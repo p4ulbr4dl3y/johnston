@@ -35,6 +35,10 @@ def test_is_sandbox_supported():
         assert get_sandbox_backend_name() == "bubblewrap"
 
     with patch("platform.system", return_value="Windows"):
+        assert is_sandbox_supported() is True
+        assert get_sandbox_backend_name() == "windows_safer"
+
+    with patch("platform.system", return_value="FreeBSD"):
         assert is_sandbox_supported() is False
         assert get_sandbox_backend_name() == "none"
 
@@ -57,8 +61,16 @@ def test_build_sandboxed_command_linux():
         assert "echo 1" in args[-1]
 
 
-def test_build_sandboxed_command_unsupported():
+def test_build_sandboxed_command_windows():
     with patch("platform.system", return_value="Windows"):
+        exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="C:\\test_dir")
+        assert sandboxed is True
+        assert "win_sandbox_runner" in args[1]
+        assert "echo 1" in args[-1]
+
+
+def test_build_sandboxed_command_unsupported():
+    with patch("platform.system", return_value="FreeBSD"):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
         assert sandboxed is False
         assert "echo 1" in args[-1]

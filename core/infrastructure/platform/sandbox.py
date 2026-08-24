@@ -24,6 +24,8 @@ def is_sandbox_supported() -> bool:
         return os.path.exists(_SEATBELT_EXE)
     if platform.system() == "Linux":
         return shutil.which("bwrap") is not None
+    if platform.system() == "Windows":
+        return True
     return False
 
 
@@ -33,6 +35,8 @@ def get_sandbox_backend_name() -> str:
         return "seatbelt"
     if platform.system() == "Linux" and shutil.which("bwrap") is not None:
         return "bubblewrap"
+    if platform.system() == "Windows":
+        return "windows_safer"
     return "none"
 
 
@@ -58,17 +62,16 @@ def is_path_writable_in_sandbox(
     target_abs = os.path.realpath(os.path.abspath(path))
     workspace = os.path.realpath(os.path.abspath(cwd or os.getcwd()))
 
-    allowed_roots = [workspace, "/tmp", "/private/tmp", "/dev"]
+    raw_roots = [workspace, "/tmp", "/private/tmp", "/dev"]
     sys_temp = tempfile.gettempdir()
     if sys_temp:
-        allowed_roots.append(os.path.realpath(os.path.abspath(sys_temp)))
+        raw_roots.append(sys_temp)
 
     if extra_writable_roots:
-        for p in extra_writable_roots:
-            allowed_roots.append(os.path.realpath(os.path.abspath(p)))
+        raw_roots.extend(extra_writable_roots)
 
-    for root in allowed_roots:
-        clean_root = root.rstrip(os.sep)
+    for r in raw_roots:
+        clean_root = os.path.realpath(os.path.abspath(r)).rstrip(os.sep)
         if target_abs == clean_root or target_abs.startswith(clean_root + os.sep):
             return True
     return False
@@ -216,5 +219,14 @@ def build_sandboxed_command(
         bwrap_args.extend(["--", shell, "-c", command])
         return (bwrap, bwrap_args, True)
 
-    # Windows or unsupported platform: no wrapping
+    if platform.system() == "Windows":
+        import sys
+
+        return (
+            sys.executable,
+            ["-m", "core.infrastructure.platform.win_sandbox_runner", command],
+            True,
+        )
+
+    # Unsupported platform: no wrapping
     return (shell, ["-c", command], False)
