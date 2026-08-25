@@ -13,7 +13,6 @@ from widgets.utils.message_visibility import is_ui_visible_user_message
 class SubagentViewScreen(Screen[None]):
     """Full-screen view of a subagent's chat without input panel."""
 
-    ALLOW_SELECT = False
     inherit_bindings = False
     BINDINGS = expand_bindings([
         ("escape", "close", "Close Screen"),

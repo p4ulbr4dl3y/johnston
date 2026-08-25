@@ -381,6 +381,23 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
                 screen.action_quit_app()
                 mock_exit.assert_called_once()
 
+    async def test_subagent_screen_allows_selection(self):
+        sess = self._mk("task-sel-test", "Sel Agent", "Prompt to select")
+        sess.add_event({"type": "bot", "text": "Bot response to select", "final": True})
+        screen = SubagentViewScreen("task-sel-test")
+        self.assertTrue(screen.allow_select)
+
+        app = DummyHostApp(screen, store=self.store)
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            from widgets.presentation.widgets.chat_messages import BotMessage, UserMessage
+
+            bm = screen.query_one(BotMessage)
+            um = screen.query_one(UserMessage)
+            self.assertTrue(bm.allow_select)
+            self.assertTrue(um.allow_select)
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -29,6 +29,93 @@ def apply_textual_patches() -> None:
 
     Screen._forward_event = _safe_forward_event
 
+    from functools import partial
+    from typing import Literal
+
+    from textual import constants
+    from textual.geometry import Offset
+    from textual.selection import SelectEnd, SelectStart
+
+    def _new_pointer_start_offset(self: SelectStart) -> Offset:
+        return (
+            self.container.region.offset
+            + self.container_pointer_delta
+            - (self.container.scroll_offset - self.container_initial_scroll_offset)
+        )
+
+    SelectStart.pointer_start_offset = property(_new_pointer_start_offset)
+
+    def _get_scroll_container_for(widget: Widget | None) -> Widget | None:
+        if widget is None:
+            return None
+        for ancestor in widget.ancestors_with_self:
+            if isinstance(ancestor, Widget) and ancestor.allow_vertical_scroll and ancestor.is_scrollable:
+                return ancestor
+        return None
+
+    def _patched_start_auto_scroll(
+        self: Screen, widget: Widget, direction: Literal[+1, -1], speed: float = 1.0
+    ) -> None:
+        assert speed > 0
+
+        def _auto_scroll_y(w: Widget, d: float) -> None:
+            if self._select_state is not None:
+                w.scroll_y += d
+                w.scroll_target_y = w.scroll_y
+                if hasattr(self, "_last_select_mouse_coord"):
+                    mx, my = self._last_select_mouse_coord
+                    reg = w.content_region
+                    sy = max(reg.y, min(reg.bottom - 1, int(my)))
+                    sx = max(reg.x, min(reg.right - 1, int(mx)))
+                    sw, so = self.get_widget_and_offset_at(sx, sy)
+                    if sw is not None:
+                        cw = sw
+                        co = so
+                        cont = cw if isinstance(cw, Screen) else cw.parent
+                        self._select_state = self._select_state.update_end(
+                            Offset(sx, sy),
+                            SelectEnd(cont, cw, co),
+                        )
+                self._update_select()
+
+        self._stop_auto_scroll()
+        lines_to_scroll = direction * (getattr(self.app, "SELECT_AUTO_SCROLL_SPEED", 60.0) / constants.MAX_FPS) * speed
+        callback = partial(_auto_scroll_y, widget, lines_to_scroll)
+        callback()
+        self._auto_select_scroll_timer = self.set_interval(1 / constants.MAX_FPS, callback)
+
+    Screen._start_auto_scroll = _patched_start_auto_scroll
+
+    def _patched_check_auto_scroll(
+        self: Screen, select_widget: Widget, mouse_coord: tuple[float, float], delta_y: float
+    ) -> None:
+        if not getattr(self.app, "ENABLE_SELECT_AUTO_SCROLL", True) or self._select_state is None:
+            return
+        self._last_select_mouse_coord = mouse_coord
+        mx, my = mouse_coord
+        start_w = self._select_state.start.content_widget or self._select_state.start.container
+        scroll_w = _get_scroll_container_for(start_w) or _get_scroll_container_for(select_widget)
+        if scroll_w is None:
+            self._stop_auto_scroll()
+            return
+
+        reg = scroll_w.content_region
+        lines = max(1, getattr(self.app, "SELECT_AUTO_SCROLL_LINES", 3))
+        if my >= reg.bottom - lines:
+            if scroll_w.scroll_y < scroll_w.max_scroll_y:
+                speed = 1.0 if my >= reg.bottom else max(0.2, (lines - (reg.bottom - my)) / lines)
+                self._start_auto_scroll(scroll_w, +1, speed)
+                return
+        elif my <= reg.y + lines:
+            if scroll_w.scroll_y > 0:
+                speed = 1.0 if my <= reg.y else max(0.2, (lines - (my - reg.y)) / lines)
+                self._start_auto_scroll(scroll_w, -1, speed)
+                return
+        self._stop_auto_scroll()
+
+    Screen._check_auto_scroll = _patched_check_auto_scroll
+
+
     from textual.geometry import Offset
 
     _old_get_widget_and_offset_at = getattr(Screen, "_original_get_widget_and_offset_at", Screen.get_widget_and_offset_at)

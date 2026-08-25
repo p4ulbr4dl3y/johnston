@@ -76,6 +76,73 @@ class TestPatch(unittest.TestCase):
         test_wrapper(event)
         self.assertIsNone(screen._select_state)
 
+    def test_pointer_start_offset_with_scroll(self):
+        from textual.containers import VerticalScroll
+        from textual.geometry import Offset, Region, Size
+        from textual.selection import SelectStart
+
+        apply_textual_patches()
+
+        scroll = VerticalScroll()
+        scroll._region = Region(0, 0, 80, 24)
+        scroll.virtual_size = Size(80, 100)
+        scroll.scroll_y = 5
+
+        start = SelectStart(
+            scroll,
+            Offset(5, 2),
+            Offset(0, 0),
+            Offset(0, 0),
+            None,
+            None,
+        )
+        # Content at y=2 with scroll=5 moves to y=-3
+        self.assertEqual(start.pointer_start_offset, Offset(5, -3))
+
+
+class TestPatchAsync(unittest.IsolatedAsyncioTestCase):
+    async def test_selection_auto_scroll_downwards(self):
+        from textual import events
+        from textual.app import App, ComposeResult
+        from textual.containers import Vertical, VerticalScroll
+        from textual.geometry import Offset
+        from textual.widgets import Static
+
+        apply_textual_patches()
+
+        lines = "\n".join(f"line {i}" for i in range(50))
+
+        class AutoScrollApp(App):
+            ENABLE_SELECT_AUTO_SCROLL = True
+
+            def compose(self) -> ComposeResult:
+                with Vertical():
+                    with VerticalScroll(id="scroll"):
+                        yield Static(lines, id="text")
+                    yield Static("Footer", id="footer")
+
+        app = AutoScrollApp()
+        async with app.run_test(size=(40, 10)) as pilot:
+            footer = app.query_one("#footer")
+            footer.ALLOW_SELECT = False
+            scroll = app.query_one("#scroll", VerticalScroll)
+
+            # Click near top
+            await pilot.mouse_down(offset=Offset(5, 1))
+            await pilot.pause(0.05)
+
+            # Drag towards footer line
+            app.screen._forward_event(
+                events.MouseMove(None, 5, 9, 0, 8, 1, False, False, False, 5, 9)
+            )
+            await pilot.pause(0.3)
+
+            # Scroll should have progressed down
+            self.assertGreater(scroll.scroll_y, 0)
+            # Text selection should be present and expanded
+            self.assertIn(app.query_one("#text"), app.screen.selections)
+
 
 if __name__ == "__main__":
     unittest.main()
+
