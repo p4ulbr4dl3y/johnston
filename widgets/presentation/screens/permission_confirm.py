@@ -317,15 +317,19 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         title = "Confirm Tool Action"
         base_width = modal_content_width(options=options, title=title, hint=hint, extra=MODAL_CONTENT_GUTTER)
 
+        # Cap natural language descriptions so they wrap gracefully rather than ballooning modal width
+        TEXT_DESC_CAP = 64
         max_line = 0
         if getattr(self, "_action_desc", None):
-            max_line = max(max_line, display_width(self._action_desc))
+            max_line = max(max_line, min(display_width(self._action_desc), TEXT_DESC_CAP))
 
         nargs = self.args if isinstance(self.args, dict) else {}
         target_path = nargs.get("path") or ""
 
+        is_code_or_diff = False
         content_lines: list[str] = []
         if self.tool_name == "create":
+            is_code_or_diff = True
             file_exists = bool(target_path and os.path.isfile(target_path))
             if file_exists or self.diff:
                 diff_text = self._build_diff_text(target_path)
@@ -334,18 +338,23 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 code_content = nargs.get("content") or ""
                 content_lines = code_content.splitlines()
         elif self.tool_name == "edit" or self.diff:
+            is_code_or_diff = True
             diff_text = self._build_diff_text(target_path)
             content_lines = diff_text.splitlines()
         elif self.tool_name == "shell":
+            is_code_or_diff = True
             cmd = nargs.get("command") or ""
             content_lines = cmd.splitlines()
         elif self.tool_name == "manage_shell" and (nargs.get("action") or "").lower() == "send_input":
+            is_code_or_diff = True
             inp = nargs.get("input") or ""
             content_lines = inp.splitlines()
         elif self.tool_name == "manage_subagent" and (nargs.get("action") or "").lower() == "send_message":
+            is_code_or_diff = False
             msg = nargs.get("message") or ""
             content_lines = msg.splitlines()
         elif self.tool_name == "invoke_subagent":
+            is_code_or_diff = False
             prompt = nargs.get("prompt") or ""
             content_lines = prompt.splitlines()
         elif self.args and self.tool_name not in (
@@ -358,14 +367,17 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             "update_plan",
             "ask_user",
         ):
+            is_code_or_diff = True
             try:
                 args_str = json.dumps(self.args, indent=2, ensure_ascii=False)
                 content_lines = args_str.splitlines()
             except Exception:
                 pass
 
+        line_cap = 104 if is_code_or_diff else TEXT_DESC_CAP
         for line in content_lines[:200]:
-            max_line = max(max_line, display_width(line.rstrip()) + 4)
+            line_w = min(display_width(line.rstrip()) + 4, line_cap)
+            max_line = max(max_line, line_w)
 
         return max(base_width, max_line + MODAL_CONTENT_GUTTER)
 

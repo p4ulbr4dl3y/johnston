@@ -323,6 +323,20 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         w_long = screen_long._calculate_content_width()
         self.assertGreater(w_long, 100)
 
+    def test_content_width_calculation_subagent_prompt_capped(self):
+        screen_prompt = PermissionConfirmScreen(
+            "invoke_subagent",
+            {
+                "title": "Audit permission handlers",
+                "type": "Codebase Researcher",
+                "prompt": "Analyze all references to PermissionConfirmScreen across tests and widgets.",
+            },
+        )
+        w = screen_prompt._calculate_content_width()
+        # Text descriptions and prompts are capped to ~64 + gutter, avoiding 100+ ballooning
+        self.assertLessEqual(w, 75)
+        self.assertGreaterEqual(w, 52)
+
     async def test_adaptive_modal_width_applied_on_mount(self):
         screen = PermissionConfirmScreen("shell", {"command": "git status"})
         async with HostApp(screen).run_test(size=(120, 40)) as pilot:
