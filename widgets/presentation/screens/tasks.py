@@ -266,6 +266,9 @@ class BaseTasksListScreen(BaseModalScreen[None]):
 
     def _update_hint(self) -> None:
         try:
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
             opt_list = self._get_option_list()
             hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
             idx = opt_list.highlighted
@@ -274,10 +277,21 @@ class BaseTasksListScreen(BaseModalScreen[None]):
                 item = self.filtered_tasks[idx]
                 if item and item.get("is_running"):
                     is_running = True
-            if is_running:
-                hint.update(f"{self.hint_action_name} • ↑↓: nav • k: kill • esc: close")
+
+            action_short = self.hint_action_name.split(":")[0]
+            if is_compact:
+                hint_str = (
+                    f"{action_short} • k: kill • esc"
+                    if is_running
+                    else f"{action_short} • ↑↓ • esc"
+                )
             else:
-                hint.update(f"{self.hint_action_name} • ↑↓: nav • esc: close")
+                hint_str = (
+                    f"{self.hint_action_name} • ↑↓: nav • k: kill • esc: close"
+                    if is_running
+                    else f"{self.hint_action_name} • ↑↓: nav • esc: close"
+                )
+            hint.update(hint_str)
         except Exception:
             pass
 

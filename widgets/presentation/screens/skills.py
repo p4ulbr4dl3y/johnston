@@ -14,6 +14,7 @@ from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
+    MODAL_HINT,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
     MODAL_MARKDOWN_CENTERED,
@@ -137,6 +138,12 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
                 if s is not None:
                     opt_list.highlighted = i
                     break
+
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
+            hint_lbl = self.query_one(MODAL_HINT, Label)
+            hint_lbl.update("enter • space/tab: toggle • esc" if is_compact else "enter: select • space/tab: toggle • esc: close")
         except Exception:
             pass
 

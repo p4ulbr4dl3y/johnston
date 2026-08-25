@@ -232,12 +232,11 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                     highlight_idx = 0
                     input_field.value = ""
 
-                dialog_width = 86
-                if self.is_mounted and self.app and getattr(self.app, "size", None):
-                    raw_w = getattr(self.app.size, "width", 86)
-                    if isinstance(raw_w, int) and raw_w > 0:
-                        dialog_width = min(raw_w, 86)
-                wrap_width = max(36, dialog_width - 14)
+                from widgets.utils.responsive import MODAL_CONTENT_GUTTER, MODAL_WIDTH_RATIO, resolve_screen_width
+
+                screen_w = resolve_screen_width(self)
+                avail_w = int(screen_w * MODAL_WIDTH_RATIO) - MODAL_CONTENT_GUTTER
+                wrap_width = max(20, min(78, avail_w))
                 has_multi = any(len(o) + 4 > wrap_width for o in self.options)
 
                 for idx, opt in enumerate(self.options):
@@ -279,30 +278,49 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
 
     def _update_wizard_hint(self) -> None:
         try:
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            screen_w = resolve_screen_width(self)
+            is_compact = screen_w < BREAKPOINT_HINT
+
             hint = self.query_one(MODAL_HINT, Label)
             if self.q_idx >= len(self.questions):
-                hint.update("enter: confirm • ←: back • esc: cancel")
+                hint.update("enter • ← • esc" if is_compact else "enter: confirm • ←: back • esc: cancel")
                 return
 
             q = self.questions[self.q_idx] if 0 <= self.q_idx < len(self.questions) else {}
             is_multi = bool(q.get("is_multi_select", False))
-            is_last = (self.q_idx == len(self.questions) - 1)
+            is_last = self.q_idx == len(self.questions) - 1
             action = "confirm" if is_last else "next"
 
             input_field = self.query_one(WRITE_IN_INPUT, Input)
             is_write_in = input_field.display and input_field.has_focus
 
             back_part = "←: back • " if self.q_idx > 0 else ""
+            back_part_compact = "← • " if self.q_idx > 0 else ""
 
             if not self.raw_options:
-                hint.update(f"enter: {action} • {back_part}tab: min • esc: cancel")
+                hint.update(
+                    f"enter • {back_part_compact}esc"
+                    if is_compact
+                    else f"enter: {action} • {back_part}tab: min • esc: cancel"
+                )
                 return
 
             if is_write_in:
-                hint.update(f"enter: {action} • ↑: list • {back_part}tab: min • esc: cancel")
+                hint.update(
+                    f"enter • ↑ • {back_part_compact}esc"
+                    if is_compact
+                    else f"enter: {action} • ↑: list • {back_part}tab: min • esc: cancel"
+                )
             else:
                 space_part = "space: toggle • " if is_multi else ""
-                hint.update(f"enter: {action} • {space_part}{back_part}tab: min • esc: cancel")
+                space_part_compact = "space • " if is_multi else ""
+                hint.update(
+                    f"enter • {space_part_compact}{back_part_compact}esc"
+                    if is_compact
+                    else f"enter: {action} • {space_part}{back_part}tab: min • esc: cancel"
+                )
         except Exception:
             pass
 

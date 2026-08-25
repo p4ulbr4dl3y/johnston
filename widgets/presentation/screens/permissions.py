@@ -13,6 +13,7 @@ from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
+    MODAL_HINT,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
     MODAL_MARKDOWN_CENTERED,
@@ -232,6 +233,15 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             opt_list.highlighted = prev_highlighted
         elif self.filtered_items:
             opt_list.highlighted = self._first_selectable_index()
+
+        try:
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
+            hint_lbl = self.query_one(MODAL_HINT, Label)
+            hint_lbl.update("enter/tab: toggle • esc" if is_compact else "enter/space/tab: toggle • ↑↓: nav • esc: close")
+        except Exception:
+            pass
 
     def _cycle_action(self, current: str) -> str:
         cur = current.lower()

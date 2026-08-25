@@ -52,12 +52,30 @@ KEYBINDINGS_DATA: list[tuple[str, str]] = [
 ]
 
 
-def _build_help_table(items: list[tuple[str, str]]) -> Table:
-    table = Table.grid(expand=True, padding=(0, 2))
+def _format_help_key(key: str, is_compact: bool) -> str:
+    if not is_compact:
+        return key
+    replacements = {
+        "Shift+PgUp / Shift+PgDn": "S-PgUp/Dn",
+        "PageUp / PgDn": "PgUp/Dn",
+        "Shift+Tab": "S-Tab",
+        "Ctrl+Enter": "C-Enter",
+        "Ctrl+C / Ctrl+Q": "C-C/C-Q",
+        "Ctrl+B": "C-B",
+        "Ctrl+O": "C-O",
+        "Ctrl+V": "C-V",
+        "Ctrl+X": "C-X",
+        "Ctrl+D": "C-D",
+    }
+    return replacements.get(key, key)
+
+
+def _build_help_table(items: list[tuple[str, str]], is_compact: bool = False) -> Table:
+    table = Table.grid(expand=True, padding=(0, 1 if is_compact else 2))
     table.add_column(style="bold #f4f4f5", no_wrap=True)
     table.add_column(style="#a1a1aa")
     for key, desc in items:
-        table.add_row(key, desc)
+        table.add_row(_format_help_key(key, is_compact), desc)
     return table
 
 
@@ -81,7 +99,24 @@ class HelpScreen(BaseModalScreen[None]):
         return "[#71717a]  Commands  [/]   [bold #ffffff on #27272a]  Keybindings  [/]"
 
     def _get_active_table(self) -> Table:
-        return _build_help_table(KEYBINDINGS_DATA if self.active_tab == 1 else COMMANDS_DATA)
+        from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+        is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
+        return _build_help_table(
+            KEYBINDINGS_DATA if self.active_tab == 1 else COMMANDS_DATA, is_compact=is_compact
+        )
+
+    def _apply_dialog_fit(self) -> None:
+        try:
+            from widgets.utils.responsive import apply_modal_fit, modal_content_width
+
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+            # Max width across commands/keybindings
+            sample_items = [f"{k}    {d}" for k, d in COMMANDS_DATA + KEYBINDINGS_DATA]
+            content_w = modal_content_width(sample_items, "### **Johnston Help**", "tab / ←→: switch • esc: close")
+            apply_modal_fit(dialog, content_w, min_width=48, max_width=78)
+        except Exception:
+            pass
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
@@ -94,13 +129,33 @@ class HelpScreen(BaseModalScreen[None]):
             yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
             yield Label("tab / ←→: switch • esc: close", id=MODAL_HINT_ID)
 
-    async def _on_key(self, event: events.Key) -> None:
-        if event.key in ("left", "right", "tab", "backtab"):
-            self.active_tab = 1 if self.active_tab == 0 else 0
+    def on_mount(self) -> None:
+        self._apply_dialog_fit()
+        self._refresh_view()
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._apply_dialog_fit()
+        self._refresh_view()
+
+    def _refresh_view(self) -> None:
+        try:
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
             tabs_static = self.query_one("#help-tabs", Static)
             tabs_static.update(self._get_tabs_markup())
             body_static = self.query_one("#help-body", Static)
             body_static.update(self._get_active_table())
+
+            hint_lbl = self.query_one(f"#{MODAL_HINT_ID}", Label)
+            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
+            hint_lbl.update("tab/←→: switch • esc" if is_compact else "tab / ←→: switch • esc: close")
+        except Exception:
+            pass
+
+    async def _on_key(self, event: events.Key) -> None:
+        if event.key in ("left", "right", "tab", "backtab"):
+            self.active_tab = 1 if self.active_tab == 0 else 0
+            self._refresh_view()
             event.prevent_default()
             event.stop()
             return

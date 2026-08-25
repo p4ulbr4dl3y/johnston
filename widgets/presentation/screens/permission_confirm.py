@@ -285,7 +285,10 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             self._option_keys = ["allow"]
 
             if self.suggested_pattern:
-                pat_escaped = escape(self.suggested_pattern)
+                pat_clean = " ".join(self.suggested_pattern.split())
+                if len(pat_clean) > 36:
+                    pat_clean = pat_clean[:33] + "..."
+                pat_escaped = escape(pat_clean)
                 options.append(f"Allow pattern [dim]({pat_escaped})[/dim]")
                 self._option_keys.append(f"pattern:{self.suggested_pattern}")
 

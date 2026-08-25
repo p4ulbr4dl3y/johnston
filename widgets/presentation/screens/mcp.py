@@ -15,6 +15,7 @@ from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
+    MODAL_HINT,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
     MODAL_MARKDOWN_CENTERED,
@@ -246,6 +247,15 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             else:
                 stag = status_tag("ERR") if (not cmd and not url) else status_tag("ON")
                 opt_list.add_option(_row(stag, name))
+
+        try:
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
+            hint_lbl = self.query_one(MODAL_HINT, Label)
+            hint_lbl.update("enter/tab: toggle • esc" if is_compact else "enter/space/tab: toggle • ↑↓: nav • esc: close")
+        except Exception:
+            pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == MODAL_SEARCH_INPUT_ID:

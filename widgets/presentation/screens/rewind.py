@@ -109,12 +109,27 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             options.append(opt)
         return options
 
+    def _format_step2_options(self, target_width: int) -> list[str]:
+        raw_step2 = [
+            ("Rollback conversation & files", "revert code"),
+            ("Rollback conversation only", "keep current code"),
+            ("View changes diff", "inspect code changes"),
+        ]
+        return [format_badge_row(title, badge, target_width=target_width) for title, badge in raw_step2]
+
     def _refresh_step1_options(self) -> None:
         if self.step != 1:
             return
+        self._refresh_options()
+
+    def _refresh_options(self) -> None:
         target_w = self._row_width()
-        self.raw_options = self._format_step1_options(target_w)
-        self.filtered_options = list(self.raw_options)
+        if self.step == 1:
+            self.raw_options = self._format_step1_options(target_w)
+            self.filtered_options = list(self.raw_options)
+        else:
+            self.filtered_options = self._format_step2_options(target_w)
+
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
             saved_idx = opt_list.highlighted
@@ -122,6 +137,19 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             opt_list.add_options(self.filtered_options)
             if saved_idx is not None and 0 <= saved_idx < len(self.filtered_options):
                 opt_list.highlighted = saved_idx
+        except Exception:
+            pass
+
+        try:
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            screen_w = resolve_screen_width(self)
+            hint_lbl = self.query_one(MODAL_HINT, Label)
+            if self.step == 1:
+                h_text = "enter • ↑↓ • esc" if screen_w < BREAKPOINT_HINT else self.hint_text
+            else:
+                h_text = "enter • ↑↓ • esc: back" if screen_w < BREAKPOINT_HINT else "enter: select • ↑↓: nav • esc: back to messages"
+            hint_lbl.update(h_text)
         except Exception:
             pass
 
@@ -147,10 +175,10 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             except Exception:
                 pass
         opt_list.focus()
-        self._refresh_step1_options()
+        self._refresh_options()
 
     def on_resize(self, event: events.Resize) -> None:
-        self._refresh_step1_options()
+        self._refresh_options()
 
     def _show_step_2(self, entry: RewindEntry) -> None:
         self.step = 2
@@ -177,28 +205,12 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         except Exception:
             pass
 
-        step2_options = [
-            "Rollback conversation & files [dim #71717a](revert code)[/]",
-            "Rollback conversation only [dim #71717a](keep current code)[/]",
-            "View changes diff [dim #71717a](inspect code changes)[/]",
-        ]
-        step2_actions = ["both", "conversation", "diff"]
-
-        self.filtered_options = step2_options
-        self.filtered_items = step2_actions
-
+        self.filtered_items = ["both", "conversation", "diff"]
+        self._refresh_options()
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
-            opt_list.clear_options()
-            opt_list.add_options(step2_options)
             opt_list.highlighted = 0
             opt_list.focus()
-        except Exception:
-            pass
-
-        try:
-            hint = self.query_one(MODAL_HINT, Label)
-            hint.update("enter: select • ↑↓: nav • esc: back to messages")
         except Exception:
             pass
 

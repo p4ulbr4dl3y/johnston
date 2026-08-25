@@ -9,7 +9,7 @@ from core.models_catalog import catalog, format_context_tokens
 from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
-from widgets.utils.responsive import is_compact_width, resolve_width
+from widgets.utils.responsive import BREAKPOINT_COMPACT, is_compact_width, resolve_width
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
 STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
@@ -329,7 +329,8 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             # Row 1 (LLM): ⠋ Action • claude-3.7  <left> | <right> 45% ctx • $0.02
             row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
             if is_connected and clean_model and clean_model != "[Select model: /models]":
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/]")
+                disp_model = clean_model if len(clean_model) <= 18 else clean_model[:17] + "…"
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{disp_model}[/]")
             row1_left = STATUS_SEP_COMPACT.join(row1_left_parts)
 
             if is_connected and bool(model_name):
@@ -691,23 +692,13 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
             else:
                 role_formatted = role_str
 
-            app_width = 80
-            try:
-                if cur_app and getattr(cur_app, "size", None):
-                    raw_w = getattr(cur_app.size, "width", 80)
-                    if isinstance(raw_w, int):
-                        app_width = raw_w
-            except Exception:
-                pass
-
-            raw_size_w = getattr(getattr(self, "size", None), "width", 0)
-            size_w = raw_size_w if isinstance(raw_size_w, int) else 0
-            width = size_w if size_w > 0 else app_width
+            width = resolve_width(self)
+            is_compact = is_compact_width(width, breakpoint=BREAKPOINT_COMPACT)
 
             role_part = f"[bold {THEME_PRIMARY}]{role_formatted}[/]"
             description = (getattr(session, "description", "") or "").strip()
             if description:
-                max_desc = max(15, width - len(role_str) - 20)
+                max_desc = max(8, width - len(role_str) - (12 if is_compact else 22))
                 if len(description) > max_desc:
                     clean_desc = description[: max_desc - 1] + "…"
                 else:
@@ -715,7 +706,11 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
                 role_part += f": [{THEME_SECONDARY}]{clean_desc}[/]"
 
             row_left = role_part
-            esc_label = "esc: back" if getattr(self, "from_tasks", False) else "esc: close"
+            esc_label = (
+                "esc: back"
+                if getattr(self, "from_tasks", False)
+                else ("esc" if is_compact else "esc: close")
+            )
             row_right = f"[{THEME_MUTED}]{esc_label}[/{THEME_MUTED}]"
 
             grid.add_row(row_left, row_right)

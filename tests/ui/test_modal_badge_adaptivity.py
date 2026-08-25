@@ -89,18 +89,24 @@ class TestRewindScreenAdaptivity(unittest.TestCase):
         self.assertEqual(display_width(plain0), 48)
         self.assertIn("2 files (+10 -2)", plain0)
 
-    def test_on_resize_refreshes_step1_only(self):
+    def test_on_resize_refreshes_step1_and_step2(self):
         screen = RewindScreen(self.messages, checkpoints_enabled=True)
-        screen._refresh_step1_options = MagicMock()
+        screen._refresh_options = MagicMock()
 
         screen.on_resize(MagicMock(spec=events.Resize))
-        screen._refresh_step1_options.assert_called_once()
+        screen._refresh_options.assert_called_once()
 
-        # When step == 2, _refresh_step1_options does not overwrite step 2 options
-        screen.step = 2
-        screen.raw_options = ["step2 option"]
-        screen._refresh_step1_options()
-        self.assertEqual(screen.raw_options, ["step2 option"])
+        # Step 2 formats options with badge row
+        screen2 = RewindScreen(self.messages, checkpoints_enabled=True)
+        screen2.step = 2
+        screen2.filtered_items = ["both", "conversation", "diff"]
+        opt_list = MagicMock()
+        opt_list.size.width = 50
+        opt_list.highlighted = 0
+        screen2.query_one = MagicMock(return_value=opt_list)
+        screen2._refresh_options()
+        self.assertEqual(len(screen2.filtered_options), 3)
+        self.assertIn("revert code", screen2.filtered_options[0])
 
 
 class TestTasksScreenAdaptivity(unittest.TestCase):
