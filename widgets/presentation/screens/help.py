@@ -71,9 +71,9 @@ def _format_help_key(key: str, is_compact: bool) -> str:
 
 
 def _build_help_table(items: list[tuple[str, str]], is_compact: bool = False) -> Table:
-    table = Table.grid(expand=True, padding=(0, 1 if is_compact else 2))
+    table = Table.grid(expand=True, padding=(0, 2 if not is_compact else 1))
     table.add_column(style="bold #f4f4f5", no_wrap=True)
-    table.add_column(style="#a1a1aa")
+    table.add_column(style="#a1a1aa", ratio=1)
     for key, desc in items:
         table.add_row(_format_help_key(key, is_compact), desc)
     return table
@@ -111,15 +111,15 @@ class HelpScreen(BaseModalScreen[None]):
             from widgets.utils.responsive import apply_modal_fit, modal_content_width
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-            # Max width across commands/keybindings
-            sample_items = [f"{k}    {d}" for k, d in COMMANDS_DATA + KEYBINDINGS_DATA]
+            # Max width across commands/keybindings with generous column gap
+            sample_items = [f"{k}        {d}" for k, d in COMMANDS_DATA + KEYBINDINGS_DATA]
             content_w = modal_content_width(sample_items, "### **Johnston Help**", "tab / ←→: switch • esc: close")
-            apply_modal_fit(dialog, content_w, min_width=48, max_width=78)
+            apply_modal_fit(dialog, content_w, min_width=64, max_width=86)
         except Exception:
             pass
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
             yield Markdown(
                 "### **Johnston Help**",
                 id="help-header-md",
