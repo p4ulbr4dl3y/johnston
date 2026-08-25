@@ -67,6 +67,7 @@ def _build_subagent_grid(
     git_diff_stats,
     is_compact: bool = False,
     sandbox_enabled: bool = True,
+    execution_mode: str = "review",
 ) -> tuple[Table, list[tuple[str, str]]]:
     """Shared subagent-status table builder (2-line layout, with compact support)."""
     grid = Table.grid(expand=True)
@@ -90,7 +91,7 @@ def _build_subagent_grid(
         else:
             row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
 
-        # Row 2 (Compact): Left [dir • branch (+N/-M) • sb:on] | Right []
+        # Row 2 (Compact): Left [dir • branch (+N/-M) • sb:on • mode] | Right []
         dir_basename = os.path.basename(os.path.abspath(directory)) or directory
         row2_left_parts = [f"[{THEME_SECONDARY}]{dir_basename}[/]"]
         diff_text = git_diff_stats()
@@ -101,6 +102,8 @@ def _build_subagent_grid(
         elif diff_text:
             row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
         row2_left_parts.append(f"[{THEME_PRIMARY}]sb:on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sb:off[/]")
+        if execution_mode:
+            row2_left_parts.append(f"[{THEME_SECONDARY}]{execution_mode}[/]")
         row2_left = STATUS_SEP_COMPACT.join(row2_left_parts)
         row2_right = ""
 
@@ -142,7 +145,7 @@ def _build_subagent_grid(
         row1_right = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
     grid.add_row(row1_left, row1_right)
 
-    # Row 2: Left [directory • branch (+N/-M) • sandbox: on] | Right []
+    # Row 2: Left [directory • branch (+N/-M) • sandbox: on • mode] | Right []
     dir_text = format_display_path(directory)
     row2_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
     diff_text = git_diff_stats()
@@ -153,6 +156,8 @@ def _build_subagent_grid(
     elif diff_text:
         row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
     row2_left_parts.append(f"[{THEME_PRIMARY}]sandbox: on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sandbox: off[/]")
+    if execution_mode:
+        row2_left_parts.append(f"[{THEME_SECONDARY}]{execution_mode}[/]")
     row2_left = STATUS_SEP.join(row2_left_parts)
 
     row2_right = ""
@@ -294,6 +299,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
         mcp_total: int = 0,
         attachments_count: int = 0,
         sandbox_enabled: bool = False,
+        execution_mode: str = "review",
     ) -> None:
         if not directory:
             directory = os.getcwd()
@@ -343,7 +349,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             else:
                 row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
 
-            # Row 2 (Env): johnston • main (+3/-1) • sb:on  <left> | <right> ⚡ 2a • 1s
+            # Row 2 (Env): johnston • main (+3/-1) • sb:on • mode  <left> | <right> ⚡ 2a • 1s
             dir_basename = os.path.basename(os.path.abspath(directory)) or directory
             row2_left_parts = [f"[{THEME_SECONDARY}]{dir_basename}[/]"]
             if branch and diff_text:
@@ -353,6 +359,8 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             elif diff_text:
                 row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
             row2_left_parts.append(f"[{THEME_PRIMARY}]sb:on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sb:off[/]")
+            if execution_mode:
+                row2_left_parts.append(f"[{THEME_SECONDARY}]{execution_mode}[/]")
             row2_left = STATUS_SEP_COMPACT.join(row2_left_parts)
 
             task_parts = []
@@ -408,7 +416,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             else:
                 row1_right = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
 
-            # Row 2 (Env): ~/repo/johnston • main (+12/-3) • sandbox: on  <left> | <right> ⚡ 2 agents • 1 shell • 4 MCP
+            # Row 2 (Env): ~/repo/johnston • main (+12/-3) • sandbox: on • mode  <left> | <right> ⚡ 2 agents • 1 shell • 4 MCP
             max_path_len = min(50, max(25, width // 3))
             dir_text = format_display_path(directory, max_length=max_path_len)
             row2_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
@@ -419,6 +427,8 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             elif diff_text:
                 row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
             row2_left_parts.append(f"[{THEME_PRIMARY}]sandbox: on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sandbox: off[/]")
+            if execution_mode:
+                row2_left_parts.append(f"[{THEME_SECONDARY}]{execution_mode}[/]")
             row2_left = STATUS_SEP.join(row2_left_parts)
 
             service_parts = []

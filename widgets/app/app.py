@@ -30,7 +30,8 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         ("ctrl+q", "quit", "Exit"),
         ("ctrl+b", "background_all", "Background All"),
         ("ctrl+o", "toggle_expand", "Toggle Expand"),
-        ("shift+tab", "toggle_role", "Toggle Role"),
+        ("tab", "toggle_role", "Toggle Role"),
+        ("shift+tab", "toggle_mode", "Toggle Mode"),
     ])
 
     def __init__(self, resume_session_id: str | None = None):

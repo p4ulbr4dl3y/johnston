@@ -10,7 +10,6 @@ from widgets.commands import (
     BaseCommand,
     CompactCommand,
     ModelsCommand,
-    PermissionsCommand,
     ProvidersCommand,
     QuestionsCommand,
     ResumeCommand,
@@ -1406,12 +1405,6 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0)
         self.assertFalse(app.is_generating)
         self.assertEqual(processed, [("next-prompt", True)])
-
-    async def test_permissions_command_pushes_screen(self):
-        app = SimpleApp()
-        with patch.object(app, "push_screen") as ps:
-            await PermissionsCommand().execute(app)
-        ps.assert_called_once()
 
     async def test_questions_wizard_active(self):
         app = SimpleApp()

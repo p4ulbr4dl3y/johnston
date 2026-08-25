@@ -19,35 +19,71 @@ class TestPermissionManager(unittest.TestCase):
         self.config_patcher.stop()
 
     def test_default_permissions(self):
-        # Builtin read defaults to 'allow' (default action is allow)
+        # Builtin read defaults to 'allow'
         action = self.pm.check_permission("read").action
         self.assertEqual(action, "allow")
 
-        # Builtin create explicitly defaults to 'ask'
+        # Builtin create defaults to 'ask' in review mode
         action = self.pm.check_permission("create").action
         self.assertEqual(action, "ask")
 
-        # Builtin edit explicitly defaults to 'ask'
+        # Builtin edit defaults to 'ask' in review mode
         action = self.pm.check_permission("edit").action
         self.assertEqual(action, "ask")
 
-        # Builtin shell explicitly defaults to 'ask'
+        # Builtin shell defaults to 'ask' in review mode
         action = self.pm.check_permission("shell", {"command": "ls"}).action
         self.assertEqual(action, "ask")
 
-        # Other builtin tools fall back to the default 'allow'
+        # In review mode, web_fetch is 'ask'
         action = self.pm.check_permission("web_fetch").action
-        self.assertEqual(action, "allow")
+        self.assertEqual(action, "ask")
+
+        # ask_user and manage tools are 'allow'
         action = self.pm.check_permission("ask_user").action
         self.assertEqual(action, "allow")
+        action = self.pm.check_permission("manage_shell", {"action": "list"}).action
+        self.assertEqual(action, "allow")
 
-    def test_mcp_tools_default_allow(self):
-        # MCP tools (not in the builtin registry) default to 'allow'
+    def test_execution_modes(self):
+        # 1. Review mode
+        self.pm.set_session_mode("review")
+        self.assertEqual(self.pm.check_permission("create").action, "ask")
+        self.assertEqual(self.pm.check_permission("edit").action, "ask")
+        self.assertEqual(self.pm.check_permission("shell").action, "ask")
+        self.assertEqual(self.pm.check_permission("web_fetch").action, "ask")
+        self.assertEqual(self.pm.check_permission("mcp_custom_tool").action, "ask")
+        self.assertEqual(self.pm.check_permission("read").action, "allow")
+
+        # 2. Edits mode
+        self.pm.set_session_mode("edits")
+        self.assertEqual(self.pm.check_permission("create").action, "allow")
+        self.assertEqual(self.pm.check_permission("edit").action, "allow")
+        self.assertEqual(self.pm.check_permission("shell").action, "ask")
+        self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
+        self.assertEqual(self.pm.check_permission("mcp_custom_tool").action, "allow")
+        self.assertEqual(self.pm.check_permission("read").action, "allow")
+
+        # 3. YOLO mode
+        self.pm.set_session_mode("yolo")
+        self.assertEqual(self.pm.check_permission("create").action, "allow")
+        self.assertEqual(self.pm.check_permission("edit").action, "allow")
+        self.assertEqual(self.pm.check_permission("shell").action, "allow")
+        self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
+        self.assertEqual(self.pm.check_permission("mcp_custom_tool").action, "allow")
+        self.assertEqual(self.pm.check_permission("read").action, "allow")
+
+    def test_mcp_tools_mode_baseline(self):
+        # In review mode, MCP tools default to 'ask'
+        self.pm.set_session_mode("review")
         decision = self.pm.check_permission("gh__search")
-        self.assertEqual(decision.action, "allow")
-        self.assertIn("MCP tool default", decision.reason)
+        self.assertEqual(decision.action, "ask")
 
-        # An explicit config entry still wins over the MCP default
+        # In edits and yolo, MCP tools default to 'allow'
+        self.pm.set_session_mode("edits")
+        self.assertEqual(self.pm.check_permission("gh__search").action, "allow")
+
+        # An explicit config entry still wins over the MCP mode default
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
@@ -58,11 +94,12 @@ class TestPermissionManager(unittest.TestCase):
 
     def test_session_override(self):
         action_before = self.pm.check_permission("web_fetch").action
-        self.assertEqual(action_before, "allow")
+        self.assertEqual(action_before, "ask")
 
-        self.pm.set_session_override("web_fetch", "deny")
+        self.pm.set_session_override("web_fetch", "allow")
         action_after = self.pm.check_permission("web_fetch").action
-        self.assertEqual(action_after, "deny")
+        self.assertEqual(action_after, "allow")
+
 
     def test_global_tool_permissions_override(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -125,16 +162,15 @@ class TestPermissionManager(unittest.TestCase):
                 self.assertEqual(action, "ask")
 
     def test_session_override_invalid_action_ignored(self):
-        # Invalid action silently ignored per docstring; falls through to global default
+        # Invalid action silently ignored per docstring; falls through to global default / mode baseline
         self.pm.set_session_override("web_fetch", "bogus")
         action = self.pm.check_permission("web_fetch").action
-        self.assertEqual(action, "allow", "invalid session override must be ignored; falls through to config default")
+        self.assertEqual(action, "ask", "invalid session override must be ignored; falls through to mode baseline")
 
         # Valid action with whitespace normalizes correctly
         self.pm.set_session_override("web_fetch", " ALLOW ")
         action = self.pm.check_permission("web_fetch").action
         self.assertEqual(action, "allow")
-        self.assertEqual(action, "allow", "valid action with whitespace must normalize")
 
     def test_update_permission_validation(self):
         with self.assertRaises(ValueError):

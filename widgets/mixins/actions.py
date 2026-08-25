@@ -19,6 +19,25 @@ class ActionsMixin:
 
         toggle_agent_role(self)
 
+    def action_toggle_mode(self) -> None:
+        """Cycle execution mode: review -> edits -> yolo -> review"""
+        from core.domain.policies.permission_policy import ExecutionMode
+        from core.permission_manager import PermissionManager
+
+        pm = PermissionManager.get_instance()
+        cur = pm.execution_mode
+        if cur == ExecutionMode.REVIEW:
+            nxt = ExecutionMode.EDITS
+        elif cur == ExecutionMode.EDITS:
+            nxt = ExecutionMode.YOLO
+        else:
+            nxt = ExecutionMode.REVIEW
+        pm.set_session_mode(nxt)
+        if hasattr(self, "refresh_status_footer"):
+            self.refresh_status_footer()
+
+
+
     def action_toggle_expand(self) -> None:
         """Toggle expand on all expandable widgets in chat"""
         try:

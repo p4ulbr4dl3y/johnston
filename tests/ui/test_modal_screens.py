@@ -240,16 +240,15 @@ class TestPermissionConfirmExtra(unittest.IsolatedAsyncioTestCase):
 
 
 class TestModalScreenBindings(unittest.TestCase):
-    def test_mcp_and_permissions_bindings_include_quit(self):
+    def test_mcp_bindings_include_quit(self):
         from widgets.presentation.screens.mcp import MCPScreen
-        from widgets.presentation.screens.permissions import PermissionsScreen
 
-        for cls in (MCPScreen, PermissionsScreen):
-            actions = {b[1] for b in cls.BINDINGS}
-            self.assertIn("cancel", actions)
-            self.assertIn("quit_app", actions)
+        actions = {b[1] for b in MCPScreen.BINDINGS}
+        self.assertIn("cancel", actions)
+        self.assertIn("quit_app", actions)
 
 
 if __name__ == "__main__":
     unittest.main()
+
 

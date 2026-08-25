@@ -18,6 +18,76 @@ class PermissionAction(str, Enum):
 VALID_ACTIONS = frozenset(action.value for action in PermissionAction)
 
 
+class ExecutionMode(str, Enum):
+    """Execution / Approval Mode for tool authorization."""
+
+    REVIEW = "review"
+    EDITS = "edits"
+    YOLO = "yolo"
+
+
+VALID_EXECUTION_MODES = frozenset(mode.value for mode in ExecutionMode)
+
+MODE_TOOL_BASELINES: Dict[ExecutionMode, Dict[str, PermissionAction]] = {
+    ExecutionMode.REVIEW: {
+        "create": PermissionAction.ASK,
+        "edit": PermissionAction.ASK,
+        "shell": PermissionAction.ASK,
+        "web_fetch": PermissionAction.ASK,
+        "_mcp": PermissionAction.ASK,
+        "default": PermissionAction.ALLOW,
+    },
+    ExecutionMode.EDITS: {
+        "create": PermissionAction.ALLOW,
+        "edit": PermissionAction.ALLOW,
+        "shell": PermissionAction.ASK,
+        "web_fetch": PermissionAction.ALLOW,
+        "_mcp": PermissionAction.ALLOW,
+        "default": PermissionAction.ALLOW,
+    },
+    ExecutionMode.YOLO: {
+        "create": PermissionAction.ALLOW,
+        "edit": PermissionAction.ALLOW,
+        "shell": PermissionAction.ALLOW,
+        "web_fetch": PermissionAction.ALLOW,
+        "_mcp": PermissionAction.ALLOW,
+        "default": PermissionAction.ALLOW,
+    },
+}
+
+
+def normalize_execution_mode(mode: Any, default: ExecutionMode = ExecutionMode.REVIEW) -> ExecutionMode:
+    """Normalizes an execution mode to ExecutionMode enum. Invalid values fallback to default."""
+    if isinstance(mode, ExecutionMode):
+        return mode
+    if isinstance(mode, str):
+        cleaned = mode.strip().lower()
+        if cleaned in ("auto", "accept_edits", "acceptedits", "auto_edits", "auto-edits", "edits"):
+            return ExecutionMode.EDITS
+        if cleaned in ("yolo", "bypass", "full_auto", "fullauto", "dontask", "dont_ask"):
+            return ExecutionMode.YOLO
+        if cleaned in ("review", "default", "ask", "interactive"):
+            return ExecutionMode.REVIEW
+        if cleaned in VALID_EXECUTION_MODES:
+            return ExecutionMode(cleaned)
+    return default
+
+
+def get_mode_baseline_action(
+    mode: ExecutionMode,
+    tool_name: str,
+    is_mcp: bool = False,
+) -> PermissionAction:
+    """Returns the baseline action for a given tool under the specified execution mode."""
+    canonical = (tool_name or "").strip().lower()
+    table = MODE_TOOL_BASELINES.get(mode, MODE_TOOL_BASELINES[ExecutionMode.REVIEW])
+    if is_mcp:
+        return table.get("_mcp", table.get("default", PermissionAction.ALLOW))
+    if canonical in table:
+        return table[canonical]
+    return table.get("default", PermissionAction.ALLOW)
+
+
 @dataclass(frozen=True)
 class PermissionDecision:
     """Result of a tool permission check: the action and a human-readable reason."""

@@ -26,7 +26,8 @@ KEY_PASTE: tuple[str, ...] = (
     "ctrl+v", "cmd+v", "ctrl+м", "ctrl+М", "cmd+м", "cmd+М", "ctrl+m", "ctrl+M"
 )
 KEY_DETACH: tuple[str, ...] = ("ctrl+d", "cmd+d", "ctrl+в", "ctrl+В", "cmd+в", "cmd+В")
-KEY_TOGGLE_ROLE: tuple[str, ...] = SHIFT_TAB_KEYS
+KEY_TOGGLE_ROLE: tuple[str, ...] = ("tab",)
+KEY_TOGGLE_MODE: tuple[str, ...] = SHIFT_TAB_KEYS
 KEY_NEWLINE: tuple[str, ...] = ("ctrl+enter", "ctrl+j", "shift+enter")
 KEY_TOGGLE_DISABLED: tuple[str, ...] = ("tab", "ctrl+t", "ctrl_t", "ctrl+i", "ctrl+е", "ctrl+Е")
 KEY_SCROLL_UP: tuple[str, ...] = ("pageup", "page_up")

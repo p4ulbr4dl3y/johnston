@@ -7,6 +7,7 @@ from widgets.utils.key_aliases import (
     KEY_PASTE,
     KEY_QUIT,
     KEY_TOGGLE_DISABLED,
+    KEY_TOGGLE_MODE,
     KEY_TOGGLE_ROLE,
     QWERTY_TO_RU,
     expand_bindings,
@@ -112,5 +113,7 @@ class TestKeyAliases(unittest.TestCase):
         self.assertTrue(len(KEY_PASTE) > 0)
         self.assertTrue(len(KEY_DETACH) > 0)
         self.assertTrue(len(KEY_TOGGLE_ROLE) > 0)
+        self.assertTrue(len(KEY_TOGGLE_MODE) > 0)
         self.assertTrue(len(KEY_NEWLINE) > 0)
         self.assertTrue(len(KEY_TOGGLE_DISABLED) > 0)
+

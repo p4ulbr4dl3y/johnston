@@ -184,6 +184,10 @@ def build_status_kwargs(app, widget=None) -> dict:
     except Exception:
         attachments_count = 0
 
+    from core.permission_manager import PermissionManager
+
+    execution_mode = PermissionManager.get_instance().execution_mode.value
+
     return {
         "provider_key": pkey,
         "provider_display": provider_display,
@@ -207,6 +211,7 @@ def build_status_kwargs(app, widget=None) -> dict:
         "mcp_total": mcp_total,
         "attachments_count": attachments_count,
         "sandbox_enabled": getattr(app, "sandbox_enabled", False) if app else False,
+        "execution_mode": execution_mode,
     }
 
 

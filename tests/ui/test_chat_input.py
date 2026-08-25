@@ -17,16 +17,21 @@ class DummyChatApp(App[None]):
         super().__init__()
         self.chat_input = chat_input
         self.submitted_messages = []
+        self.role_toggled = False
         self.mode_toggled = False
 
     def compose(self) -> ComposeResult:
         yield self.chat_input
 
     def action_toggle_role(self):
+        self.role_toggled = True
+
+    def action_toggle_mode(self):
         self.mode_toggled = True
 
     def on_chat_input_submitted(self, message: ChatInput.Submitted):
         self.submitted_messages.append(message)
+
 
 
 class TestClipboardAttachment(unittest.TestCase):
@@ -284,6 +289,13 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 mock_exit.assert_not_called()
 
             ci.load_text("")
+
+            # tab -> toggle role
+            event_tab = Key("tab", "tab")
+            event_tab.prevent_default = MagicMock()
+            event_tab.stop = MagicMock()
+            await ci._on_key(event_tab)
+            self.assertTrue(app.role_toggled)
 
             # shift+tab -> toggle mode
             event_st = Key("shift+tab", "shift+tab")

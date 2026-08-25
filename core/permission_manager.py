@@ -4,11 +4,14 @@ from core.domain.defaults.config import DEFAULT_PERMISSIONS
 from core.domain.policies.permission_policy import (
     _BUILTIN_TOOLS,
     VALID_ACTIONS,
+    ExecutionMode,
     PermissionAction,
     PermissionDecision,
     _merge_perms,
     evaluate_pattern_rules,
+    get_mode_baseline_action,
     normalize_action,
+    normalize_execution_mode,
 )
 from core.infrastructure.platform.paths import CONFIG_FILE
 from core.infrastructure.platform.platform_utils import atomic_write_json
@@ -16,7 +19,7 @@ from core.infrastructure.runtime.tool_name import normalize_tool_name
 
 
 class PermissionManager:
-    """Manages tool execution permissions (allow, ask, deny) with config cascade."""
+    """Manages tool execution permissions (allow, ask, deny) and execution modes with config cascade."""
 
     VALID_ACTIONS = VALID_ACTIONS
 
@@ -29,6 +32,7 @@ class PermissionManager:
     ):
         self.session_overrides: Dict[str, str] = {}
         self.session_pattern_overrides: Dict[str, List[Dict[str, str]]] = {}
+        self.session_mode: Optional[ExecutionMode] = None
         self.tool_name_normalizer = tool_name_normalizer
         self.builtin_tool_names = builtin_tool_names if builtin_tool_names is not None else _BUILTIN_TOOLS
 
@@ -37,6 +41,41 @@ class PermissionManager:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+    @property
+    def execution_mode(self) -> ExecutionMode:
+        """Returns the active execution mode (session override or config default)."""
+        if self.session_mode is not None:
+            return self.session_mode
+        effective = self.get_effective_permissions()
+        configured_mode = effective.get("mode")
+        return normalize_execution_mode(configured_mode, default=ExecutionMode.REVIEW)
+
+    def set_session_mode(self, mode: Any) -> ExecutionMode:
+        """Sets a runtime session execution mode override ('review', 'edits', 'yolo')."""
+        norm = normalize_execution_mode(mode)
+        self.session_mode = norm
+        return norm
+
+    def set_execution_mode(self, mode: Any) -> ExecutionMode:
+        """Alias for set_session_mode."""
+        return self.set_session_mode(mode)
+
+    def update_execution_mode(self, mode: Any) -> ExecutionMode:
+        """Updates and persists the default execution mode in global config (~/.johnston/config.json)."""
+        norm = normalize_execution_mode(mode)
+        self.session_mode = norm
+
+        file_path = CONFIG_FILE
+        data = self._load_json_config(file_path)
+        if "permissions" not in data or not isinstance(data["permissions"], dict):
+            data["permissions"] = {}
+        data["permissions"]["mode"] = norm.value
+
+        atomic_write_json(file_path, data)
+        self._cached_effective_perms = None
+        self._cached_effective_perms_id = None
+        return norm
 
     def set_session_override(self, tool_name: str, action: str) -> None:
         """Sets a runtime session override for a tool (e.g. 'allow', 'deny'). Invalid actions are ignored."""
@@ -74,6 +113,7 @@ class PermissionManager:
     def clear_session_overrides(self) -> None:
         self.session_overrides.clear()
         self.session_pattern_overrides.clear()
+        self.session_mode = None
 
     def _load_json_config(self, filepath: str) -> Dict[str, Any]:
         from core.models_catalog import cached_json_read
@@ -155,13 +195,19 @@ class PermissionManager:
 
         # 1. Base defaults
         merged = {
-            "default": DEFAULT_PERMISSIONS.get("default", "ask"),
+            "mode": DEFAULT_PERMISSIONS.get("mode", "review"),
+            "default": DEFAULT_PERMISSIONS.get("default", "allow"),
             "tools": dict(DEFAULT_PERMISSIONS.get("tools", {})),
             "patterns": dict(DEFAULT_PERMISSIONS.get("patterns", {})),
         }
 
         # 2. Global config (~/.johnston/config.json)
         global_perms = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}
+        if "mode" in global_perms and isinstance(global_perms["mode"], str):
+            merged["mode"] = normalize_execution_mode(global_perms["mode"]).value
+        elif "execution_mode" in global_cfg and isinstance(global_cfg["execution_mode"], str):
+            merged["mode"] = normalize_execution_mode(global_cfg["execution_mode"]).value
+
         _merge_perms(merged, global_perms)
 
         self._cached_effective_perms = merged
@@ -170,10 +216,13 @@ class PermissionManager:
 
     def check_permission(self, tool_name: str, args: Optional[Dict[str, Any]] = None) -> PermissionDecision:
         """
-        Evaluates permission for executing a tool.
-
-        Returns a PermissionDecision(action, reason) where action is
-        PermissionAction.ALLOW/ASK/DENY.
+        Evaluates permission for executing a tool against the resolution cascade:
+        1. Runtime session tool override
+        2. Runtime session pattern overrides
+        3. Config pattern rules (fail-closed DENY > ASK > ALLOW)
+        4. Explicit user tool config in config.json
+        5. Active Execution Mode baseline (review / edits / yolo)
+        6. Global default fallback
         """
         canonical_name = self._normalize_name(tool_name)
         # Fail-closed: an empty/absent tool name must never grant execution.
@@ -202,41 +251,39 @@ class PermissionManager:
             if decision is not None:
                 return decision
 
-        # 4. Check tool-specific config
-        tools_cfg = effective_perms.get("tools", {})
-        if canonical_name in tools_cfg:
+        # 4. Check explicit tool config from user's config file
+        global_cfg = self._load_json_config(CONFIG_FILE)
+        global_perms = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}
+        explicit_tools = global_perms.get("tools", {}) if isinstance(global_perms.get("tools"), dict) else {}
+        if canonical_name in explicit_tools:
+            act_str = normalize_action(explicit_tools[canonical_name], default="ask")
             return PermissionDecision(
-                PermissionAction(tools_cfg[canonical_name]),
+                PermissionAction(act_str),
                 f"Explicit tool permission for '{canonical_name}'",
             )
 
-        # 5. MCP tools (not in the builtin registry) default to 'allow' so that
-        #    connected servers work out of the box; explicit config still applies.
-        if canonical_name not in self.builtin_tool_names:
-            # Fail-closed: a broken raw 'default' config must never silently allow.
-            global_cfg = self._load_json_config(CONFIG_FILE)
-            perms_cfg = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}
-            raw_default = perms_cfg.get("default")
-            if raw_default is not None:
-                norm_default = normalize_action(raw_default)
-                if norm_default in VALID_ACTIONS:
-                    return PermissionDecision(
-                        PermissionAction(norm_default),
-                        f"MCP tool '{canonical_name}' applies configured default '{norm_default}'",
-                    )
+        # Check if user explicitly configured a global default that fails closed or locks down to deny
+        raw_default = global_perms.get("default")
+        if raw_default is not None:
+            norm_default = normalize_action(raw_default, default="ask")
+            if norm_default == "deny":
                 return PermissionDecision(
                     PermissionAction.DENY,
-                    f"Invalid default configured; MCP tool '{canonical_name}' fails closed",
+                    f"Configured global default 'deny' for '{canonical_name}'",
                 )
-            return PermissionDecision(
-                PermissionAction.ALLOW, f"MCP tool default for '{canonical_name}'"
-            )
+            if isinstance(raw_default, str) and raw_default.strip().lower() not in VALID_ACTIONS:
+                return PermissionDecision(
+                    PermissionAction.ASK,
+                    f"Invalid default configured; fails closed for '{canonical_name}'",
+                )
 
-        # 6. Fallback to default
-        default_action = effective_perms.get("default", "ask")
-        # Fail-closed: any unexpected value becomes 'ask' (user confirmation), never silent 'allow'.
+        # 5. Active Execution Mode baseline
+        active_mode = self.execution_mode
+        is_mcp = canonical_name not in self.builtin_tool_names
+        mode_action = get_mode_baseline_action(active_mode, canonical_name, is_mcp=is_mcp)
         return PermissionDecision(
-            PermissionAction(normalize_action(default_action)),
-            f"Default permission fallback for '{canonical_name}'",
+            mode_action,
+            f"Execution mode '{active_mode.value}' baseline for '{canonical_name}'",
         )
+
 

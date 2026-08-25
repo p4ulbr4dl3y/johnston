@@ -13,10 +13,9 @@ THEME_SUBTLE = "#e4e4e7"
 
 # Permissions Defaults
 DEFAULT_PERMISSIONS = {
+    "mode": "review",
     "default": "allow",
-    "tools": {
-        "create": "ask",
-        "edit": "ask",
-        "shell": "ask",
-    },
+    "tools": {},
+    "patterns": {},
 }
+

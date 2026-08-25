@@ -548,17 +548,6 @@ class CompactCommand(BaseCommand):
                     app.trigger_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
 
 
-class PermissionsCommand(BaseCommand):
-    name = "/permissions"
-    aliases = ["/permission", "/perms"]
-    description = "Manage tool permissions (allow, ask, deny)"
-
-    async def execute(self, app) -> None:
-        from widgets.presentation.screens.permissions import PermissionsScreen
-
-        app.push_screen(PermissionsScreen())
-
-
 class QuestionsCommand(BaseCommand):
     name = "/questions"
     aliases = ["/q", "/ask"]
@@ -661,8 +650,8 @@ COMMAND_CLASSES = [
     SkillsCommand,
     MCPCommand,
     CompactCommand,
-    PermissionsCommand,
     QuestionsCommand,
     DiffCommand,
     SandboxCommand,
 ]
+

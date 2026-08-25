@@ -21,6 +21,7 @@ from widgets.utils.key_aliases import (
     KEY_SCROLL_DOWN,
     KEY_SCROLL_TOP,
     KEY_SCROLL_UP,
+    KEY_TOGGLE_MODE,
     KEY_TOGGLE_ROLE,
 )
 
@@ -535,19 +536,24 @@ class ChatInput(TextArea):
                 event.stop()
                 return
 
-        # Tab press for slash command or file autocompletion
-        if event.key == "tab":
+        # Tab press: accept suggestion if open, otherwise toggle agent role
+        if event.key in KEY_TOGGLE_ROLE:
             if self._accept_active_suggestion():
                 event.prevent_default()
                 event.stop()
                 return
-
-        # Shift+Tab press to toggle mode (Action / Explore)
-        if event.key in KEY_TOGGLE_ROLE:
             event.prevent_default()
             event.stop()
             if hasattr(self.app, "action_toggle_role"):
                 self.app.action_toggle_role()
+            return
+
+        # Shift+Tab press to toggle execution mode (review / edits / yolo)
+        if event.key in KEY_TOGGLE_MODE:
+            event.prevent_default()
+            event.stop()
+            if hasattr(self.app, "action_toggle_mode"):
+                self.app.action_toggle_mode()
             return
 
         # Handle arrow navigation in suggestions menu

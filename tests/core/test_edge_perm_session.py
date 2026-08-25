@@ -170,11 +170,12 @@ def test_case_insensitive_and_trailing_space_toolname(pm):
 
 def test_empty_override_cleared_recheck(pm):
     pm_obj, cfg = pm
-    pm_obj.set_session_override("web_fetch", "deny")
-    assert pm_obj.check_permission("web_fetch").action == "deny"
+    pm_obj.set_session_override("read", "deny")
+    assert pm_obj.check_permission("read").action == "deny"
     # cache invalidation / re-evaluation after clear
     pm_obj.clear_session_overrides()
-    assert pm_obj.check_permission("web_fetch").action == "allow"
+    assert pm_obj.check_permission("read").action == "allow"
+
 
 
 def test_update_permission_overwrites_and_removes_duplicates(pm):

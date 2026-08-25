@@ -22,7 +22,6 @@ COMMANDS_DATA: list[tuple[str, str]] = [
     ("/copy", "Copy last assistant response to clipboard"),
     ("/diff", "View workspace diff since session checkpoint"),
     ("/sandbox", "Toggle shell command sandbox (ON/OFF)"),
-    ("/permissions", "Manage tool permissions (allow, ask, deny)"),
     ("/subagents", "View and manage subagents"),
     ("/shell", "View and manage background shell tasks"),
     ("/skills", "Browse and activate available skills"),
@@ -34,7 +33,8 @@ COMMANDS_DATA: list[tuple[str, str]] = [
 ]
 
 KEYBINDINGS_DATA: list[tuple[str, str]] = [
-    ("Shift+Tab", "Toggle Action / Explore mode"),
+    ("Tab", "Toggle agent role (Worker / Explorer / ...)"),
+    ("Shift+Tab", "Cycle execution mode (review / edits / yolo)"),
     ("Ctrl+B", "Move active shell tasks to background"),
     ("Ctrl+O", "Expand / collapse tool output & thinking"),
     ("PageUp / PgDn", "Scroll chat history"),
