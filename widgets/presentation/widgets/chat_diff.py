@@ -86,6 +86,23 @@ class DiffRenderable:
         return getattr(self._text, name)
 
 
+GIT_HEADER_PREFIXES = (
+    "diff --git ",
+    "index ",
+    "--- ",
+    "+++ ",
+    "new file mode ",
+    "deleted file mode ",
+    "similarity index ",
+    "rename from ",
+    "rename to ",
+    "old mode ",
+    "new mode ",
+    "Binary files ",
+    "GIT binary patch",
+)
+
+
 def format_edit_diff(diff_text: str, file_path: str) -> Any:
     diff_text = re.sub(
         r"^(?:Success|OK):\s*file\s+'[^']+'\s*(?:updated|created|saved)[^\n]*\n?", "", diff_text, flags=re.MULTILINE
@@ -114,7 +131,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             current_new = int(hunk_match.group(3))
             in_hunk = True
             continue
-        if line.startswith("--- ") or line.startswith("+++ "):
+        if line.startswith(GIT_HEADER_PREFIXES):
             continue
         if not in_hunk:
             continue
@@ -136,7 +153,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             current_new += 1
             old_code_lines.append(content.expandtabs(4))
             new_code_lines.append(content.expandtabs(4))
-    max_num_digits = len(str(max_num))
+    max_num_digits = max(len(str(max_num)), 3)
 
     full_sample = "\n".join(old_code_lines + new_code_lines)
     if lexer_name in ("html", "htm", "xhtml", "php", "vue", "svelte"):
@@ -201,14 +218,19 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
         formatted_lines.append(DiffLine(prefix, code_text, style_bg=style_bg))
 
     in_hunk = False
+    hunk_count = 0
     for line in lines:
-        if line.startswith("--- ") or line.startswith("+++ "):
+        if line.startswith(GIT_HEADER_PREFIXES):
             continue
 
         hunk_match = HUNK_HEADER_RE.match(line)
         if hunk_match:
             old_line = int(hunk_match.group(1))
             new_line = int(hunk_match.group(3))
+            if hunk_count > 0 and formatted_lines:
+                sep_prefix = Text(f"{'···'.rjust(max_num_digits)}   ", style="dim #6e7681")
+                formatted_lines.append(DiffLine(sep_prefix, Text(""), style_bg=None))
+            hunk_count += 1
             in_hunk = True
             continue
 

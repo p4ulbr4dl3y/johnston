@@ -180,3 +180,38 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertGreater(len(lines), 1)
         # Continuation line must be indented with blanks under gutter
         self.assertTrue(lines[1].startswith("      "))
+
+    def test_format_edit_diff_git_metadata_headers_stripped(self):
+        diff = (
+            "diff --git a/core/mgr.py b/core/mgr.py\n"
+            "index 8200ebb..79d08e7 100644\n"
+            "--- a/core/mgr.py\n"
+            "+++ b/core/mgr.py\n"
+            "@@ -10,1 +10,1 @@\n"
+            "-foo\n"
+            "+bar\n"
+        )
+        result = format_edit_diff(diff, "mgr.py")
+        self.assertNotIn("diff --git", result.plain)
+        self.assertNotIn("index 8200", result.plain)
+        self.assertIn("10 - foo", result.plain)
+        self.assertIn("10 + bar", result.plain)
+
+    def test_format_edit_diff_multi_hunk_separator(self):
+        diff = (
+            "@@ -10,1 +10,1 @@\n"
+            "-foo\n"
+            "+bar\n"
+            "@@ -50,1 +50,1 @@\n"
+            "-baz\n"
+            "+qux\n"
+        )
+        result = format_edit_diff(diff, "file.py")
+        plain = result.plain
+        self.assertIn("···", plain)
+        lines = plain.splitlines()
+        # Ensure hunk 1 line, separator line, hunk 2 line order
+        self.assertTrue(any("10 - foo" in item for item in lines))
+        self.assertTrue(any("···" in item for item in lines))
+        self.assertTrue(any("50 + qux" in item for item in lines))
+
