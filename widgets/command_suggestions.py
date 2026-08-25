@@ -8,6 +8,7 @@ from textual.widgets import OptionList
 from widgets.app.command_provider import get_all_command_suggestions
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.constants import MESSAGE_INPUT
+from widgets.utils.responsive import resolve_width
 from widgets.utils.row_format import display_width, ellipsize
 
 
@@ -97,6 +98,12 @@ class CommandSuggestions(HeaderWrapOptionList):
     def _render_file_suggestions(self, files: list[str], query_lower: str) -> list[str]:
         """Build option rows from the (already cached) file list for the given query."""
         self.clear_options()
+        # Viewport-aware layout: align the File/Dir tag at column 46 when the
+        # terminal is wide enough, shrink the alignment column on narrow ones,
+        # and ellipsize long paths so the kind tag always stays visible.
+        row_budget = max(24, resolve_width(self) - 2)
+        name_budget = row_budget - len(" Dir") - 1
+        align_col = min(46, max(12, name_budget))
         matched_files = []
         seen: set[str] = set()
         for f in files:
@@ -106,10 +113,10 @@ class CommandSuggestions(HeaderWrapOptionList):
             if not query_lower or query_lower in f.lower():
                 matched_files.append(f)
                 kind = "Dir" if f.endswith("/") else "File"
-                escaped_f = escape(f)
-                pad = max(0, 46 - display_width(f))
+                display_name = f if display_width(f) <= align_col else ellipsize(f, align_col)
+                pad = max(0, align_col - display_width(display_name))
                 padding_spaces = " " * pad
-                formatted_line = f"{escaped_f}{padding_spaces} [dim #71717a]{kind}[/dim #71717a]"
+                formatted_line = f"{escape(display_name)}{padding_spaces} [dim #71717a]{kind}[/dim #71717a]"
                 self.add_option(formatted_line)
                 if len(matched_files) >= 50:
                     break
@@ -151,11 +158,16 @@ class CommandSuggestions(HeaderWrapOptionList):
                     all_cmds = await get_all_command_suggestions()
                     max_cmd_len = max((len(c) for c, _ in all_cmds), default=14)
                     padding = max(16, max_cmd_len + 2)
+                    row_budget = max(30, resolve_width(self) - 2)
                     for cmd, desc in all_cmds:
                         if cmd.lower().startswith(query_lower):
                             matched_cmds.append(cmd)
                             clean_desc = " ".join(desc.split())
-                            clean_desc = ellipsize(clean_desc, 60)
+                            # Description budget: from the tag column to the right
+                            # edge; capped at 60 on wide terminals, shrinking on
+                            # narrow ones instead of clipping the tail unseen.
+                            desc_start = max(display_width(cmd), padding) + 1
+                            clean_desc = ellipsize(clean_desc, min(60, max(10, row_budget - desc_start)))
                             escaped_cmd = escape(cmd)
                             escaped_desc = escape(clean_desc)
                             pad = max(0, padding - display_width(cmd))

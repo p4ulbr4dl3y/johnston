@@ -7,7 +7,9 @@ from core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECOND
 from core.infrastructure.runtime.thinking_effort import display_thinking_effort
 from core.models_catalog import catalog, format_context_tokens
 from widgets.git_metrics_mixin import GitMetricsMixin
+from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
+from widgets.utils.responsive import is_compact_width, resolve_width
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
 STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
@@ -163,7 +165,7 @@ def _build_subagent_grid(
     return grid, rows
 
 
-class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
+class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Static):
     """Two-line status footer below chat"""
 
     can_focus = False
@@ -174,8 +176,6 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
         self._spinner_idx: int = 0
         self._spinner_timer = None
         self._mcp_poll_timer = None
-        self._resize_timer = None
-        self._last_resize_size = None
 
     def set_generating(self, generating: bool) -> None:
         if self.is_generating == generating:
@@ -232,12 +232,7 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
             except Exception:
                 pass
             self._mcp_poll_timer = None
-        if getattr(self, "_resize_timer", None):
-            try:
-                self._resize_timer.stop()
-            except Exception:
-                pass
-            self._resize_timer = None
+        self.cancel_resize_timer()
 
     def _on_mcp_event(self, _event: str = "") -> None:
         """Reactive MCP event handler: triggers footer update when MCP state changes."""
@@ -324,19 +319,8 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
         else:
             role_formatted = role_str
 
-        app_width = 80
-        try:
-            if self.app and self.app.size:
-                app_width = self.app.size.width
-        except Exception:
-            pass
-
-        width = (
-            self.size.width
-            if (self.size and self.size.width > 0)
-            else app_width
-        )
-        is_compact = width > 0 and width < 75
+        width = resolve_width(self)
+        is_compact = is_compact_width(width)
 
         if is_compact:
             branch = self._git_branch(cwd=directory)
@@ -468,22 +452,11 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
     def _on_diff_updated(self) -> None:
         self.refresh_footer()
 
-    def on_resize(self, event) -> None:
-        size = getattr(event, "size", None)
-        if size is not None and size == self._last_resize_size:
-            return
-        self._last_resize_size = size
-        if self._resize_timer is not None:
-            self._resize_timer.stop()
-            self._resize_timer = None
-        self._resize_timer = self.set_timer(0.15, self._debounced_refresh)
-
-    def _debounced_refresh(self) -> None:
-        self._resize_timer = None
+    def render_for_size(self) -> None:
         self.refresh_footer()
 
 
-class SubagentStatusFooter(GitMetricsMixin, Static):
+class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
     """Dedicated status footer for subagent screen, isolated from main app footer."""
 
     can_focus = False
@@ -496,19 +469,12 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
         self._diff_time: float = 0.0
         self._diff_loading: bool = False
         self._last_grid_rows: list[tuple[str, str]] | None = None
-        self._resize_timer = None
-        self._last_resize_size = None
 
     def on_mount(self) -> None:
         self._render_footer()
 
     def on_unmount(self) -> None:
-        if getattr(self, "_resize_timer", None):
-            try:
-                self._resize_timer.stop()
-            except Exception:
-                pass
-            self._resize_timer = None
+        self.cancel_resize_timer()
 
     def update_session(self, session) -> None:
         """Update with a subagent session record (AgentSession) and refresh render."""
@@ -596,19 +562,8 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
                 context_limit = 128000
             context_window = metrics.get("context") or format_context_tokens(context_limit)
 
-            app_width = 80
-            try:
-                if cur_app and getattr(cur_app, "size", None):
-                    raw_w = getattr(cur_app.size, "width", 80)
-                    if isinstance(raw_w, int):
-                        app_width = raw_w
-            except Exception:
-                pass
-
-            raw_size_w = getattr(getattr(self, "size", None), "width", 0)
-            size_w = raw_size_w if isinstance(raw_size_w, int) else 0
-            width = size_w if size_w > 0 else app_width
-            is_compact = isinstance(width, int) and width > 0 and width < 75
+            width = resolve_width(self)
+            is_compact = is_compact_width(width)
 
             sandbox_val = getattr(session, "sandbox_enabled", None)
             if sandbox_val is None and agent:
@@ -644,23 +599,11 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
     def _on_diff_updated(self) -> None:
         self._render_footer()
 
-    def on_resize(self, event) -> None:
-        size = getattr(event, "size", None)
-        if size is not None and size == getattr(self, "_last_resize_size", None):
-            return
-        self._last_resize_size = size
-        timer = getattr(self, "_resize_timer", None)
-        if timer is not None:
-            timer.stop()
-            self._resize_timer = None
-        self._resize_timer = self.set_timer(0.15, self._debounced_render)
-
-    def _debounced_render(self) -> None:
-        self._resize_timer = None
+    def render_for_size(self) -> None:
         self._render_footer()
 
 
-class SubagentHeader(StreamFrameMixin, Static):
+class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
     """Single-line top header for subagent screen displaying role, description and esc hint."""
 
     can_focus = False
@@ -674,8 +617,6 @@ class SubagentHeader(StreamFrameMixin, Static):
         self._spinner_idx: int = 0
         self._spinner_timer = None
         self._last_grid_rows: list[tuple[str, str]] | None = None
-        self._resize_timer = None
-        self._last_resize_size = None
 
     def on_mount(self) -> None:
         self._render_header()
@@ -687,12 +628,7 @@ class SubagentHeader(StreamFrameMixin, Static):
             except Exception:
                 pass
             self._spinner_timer = None
-        if self._resize_timer:
-            try:
-                self._resize_timer.stop()
-            except Exception:
-                pass
-            self._resize_timer = None
+        self.cancel_resize_timer()
 
     def update_session(self, session) -> None:
         """Update with a subagent session record and refresh header render."""
@@ -722,19 +658,7 @@ class SubagentHeader(StreamFrameMixin, Static):
         else:
             self._render_header()
 
-    def on_resize(self, event) -> None:
-        size = getattr(event, "size", None)
-        if size is not None and size == getattr(self, "_last_resize_size", None):
-            return
-        self._last_resize_size = size
-        timer = getattr(self, "_resize_timer", None)
-        if timer is not None:
-            timer.stop()
-            self._resize_timer = None
-        self._resize_timer = self.set_timer(0.15, self._debounced_render)
-
-    def _debounced_render(self) -> None:
-        self._resize_timer = None
+    def render_for_size(self) -> None:
         self._render_header()
 
     def _render_header(self) -> None:

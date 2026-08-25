@@ -5,6 +5,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList, Static
 
+from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.constants import (
@@ -101,7 +102,7 @@ class WriteInInput(Input):
         await super()._on_key(event)
 
 
-class AskUserWizardScreen(BaseModalScreen[str]):
+class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
     """Unified modal screen that handles multi-question wizard without flickering."""
 
     BINDINGS = expand_bindings([
@@ -153,6 +154,42 @@ class AskUserWizardScreen(BaseModalScreen[str]):
                     self.query_one(WRITE_IN_INPUT, Input).focus()
                 except Exception:
                     pass
+
+    def render_for_size(self) -> None:
+        """Re-flow option wrapping after a terminal resize (question step only).
+
+        Preserves the current highlight and any in-progress custom answer text,
+        then re-runs the step renderer so options re-wrap to the new width.
+        """
+        if self.q_idx >= len(self.questions):
+            return
+        try:
+            opt_list = self.query_one(OPTIONS_LIST, OptionList)
+            highlighted = opt_list.highlighted
+            if not opt_list.display or highlighted is None:
+                return
+        except Exception:
+            return
+        preserved_value: str | None = None
+        preserved_cursor = 0
+        try:
+            inp = self.query_one(WRITE_IN_INPUT, Input)
+            if inp.display and inp.has_focus:
+                preserved_value = inp.value
+                preserved_cursor = inp.cursor_position
+        except Exception:
+            pass
+        self.update_step(target_highlight=highlighted)
+        if preserved_value is not None:
+            try:
+                inp = self.query_one(WRITE_IN_INPUT, Input)
+                inp.value = preserved_value
+                inp.cursor_position = preserved_cursor
+            except Exception:
+                pass
+
+    def on_unmount(self) -> None:
+        self.cancel_resize_timer()
 
     def update_step(self, target_highlight: int | None = None) -> None:
         title_md = self.query_one("#wizard-title", Markdown)

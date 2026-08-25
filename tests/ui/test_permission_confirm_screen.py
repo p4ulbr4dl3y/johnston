@@ -184,10 +184,14 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             screen.action_page_down()
 
     def test_hint_text_adaptation(self):
-        # Hint text is unified with OptionList
+        # Hint text is unified with OptionList and collapses below BREAKPOINT_HINT (60)
         screen = PermissionConfirmScreen("read", {})
         self.assertIn("enter: select", screen._build_hint_text(width=80))
-        self.assertIn("esc: deny", screen._build_hint_text(width=40))
+        self.assertIn("esc: deny", screen._build_hint_text(width=80))
+        compact = screen._build_hint_text(width=40)
+        self.assertIn("enter", compact)
+        self.assertIn("esc", compact)
+        self.assertNotIn("enter: select", compact)
 
     async def test_reject_with_reason_flow(self):
         screen = PermissionConfirmScreen("shell", {"command": "rm -rf tmp"})

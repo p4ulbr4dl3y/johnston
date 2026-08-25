@@ -14,6 +14,7 @@ from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
+from widgets.utils.responsive import BREAKPOINT_HINT, is_compact_width, resolve_width
 
 
 class RejectReasonInput(Input):
@@ -310,8 +311,14 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             self.query_one("#permission-options-list", OptionList).focus()
         except Exception:
             self.focus()
+        try:
+            self.query_one("#modal-hint", Label).update(self._build_hint_text(resolve_width(self)))
+        except Exception:
+            pass
 
     def _build_hint_text(self, width: Optional[int] = None) -> str:
+        if isinstance(width, int) and is_compact_width(width, breakpoint=BREAKPOINT_HINT):
+            return "enter • ↑↓ • r • esc"
         return "enter: select • ↑↓: nav • r: feedback • esc: deny"
 
     def on_resize(self, event) -> None:

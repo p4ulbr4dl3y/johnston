@@ -3,6 +3,8 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Static
 
+from widgets.utils.responsive import BREAKPOINT_BANNER, is_compact_width, resolve_width
+
 
 class WelcomeWidget(Vertical):
     """Centered welcome logo on main screen"""
@@ -26,7 +28,7 @@ class WelcomeWidget(Vertical):
     def _update_banner_for_size(self, width: int) -> None:
         try:
             logo = self.query_one("#welcome-logo", Static)
-            if width < 52:
+            if is_compact_width(width, breakpoint=BREAKPOINT_BANNER):
                 logo.update("[bold #ffffff]johnston[/bold #ffffff]")
             else:
                 logo.update(self.FULL_BANNER)
@@ -34,8 +36,7 @@ class WelcomeWidget(Vertical):
             pass
 
     def on_mount(self) -> None:
-        if self.app and self.app.size.width > 0:
-            self._update_banner_for_size(self.app.size.width)
+        self._update_banner_for_size(resolve_width(self))
 
     def on_resize(self, event) -> None:
         self._update_banner_for_size(event.size.width)

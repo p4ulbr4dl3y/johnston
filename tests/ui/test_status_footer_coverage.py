@@ -391,7 +391,7 @@ class TestSubagentHeaderCoverage(unittest.TestCase):
         header.on_resize(event)
         # call debounced
         with patch.object(header, "_render_header") as rh:
-            header._debounced_render()
+            header._debounced_resize()
             rh.assert_called_once()
             self.assertIsNone(header._resize_timer)
 

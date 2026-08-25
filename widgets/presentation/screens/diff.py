@@ -11,13 +11,15 @@ from textual.screen import Screen
 from textual.widgets import Input, OptionList, Static
 
 from widgets.chat_toolcall import ToolScrollBox
+from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_selection import ModalSearchNavMixin
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
+from widgets.utils.responsive import BREAKPOINT_COMPACT, BREAKPOINT_HINT, is_compact_width, resolve_width
 from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width
 
 
-class DiffHeader(Static):
+class DiffHeader(ResizeDebounceMixin, Static):
     """Header widget for the full-screen diff viewer with responsive width adaptation."""
 
     def __init__(
@@ -36,24 +38,15 @@ class DiffHeader(Static):
     def on_mount(self) -> None:
         self.render_header()
 
-    def on_resize(self, event: events.Resize) -> None:
-        self.render_header()
-
     def render_header(self) -> None:
         table = Table.grid(expand=True)
         table.add_column(ratio=1, justify="left")
         table.add_column(justify="right")
 
-        width = 80
-        try:
-            if self.app and self.app.size:
-                width = self.app.size.width
-        except Exception:
-            pass
-
+        width = resolve_width(self)
         esc_label = "esc: back" if self.from_rewind else "esc: close"
 
-        if width < 75:
+        if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             left_text = (
                 f"[bold #ffffff]Diff[/]  [#71717a]•[/]  "
                 f"[#f4f4f5]{escape(self.title_text[:20])}[/]  "
@@ -70,6 +63,9 @@ class DiffHeader(Static):
 
         table.add_row(left_text, right_text)
         self.update(table)
+
+    def render_for_size(self) -> None:
+        self.render_header()
 
 
 def format_relative_path(path: str, max_length: int = 40) -> str:
@@ -88,7 +84,7 @@ def format_relative_path(path: str, max_length: int = 40) -> str:
     return path[: max_length - 3] + "..."
 
 
-class DiffFooter(Static):
+class DiffFooter(ResizeDebounceMixin, Static):
     """Footer widget for the full-screen diff viewer with responsive width adaptation."""
 
     def __init__(self, id: Optional[str] = None, classes: Optional[str] = None):
@@ -99,12 +95,12 @@ class DiffFooter(Static):
     def on_mount(self) -> None:
         self.render_footer()
 
-    def on_resize(self, event: events.Resize) -> None:
-        self.render_footer()
-
     def update_info(self, file_path: str, stats: str) -> None:
         self.current_file = file_path
         self.current_stats = stats
+        self.render_footer()
+
+    def render_for_size(self) -> None:
         self.render_footer()
 
     def render_footer(self) -> None:
@@ -112,12 +108,7 @@ class DiffFooter(Static):
         table.add_column(ratio=1, justify="left")
         table.add_column(justify="right")
 
-        width = 80
-        try:
-            if self.app and self.app.size:
-                width = self.app.size.width
-        except Exception:
-            pass
+        width = resolve_width(self)
 
         max_path_len = min(45, max(18, width // 3))
 
@@ -127,7 +118,7 @@ class DiffFooter(Static):
         else:
             left_text = "[dim #71717a]No file selected[/]"
 
-        if width >= 60:
+        if width >= BREAKPOINT_HINT:
             right_text = "[#71717a]↑↓: files  •  pgup/pgdn: scroll[/]"
         else:
             right_text = "[#71717a]↑↓: files[/]"
