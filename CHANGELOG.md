@@ -7,6 +7,108 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.26.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.25.0...johnston-v0.26.0) (2026-08-25)
+
+
+### Features
+
+* **checkpoints:** archive purged states with ttl and harden snapshot pipeline ([ffa92e3](https://github.com/p4ulbr4dl3y/johnston/commit/ffa92e3ec2c93ce404200ae374f66526750dd560))
+* **core:** update tool display, task screens and shell hint ([81c4b45](https://github.com/p4ulbr4dl3y/johnston/commit/81c4b452b8d0183c403903f51ed97bda287343eb))
+* **diff:** add full-screen diff viewer and rewind integration ([69dbb02](https://github.com/p4ulbr4dl3y/johnston/commit/69dbb02c286d2d2bda5228485ce13923cd7d4d31))
+* **diff:** add live search filter to sidebar files list ([0abc5b3](https://github.com/p4ulbr4dl3y/johnston/commit/0abc5b3785e5ae5d870d2a5e800e5757ecd7e737))
+* **permissions:** add pattern-level rules for tools and shell commands ([d2400f9](https://github.com/p4ulbr4dl3y/johnston/commit/d2400f91cf2709d0208535c2021a0674d7ea2b40))
+* **provider:** harden config handling, env keys, base_url templates ([699d5bc](https://github.com/p4ulbr4dl3y/johnston/commit/699d5bcefa73d16e40681b5c60a631e26766cdcd))
+* **provider:** support native api cost and granular cache pricing ([86b3c71](https://github.com/p4ulbr4dl3y/johnston/commit/86b3c71dce26cb5189175837d6cd8a62cf225034))
+* **runtime:** keep strong refs on fire-and-forget background tasks ([06cd70d](https://github.com/p4ulbr4dl3y/johnston/commit/06cd70db2253e0efd0385047aa070e5cd0f5d76d))
+* **sandbox:** add comprehensive cross-platform credential deny paths ([734fd40](https://github.com/p4ulbr4dl3y/johnston/commit/734fd40c3ca50051ebc7fd8e10ddb7de7825f8e4))
+* **sandbox:** add read-only role policy and sandbox restrictions ([037edb5](https://github.com/p4ulbr4dl3y/johnston/commit/037edb501dd0be3605fd075d694a6bf225694160))
+* **sandbox:** add shell sandbox toggle and os-level isolation ([0acfca0](https://github.com/p4ulbr4dl3y/johnston/commit/0acfca090c2162556573646ed5b3889eb5acd51d))
+* **sandbox:** add windows safer restricted token sandbox backend ([70afb66](https://github.com/p4ulbr4dl3y/johnston/commit/70afb668cd036f293045d21b47e2db8003477712))
+* **secrets:** centralize api keys in secrets.json with interpolation ([d1074fe](https://github.com/p4ulbr4dl3y/johnston/commit/d1074fe21c3cc03f7cd34a91c1d9cee9db6de818))
+* **session:** add session scratchpad space with sandbox integration ([8b01800](https://github.com/p4ulbr4dl3y/johnston/commit/8b01800ca8661f5c89e9c0a11b43b41441a03475))
+* **session:** persist and restore agent role in session data ([38648a1](https://github.com/p4ulbr4dl3y/johnston/commit/38648a1756605496d65a4faf537a1608b1996df1))
+* **shell:** surface unsandboxed fallback when backend unusable ([a454663](https://github.com/p4ulbr4dl3y/johnston/commit/a454663645cc9ff79cc7ac27f714016a1b6ec863))
+* **subagents:** enforce sandbox and autonomous allow execution ([8939f1c](https://github.com/p4ulbr4dl3y/johnston/commit/8939f1c249b7698f90e7c6f21ec0ee91d033d731))
+* **tools:** clarify subagent reuse, branch merge, and shell schemas ([814049c](https://github.com/p4ulbr4dl3y/johnston/commit/814049c33376fe817e143ba78f940d826e17b97c))
+* **ui:** add 2-step rewind flow for code vs conversation rollback ([1359f52](https://github.com/p4ulbr4dl3y/johnston/commit/1359f52d275a922e96e13b38fb862f0a1121f9c8))
+* **ui:** add chat keyboard scroll, /copy command and pill help modal ([f2eaf21](https://github.com/p4ulbr4dl3y/johnston/commit/f2eaf2133a959b15cafb77b48dabd009a2e74711))
+* **ui:** add placeholder support for ChatInput ([518eb8e](https://github.com/p4ulbr4dl3y/johnston/commit/518eb8ef23499ccd6aac33bd0df2fedb9debfc29))
+* **ui:** add token count formatting for completed subagents ([2cef5a2](https://github.com/p4ulbr4dl3y/johnston/commit/2cef5a2df844912c8ff3ca1d3f3a348f82fc3367))
+* **ui:** display changed files list in rewind step 2 ([7ae088a](https://github.com/p4ulbr4dl3y/johnston/commit/7ae088add9d8fb53ada003436e214bf091ca6582))
+* **ui:** display live progress and status badge for shell tasks ([9be75e5](https://github.com/p4ulbr4dl3y/johnston/commit/9be75e5f6c82036689b5ba26af75b7613c1e6576))
+* **ui:** display live progress badge for running subagents ([e1c058b](https://github.com/p4ulbr4dl3y/johnston/commit/e1c058bc9bc4e7aa86c2a36c378fc420adfb5a1d))
+* **ui:** notify on copy and auto-copy ChatInput mouse selection ([d3f46ee](https://github.com/p4ulbr4dl3y/johnston/commit/d3f46ee7b1b0aa6404b9c874595347ea465cf1e5))
+* **ui:** pop last attachment on ctrl+d and format as Image #N ([2f7adcd](https://github.com/p4ulbr4dl3y/johnston/commit/2f7adcdd385037b46c8f92dc77c5a88dcca0abae))
+* **ui:** remove unused tab focus binding from diff screen ([9252a9d](https://github.com/p4ulbr4dl3y/johnston/commit/9252a9dfc881b5d7244766a26682f0fb73bdf256))
+* **ui:** simplify sandbox toggle notifications ([ea8a1f8](https://github.com/p4ulbr4dl3y/johnston/commit/ea8a1f80e03e4357e6eb6a2074ec705c98a45018))
+* **ui:** skip rewind confirmation step if no file changes exist ([9abf4b9](https://github.com/p4ulbr4dl3y/johnston/commit/9abf4b90ad6bbf20ef4939d8d8b89e85a8607daf))
+* **ui:** strip git headers and add hunk separators in diff viewer ([7fb83d1](https://github.com/p4ulbr4dl3y/johnston/commit/7fb83d153921568d5c2b472d8fcade94169f46d1))
+* **ui:** support subagent context and scroll keys in confirm modal ([1bafc75](https://github.com/p4ulbr4dl3y/johnston/commit/1bafc750126164f4dd4e73bc215192798876cb5b))
+* **ui:** unify and add dynamic hotkey hints across modals and screens ([5488d3e](https://github.com/p4ulbr4dl3y/johnston/commit/5488d3e2d209e870cd0549355b0ff20db1ae144c))
+* **ui:** unify ask_user summary answer format with checkmark ([3d2227e](https://github.com/p4ulbr4dl3y/johnston/commit/3d2227e5a678beee25e8adc9fc569daeaf99d784))
+* **ui:** unify modal layouts and add rejection reason input ([e9f2ebb](https://github.com/p4ulbr4dl3y/johnston/commit/e9f2ebb8e5b3a3debc0fc0fb23bc6fe0ae24b6da))
+* **ui:** use unicode status indicators and align list gutters ([b7db0c5](https://github.com/p4ulbr4dl3y/johnston/commit/b7db0c552bac61a13ca4f6ee37522266b4b18067))
+
+
+### Bug Fixes
+
+* **agent:** treat error finish reasons as retryable stream failures ([c32560d](https://github.com/p4ulbr4dl3y/johnston/commit/c32560db5e6ca8961db2b3d92c0f4fd83715d864))
+* **core:** resolve concurrency, timeout and edge cases in git rewind ([881c4ad](https://github.com/p4ulbr4dl3y/johnston/commit/881c4adbe3f64cf844ddfa1857a1527eb5d455a7))
+* **mcp:** tear down stale warmup client by identity, not by key ([d4347e8](https://github.com/p4ulbr4dl3y/johnston/commit/d4347e874ffd9820c36df50c1dfedf4bc5d58472))
+* **mcp:** warm enabled server immediately and surface start errors in modal ([8c3a549](https://github.com/p4ulbr4dl3y/johnston/commit/8c3a549df5eae6df797c0cf029086ca594088f63))
+* **mcp:** warn clearly on unsupported url-only servers ([42f20e1](https://github.com/p4ulbr4dl3y/johnston/commit/42f20e1564da0901485df3ac848befac845e5922))
+* **permissions:** fail-closed pattern priority and strict action validation ([d9c4d79](https://github.com/p4ulbr4dl3y/johnston/commit/d9c4d79e6c940dc7278000bd1cdbcc8bbb4f9ec2))
+* **sandbox:** add sensitive path masking to linux bubblewrap backend ([fa9e7d9](https://github.com/p4ulbr4dl3y/johnston/commit/fa9e7d9fe9dd614481aa587837903d98e5ae2969))
+* **sandbox:** allow git worktrees and cache paths in sandbox ([d3eb32d](https://github.com/p4ulbr4dl3y/johnston/commit/d3eb32dc4d7c4873b16282b056fcfeea78c988a8))
+* **sandbox:** fs-root extras grant nothing; probe bwrap usability ([0091894](https://github.com/p4ulbr4dl3y/johnston/commit/00918944bca68d69b351e301c62c6fc23d41fc2d))
+* **sandbox:** harden path normalization, sbpl escaping, and win32 handles ([a93ee2a](https://github.com/p4ulbr4dl3y/johnston/commit/a93ee2a2fb5bcbebbdb2ce8bf57c6fded98ea7c8))
+* **sandbox:** protect credentials, api keys and keychains from read ([b0fcf94](https://github.com/p4ulbr4dl3y/johnston/commit/b0fcf946fe456a5eaee6ad448374b2e6127a6cec))
+* **sandbox:** scope protected read paths to johnston-guide configs ([1e5d4a8](https://github.com/p4ulbr4dl3y/johnston/commit/1e5d4a8199a96d0aa34b8939c6aa384af1bfa110))
+* **session:** serialize rewind git restore against next turn snapshot ([757a969](https://github.com/p4ulbr4dl3y/johnston/commit/757a9697330f6afe3018c043ceeff8a843c5cb15))
+* **tools:** enforce sandbox path checks on file operations ([f2b4a64](https://github.com/p4ulbr4dl3y/johnston/commit/f2b4a64b204979f0632cc6b63697ca092c4f0281))
+* **tools:** harden argument coercion, validation and cancel handling ([4f40839](https://github.com/p4ulbr4dl3y/johnston/commit/4f40839f5211cda9f292a59928e3c32779d5caa6))
+* **tools:** preserve process returncode in shell tool execution results ([29ed1e8](https://github.com/p4ulbr4dl3y/johnston/commit/29ed1e8ad533ff929b63b187c80a39eebf6cdc3c))
+* **ui:** align right-side badges via shared cell-aware row formatter ([6c0e6e5](https://github.com/p4ulbr4dl3y/johnston/commit/6c0e6e5304806ec97aa3810fb62e70dcbdd3c4dc))
+* **ui:** compact hotkey hint in ask_user wizard to avoid overflow ([7dedba8](https://github.com/p4ulbr4dl3y/johnston/commit/7dedba8517e5e92d27efbcaf2a0ac25b2775d971))
+* **ui:** disable click and hover on invoke_subagent error ([e51c150](https://github.com/p4ulbr4dl3y/johnston/commit/e51c150543536290f909e8533b29dbb931d54ef4))
+* **ui:** enable copying and cutting selected text in ChatInput ([aec63ca](https://github.com/p4ulbr4dl3y/johnston/commit/aec63ca62af9e415273b2215531e4e73d4844e8a))
+* **ui:** enable subagent selection and fix auto-scroll on drag ([152b557](https://github.com/p4ulbr4dl3y/johnston/commit/152b557ef0d085b2a513e25cd8c3b41a57e35b5d))
+* **ui:** enforce fence-header height to fix code selection ([86ac4bd](https://github.com/p4ulbr4dl3y/johnston/commit/86ac4bd2e6a8e9432530a9a8e59aba74d0c489f9))
+* **ui:** ensure autoscroll completes after layout reflow ([4e3e1de](https://github.com/p4ulbr4dl3y/johnston/commit/4e3e1de9b91df97785c8ceceaafd152afcd0a865))
+* **ui:** ensure Ctrl+C always exits and remove copy interceptor ([0f7ff87](https://github.com/p4ulbr4dl3y/johnston/commit/0f7ff87dd7c4fb94727d718fd95c0184123bceab))
+* **ui:** fix markdown bullet line breaks for changed files in rewind ([3b8aea7](https://github.com/p4ulbr4dl3y/johnston/commit/3b8aea770c8b4a003d3c99b59b1ec03580f5c8ad))
+* **ui:** fix markdown title formatting in rewind step 2 ([3996964](https://github.com/p4ulbr4dl3y/johnston/commit/399696492c42c45d5e08e22f860da6653ed4ec72))
+* **ui:** force scroll on toolcard expansion and result update ([802c92b](https://github.com/p4ulbr4dl3y/johnston/commit/802c92b76d7c4fb0b4732e866c09f585961598ef))
+* **ui:** keep shell expansion open when foreground task backgrounded ([7a4d82c](https://github.com/p4ulbr4dl3y/johnston/commit/7a4d82cd4fe20d145160b189111f9ab331f56a5e))
+* **ui:** make chat autoscroll respect user intent and layout races ([9338dfe](https://github.com/p4ulbr4dl3y/johnston/commit/9338dfefdff04d6d6358955cd6afd2320bfbed12))
+* **ui:** preserve active tool badge across tool results ([5f96c01](https://github.com/p4ulbr4dl3y/johnston/commit/5f96c011b4554f33f8ef624c6b77abc61d40e251))
+* **ui:** prevent BaseSelectionScreen handler conflict in RewindScreen ([2b9628e](https://github.com/p4ulbr4dl3y/johnston/commit/2b9628eef219ed43eda9f0d786dc9993229adcef))
+* **ui:** remove redundant cancel option from rewind step 2 ([902fbee](https://github.com/p4ulbr4dl3y/johnston/commit/902fbee27c94c59ec18065c607d27f2bdc7fc629))
+* **ui:** remove stats info from rewind step 2 title ([f59c2aa](https://github.com/p4ulbr4dl3y/johnston/commit/f59c2aaa5202c899b9d80b20ec6fc07e8b77aef2))
+* **ui:** render toolcall badge red on non-zero returncode ([6031179](https://github.com/p4ulbr4dl3y/johnston/commit/60311791de3dd4c163f3010401852c13b12125d6))
+* **ui:** render untagged markdown code blocks as plain text ([163a574](https://github.com/p4ulbr4dl3y/johnston/commit/163a5741cb8f894e2e632cadd754dd7118834f2e))
+* **ui:** resolve session save races, status blocking and duplicate code ([0ae48f3](https://github.com/p4ulbr4dl3y/johnston/commit/0ae48f37f25f6e92476e61d733cdbab7e606a640))
+* **ui:** restore quit bindings and key expansion in modal screens ([d86a02b](https://github.com/p4ulbr4dl3y/johnston/commit/d86a02b99d4d3693703061fe84c82f9749c0cc9e))
+* **ui:** scroll to widget top on manual card expansion ([7273f86](https://github.com/p4ulbr4dl3y/johnston/commit/7273f86e16e473bf33cff6e39a295a0db41c278c))
+* **ui:** shorten modal hotkey hints to prevent wrap on 80col terminals ([080d15e](https://github.com/p4ulbr4dl3y/johnston/commit/080d15eaceb4b812715561d1d1972f31adc4c461))
+* **ui:** smooth tool expand and ctrl+o scrolling without jitter ([19b3b4b](https://github.com/p4ulbr4dl3y/johnston/commit/19b3b4b7b8a8e73c772b202079b1617e83315399))
+* **ui:** subtract OptionList option padding from badge row widths ([ccf5491](https://github.com/p4ulbr4dl3y/johnston/commit/ccf54917b82db1a891a175f151ab254c61849a1e))
+* **ui:** unify cost estimation, stop subagent footer pricing free models ([42fc50a](https://github.com/p4ulbr4dl3y/johnston/commit/42fc50a3da836f3069f020809cd0e678da7f5134))
+* **ui:** use Content in CustomMarkdownFence for precise mouse selection ([21fd0ef](https://github.com/p4ulbr4dl3y/johnston/commit/21fd0ef10e0e5c50f93dd2bdb6a1d861f3ef296d))
+* **ui:** use modal-dialog-medium for subagents screen ([9504f45](https://github.com/p4ulbr4dl3y/johnston/commit/9504f45db9fa5103c0c8447304f0e786b42c11b4))
+* **win-sandbox:** restricted-token runner without Safer privilege traps ([7046549](https://github.com/p4ulbr4dl3y/johnston/commit/7046549ae99ff83899261f5007caf65275b6d784))
+
+
+### Performance Improvements
+
+* resolve performance bottlenecks across ui, core, and tools ([4eb9395](https://github.com/p4ulbr4dl3y/johnston/commit/4eb9395c05a2c2f23f26c7995cdb4f0d854ca986))
+
+
+### Documentation
+
+* **skills:** align module docstring with SKILL.md-only scan ([6e7967a](https://github.com/p4ulbr4dl3y/johnston/commit/6e7967a3c153363cd1cc5717392b80b64aa304e8))
+* **tools:** mention unbuffered output for live shell logs ([1b27206](https://github.com/p4ulbr4dl3y/johnston/commit/1b27206946e1471100f9c2fc4740c4ca2376c881))
+
 ## [0.25.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.24.0...johnston-v0.25.0) (2026-08-23)
 
 
