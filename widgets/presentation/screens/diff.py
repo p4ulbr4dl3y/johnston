@@ -127,10 +127,8 @@ class DiffFooter(Static):
         else:
             left_text = "[dim #71717a]No file selected[/]"
 
-        if width >= 80:
-            right_text = "[#71717a]↑↓: files  •  pgup/pgdn: scroll  •  tab: focus[/]"
-        elif width >= 60:
-            right_text = "[#71717a]↑↓: files  •  tab: focus[/]"
+        if width >= 60:
+            right_text = "[#71717a]↑↓: files  •  pgup/pgdn: scroll[/]"
         else:
             right_text = "[#71717a]↑↓: files[/]"
 
@@ -149,7 +147,6 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
 
     BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
-        ("tab", "switch_focus", "Switch Focus"),
         ("pageup", "page_up", "Page Up"),
         ("pagedown", "page_down", "Page Down"),
         ("ctrl+c", "quit_app", "Quit"),
@@ -304,17 +301,6 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         if event.option_index is not None and 0 <= event.option_index < len(self.filtered_indices):
             real_idx = self.filtered_indices[event.option_index]
             self._render_current_diff(real_idx)
-
-    def action_switch_focus(self) -> None:
-        try:
-            search_input = self.query_one("#diff-search-input", Input)
-            scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
-            if scroll_box.has_focus:
-                search_input.focus()
-            else:
-                scroll_box.focus()
-        except Exception:
-            pass
 
     def action_page_up(self) -> None:
         try:

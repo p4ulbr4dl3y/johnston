@@ -61,9 +61,6 @@ class TestDiffScreen(unittest.TestCase):
         screen.action_close()
         screen.dismiss.assert_called_once_with(None)
 
-        # Focus switch
-        screen.action_switch_focus()
-
     def test_diff_screen_search_filtering(self):
         from textual.widgets import Input
 
