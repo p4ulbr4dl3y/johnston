@@ -1,13 +1,15 @@
 import time
 from typing import Any, Optional
 
-from rich.markup import escape
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, OptionList, RichLog
 from textual.widgets.option_list import Option
 
-from core.infrastructure.presentation.tool_display import extract_subagent_progress
+from core.infrastructure.presentation.tool_display import (
+    extract_subagent_progress,
+    is_subagent_running,
+)
 from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
@@ -18,6 +20,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
 )
 from widgets.utils.key_aliases import expand_bindings
+from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, option_list_row_width
 
 
 def _format_duration(seconds: float) -> str:
@@ -78,7 +81,7 @@ def extract_shell_task_progress(task: Any) -> str:
 
 
 def format_shell_task_row(
-    cmd: str, task: Optional[object] = None, is_running: bool = False, target_width: int = 74
+    cmd: str, task: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_MEDIUM_ROW_WIDTH
 ) -> str:
     """Format a shell task row with human-like activity/status badge on the right."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(shell task)"
@@ -87,14 +90,7 @@ def format_shell_task_row(
         if task is not None
         else ("running..." if is_running else "done")
     )
-
-    max_title = max(10, target_width - len(badge_plain) - 2)
-    if len(clean) > max_title:
-        clean = clean[: max_title - 3] + "..."
-
-    spaces = " " * max(2, target_width - len(clean) - len(badge_plain))
-    badge_markup = f"[dim #71717a]{badge_plain}[/]"
-    return f"{escape(clean)}{spaces}{badge_markup}"
+    return format_badge_row(clean, badge_plain, target_width=target_width)
 
 
 def format_task_row(cmd: str) -> str:
@@ -107,7 +103,7 @@ def format_task_row(cmd: str) -> str:
 
 
 def format_subagent_task_row(
-    cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = 74
+    cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_MEDIUM_ROW_WIDTH
 ) -> str:
     """Format a subagent row with human-like activity/status badge on the right."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(subagent task)"
@@ -116,14 +112,7 @@ def format_subagent_task_row(
         if session is not None
         else ("running..." if is_running else "done")
     )
-
-    max_title = max(10, target_width - len(badge_plain) - 2)
-    if len(clean) > max_title:
-        clean = clean[: max_title - 3] + "..."
-
-    spaces = " " * max(2, target_width - len(clean) - len(badge_plain))
-    badge_markup = f"[dim #71717a]{badge_plain}[/]"
-    return f"{escape(clean)}{spaces}{badge_markup}"
+    return format_badge_row(clean, badge_plain, target_width=target_width)
 
 
 def _filter_and_sort_tasks(items: list, search_query: str) -> list:
@@ -234,13 +223,17 @@ class BaseTasksListScreen(BaseModalScreen[None]):
     def _get_header_md(self) -> str:
         raise NotImplementedError
 
+    def _row_width(self) -> int:
+        """Visible content width of the option list for right-aligned badges."""
+        return option_list_row_width(self._get_option_list(), MODAL_MEDIUM_ROW_WIDTH)
+
     def _get_option_list(self) -> OptionList:
         return self.query_one(f"#{self.option_list_id}", OptionList)
 
     def _get_filtered_tasks(self) -> list:
         raise NotImplementedError
 
-    def _format_task_row(self, item: dict) -> str:
+    def _format_task_row(self, item: dict, target_width: int) -> str:
         raise NotImplementedError
 
     def _on_task_selected(self, item: dict) -> None:
@@ -300,6 +293,7 @@ class BaseTasksListScreen(BaseModalScreen[None]):
 
         opt_list = self._get_option_list()
         current_highlighted = opt_list.highlighted
+        row_width = self._row_width()
 
         opt_list.clear_options()
         if not tasks:
@@ -320,7 +314,7 @@ class BaseTasksListScreen(BaseModalScreen[None]):
             opt_list.add_option(Option(status_key.capitalize(), disabled=True))
             self.filtered_tasks.append(None)
             for item in group:
-                opt_list.add_option(self._format_task_row(item))
+                opt_list.add_option(self._format_task_row(item, row_width))
                 self.filtered_tasks.append(item)
 
         if current_highlighted is not None and 0 <= current_highlighted < len(self.filtered_tasks):
@@ -393,11 +387,12 @@ class ShellTasksScreen(BaseTasksListScreen):
 
         return _filter_and_sort_tasks(items, self.search_query)
 
-    def _format_task_row(self, item: dict) -> str:
+    def _format_task_row(self, item: dict, target_width: int) -> str:
         return format_shell_task_row(
             item["command"],
             task=item.get("raw_obj"),
             is_running=item.get("is_running", False),
+            target_width=target_width,
         )
 
     def _on_task_selected(self, item: dict) -> None:
@@ -451,7 +446,7 @@ class SubagentsScreen(BaseTasksListScreen):
 
         for s in sessions:
             st_str = (getattr(s, "status", "") or "unknown").upper()
-            is_run = st_str == "RUNNING"
+            is_run = is_subagent_running(s)
             badge = extract_subagent_progress(s)
             items.append(
                 {
@@ -469,11 +464,12 @@ class SubagentsScreen(BaseTasksListScreen):
         self._tasks_cache_ts = time.monotonic()
         return result
 
-    def _format_task_row(self, item: dict) -> str:
+    def _format_task_row(self, item: dict, target_width: int) -> str:
         return format_subagent_task_row(
             item["command"],
             session=item.get("raw_obj"),
             is_running=item.get("is_running", False),
+            target_width=target_width,
         )
 
     def _open_task_details(self, item: dict) -> None:
@@ -487,7 +483,7 @@ class SubagentsScreen(BaseTasksListScreen):
 
     async def _kill_item(self, item: dict) -> None:
         sess = item["raw_obj"]
-        if getattr(sess, "status", "") == "running" or getattr(sess, "is_running", False):
+        if is_subagent_running(sess):
             if getattr(sess, "async_task", None) and not sess.async_task.done():
                 try:
                     sess.async_task.cancel()

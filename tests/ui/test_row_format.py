@@ -1,0 +1,123 @@
+"""Regression tests for right-aligned badge row formatting and the unified
+subagent running predicate (row_format helper used by tasks/resume/rewind/
+mcp/diff-sidebar lists)."""
+import unittest
+
+from rich.cells import cell_len
+from rich.markup import escape
+from rich.text import Text
+
+from core.infrastructure.presentation.tool_display import is_subagent_running
+from widgets.utils.row_format import (
+    DIFF_SIDEBAR_ROW_WIDTH,
+    display_width,
+    ellipsize,
+    format_badge_row,
+)
+
+
+def visible_len(row: str) -> int:
+    """Visible width of a rendered row: parse rich markup, measure cells."""
+    return cell_len(Text.from_markup(row).plain)
+
+
+class TestDisplayWidth(unittest.TestCase):
+    def test_ascii(self):
+        self.assertEqual(display_width("abc"), 3)
+
+    def test_wide_chars_count_two(self):
+        self.assertEqual(display_width("日本語"), 6)
+        self.assertNotEqual(display_width("日本語"), len("日本語"))
+
+
+class TestEllipsize(unittest.TestCase):
+    def test_noop_when_fits(self):
+        self.assertEqual(ellipsize("hello", 10), "hello")
+
+    def test_truncates_with_ellipsis_within_budget(self):
+        out = ellipsize("hello world", 8)
+        self.assertTrue(out.endswith("..."))
+        self.assertLessEqual(display_width(out), 8)
+
+    def test_cell_aware_truncation_keeps_width(self):
+        text = "日本語日本語日本語"
+        out = ellipsize(text, 8)
+        self.assertLessEqual(display_width(out), 8)
+        self.assertTrue(out.endswith("..."))
+
+    def test_zero_budget(self):
+        self.assertEqual(ellipsize("abc", 0), "...")
+
+
+class TestFormatBadgeRow(unittest.TestCase):
+    def test_badge_flush_right_at_target_width(self):
+        row = format_badge_row("Research codebase", "running • 12s", target_width=40)
+        self.assertEqual(visible_len(row), 40)
+        self.assertIn("[dim #71717a]running • 12s[/]", row)
+
+    def test_min_gap_enforced_when_title_too_long(self):
+        row = format_badge_row("x" * 100, "done", target_width=20)
+        self.assertIn("...", row)
+        # Title truncated to reserve space; row never shorter than min gap.
+        self.assertGreaterEqual(visible_len(row) - 4, 12)  # 20 - 4 badge - gap slack
+
+    def test_wide_char_title_still_aligns_badge(self):
+        title = "研究コードベースの構造を調べる" * 2
+        row = format_badge_row(title, "done", target_width=50)
+        self.assertEqual(visible_len(row), 50)
+
+    def test_empty_badge_plain_row(self):
+        row = format_badge_row("plain [title]", "")
+        self.assertEqual(row, f"{escape('plain [title]')}")
+
+    def test_prefix_included_in_math(self):
+        row = format_badge_row("sess one", "5 steps", target_width=30, prefix="● ")
+        self.assertEqual(visible_len(row), 30)
+        self.assertTrue(row.startswith("● sess one"))
+
+    def test_whitespace_collapsed_and_escaped(self):
+        row = format_badge_row("multi\nline\rtab  x [br]", "done", target_width=60)
+        self.assertNotIn("\n", row)
+        self.assertNotIn("\r", row)
+        self.assertIn(escape("x [br]"), row)
+
+
+class TestIsSubagentRunning(unittest.TestCase):
+    def _sess(self, status=None, is_running=None):
+        class S:
+            pass
+
+        s = S()
+        if status is not None:
+            s.status = status
+        if is_running is not None:
+            s.is_running = is_running
+        return s
+
+    def test_running_and_active_statuses(self):
+        self.assertTrue(is_subagent_running(self._sess(status="running")))
+        self.assertTrue(is_subagent_running(self._sess(status="RUNNING")))
+        # ACTIVE sessions (created, stream not started yet) count as running.
+        self.assertTrue(is_subagent_running(self._sess(status="active")))
+        self.assertTrue(is_subagent_running(self._sess(status="Active")))
+
+    def test_terminal_statuses(self):
+        for st in ("completed", "cancelled", "error"):
+            self.assertFalse(is_subagent_running(self._sess(status=st)))
+
+    def test_is_running_attribute_fallback(self):
+        self.assertTrue(is_subagent_running(self._sess(is_running=True)))
+        self.assertFalse(is_subagent_running(self._sess(is_running=False)))
+
+    def test_missing_status_not_running(self):
+        self.assertFalse(is_subagent_running(object()))
+
+
+class TestDiffSidebarWidthConstant(unittest.TestCase):
+    def test_constant_matches_css_geometry(self):
+        # app.tcss: #diff-sidebar width 34 - border-right 1 - option padding 2x1.
+        self.assertEqual(DIFF_SIDEBAR_ROW_WIDTH, 31)
+
+
+if __name__ == "__main__":
+    unittest.main()

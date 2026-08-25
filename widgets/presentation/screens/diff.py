@@ -14,6 +14,7 @@ from widgets.chat_toolcall import ToolScrollBox
 from widgets.presentation.screens.base_selection import ModalSearchNavMixin
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
+from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width
 
 
 class DiffHeader(Static):
@@ -183,18 +184,18 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         for file_path, _, added, deleted in self.diff_items:
             short_name = os.path.basename(file_path) or file_path
             stat_plain = f"+{added}/-{deleted}"
-            target_width = 28
-            if len(short_name) + len(stat_plain) + 1 > target_width:
-                max_name_len = max(4, target_width - len(stat_plain) - 1)
+            target_width = DIFF_SIDEBAR_ROW_WIDTH
+            if display_width(short_name) + display_width(stat_plain) + 1 > target_width:
+                max_name_len = max(4, target_width - display_width(stat_plain) - 1)
                 dot_idx = short_name.rfind(".")
                 if dot_idx > 3 and len(short_name) - dot_idx <= 5:
                     ext = short_name[dot_idx:]
                     base = short_name[:dot_idx]
-                    short_name = base[: max_name_len - len(ext) - 1] + "…" + ext
+                    short_name = base[: max_name_len - display_width(ext) - 1] + "…" + ext
                 else:
                     short_name = short_name[: max_name_len - 1] + "…"
 
-            spaces = " " * max(1, target_width - len(short_name) - len(stat_plain))
+            spaces = " " * max(1, target_width - display_width(short_name) - display_width(stat_plain))
             stat_markup = f"[#22c55e]+{added}[/][dim #71717a]/[/][#ef4444]-{deleted}[/]"
             self.sidebar_options.append(f"{escape(short_name)}{spaces}{stat_markup}")
 

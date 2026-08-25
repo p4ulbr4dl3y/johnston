@@ -265,6 +265,17 @@ def _format_active_tool_progress(tool_name: str, args: Dict[str, Any], target: s
     return f"tool: {clean_name}"
 
 
+def is_subagent_running(session: Any) -> bool:
+    """Canonical running predicate for subagent sessions.
+
+    Single source of truth for UI grouping (running vs completed), the live
+    progress badge and kill availability. Sessions are created as ACTIVE and
+    flip to RUNNING once their stream starts, so both count as running.
+    """
+    st_str = (getattr(session, "status", "") or "").lower()
+    return st_str in ("running", "active") or getattr(session, "is_running", None) is True
+
+
 def extract_subagent_progress(session: Any) -> str:
     """Extract a short, human-like activity/status badge for a subagent session.
 
@@ -274,9 +285,7 @@ def extract_subagent_progress(session: Any) -> str:
         return ""
 
     st_str = (getattr(session, "status", "") or "unknown").lower()
-    is_running = st_str in ("running", "active") or getattr(session, "is_running", None) is True
-
-    if not is_running:
+    if not is_subagent_running(session):
         if st_str in ("completed", "done"):
             tokens = getattr(session, "total_tokens", 0)
             if not isinstance(tokens, int) or tokens <= 0:

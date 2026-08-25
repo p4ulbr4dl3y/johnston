@@ -8,6 +8,7 @@ from textual.widgets import OptionList
 from widgets.app.command_provider import get_all_command_suggestions
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.constants import MESSAGE_INPUT
+from widgets.utils.row_format import display_width, ellipsize
 
 
 class CommandSuggestions(HeaderWrapOptionList):
@@ -106,7 +107,7 @@ class CommandSuggestions(HeaderWrapOptionList):
                 matched_files.append(f)
                 kind = "Dir" if f.endswith("/") else "File"
                 escaped_f = escape(f)
-                pad = max(0, 46 - len(f))
+                pad = max(0, 46 - display_width(f))
                 padding_spaces = " " * pad
                 formatted_line = f"{escaped_f}{padding_spaces} [dim #71717a]{kind}[/dim #71717a]"
                 self.add_option(formatted_line)
@@ -154,11 +155,10 @@ class CommandSuggestions(HeaderWrapOptionList):
                         if cmd.lower().startswith(query_lower):
                             matched_cmds.append(cmd)
                             clean_desc = " ".join(desc.split())
-                            if len(clean_desc) > 60:
-                                clean_desc = clean_desc[:57] + "..."
+                            clean_desc = ellipsize(clean_desc, 60)
                             escaped_cmd = escape(cmd)
                             escaped_desc = escape(clean_desc)
-                            pad = max(0, padding - len(cmd))
+                            pad = max(0, padding - display_width(cmd))
                             padding_spaces = " " * pad
                             formatted_line = f"{escaped_cmd}{padding_spaces} [dim #71717a]{escaped_desc}[/dim #71717a]"
                             self.add_option(formatted_line)

@@ -19,6 +19,7 @@ from widgets.presentation.screens.constants import (
     MODAL_OPTION_LIST,
     MODAL_OPTION_LIST_ID,
 )
+from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, ellipsize, format_badge_row
 
 
 @dataclass
@@ -74,7 +75,6 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self.selected_step1_index: Optional[int] = None
 
         options = []
-        target_width = 76
         for msg in user_messages:
             text = msg.text
             diff_stat = msg.git_stats
@@ -83,18 +83,10 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             opt_text = clean or "(empty message)"
 
             if checkpoints_enabled:
-                stat_label = diff_stat or "no checkpoint"
-                badge_plain = stat_label
-                max_title = max(10, target_width - len(badge_plain) - 2)
-                if len(opt_text) > max_title:
-                    opt_text = opt_text[: max_title - 3] + "..."
-                spaces = " " * max(2, target_width - len(opt_text) - len(badge_plain))
-                badge_markup = f"[dim #71717a]{badge_plain}[/]"
-                opt = f"{escape(opt_text)}{spaces}{badge_markup}"
+                badge_plain = diff_stat or "no checkpoint"
+                opt = format_badge_row(opt_text, badge_plain, target_width=MODAL_MEDIUM_ROW_WIDTH)
             else:
-                if len(opt_text) > 65:
-                    opt_text = opt_text[:62] + "..."
-                opt = escape(opt_text)
+                opt = escape(ellipsize(opt_text, 65))
             options.append(opt)
 
         self.title = "### **Select Message to Rollback To**"
