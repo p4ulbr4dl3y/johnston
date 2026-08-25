@@ -579,9 +579,21 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
             sandbox_val = getattr(session, "sandbox_enabled", None)
             if sandbox_val is None and agent:
                 sandbox_val = getattr(agent, "sandbox_enabled", None)
+            if sandbox_val is None and cur_app:
+                sandbox_val = getattr(cur_app, "sandbox_enabled", None)
             if sandbox_val is None:
-                sandbox_val = True
+                if getattr(session, "role", "") == "explorer" or getattr(agent, "read_only", False):
+                    sandbox_val = True
+                else:
+                    from core.infrastructure.config.config_helpers import load_sandbox_config
+
+                    sandbox_val = load_sandbox_config()
             sandbox_enabled = bool(sandbox_val)
+
+            from core.permission_manager import PermissionManager
+
+            pm_inst = PermissionManager.get_instance()
+            execution_mode = pm_inst.execution_mode.value if pm_inst else "review"
 
             branch = getattr(session, "branch_name", "") or self._git_branch(cwd=directory)
             grid, rows = _build_subagent_grid(
@@ -600,6 +612,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
                 git_diff_stats=lambda: self._git_diff_stats(cwd=directory),
                 is_compact=is_compact,
                 sandbox_enabled=sandbox_enabled,
+                execution_mode=execution_mode,
             )
 
             self._last_grid_rows = rows

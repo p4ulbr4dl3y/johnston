@@ -220,7 +220,40 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         self.assertIsNotNone(footer._last_grid_rows)
         self.assertIn("[Select model: /models]", footer._last_grid_rows[0][0])
         self.assertIn("sandbox: on", footer._last_grid_rows[1][0])
+        self.assertIn("review", footer._last_grid_rows[1][0])
         self.assertEqual(footer._last_grid_rows[1][1], "")
+
+    def test_render_footer_reflects_execution_mode_and_sandbox_off(self):
+        from core.domain.policies.permission_policy import ExecutionMode
+        from core.permission_manager import PermissionManager
+
+        footer = SubagentStatusFooter()
+        footer._harness_app = MagicMock()
+        footer._harness_app.sandbox_enabled = False
+        session = MagicMock()
+        session.agent = None
+        session.role = "worker"
+        session.project_dir = "/tmp"
+        session.branch_name = ""
+        session.messages = None
+        session.last_context_tokens = 0
+        session.total_tokens = 100
+        session.cost_usd = 0.0
+        session.sandbox_enabled = False
+        footer.session = session
+
+        pm = PermissionManager.get_instance()
+        orig_mode = pm.session_mode
+        pm.set_session_mode("yolo")
+        try:
+            with patch("widgets.status_footer.catalog.get_model_display_name", return_value=""), patch(
+                "widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
+            ), patch.object(footer, "_git_diff_stats", return_value=""):
+                footer._render_footer()
+            self.assertIn("sandbox: off", footer._last_grid_rows[1][0])
+            self.assertIn("yolo", footer._last_grid_rows[1][0])
+        finally:
+            pm.set_session_mode(orig_mode)
 
     def test_render_footer_compact_mode(self):
         footer = SubagentStatusFooter()
