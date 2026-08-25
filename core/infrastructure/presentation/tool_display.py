@@ -6,10 +6,9 @@ own rendering-format output, so these helpers live in the infrastructure
 presentation area consumed by core widgets and UI tests.
 """
 import json
-import os
 import re
 from collections import OrderedDict
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 # Textual markup-aware escaping: literal [ and ] would otherwise be swallowed as
 # style tags, so escape them (and backslashes) for the chat tool chip.
@@ -199,7 +198,12 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
     return ""
 
 
-def _format_active_tool_progress(tool_name: str, args: Dict[str, Any], target: str = "") -> str:
+def _format_active_tool_progress(
+    tool_name: str,
+    args: Dict[str, Any],
+    target: str = "",
+    turn_events: Optional[List[Dict[str, Any]]] = None,
+) -> str:
     """Format an active tool invocation into a short, human-like activity badge."""
     from tools.registry import normalize_tool_name as _normalize
 
@@ -207,54 +211,74 @@ def _format_active_tool_progress(tool_name: str, args: Dict[str, Any], target: s
     if not isinstance(args, dict):
         args = {}
 
-    def _get_path() -> str:
-        p = str(args.get("path") or args.get("file_path") or target or "").strip()
-        if not p:
-            return ""
-        base = os.path.basename(p.rstrip("/\\"))
-        return base or p
+    def _extract_path(targs: Any, ttgt: str = "") -> str:
+        if not isinstance(targs, dict):
+            return str(ttgt or "").strip()
+        return str(
+            targs.get("path")
+            or targs.get("file_path")
+            or targs.get("TargetFile")
+            or targs.get("AbsolutePath")
+            or ttgt
+            or ""
+        ).strip()
+
+    def _count_unique_files(tool_names: tuple[str, ...]) -> int:
+        if not turn_events:
+            return 1
+        files = set()
+        for evt in turn_events:
+            if not isinstance(evt, dict) or evt.get("type") != "tool":
+                continue
+            t_name = _normalize(evt.get("tool_type") or "")
+            if t_name in tool_names:
+                p = _extract_path(evt.get("args") or {}, evt.get("target") or "")
+                if p:
+                    files.add(p)
+                else:
+                    files.add(f"__anon_file_{id(evt)}")
+        return max(1, len(files))
+
+    def _count_tool_invocations(tool_names: tuple[str, ...]) -> int:
+        if not turn_events:
+            return 1
+        cnt = sum(
+            1
+            for evt in turn_events
+            if isinstance(evt, dict)
+            and evt.get("type") == "tool"
+            and _normalize(evt.get("tool_type") or "") in tool_names
+        )
+        return max(1, cnt)
 
     if name in ("read", "view_file"):
-        fn = _get_path()
-        return f"reading {fn}" if fn else "reading files"
+        n_files = _count_unique_files(("read", "view_file"))
+        return f"reading {n_files} files" if n_files > 1 else "reading file"
+
     if name in ("create", "write_to_file"):
-        fn = _get_path()
-        return f"creating {fn}" if fn else "creating file"
-    if name in ("edit", "replace_file_content"):
-        fn = _get_path()
-        return f"editing {fn}" if fn else "editing file"
+        n_files = _count_unique_files(("create", "write_to_file"))
+        return f"creating {n_files} files" if n_files > 1 else "creating file"
+
+    if name in ("edit", "replace_file_content", "multi_edit"):
+        n_files = _count_unique_files(("edit", "replace_file_content", "multi_edit"))
+        return f"editing {n_files} files" if n_files > 1 else "editing file"
+
     if name in ("shell", "run_command", "bash"):
-        cmd = str(args.get("command") or args.get("CommandLine") or target or "").strip()
-        if not cmd:
-            return "running command"
-        first_line = cmd.split("\n")[0].strip()
-        parts = first_line.split()
-        if parts:
-            if parts[0] in ("uv", "poetry") and len(parts) > 2 and parts[1] == "run":
-                short_cmd = " ".join(parts[2:4])
-            elif parts[0] in ("git", "npm", "yarn", "cargo") and len(parts) > 1:
-                short_cmd = f"{parts[0]} {parts[1]}"
-            else:
-                short_cmd = parts[0]
-            if len(short_cmd) > 16:
-                short_cmd = short_cmd[:13] + "..."
-            return f"running {short_cmd}"
-        return "running command"
+        n_cmds = _count_tool_invocations(("shell", "run_command", "bash"))
+        return f"running {n_cmds} commands" if n_cmds > 1 else "running command"
+
     if name == "update_plan":
         plan = args.get("plan")
         if isinstance(plan, list) and plan:
             done = sum(1 for item in plan if isinstance(item, dict) and item.get("status") == "completed")
             return f"plan [{done}/{len(plan)}]"
         return "updating plan"
-    if name in ("web_fetch", "read_url_content"):
-        url = str(args.get("url") or args.get("Url") or target or "").strip()
-        if url:
-            domain = re.sub(r"^https?://(www\.)?", "", url).split("/")[0]
-            if domain:
-                if len(domain) > 16:
-                    domain = domain[:13] + "..."
-                return f"fetching {domain}"
-        return "fetching web"
+
+    if name in ("web_fetch", "read_url_content", "search_web"):
+        n_web = _count_tool_invocations(("web_fetch", "read_url_content", "search_web"))
+        if "search" in name:
+            return f"searching web ({n_web})" if n_web > 1 else "searching web"
+        return f"fetching web ({n_web})" if n_web > 1 else "fetching web"
 
     # Generic or MCP tool
     if not name:
@@ -276,6 +300,26 @@ def is_subagent_running(session: Any) -> bool:
     return st_str in ("running", "active") or getattr(session, "is_running", None) is True
 
 
+def _count_session_steps(session: Any) -> int:
+    """Count agent loop iterations / steps for a session."""
+    if session is None:
+        return 0
+    step_cnt = getattr(session, "step_count", None)
+    if isinstance(step_cnt, int) and step_cnt > 0:
+        return step_cnt
+    history = getattr(session, "agent_history", None)
+    if isinstance(history, list) and history:
+        cnt = sum(1 for m in history if isinstance(m, dict) and m.get("role") == "assistant")
+        if cnt > 0:
+            return cnt
+    messages = getattr(session, "messages", None)
+    if isinstance(messages, list) and messages:
+        cnt = sum(1 for m in messages if isinstance(m, dict) and m.get("type") in ("bot", "tool"))
+        if cnt > 0:
+            return cnt
+    return 0
+
+
 def extract_subagent_progress(session: Any) -> str:
     """Extract a short, human-like activity/status badge for a subagent session.
 
@@ -287,15 +331,10 @@ def extract_subagent_progress(session: Any) -> str:
     st_str = (getattr(session, "status", "") or "unknown").lower()
     if not is_subagent_running(session):
         if st_str in ("completed", "done"):
-            tokens = getattr(session, "total_tokens", 0)
-            if not isinstance(tokens, int) or tokens <= 0:
-                in_tok = getattr(session, "tokens_input", 0) or 0
-                out_tok = getattr(session, "tokens_output", 0) or 0
-                tokens = (in_tok if isinstance(in_tok, int) else 0) + (out_tok if isinstance(out_tok, int) else 0)
-            if isinstance(tokens, int) and tokens > 0:
-                from core.domain.policies.model_catalog_policy import format_context_tokens
-
-                return f"done • {format_context_tokens(tokens)} tok"
+            steps = _count_session_steps(session)
+            if steps > 0:
+                step_str = "step" if steps == 1 else "steps"
+                return f"done • {steps} {step_str}"
             return "done"
         if st_str in ("cancelled", "canceled"):
             return "cancelled"
@@ -307,9 +346,17 @@ def extract_subagent_progress(session: Any) -> str:
     if not isinstance(messages, (list, tuple)) or not messages:
         return "starting..."
 
+    # Slice events belonging to the latest turn (from last user message)
+    turn_events: List[Dict[str, Any]] = []
     for evt in reversed(messages):
         if not isinstance(evt, dict):
             continue
+        turn_events.append(evt)
+        if evt.get("type") == "user":
+            break
+    turn_events.reverse()
+
+    for evt in reversed(turn_events):
         etype = evt.get("type")
         if etype == "tool":
             tool_type = evt.get("tool_type") or ""
@@ -317,7 +364,7 @@ def extract_subagent_progress(session: Any) -> str:
             target = evt.get("target") or ""
             if "result_text" in evt:
                 return "generating..."
-            return _format_active_tool_progress(tool_type, args, target)
+            return _format_active_tool_progress(tool_type, args, target, turn_events=turn_events)
         elif etype == "thinking":
             if evt.get("duration") is not None and evt.get("duration") > 0:
                 return "generating..."
@@ -328,4 +375,3 @@ def extract_subagent_progress(session: Any) -> str:
             return "starting..."
 
     return "running..."
-

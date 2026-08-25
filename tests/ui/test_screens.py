@@ -208,6 +208,36 @@ class TestTaskScreens(unittest.TestCase):
             s.dismiss.assert_called_once()
             self.assertEqual(s.filtered_tasks, [])
 
+    def test_subagents_screen_sync_listeners_and_unmount(self):
+        s = SubagentsScreen()
+        sess1 = MagicMock()
+        sess2 = MagicMock()
+        s._sync_session_listeners([sess1, sess2])
+        sess1.add_listener.assert_called_once_with(s._on_session_event)
+        sess2.add_listener.assert_called_once_with(s._on_session_event)
+        self.assertEqual(s._observed_sessions, {sess1, sess2})
+
+        # syncing again does not re-add
+        s._sync_session_listeners([sess1])
+        self.assertEqual(sess1.add_listener.call_count, 1)
+
+        # unmount detaches all
+        s.on_unmount()
+        sess1.remove_listener.assert_called_once_with(s._on_session_event)
+        sess2.remove_listener.assert_called_once_with(s._on_session_event)
+        self.assertEqual(s._observed_sessions, set())
+
+    def test_subagents_screen_on_session_event_invalidates_and_updates(self):
+        s = SubagentsScreen()
+        s._tasks_cache_ts = 123.45
+        mock_app = MagicMock()
+        s.update_tasks_list = MagicMock()
+        with patch.object(SubagentsScreen, "is_mounted", new_callable=PropertyMock, return_value=True), \
+             patch.object(SubagentsScreen, "app", new_callable=PropertyMock, return_value=mock_app):
+            s._on_session_event({"type": "tool"})
+            self.assertIsNone(s._tasks_cache_ts)
+            mock_app.call_from_thread.assert_called_once_with(s.update_tasks_list)
+
 
 
 class TestProvidersScreen(unittest.TestCase):

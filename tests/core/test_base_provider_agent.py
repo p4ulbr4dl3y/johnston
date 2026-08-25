@@ -522,7 +522,30 @@ class TestAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("Error processing attachment image" in str(p) for p in logged))
         messages = mock_create.call_args.kwargs["messages"]
         user_content = messages[1]["content"]
-        self.assertEqual(user_content[0], {"type": "text", "text": "Look"})
+        self.assertEqual(
+            user_content[0],
+            {"type": "text", "text": "Look\n[Image file: 'a.png']\n[Image file: 'bad.png']"},
+        )
+        self.assertEqual(
+            user_content[1],
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUFB", "detail": "high"}},
+        )
+
+    async def test_attachments_with_empty_text(self):
+        agent = self._make_agent()
+        img_json = json.dumps({"base64": "QUFB", "media_type": "image/png", "detail": "high"})
+        agent.image_processor = lambda path: img_json
+
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = _MockStream([_text_chunk("ok")])
+            async for _ in agent.stream_steps("", attachments=[_Attachment("clip.png")]):
+                pass
+
+        messages = mock_create.call_args.kwargs["messages"]
+        user_content = messages[1]["content"]
+        self.assertEqual(user_content[0], {"type": "text", "text": "[Image file: 'clip.png']"})
         self.assertEqual(
             user_content[1],
             {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUFB", "detail": "high"}},

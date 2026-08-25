@@ -355,8 +355,40 @@ class ShellTasksScreen(BaseTasksListScreen):
     option_list_id = "shell-option-list"
     hint_action_name = "enter: console"
 
+    def __init__(self):
+        super().__init__()
+        self._observed_tasks: set = set()
+
     def _get_header_md(self) -> str:
         return "### **Shell Tasks**"
+
+    def _on_task_event(self, _text: str = "") -> None:
+        if hasattr(self, "app") and self.app and self.is_mounted:
+            try:
+                self.app.call_from_thread(self.update_tasks_list)
+            except Exception:
+                try:
+                    self.update_tasks_list()
+                except Exception:
+                    pass
+
+    def _sync_task_listeners(self, tasks: list) -> None:
+        for t in tasks:
+            if hasattr(t, "add_listener") and t not in self._observed_tasks:
+                try:
+                    t.add_listener(self._on_task_event)
+                    self._observed_tasks.add(t)
+                except Exception:
+                    pass
+
+    def on_unmount(self) -> None:
+        for t in list(self._observed_tasks):
+            if hasattr(t, "remove_listener"):
+                try:
+                    t.remove_listener(self._on_task_event)
+                except Exception:
+                    pass
+        self._observed_tasks.clear()
 
     def _get_filtered_tasks(self) -> list:
         all_tasks = []
@@ -366,6 +398,8 @@ class ShellTasksScreen(BaseTasksListScreen):
             curr_sid = getattr(app, "current_session_id", None)
             if curr_sid:
                 all_tasks = [t for t in all_tasks if getattr(t, "session_id", None) == curr_sid]
+
+        self._sync_task_listeners(all_tasks)
 
         items = []
         for t in all_tasks:
@@ -420,6 +454,7 @@ class SubagentsScreen(BaseTasksListScreen):
         self._cached_tasks: list = []
         self._tasks_cache_ts: Optional[float] = None
         self._tasks_cache_ttl: float = 0.5
+        self._observed_sessions: set = set()
 
     def _get_header_md(self) -> str:
         return "### **Subagents**"
@@ -427,6 +462,35 @@ class SubagentsScreen(BaseTasksListScreen):
     def _invalidate_tasks_cache(self) -> None:
         """Drop the cached filtered-tasks snapshot so the next read re-reads the store."""
         self._tasks_cache_ts = None
+
+    def _on_session_event(self, _event: Any = None) -> None:
+        self._invalidate_tasks_cache()
+        if hasattr(self, "app") and self.app and self.is_mounted:
+            try:
+                self.app.call_from_thread(self.update_tasks_list)
+            except Exception:
+                try:
+                    self.update_tasks_list()
+                except Exception:
+                    pass
+
+    def _sync_session_listeners(self, sessions: list) -> None:
+        for s in sessions:
+            if hasattr(s, "add_listener") and s not in self._observed_sessions:
+                try:
+                    s.add_listener(self._on_session_event)
+                    self._observed_sessions.add(s)
+                except Exception:
+                    pass
+
+    def on_unmount(self) -> None:
+        for s in list(self._observed_sessions):
+            if hasattr(s, "remove_listener"):
+                try:
+                    s.remove_listener(self._on_session_event)
+                except Exception:
+                    pass
+        self._observed_sessions.clear()
 
     def _get_filtered_tasks(self) -> list:
         now = time.monotonic()
@@ -443,6 +507,7 @@ class SubagentsScreen(BaseTasksListScreen):
         store = get_session_store(self.app)
         curr_sid = getattr(self.app, "current_session_id", None) if (hasattr(self, "app") and self.app) else None
         sessions = store.children(curr_sid) if curr_sid else store.list(kind="subagent")
+        self._sync_session_listeners(sessions)
 
         for s in sessions:
             st_str = (getattr(s, "status", "") or "unknown").upper()
@@ -492,3 +557,4 @@ class SubagentsScreen(BaseTasksListScreen):
             if hasattr(sess, "finish"):
                 sess.finish("cancelled", "Terminated from subagents menu")
         self._invalidate_tasks_cache()
+        self._on_session_event()

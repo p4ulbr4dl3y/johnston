@@ -173,7 +173,27 @@ class AnthropicAdapter(BaseApiAdapter):
                 if isinstance(content, str):
                     final.append({"role": "user", "content": content})
                 elif isinstance(content, list):
-                    final.append({"role": "user", "content": content})
+                    converted_parts = []
+                    for p in content:
+                        if isinstance(p, dict) and p.get("type") == "image_url":
+                            img_url = p.get("image_url", {})
+                            url = img_url.get("url", "") if isinstance(img_url, dict) else str(img_url)
+                            if url.startswith("data:"):
+                                header, b64_data = url.split(",", 1) if "," in url else ("", url)
+                                mime_type = header.split(";")[0].replace("data:", "") or "image/jpeg"
+                                converted_parts.append(
+                                    {
+                                        "type": "image",
+                                        "source": {
+                                            "type": "base64",
+                                            "media_type": mime_type,
+                                            "data": b64_data,
+                                        },
+                                    }
+                                )
+                        else:
+                            converted_parts.append(p)
+                    final.append({"role": "user", "content": converted_parts})
                 else:
                     final.append({"role": "user", "content": json.dumps(content)})
             elif role == "assistant":

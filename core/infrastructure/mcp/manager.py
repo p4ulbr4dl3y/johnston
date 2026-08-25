@@ -89,6 +89,26 @@ class MCPManager:
         # ``last_error``; the UI reads this map via ``get_server_status`` to
         # keep showing ERR/Timeout badges after a failed warmup.
         self._server_errors: Dict[str, str] = {}
+        self._listeners: List[Any] = []
+
+    def add_listener(self, callback: Any) -> None:
+        """Subscribe a callback to be notified on MCP state changes (warmup, tools, stop)."""
+        if not hasattr(self, "_listeners"):
+            self._listeners = []
+        if callback not in self._listeners:
+            self._listeners.append(callback)
+
+    def remove_listener(self, callback: Any) -> None:
+        """Unsubscribe a callback."""
+        if hasattr(self, "_listeners") and callback in self._listeners:
+            self._listeners.remove(callback)
+
+    def _notify_listeners(self, event_type: str = "tools_updated") -> None:
+        for cb in list(getattr(self, "_listeners", [])):
+            try:
+                cb(event_type)
+            except Exception:
+                logger.debug("MCPManager listener failed", exc_info=True)
 
     def stop_all(self):
         """Stops all running MCP client processes and cancels background warmup.
@@ -114,6 +134,7 @@ class MCPManager:
             except Exception:
                 logger.warning("Failed to stop MCP client", exc_info=True)
         self.clients.clear()
+        self._notify_listeners("stopped")
 
     async def stop_all_async(self):
         """Stops all running MCP client processes concurrently without blocking."""
@@ -137,6 +158,7 @@ class MCPManager:
                         coros.append(asyncio.to_thread(stop))
             if coros:
                 await asyncio.gather(*coros, return_exceptions=True)
+        self._notify_listeners("stopped")
 
     def _reset_clients_for_project(self):
         """Stops and drops clients whose cwd belongs to a now-inactive project.
@@ -405,6 +427,7 @@ class MCPManager:
             # error so re-enabling starts with a clean status.
             self._server_errors.pop(name, None)
 
+        self._notify_listeners("server_updated")
         return new_enabled
 
     def get_active_tools(self) -> List[Dict[str, Any]]:
@@ -577,6 +600,8 @@ class MCPManager:
             raise
         except Exception:
             logger.warning("Failed to warm MCP server %s", name, exc_info=True)
+        finally:
+            self._notify_listeners("server_updated")
 
     async def get_active_tools_async(self) -> List[Dict[str, Any]]:
         servers = await self.load_servers_async()
@@ -699,6 +724,7 @@ class MCPManager:
                     logger.debug("Background MCP warmup failed: %s", exc)
             if self._tools_refresh_task is done:
                 self._tools_refresh_task = None
+            self._notify_listeners("warmup_complete")
 
         task.add_done_callback(_on_done)
 

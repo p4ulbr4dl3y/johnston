@@ -202,12 +202,24 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
 
     def on_mount(self) -> None:
         self.refresh_footer()
-        # While MCP servers are still warming up (or their tool counts change),
-        # poll so the footer spinner and loaded-server count stay current even
-        # when not generating.
-        self._mcp_poll_timer = self.set_interval(1.0, self._poll_mcp_refresh)
+        try:
+            from core.infrastructure.mcp import get_mcp_manager
+
+            mgr = get_mcp_manager()
+            if mgr and hasattr(mgr, "add_listener"):
+                mgr.add_listener(self._on_mcp_event)
+        except Exception:
+            pass
 
     def on_unmount(self) -> None:
+        try:
+            from core.infrastructure.mcp import get_mcp_manager
+
+            mgr = get_mcp_manager()
+            if mgr and hasattr(mgr, "remove_listener"):
+                mgr.remove_listener(self._on_mcp_event)
+        except Exception:
+            pass
         if getattr(self, "_spinner_timer", None):
             try:
                 self._spinner_timer.stop()
@@ -227,26 +239,29 @@ class StatusFooter(GitMetricsMixin, StreamFrameMixin, Static):
                 pass
             self._resize_timer = None
 
-    def _poll_mcp_refresh(self) -> None:
-        """Periodic MCP tick: updates footer when server tool discovery completes."""
+    def _on_mcp_event(self, _event: str = "") -> None:
+        """Reactive MCP event handler: triggers footer update when MCP state changes."""
+        if hasattr(self, "_st_cache_time"):
+            self._st_cache_time = 0.0
         try:
-            from core.infrastructure.mcp import _mcp_manager_instance
+            from widgets.app.status_state import refresh_footer_cache
 
-            if _mcp_manager_instance is None:
-                return
-            mgr = _mcp_manager_instance
-            warming = getattr(mgr, "is_warming_up", None)
-            is_warming = warming() if callable(warming) else False
-            if is_warming:
-                self.refresh_footer()
-            else:
-                tools = getattr(mgr, "get_cached_tools", lambda: [])()
-                count = len(tools) if isinstance(tools, list) else 0
-                if count != getattr(self, "_last_polled_mcp_count", -1):
-                    self._last_polled_mcp_count = count
-                    self.refresh_footer()
+            app = getattr(self, "_app", None) or (self.app if hasattr(self, "app") and self.is_mounted else None)
+            if app:
+                import asyncio
+
+                try:
+                    asyncio.get_running_loop().create_task(refresh_footer_cache(app, self))
+                    return
+                except RuntimeError:
+                    pass
+            self.refresh_footer()
         except Exception:
-            pass
+            self.refresh_footer()
+
+    def _poll_mcp_refresh(self) -> None:
+        """MCP refresh trigger: updates footer when server tool discovery completes."""
+        self._on_mcp_event()
 
     def refresh_footer(self) -> None:
         if not self.app:

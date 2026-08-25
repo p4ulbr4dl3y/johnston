@@ -368,7 +368,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
         sanitized_history = await sanitize_history_cached(self, self.history)
         if attachments:
-            user_content: List[Dict[str, Any]] = [{"type": "text", "text": user_text}]
+            text_parts = [user_text] if user_text else []
+            for att in attachments:
+                att_path = getattr(att, "path", str(att))
+                if att_path and f"[Image file: '{att_path}']" not in user_text and f"@{att_path}" not in user_text:
+                    text_parts.append(f"[Image file: '{att_path}']")
+            text_content = "\n".join(text_parts) if text_parts else "What is in this image?"
+            user_content: List[Dict[str, Any]] = [{"type": "text", "text": text_content}]
             for att in attachments:
                 att_path = getattr(att, "path", str(att))
                 img_item = await self._process_attachment_image(att_path)

@@ -19,13 +19,17 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         sess = MagicMock()
         sess.is_running = False
         sess.status = "completed"
-        sess.total_tokens = 1420
-        self.assertEqual(extract_subagent_progress(sess), "done • 1.4k tok")
-        sess.total_tokens = 420
-        self.assertEqual(extract_subagent_progress(sess), "done • 420 tok")
-        sess.total_tokens = 0
-        sess.tokens_input = 0
-        sess.tokens_output = 0
+        sess.step_count = 1
+        self.assertEqual(extract_subagent_progress(sess), "done • 1 step")
+        sess.step_count = 5
+        self.assertEqual(extract_subagent_progress(sess), "done • 5 steps")
+        sess.step_count = 0
+        sess.agent_history = [{"role": "assistant"}]
+        sess.messages = []
+        self.assertEqual(extract_subagent_progress(sess), "done • 1 step")
+        sess.agent_history = [{"role": "assistant"}, {"role": "assistant"}, {"role": "assistant"}]
+        self.assertEqual(extract_subagent_progress(sess), "done • 3 steps")
+        sess.agent_history = []
         self.assertEqual(extract_subagent_progress(sess), "done")
         sess.status = "cancelled"
         self.assertEqual(extract_subagent_progress(sess), "cancelled")
@@ -59,22 +63,53 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         sess = MagicMock()
         sess.is_running = True
         sess.status = "running"
-        # read
+        # read single
         sess.messages = [{"type": "tool", "tool_type": "read", "args": {"path": "core/session_manager.py"}}]
-        self.assertEqual(extract_subagent_progress(sess), "reading session_manager.py")
-        # create
+        self.assertEqual(extract_subagent_progress(sess), "reading file")
+        # read multiple files in batch
+        sess.messages = [
+            {"type": "tool", "tool_type": "read", "args": {"path": "core/session_manager.py"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "view_file", "args": {"path": "core/app.py"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "read", "args": {"path": "core/test.py"}},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "reading 3 files")
+        # multiple reads to same file -> 1 file
+        sess.messages = [
+            {"type": "tool", "tool_type": "read", "args": {"path": "core/session_manager.py"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "read", "args": {"path": "core/session_manager.py"}},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "reading file")
+
+        # create single
         sess.messages = [{"type": "tool", "tool_type": "create", "args": {"path": "tests/test_foo.py"}}]
-        self.assertEqual(extract_subagent_progress(sess), "creating test_foo.py")
-        # edit
+        self.assertEqual(extract_subagent_progress(sess), "creating file")
+        # create multiple
+        sess.messages = [
+            {"type": "tool", "tool_type": "create", "args": {"path": "a.py"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "write_to_file", "args": {"path": "b.py"}},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "creating 2 files")
+
+        # edit single
         sess.messages = [{"type": "tool", "tool_type": "edit", "args": {"path": "widgets/app.py"}}]
-        self.assertEqual(extract_subagent_progress(sess), "editing app.py")
-        # shell
+        self.assertEqual(extract_subagent_progress(sess), "editing file")
+        # edit multiple
+        sess.messages = [
+            {"type": "tool", "tool_type": "edit", "args": {"path": "a.py"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "replace_file_content", "args": {"path": "b.py"}},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "editing 2 files")
+
+        # shell single
         sess.messages = [{"type": "tool", "tool_type": "shell", "args": {"command": "uv run pytest -k test_app"}}]
-        self.assertEqual(extract_subagent_progress(sess), "running pytest -k")
-        sess.messages = [{"type": "tool", "tool_type": "shell", "args": {"command": "git status --short"}}]
-        self.assertEqual(extract_subagent_progress(sess), "running git status")
-        sess.messages = [{"type": "tool", "tool_type": "shell", "args": {"command": "npm test"}}]
-        self.assertEqual(extract_subagent_progress(sess), "running npm test")
+        self.assertEqual(extract_subagent_progress(sess), "running command")
+        # shell multiple
+        sess.messages = [
+            {"type": "tool", "tool_type": "shell", "args": {"command": "cd /tmp && pytest"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "run_command", "args": {"command": "git status"}},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "running 2 commands")
+
         # update_plan
         sess.messages = [
             {
@@ -84,11 +119,17 @@ class TestSubagentProgressDisplay(unittest.TestCase):
             }
         ]
         self.assertEqual(extract_subagent_progress(sess), "plan [1/2]")
-        # web_fetch
+
+        # web_fetch single & search multi
         sess.messages = [
             {"type": "tool", "tool_type": "web_fetch", "args": {"url": "https://docs.python.org/3/library"}}
         ]
-        self.assertEqual(extract_subagent_progress(sess), "fetching docs.python.org")
+        self.assertEqual(extract_subagent_progress(sess), "fetching web")
+        sess.messages = [
+            {"type": "tool", "tool_type": "search_web", "args": {"query": "python"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "search_web", "args": {"query": "textual"}},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "searching web (2)")
 
     def test_extract_progress_completed_tool_means_generating(self):
         sess = MagicMock()
@@ -110,7 +151,7 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         sess.messages = [{"type": "tool", "tool_type": "read", "args": {"path": "test.py"}}]
         row = format_subagent_task_row("Research codebase structure", session=sess, is_running=True)
         self.assertIn("Research codebase structure", row)
-        self.assertIn("reading test.py", row)
+        self.assertIn("reading file", row)
         self.assertIn("[dim #71717a]", row)
 
 

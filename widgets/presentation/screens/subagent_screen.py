@@ -68,14 +68,13 @@ class SubagentViewScreen(Screen[None]):
         header.update_session(self.session)
         footer.update_session(self.session)
 
-        # Keep the header & footer live while the subagent streams (tokens, spinner).
-        # Stop any stale interval from a previous mount before re-arming.
+        # Stop any stale interval from a previous mount
         if getattr(self, "_footer_refresh", None) is not None:
             try:
                 self._footer_refresh.stop()
             except Exception:
                 pass
-        self._footer_refresh = self.set_interval(1.0, self._refresh_chrome)
+            self._footer_refresh = None
 
         self._history_worker = self.run_worker(self._load_history_session())
 
@@ -100,8 +99,10 @@ class SubagentViewScreen(Screen[None]):
         self.current_tool_widget = None
         self.bot_msg = None
 
+        rendered_count = 0
         if self.session:
             history_events = list(self.session.messages)
+            rendered_count = len(history_events)
             has_user_msg = any(
                 isinstance(e, dict) and e.get("type") == "user" and is_ui_visible_user_message(e)
                 for e in history_events
@@ -136,6 +137,11 @@ class SubagentViewScreen(Screen[None]):
         if self.session:
             self.session.remove_listener(self._on_live_event)
             self.session.add_listener(self._on_live_event)
+            current_msgs = list(self.session.messages)
+            if len(current_msgs) > rendered_count:
+                for evt in current_msgs[rendered_count:]:
+                    self.event_queue.put_nowait(evt)
+            self._refresh_chrome()
 
     def on_unmount(self) -> None:
         if getattr(self, "_footer_refresh", None) is not None:
@@ -158,6 +164,7 @@ class SubagentViewScreen(Screen[None]):
     def _on_live_event(self, evt: dict) -> None:
         if self.is_mounted and hasattr(self, "event_queue"):
             self.event_queue.put_nowait(evt)
+            self._refresh_chrome()
 
     async def _process_queue(self) -> None:
         while True:
@@ -165,6 +172,7 @@ class SubagentViewScreen(Screen[None]):
                 evt = await self.event_queue.get()
                 try:
                     await self._render_event(evt)
+                    self._refresh_chrome()
                 finally:
                     self.event_queue.task_done()
             except asyncio.CancelledError:

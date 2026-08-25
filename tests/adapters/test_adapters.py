@@ -177,6 +177,28 @@ class TestAdapterMessageNormalization(unittest.TestCase):
         self.assertEqual(blocks[1]["type"], "image")
         self.assertEqual(blocks[1]["source"]["data"], "QUFBQQ==")
 
+    def test_anthropic_user_image_url_conversion(self):
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Look at this\n[Image file: 'test.png']"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "data:image/png;base64,QUFB", "detail": "high"},
+                    },
+                ],
+            }
+        ]
+        _, final = AnthropicAdapter._to_anthropic_messages(messages)
+        user_msg = final[0]
+        self.assertEqual(user_msg["role"], "user")
+        self.assertEqual(user_msg["content"][0], {"type": "text", "text": "Look at this\n[Image file: 'test.png']"})
+        self.assertEqual(
+            user_msg["content"][1],
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "QUFB"}},
+        )
+
     def test_gemini_image_tool_result(self):
         import json
 
