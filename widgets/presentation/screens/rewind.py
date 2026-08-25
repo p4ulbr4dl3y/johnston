@@ -3,6 +3,7 @@ from typing import Optional
 
 from rich.markup import escape
 from rich.text import Text
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, OptionList, Static
@@ -19,7 +20,7 @@ from widgets.presentation.screens.constants import (
     MODAL_OPTION_LIST,
     MODAL_OPTION_LIST_ID,
 )
-from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, ellipsize, format_badge_row
+from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, ellipsize, format_badge_row, option_list_row_width
 
 
 @dataclass
@@ -74,20 +75,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self.selected_entry: Optional[RewindEntry] = None
         self.selected_step1_index: Optional[int] = None
 
-        options = []
-        for msg in user_messages:
-            text = msg.text
-            diff_stat = msg.git_stats
-
-            clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
-            opt_text = clean or "(empty message)"
-
-            if checkpoints_enabled:
-                badge_plain = diff_stat or "no checkpoint"
-                opt = format_badge_row(opt_text, badge_plain, target_width=MODAL_MEDIUM_ROW_WIDTH)
-            else:
-                opt = escape(ellipsize(opt_text, 65))
-            options.append(opt)
+        options = self._format_step1_options(MODAL_MEDIUM_ROW_WIDTH)
 
         self.title = "### **Select Message to Rollback To**"
         self.hint_text = "enter: select • ↑↓: nav • esc: cancel"
@@ -98,6 +86,44 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self.default_value = self.raw_items[-1] if self.raw_items else -1
         self.option_list_id = MODAL_OPTION_LIST_ID
         self.dialog_classes = "modal-dialog-medium"
+
+    def _row_width(self) -> int:
+        try:
+            opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
+        except Exception:
+            opt_list = self
+        return option_list_row_width(opt_list, MODAL_MEDIUM_ROW_WIDTH)
+
+    def _format_step1_options(self, target_width: int) -> list[str]:
+        options = []
+        for msg in self.user_messages:
+            text = msg.text
+            diff_stat = msg.git_stats
+            clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
+            opt_text = clean or "(empty message)"
+            if self.checkpoints_enabled:
+                badge_plain = diff_stat or "no checkpoint"
+                opt = format_badge_row(opt_text, badge_plain, target_width=target_width)
+            else:
+                opt = escape(ellipsize(opt_text, max(10, target_width - 5)))
+            options.append(opt)
+        return options
+
+    def _refresh_step1_options(self) -> None:
+        if self.step != 1:
+            return
+        target_w = self._row_width()
+        self.raw_options = self._format_step1_options(target_w)
+        self.filtered_options = list(self.raw_options)
+        try:
+            opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
+            saved_idx = opt_list.highlighted
+            opt_list.clear_options()
+            opt_list.add_options(self.filtered_options)
+            if saved_idx is not None and 0 <= saved_idx < len(self.filtered_options):
+                opt_list.highlighted = saved_idx
+        except Exception:
+            pass
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes=self.dialog_classes):
@@ -121,6 +147,10 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             except Exception:
                 pass
         opt_list.focus()
+        self._refresh_step1_options()
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._refresh_step1_options()
 
     def _show_step_2(self, entry: RewindEntry) -> None:
         self.step = 2

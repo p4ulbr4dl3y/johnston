@@ -2,6 +2,7 @@
 subagent running predicate (row_format helper used by tasks/resume/rewind/
 mcp/diff-sidebar lists)."""
 import unittest
+from unittest.mock import MagicMock
 
 from rich.cells import cell_len
 from rich.markup import escape
@@ -15,6 +16,7 @@ from widgets.utils.row_format import (
     display_width,
     ellipsize,
     format_badge_row,
+    option_list_row_width,
 )
 
 
@@ -129,5 +131,45 @@ class TestDialogWidthConstants(unittest.TestCase):
         self.assertEqual(MODAL_DEFAULT_ROW_WIDTH, 70)  # 78 - 4 - 2 - 2
 
 
+class TestOptionListRowWidth(unittest.TestCase):
+    def test_mounted_widget_subtracts_option_padding(self):
+        widget = MagicMock()
+        widget.size.width = 60
+        # 60 - 2 = 58
+        self.assertEqual(option_list_row_width(widget, default=78), 58)
+
+    def test_mounted_widget_clamps_at_minimum_20(self):
+        widget = MagicMock()
+        widget.size.width = 21
+        # max(20, 21 - 2) = 20
+        self.assertEqual(option_list_row_width(widget, default=78), 20)
+
+    def test_unmounted_widget_clamps_against_screen_width(self):
+        widget = MagicMock()
+        widget.size.width = 0
+        app = MagicMock()
+        app.size.width = 80
+        widget.app = app
+        # 80 * 0.9 - 8 = 64
+        self.assertEqual(option_list_row_width(widget, default=78), 64)
+
+    def test_unmounted_widget_wide_screen_uses_default(self):
+        widget = MagicMock()
+        widget.size.width = 0
+        app = MagicMock()
+        app.size.width = 120
+        widget.app = app
+        # 120 * 0.9 - 8 = 100 > 78 -> returns 78
+        self.assertEqual(option_list_row_width(widget, default=78), 78)
+
+    def test_unmounted_no_size_info_clamps_to_default_terminal(self):
+        widget = object()
+        # Default terminal is 80 -> cap is 64; 78 clamped to 64
+        self.assertEqual(option_list_row_width(widget, default=78), 64)
+        # Small default (e.g. 50 < 64) remains 50
+        self.assertEqual(option_list_row_width(widget, default=50), 50)
+
+
 if __name__ == "__main__":
     unittest.main()
+

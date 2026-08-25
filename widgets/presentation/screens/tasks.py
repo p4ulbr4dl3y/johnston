@@ -1,6 +1,7 @@
 import time
 from typing import Any, Optional
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, OptionList, RichLog
@@ -225,7 +226,11 @@ class BaseTasksListScreen(BaseModalScreen[None]):
 
     def _row_width(self) -> int:
         """Visible content width of the option list for right-aligned badges."""
-        return option_list_row_width(self._get_option_list(), MODAL_MEDIUM_ROW_WIDTH)
+        try:
+            opt = self._get_option_list()
+        except Exception:
+            opt = self
+        return option_list_row_width(opt, MODAL_MEDIUM_ROW_WIDTH)
 
     def _get_option_list(self) -> OptionList:
         return self.query_one(f"#{self.option_list_id}", OptionList)
@@ -279,27 +284,35 @@ class BaseTasksListScreen(BaseModalScreen[None]):
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         self._update_hint()
 
+    def on_resize(self, event: events.Resize) -> None:
+        self._last_signatures = None
+        self.update_tasks_list()
+
     def update_tasks_list(self) -> None:
         if not self.is_mounted:
             return
         tasks = self._get_filtered_tasks()
+        row_width = self._row_width()
         new_signatures = [
-            (item["id"], item["is_running"], item["command"], item.get("progress_badge", ""))
+            (item["id"], item["is_running"], item["command"], item.get("progress_badge", ""), row_width)
             for item in tasks
         ]
         if hasattr(self, "_last_signatures") and self._last_signatures == new_signatures:
             return
         self._last_signatures = new_signatures
 
-        opt_list = self._get_option_list()
-        current_highlighted = opt_list.highlighted
-        row_width = self._row_width()
-
-        opt_list.clear_options()
         if not tasks:
             self.filtered_tasks = []
             self.dismiss()
             return
+
+        try:
+            opt_list = self._get_option_list()
+        except Exception:
+            return
+        current_highlighted = opt_list.highlighted
+
+        opt_list.clear_options()
 
         self.filtered_tasks = []
         first_group = True

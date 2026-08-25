@@ -77,6 +77,10 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         # Non-blocking background warmup for unstarted MCP servers
         self._warmup_task = asyncio.create_task(self._warmup_tools())
 
+    def on_resize(self, event: events.Resize) -> None:
+        if getattr(self, "is_mounted", True):
+            self._render_from_cache()
+
     def on_unmount(self) -> None:
         if self._warmup_task and not self._warmup_task.done():
             self._warmup_task.cancel()

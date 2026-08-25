@@ -172,8 +172,9 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
     def on_resize(self, event: events.Resize) -> None:
         self._apply_dialog_fit()
 
-    def on_input_changed(self, event: Input.Changed) -> None:
-        query_raw = event.value.strip().lower()
+    def _filter_options(self, query_raw: str = "") -> None:
+        """Filter options by query and update the OptionList, preserving highlight."""
+        query_raw = (query_raw or "").strip().lower()
         if not query_raw:
             self.filtered_items = list(self.raw_items)
             self.filtered_options = list(self.raw_options)
@@ -234,16 +235,26 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             self.filtered_options = filtered_options
             self.filtered_items = filtered_items
 
-        opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
-        opt_list.clear_options()
-        opt_list.add_options(self.filtered_options)
-        default_idx = None
-        if self.default_value is not None and self.default_value in self.filtered_items:
-            try:
-                default_idx = self.filtered_items.index(self.default_value)
-            except Exception:
-                pass
-        opt_list.highlighted = default_idx
+        try:
+            opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
+            saved_idx = opt_list.highlighted
+            opt_list.clear_options()
+            opt_list.add_options(self.filtered_options)
+            if saved_idx is not None and 0 <= saved_idx < len(self.filtered_items):
+                opt_list.highlighted = saved_idx
+            else:
+                default_idx = None
+                if self.default_value is not None and self.default_value in self.filtered_items:
+                    try:
+                        default_idx = self.filtered_items.index(self.default_value)
+                    except Exception:
+                        pass
+                opt_list.highlighted = default_idx
+        except Exception:
+            pass
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        self._filter_options(event.value)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         opt_list = self.query_one(f"#{self.option_list_id}", OptionList)

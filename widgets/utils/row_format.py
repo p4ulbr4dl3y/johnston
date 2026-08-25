@@ -26,14 +26,28 @@ DIFF_SIDEBAR_ROW_WIDTH = 31
 def option_list_row_width(opt_list: Any, default: int) -> int:
     """Visible content width of a mounted OptionList for badge padding math.
 
-    Falls back to ``default`` before layout (width 0), on unmounted widgets
-    and on test doubles whose ``size.width`` is not an int.
+    Subtracts Textual's OptionList option padding (0 1 -> 2 cells) from the
+    widget width. When unmounted or before layout, clamps ``default`` against
+    the screen width so narrow terminals don't overflow even on initial draw.
     """
     try:
         width = opt_list.size.width
+        if isinstance(width, int) and width > 20:
+            return max(20, width - 2)
     except Exception:
-        return default
-    return width if isinstance(width, int) and width > 20 else default
+        pass
+
+    # Unmounted / pre-layout fallback: clamp default to terminal width
+    try:
+        from widgets.utils.responsive import MODAL_CONTENT_GUTTER, MODAL_WIDTH_RATIO, resolve_screen_width
+
+        screen_w = resolve_screen_width(opt_list)
+        if screen_w > 0:
+            cap = int(screen_w * MODAL_WIDTH_RATIO) - MODAL_CONTENT_GUTTER
+            return max(20, min(default, cap))
+    except Exception:
+        pass
+    return default
 
 
 def display_width(text: str) -> int:
