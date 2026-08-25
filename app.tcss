@@ -812,15 +812,10 @@ DiffScreen {
 
 #modal-dialog.bash-confirm-dialog {
     width: 90%;
-    max-width: 80;
+    max-width: 104;
     height: auto;
     max-height: 85%;
     overflow-y: hidden;
-}
-
-#modal-dialog.bash-confirm-dialog.modal-dialog-wide {
-    width: 90%;
-    max-width: 104;
 }
 
 #modal-dialog.bash-confirm-dialog .modal-markdown {

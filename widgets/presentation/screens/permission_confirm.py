@@ -14,7 +14,15 @@ from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
-from widgets.utils.responsive import BREAKPOINT_HINT, is_compact_width, resolve_width
+from widgets.utils.responsive import (
+    BREAKPOINT_HINT,
+    MODAL_CONTENT_GUTTER,
+    apply_modal_fit,
+    is_compact_width,
+    modal_content_width,
+    resolve_width,
+)
+from widgets.utils.row_format import display_width
 
 
 class RejectReasonInput(Input):
@@ -200,25 +208,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             else:
                 action_desc = f"{actor} wants to execute `{self.tool_name}`"
 
-        is_wide = (
-            self.tool_name in ("create", "edit", "shell")
-            or bool(self.diff)
-            or (
-                bool(self.args)
-                and self.tool_name not in (
-                    "read",
-                    "web_fetch",
-                    "manage_shell",
-                    "manage_subagent",
-                    "invoke_subagent",
-                    "update_plan",
-                    "ask_user",
-                )
-            )
-        )
-        dialog_classes = "bash-confirm-dialog modal-dialog-wide" if is_wide else "bash-confirm-dialog"
-
-        with Vertical(id="modal-dialog", classes=dialog_classes):
+        self._action_desc = action_desc
+        with Vertical(id="modal-dialog", classes="bash-confirm-dialog"):
             yield Markdown("### **Confirm Tool Action**", classes="modal-markdown modal-markdown-centered")
             yield Markdown(action_desc, classes="modal-markdown")
 
@@ -309,6 +300,83 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             yield inp
             yield Label(self._build_hint_text(), id="modal-hint")
 
+    def _calculate_content_width(self) -> int:
+        options = [
+            "Allow once",
+            "Always allow for session",
+            "Deny",
+            "Reject with feedback...",
+        ]
+        if self.suggested_pattern:
+            pat_clean = " ".join(self.suggested_pattern.split())
+            if len(pat_clean) > 36:
+                pat_clean = pat_clean[:33] + "..."
+            options.append(f"Allow pattern ({pat_clean})")
+
+        hint = self._build_hint_text()
+        title = "Confirm Tool Action"
+        base_width = modal_content_width(options=options, title=title, hint=hint, extra=MODAL_CONTENT_GUTTER)
+
+        max_line = 0
+        if getattr(self, "_action_desc", None):
+            max_line = max(max_line, display_width(self._action_desc))
+
+        nargs = self.args if isinstance(self.args, dict) else {}
+        target_path = nargs.get("path") or ""
+
+        content_lines: list[str] = []
+        if self.tool_name == "create":
+            file_exists = bool(target_path and os.path.isfile(target_path))
+            if file_exists or self.diff:
+                diff_text = self._build_diff_text(target_path)
+                content_lines = diff_text.splitlines()
+            else:
+                code_content = nargs.get("content") or ""
+                content_lines = code_content.splitlines()
+        elif self.tool_name == "edit" or self.diff:
+            diff_text = self._build_diff_text(target_path)
+            content_lines = diff_text.splitlines()
+        elif self.tool_name == "shell":
+            cmd = nargs.get("command") or ""
+            content_lines = cmd.splitlines()
+        elif self.tool_name == "manage_shell" and (nargs.get("action") or "").lower() == "send_input":
+            inp = nargs.get("input") or ""
+            content_lines = inp.splitlines()
+        elif self.tool_name == "manage_subagent" and (nargs.get("action") or "").lower() == "send_message":
+            msg = nargs.get("message") or ""
+            content_lines = msg.splitlines()
+        elif self.tool_name == "invoke_subagent":
+            prompt = nargs.get("prompt") or ""
+            content_lines = prompt.splitlines()
+        elif self.args and self.tool_name not in (
+            "shell",
+            "read",
+            "web_fetch",
+            "manage_shell",
+            "manage_subagent",
+            "invoke_subagent",
+            "update_plan",
+            "ask_user",
+        ):
+            try:
+                args_str = json.dumps(self.args, indent=2, ensure_ascii=False)
+                content_lines = args_str.splitlines()
+            except Exception:
+                pass
+
+        for line in content_lines[:200]:
+            max_line = max(max_line, display_width(line.rstrip()) + 4)
+
+        return max(base_width, max_line + MODAL_CONTENT_GUTTER)
+
+    def _apply_dialog_fit(self) -> None:
+        try:
+            dialog = self.query_one("#modal-dialog")
+            content_w = self._calculate_content_width()
+            apply_modal_fit(dialog, content_w, min_width=52, max_width=104)
+        except Exception:
+            pass
+
     def on_mount(self) -> None:
         try:
             self.query_one("#permission-options-list", OptionList).focus()
@@ -318,6 +386,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             self.query_one("#modal-hint", Label).update(self._build_hint_text(resolve_width(self)))
         except Exception:
             pass
+        self._apply_dialog_fit()
 
     def _build_hint_text(self, width: Optional[int] = None) -> str:
         if isinstance(width, int) and is_compact_width(width, breakpoint=BREAKPOINT_HINT):
@@ -332,6 +401,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 hint_label.update(self._build_hint_text(event.size.width))
         except Exception:
             pass
+        self._apply_dialog_fit()
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         if not self.is_mounted:

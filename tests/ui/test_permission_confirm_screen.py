@@ -305,6 +305,34 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
             self.assertIn("Agent wants to ask a question", all_md)
 
+    def test_content_width_calculation_shell(self):
+        screen_short = PermissionConfirmScreen("shell", {"command": "git status"})
+        w_short = screen_short._calculate_content_width()
+        self.assertGreaterEqual(w_short, 52)
+        self.assertLess(w_short, 70)
+
+        screen_med = PermissionConfirmScreen(
+            "shell",
+            {"command": "uv run pytest -n auto -m 'not slow' --cov=core"},
+        )
+        w_med = screen_med._calculate_content_width()
+        self.assertGreater(w_med, w_short)
+        self.assertLessEqual(w_med, 80)
+
+        screen_long = PermissionConfirmScreen("shell", {"command": "x" * 150})
+        w_long = screen_long._calculate_content_width()
+        self.assertGreater(w_long, 100)
+
+    async def test_adaptive_modal_width_applied_on_mount(self):
+        screen = PermissionConfirmScreen("shell", {"command": "git status"})
+        async with HostApp(screen).run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            dialog = screen.query_one("#modal-dialog")
+            # Should hug content rather than stretching to 104
+            self.assertIsNotNone(dialog.styles.width)
+            self.assertLessEqual(dialog.styles.width.value, 70)
+            self.assertGreaterEqual(dialog.styles.width.value, 52)
+
 
 if __name__ == "__main__":
     unittest.main()
