@@ -67,7 +67,7 @@ class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
         f"Launch an autonomous subagent in the background for a bounded task "
-        f"(runs sandboxed to workspace, max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
+        f"(max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
         "Completion notifies automatically. Manage or follow up via 'manage_subagent'."
     )
     schema = {

@@ -224,7 +224,6 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         self.assertEqual(footer._last_grid_rows[1][1], "")
 
     def test_render_footer_reflects_execution_mode_and_sandbox_off(self):
-        from core.domain.policies.permission_policy import ExecutionMode
         from core.permission_manager import PermissionManager
 
         footer = SubagentStatusFooter()
