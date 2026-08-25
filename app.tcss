@@ -814,11 +814,6 @@ DiffScreen {
     max-width: 104;
 }
 
-#modal-dialog.bash-confirm-dialog #modal-hint {
-    dock: none;
-    margin-top: 1;
-}
-
 #modal-dialog.bash-confirm-dialog .modal-markdown {
     margin-bottom: 0;
 }
@@ -994,6 +989,7 @@ ModalScreen OptionList > .option-list--option-hover {
 }
 
 #modal-hint {
+    dock: bottom;
     width: 100%;
     height: auto;
     text-align: left;
