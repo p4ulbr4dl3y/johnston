@@ -5,9 +5,12 @@ the tasks/subagents, resume, rewind, MCP and diff-sidebar lists. All padding
 math uses visible terminal-cell width (``rich.cells.cell_len``), so wide/CJK
 characters keep the badge flush right instead of drifting.
 
-Layout constants mirror ``app.tcss`` geometry:
-- ``modal-dialog-medium``: max-width 86 - padding 2x2 - border 2 = 80 content.
-- ``modal-dialog`` (default): max-width 78 - padding 2x2 - border 2 = 72.
+Layout constants mirror ``app.tcss`` geometry (OptionList options render
+with Textual's default ``padding: 0 1``, so 2 columns are subtracted):
+- ``modal-dialog-medium``: max-width 86 - dialog padding 2x2 - border 2
+  - option padding 2x1 = 78.
+- ``modal-dialog`` (default): max-width 78 - dialog padding 2x2 - border 2
+  - option padding 2x1 = 70.
 - diff sidebar: CSS width 34 - border-right 1 - option padding 2x1 = 31.
 """
 from typing import Any
@@ -15,8 +18,8 @@ from typing import Any
 from rich.cells import cell_len
 from rich.markup import escape
 
-MODAL_MEDIUM_ROW_WIDTH = 80
-MODAL_DEFAULT_ROW_WIDTH = 72
+MODAL_MEDIUM_ROW_WIDTH = 78
+MODAL_DEFAULT_ROW_WIDTH = 70
 DIFF_SIDEBAR_ROW_WIDTH = 31
 
 

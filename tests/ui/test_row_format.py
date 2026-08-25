@@ -10,6 +10,8 @@ from rich.text import Text
 from core.infrastructure.presentation.tool_display import is_subagent_running
 from widgets.utils.row_format import (
     DIFF_SIDEBAR_ROW_WIDTH,
+    MODAL_DEFAULT_ROW_WIDTH,
+    MODAL_MEDIUM_ROW_WIDTH,
     display_width,
     ellipsize,
     format_badge_row,
@@ -117,6 +119,14 @@ class TestDiffSidebarWidthConstant(unittest.TestCase):
     def test_constant_matches_css_geometry(self):
         # app.tcss: #diff-sidebar width 34 - border-right 1 - option padding 2x1.
         self.assertEqual(DIFF_SIDEBAR_ROW_WIDTH, 31)
+
+
+class TestDialogWidthConstants(unittest.TestCase):
+    def test_modal_widths_account_for_option_padding(self):
+        # Modal OptionList options render with Textual default padding 0 1;
+        # rows wider than the remaining text area get ellipsized by CSS.
+        self.assertEqual(MODAL_MEDIUM_ROW_WIDTH, 78)  # 86 - 4 - 2 - 2
+        self.assertEqual(MODAL_DEFAULT_ROW_WIDTH, 70)  # 78 - 4 - 2 - 2
 
 
 if __name__ == "__main__":
