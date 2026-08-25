@@ -164,7 +164,6 @@ class SubagentViewScreen(Screen[None]):
     def _on_live_event(self, evt: dict) -> None:
         if self.is_mounted and hasattr(self, "event_queue"):
             self.event_queue.put_nowait(evt)
-            self._refresh_chrome()
 
     async def _process_queue(self) -> None:
         while True:

@@ -145,13 +145,21 @@ class GitCheckpointManager:
         shadow_dir = os.path.join(SHADOW_REPOS_DIR, f"{hash_id}.git")
         return shadow_dir, cwd
 
+    _initialized_repos: set[str] = set()
+
     @classmethod
     def is_git_repo(cls, project_path: Optional[str] = None) -> bool:
         shadow_dir, _ = cls._get_shadow_dir(project_path)
         if not os.path.exists(shadow_dir):
+            cls._initialized_repos.discard(shadow_dir)
             return False
+        if shadow_dir in cls._initialized_repos:
+            return True
         res = run_git(["rev-parse", "--git-dir"], cwd=shadow_dir)
-        return res.returncode == 0
+        if res.returncode == 0:
+            cls._initialized_repos.add(shadow_dir)
+            return True
+        return False
 
     @classmethod
     def get_ref_name(cls, session_id: str, message_index: int) -> str:
@@ -161,16 +169,23 @@ class GitCheckpointManager:
     def ensure_git_repo(cls, project_path: Optional[str] = None) -> bool:
         """Ensures an isolated shadow Git repository exists in ~/.johnston/shadow_repos for the project path."""
         shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        if shadow_dir in cls._initialized_repos and os.path.exists(shadow_dir):
+            return True
+
         os.makedirs(shadow_dir, exist_ok=True)
 
         rev_res = run_git(["rev-parse", "--git-dir"], cwd=shadow_dir)
+        newly_initialized = False
         if rev_res.returncode != 0:
             init_res = run_git(["init", "--bare"], cwd=shadow_dir)
             if init_res.returncode != 0:
                 return False
+            newly_initialized = True
 
-        run_git(["config", "user.name", "Johnston AI"], cwd=shadow_dir)
-        run_git(["config", "user.email", "johnston@local"], cwd=shadow_dir)
+        if newly_initialized:
+            run_git(["config", "user.name", "Johnston AI"], cwd=shadow_dir)
+            run_git(["config", "user.email", "johnston@local"], cwd=shadow_dir)
+
         cls._ensure_shadow_exclude(shadow_dir)
 
         head_res = run_git(["rev-parse", "--verify", "HEAD"], cwd=shadow_dir)
@@ -189,6 +204,7 @@ class GitCheckpointManager:
             run_git(["update-ref", "refs/heads/main", commit_sha], cwd=shadow_dir)
             run_git(["symbolic-ref", "HEAD", "refs/heads/main"], cwd=shadow_dir)
 
+        cls._initialized_repos.add(shadow_dir)
         return True
 
     @classmethod

@@ -8,7 +8,14 @@ except ImportError:  # pragma: no cover - Python < 3.11
     import tomli as tomllib  # type: ignore[no-redef]
 
 from core.infrastructure.platform.paths import CONFIG_DIR
-from core.provider_manager import ProviderManager
+
+
+def __getattr__(name: str):
+    if name == "ProviderManager":
+        from core.provider_manager import ProviderManager
+
+        return ProviderManager
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def get_version() -> str:
@@ -29,7 +36,8 @@ def get_version() -> str:
 
 def print_models():
     """Print available providers and models to stdout"""
-    pm = ProviderManager()
+    pm_cls = getattr(sys.modules[__name__], "ProviderManager")
+    pm = pm_cls()
     providers = pm.load_providers()
     active_key = pm.get_active_provider_key()
     print("Available Johnston Providers & Models:")

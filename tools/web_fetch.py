@@ -5,6 +5,7 @@ import re
 import socket
 import tempfile
 import threading
+import time
 from typing import Any, Dict
 
 import httpx
@@ -22,6 +23,13 @@ DEFAULT_USER_AGENT = (
 
 
 _FAKE_IP_NET = ipaddress.ip_network("198.18.0.0/15")
+_DNS_CACHE: dict[str, tuple[float, bool]] = {}
+_DNS_CACHE_TTL = 60.0
+_MAX_DNS_CACHE = 512
+
+
+def _clear_dns_cache() -> None:
+    _DNS_CACHE.clear()
 
 
 def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
@@ -45,6 +53,15 @@ async def _is_private_host(url: str) -> bool:
         return _is_blocked_ip(addr)
     except ValueError:
         pass
+
+    now = time.monotonic()
+    cached = _DNS_CACHE.get(host)
+    if cached is not None:
+        cached_ts, cached_res = cached
+        if now - cached_ts < _DNS_CACHE_TTL:
+            return cached_res
+        _DNS_CACHE.pop(host, None)
+
     # Hostname: resolve; block any private/loopback result.
     try:
         infos = await asyncio.to_thread(socket.getaddrinfo, host, None)
@@ -52,14 +69,23 @@ async def _is_private_host(url: str) -> bool:
         # Unresolvable host: cannot classify as private. Let httpx surface the real
         # connection error rather than (falsely) blocking offline/sandboxed resolvers.
         return False
+    except Exception:
+        return False
+
+    is_blocked = False
     for info in infos:
         try:
             addr = ipaddress.ip_address(info[4][0])
         except ValueError:
             continue
         if _is_blocked_ip(addr):
-            return True
-    return False
+            is_blocked = True
+            break
+
+    if len(_DNS_CACHE) >= _MAX_DNS_CACHE:
+        _DNS_CACHE.clear()
+    _DNS_CACHE[host] = (now, is_blocked)
+    return is_blocked
 
 
 _SCRIPT_TAG_RE = re.compile(r"<\s*/?\s*script\b[^>]*>", re.IGNORECASE)
@@ -131,6 +157,12 @@ class WebFetchTool(BaseTool):
         if self._client is not None and getattr(self._client, "is_closed", False) is False:
             await self._client.aclose()
             self._client = None
+
+    async def __aenter__(self) -> "WebFetchTool":
+        return self
+
+    async def __aexit__(self, *exc: Any) -> None:
+        await self.aclose()
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         """Fetch URL content with follow_redirects=True and _is_private_host security guard."""

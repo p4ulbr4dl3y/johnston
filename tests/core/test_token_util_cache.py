@@ -13,6 +13,7 @@ from core.infrastructure.runtime.token_util import estimate_tokens
 class TestEstimateTokensCache(unittest.TestCase):
     def tearDown(self):
         token_util._estimate_cache.clear()
+        token_util._msg_tokens_cache.clear()
 
     def test_repeated_unmutated_history_is_deduplicated(self):
         history = [{"role": "user", "content": "Помоги починить сборку"}, {"role": "assistant", "content": "Смотрю"}]
@@ -20,6 +21,22 @@ class TestEstimateTokensCache(unittest.TestCase):
         # Same object, unchanged -> same memoized slot.
         self.assertEqual(estimate_tokens(history), first)
         self.assertIn(token_util._estimate_cache_key(history), token_util._estimate_cache)
+
+    def test_message_tokens_cached_across_appends(self):
+        m1 = {"role": "user", "content": "first message"}
+        m2 = {"role": "assistant", "content": "second message"}
+        history = [m1]
+        t1 = estimate_tokens(history)
+        self.assertGreater(t1, 0)
+        # Message 1 must be cached in _msg_tokens_cache
+        m1_key = token_util._structural_key(m1)
+        self.assertIn(m1_key, token_util._msg_tokens_cache)
+
+        history.append(m2)
+        t2 = estimate_tokens(history)
+        self.assertGreater(t2, t1)
+        m2_key = token_util._structural_key(m2)
+        self.assertIn(m2_key, token_util._msg_tokens_cache)
 
     def test_mutation_increases_cache_size_updates_value(self):
         history = [{"role": "user", "content": "a"}]

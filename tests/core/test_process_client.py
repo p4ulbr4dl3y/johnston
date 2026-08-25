@@ -369,11 +369,12 @@ class TestReadResponse(unittest.TestCase):
         read_task.done.return_value = False
         client._read_task = read_task
 
-        def fake_sleep(secs):
+        def fake_wait(timeout=None):
             client._pending_responses[1] = {"jsonrpc": "2.0", "id": 1, "result": {"ok": True}}
+            return True
 
-        with patch("core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0]):
-            with patch("core.infrastructure.mcp.process_client.time.sleep", side_effect=fake_sleep):
+        with patch.object(client._response_event, "wait", side_effect=fake_wait):
+            with patch("core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0]):
                 res = client._read_response(req_id=1, timeout=5.0)
         self.assertEqual(res["id"], 1)
 
@@ -396,11 +397,12 @@ class TestReadResponse(unittest.TestCase):
         read_task.done.return_value = False
         client._read_task = read_task
 
-        def fake_sleep(secs):
+        def fake_wait(timeout=None):
             client._stopped = True
+            return True
 
-        with patch("core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0]):
-            with patch("core.infrastructure.mcp.process_client.time.sleep", side_effect=fake_sleep):
+        with patch.object(client._response_event, "wait", side_effect=fake_wait):
+            with patch("core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0]):
                 res = client._read_response(req_id=1, timeout=5.0)
         self.assertIsNone(res)
 

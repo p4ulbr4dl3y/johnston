@@ -397,7 +397,25 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(bm.allow_select)
             self.assertTrue(um.allow_select)
 
+    def test_subagent_status_footer_token_cache(self):
+        from widgets.status_footer import SubagentStatusFooter
+
+        footer = SubagentStatusFooter()
+        sess = self._mk("task-tok-cache", "Tok Agent", "prompt")
+        sess.messages = [{"type": "user", "text": "hello"}]
+        with patch("core.infrastructure.runtime.token_util.estimate_tokens", return_value=42) as mock_est:
+            footer.update_session(sess)
+            self.assertEqual(mock_est.call_count, 1)
+            # Re-render with same message count uses cached estimate
+            footer.update_session(sess)
+            self.assertEqual(mock_est.call_count, 1)
+            # When message count changes, token estimator runs again
+            sess.messages = [{"type": "user", "text": "hello"}, {"type": "bot", "text": "world"}]
+            footer.update_session(sess)
+            self.assertEqual(mock_est.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

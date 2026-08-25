@@ -326,7 +326,9 @@ def clean_markdown_for_rendering(text: str) -> str:
     if not text:
         return ""
 
-    text = text.replace("\r\n", "\n").expandtabs(4)
+    text = text.replace("\r\n", "\n")
+    if "\t" in text:
+        text = text.expandtabs(4)
     lines = text.splitlines()
 
     in_code = False
@@ -342,20 +344,30 @@ def clean_markdown_for_rendering(text: str) -> str:
             cleaned.append(line)
             continue
 
-        line = _RE_ITALIC_COLON.sub(r"**\1:**", line)
-        line = _RE_DOUBLE_BULLET.sub(r"\1* ", line)
-        line = _RE_BLOCKQUOTE_BULLET.sub(r"\1", line)
+        has_star = "*" in line
+        has_colon = ":" in line
+        has_quote = ">" in line
+        has_dash = "-" in line
+        has_digit = any(c.isdigit() for c in line[:10])
 
-        m_list = _RE_LIST_PREFIX.match(line)
-        if m_list:
-            prefix, body = m_list.groups()
-            line = f"{prefix} {body}"
+        if has_star and has_colon:
+            line = _RE_ITALIC_COLON.sub(r"**\1:**", line)
+        if has_star or has_dash or has_digit:
+            line = _RE_DOUBLE_BULLET.sub(r"\1* ", line)
+        if has_quote:
+            line = _RE_BLOCKQUOTE_BULLET.sub(r"\1", line)
 
-        m = _RE_EXCESS_INDENT.match(line)
-        if m:
-            indent, marker, content = m.groups()
-            new_indent_len = min(len(indent), 8)
-            line = (" " * new_indent_len) + marker + " " + content
+        if has_star or has_dash or has_digit:
+            m_list = _RE_LIST_PREFIX.match(line)
+            if m_list:
+                prefix, body = m_list.groups()
+                line = f"{prefix} {body}"
+
+            m = _RE_EXCESS_INDENT.match(line)
+            if m:
+                indent, marker, content = m.groups()
+                new_indent_len = min(len(indent), 8)
+                line = (" " * new_indent_len) + marker + " " + content
 
         if not line.strip():
             blank_run += 1

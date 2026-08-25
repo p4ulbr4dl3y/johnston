@@ -81,6 +81,33 @@ def _estimate_text_tokens(text: str) -> int:
 _CACHE_STR_KEY_MAX = 20000
 _ESTIMATE_CACHE_MAXSIZE = 256
 _estimate_cache: "OrderedDict[tuple, int]" = OrderedDict()
+_msg_tokens_cache: "OrderedDict[tuple, int]" = OrderedDict()
+_MSG_CACHE_MAXSIZE = 1024
+
+
+def _estimate_message_tokens(msg: Any) -> int:
+    if msg is None:
+        return 0
+    if isinstance(msg, str):
+        return _estimate_text_tokens(msg)
+    if not isinstance(msg, dict):
+        return estimate_tokens(msg)
+    key = _structural_key(msg)
+    if key[0] != "big":
+        cached = _msg_tokens_cache.get(key)
+        if cached is not None:
+            _msg_tokens_cache.move_to_end(key)
+            return cached
+    try:
+        text = json.dumps(msg, ensure_ascii=False)
+    except Exception:
+        text = str(msg)
+    val = _estimate_text_tokens(text)
+    if key[0] != "big":
+        _msg_tokens_cache[key] = val
+        while len(_msg_tokens_cache) > _MSG_CACHE_MAXSIZE:
+            _msg_tokens_cache.popitem(last=False)
+    return val
 
 
 def _structural_key(val: Any, depth: int = 0) -> tuple:
@@ -174,11 +201,15 @@ def estimate_tokens(input_val: Any) -> int:
     if cached is not None:
         _estimate_cache.move_to_end(key)
         return cached
-    try:
-        text = json.dumps(input_val, ensure_ascii=False)
-    except Exception:
-        text = str(input_val)
-    val = _estimate_text_tokens(text)
+
+    if isinstance(input_val, (list, tuple)):
+        val = sum(_estimate_message_tokens(item) for item in input_val)
+    else:
+        try:
+            text = json.dumps(input_val, ensure_ascii=False)
+        except Exception:
+            text = str(input_val)
+        val = _estimate_text_tokens(text)
     if key[0] != "big":
         _estimate_cache[key] = val
     _trim_cache()

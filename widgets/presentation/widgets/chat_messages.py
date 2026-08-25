@@ -273,8 +273,10 @@ class BotMessage(Vertical):
                 self.content = text
             finally:
                 self._suppress_content_watch = False
-            self.stream_widget.update(text)
-            self._scroll_if_needed()
+            if text != getattr(self, "_last_rendered_stream_text", None):
+                self.stream_widget.update(text)
+                self._last_rendered_stream_text = text
+                self._scroll_if_needed()
         except Exception:
             logger.debug("Stream flush failed", exc_info=True)
 
@@ -319,7 +321,11 @@ class BotMessage(Vertical):
     async def finalize_stream(self, content: str | None = None) -> None:
         if content is None:
             content = self._join_stream_content()
-        self.content = content
+        self._suppress_content_watch = True
+        try:
+            self.content = content
+        finally:
+            self._suppress_content_watch = False
         await self.set_final_content(content)
 
     def _schedule_markdown_render(self, content: str) -> None:
@@ -328,7 +334,9 @@ class BotMessage(Vertical):
         if self._markdown_render_task is not None and not self._markdown_render_task.done():
             return
         try:
-            self._markdown_render_task = asyncio.create_task(self._drain_markdown_render())
+            loop = asyncio.get_running_loop()
+            coro = self._drain_markdown_render()
+            self._markdown_render_task = loop.create_task(coro)
             self._markdown_render_task.add_done_callback(_handle_markdown_task_done)
         except RuntimeError:
             safe_update_markdown(self.md_widget, content, on_done=self._scroll_if_needed)
@@ -428,8 +436,11 @@ class ThinkingWidget(Vertical):
         if not self.is_expanded:
             return
         try:
-            self.content_widget.update(self.thinking_text)
-            self._scroll_if_needed()
+            txt = self.thinking_text
+            if txt != getattr(self, "_last_rendered_thinking", None):
+                self.content_widget.update(txt)
+                self._last_rendered_thinking = txt
+                self._scroll_if_needed()
         except Exception:
             logger.debug("Thinking flush failed", exc_info=True)
 

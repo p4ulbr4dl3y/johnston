@@ -160,6 +160,31 @@ async def check_and_confirm_permission(
     return None
 
 
+_TOOL_INSTANCES: Dict[Type[BaseTool], BaseTool] = {}
+
+
+def _get_tool_instance(tool_cls: Type[BaseTool]) -> BaseTool:
+    """Get or create singleton tool instance."""
+    inst = _TOOL_INSTANCES.get(tool_cls)
+    if inst is None:
+        inst = tool_cls()
+        _TOOL_INSTANCES[tool_cls] = inst
+    return inst
+
+
+async def aclose_tools() -> None:
+    """Clean up and close persistent resources held by cached tool instances."""
+    for inst in list(_TOOL_INSTANCES.values()):
+        if hasattr(inst, "aclose"):
+            try:
+                res = inst.aclose()
+                if inspect.isawaitable(res):
+                    await res
+            except Exception:
+                pass
+    _TOOL_INSTANCES.clear()
+
+
 async def execute_tool(name: str, args: dict | None, app: Any = None, context: Any = None) -> ToolResult:
     raw_name = (name or "").strip()
     clean_name = raw_name.lower()
@@ -168,7 +193,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     tool_cls = REGISTRY.get(resolved_name)
     if tool_cls:
         try:
-            tool_inst = tool_cls()
+            tool_inst = _get_tool_instance(tool_cls)
             ctx = tool_inst._ensure_context(context or app)
 
             err = await check_and_confirm_permission(resolved_name, name, args, context or app)

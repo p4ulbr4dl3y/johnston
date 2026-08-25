@@ -211,6 +211,14 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
             bot.flush_pending_stream()
             self.assertEqual(bot.content, "hello world")
 
+    async def test_flush_stream_update_skips_widget_update_when_unchanged(self):
+        bot = BotMessage()
+        bot.set_stream_content("hello")
+        bot._flush_stream_update()
+        with patch.object(bot.stream_widget, "update") as update_mock:
+            bot._flush_stream_update()
+            update_mock.assert_not_called()
+
 
 class TestThinkingWidget(unittest.TestCase):
     def _make_widget(self, text="Thinking..."):

@@ -564,7 +564,7 @@ class ProviderManager:
             cached_models: List[str] = []
             cache_age: Optional[float] = None
             if os.path.exists(cache_path):
-                cdata = read_json(cache_path, {})
+                cdata = await asyncio.to_thread(read_json, cache_path, {})
                 if isinstance(cdata, dict):
                     cache_age = time.time() - float(cdata.get("updated_at", 0))
                     cached_models = [m for m in cdata.get("models", []) if isinstance(m, str)]
@@ -620,7 +620,7 @@ class ProviderManager:
 
         if models:
             try:
-                catalog.save_cache()
+                await asyncio.to_thread(catalog.save_cache)
             except Exception:
                 pass
 
@@ -631,8 +631,11 @@ class ProviderManager:
         # Save to cache: non-empty lists live MODELS_CACHE_TTL, empty/fallback
         # ones only MODELS_CACHE_EMPTY_TTL (see fast path above).
         try:
-            atomic_write_json(
-                cache_path, {"updated_at": time.time(), "models": models, "model_limits": model_limits}, indent=2
+            await asyncio.to_thread(
+                atomic_write_json,
+                cache_path,
+                {"updated_at": time.time(), "models": models, "model_limits": model_limits},
+                indent=2,
             )
         except Exception as e:
             logger.warning("Error writing models cache: %s", e)

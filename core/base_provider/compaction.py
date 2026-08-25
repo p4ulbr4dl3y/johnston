@@ -306,7 +306,7 @@ class CompactionMixin:
 
         from core.base_provider.tools import build_prompt_context_async
 
-        _, _, sys_tokens = await build_prompt_context_async(self)
+        sys_prompt, all_tools, sys_tokens = await build_prompt_context_async(self)
 
         tokens_before = (
             self.last_context_tokens
@@ -404,9 +404,6 @@ class CompactionMixin:
             f"{prompt_header}{summary_template}\n\n"
             "Generate the structured context handoff summary now based on the conversation history."
         )
-
-        from core.base_provider.tools import build_prompt_context_async
-        sys_prompt, all_tools, _ = await build_prompt_context_async(self)
 
         compact_messages = (
             [{"role": "system", "content": sys_prompt}]

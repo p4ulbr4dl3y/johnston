@@ -17,6 +17,47 @@ _DOC_CACHE: "OrderedDict[str, Tuple[float, float, str]]" = OrderedDict()  # key:
 MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes
 
+_MARKITDOWN_CLS = None
+_MARKITDOWN_INSTANCE = None
+_LINE_COUNT_CACHE: "OrderedDict[Tuple[str, float, int], int]" = OrderedDict()
+MAX_LINE_COUNT_CACHE = 500
+
+
+def _get_markitdown():
+    global _MARKITDOWN_CLS, _MARKITDOWN_INSTANCE
+    import markitdown
+
+    current_cls = markitdown.MarkItDown
+    if _MARKITDOWN_INSTANCE is None or _MARKITDOWN_CLS is not current_cls:
+        _MARKITDOWN_CLS = current_cls
+        _MARKITDOWN_INSTANCE = current_cls()
+    return _MARKITDOWN_INSTANCE
+
+
+def _get_file_line_count(file_path: str, mtime: float, size: int) -> int:
+    key = (file_path, mtime, size)
+    if key in _LINE_COUNT_CACHE:
+        _LINE_COUNT_CACHE.move_to_end(key)
+        return _LINE_COUNT_CACHE[key]
+
+    total = 0
+    last_byte = b""
+    try:
+        with open(file_path, "rb") as f:
+            while chunk := f.read(65536):
+                total += chunk.count(b"\n")
+                last_byte = chunk[-1:]
+        if last_byte and last_byte not in (b"\n", b"\r"):
+            total += 1
+    except Exception:
+        return 0
+
+    _LINE_COUNT_CACHE[key] = total
+    _LINE_COUNT_CACHE.move_to_end(key)
+    while len(_LINE_COUNT_CACHE) > MAX_LINE_COUNT_CACHE:
+        _LINE_COUNT_CACHE.popitem(last=False)
+    return total
+
 
 def get_cached_doc_markdown(path: str) -> str | None:
     try:
@@ -65,9 +106,7 @@ def convert_doc_to_markdown_sync(path: str, cancel_event: threading.Event | None
 
     # 1. Try Python API
     try:
-        from markitdown import MarkItDown
-
-        md = MarkItDown()
+        md = _get_markitdown()
         result = md.convert(path)
         if result and getattr(result, "text_content", None) is not None:
             result_text = result.text_content
@@ -369,19 +408,14 @@ class ReadTool(BaseTool):
                     Returns (window_lines, total_line_count) so pagination headers
                     stay accurate even for partial reads.
                     """
+                    try:
+                        st = os.stat(file_path)
+                        mtime, size = st.st_mtime, st.st_size
+                    except OSError:
+                        mtime, size = 0.0, 0
+                    total = _get_file_line_count(file_path, mtime, size)
+
                     with open(file_path, "rb") as f:
-                        # Count total lines in a streaming pass (O(n) I/O, no full list).
-                        total = 0
-                        last_byte = b""
-                        chunk = f.read(65536)
-                        while chunk:
-                            total += chunk.count(b"\n")
-                            last_byte = chunk[-1:]
-                            chunk = f.read(65536)
-                        # A non-empty file that doesn't end in a newline still counts as a line.
-                        if last_byte and last_byte not in (b"\n", b"\r"):
-                            total += 1
-                        f.seek(0)
                         if offset:
                             f.seek(offset)
                         if s_line is not None and s_line > 1:

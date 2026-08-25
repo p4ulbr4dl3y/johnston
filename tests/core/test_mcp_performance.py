@@ -1,10 +1,12 @@
 import asyncio
+import threading
 import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.application.generation.prompt_builder import PromptBuilder
 from core.infrastructure.mcp import MCPManager
+from core.infrastructure.mcp.process_client import MCPProcessClient
 
 
 class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
@@ -123,3 +125,38 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
 
         manager.get_cached_tools.assert_called_once()
         manager.get_active_tools.assert_not_called()
+
+    async def test_push_notification_tools_list_changed(self):
+        client = MCPProcessClient("test_srv", "echo")
+        client.fetch_tools_async = AsyncMock(return_value=[{"name": "new_tool"}])
+        called = False
+
+        def _on_changed():
+            nonlocal called
+            called = True
+
+        client.on_tools_changed = _on_changed
+        await client._handle_tools_list_changed_async()
+        client.fetch_tools_async.assert_awaited_once()
+        self.assertTrue(called)
+
+    def test_event_wait_no_busy_loop_unblocks_on_response(self):
+        client = MCPProcessClient("test_srv", "echo")
+        client.process = MagicMock()
+        client.process.stdout = MagicMock()
+        read_task = MagicMock()
+        read_task.done.return_value = False
+        client._read_task = read_task
+
+        def _delayed_set():
+            time.sleep(0.02)
+            client._pending_responses[42] = {"jsonrpc": "2.0", "id": 42, "result": {"value": 123}}
+            client._response_event.set()
+
+        t = threading.Thread(target=_delayed_set)
+        t.start()
+        res = client._read_response(req_id=42, timeout=2.0)
+        t.join()
+        self.assertIsNotNone(res)
+        self.assertEqual(res["result"]["value"], 123)
+

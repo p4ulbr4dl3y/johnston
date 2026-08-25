@@ -328,6 +328,7 @@ class SessionStore:
     """
 
     _instance: Optional["SessionStore"] = None
+    DISK_CACHE_TTL = 2.0  # seconds between filesystem rescans
 
     def __init__(self, project_path: Optional[str] = None):
         if not project_path:
@@ -348,6 +349,7 @@ class SessionStore:
         # re-reading/parsing every file on each list()/children() call.
         self._disk_cache_signature: Optional[int] = None
         self._disk_cache: Optional[Dict[str, AgentSession]] = None
+        self._disk_cache_ts: float = 0.0
         self.ensure_dirs()
 
     @classmethod
@@ -471,8 +473,13 @@ class SessionStore:
         return result
 
     def _load_disk_sessions(self) -> Dict[str, AgentSession]:
+        now = time.time()
+        if self._disk_cache is not None and (now - self._disk_cache_ts < self.DISK_CACHE_TTL):
+            return dict(self._disk_cache)
+
         signature = self._disk_signature()
         if signature is not None and signature == self._disk_cache_signature and self._disk_cache is not None:
+            self._disk_cache_ts = now
             return dict(self._disk_cache)
 
         sessions: Dict[str, AgentSession] = {}
@@ -488,6 +495,7 @@ class SessionStore:
                     self._load_file(sessions, fpath)
         self._disk_cache = sessions
         self._disk_cache_signature = signature
+        self._disk_cache_ts = now
         return sessions
 
     def _disk_signature(self) -> Optional[int]:
@@ -508,6 +516,7 @@ class SessionStore:
     def _invalidate_disk_cache(self) -> None:
         self._disk_cache_signature = None
         self._disk_cache = None
+        self._disk_cache_ts = 0.0
 
     def _load_file(self, sessions: Dict[str, AgentSession], fpath: str) -> None:
         try:
@@ -517,25 +526,111 @@ class SessionStore:
         except Exception:
             logger.warning("Failed to load session file: %s", fpath, exc_info=True)
 
+    @staticmethod
+    def _read_session_summary_from_file(fpath: str) -> Optional[Dict[str, Any]]:
+        """Reads session metadata and title/count without deserializing all history/message objects."""
+        if not fpath or not os.path.exists(fpath):
+            return None
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                first_line = f.readline().strip()
+                if not first_line:
+                    return None
+                try:
+                    first = json.loads(first_line)
+                except Exception:
+                    return None
+
+                if not isinstance(first, dict) or first.get("_type") != "meta":
+                    return None
+
+                if first.get("kind", SessionKind.MAIN.value) != SessionKind.MAIN.value:
+                    return None
+
+                title = ""
+                has_content = False
+                message_count = 0
+
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    has_content = True
+                    if not title and ('"_type": "msg"' in line or '"_type":"msg"' in line):
+                        try:
+                            entry = json.loads(line)
+                            data = entry.get("data")
+                            if isinstance(data, dict) and data.get("type") == "user":
+                                text = str(data.get("display_text") or data.get("text", "")).strip()
+                                if text:
+                                    clean = " ".join(text.split())
+                                    title = clean[:55] + "..." if len(clean) > 55 else clean
+                        except Exception:
+                            pass
+                    if '"role": "assistant"' in line or '"role":"assistant"' in line:
+                        message_count += 1
+
+                if not has_content:
+                    return None
+
+                if not title:
+                    desc = str(first.get("description") or "").strip()
+                    if desc:
+                        clean_desc = " ".join(desc.split())
+                        title = clean_desc[:55] + "..." if len(clean_desc) > 55 else clean_desc
+                    else:
+                        title = "Untitled"
+
+                created_at = _coerce_float(first.get("created_at")) or 0.0
+                updated_at = _coerce_float(first.get("updated_at")) or created_at
+
+                return {
+                    "id": first.get("id", ""),
+                    "title": title,
+                    "created_at": created_at,
+                    "updated_at": updated_at,
+                    "message_count": message_count,
+                }
+        except Exception:
+            return None
+
     def list_main_sessions(self) -> List[Dict[str, Any]]:
         """Return NON-EMPTY main sessions sorted by updated time (for /resume UI)."""
         sessions = []
-        for sess in self.list(kind="main"):
-            if not sess.messages and not sess.agent_history:
-                continue
-            title = self._title_from_messages(sess)
-            if title == "Untitled" and sess.description:
-                desc = " ".join(str(sess.description).split())
-                title = desc[:55] + "..." if len(desc) > 55 else desc
-            sessions.append(
-                {
-                    "id": sess.id,
-                    "title": title,
-                    "created_at": sess.created_at,
-                    "updated_at": sess.updated_at,
-                    "message_count": self._message_count(sess),
-                }
-            )
+        seen_ids = set()
+
+        # 1. In-memory active sessions for the current project
+        for sid, sess in self._sessions.items():
+            if sess.project_key == self.project_key and sess.kind == SessionKind.MAIN:
+                seen_ids.add(sid)
+                if not sess.messages and not sess.agent_history:
+                    continue
+                title = self._title_from_messages(sess)
+                if title == "Untitled" and sess.description:
+                    desc = " ".join(str(sess.description).split())
+                    title = desc[:55] + "..." if len(desc) > 55 else desc
+                sessions.append(
+                    {
+                        "id": sess.id,
+                        "title": title,
+                        "created_at": sess.created_at,
+                        "updated_at": sess.updated_at,
+                        "message_count": self._message_count(sess),
+                    }
+                )
+
+        # 2. Fast header/metadata read from on-disk JSONL files
+        if os.path.isdir(self.sessions_dir):
+            for fname in sorted(os.listdir(self.sessions_dir)):
+                if fname.endswith(".jsonl"):
+                    sid = fname[:-6]
+                    if sid in seen_ids:
+                        continue
+                    fpath = os.path.join(self.sessions_dir, fname)
+                    summary = self._read_session_summary_from_file(fpath)
+                    if summary and summary.get("id"):
+                        sessions.append(summary)
+
         sessions.sort(key=lambda s: (s["updated_at"], s["created_at"], s["id"]), reverse=True)
         return sessions
 
@@ -579,6 +674,7 @@ class SessionStore:
             if self._disk_cache is not None:
                 self._disk_cache[sess.id] = sess
                 self._disk_cache_signature = self._disk_signature()
+                self._disk_cache_ts = time.time()
         except Exception:
             logger.exception("Failed to save session %s", sess.id)
 

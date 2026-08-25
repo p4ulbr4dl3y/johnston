@@ -566,7 +566,19 @@ class SubagentStatusFooter(GitMetricsMixin, Static):
 
             from core.infrastructure.runtime.token_util import estimate_tokens
 
-            history_tokens = estimate_tokens(session.messages) if getattr(session, "messages", None) else 0
+            msgs = getattr(session, "messages", None)
+            msg_count = len(msgs) if msgs else 0
+            cached_count = getattr(self, "_cached_msg_count", None)
+            cached_sess_id = getattr(self, "_cached_sess_id", None)
+            cur_sess_id = getattr(session, "id", None)
+            if cached_count == msg_count and cached_sess_id == cur_sess_id and hasattr(self, "_cached_history_tokens"):
+                history_tokens = self._cached_history_tokens
+            else:
+                history_tokens = estimate_tokens(msgs) if msgs else 0
+                self._cached_msg_count = msg_count
+                self._cached_sess_id = cur_sess_id
+                self._cached_history_tokens = history_tokens
+
             context_used = metrics.get("context_used") or getattr(session, "last_context_tokens", 0) or history_tokens
             total_tokens = metrics.get("total_tokens") or getattr(session, "total_tokens", 0) or history_tokens
             cost_usd = metrics.get("cost_usd") or getattr(session, "cost_usd", 0.0)

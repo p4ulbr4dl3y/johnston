@@ -31,6 +31,24 @@ from core.provider_manager import is_local_provider
 logger = logging.getLogger(__name__)
 
 
+_MSGS_KEY_CACHE: Dict[int, Tuple[int, bytes]] = {}
+_TOOLS_DIGEST_CACHE: Dict[int, Tuple[int, str]] = {}
+
+
+def _get_tools_digest(tools: Optional[List[Dict[str, Any]]]) -> str:
+    if not tools:
+        return ""
+    tools_id = id(tools)
+    cached = _TOOLS_DIGEST_CACHE.get(tools_id)
+    if cached is not None and cached[0] == len(tools):
+        return cached[1]
+    h = hashlib.sha256(repr(tools).encode("utf-8")).hexdigest()
+    _TOOLS_DIGEST_CACHE[tools_id] = (len(tools), h)
+    if len(_TOOLS_DIGEST_CACHE) > 64:
+        _TOOLS_DIGEST_CACHE.pop(next(iter(_TOOLS_DIGEST_CACHE)))
+    return h
+
+
 def serialize_messages_key(msgs: List[Dict[str, Any]]) -> bytes:
     """Return a stable memoization key for a message list.
 
@@ -38,6 +56,10 @@ def serialize_messages_key(msgs: List[Dict[str, Any]]) -> bytes:
     tool_call_id, tool_calls), so two distinct histories can't alias a cache
     entry without also having identical payloads.
     """
+    msgs_id = id(msgs)
+    cached = _MSGS_KEY_CACHE.get(msgs_id)
+    if cached is not None and cached[0] == len(msgs):
+        return cached[1]
     out = []
     for m in msgs:
         out.append(str(m.get("role")))
@@ -63,7 +85,11 @@ def serialize_messages_key(msgs: List[Dict[str, Any]]) -> bytes:
             out.append(str(tc))
         else:
             out.append("")
-    return ("\x1f".join(out)).encode("utf-8")
+    key = ("\x1f".join(out)).encode("utf-8")
+    _MSGS_KEY_CACHE[msgs_id] = (len(msgs), key)
+    if len(_MSGS_KEY_CACHE) > 128:
+        _MSGS_KEY_CACHE.pop(next(iter(_MSGS_KEY_CACHE)))
+    return key
 
 
 # LRU memo cache for sanitize_history_for_model. The key is a compact serialized
@@ -347,7 +373,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         model_downshift = last_limit is not None and last_limit > cur_limit and total_tokens > cur_limit
 
         # 2. Instruction / Tool schema hash change detection
-        cur_hash = hashlib.sha256(f"{sys_prompt}:{repr(all_tools)}".encode("utf-8")).hexdigest()
+        tools_digest = _get_tools_digest(all_tools)
+        cur_hash = hashlib.sha256(f"{sys_prompt}:{tools_digest}".encode("utf-8")).hexdigest()
         last_hash = getattr(self, "_last_comp_hash", None)
         self._last_comp_hash = cur_hash
         hash_changed = last_hash is not None and last_hash != cur_hash and len(self.history) > 4 and total_tokens > threshold * 0.8

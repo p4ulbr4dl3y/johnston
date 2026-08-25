@@ -9,7 +9,7 @@ import logging
 import os
 import time
 from collections import OrderedDict
-from typing import Any, Dict, Iterable, Optional, Set
+from typing import Any, Dict, FrozenSet, Iterable, Optional, Set
 
 import httpx
 
@@ -35,6 +35,38 @@ CACHE_TTL = 86400  # 24 hours
 
 # Upper bound on the in-memory model-match cache to prevent unbounded growth.
 _MATCH_CACHE_MAX = 1000
+
+_IGNORED_TOKENS: FrozenSet[str] = frozenset({
+    "it",
+    "mlx",
+    "gguf",
+    "quant",
+    "4bit",
+    "8bit",
+    "16bit",
+    "fp16",
+    "fp32",
+    "v1",
+    "v2",
+    "vision",
+    "model",
+    "chat",
+    "instruct",
+    "text",
+    "api",
+    "base",
+    "free",
+    "pro",
+    "flash",
+    "mini",
+    "small",
+    "large",
+    "turbo",
+    "latest",
+    "non",
+    "dummy",
+    "unknown",
+})
 
 
 def _get_match(cache: "OrderedDict", key: tuple):
@@ -101,6 +133,24 @@ class ModelsCatalog:
         if self._client is not None and not self._client.is_closed:
             await self._client.aclose()
             self._client = None
+
+    async def load_cache_async(self) -> bool:
+        return await asyncio.to_thread(self.load_cache)
+
+    async def save_cache_async(
+        self,
+        model_limits: Dict[str, int] = None,
+        model_names: Dict[str, str] = None,
+        model_pricing: Dict[str, Dict[str, float]] = None,
+        providers: Dict[str, Dict[str, Any]] = None,
+    ) -> None:
+        await asyncio.to_thread(
+            self.save_cache,
+            model_limits=model_limits,
+            model_names=model_names,
+            model_pricing=model_pricing,
+            providers=providers,
+        )
 
     def load_cache(self) -> bool:
         data = read_json(CACHE_FILE)
@@ -249,8 +299,12 @@ class ModelsCatalog:
             if provider_catalog:
                 self._providers = provider_catalog
             self._match_cache.clear()
+            if hasattr(self, "_slug_maps"):
+                self._slug_maps.clear()
+            if hasattr(self, "_token_maps"):
+                self._token_maps.clear()
 
-            self.save_cache()
+            await self.save_cache_async()
         except Exception as e:
             logger.warning("Error fetching models catalog: %s", e)
         return self._limits
@@ -341,52 +395,26 @@ class ModelsCatalog:
         # Stage 4: Fuzzy & Substring Token Match (for local HF/MLX/GGUF models)
         cleaned = _RE_FUZZY_STRIP.sub("", m_base)
         tokens = set(_RE_TOKEN_SPLIT.findall(cleaned))
-        ignored_tokens = {
-            "it",
-            "mlx",
-            "gguf",
-            "quant",
-            "4bit",
-            "8bit",
-            "16bit",
-            "fp16",
-            "fp32",
-            "v1",
-            "v2",
-            "vision",
-            "model",
-            "chat",
-            "instruct",
-            "text",
-            "api",
-            "base",
-            "free",
-            "pro",
-            "flash",
-            "mini",
-            "small",
-            "large",
-            "turbo",
-            "latest",
-            "non",
-            "dummy",
-            "unknown",
-        }
-        # NOTE: "free" stays ignored (tier markers are noise), but "preview" is
-        # NOT ignored: variant/date tokens like "preview" distinguish distinct
-        # catalog entries, and dropping it let unrelated models fuzzy-match each
-        # other (e.g. x-preview-f-free -> zai/glm-4.5-x borrowing paid pricing).
-        clean_tokens = tokens - ignored_tokens
+        clean_tokens = tokens - _IGNORED_TOKENS
         query_digits = {t for t in clean_tokens if t.isdigit()}
 
         if len(clean_tokens) >= 2:
+            if not hasattr(self, "_token_maps"):
+                self._token_maps = {}
+
+            if slug_key not in self._token_maps or self._token_maps[slug_key][0] != len(space_keys):
+                token_entries = []
+                for k in space_keys:
+                    k_base = k.split("/")[-1].split(":")[0].lower()
+                    k_tokens = set(_RE_TOKEN_SPLIT.findall(k_base)) - _IGNORED_TOKENS
+                    k_digits = {t for t in k_tokens if t.isdigit()}
+                    token_entries.append((k, k_tokens, k_digits))
+                self._token_maps[slug_key] = (len(space_keys), token_entries)
+
+            token_entries = self._token_maps[slug_key][1]
             best_match = ""
             best_score = 0
-            for k in space_keys:
-                k_base = k.split("/")[-1].split(":")[0].lower()
-                k_tokens = set(_RE_TOKEN_SPLIT.findall(k_base)) - ignored_tokens
-                k_digits = {t for t in k_tokens if t.isdigit()}
-
+            for k, k_tokens, k_digits in token_entries:
                 # If digit version tokens conflict (e.g. gemma-4 vs gemma-2), skip candidate
                 if query_digits and k_digits and query_digits != k_digits:
                     continue
@@ -437,6 +465,10 @@ class ModelsCatalog:
             return
         self._names.update(names)
         self._match_cache.clear()
+        if hasattr(self, "_slug_maps"):
+            self._slug_maps.clear()
+        if hasattr(self, "_token_maps"):
+            self._token_maps.clear()
 
     def get_model_display_name(self, provider_id: str, model_id: str) -> str:
         if not model_id:

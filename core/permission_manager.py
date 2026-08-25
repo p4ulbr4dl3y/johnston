@@ -110,6 +110,8 @@ class PermissionManager:
         perms["tools"][target_name] = action
 
         atomic_write_json(file_path, data)
+        self._cached_effective_perms = None
+        self._cached_effective_perms_id = None
 
     def update_pattern_permission(self, target_name: str, pattern: str, action: str) -> None:
         """
@@ -138,9 +140,19 @@ class PermissionManager:
         perms["patterns"][target_name] = [{"pattern": pat, "action": raw_action}] + existing
 
         atomic_write_json(file_path, data)
+        self._cached_effective_perms = None
+        self._cached_effective_perms_id = None
 
     def get_effective_permissions(self) -> Dict[str, Any]:
-        """Merges global config on top of DEFAULT_PERMISSIONS."""
+        """Merges global config on top of DEFAULT_PERMISSIONS (cached by config snapshot)."""
+        global_cfg = self._load_json_config(CONFIG_FILE)
+        cfg_id = id(global_cfg)
+        if (
+            getattr(self, "_cached_effective_perms_id", None) == cfg_id
+            and getattr(self, "_cached_effective_perms", None) is not None
+        ):
+            return self._cached_effective_perms
+
         # 1. Base defaults
         merged = {
             "default": DEFAULT_PERMISSIONS.get("default", "ask"),
@@ -149,10 +161,11 @@ class PermissionManager:
         }
 
         # 2. Global config (~/.johnston/config.json)
-        global_cfg = self._load_json_config(CONFIG_FILE)
         global_perms = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}
         _merge_perms(merged, global_perms)
 
+        self._cached_effective_perms = merged
+        self._cached_effective_perms_id = cfg_id
         return merged
 
     def check_permission(self, tool_name: str, args: Optional[Dict[str, Any]] = None) -> PermissionDecision:

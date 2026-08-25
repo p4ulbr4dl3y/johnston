@@ -76,6 +76,8 @@ class MCPProcessClient:
         # Monotonic timestamp of the last successful tools/list fetch, used to
         # rate-limit the per-call post-call refresh (avoids a duplicate fetch).
         self._tools_fetch_time = 0.0
+        self._response_event = threading.Event()
+        self.on_tools_changed: Optional[Any] = None
 
     def _next_req_id(self) -> int:
         with self._lock:
@@ -233,8 +235,9 @@ class MCPProcessClient:
                     continue
 
                 if "method" in data and "id" not in data:
-                    if data.get("method") == "notifications/tools/list_changed":
-                        asyncio.create_task(self.fetch_tools_async())
+                    method = data.get("method", "")
+                    if method in ("notifications/tools/list_changed", "tools/list_changed") or method.endswith("tools/list_changed"):
+                        asyncio.create_task(self._handle_tools_list_changed_async())
                     continue
 
                 res_id = data.get("id")
@@ -247,8 +250,21 @@ class MCPProcessClient:
                         if len(self._pending_responses) >= self.MAX_PENDING_RESPONSES:
                             self._pending_responses.pop(next(iter(self._pending_responses)), None)
                         self._pending_responses[res_id] = data
+                        self._response_event.set()
         finally:
             self._fail_pending_futures()
+
+    async def _handle_tools_list_changed_async(self) -> None:
+        try:
+            await self.fetch_tools_async()
+            if callable(self.on_tools_changed):
+                cb = self.on_tools_changed
+                if asyncio.iscoroutinefunction(cb):
+                    await cb()
+                else:
+                    cb()
+        except Exception:
+            logger.debug("Failed to refresh tools on list_changed notification for '%s'", self.name, exc_info=True)
 
     def _send_request_sync(
         self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
@@ -403,6 +419,7 @@ class MCPProcessClient:
 
     def _fail_pending_futures(self) -> None:
         """Fail all in-flight async requests, scheduling the exception on their loop."""
+        self._response_event.set()
         futs = list(self._pending_futures.values())
         self._pending_futures.clear()
         exc = RuntimeError(f"MCP server '{self.name}' stopped")
@@ -535,9 +552,15 @@ class MCPProcessClient:
 
             if self._read_task and not self._read_task.done():
                 elapsed = time.time() - start_time
-                if timeout is not None and elapsed >= timeout:
-                    return None
-                time.sleep(0.01)
+                if timeout is not None:
+                    remaining = timeout - elapsed
+                    if remaining <= 0:
+                        return None
+                    wait_time = min(1.0, remaining)
+                else:
+                    wait_time = 1.0
+                self._response_event.wait(timeout=wait_time)
+                self._response_event.clear()
                 continue
 
             while "\n" in self._buffer:
@@ -547,13 +570,16 @@ class MCPProcessClient:
                 if data is None:
                     continue
                 if "method" in data and "id" not in data:
-                    if data.get("method") == "notifications/tools/list_changed":
+                    method = data.get("method", "")
+                    if method in ("notifications/tools/list_changed", "tools/list_changed") or method.endswith("tools/list_changed"):
                         # Reentrant by design: _lock is an RLock and fetch_tools
                         # only mutates the same reader-critical sections guarded
                         # here; the GIL keeps _pending_responses consistent
                         # between sync and async read paths.
                         try:
                             self.fetch_tools()
+                            if callable(self.on_tools_changed):
+                                self.on_tools_changed()
                         except Exception:
                             logger.debug("Failed to refresh tools on list_changed notification", exc_info=True)
                     continue
@@ -679,8 +705,10 @@ class MCPProcessClient:
             self._tools_fetch_time = time.monotonic()
         return self.tools
 
-    def is_tools_stale(self, ttl: float = 5.0) -> bool:
+    def is_tools_stale(self, ttl: float = 300.0) -> bool:
         """True if the cached tools list is stale (based on last fetch time)."""
+        if self._tools_fetch_time <= 0.0:
+            return True
         return (time.monotonic() - self._tools_fetch_time) >= ttl
 
     def _build_call_payload(self, tool_name: str, arguments: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:

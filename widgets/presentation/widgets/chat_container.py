@@ -24,6 +24,7 @@ class ChatView(VerticalScroll):
         # scrolling back to the bottom or by sending a new message.
         self._auto_follow: bool = True
         self.auto_expand_all: bool = False
+        self._has_welcome: bool = False
 
     def on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
         # Pause bottom-follow as soon as the view has somewhere to scroll up;
@@ -70,21 +71,43 @@ class ChatView(VerticalScroll):
         self.check_welcome()
 
     def clear_welcome(self) -> None:
-        for w in self.query(WelcomeWidget):
-            w.remove()
+        welcomes = [c for c in self.children if isinstance(c, WelcomeWidget)]
+        if not welcomes:
+            try:
+                welcomes = list(self.query(WelcomeWidget))
+            except Exception:
+                welcomes = []
+        for w in welcomes:
+            try:
+                w.remove()
+            except Exception:
+                pass
+        self._has_welcome = False
 
     def check_welcome(self) -> None:
         if not getattr(self, "show_welcome", True):
             self.clear_welcome()
             return
+        welcomes = [c for c in self.children if isinstance(c, WelcomeWidget)]
+        if not welcomes:
+            try:
+                welcomes = list(self.query(WelcomeWidget))
+            except Exception:
+                welcomes = []
         msg_children = [c for c in self.children if not isinstance(c, WelcomeWidget)]
-        welcome = list(self.query(WelcomeWidget))
         if not msg_children:
-            if not welcome:
+            if not welcomes:
                 self.mount(WelcomeWidget())
+                self._has_welcome = True
+            else:
+                self._has_welcome = True
         else:
-            for w in welcome:
-                w.remove()
+            for w in welcomes:
+                try:
+                    w.remove()
+                except Exception:
+                    pass
+            self._has_welcome = False
 
     async def _wait_until_attached(self, timeout: float = 0.5) -> None:
         try:
@@ -108,7 +131,8 @@ class ChatView(VerticalScroll):
         Auto-follow scrolls are always instant: animated scrolls get superseded
         by the next debounced stream flush (~50ms) and leave the tail jittering.
         """
-        self.clear_welcome()
+        if getattr(self, "_has_welcome", False) or any(isinstance(c, WelcomeWidget) for c in self.children):
+            self.clear_welcome()
         if not self.is_attached:
             await self._wait_until_attached()
         await self.mount(widget)

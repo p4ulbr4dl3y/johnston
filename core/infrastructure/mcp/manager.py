@@ -231,7 +231,7 @@ class MCPManager:
                 sig.append((path, None, None))
         return tuple(sig)
 
-    def _tools_fetch_stale(self, server_name: str, ttl: float = 5.0) -> bool:
+    def _tools_fetch_stale(self, server_name: str, ttl: float = 300.0) -> bool:
         """True if this server's cached tools list is stale, based on last fetch time."""
         client = self.clients.get(server_name)
         if client is None:
@@ -453,6 +453,7 @@ class MCPManager:
             client = self.clients.get(name)
             if not client:
                 client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
+                client.on_tools_changed = lambda: self._notify_listeners("tools_updated")
                 if client.start():
                     self.clients[name] = client
                     self._server_errors.pop(name, None)
@@ -513,6 +514,7 @@ class MCPManager:
             created = client is None
             if created:
                 client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
+                client.on_tools_changed = lambda: self._notify_listeners("tools_updated")
                 # Register before starting: a concurrent stop_all() iterates
                 # clients, so a half-started process must already be reachable.
                 self.clients[name] = client

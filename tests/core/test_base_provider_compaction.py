@@ -97,6 +97,32 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(agent.history[0]["content"], "Refactor database models in db/schema.py with strict constraints.")
             self.assertIn("<conversation-checkpoint>", agent.history[1]["content"])
 
+    async def test_compact_history_calls_build_prompt_context_only_once(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
+        agent.history = [
+            {"role": "user", "content": "msg 1"},
+            {"role": "assistant", "content": "msg 2"},
+            {"role": "user", "content": "msg 3"},
+            {"role": "assistant", "content": "msg 4"},
+            {"role": "user", "content": "msg 5"},
+        ]
+
+        mock_response = unittest.mock.MagicMock()
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.message.content = "## Objective\n- Test\n\n## Relevant Files\n- none"
+        mock_response.choices = [mock_choice]
+
+        with (
+            unittest.mock.patch("core.base_provider.tools.build_prompt_context_async", new_callable=unittest.mock.AsyncMock) as mock_bpc,
+            unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create,
+        ):
+            mock_bpc.return_value = ("sys prompt", [], 10)
+            mock_create.return_value = mock_response
+            success, msg = await agent.compact_history()
+            self.assertTrue(success)
+            self.assertEqual(mock_bpc.await_count, 1)
+
     async def test_compaction_sends_full_history_prefix_for_prompt_caching(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="System instructions", tools=[])
         self.addAsyncCleanup(agent.close)

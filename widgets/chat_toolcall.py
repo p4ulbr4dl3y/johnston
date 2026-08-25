@@ -49,6 +49,8 @@ def _strip_hints_and_background(text: str) -> str:
     """Strip [Hint:…] and [Background Task:…] markers and simplify truncation boilerplate for UI."""
     if not text:
         return ""
+    if "[" not in text and "Command is running" not in text and "You will be notified" not in text:
+        return text.strip()
     cleaned = re.sub(r"\s*\[Hint:[\s\S]*$", "", text)
     cleaned = re.sub(r"\s*\[Hint:[^\]]+\]", "", cleaned)
     cleaned = re.sub(r"\[Background Task ID:[^\]]+\][^\[\n]*", "", cleaned)
@@ -410,6 +412,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.is_mcp = is_mcp
         self.is_expanded = False
         self.background_task_id = None
+        self._shell_update_scheduled = False
+        self._shell_update_handle: asyncio.TimerHandle | None = None
         if status is not None:
             self.status = status
         else:
@@ -432,7 +436,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if not text:
             return ""
         clean = self._clean_hints_for_ui(text)
-        clean = re.sub(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", clean)
+        if "\x1b" in clean:
+            clean = re.sub(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", clean)
         return clean
 
     def _is_parent_at_bottom(self) -> bool:
@@ -459,6 +464,14 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.md_widget.display = False
         self.render_header()
         self._sync_sequential_with_prev()
+
+    def on_unmount(self) -> None:
+        if getattr(self, "_shell_update_handle", None) is not None:
+            try:
+                self._shell_update_handle.cancel()
+            except Exception:
+                pass
+            self._shell_update_handle = None
 
     def _update_next_sibling_spacing(self) -> None:
         if not self.parent:
@@ -532,6 +545,13 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.status = "done"
 
         if self.tool_type == "shell":
+            if getattr(self, "_shell_update_handle", None) is not None:
+                try:
+                    self._shell_update_handle.cancel()
+                except Exception:
+                    pass
+                self._shell_update_handle = None
+            self._shell_update_scheduled = False
             is_bg_banner = "[Background Task ID:" in cleaned
             # A ctrl+b transition emits a transient RUNNING banner ("moved to
             # background..."). When live output already streams on the card,
@@ -744,6 +764,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.is_expanded = not self.is_expanded
         self.render_header()
         if self.is_expanded:
+            if getattr(self, "_shell_update_scheduled", False):
+                self._flush_shell_update()
             self._should_scroll_to_widget = scroll
             self.render_content()
         else:
@@ -761,13 +783,39 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self._raw_bash_buffer += text
         if len(self._raw_bash_buffer) > self._RAW_BASH_LIMIT:
             self._raw_bash_buffer = self._RAW_BASH_TRUNC + self._raw_bash_buffer[-self._RAW_BASH_LIMIT :]
+        self._schedule_shell_update()
+
+    def _schedule_shell_update(self) -> None:
+        if getattr(self, "_shell_update_scheduled", False):
+            return
+        self._shell_update_scheduled = True
+        try:
+            loop = asyncio.get_running_loop()
+            self._shell_update_handle = loop.call_later(0.05, self._flush_shell_update)
+        except RuntimeError:
+            self._flush_shell_update()
+
+    def _flush_shell_update(self) -> None:
+        self._shell_update_scheduled = False
+        self._shell_update_handle = None
         from core.infrastructure.tasks.output import process_carriage_returns
 
-        cleaned = self._clean_bash_output(self._raw_bash_buffer)
+        buf = getattr(self, "_raw_bash_buffer", "")
+        cleaned = self._clean_bash_output(buf)
         self.result_text = process_carriage_returns(cleaned)
         if self.is_expanded:
             self.render_content()
             self._scroll_if_needed()
+
+    def flush_shell_output(self) -> None:
+        if getattr(self, "_shell_update_handle", None) is not None:
+            try:
+                self._shell_update_handle.cancel()
+            except Exception:
+                pass
+            self._shell_update_handle = None
+        if getattr(self, "_shell_update_scheduled", False) or hasattr(self, "_raw_bash_buffer"):
+            self._flush_shell_update()
 
     def _compute_content(self) -> tuple:
         """Pure content computation (safe to run in a thread); returns (kind, value).
