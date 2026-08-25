@@ -90,8 +90,9 @@ async def build_prompt_context_async(agent: Any) -> Tuple[str, List[Dict[str, An
     sandbox_val = getattr(agent, "sandbox_enabled", None)
     if sandbox_val is None and app:
         sandbox_val = getattr(app, "sandbox_enabled", None)
-    if is_subagent:
-        sandbox_val = True
+    if sandbox_val is None:
+        if agent_role == "explorer" or getattr(agent, "read_only", False):
+            sandbox_val = True
 
     builder = PromptBuilder(
         agent.system_prompt,

@@ -308,7 +308,8 @@ async def confirm_permission(
     if not is_subagent:
         is_subagent = getattr(ctx_or_app, "is_subagent", False)
     if not subagent_role and is_subagent:
-        subagent_role = getattr(ctx_or_app, "subagent_role", "") or getattr(ctx_or_app, "role", "") or "worker"
+        raw_sub = getattr(ctx_or_app, "subagent_role", "") or getattr(ctx_or_app, "role", "")
+        subagent_role = raw_sub if isinstance(raw_sub, str) and raw_sub else "worker"
 
     confirm = getattr(_resolve_app(ctx_or_app), "confirm_permission", None)
     if callable(confirm):

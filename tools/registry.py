@@ -121,30 +121,28 @@ async def check_and_confirm_permission(
     app_obj = _resolve_app(context_or_app)
     decision = pm.check_permission(target_perm_name, args)
 
-    is_sub = getattr(context_or_app, "is_subagent", False) is True
-    if is_sub:
-        if decision.action == PermissionAction.DENY:
-            return ToolResult.error("denied", name=display_name, detail="by permission policy")
-        # Subagents always run inside the OS sandbox and execute allowed/ask tools autonomously
-        return None
-
     if decision.action == PermissionAction.DENY:
         return ToolResult.error("denied", name=display_name, detail="by permission policy")
     elif decision.action == PermissionAction.ASK:
-        if app_obj and hasattr(app_obj, "push_screen_wait"):
+        is_sub = (
+            getattr(context_or_app, "is_subagent", False) is True
+            or (app_obj is not None and getattr(app_obj, "is_subagent", False) is True)
+        )
+        raw_sub_role = (
+            getattr(context_or_app, "subagent_role", "")
+            or getattr(context_or_app, "role", "")
+            or (getattr(app_obj, "subagent_role", "") if app_obj else "")
+            or (getattr(app_obj, "role", "") if app_obj else "")
+        )
+        sub_role = raw_sub_role if isinstance(raw_sub_role, str) and raw_sub_role else ("worker" if is_sub else "")
+        if app_obj and (hasattr(app_obj, "push_screen_wait") or callable(getattr(app_obj, "confirm_permission", None))):
             screen_name = confirm_tool_name or target_perm_name
-            is_sub = getattr(context_or_app, "is_subagent", False)
-            sub_role = (
-                getattr(context_or_app, "subagent_role", "")
-                or getattr(context_or_app, "role", "")
-                or ("worker" if is_sub else "")
-            )
             confirmed = await confirm_permission(
                 screen_name,
                 args,
                 decision.reason,
                 target_perm_name,
-                ctx_or_app=app_obj,
+                ctx_or_app=context_or_app or app_obj,
                 is_subagent=is_sub,
                 subagent_role=sub_role,
             )

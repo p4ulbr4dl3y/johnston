@@ -116,11 +116,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
     def compose(self) -> ComposeResult:
         nargs = self.args if isinstance(self.args, dict) else {}
         target_path = nargs.get("path") or ""
-        actor = (
-            f"Subagent ({self.subagent_role})"
-            if (self.is_subagent and self.subagent_role)
-            else ("Subagent" if self.is_subagent else "Agent")
-        )
+        actor = "Subagent" if self.is_subagent else "Agent"
 
         if self.tool_name == "create":
             file_exists = bool(target_path and os.path.isfile(target_path))

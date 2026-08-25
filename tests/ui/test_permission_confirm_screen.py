@@ -153,7 +153,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             mds = screen.query("Markdown")
             all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
-            self.assertIn("Subagent (worker) wants to edit", all_md)
+            self.assertIn("Subagent wants to edit", all_md)
 
     async def test_compose_manage_shell_list_other(self):
         cases = [

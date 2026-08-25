@@ -224,7 +224,7 @@ class PromptBuilder:
         self.subagent_schema = subagent_schema
         if sandbox_enabled is not None:
             self.sandbox_enabled = bool(sandbox_enabled)
-        elif is_subagent:
+        elif self.role == "explorer":
             self.sandbox_enabled = True
         else:
             from core.infrastructure.config.config_helpers import load_sandbox_config

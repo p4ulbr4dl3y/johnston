@@ -331,7 +331,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertIn("[Output truncated: showing first 8000 chars", res.content)
         self.assertIn("Refine parameters or request partial data", res.content)
 
-    async def test_subagent_auto_allows_non_denied_tools(self):
+    async def test_subagent_denies_ask_in_headless_mode(self):
         from tools.context import ToolContext
         from tools.read import ReadTool
 
@@ -344,8 +344,37 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             patch.object(ReadTool, "execute", new=AsyncMock(return_value="CONTENT_OK")),
         ):
             res = await execute_tool("read", {"path": "dummy.txt"}, context=ctx)
+        self.assertTrue(res.is_error)
+        self.assertIn("requires user confirmation", res.content)
+
+    async def test_subagent_confirms_ask_in_ui_mode(self):
+        from tools.context import ToolContext
+        from tools.read import ReadTool
+
+        mock_app = MagicMock()
+        mock_app.push_screen_wait = MagicMock()
+        mock_app.confirm_permission = AsyncMock(return_value=True)
+        mock_app.is_subagent = False
+
+        ctx = ToolContext(app=mock_app, is_subagent=True)
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Ask confirmation")
+
+        with (
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch.object(ReadTool, "execute", new=AsyncMock(return_value="CONTENT_OK")),
+        ):
+            res = await execute_tool("read", {"path": "dummy.txt"}, context=ctx)
         self.assertFalse(res.is_error)
         self.assertEqual(res.content, "CONTENT_OK")
+        mock_app.confirm_permission.assert_called_once_with(
+            "read",
+            {"path": "dummy.txt"},
+            "Ask confirmation",
+            "read",
+            is_subagent=True,
+            subagent_role="worker",
+        )
 
     async def test_subagent_respects_explicit_deny(self):
         from tools.context import ToolContext

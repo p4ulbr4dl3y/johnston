@@ -83,6 +83,8 @@ def configure_subagent_agent(subagent: Any, role_key: str, app: Any = None, proj
     """
     subagent.app = app
     subagent.is_subagent = True
+    if app and hasattr(app, "sandbox_enabled"):
+        subagent.sandbox_enabled = app.sandbox_enabled
     from core.roles import apply_role
 
     return apply_role(subagent, role_key, project_dir=project_dir)
