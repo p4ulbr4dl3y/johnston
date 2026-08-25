@@ -22,6 +22,7 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import (
     MODAL_DEFAULT_ROW_WIDTH,
     format_badge_row,
@@ -40,9 +41,11 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     search_nav_option_list_id = "mcp-option-list"
     search_nav_filtered_attr = "filtered_servers"
 
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("escape", "cancel", "Close"),
-    ]
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(self):
         super().__init__()

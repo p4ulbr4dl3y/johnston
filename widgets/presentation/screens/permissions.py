@@ -21,6 +21,7 @@ from widgets.presentation.screens.constants import (
     TAB_KEYS,
 )
 from widgets.tool_helpers import get_all_tool_types
+from widgets.utils.key_aliases import expand_bindings
 
 _SELECTABLE_TYPES = ("tool",)
 
@@ -35,9 +36,11 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     search_nav_option_list_id = "permissions-option-list"
     search_nav_filtered_attr = "filtered_items"
 
-    BINDINGS = [
+    BINDINGS = expand_bindings([
         ("escape", "cancel", "Close"),
-    ]
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(self):
         super().__init__()
