@@ -59,7 +59,7 @@ class ModalSearchNavMixin:
     ``BaseSelectionScreen`` subclasses but share the same key handling.
     """
 
-    # Subclasses must set these:
+    search_nav_input_id: str = MODAL_SEARCH_INPUT
     search_nav_option_list_id: str = ""
     search_nav_filtered_attr: str = ""
 
@@ -71,9 +71,11 @@ class ModalSearchNavMixin:
         if event.key not in ("down", "up"):
             return False
         try:
-            search_input = self.query_one(MODAL_SEARCH_INPUT, Input)
+            inp_selector = self.search_nav_input_id if self.search_nav_input_id.startswith("#") else f"#{self.search_nav_input_id}"
+            search_input = self.query_one(inp_selector, Input)
             if search_input.has_focus:
-                opt_list = self.query_one(f"#{self.search_nav_option_list_id}", OptionList)
+                opt_selector = self.search_nav_option_list_id if self.search_nav_option_list_id.startswith("#") else f"#{self.search_nav_option_list_id}"
+                opt_list = self.query_one(opt_selector, OptionList)
                 filtered = getattr(self, self.search_nav_filtered_attr, [])
                 if opt_list.highlighted is None and filtered:
                     opt_list.highlighted = 0
@@ -90,7 +92,7 @@ class ModalSearchNavMixin:
         return False
 
 
-class BaseSelectionScreen(BaseModalScreen[T], Generic[T]):
+class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
     """Base class for selection modal screens with OptionList"""
 
     def __init__(

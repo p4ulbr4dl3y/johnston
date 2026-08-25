@@ -121,7 +121,10 @@ class ActionsMixin:
                     await asyncio.sleep(0.05)
                     self.selection_copy_active = False
 
-                asyncio.create_task(reset_flag())
+                if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
+                    self.create_tracked_task(reset_flag())
+                else:
+                    asyncio.create_task(reset_flag())
         else:
             self.screen.clear_selection()
 

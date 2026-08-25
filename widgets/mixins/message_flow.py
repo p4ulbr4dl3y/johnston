@@ -294,11 +294,21 @@ class MessageFlowMixin:
                             msg["result_text"] = final_result
                             msg["status"] = status
                             break
-                    try:
-                        loop = asyncio.get_running_loop()
-                        loop.create_task(asyncio.to_thread(self.sm.save, session))
-                    except RuntimeError:
-                        self.sm.save(session)
+                    from widgets.mixins.session_persistence import _global_session_write_lock
+
+                    def _save_locked(s):
+                        with _global_session_write_lock:
+                            self.sm.save(s)
+
+                    save_coro = asyncio.to_thread(_save_locked, session)
+                    if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
+                        self.create_tracked_task(save_coro)
+                    else:
+                        try:
+                            loop = asyncio.get_running_loop()
+                            loop.create_task(save_coro)
+                        except RuntimeError:
+                            _save_locked(session)
             except Exception as e:
                 logger.warning("Failed to update session for background shell %s: %s", task_id, e)
 
@@ -333,10 +343,20 @@ class MessageFlowMixin:
                                 msg["result_text"] = result or "(no output)"
                                 msg["status"] = final_status
                                 break
-                    try:
-                        loop = asyncio.get_running_loop()
-                        loop.create_task(asyncio.to_thread(self.sm.save, session))
-                    except RuntimeError:
-                        self.sm.save(session)
+                    from widgets.mixins.session_persistence import _global_session_write_lock
+
+                    def _save_locked(s):
+                        with _global_session_write_lock:
+                            self.sm.save(s)
+
+                    save_coro = asyncio.to_thread(_save_locked, session)
+                    if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
+                        self.create_tracked_task(save_coro)
+                    else:
+                        try:
+                            loop = asyncio.get_running_loop()
+                            loop.create_task(save_coro)
+                        except RuntimeError:
+                            _save_locked(session)
         except Exception as e:
             logger.warning("Subagent tool completion handling failed: %s", e)

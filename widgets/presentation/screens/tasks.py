@@ -211,8 +211,8 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self.dismiss()
 
 
-class ShellTasksScreen(BaseModalScreen[None]):
-    """Modal screen listing background shell tasks with console view and kill."""
+class BaseTasksListScreen(BaseModalScreen[None]):
+    """Base modal screen for listing and managing background items (shell tasks, subagents)."""
 
     BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
@@ -221,11 +221,145 @@ class ShellTasksScreen(BaseModalScreen[None]):
         ("ctrl+q", "quit_app", "Quit"),
     ])
 
+    title_id: str = "tasks-title"
+    option_list_id: str = "tasks-option-list"
+    hint_action_name: str = "enter: select"
+
     def __init__(self):
         super().__init__()
         self.search_query = ""
         self.filtered_tasks = []
         self._last_signatures = None
+
+    def _get_header_md(self) -> str:
+        raise NotImplementedError
+
+    def _get_option_list(self) -> OptionList:
+        return self.query_one(f"#{self.option_list_id}", OptionList)
+
+    def _get_filtered_tasks(self) -> list:
+        raise NotImplementedError
+
+    def _format_task_row(self, item: dict) -> str:
+        raise NotImplementedError
+
+    def _on_task_selected(self, item: dict) -> None:
+        raise NotImplementedError
+
+    async def _kill_item(self, item: dict) -> None:
+        raise NotImplementedError
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
+            yield Markdown(
+                self._get_header_md(), id=self.title_id, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
+            )
+            yield HeaderWrapOptionList(id=self.option_list_id)
+            yield Label(f"{self.hint_action_name} • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
+
+    def on_mount(self) -> None:
+        self._last_signatures = None
+        self.update_tasks_list()
+        try:
+            self._get_option_list().focus()
+        except Exception:
+            pass
+        self.set_interval(0.5, self.update_tasks_list)
+
+    def _update_hint(self) -> None:
+        try:
+            opt_list = self._get_option_list()
+            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
+            idx = opt_list.highlighted
+            is_running = False
+            if idx is not None and 0 <= idx < len(self.filtered_tasks):
+                item = self.filtered_tasks[idx]
+                if item and item.get("is_running"):
+                    is_running = True
+            if is_running:
+                hint.update(f"{self.hint_action_name} • ↑↓: nav • k: kill • esc: close")
+            else:
+                hint.update(f"{self.hint_action_name} • ↑↓: nav • esc: close")
+        except Exception:
+            pass
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        self._update_hint()
+
+    def update_tasks_list(self) -> None:
+        if not self.is_mounted:
+            return
+        tasks = self._get_filtered_tasks()
+        new_signatures = [
+            (item["id"], item["is_running"], item["command"], item.get("progress_badge", ""))
+            for item in tasks
+        ]
+        if hasattr(self, "_last_signatures") and self._last_signatures == new_signatures:
+            return
+        self._last_signatures = new_signatures
+
+        opt_list = self._get_option_list()
+        current_highlighted = opt_list.highlighted
+
+        opt_list.clear_options()
+        if not tasks:
+            self.filtered_tasks = []
+            self.dismiss()
+            return
+
+        self.filtered_tasks = []
+        first_group = True
+        for status_key, group in (("running", [t for t in tasks if t["is_running"]]),
+                                  ("completed", [t for t in tasks if not t["is_running"]])):
+            if not group:
+                continue
+            if not first_group:
+                opt_list.add_option(Option("", disabled=True))
+                self.filtered_tasks.append(None)
+            first_group = False
+            opt_list.add_option(Option(status_key.capitalize(), disabled=True))
+            self.filtered_tasks.append(None)
+            for item in group:
+                opt_list.add_option(self._format_task_row(item))
+                self.filtered_tasks.append(item)
+
+        if current_highlighted is not None and 0 <= current_highlighted < len(self.filtered_tasks):
+            highlighted_item = self.filtered_tasks[current_highlighted]
+            opt_list.highlighted = current_highlighted if highlighted_item is not None else 0
+        else:
+            for i, it in enumerate(self.filtered_tasks):
+                if it is not None:
+                    opt_list.highlighted = i
+                    break
+        self._update_hint()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if 0 <= event.option_index < len(self.filtered_tasks):
+            item = self.filtered_tasks[event.option_index]
+            if item is not None:
+                self._on_task_selected(item)
+
+    async def action_kill_task(self) -> None:
+        opt_list = self._get_option_list()
+        idx = opt_list.highlighted
+        if idx is not None and 0 <= idx < len(self.filtered_tasks):
+            item = self.filtered_tasks[idx]
+            if item is None:
+                return
+            await self._kill_item(item)
+            self._last_signatures = None
+            self.update_tasks_list()
+
+    def action_close(self) -> None:
+        self.dismiss()
+
+
+class ShellTasksScreen(BaseTasksListScreen):
+    """Modal screen listing background shell tasks with console view and kill."""
+
+    title_id = "shell-title"
+    option_list_id = "shell-option-list"
+    hint_action_name = "enter: console"
 
     def _get_header_md(self) -> str:
         return "### **Shell Tasks**"
@@ -259,90 +393,6 @@ class ShellTasksScreen(BaseModalScreen[None]):
 
         return _filter_and_sort_tasks(items, self.search_query)
 
-    def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
-            yield Markdown(
-                self._get_header_md(), id="shell-title", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
-            )
-            yield HeaderWrapOptionList(id="shell-option-list")
-            yield Label("enter: console • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
-
-    def on_mount(self) -> None:
-        self._last_signatures = None
-        self.update_tasks_list()
-        try:
-            self.query_one("#shell-option-list", OptionList).focus()
-        except Exception:
-            pass
-        self.set_interval(0.5, self.update_tasks_list)
-
-    def _update_hint(self) -> None:
-        try:
-            opt_list = self.query_one("#shell-option-list", OptionList)
-            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
-            idx = opt_list.highlighted
-            is_running = False
-            if idx is not None and 0 <= idx < len(self.filtered_tasks):
-                item = self.filtered_tasks[idx]
-                if item and item.get("is_running"):
-                    is_running = True
-            if is_running:
-                hint.update("enter: console • ↑↓: nav • k: kill • esc: close")
-            else:
-                hint.update("enter: console • ↑↓: nav • esc: close")
-        except Exception:
-            pass
-
-    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
-        self._update_hint()
-
-    def update_tasks_list(self) -> None:
-        if not self.is_mounted:
-            return
-        tasks = self._get_filtered_tasks()
-        new_signatures = [
-            (item["id"], item["is_running"], item["command"], item.get("progress_badge", ""))
-            for item in tasks
-        ]
-        if self._last_signatures == new_signatures:
-            return
-        self._last_signatures = new_signatures
-
-        opt_list = self.query_one("#shell-option-list", OptionList)
-        current_highlighted = opt_list.highlighted
-
-        opt_list.clear_options()
-        if not tasks:
-            self.filtered_tasks = []
-            self.dismiss()
-            return
-
-        self.filtered_tasks = []
-        first_group = True
-        for status_key, group in (("running", [t for t in tasks if t["is_running"]]),
-                                  ("completed", [t for t in tasks if not t["is_running"]])):
-            if not group:
-                continue
-            if not first_group:
-                opt_list.add_option(Option("", disabled=True))
-                self.filtered_tasks.append(None)
-            first_group = False
-            opt_list.add_option(Option(status_key.capitalize(), disabled=True))
-            self.filtered_tasks.append(None)
-            for item in group:
-                opt_list.add_option(self._format_task_row(item))
-                self.filtered_tasks.append(item)
-
-        if current_highlighted is not None and 0 <= current_highlighted < len(self.filtered_tasks):
-            highlighted_item = self.filtered_tasks[current_highlighted]
-            opt_list.highlighted = current_highlighted if highlighted_item is not None else 0
-        else:
-            for i, it in enumerate(self.filtered_tasks):
-                if it is not None:
-                    opt_list.highlighted = i
-                    break
-        self._update_hint()
-
     def _format_task_row(self, item: dict) -> str:
         return format_shell_task_row(
             item["command"],
@@ -350,58 +400,34 @@ class ShellTasksScreen(BaseModalScreen[None]):
             is_running=item.get("is_running", False),
         )
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if 0 <= event.option_index < len(self.filtered_tasks):
-            item = self.filtered_tasks[event.option_index]
-            if item is not None:
-                self.app.push_screen(TaskConsoleScreen(item["raw_obj"]))
+    def _on_task_selected(self, item: dict) -> None:
+        self.app.push_screen(TaskConsoleScreen(item["raw_obj"]))
 
-    async def action_kill_task(self) -> None:
-        opt_list = self.query_one("#shell-option-list", OptionList)
-        idx = opt_list.highlighted
-        if idx is not None and 0 <= idx < len(self.filtered_tasks):
-            item = self.filtered_tasks[idx]
-            if item is None:
-                return
-            raw = item["raw_obj"]
-            if getattr(raw, "is_running", False):
-                import inspect
+    async def _kill_item(self, item: dict) -> None:
+        raw = item["raw_obj"]
+        if getattr(raw, "is_running", False):
+            import inspect
 
-                res = raw.kill()
-                if inspect.isawaitable(res):
-                    await res
-            self._last_signatures = None
-            self.update_tasks_list()
-
-    def action_close(self) -> None:
-        self.dismiss()
+            res = raw.kill()
+            if inspect.isawaitable(res):
+                await res
 
 
-class SubagentsScreen(BaseModalScreen[None]):
+class SubagentsScreen(BaseTasksListScreen):
     """Modal screen listing running/completed subagents with detail view and kill."""
 
-    BINDINGS = expand_bindings([
-        ("escape", "close", "Close"),
-        ("k", "kill_task", "Kill Task"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
-    ])
+    title_id = "subagents-title"
+    option_list_id = "subagents-option-list"
+    hint_action_name = "enter: details"
 
     def __init__(self):
         super().__init__()
-        self.search_query = ""
-        self.filtered_tasks = []
-        # Cache of the last _get_filtered_tasks() result to avoid re-reading the
-        # session store / disk on every 0.5s ticker invocation.
         self._cached_tasks: list = []
         self._tasks_cache_ts: Optional[float] = None
         self._tasks_cache_ttl: float = 0.5
 
     def _get_header_md(self) -> str:
         return "### **Subagents**"
-
-    def _get_option_list(self) -> OptionList:
-        return self.query_one("#subagents-option-list", OptionList)
 
     def _invalidate_tasks_cache(self) -> None:
         """Drop the cached filtered-tasks snapshot so the next read re-reads the store."""
@@ -417,7 +443,6 @@ class SubagentsScreen(BaseModalScreen[None]):
             return self._cached_tasks
 
         items = []
-
         from core.session_manager import get_session_store
 
         store = get_session_store(self.app)
@@ -444,93 +469,6 @@ class SubagentsScreen(BaseModalScreen[None]):
         self._tasks_cache_ts = time.monotonic()
         return result
 
-    def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
-            yield Markdown(
-                self._get_header_md(), id="subagents-title", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
-            )
-            yield HeaderWrapOptionList(id="subagents-option-list")
-            yield Label("enter: details • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
-
-    def on_mount(self) -> None:
-        self._last_signatures = None
-        self.update_tasks_list()
-        try:
-            self._get_option_list().focus()
-        except Exception:
-            pass
-        self.set_interval(0.5, self.update_tasks_list)
-
-    def _update_hint(self) -> None:
-        try:
-            opt_list = self._get_option_list()
-            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
-            idx = opt_list.highlighted
-            is_running = False
-            if idx is not None and 0 <= idx < len(self.filtered_tasks):
-                item = self.filtered_tasks[idx]
-                if item and item.get("is_running"):
-                    is_running = True
-            if is_running:
-                hint.update("enter: details • ↑↓: nav • k: kill • esc: close")
-            else:
-                hint.update("enter: details • ↑↓: nav • esc: close")
-        except Exception:
-            pass
-
-    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
-        self._update_hint()
-
-    def update_tasks_list(self) -> None:
-        if not self.is_mounted:
-            return
-        tasks = self._get_filtered_tasks()
-        new_signatures = [
-            (item["id"], item["is_running"], item["command"], item.get("progress_badge", ""))
-            for item in tasks
-        ]
-        if hasattr(self, "_last_signatures") and self._last_signatures == new_signatures:
-            return
-        self._last_signatures = new_signatures
-
-        opt_list = self._get_option_list()
-        current_highlighted = opt_list.highlighted
-
-        opt_list.clear_options()
-        if not tasks:
-            self.filtered_tasks = []
-            self.dismiss()
-            return
-
-        # Build display rows in lockstep with self.filtered_tasks: a None marks a
-        # group header (Running / Completed), a dict marks a real subagent.
-        self.filtered_tasks = []
-        first_group = True
-        for status_key, group in (("running", [t for t in tasks if t["is_running"]]),
-                                  ("completed", [t for t in tasks if not t["is_running"]])):
-            if not group:
-                continue
-            if not first_group:
-                opt_list.add_option(Option("", disabled=True))
-                self.filtered_tasks.append(None)
-            first_group = False
-            opt_list.add_option(Option(status_key.capitalize(), disabled=True))
-            self.filtered_tasks.append(None)
-            for item in group:
-                opt_list.add_option(self._format_task_row(item))
-                self.filtered_tasks.append(item)
-
-        if current_highlighted is not None and 0 <= current_highlighted < len(self.filtered_tasks):
-            highlighted_item = self.filtered_tasks[current_highlighted]
-            opt_list.highlighted = current_highlighted if highlighted_item is not None else 0
-        else:
-            # First selectable (non-header) row
-            for i, it in enumerate(self.filtered_tasks):
-                if it is not None:
-                    opt_list.highlighted = i
-                    break
-        self._update_hint()
-
     def _format_task_row(self, item: dict) -> str:
         return format_subagent_task_row(
             item["command"],
@@ -544,31 +482,17 @@ class SubagentsScreen(BaseModalScreen[None]):
         session_id = getattr(item["raw_obj"], "id", item["id"])
         self.app.push_screen(SubagentViewScreen(session_id, from_tasks=True))
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if 0 <= event.option_index < len(self.filtered_tasks):
-            item = self.filtered_tasks[event.option_index]
-            if item is not None:
-                self._open_task_details(item)
+    def _on_task_selected(self, item: dict) -> None:
+        self._open_task_details(item)
 
-    async def action_kill_task(self) -> None:
-        opt_list = self._get_option_list()
-        idx = opt_list.highlighted
-        if idx is not None and 0 <= idx < len(self.filtered_tasks):
-            item = self.filtered_tasks[idx]
-            if item is None:
-                return
-            sess = item["raw_obj"]
-            if getattr(sess, "status", "") == "running" or getattr(sess, "is_running", False):
-                if getattr(sess, "async_task", None) and not sess.async_task.done():
-                    try:
-                        sess.async_task.cancel()
-                    except Exception:
-                        pass
-                if hasattr(sess, "finish"):
-                    sess.finish("cancelled", "Terminated from subagents menu")
-            self._last_signatures = None
-            self._invalidate_tasks_cache()
-            self.update_tasks_list()
-
-    def action_close(self) -> None:
-        self.dismiss()
+    async def _kill_item(self, item: dict) -> None:
+        sess = item["raw_obj"]
+        if getattr(sess, "status", "") == "running" or getattr(sess, "is_running", False):
+            if getattr(sess, "async_task", None) and not sess.async_task.done():
+                try:
+                    sess.async_task.cancel()
+                except Exception:
+                    pass
+            if hasattr(sess, "finish"):
+                sess.finish("cancelled", "Terminated from subagents menu")
+        self._invalidate_tasks_cache()

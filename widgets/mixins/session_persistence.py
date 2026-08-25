@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 import time
 from typing import Optional
 
@@ -7,6 +8,8 @@ from widgets.presentation.widgets.chat_container import ChatView
 from widgets.utils.message_visibility import is_ui_visible_user_message
 
 logger = logging.getLogger(__name__)
+
+_global_session_write_lock = threading.Lock()
 
 
 class SessionPersistenceMixin:
@@ -160,21 +163,22 @@ class SessionPersistenceMixin:
 
     def _write_session_data(self, session_data: dict) -> None:
         """Write collected session data into the store (no UI access — safe for threads)."""
-        session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
-        session.description = session.description or session_data.get("title", "")
-        if "role" in session_data:
-            session.role = session_data["role"]
-        session.messages = session_data.get("messages", [])
-        session.agent_history = session_data.get("agent_history", [])
-        session.tokens_input = session_data.get("tokens_input", 0)
-        session.tokens_output = session_data.get("tokens_output", 0)
-        session.total_tokens = session_data.get("total_tokens", 0)
-        session.cost_usd = session_data.get("cost_usd", 0.0)
-        session.last_context_tokens = session_data.get("last_context_tokens", 0)
-        session.tokens_cache_read = session_data.get("tokens_cache_read", 0)
-        session.touch()
-        self.sm.save(session)
-        self.sm.set_active_session_id(self.current_session_id)
+        with _global_session_write_lock:
+            session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
+            session.description = session.description or session_data.get("title", "")
+            if "role" in session_data:
+                session.role = session_data["role"]
+            session.messages = session_data.get("messages", [])
+            session.agent_history = session_data.get("agent_history", [])
+            session.tokens_input = session_data.get("tokens_input", 0)
+            session.tokens_output = session_data.get("tokens_output", 0)
+            session.total_tokens = session_data.get("total_tokens", 0)
+            session.cost_usd = session_data.get("cost_usd", 0.0)
+            session.last_context_tokens = session_data.get("last_context_tokens", 0)
+            session.tokens_cache_read = session_data.get("tokens_cache_read", 0)
+            session.touch()
+            self.sm.save(session)
+            self.sm.set_active_session_id(self.current_session_id)
 
     async def save_current_session_async(self, force: bool = False) -> None:
         """Collect session data on main UI thread, then save to disk in background thread."""

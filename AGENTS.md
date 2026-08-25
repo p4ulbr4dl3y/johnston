@@ -29,7 +29,7 @@ Layered core (`core/`): DDD-style. High-level vs low-level — keep deps pointin
 Widgets layering (`widgets/`):
 
 - `widgets/app/` — app controllers/state (app, ai_controller, dispatch, role_service, session/status_state).
-- `widgets/screens/` — user-facing screens. Reusable sub-widgets live in `widgets/presentation/{screens,widgets}`.
+- `widgets/presentation/screens/` — user-facing screens. Reusable sub-widgets live in `widgets/presentation/widgets/`.
 - `widgets/mixins/` — shared view behavior (actions, lifecycle, message_flow, session_persistence).
 - `widgets/` root — core chat widgets (chat_input, chat_toolcall, status_footer, commands, chat_view).
 - Utils in `widgets/utils/` (file_reader, lexer).

@@ -15,9 +15,15 @@ import asyncio
 import os
 import time
 
-from core.infrastructure.mcp import get_mcp_manager
 from core.infrastructure.runtime.thinking_effort import display_thinking_effort
 from core.models_catalog import catalog, format_context_tokens
+
+
+def get_mcp_manager():
+    """Resolve MCP manager dynamically from core infrastructure."""
+    import core.infrastructure.mcp as mcp_mod
+
+    return mcp_mod.get_mcp_manager()
 
 
 def _collect_cache(app):
@@ -36,9 +42,7 @@ def _collect_cache(app):
     except Exception:
         skills_total, skills_visible = 0, 0
     try:
-        import core.infrastructure.mcp as mcp_mod
-
-        mcp_servers = mcp_mod.get_mcp_manager().load_servers()
+        mcp_servers = get_mcp_manager().load_servers()
     except Exception:
         mcp_servers = []
     return providers, skills_visible, skills_total, mcp_servers
@@ -106,26 +110,26 @@ def build_status_kwargs(app, widget=None) -> dict:
     """
     if widget is not None:
         _ensure_cache(app, widget)
+        providers = getattr(widget, "_st_cached_providers", None)
+        if providers is None:
+            providers = {}
+        cached_skills = getattr(widget, "_st_cached_skills", (0, 0))
+        skills_visible, skills_total = cached_skills
+        cached_mcp = getattr(widget, "_st_cached_mcp_servers", None)
+        mcp_servers = cached_mcp if cached_mcp is not None else []
     else:
         # No cache holder: fall back to a lightweight synchronous read subset.
         try:
-            _collect_cache(app)
+            providers, skills_visible, skills_total, mcp_servers = _collect_cache(app)
         except Exception:
-            pass
+            providers, skills_visible, skills_total, mcp_servers = {}, 0, 0, []
+
     from core.infrastructure.runtime.task_collection import collect_current_tasks
 
     pm = getattr(app, "pm", None)
     pkey = pm.get_active_provider_key() if pm else "default"
     agent = getattr(app, "agent", None)
     model_name = getattr(agent, "model", "")
-    providers = getattr(widget, "_st_cached_providers", None)
-    if providers is None:
-        if widget is not None:
-            # Cache not ready yet (background load in flight): avoid blocking the
-            # footer timer on disk; the background loader will re-render shortly.
-            providers = {}
-        else:
-            providers = pm.load_providers() if pm else {}
     provider_info = providers.get(pkey, {}) if isinstance(providers, dict) else {}
     provider_display = provider_info.get("name", pkey) if provider_info else pkey
     is_connected = pm.is_provider_connected(pkey, provider_info) if (pm and pkey) else False
@@ -139,23 +143,6 @@ def build_status_kwargs(app, widget=None) -> dict:
     thinking_effort = display_thinking_effort(effort_val)
     metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
 
-    cached_skills = getattr(widget, "_st_cached_skills", None)
-    if cached_skills is None:
-        _ensure_cache(app, widget)
-        cached_skills = getattr(widget, "_st_cached_skills", (0, 0))
-    skills_visible, skills_total = cached_skills
-
-    cached_mcp = getattr(widget, "_st_cached_mcp_servers", None)
-    if cached_mcp is None:
-        if widget is not None:
-            # Background cache load is still in flight: never block the footer
-            # timer on disk reads. Keep the last-known state (empty on first
-            # render); the background loader re-renders as soon as it's ready.
-            cached_mcp = []
-        else:
-            cached_mcp = get_mcp_manager().load_servers()
-    mcp_servers = cached_mcp
-
     # Count only servers that are actually loading (enabled, stdio
     # command) and of those, only the ones that finished loading: a
     # running client that discovered tools and has no error. Pending or
@@ -166,15 +153,13 @@ def build_status_kwargs(app, widget=None) -> dict:
         if s.get("url") and not s.get("command"):
             continue
         mcp_total += 1
-    import core.infrastructure.mcp as mcp_mod
-
-    count_fn = getattr(mcp_mod.get_mcp_manager(), "active_server_count", None)
-    mcp_active = 0
-    if callable(count_fn):
-        try:
+    try:
+        count_fn = getattr(get_mcp_manager(), "active_server_count", None)
+        mcp_active = 0
+        if callable(count_fn):
             mcp_active = count_fn(mcp_servers) or 0
-        except Exception:
-            mcp_active = 0
+    except Exception:
+        mcp_active = 0
 
     tasks = collect_current_tasks(app, getattr(app, "current_session_id", None))
     bg_tasks = tasks.shell_tasks
@@ -229,14 +214,15 @@ def build_subagent_status_kwargs(
     app,
     session,
     *,
-    spinner_running: bool,
-    spinner_idx: int,
+    widget=None,
+    spinner_running: bool = False,
+    spinner_idx: int = 0,
 ) -> tuple:
-    """Collect subagent footer values and return them as a ``_render_subagent`` arg tuple.
+    """State builder for the subagent screen status bar and header.
 
-    The tuple order matches ``StatusFooter._render_subagent`` signature:
-    ``(role_formatted, provider_display, clean_model, is_connected, model_name,
-    context_used, total_tokens, context_limit, context_window, cost_usd,
+    Pure aggregator: reads the subagent ``AgentSession`` and returns
+    ``(role_formatted, provider_display, clean_model, is_connected,
+    model_name, context_used, total_tokens, context_limit, context_window, cost_usd,
     thinking_effort, directory)``.
 
     ``spinner_running`` / ``spinner_idx`` are passed in; the widget decides
@@ -260,7 +246,13 @@ def build_subagent_status_kwargs(
     pm = getattr(app, "pm", None)
     if not provider_key and pm:
         provider_key = pm.get_active_provider_key()
-    providers = pm.load_providers() if pm else {}
+    providers = None
+    if widget is not None:
+        providers = getattr(widget, "_st_cached_providers", None)
+    if providers is None and app:
+        providers = getattr(app, "_st_cached_providers", None)
+    if providers is None:
+        providers = pm.load_providers() if pm else {}
     provider_info = providers.get(provider_key, {}) if isinstance(providers, dict) else {}
     provider_display = provider_info.get("name", provider_key) if provider_info else provider_key
     is_connected = pm.is_provider_connected(provider_key, provider_info) if (pm and provider_key) else False

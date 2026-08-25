@@ -7,6 +7,7 @@ from textual.widgets import OptionList
 
 from widgets.app.command_provider import get_all_command_suggestions
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
+from widgets.presentation.screens.constants import MESSAGE_INPUT
 
 
 class CommandSuggestions(HeaderWrapOptionList):
@@ -126,7 +127,7 @@ class CommandSuggestions(HeaderWrapOptionList):
                 if self.app:
                     from widgets.chat_input import ChatInput
 
-                    ci = self.app.query_one("#message-input", ChatInput)
+                    ci = self.app.query_one(MESSAGE_INPUT, ChatInput)
                     ci.update_height()
             except Exception:
                 pass
@@ -200,7 +201,7 @@ class CommandSuggestions(HeaderWrapOptionList):
             try:
                 from widgets.chat_input import ChatInput
 
-                chat_input = self.app.query_one("#message-input", ChatInput)
+                chat_input = self.app.query_one(MESSAGE_INPUT, ChatInput)
                 if self.mode == "command":
                     chosen_cmd = self.current_matched[self.highlighted]
                     chat_input.apply_suggestion(chosen_cmd, self.at_start_idx)

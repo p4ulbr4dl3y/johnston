@@ -35,9 +35,14 @@ class LifecycleMixin:
         from core.infrastructure.mcp import get_mcp_manager
 
         self.refresh_status_footer()
-        asyncio.create_task(catalog.refresh())
-        asyncio.create_task(get_mcp_manager().ensure_tools_ready_async())
-        asyncio.create_task(self._check_initial_setup())
+        if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
+            self.create_tracked_task(catalog.refresh())
+            self.create_tracked_task(get_mcp_manager().ensure_tools_ready_async())
+            self.create_tracked_task(self._check_initial_setup())
+        else:
+            asyncio.create_task(catalog.refresh())
+            asyncio.create_task(get_mcp_manager().ensure_tools_ready_async())
+            asyncio.create_task(self._check_initial_setup())
 
     async def _check_initial_setup(self) -> None:
         """Auto-prompt for provider/model selection on first launch if unconfigured"""

@@ -71,6 +71,18 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.message_queue = []
         self.is_generating = False
         self.sandbox_enabled = load_sandbox_config()
+        self._background_tasks: set[asyncio.Task] = set()
+
+    def create_tracked_task(self, coro) -> asyncio.Task | None:
+        """Spawn an asyncio task and keep a strong reference until done."""
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(coro)
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+            return task
+        except RuntimeError:
+            return None
 
     def copy_to_clipboard(self, text: str, notify: bool = True) -> None:
         """Copy text to both Textual clipboard (OSC 52) and native OS clipboard."""
@@ -82,7 +94,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             pass
         from core.infrastructure.platform.platform_utils import copy_to_os_clipboard_async
 
-        asyncio.create_task(copy_to_os_clipboard_async(text))
+        self.create_tracked_task(copy_to_os_clipboard_async(text))
         if notify and hasattr(self, "notify"):
             try:
                 self.notify("Copied to clipboard", severity="information", timeout=1.5)

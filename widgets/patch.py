@@ -22,7 +22,8 @@ def apply_textual_patches() -> None:
         try:
             original_forward_event(self, event)
         except AttributeError as err:
-            if "has no attribute 'region'" in str(err) or "has no attribute 'scroll_offset'" in str(err):
+            err_msg = str(err)
+            if "region" in err_msg or "scroll_offset" in err_msg or getattr(self, "_select_state", None) is not None:
                 self._select_state = None
             else:
                 raise

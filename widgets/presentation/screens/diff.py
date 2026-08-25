@@ -11,6 +11,7 @@ from textual.screen import Screen
 from textual.widgets import Input, OptionList, Static
 
 from widgets.chat_toolcall import ToolScrollBox
+from widgets.presentation.screens.base_selection import ModalSearchNavMixin
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
 
@@ -136,11 +137,14 @@ class DiffFooter(Static):
         self.update(table)
 
 
-class DiffScreen(Screen[None]):
+class DiffScreen(ModalSearchNavMixin, Screen[None]):
     """Full-screen Git Diff Viewer matching Johnston's zinc monochrome design."""
 
     ALLOW_SELECT = False
     inherit_bindings = False
+    search_nav_input_id = "diff-search-input"
+    search_nav_option_list_id = "diff-file-list"
+    search_nav_filtered_attr = "filtered_indices"
 
     BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
@@ -326,23 +330,8 @@ class DiffScreen(Screen[None]):
             pass
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("down", "up"):
-            try:
-                search_input = self.query_one("#diff-search-input", Input)
-                if search_input.has_focus:
-                    opt_list = self.query_one("#diff-file-list", OptionList)
-                    if opt_list.highlighted is None and self.filtered_indices:
-                        opt_list.highlighted = 0
-                    elif opt_list.highlighted is not None:
-                        if event.key == "down":
-                            opt_list.action_cursor_down()
-                        else:
-                            opt_list.action_cursor_up()
-                    event.prevent_default()
-                    event.stop()
-                    return
-            except Exception:
-                pass
+        if self._handle_search_navigation(event):
+            return
         if event.key in ("pageup", "pagedown"):
             try:
                 scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)

@@ -388,6 +388,92 @@ class ChatInput(TextArea):
 
         return False
 
+    def _accept_active_suggestion(self) -> bool:
+        """Apply active suggestion if suggestion menu is visible."""
+        try:
+            from widgets.command_suggestions import CommandSuggestions
+
+            suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
+            if suggestions.display and suggestions.highlighted is not None:
+                if suggestions.highlighted < len(suggestions.current_matched):
+                    chosen = suggestions.current_matched[suggestions.highlighted]
+                    if suggestions.mode == "command":
+                        self.apply_suggestion(chosen, suggestions.at_start_idx)
+                    elif suggestions.mode == "file":
+                        self.apply_file_suggestion(chosen, suggestions.at_start_idx)
+                    suggestions.display = False
+                    if hasattr(suggestions, "_set_display") and callable(suggestions._set_display):
+                        suggestions._set_display(False)
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _handle_chat_scroll_keys(self, key: str) -> bool:
+        """Handle page up/down and top/bottom chat scroll keys."""
+        if (
+            key not in KEY_SCROLL_UP
+            and key not in KEY_SCROLL_DOWN
+            and key not in KEY_SCROLL_TOP
+            and key not in KEY_SCROLL_BOTTOM
+        ):
+            return False
+        try:
+            from widgets.presentation.widgets.chat_container import ChatView
+
+            chat_view = self.app.query_one(ChatView)
+            if key in KEY_SCROLL_UP:
+                chat_view.scroll_up_page()
+            elif key in KEY_SCROLL_DOWN:
+                chat_view.scroll_down_page()
+            elif key in KEY_SCROLL_TOP:
+                chat_view.scroll_to_top()
+            elif key in KEY_SCROLL_BOTTOM:
+                chat_view.scroll_to_bottom()
+            return True
+        except Exception:
+            return False
+
+    def _handle_history_navigation(self, key: str) -> bool:
+        """Navigate prompt history when cursor is at the top/bottom boundary."""
+        lines = self.text.split("\n")
+        if key == "up" and self.cursor_location[0] == 0:
+            if not self.prompt_history:
+                return False
+            if self.prompt_history_index == len(self.prompt_history):
+                self.prompt_draft = self.text
+
+            if self.prompt_history_index == 0:
+                self.prompt_history_index = len(self.prompt_history)
+                self.load_text(self.prompt_draft)
+            else:
+                self.prompt_history_index -= 1
+                self.load_text(self.prompt_history[self.prompt_history_index])
+
+            new_lines = self.text.split("\n")
+            self.move_cursor((len(new_lines) - 1, len(new_lines[-1])))
+            return True
+
+        if key == "down" and self.cursor_location[0] == len(lines) - 1:
+            if not self.prompt_history:
+                return False
+            if self.prompt_history_index == len(self.prompt_history):
+                self.prompt_draft = self.text
+                self.prompt_history_index = 0
+                self.load_text(self.prompt_history[0])
+            else:
+                self.prompt_history_index += 1
+                if self.prompt_history_index == len(self.prompt_history):
+                    self.load_text(self.prompt_draft)
+                else:
+                    self.load_text(self.prompt_history[self.prompt_history_index])
+
+            new_lines = self.text.split("\n")
+            self.move_cursor((len(new_lines) - 1, len(new_lines[-1])))
+            return True
+
+        return False
+
     async def _on_key(self, event: events.Key) -> None:
         if event.key in KEY_PASTE:
             if await self.try_paste_clipboard_image():
@@ -415,29 +501,10 @@ class ChatInput(TextArea):
             return
 
         # Main chat history scrolling via keyboard
-        if (
-            event.key in KEY_SCROLL_UP
-            or event.key in KEY_SCROLL_DOWN
-            or event.key in KEY_SCROLL_TOP
-            or event.key in KEY_SCROLL_BOTTOM
-        ):
-            try:
-                from widgets.presentation.widgets.chat_container import ChatView
-
-                chat_view = self.app.query_one(ChatView)
-                if event.key in KEY_SCROLL_UP:
-                    chat_view.scroll_up_page()
-                elif event.key in KEY_SCROLL_DOWN:
-                    chat_view.scroll_down_page()
-                elif event.key in KEY_SCROLL_TOP:
-                    chat_view.scroll_to_top()
-                elif event.key in KEY_SCROLL_BOTTOM:
-                    chat_view.scroll_to_bottom()
-                event.prevent_default()
-                event.stop()
-                return
-            except Exception:
-                pass
+        if self._handle_chat_scroll_keys(event.key):
+            event.prevent_default()
+            event.stop()
+            return
 
         # Global Exit shortcut: Ctrl+C / Ctrl+Q (and layout aliases)
         if event.key in KEY_QUIT:
@@ -470,29 +537,10 @@ class ChatInput(TextArea):
 
         # Tab press for slash command or file autocompletion
         if event.key == "tab":
-            try:
-                from widgets.command_suggestions import CommandSuggestions
-
-                suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
-                if suggestions.display and suggestions.highlighted is not None:
-                    if suggestions.mode == "command":
-                        if suggestions.highlighted < len(suggestions.current_matched):
-                            chosen_cmd = suggestions.current_matched[suggestions.highlighted]
-                            self.apply_suggestion(chosen_cmd, suggestions.at_start_idx)
-                            suggestions.display = False
-                            event.prevent_default()
-                            event.stop()
-                            return
-                    elif suggestions.mode == "file":
-                        if suggestions.highlighted < len(suggestions.current_matched):
-                            chosen_file = suggestions.current_matched[suggestions.highlighted]
-                            self.apply_file_suggestion(chosen_file, suggestions.at_start_idx)
-                            suggestions.display = False
-                            event.prevent_default()
-                            event.stop()
-                            return
-            except Exception:
-                pass
+            if self._accept_active_suggestion():
+                event.prevent_default()
+                event.stop()
+                return
 
         # Shift+Tab press to toggle mode (Action / Explore)
         if event.key in KEY_TOGGLE_ROLE:
@@ -521,75 +569,18 @@ class ChatInput(TextArea):
         except Exception:
             pass
 
-        # Looped navigation through query history: Up
-        if event.key == "up" and self.cursor_location[0] == 0:
-            if self.prompt_history:
-                if self.prompt_history_index == len(self.prompt_history):
-                    self.prompt_draft = self.text
-
-                if self.prompt_history_index == 0:
-                    self.prompt_history_index = len(self.prompt_history)
-                    self.load_text(self.prompt_draft)
-                else:
-                    self.prompt_history_index -= 1
-                    self.load_text(self.prompt_history[self.prompt_history_index])
-
-                lines = self.text.split("\n")
-                self.move_cursor((len(lines) - 1, len(lines[-1])))
-                event.prevent_default()
-                event.stop()
-                return
-
-        # Looped navigation through query history: Down
-        lines = self.text.split("\n")
-        if event.key == "down" and self.cursor_location[0] == len(lines) - 1:
-            if self.prompt_history:
-                if self.prompt_history_index == len(self.prompt_history):
-                    self.prompt_draft = self.text
-                    self.prompt_history_index = 0
-                    self.load_text(self.prompt_history[0])
-                else:
-                    self.prompt_history_index += 1
-                    if self.prompt_history_index == len(self.prompt_history):
-                        self.load_text(self.prompt_draft)
-                    else:
-                        self.load_text(self.prompt_history[self.prompt_history_index])
-
-                lines = self.text.split("\n")
-                self.move_cursor((len(lines) - 1, len(lines[-1])))
-                event.prevent_default()
-                event.stop()
-                return
+        # Looped navigation through query history
+        if self._handle_history_navigation(event.key):
+            event.prevent_default()
+            event.stop()
+            return
 
         if event.key == "enter":
             # Select suggestion if suggestion menu is open
-            try:
-                from widgets.command_suggestions import CommandSuggestions
-
-                suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
-                if suggestions.display and suggestions.highlighted is not None:
-                    if suggestions.mode == "command":
-                        if suggestions.highlighted < len(suggestions.current_matched):
-                            chosen_cmd = suggestions.current_matched[suggestions.highlighted]
-                            self.apply_suggestion(chosen_cmd, suggestions.at_start_idx)
-                            suggestions.display = False
-                            if hasattr(suggestions, "_set_display") and callable(suggestions._set_display):
-                                suggestions._set_display(False)
-                            event.prevent_default()
-                            event.stop()
-                            return
-                    elif suggestions.mode == "file":
-                        if suggestions.highlighted < len(suggestions.current_matched):
-                            chosen_file = suggestions.current_matched[suggestions.highlighted]
-                            self.apply_file_suggestion(chosen_file, suggestions.at_start_idx)
-                            suggestions.display = False
-                            if hasattr(suggestions, "_set_display") and callable(suggestions._set_display):
-                                suggestions._set_display(False)
-                            event.prevent_default()
-                            event.stop()
-                            return
-            except Exception:
-                pass
+            if self._accept_active_suggestion():
+                event.prevent_default()
+                event.stop()
+                return
 
             event.prevent_default()
             event.stop()
