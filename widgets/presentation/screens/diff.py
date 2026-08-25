@@ -91,8 +91,15 @@ class DiffFooter(ResizeDebounceMixin, Static):
         super().__init__(id=id, classes=classes)
         self.current_file = ""
         self.current_stats = ""
+        self.is_compact = False
+        self.compact_view = "files"
 
     def on_mount(self) -> None:
+        self.render_footer()
+
+    def set_view_context(self, is_compact: bool, compact_view: str) -> None:
+        self.is_compact = is_compact
+        self.compact_view = compact_view
         self.render_footer()
 
     def update_info(self, file_path: str, stats: str) -> None:
@@ -118,10 +125,15 @@ class DiffFooter(ResizeDebounceMixin, Static):
         else:
             left_text = "[dim #71717a]No file selected[/]"
 
-        if width >= BREAKPOINT_HINT:
-            right_text = "[#71717a]↑↓: files  •  pgup/pgdn: scroll[/]"
+        if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
+            if self.compact_view == "diff":
+                right_text = "[#71717a]esc: files  •  pgup/pgdn: scroll[/]"
+            else:
+                right_text = "[#71717a]enter: view diff  •  esc: close[/]"
+        elif width >= BREAKPOINT_HINT:
+            right_text = "[#71717a]↑↓: files  •  tab: toggle sidebar  •  pgup/pgdn: scroll[/]"
         else:
-            right_text = "[#71717a]↑↓: files[/]"
+            right_text = "[#71717a]↑↓: files  •  tab: sidebar[/]"
 
         table.add_row(left_text, right_text)
         self.update(table)
@@ -138,6 +150,8 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
 
     BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
+        ("tab", "toggle_sidebar", "Toggle Sidebar"),
+        ("b", "toggle_sidebar", "Toggle Sidebar"),
         ("pageup", "page_up", "Page Up"),
         ("pagedown", "page_down", "Page Down"),
         ("ctrl+c", "quit_app", "Quit"),
@@ -155,6 +169,8 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         self.title_text = title
         self.from_rewind = from_rewind
         self.selected_index = 0
+        self.sidebar_visible = True
+        self.compact_view = "files"
 
         total_added = sum(item[2] for item in diff_items)
         total_deleted = sum(item[3] for item in diff_items)
@@ -167,12 +183,13 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
             self.stats_summary = f"{files_count} {plural}, +{total_added} / -{total_deleted}"
 
         self.filtered_indices: list[int] = list(range(len(self.diff_items)))
+        self.sidebar_options: list[str] = self._format_sidebar_options(DIFF_SIDEBAR_ROW_WIDTH)
 
-        self.sidebar_options: list[str] = []
+    def _format_sidebar_options(self, target_width: int = DIFF_SIDEBAR_ROW_WIDTH) -> list[str]:
+        options = []
         for file_path, _, added, deleted in self.diff_items:
             short_name = os.path.basename(file_path) or file_path
             stat_plain = f"+{added}/-{deleted}"
-            target_width = DIFF_SIDEBAR_ROW_WIDTH
             if display_width(short_name) + display_width(stat_plain) + 1 > target_width:
                 max_name_len = max(4, target_width - display_width(stat_plain) - 1)
                 dot_idx = short_name.rfind(".")
@@ -185,7 +202,68 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
 
             spaces = " " * max(1, target_width - display_width(short_name) - display_width(stat_plain))
             stat_markup = f"[#22c55e]+{added}[/][dim #71717a]/[/][#ef4444]-{deleted}[/]"
-            self.sidebar_options.append(f"{escape(short_name)}{spaces}{stat_markup}")
+            options.append(f"{escape(short_name)}{spaces}{stat_markup}")
+        return options
+
+    def _sidebar_row_width(self) -> int:
+        try:
+            sidebar = self.query_one("#diff-sidebar", Vertical)
+            width = sidebar.size.width
+            if isinstance(width, int) and width > 15:
+                return max(15, width - 3)
+        except Exception:
+            pass
+        return DIFF_SIDEBAR_ROW_WIDTH
+
+    def _refresh_sidebar_options(self) -> None:
+        target_w = self._sidebar_row_width()
+        self.sidebar_options = self._format_sidebar_options(target_w)
+        try:
+            opt_list = self.query_one("#diff-file-list", OptionList)
+            saved_hl = opt_list.highlighted
+            opt_list.clear_options()
+            opt_list.add_options([self.sidebar_options[i] for i in self.filtered_indices])
+            if saved_hl is not None and 0 <= saved_hl < len(self.filtered_indices):
+                opt_list.highlighted = saved_hl
+        except Exception:
+            pass
+
+    def _update_layout(self) -> None:
+        width = resolve_width(self)
+        try:
+            sidebar = self.query_one("#diff-sidebar", Vertical)
+            content = self.query_one("#diff-content-container", Vertical)
+        except Exception:
+            return
+
+        is_compact = is_compact_width(width, breakpoint=BREAKPOINT_COMPACT)
+        if is_compact:
+            if self.compact_view == "diff":
+                sidebar.add_class("-hidden")
+                sidebar.remove_class("-full-width")
+                content.remove_class("-hidden")
+                content.add_class("-full-width")
+            else:
+                sidebar.remove_class("-hidden")
+                sidebar.add_class("-full-width")
+                content.add_class("-hidden")
+                content.remove_class("-full-width")
+        else:
+            sidebar.remove_class("-full-width")
+            content.remove_class("-full-width")
+            if self.sidebar_visible:
+                sidebar.remove_class("-hidden")
+            else:
+                sidebar.add_class("-hidden")
+            content.remove_class("-hidden")
+
+        self._refresh_sidebar_options()
+
+        try:
+            footer = self.query_one("#diff-footer", DiffFooter)
+            footer.set_view_context(is_compact=is_compact, compact_view=self.compact_view)
+        except Exception:
+            pass
 
     def compose(self) -> ComposeResult:
         with Vertical(id="diff-container"):
@@ -204,6 +282,7 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
             yield DiffFooter(id="diff-footer")
 
     def on_mount(self) -> None:
+        self._update_layout()
         if self.diff_items:
             try:
                 search_input = self.query_one("#diff-search-input", Input)
@@ -217,6 +296,9 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
                 footer.update_info("", "no changes")
             except Exception:
                 pass
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._update_layout()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id != "diff-search-input":
@@ -243,6 +325,13 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
                 self._render_empty_search()
         except Exception:
             pass
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if self.filtered_indices:
+            width = resolve_width(self)
+            if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
+                self.compact_view = "diff"
+                self._update_layout()
 
     def _render_empty_search(self) -> None:
         try:
@@ -292,6 +381,18 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         if event.option_index is not None and 0 <= event.option_index < len(self.filtered_indices):
             real_idx = self.filtered_indices[event.option_index]
             self._render_current_diff(real_idx)
+            width = resolve_width(self)
+            if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
+                self.compact_view = "diff"
+                self._update_layout()
+
+    def action_toggle_sidebar(self) -> None:
+        width = resolve_width(self)
+        if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
+            self.compact_view = "diff" if self.compact_view == "files" else "files"
+        else:
+            self.sidebar_visible = not self.sidebar_visible
+        self._update_layout()
 
     def action_page_up(self) -> None:
         try:
@@ -323,6 +424,15 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
                 pass
 
     def action_close(self) -> None:
+        width = resolve_width(self)
+        if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT) and self.compact_view == "diff":
+            self.compact_view = "files"
+            self._update_layout()
+            try:
+                self.query_one("#diff-search-input", Input).focus()
+            except Exception:
+                pass
+            return
         self.dismiss(None)
 
     def action_quit_app(self) -> None:

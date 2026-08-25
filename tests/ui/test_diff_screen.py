@@ -108,6 +108,55 @@ class TestDiffScreen(unittest.TestCase):
         screen.on_input_changed(mock_event)
         self.assertEqual(screen.filtered_indices, [0, 1, 2])
 
+    def test_diff_screen_toggle_sidebar_wide(self):
+        items = [("file1.py", "diff1", 1, 0)]
+        screen = DiffScreen(items)
+        screen._update_layout = MagicMock()
+
+        with patch("widgets.presentation.screens.diff.resolve_width", return_value=100):
+            screen.action_toggle_sidebar()
+            self.assertFalse(screen.sidebar_visible)
+            screen.action_toggle_sidebar()
+            self.assertTrue(screen.sidebar_visible)
+
+    def test_diff_screen_compact_mode_navigation(self):
+        items = [("file1.py", "diff1", 1, 0)]
+        screen = DiffScreen(items)
+        screen.dismiss = MagicMock()
+        screen.query_one = MagicMock()
+
+        with patch("widgets.presentation.screens.diff.resolve_width", return_value=50):
+            # In compact mode, default is files view
+            self.assertEqual(screen.compact_view, "files")
+
+            # Selecting an option switches to diff view
+            mock_sel = MagicMock(spec=OptionList.OptionSelected)
+            mock_sel.option_index = 0
+            screen.on_option_list_option_selected(mock_sel)
+            self.assertEqual(screen.compact_view, "diff")
+
+            # Pressing close in diff view switches back to files view
+            screen.action_close()
+            self.assertEqual(screen.compact_view, "files")
+            screen.dismiss.assert_not_called()
+
+            # Pressing close in files view dismisses the screen
+            screen.action_close()
+            screen.dismiss.assert_called_once_with(None)
+
+    def test_diff_screen_input_submitted_in_compact_mode(self):
+        from textual.widgets import Input
+
+        items = [("file1.py", "diff1", 1, 0)]
+        screen = DiffScreen(items)
+        screen._update_layout = MagicMock()
+
+        with patch("widgets.presentation.screens.diff.resolve_width", return_value=50):
+            mock_event = MagicMock(spec=Input.Submitted)
+            screen.on_input_submitted(mock_event)
+            self.assertEqual(screen.compact_view, "diff")
+
+
 
 class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
     async def test_diff_command_no_session(self):

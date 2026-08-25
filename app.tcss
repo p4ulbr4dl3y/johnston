@@ -675,14 +675,35 @@ DiffScreen {
 }
 
 #diff-sidebar {
-    width: 34;
-    /* Never claim more than half the dialog: on narrow terminals the code
-       pane keeps usable width instead of being squeezed to a sliver. */
-    max-width: 55%;
+    width: 32;
+    max-width: 40%;
+    min-width: 22;
     height: 100%;
     background: #18181b;
     border-right: solid #27272a;
     padding: 0;
+}
+
+#diff-sidebar.-hidden {
+    display: none;
+}
+
+#diff-content-container.-hidden {
+    display: none;
+}
+
+#diff-sidebar.-full-width {
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    border-right: none;
+}
+
+#diff-content-container.-full-width {
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    padding: 0 1;
 }
 
 #diff-search-input,
