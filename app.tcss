@@ -563,10 +563,19 @@ ModalScreen {
     padding: 0 1;
 }
 
+#help-scroll-box {
+    width: 100%;
+    height: auto;
+    max-height: 15;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-size: 0 0 !important;
+}
+
 #help-body,
 #help-body-md {
     margin-top: 0;
-    margin-bottom: 1;
+    margin-bottom: 0;
     padding: 0 1;
 }
 

@@ -119,6 +119,8 @@ class HelpScreen(BaseModalScreen[None]):
             pass
 
     def compose(self) -> ComposeResult:
+        from widgets.chat_toolcall import ToolScrollBox
+
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
             yield Markdown(
                 "### **Johnston Help**",
@@ -126,7 +128,8 @@ class HelpScreen(BaseModalScreen[None]):
                 classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}",
             )
             yield Static(self._get_tabs_markup(), id="help-tabs", classes=MODAL_MARKDOWN)
-            yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
+            with ToolScrollBox(id="help-scroll-box"):
+                yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
             yield Label("tab / ←→: switch • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
@@ -159,6 +162,24 @@ class HelpScreen(BaseModalScreen[None]):
             event.prevent_default()
             event.stop()
             return
+        if event.key in ("up", "down", "pageup", "pagedown"):
+            from widgets.chat_toolcall import ToolScrollBox
+
+            try:
+                scroll_box = self.query_one("#help-scroll-box", ToolScrollBox)
+                if event.key == "up":
+                    scroll_box.scroll_up(animate=False)
+                elif event.key == "down":
+                    scroll_box.scroll_down(animate=False)
+                elif event.key == "pageup":
+                    scroll_box.scroll_page_up(animate=False)
+                elif event.key == "pagedown":
+                    scroll_box.scroll_page_down(animate=False)
+                event.prevent_default()
+                event.stop()
+                return
+            except Exception:
+                pass
         await super()._on_key(event)
 
     def action_close(self) -> None:
