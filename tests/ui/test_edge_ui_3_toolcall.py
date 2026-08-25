@@ -116,12 +116,18 @@ class TestEdgeToolCallInvokeSubagentStatus(unittest.TestCase):
         widget = ToolCallWidget("invoke_subagent", "task", args={})
         widget.set_result("ERR: provider unavailable", status="error")
         self.assertEqual(widget.status, "error")
+        self.assertFalse(widget.is_clickable_header())
+        self.assertNotIn("tool-header-expandable", widget.header_label.classes)
 
     def test_final_error_is_red(self):
         widget = ToolCallWidget("invoke_subagent", "task", args={})
         widget.set_result("subagent 'x' launched (session_id: subagent-abc)", status="running")
+        self.assertTrue(widget.is_clickable_header())
+        self.assertIn("tool-header-expandable", widget.header_label.classes)
         widget.set_result("Subagent error: boom", status="error")
         self.assertEqual(widget.status, "error")
+        self.assertFalse(widget.is_clickable_header())
+        self.assertNotIn("tool-header-expandable", widget.header_label.classes)
 
 
 class TestEdgeToolCallMarkRunning(unittest.TestCase):

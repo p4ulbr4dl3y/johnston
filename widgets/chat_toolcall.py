@@ -373,7 +373,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def is_clickable_header(self) -> bool:
         if self.status in ("error", "cancelled"):
-            return self.canonical_tool == "invoke_subagent" or (
+            return (
                 self.canonical_tool == "shell" and bool((self.result_text or "").strip())
             )
         return (
@@ -544,12 +544,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 bg_m = re.search(r"Background Task ID:\s*([^\s\]]+)", cleaned)
                 if bg_m:
                     self.background_task_id = bg_m.group(1)
-        elif self.canonical_tool == "invoke_subagent":
-            self.result_text = cleaned
-            self.render_header()
-            if self.is_expanded:
-                self.render_content()
-            return
         else:
             self.result_text = cleaned
 
@@ -562,6 +556,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.md_widget.display = False
             if was_expanded:
                 self._update_next_sibling_spacing()
+        else:
+            self.header_label.add_class(TOOL_HEADER_EXPANDABLE)
+            self.header_label.remove_class(TOOL_HEADER)
         self.render_header()
         if self.is_expanded:
             # Scroll the finished result into view only when the user is
@@ -605,6 +602,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.status = "running"
         if text:
             self.result_text = text.strip()
+        if not self.is_clickable_header():
+            self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
+            self.header_label.add_class(TOOL_HEADER)
+        else:
+            self.header_label.add_class(TOOL_HEADER_EXPANDABLE)
+            self.header_label.remove_class(TOOL_HEADER)
         self.render_header()
 
     DISPLAY_NAMES = DISPLAY_NAMES

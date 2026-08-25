@@ -359,6 +359,36 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         screen_cls.assert_called_once()
         event.stop.assert_called_once()
 
+    def test_on_click_invoke_subagent_error_not_clickable(self):
+        widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
+        widget.set_result("Error: launch failed", status="error")
+        self.assertFalse(widget.is_clickable_header())
+        self.assertNotIn("tool-header-expandable", widget.header_label.classes)
+        event = MagicMock()
+        with (
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app_prop.return_value = MagicMock()
+            widget.on_click(event)
+        screen_cls.assert_not_called()
+        event.stop.assert_not_called()
+
+    def test_on_click_invoke_subagent_cancelled_not_clickable(self):
+        widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
+        widget.mark_cancelled()
+        self.assertFalse(widget.is_clickable_header())
+        self.assertNotIn("tool-header-expandable", widget.header_label.classes)
+        event = MagicMock()
+        with (
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app_prop.return_value = MagicMock()
+            widget.on_click(event)
+        screen_cls.assert_not_called()
+        event.stop.assert_not_called()
+
     def test_on_click_manage_shell_no_longer_clickable(self):
         widget = self._widget("manage_shell", "t", args={"description": "desc"})
         event = MagicMock()
