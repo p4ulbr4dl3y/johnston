@@ -114,12 +114,12 @@ class HelpScreen(BaseModalScreen[None]):
             # Max width across commands/keybindings with generous column gap
             sample_items = [f"{k}        {d}" for k, d in COMMANDS_DATA + KEYBINDINGS_DATA]
             content_w = modal_content_width(sample_items, "### **Johnston Help**", "tab / ←→: switch • esc: close")
-            apply_modal_fit(dialog, content_w, min_width=64, max_width=86)
+            apply_modal_fit(dialog, content_w, min_width=70, max_width=92)
         except Exception:
             pass
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
             yield Markdown(
                 "### **Johnston Help**",
                 id="help-header-md",
