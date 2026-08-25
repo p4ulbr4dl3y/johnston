@@ -228,7 +228,7 @@ def _format_active_tool_progress(
             return 1
         files = set()
         for evt in turn_events:
-            if not isinstance(evt, dict) or evt.get("type") != "tool":
+            if not isinstance(evt, dict) or evt.get("type") != "tool" or not evt.get("tool_type"):
                 continue
             t_name = _normalize(evt.get("tool_type") or "")
             if t_name in tool_names:
@@ -247,6 +247,7 @@ def _format_active_tool_progress(
             for evt in turn_events
             if isinstance(evt, dict)
             and evt.get("type") == "tool"
+            and evt.get("tool_type")
             and _normalize(evt.get("tool_type") or "") in tool_names
         )
         return max(1, cnt)
@@ -346,24 +347,33 @@ def extract_subagent_progress(session: Any) -> str:
     if not isinstance(messages, (list, tuple)) or not messages:
         return "starting..."
 
-    # Slice events belonging to the latest turn (from last user message)
-    turn_events: List[Dict[str, Any]] = []
+    # Slice events belonging to the current step / batch
+    batch_events: List[Dict[str, Any]] = []
     for evt in reversed(messages):
         if not isinstance(evt, dict):
             continue
-        turn_events.append(evt)
-        if evt.get("type") == "user":
+        etype = evt.get("type")
+        batch_events.append(evt)
+        if etype == "user":
             break
-    turn_events.reverse()
+        if etype == "bot":
+            if any(e.get("type") == "tool" and e.get("tool_type") for e in batch_events):
+                batch_events.pop()
+                break
+        elif etype == "thinking":
+            if any(e.get("type") == "tool" and e.get("tool_type") for e in batch_events):
+                batch_events.pop()
+                break
+    batch_events.reverse()
 
-    for evt in reversed(turn_events):
+    for evt in reversed(batch_events):
         etype = evt.get("type")
         if etype == "tool":
             tool_type = evt.get("tool_type") or ""
             args = evt.get("args") or {}
             target = evt.get("target") or ""
             if tool_type:
-                return _format_active_tool_progress(tool_type, args, target, turn_events=turn_events)
+                return _format_active_tool_progress(tool_type, args, target, turn_events=batch_events)
             continue
         elif etype == "thinking":
             if evt.get("duration") is None or evt.get("duration") == 0:

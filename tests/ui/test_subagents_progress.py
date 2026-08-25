@@ -160,6 +160,43 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         sess.messages.append({"type": "bot", "text": "Analyzing the file content..."})
         self.assertEqual(extract_subagent_progress(sess), "generating...")
 
+    def test_extract_progress_aggregation_resets_on_step_boundaries(self):
+        sess = MagicMock()
+        sess.is_running = True
+        sess.status = "running"
+        # Step 1: 4 shell commands
+        sess.messages = [
+            {"type": "user", "text": "Run commands"},
+            {"type": "tool", "tool_type": "shell", "args": {"command": "cmd1"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "shell", "args": {"command": "cmd2"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "shell", "args": {"command": "cmd3"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "shell", "args": {"command": "cmd4"}, "result_text": "ok"},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "running 4 commands")
+
+        # Step 2: thinking phase
+        sess.messages.append({"type": "thinking", "text": "planning next step...", "duration": 0.0})
+        # When thinking with 0 duration or active thinking -> thinking...
+        sess.messages[-1]["duration"] = None
+        self.assertEqual(extract_subagent_progress(sess), "thinking...")
+
+        # Step 2: followed by new batch of 4 shell commands (should be 4, NOT 8)
+        sess.messages.extend([
+            {"type": "tool", "tool_type": "shell", "args": {"command": "cmd5"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "shell", "args": {"command": "cmd6"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "shell", "args": {"command": "cmd7"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "shell", "args": {"command": "cmd8"}},
+        ])
+        self.assertEqual(extract_subagent_progress(sess), "running 4 commands")
+
+        # Step 3: bot message followed by read files in new step
+        sess.messages.append({"type": "bot", "text": "moving to file checks"})
+        sess.messages.extend([
+            {"type": "tool", "tool_type": "read", "args": {"path": "file1.py"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "read", "args": {"path": "file2.py"}},
+        ])
+        self.assertEqual(extract_subagent_progress(sess), "reading 2 files")
+
     def test_format_active_tool_generic(self):
         self.assertEqual(_format_active_tool_progress("custom_mcp_query", {}), "tool: custom_mcp_query")
         self.assertEqual(_format_active_tool_progress("", {}), "running...")
