@@ -328,7 +328,6 @@ async def generate_ai_response(
                     pass
             elif event_type == "event_divider":
                 div_text = val1 or "Session Compacted"
-                session.add_event({"type": "event_divider", "text": div_text})
                 await canvas.add_event_divider(div_text)
                 canvas.refresh_status_footer()
                 try:

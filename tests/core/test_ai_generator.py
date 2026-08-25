@@ -206,15 +206,18 @@ async def test_bot_message_preserved_when_tool_call_emitted():
 @pytest.mark.asyncio
 async def test_event_divider_refreshes_footer():
     canvas = _canvas()
+    sess = _fake_session()
 
     async def stream(prompt, attachments=None):
         yield ("event_divider", "Compacted", "")
 
     await generate_ai_response(
-        _FakeAgent(stream), _fake_session(), canvas, session_id="s1", user_text="hi"
+        _FakeAgent(stream), sess, canvas, session_id="s1", user_text="hi"
     )
     canvas.add_event_divider.assert_awaited_once_with("Compacted")
     canvas.refresh_status_footer.assert_called_once()
+    assert len(sess.events) == 2
+    assert sess.events[1] == {"type": "event_divider", "text": "Compacted"}
 
 
 @pytest.mark.asyncio

@@ -231,6 +231,15 @@ class TestSessionManagerPureReader(unittest.TestCase):
         title = self.store._title_from_messages(sess)
         self.assertEqual(title, "/caveman help")
 
+    def test_add_event_deduplicates_consecutive_event_dividers(self):
+        sid = self.store.generate_session_id()
+        sess = self.store.create_main(sid)
+        sess.add_event({"type": "event_divider", "text": "Session Compacted"})
+        sess.add_event({"type": "event_divider", "text": "Session Compacted"})
+        self.assertEqual(len(sess.messages), 1)
+        sess.add_event({"type": "event_divider", "text": "API Error: 400"})
+        self.assertEqual(len(sess.messages), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

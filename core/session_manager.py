@@ -40,6 +40,7 @@ class MessageType(str, Enum):
     TOOL = "tool"
     STATUS_CHANGE = "status_change"
     USER = "user"
+    EVENT_DIVIDER = "event_divider"
 
 
 
@@ -143,6 +144,13 @@ class AgentSession:
             for key in ("status", "is_error", "returncode"):
                 if key in event:
                     last[key] = event[key]
+        elif (
+            etype == MessageType.EVENT_DIVIDER
+            and last
+            and last.get("type") == MessageType.EVENT_DIVIDER
+            and last.get("text") == event.get("text")
+        ):
+            return
         else:
             if etype == MessageType.TOOL and last and last.get("type") == MessageType.BOT and not last.get("text", "").strip():
                 self.messages.pop()
