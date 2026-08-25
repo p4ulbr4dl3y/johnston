@@ -1,4 +1,3 @@
-from typing import Any
 
 from core.domain.defaults.errors import format_tool_error
 from tools.base import try_int
@@ -19,17 +18,6 @@ def truncate_leading(text: str, max_chars: int) -> tuple[str, int]:
     shown_lines = truncated.count("\n") + (1 if truncated else 0)
     return truncated, shown_lines
 
-
-def get_session_store(app: Any) -> Any:
-    """Return the host's SessionStore or the module singleton fallback.
-
-    ``app`` is the already-resolved host (or agent carrying one); uses ``app.sm``
-    when provided, otherwise the ``core.session_manager.SessionStore`` singleton.
-    Callers pass a resolved host (e.g. ``ctx.host``), not a raw ToolContext.
-    """
-    from core.session_manager import SessionStore
-
-    return getattr(app, "sm", None) or SessionStore.get_instance()
 
 
 def format_line_pagination(

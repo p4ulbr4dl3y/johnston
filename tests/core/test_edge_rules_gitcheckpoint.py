@@ -214,9 +214,9 @@ class TestGitCheckpointEdge(unittest.TestCase):
         self.assertTrue(GitCheckpointManager.ensure_git_repo(repo))
         self.assertTrue(GitCheckpointManager.is_git_repo(repo))
 
-    def test_get_diff_stats_batch_empty_indices(self):
+    def test_get_diff_details_batch_empty_indices(self):
         repo = self._init_git_repo()
-        self.assertEqual(GitCheckpointManager.get_diff_stats_batch("s", [], project_path=repo), {})
+        self.assertEqual(GitCheckpointManager.get_diff_details_batch("s", [], project_path=repo), {})
 
     def test_session_id_special_chars_ref(self):
         repo = self._init_git_repo()

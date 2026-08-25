@@ -94,15 +94,6 @@ def format_shell_task_row(
     return format_badge_row(clean, badge_plain, target_width=target_width)
 
 
-def format_task_row(cmd: str) -> str:
-    """Format a task command line for display in the option list."""
-    clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split())
-    if len(clean) > 60:
-        clean = clean[:57] + "..."
-    return clean
-
-
-
 def format_subagent_task_row(
     cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_MEDIUM_ROW_WIDTH
 ) -> str:

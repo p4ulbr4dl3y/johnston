@@ -81,18 +81,14 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         self,
         tool_name: str,
         args: Optional[Dict[str, Any]] = None,
-        reason: str = "",
         diff: str = "",
         is_subagent: bool = False,
-        subagent_role: str = "",
     ):
         super().__init__()
         self.tool_name = tool_name
         self.args = args or {}
-        self.reason = reason
         self.diff = diff
         self.is_subagent = is_subagent
-        self.subagent_role = subagent_role or ("worker" if is_subagent else "")
         self.suggested_pattern = suggest_pattern(self.tool_name, self.args)
 
     def _build_diff_text(self, target_path: str) -> str:
@@ -484,18 +480,6 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             return self.query_one(".tool-scroll-box")
         except Exception:
             return self.query_one("#modal-dialog")
-
-    def action_scroll_up(self) -> None:
-        try:
-            self._get_scroll_target().scroll_up(animate=False)
-        except Exception:
-            pass
-
-    def action_scroll_down(self) -> None:
-        try:
-            self._get_scroll_target().scroll_down(animate=False)
-        except Exception:
-            pass
 
     def action_page_up(self) -> None:
         try:

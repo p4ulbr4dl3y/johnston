@@ -102,7 +102,7 @@ class TestGitCheckpointManager(unittest.TestCase):
         self.assertFalse(GitCheckpointManager.restore_checkpoint("session_456", 1, project_path=repo_path))
         self.assertFalse(GitCheckpointManager.restore_checkpoint("session_456", 2, project_path=repo_path))
 
-    def test_get_diff_stats_batch(self):
+    def test_get_diff_details_batch(self):
         repo_path = self._init_git_repo()
         GitCheckpointManager.create_checkpoint("session_batch", 0, project_path=repo_path)
 
@@ -114,10 +114,10 @@ class TestGitCheckpointManager(unittest.TestCase):
         with open(mod_file, "a") as f:
             f.write("added line 2\n")
 
-        batch_stats = GitCheckpointManager.get_diff_stats_batch("session_batch", [0, 1, 2], project_path=repo_path)
-        self.assertEqual(batch_stats[0], "1 file, +2 / -0")
-        self.assertEqual(batch_stats[1], "1 file, +1 / -0")
-        self.assertIsNone(batch_stats[2])
+        batch_details = GitCheckpointManager.get_diff_details_batch("session_batch", [0, 1, 2], project_path=repo_path)
+        self.assertEqual(batch_details[0], ("1 file, +2 / -0", ["initial.txt"]))
+        self.assertEqual(batch_details[1], ("1 file, +1 / -0", ["initial.txt"]))
+        self.assertIsNone(batch_details[2])
 
     def test_get_checkpoint_diff_and_split(self):
         repo_path = self._init_git_repo()

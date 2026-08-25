@@ -281,16 +281,6 @@ class ChatInput(TextArea):
             self.clipboard_attachments.remove(attachment)
             self.update_attachment_bar()
 
-    def clear_clipboard_attachments(self) -> None:
-        for att in list(self.clipboard_attachments):
-            if os.path.exists(att.path) and "temp_images" in att.path:
-                try:
-                    os.remove(att.path)
-                except OSError:
-                    pass
-        self.clipboard_attachments.clear()
-        self.update_attachment_bar()
-
     async def try_paste_clipboard_image(self) -> bool:
         """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
         import time

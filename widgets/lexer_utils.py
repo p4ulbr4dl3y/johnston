@@ -48,11 +48,10 @@ def generate_chunk_unified_diff(
 
 
 def build_edit_diff_text(args: dict, file_path: str = "file") -> str:
-    """Generates unified diff text from tool arguments."""
     if not isinstance(args, dict):
         return ""
-    old_s = args.get("old_str") if "old_str" in args else args.get("old_string", "")
-    new_s = args.get("new_str") if "new_str" in args else args.get("new_string", "")
+    old_s = args.get("old_str", "")
+    new_s = args.get("new_str", "")
     start_l = args.get("start_line") or 1
     if old_s or new_s:
         diff_parts = generate_chunk_unified_diff(old_s or "", new_s or "", file_path, start_l)

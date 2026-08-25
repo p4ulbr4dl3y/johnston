@@ -399,21 +399,26 @@ def test_connected_whitespace_key(pm):
 
 
 def test_connected_case_sensitive_name(pm, tmp_path):
-    _write(tmp_path / "config.json", {"api_keys": {"openai": "sk-abc"}})
+    from core.infrastructure.secrets import save_secret
+
+    save_secret("openai", "sk-abc")
     # actual provider key is lowercase; uppercase name must not match
     assert pm.is_provider_connected("OpenAI") is False
 
 
 def test_connected_disabled_provider(pm, tmp_path):
-    _write(tmp_path / "config.json", {"api_keys": {"openai": "sk-abc"}, "disabled_providers": ["openai"]})
+    from core.infrastructure.secrets import save_secret
+
+    save_secret("openai", "sk-abc")
+    _write(tmp_path / "config.json", {"disabled_providers": ["openai"]})
     assert pm.is_provider_connected("openai") is False
 
 
 def test_connected_multiple_providers(pm, tmp_path):
-    _write(
-        tmp_path / "config.json",
-        {"api_keys": {"openai": "sk-abc", "groq": "sk-xyz"}},
-    )
+    from core.infrastructure.secrets import save_secret
+
+    save_secret("openai", "sk-abc")
+    save_secret("groq", "sk-xyz")
     assert pm.is_provider_connected("openai") is True
     assert pm.is_provider_connected("groq") is True
     assert pm.is_provider_connected("anthropic") is False
@@ -489,11 +494,13 @@ def test_create_agent_provider_without_base_url(pm, tmp_path):
 
 
 def test_fetch_models_network_error_swallowed(pm, tmp_path):
+    from core.infrastructure.secrets import save_secret
+
     _write(
         tmp_path / "providers.json",
         {"custom": {"key": "custom", "name": "C", "base_url": "http://127.0.0.1:1/v1", "model": "m1"}},
     )
-    _write(tmp_path / "config.json", {"api_keys": {"custom": "sk-abc"}})
+    save_secret("custom", "sk-abc")
 
     async def _run():
         # httpx fails to connect; ProviderManager catches Exception and
@@ -505,11 +512,13 @@ def test_fetch_models_network_error_swallowed(pm, tmp_path):
 
 
 def test_fetch_models_no_base_url(pm, tmp_path):
+    from core.infrastructure.secrets import save_secret
+
     _write(
         tmp_path / "providers.json",
         {"nobaseurl": {"key": "nobaseurl", "name": "N", "model": "m1"}},
     )
-    _write(tmp_path / "config.json", {"api_keys": {"nobaseurl": "sk-abc"}})
+    save_secret("nobaseurl", "sk-abc")
 
     async def _run():
         return await pm.fetch_models_for_provider("nobaseurl", force_refresh=True)
@@ -630,12 +639,12 @@ def test_cache_invalidated_after_set(pm, tmp_path):
 
 def test_cache_reload_after_external_file_change(pm, tmp_path):
     config = tmp_path / "config.json"
-    _write(config, {"api_keys": {"openai": "one"}})
-    assert pm.get_api_key("openai") == "one"
+    _write(config, {"active_provider": "one"})
+    assert pm.get_active_provider_key() == "one"
     # external modification with a later mtime
     time.sleep(0.01)
-    _write(config, {"api_keys": {"openai": "two"}})
-    assert pm.get_api_key("openai") == "two"
+    _write(config, {"active_provider": "two"})
+    assert pm.get_active_provider_key() == "two"
 
 
 def test_cache_reload_after_providers_change(pm, tmp_path):
@@ -708,10 +717,10 @@ def test_env_api_key_fallback_and_stored_precedence(pm, tmp_path, monkeypatch):
 def test_env_api_key_alias_togetherai(pm, monkeypatch):
     monkeypatch.delenv("TOGETHERAI_API_KEY", raising=False)
     monkeypatch.setenv("TOGETHER_API_KEY", "tog-key")
-    from core.provider_manager import env_api_key
+    from core.infrastructure.secrets import get_secret
 
-    assert env_api_key("togetherai") == "tog-key"
-    assert env_api_key("unknown-provider") == ""
+    assert get_secret("togetherai") == "tog-key"
+    assert get_secret("unknown-provider") == ""
 
 
 def test_base_url_placeholder_resolved_from_env(pm, tmp_path, monkeypatch):

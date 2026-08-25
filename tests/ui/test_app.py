@@ -104,12 +104,12 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.2)
             self.assertFalse(isinstance(app.screen, SubagentsScreen))
 
-            # 9. Test mode toggle via Shift+Tab
+            # 9. Test role toggle via Tab
             self.assertEqual(getattr(app.agent, "role", "worker"), "worker")
-            await pilot.press("shift+tab")
+            await pilot.press("tab")
             await pilot.pause(0.2)
             self.assertEqual(getattr(app.agent, "role", "worker"), "explorer")
-            await pilot.press("shift+tab")
+            await pilot.press("tab")
             await pilot.pause(0.2)
             self.assertEqual(getattr(app.agent, "role", "worker"), "worker")
 

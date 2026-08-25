@@ -152,18 +152,17 @@ class TestCLIAdvanced(unittest.TestCase):
         self.assertIn("AGENTS.md [project instruction]", out)
         self.assertIn("bytes)", out)
 
-    def test_print_rules_with_roles(self):
+    def test_print_rules_with_rule(self):
         import pathlib
         import tempfile
+
+        from core.application.rules.rules import RuleDefinition
 
         f = io.StringIO()
         with tempfile.TemporaryDirectory() as tmp:
             with patch("pathlib.Path.cwd", return_value=pathlib.Path(tmp)):
                 with patch("core.application.rules.rules.RulesManager") as mock_cls:
-                    rule = MagicMock()
-                    rule.name = "R1"
-                    rule.source = "project"
-                    rule.roles = ["worker", "explorer"]
+                    rule = RuleDefinition(name="R1", content="some content", source="project")
                     rules_mgr = MagicMock()
                     rules_mgr.load_rules.return_value = [rule]
                     mock_cls.get_instance.return_value = rules_mgr
@@ -171,7 +170,6 @@ class TestCLIAdvanced(unittest.TestCase):
                         print_rules()
         out = f.getvalue()
         self.assertIn("R1 [rule] [project]", out)
-        self.assertIn("Roles: worker, explorer", out)
 
     def test_print_models_no_key_no_models_skipped(self):
         f = io.StringIO()
@@ -179,7 +177,7 @@ class TestCLIAdvanced(unittest.TestCase):
         pm.load_providers.return_value = {"empty": {"name": "Empty"}}
         pm.get_active_provider_key.return_value = "empty"
         pm.get_api_key.return_value = ""
-        with patch("cli.ProviderManager", return_value=pm):
+        with patch("core.provider_manager.ProviderManager", return_value=pm):
             with redirect_stdout(f):
                 from cli import print_models
 
@@ -199,7 +197,7 @@ class TestCLIAdvanced(unittest.TestCase):
         }
         pm.get_active_provider_key.return_value = "openai"
         pm.get_api_key.return_value = "sk-123"
-        with patch("cli.ProviderManager", return_value=pm):
+        with patch("core.provider_manager.ProviderManager", return_value=pm):
             with redirect_stdout(f):
                 from cli import print_models
 

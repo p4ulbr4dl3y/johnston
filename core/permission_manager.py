@@ -122,8 +122,6 @@ class PermissionManager:
         global_perms = global_cfg.get("permissions") if isinstance(global_cfg.get("permissions"), dict) else {}
         if "mode" in global_perms and isinstance(global_perms["mode"], str):
             merged["mode"] = normalize_execution_mode(global_perms["mode"]).value
-        elif "execution_mode" in global_cfg and isinstance(global_cfg["execution_mode"], str):
-            merged["mode"] = normalize_execution_mode(global_cfg["execution_mode"]).value
 
         _merge_perms(merged, global_perms)
 

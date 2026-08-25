@@ -181,7 +181,6 @@ class TestActionsExtra(unittest.IsolatedAsyncioTestCase):
         obj._background_shell_widgets = {"tid": widget}
         obj.notify = MagicMock()
         ActionsMixin.action_background_all(obj)
-        widget.collapse.assert_not_called()
         widget.toggle_expanded.assert_not_called()
 
     def _ask_host(self, on_push):

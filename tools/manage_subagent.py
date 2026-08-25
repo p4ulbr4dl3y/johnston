@@ -46,7 +46,7 @@ class ManageSubagentTool(BaseTool):
         session_id = (args.get("session_id") or "").strip()
         message = (args.get("message") or "").strip()
 
-        from tools.utils import get_session_store
+        from core.session_manager import get_session_store
 
         store = get_session_store(ctx.host)
         curr_session_id = ctx.session_id

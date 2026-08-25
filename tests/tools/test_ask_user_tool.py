@@ -68,15 +68,14 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Question: Q?", res)
         self.assertIn("Answer: A", res)
 
-    async def test_flat_single_question_dict_supported(self):
+    async def test_flat_single_question_dict_rejected(self):
         tool = AskUserTool()
         mock_app = MagicMock()
-        mock_app.ask_user = AsyncMock(return_value="Question: Single Q?\nAnswer: Opt1")
         res = str(await tool.execute(
             {"question": "Single Q?", "options": ["Opt1", "Opt2"]},
             ctx=mock_app,
         ))
-        self.assertIn("Question: Single Q?", res)
+        self.assertEqual(res, "ERR: params 'questions': missing or invalid")
 
     async def test_error_on_push_screen_failure(self):
         tool = AskUserTool()

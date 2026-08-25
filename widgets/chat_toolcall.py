@@ -738,16 +738,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 answers[i] = {"answer": "(No response)"}
         return answers
 
-    def collapse(self) -> None:
-        """Collapse expanded content if currently open."""
-        if not self.is_expanded:
-            return
-        self.is_expanded = False
-        self.render_header()
-        self.content_widget.display = False
-        self.md_widget.display = False
-        self._update_next_sibling_spacing()
-
     def _scroll_if_needed(self, force: bool = False) -> None:
         from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
 

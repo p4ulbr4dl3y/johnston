@@ -206,10 +206,6 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
     mcp_mgr = get_mcp_manager()
 
-    from tools.base import is_mock_manager
-
-    mock_mgr = is_mock_manager(mcp_mgr)
-
     # Fast path: a known MCP tool must not re-warm every server (spawning npx)
     # just to confirm the name. Check the already-discovered cached tools first;
     # only fall back to a full active listing when the name isn't cached (cold
@@ -242,7 +238,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         if _mcp_name_recently_missed(name):
             return _unknown_tool_result(name, clean_name)
         try:
-            if hasattr(mcp_mgr, "get_active_tools_async") and not mock_mgr:
+            if hasattr(mcp_mgr, "get_active_tools_async"):
                 res_or_coro = mcp_mgr.get_active_tools_async()
                 listed_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
             else:

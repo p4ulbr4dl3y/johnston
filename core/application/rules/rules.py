@@ -89,7 +89,7 @@ class RulesManager:
             return None
 
     def get_active_rules(
-        self, role: str = "worker", project_dir: Optional[str] = None, include_global: bool = True
+        self, project_dir: Optional[str] = None, include_global: bool = True
     ) -> List[RuleDefinition]:
         """Return the active ``RuleDefinition`` objects.
 

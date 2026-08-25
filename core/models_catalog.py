@@ -134,9 +134,6 @@ class ModelsCatalog:
             await self._client.aclose()
             self._client = None
 
-    async def load_cache_async(self) -> bool:
-        return await asyncio.to_thread(self.load_cache)
-
     async def save_cache_async(
         self,
         model_limits: Dict[str, int] = None,

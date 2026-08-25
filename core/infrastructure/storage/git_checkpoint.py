@@ -462,20 +462,6 @@ class GitCheckpointManager:
             return results
 
     @classmethod
-    def get_diff_stats_batch(
-        cls,
-        session_id: str,
-        message_indices: List[int],
-        project_path: Optional[str] = None,
-    ) -> dict[int, Optional[str]]:
-        """Calculates line changes between each saved checkpoint in message_indices and current workspace.
-
-        Returns dict mapping message_index -> stat string (e.g. '+12 / -4', 'no changes', or None).
-        """
-        details = cls.get_diff_details_batch(session_id, message_indices, project_path=project_path)
-        return {idx: (res[0] if res else None) for idx, res in details.items()}
-
-    @classmethod
     def _split_git_diff(cls, diff_output: str) -> list[tuple[str, str, int, int]]:
         """Splits full unified git diff into per-file chunks: (file_path, diff_text, added, deleted)."""
         if not diff_output or not diff_output.strip():

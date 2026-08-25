@@ -169,9 +169,7 @@ class ActionsMixin:
         screen = PermissionConfirmScreen(
             tool_name=screen_name,
             args=args,
-            reason=reason,
             is_subagent=is_subagent,
-            subagent_role=subagent_role,
         )
 
         loop = asyncio.get_running_loop()

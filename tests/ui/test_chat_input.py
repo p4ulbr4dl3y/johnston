@@ -150,14 +150,10 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         ci = ChatInput()
         app = DummyChatApp(ci)
         async with app.run_test():
-            with tempfile.NamedTemporaryFile(suffix=".png", prefix="temp_images_") as tmp:
-                att = ClipboardAttachment(tmp.name)
-                ci.clipboard_attachments.append(att)
-
-                with patch("os.remove") as mock_remove:
-                    ci.clear_clipboard_attachments()
-                    mock_remove.assert_called_once_with(tmp.name)
-                    self.assertEqual(len(ci.clipboard_attachments), 0)
+            att = ClipboardAttachment("test.png")
+            ci.clipboard_attachments.append(att)
+            ci.clipboard_attachments.clear()
+            self.assertEqual(len(ci.clipboard_attachments), 0)
 
     async def test_try_paste_clipboard_image_non_rgb_mode(self):
         ci = ChatInput()
@@ -762,17 +758,6 @@ class TestChatInputFormatPasted(unittest.TestCase):
         ci = ChatInput()
         result = ci.format_pasted_file_path("line1\n\nline3")
         self.assertEqual(result, "line1\n\nline3")
-
-    def test_clear_attachments_swallows_oserror(self):
-        ci = ChatInput()
-        with tempfile.TemporaryDirectory(prefix="temp_images") as tmp:
-            path = f"{tmp}/img.png"
-            att = chat_input_mod.ClipboardAttachment(path)
-            ci.clipboard_attachments = [att]
-            with patch("widgets.chat_input.os.path.exists", return_value=True):
-                with patch("widgets.chat_input.os.remove", side_effect=OSError("busy")):
-                    ci.clear_clipboard_attachments()
-            self.assertEqual(ci.clipboard_attachments, [])
 
 
 class TestChatInputOnPaste(unittest.IsolatedAsyncioTestCase):

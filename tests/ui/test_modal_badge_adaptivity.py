@@ -82,7 +82,7 @@ class TestRewindScreenAdaptivity(unittest.TestCase):
         opt_list.highlighted = 0
         screen.query_one = MagicMock(return_value=opt_list)
 
-        screen._refresh_step1_options()
+        screen._refresh_options()
 
         from rich.text import Text
         plain0 = Text.from_markup(screen.raw_options[0]).plain

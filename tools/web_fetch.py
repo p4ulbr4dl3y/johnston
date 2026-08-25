@@ -28,9 +28,6 @@ _DNS_CACHE_TTL = 60.0
 _MAX_DNS_CACHE = 512
 
 
-def _clear_dns_cache() -> None:
-    _DNS_CACHE.clear()
-
 
 def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     # 198.18.0.0/15 is used by transparent proxies / VPNs (Clash, Surge, Sing-box) as Fake-IP pool

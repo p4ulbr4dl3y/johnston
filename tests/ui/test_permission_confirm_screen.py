@@ -23,7 +23,6 @@ class TestPermissionConfirmScreen(unittest.TestCase):
         screen = PermissionConfirmScreen(
             tool_name="create",
             args={"path": "src/app.py"},
-            reason="Update entrypoint",
             diff="--- a\n+++ b",
         )
         self.assertEqual(screen.tool_name, "create")
@@ -98,8 +97,6 @@ class TestPermissionConfirmScreen(unittest.TestCase):
     def test_scroll_actions_swallow_errors(self):
         screen = PermissionConfirmScreen("read", {"path": "foo.py"})
         screen.query_one = MagicMock(side_effect=Exception("boom"))
-        screen.action_scroll_up()
-        screen.action_scroll_down()
         screen.action_page_up()
         screen.action_page_down()
 
@@ -148,7 +145,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_compose_subagent_actor_prefix(self):
-        screen = PermissionConfirmScreen("edit", {"path": "main.py"}, is_subagent=True, subagent_role="worker")
+        screen = PermissionConfirmScreen("edit", {"path": "main.py"}, is_subagent=True)
         async with HostApp(screen).run_test() as pilot:
             await pilot.pause()
             mds = screen.query("Markdown")
@@ -178,8 +175,6 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         )
         async with HostApp(screen).run_test() as pilot:
             await pilot.pause()
-            screen.action_scroll_up()
-            screen.action_scroll_down()
             screen.action_page_up()
             screen.action_page_down()
 

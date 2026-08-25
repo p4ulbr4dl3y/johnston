@@ -86,15 +86,11 @@ You run tests and report coverage.""")
         role_ro = AgentRole(key="reviewer", name="Reviewer", disallowed_tools=["edit"], allowed_tools=["read", "grep"])
 
         # Read tool in allowed list -> ok
-        self.assertIsNone(role_ro.is_tool_allowed("read"))
-        # Shell not in allowed list -> blocked
-        self.assertIsNotNone(role_ro.is_tool_allowed("shell"))
-        # Edit in disallowed list -> blocked
-        self.assertIsNotNone(role_ro.is_tool_allowed("edit"))
-
-        # Test role_tool_error helper
-        self.assertIsNotNone(role_tool_error(role_ro, "edit"))
         self.assertIsNone(role_tool_error(role_ro, "read"))
+        # Shell not in allowed list -> blocked
+        self.assertIsNotNone(role_tool_error(role_ro, "shell"))
+        # Edit in disallowed list -> blocked
+        self.assertIsNotNone(role_tool_error(role_ro, "edit"))
 
     def test_tool_name_normalizer_no_alias_resolution(self):
         from tools.registry import normalize_tool_name
@@ -108,14 +104,14 @@ You run tests and report coverage.""")
 
         # normalize_tool_name no longer resolves aliases: 'subagent' is not in the
         # disallowed list (which holds 'invoke_subagent'), so it is allowed.
-        self.assertIsNone(role_ro.is_tool_allowed("subagent"))
+        self.assertIsNone(role_tool_error(role_ro, "subagent"))
         # Without a normalizer the result is the same (identity on lowercase).
         role_no_norm = AgentRole(key="reviewer", name="Reviewer", disallowed_tools=["invoke_subagent", "create"])
-        self.assertIsNone(role_no_norm.is_tool_allowed("subagent"))
+        self.assertIsNone(role_tool_error(role_no_norm, "subagent"))
         # Canonical 'invoke_subagent' is blocked by the disallowed list.
-        self.assertIsNotNone(role_ro.is_tool_allowed("invoke_subagent"))
-        self.assertIsNone(role_ro.is_tool_allowed("write_file"))
-        self.assertIsNotNone(role_ro.is_tool_allowed("create"))
+        self.assertIsNotNone(role_tool_error(role_ro, "invoke_subagent"))
+        self.assertIsNone(role_tool_error(role_ro, "write_file"))
+        self.assertIsNotNone(role_tool_error(role_ro, "create"))
 
     def test_scope_filtering(self):
         reg = RoleRegistry.get_instance()
@@ -248,27 +244,27 @@ class TestToolLists:
         # (empty list is falsy). Both should behave identically.
         r_none = AgentRole(key="a", allowed_tools=None)
         r_empty = AgentRole(key="b", allowed_tools=[])
-        assert r_none.is_tool_allowed("any_tool") is None
-        assert r_empty.is_tool_allowed("any_tool") is None
+        assert role_tool_error(r_none, "any_tool") is None
+        assert role_tool_error(r_empty, "any_tool") is None
 
     def test_disallowed_none_and_empty(self):
         r = AgentRole(key="x", disallowed_tools=None)
-        assert r.is_tool_allowed("create") is None
+        assert role_tool_error(r, "create") is None
         r2 = AgentRole(key="y", disallowed_tools=[])
-        assert r2.is_tool_allowed("create") is None
+        assert role_tool_error(r2, "create") is None
 
     def test_unknown_tool_names_in_lists(self):
         r = AgentRole(key="x", allowed_tools=["totally_unknown_tool"], disallowed_tools=["also_unknown"])
         # allowed list contains unknown name -> tool not in it -> blocked
-        assert r.is_tool_allowed("read") is not None
+        assert role_tool_error(r, "read") is not None
         # disallowed unknown name should not block unrelated tools
         r2 = AgentRole(key="y", disallowed_tools=["ghost_tool"])
-        assert r2.is_tool_allowed("edit") is None
+        assert role_tool_error(r2, "edit") is None
 
     def test_tool_string_whitespace_in_lists(self):
         r = AgentRole(key="x", allowed_tools=[" read ", "grep"])
-        assert r.is_tool_allowed("read") is None
-        assert r.is_tool_allowed("grep") is None
+        assert role_tool_error(r, "read") is None
+        assert role_tool_error(r, "grep") is None
 
 
 class TestIsToolAllowed:
@@ -276,41 +272,41 @@ class TestIsToolAllowed:
         r = AgentRole(key="x", allowed_tools=["read"])
         # None/"" tool names are tolerated (return None) even though they are
         # not in the allowed list.
-        assert r.is_tool_allowed(None) is None
-        assert r.is_tool_allowed("") is None
+        assert role_tool_error(r, None) is None
+        assert role_tool_error(r, "") is None
 
     def test_whitespace_tool_name_differs_from_empty(self):
         # " " strips to "" -> falsy? No: " " is truthy, strip yields "".
         # It is NOT caught by the `not tool_name` guard, so it falls through to
         # the allowed-list check. This is an inconsistency with None/"".
         r = AgentRole(key="x", allowed_tools=["read"])
-        result = r.is_tool_allowed(" ")
+        result = role_tool_error(r, " ")
         # Document actual behavior: a whitespace tool is treated as a real tool
         # and blocked because it is not in the allowed list.
         assert result is not None
 
     def test_case_insensitive_tool(self):
         r = AgentRole(key="x", allowed_tools=["read"])
-        assert r.is_tool_allowed("READ") is None
-        assert r.is_tool_allowed("Read") is None
+        assert role_tool_error(r, "READ") is None
+        assert role_tool_error(r, "Read") is None
 
     def test_tool_in_allowed_and_disallowed(self):
         # disallowed wins over allowed
         r = AgentRole(key="x", allowed_tools=["read"], disallowed_tools=["read"])
-        assert r.is_tool_allowed("read") is not None
+        assert role_tool_error(r, "read") is not None
 
     def test_allowed_empty_vs_allowed_set(self):
         # WARNING: allowed_tools=[] allows everything (falsy). This means an
         # author who writes `tools:` with an empty value silently gets full
         # tool access - a security footgun.
         r_empty = AgentRole(key="x", allowed_tools=[])
-        assert r_empty.is_tool_allowed("shell") is None  # shell allowed!
+        assert role_tool_error(r_empty, "shell") is None  # shell allowed!
 
     def test_disallowed_blocks_specified_tools(self):
         r = AgentRole(key="x", disallowed_tools=["create", "edit"])
         for w in ("create", "edit"):
-            assert r.is_tool_allowed(w) is not None
-        assert r.is_tool_allowed("read") is None
+            assert role_tool_error(r, w) is not None
+        assert role_tool_error(r, "read") is None
 
 
 # --------------------------------------------------------------------------- #

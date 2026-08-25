@@ -238,17 +238,17 @@ class TestCoverPurge:
 
 
 class TestCoverGetDiffStats:
-    def test_get_diff_stats_batch_empty_indices(self):
+    def test_get_diff_details_batch_empty_indices(self):
         with patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")):
-            out = GitCheckpointManager.get_diff_stats_batch("s", [])
+            out = GitCheckpointManager.get_diff_details_batch("s", [])
         assert out == {}
 
-    def test_get_diff_stats_batch_not_git_repo(self):
+    def test_get_diff_details_batch_not_git_repo(self):
         with (
             patch.object(GitCheckpointManager, "is_git_repo", return_value=False),
             patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")),
         ):
-            out = GitCheckpointManager.get_diff_stats_batch("s", [0], project_path="/w")
+            out = GitCheckpointManager.get_diff_details_batch("s", [0], project_path="/w")
         assert out == {0: None}
 
     def _run_batch(self, add_res=_cp(0), diff_res=_cp(0, "")):
@@ -269,7 +269,7 @@ class TestCoverGetDiffStats:
             patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")),
             patch("core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake),
         ):
-            return GitCheckpointManager.get_diff_stats_batch("s", [0], project_path="/w")
+            return GitCheckpointManager.get_diff_details_batch("s", [0], project_path="/w")
 
     def test_add_fails(self):
         assert self._run_batch(add_res=_cp(1)) == {0: None}
@@ -278,4 +278,4 @@ class TestCoverGetDiffStats:
         assert self._run_batch(diff_res=_cp(1)) == {0: None}
 
     def test_no_changes(self):
-        assert self._run_batch() == {0: "no changes"}
+        assert self._run_batch() == {0: ("no changes", [])}

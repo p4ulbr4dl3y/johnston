@@ -22,7 +22,6 @@ __all__ = [
     "check_mcp_role_policy",
     "confirm_permission",
     "_resolve_app",
-    "is_mock_manager",
     "BaseTool",
 ]
 
@@ -258,23 +257,6 @@ def _resolve_app(ctx_or_app: Any) -> Any:
     return getattr(ctx_or_app, "app", None) or ctx_or_app
 
 
-def is_mock_manager(mgr: Any) -> bool:
-    """Return True if ``mgr`` is a test double (unittest.mock or ``*Mock`` name).
-
-    Managers wrapped by the stdlib ``unittest.mock`` module, or whose class name
-    ends with ``Mock``, should not take the async backend path. Covers both the
-    name-based heuristic (kept for suites that name double classes ``*Mock``) and
-    a true ``isinstance`` check for real mock objects.
-    """
-    try:
-        from unittest.mock import Mock
-    except Exception:  # pragma: no cover
-        return False
-    if isinstance(mgr, Mock):
-        return True
-    return type(mgr).__name__.endswith("Mock")
-
-
 def check_mcp_role_policy(ctx_or_app: Any, target: str) -> Optional[ToolResult]:
     """Checks the active role's tool policy for an MCP tool call.
 
@@ -313,24 +295,21 @@ async def confirm_permission(
 
     confirm = getattr(_resolve_app(ctx_or_app), "confirm_permission", None)
     if callable(confirm):
-        try:
-            return await confirm(
-                screen_name,
-                args,
-                reason,
-                perm_name,
-                is_subagent=is_subagent,
-                subagent_role=subagent_role,
-            )
-        except TypeError:
-            return await confirm(screen_name, args, reason, perm_name)
+        return await confirm(
+            screen_name,
+            args,
+            reason,
+            perm_name,
+            is_subagent=is_subagent,
+            subagent_role=subagent_role,
+        )
     return False
 
 
 async def execute_mcp_tool(mcp_mgr: Any, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None):
     """Invokes an MCP tool, preferring the async API when available."""
     kwargs = {"target_server": target_server} if target_server is not None else {}
-    if not is_mock_manager(mcp_mgr) and hasattr(mcp_mgr, "call_tool_async"):
+    if hasattr(mcp_mgr, "call_tool_async"):
         res_or_coro = mcp_mgr.call_tool_async(tool_name, arguments, **kwargs)
     else:
         res_or_coro = mcp_mgr.call_tool(tool_name, arguments, **kwargs)

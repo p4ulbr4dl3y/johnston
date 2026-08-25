@@ -118,17 +118,6 @@ class TestExecuteMcpEdge(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(await execute_mcp_tool(AsyncMgr(), "x", {}), "A:x")
 
-    async def test_mock_manager_uses_sync(self):
-        # type name ends with "Mock" -> sync path even if async exists
-        class ManagerMock:
-            def call_tool(self, n, a, **k):
-                return "M-sync"
-
-            async def call_tool_async(self, n, a, **k):
-                return "M-async"
-
-        self.assertEqual(await execute_mcp_tool(ManagerMock(), "x", {}), "M-sync")
-
     async def test_returns_none(self):
         class NoneMgr:
             def call_tool(self, n, a, **k):

@@ -62,7 +62,7 @@ def normalize_execution_mode(mode: Any, default: ExecutionMode = ExecutionMode.R
         return mode
     if isinstance(mode, str):
         cleaned = mode.strip().lower()
-        if cleaned in ("auto", "accept_edits", "acceptedits", "auto_edits", "auto-edits", "edits"):
+        if cleaned in ("auto", "acceptedits", "auto_edits", "auto-edits", "edits"):
             return ExecutionMode.EDITS
         if cleaned in ("yolo", "bypass", "full_auto", "fullauto", "dontask", "dont_ask"):
             return ExecutionMode.YOLO
@@ -253,11 +253,11 @@ def extract_tool_target_value(tool_name: str, args: Optional[Dict[str, Any]]) ->
         return None
     canonical = (tool_name or "").strip().lower()
     if canonical == "shell":
-        return args.get("command") or args.get("cmd")
+        return args.get("command")
     if canonical in ("create", "edit", "read"):
-        return args.get("path") or args.get("file_path") or args.get("filepath")
+        return args.get("path") or args.get("file_path")
     if canonical == "web_fetch":
-        return args.get("url") or args.get("uri")
+        return args.get("url")
     return None
 
 

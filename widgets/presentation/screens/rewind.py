@@ -117,11 +117,6 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         ]
         return [format_badge_row(title, badge, target_width=target_width) for title, badge in raw_step2]
 
-    def _refresh_step1_options(self) -> None:
-        if self.step != 1:
-            return
-        self._refresh_options()
-
     def _refresh_options(self) -> None:
         target_w = self._row_width()
         if self.step == 1:

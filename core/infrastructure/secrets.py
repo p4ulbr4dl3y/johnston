@@ -75,8 +75,6 @@ def get_secret(key: str, default: str = "") -> str:
 
     return default
 
-    return default
-
 
 def interpolate_secrets(text: str) -> str:
     """Expand ${VAR_NAME} or $VAR_NAME placeholders from secrets and environment."""

@@ -135,24 +135,6 @@ def read_json(path: str, default: Any = None) -> Any:
         return default
 
 
-def read_jsonl(path: str, default: Any = None) -> Any:
-    """Reads JSONL file safely, returning list of parsed JSON objects."""
-    if not path or not os.path.exists(path):
-        return default
-    try:
-        import json
-
-        items = []
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    items.append(json.loads(line))
-        return items if items else default
-    except Exception:
-        return default
-
-
 def shell_executable() -> str | None:
     if is_windows():
         for candidate in ("pwsh", "powershell", "cmd"):

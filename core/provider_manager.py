@@ -41,11 +41,6 @@ MODELS_CACHE_EMPTY_TTL = 300.0
 # Providers whose server runs on localhost and never requires credentials.
 LOCAL_PROVIDER_KEYS = ("ollama", "lmstudio", "litellm")
 
-# Conventional env vars that deviate from the <KEY>_API_KEY scheme.
-_ENV_KEY_ALIASES = {
-    "togetherai": "TOGETHER_API_KEY",
-}
-
 _BASE_URL_PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 _WARNED_BASE_URL_TOKENS: set = set()
 
@@ -75,11 +70,6 @@ def is_local_provider(
         ):
             return True
     return False
-
-
-def env_api_key(provider_key: str) -> str:
-    """Resolve API key from environment or centralized ~/.johnston/secrets.json."""
-    return get_secret(provider_key)
 
 
 def resolve_base_url_placeholders(raw: str, provider_key: str, data: Dict[str, Any]) -> str:
@@ -374,14 +364,8 @@ class ProviderManager:
         self.invalidate_cache()
 
     def get_api_key(self, key: str) -> str:
-        """Resolve API key for provider *key* from secrets.json, env var, or config."""
-        secret = get_secret(key)
-        if secret:
-            return secret
-        stored = self._get_config_data().get("api_keys", {}).get(key, "")
-        if stored and str(stored).strip():
-            return str(stored)
-        return ""
+        """Resolve API key for provider *key* from secrets.json or env var."""
+        return get_secret(key)
 
     def set_provider_api_key(self, key: str, api_key: str):
         save_secret(key, api_key)

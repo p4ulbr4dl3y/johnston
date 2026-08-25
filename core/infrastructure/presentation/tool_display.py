@@ -217,8 +217,6 @@ def _format_active_tool_progress(
         return str(
             targs.get("path")
             or targs.get("file_path")
-            or targs.get("TargetFile")
-            or targs.get("AbsolutePath")
             or ttgt
             or ""
         ).strip()
@@ -264,8 +262,8 @@ def _format_active_tool_progress(
         n_files = _count_unique_files(("edit", "replace_file_content", "multi_edit"))
         return f"editing {n_files} files" if n_files > 1 else "editing file"
 
-    if name in ("shell", "run_command", "bash"):
-        n_cmds = _count_tool_invocations(("shell", "run_command", "bash"))
+    if name in ("shell", "run_command"):
+        n_cmds = _count_tool_invocations(("shell", "run_command"))
         return f"running {n_cmds} commands" if n_cmds > 1 else "running command"
 
     if name == "update_plan":

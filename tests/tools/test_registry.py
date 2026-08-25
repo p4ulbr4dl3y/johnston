@@ -86,10 +86,22 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         res = await execute_tool("zzzzzzzzz_unknown", None)
         self.assertEqual(res.content, "ERR: unknown 'zzzzzzzzz_unknown'")
 
-    async def test_execute_tool_mcp_disallowed_in_mode(self):
+    def _mock_mcp_mgr(self, active_tools=None, capabilities=None, call_result=None, call_side_effect=None):
         mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_tool_test"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_mcp_mgr.get_cached_tools.return_value = []
+        mock_mcp_mgr.get_active_tools.return_value = active_tools or []
+        mock_mcp_mgr.get_active_tools_async = AsyncMock(return_value=active_tools or [])
+        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = capabilities
+        mock_mcp_mgr.call_tool.return_value = call_result
+        if call_side_effect:
+            mock_mcp_mgr.call_tool_async = AsyncMock(side_effect=call_side_effect)
+            mock_mcp_mgr.call_tool.side_effect = call_side_effect
+        else:
+            mock_mcp_mgr.call_tool_async = AsyncMock(return_value=call_result)
+        return mock_mcp_mgr
+
+    async def test_execute_tool_mcp_disallowed_in_mode(self):
+        mock_mcp_mgr = self._mock_mcp_mgr(active_tools=[{"function": {"name": "mcp_tool_test"}}])
 
         mock_mode_def = MagicMock()
         mock_mode_def.name = "plan"
@@ -108,10 +120,11 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             self.assertIn("ERR: tool 'mcp_tool_test' disabled in plan role", res.content)
 
     async def test_execute_tool_mcp_success(self):
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = []
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = {"server": "s1"}
-        mock_mcp_mgr.call_tool.return_value = "MCP Executed Output"
+        mock_mcp_mgr = self._mock_mcp_mgr(
+            active_tools=[],
+            capabilities={"server": "s1"},
+            call_result="MCP Executed Output",
+        )
 
         mock_mode_def = MagicMock()
         mock_mode_def.name = "action"
@@ -126,13 +139,13 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         ):
             res = await execute_tool("exposed_mcp_tool", {"foo": "bar"})
             self.assertEqual(res.content, "MCP Executed Output")
-            mock_mcp_mgr.call_tool.assert_called_once_with("exposed_mcp_tool", {"foo": "bar"})
+            mock_mcp_mgr.call_tool_async.assert_called_once_with("exposed_mcp_tool", {"foo": "bar"})
 
     async def test_execute_tool_mcp_error_exception(self):
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "faulty_mcp"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
-        mock_mcp_mgr.call_tool.side_effect = RuntimeError("MCP connection failed")
+        mock_mcp_mgr = self._mock_mcp_mgr(
+            active_tools=[{"function": {"name": "faulty_mcp"}}],
+            call_side_effect=RuntimeError("MCP connection failed"),
+        )
 
         mock_mode_def = MagicMock()
         mock_mode_def.name = "action"
@@ -149,10 +162,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             self.assertIn("ERR: mcp 'faulty_mcp': MCP connection failed", res.content)
 
     async def test_execute_tool_mcp_returns_none(self):
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "none_mcp"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
-        mock_mcp_mgr.call_tool.return_value = None
+        mock_mcp_mgr = self._mock_mcp_mgr(
+            active_tools=[{"function": {"name": "none_mcp"}}],
+            call_result=None,
+        )
 
         mock_mode_def = MagicMock()
         mock_mode_def.name = "action"
@@ -238,9 +251,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.content, "async mcp output")
 
     async def test_execute_tool_mcp_permission_denied(self):
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_deny_tool"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_mcp_mgr = self._mock_mcp_mgr(active_tools=[{"function": {"name": "mcp_deny_tool"}}])
 
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Policy blocks it")
@@ -253,13 +264,13 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             res = await execute_tool("mcp_deny_tool", {"arg": "val"})
         self.assertEqual(res.content, "ERR: denied 'mcp_deny_tool': by permission policy")
         mock_pm.check_permission.assert_called_once_with("mcp_deny_tool", {"arg": "val"})
-        mock_mcp_mgr.call_tool.assert_not_called()
+        mock_mcp_mgr.call_tool_async.assert_not_called()
 
     async def test_execute_tool_mcp_permission_allow(self):
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_allow_tool"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
-        mock_mcp_mgr.call_tool.return_value = "MCP ALLOWED OUTPUT"
+        mock_mcp_mgr = self._mock_mcp_mgr(
+            active_tools=[{"function": {"name": "mcp_allow_tool"}}],
+            call_result="MCP ALLOWED OUTPUT",
+        )
 
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ALLOW, "")
@@ -271,14 +282,12 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         ):
             res = await execute_tool("mcp_allow_tool", {"arg": "val"})
         self.assertEqual(res.content, "MCP ALLOWED OUTPUT")
-        mock_mcp_mgr.call_tool.assert_called_once_with("mcp_allow_tool", {"arg": "val"})
+        mock_mcp_mgr.call_tool_async.assert_called_once_with("mcp_allow_tool", {"arg": "val"})
 
     async def test_execute_tool_mcp_permission_uses_exposed_name(self):
         # Collision-style exposed name ("server__tool"): the permission must be
         # checked under the exposed name, not the raw caller name.
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "gh__search"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
+        mock_mcp_mgr = self._mock_mcp_mgr(active_tools=[{"function": {"name": "gh__search"}}])
 
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Policy blocks it")
@@ -296,10 +305,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         # MCP failures now surface as ERR:-prefixed strings (JSON-RPC error,
         # isError result, transport failure), so the registry classifies them as
         # real tool errors (is_error=True) exactly like native-tool failures.
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "err_mcp"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
-        mock_mcp_mgr.call_tool.return_value = "ERR: mcp 'err_mcp': boom"
+        mock_mcp_mgr = self._mock_mcp_mgr(
+            active_tools=[{"function": {"name": "err_mcp"}}],
+            call_result="ERR: mcp 'err_mcp': boom",
+        )
 
         with (
             patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
@@ -312,10 +321,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
     async def test_execute_tool_mcp_output_truncated(self):
         huge_output = "X" * 15000
-        mock_mcp_mgr = MagicMock()
-        mock_mcp_mgr.get_active_tools.return_value = [{"function": {"name": "mcp_huge_tool"}}]
-        mock_mcp_mgr.get_capabilities_for_exposed_tool.return_value = None
-        mock_mcp_mgr.call_tool.return_value = huge_output
+        mock_mcp_mgr = self._mock_mcp_mgr(
+            active_tools=[{"function": {"name": "mcp_huge_tool"}}],
+            call_result=huge_output,
+        )
 
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ALLOW, "")

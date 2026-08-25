@@ -16,6 +16,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import core.provider_manager as pm_mod
+from core.infrastructure.secrets import save_secret
 from core.provider_manager import ProviderManager
 
 
@@ -40,7 +41,7 @@ def _write_providers(tmp_path, data):
 
 
 def _set_api_key(pm, key, value="sekret"):
-    pm._save_config({"api_keys": {key: value}})
+    save_secret(key, value)
 
 
 def test_ensure_config_dir_save_failure_is_swallowed(pm):

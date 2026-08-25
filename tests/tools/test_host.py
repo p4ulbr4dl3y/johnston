@@ -17,7 +17,15 @@ class _AsyncHost:
     def notify(self, message: str, severity: str = "info"):
         self.notified.append((message, severity))
 
-    def confirm_permission(self, screen_name, args, reason, perm_name=None):
+    def confirm_permission(
+        self,
+        screen_name,
+        args,
+        reason,
+        perm_name=None,
+        is_subagent=False,
+        subagent_role="",
+    ):
         self.confirmed = True
         return True
 

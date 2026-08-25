@@ -71,45 +71,20 @@ class AskUserTool(BaseTool):
 
             try:
                 parsed = json.loads(questions_list.strip())
-                if isinstance(parsed, (list, dict)):
+                if isinstance(parsed, list):
                     questions_list = parsed
             except Exception:
                 pass
 
-        if isinstance(questions_list, dict):
-            questions_list = [questions_list]
-        elif not questions_list and ("question" in args or "options" in args):
-            questions_list = [args]
-
-        if not questions_list or not isinstance(questions_list, list):
+        if not isinstance(questions_list, list) or not questions_list:
             return ToolResult.error("params", name="questions", detail="missing or invalid")
 
         validated_questions = []
         for q in questions_list:
-            if isinstance(q, str) and q.strip():
-                try:
-                    import json
-
-                    q_parsed = json.loads(q)
-                    if isinstance(q_parsed, dict):
-                        q = q_parsed
-                except Exception:
-                    pass
             if not isinstance(q, dict):
                 continue
-            q_text = str(q.get("question") or q.get("q") or "").strip()
+            q_text = str(q.get("question") or "").strip()
             options = q.get("options")
-            if options is None:
-                options = q.get("choices")
-            if isinstance(options, str):
-                try:
-                    import json
-
-                    opt_parsed = json.loads(options)
-                    if isinstance(opt_parsed, list):
-                        options = opt_parsed
-                except Exception:
-                    pass
             if not q_text or not isinstance(options, list):
                 continue
             validated_questions.append(

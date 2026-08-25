@@ -59,13 +59,9 @@ class AgentRole:
         self.tool_name_normalizer = tool_name_normalizer
         self.read_only = bool(read_only)
 
-    def is_tool_allowed(self, tool_name: str) -> Optional[ToolResult]:
-        """Returns an error ToolResult if this role disables tool_name, else None."""
-        return role_tool_error(self, tool_name, tool_name_normalizer=getattr(self, "tool_name_normalizer", None))
-
 
 # Single source of truth for role tool-policy checks. Used by
-# role_tool_error, AgentRole.is_tool_allowed, roles/tools, and application.generation.prompt_builder so
+# role_tool_error, roles/tools, and application.generation.prompt_builder so
 # disallowed, allowed_tools, and subagent exclusions are honored in one place.
 def _tool_policy_result(
     role_def: Any,

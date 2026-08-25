@@ -439,14 +439,14 @@ class TestGetRewindGitStats(unittest.IsolatedAsyncioTestCase):
     async def test_diff_stats_batch_raises(self):
         from core.infrastructure.storage import git_checkpoint as gcm
 
-        with patch.object(gcm.GitCheckpointManager, "is_valid_checkpoint_target", new=AsyncMock(return_value=True)):
+        with patch.object(gcm.GitCheckpointManager, "is_valid_checkpoint_target", return_value=True):
             with patch.object(
                 gcm.GitCheckpointManager,
-                "get_diff_stats_batch",
+                "get_diff_details_batch",
                 side_effect=RuntimeError("timeout"),
             ):
                 entries = await get_rewind_git_stats("sid", [(0, "m0"), (1, "m1")], "/proj")
-        self.assertEqual([e.git_stats for e in entries], ["", ""])
+        self.assertEqual([e.git_stats for e in entries], ["diff unavailable", "diff unavailable"])
 
 
 class TestRewindExtraPaths(unittest.IsolatedAsyncioTestCase):

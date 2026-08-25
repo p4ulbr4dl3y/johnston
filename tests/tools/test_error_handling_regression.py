@@ -10,7 +10,7 @@ Covers three hardening fixes:
 """
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from tools import ask_user, edit
 from tools.registry import execute_tool
@@ -55,6 +55,8 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_active_tools_exception_wrapped(self):
         mock_mgr = MagicMock()
+        mock_mgr.get_cached_tools.return_value = []
+        mock_mgr.get_active_tools_async = AsyncMock(side_effect=RuntimeError("broken transport"))
         mock_mgr.get_active_tools.side_effect = RuntimeError("broken transport")
         # Explicit caps miss so the flow reaches the full active-tools listing.
         mock_mgr.get_capabilities_for_exposed_tool.return_value = None
@@ -70,9 +72,11 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
 
     async def test_capabilities_exception_wrapped(self):
         mock_mgr = MagicMock()
+        mock_mgr.get_cached_tools.return_value = []
         # No active-tool name match, so the `any(...)` short-circuit is False and
         # get_capabilities_for_exposed_tool is actually reached.
         mock_mgr.get_active_tools.return_value = []
+        mock_mgr.get_active_tools_async = AsyncMock(return_value=[])
         mock_mgr.get_capabilities_for_exposed_tool.side_effect = RuntimeError("policy crash")
         with (
             patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
@@ -115,6 +119,7 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
         mock_mgr.get_cached_tools.return_value = []
         mock_mgr.get_capabilities_for_exposed_tool.return_value = None
         mock_mgr.get_active_tools.return_value = []
+        mock_mgr.get_active_tools_async = AsyncMock(return_value=[])
         return mock_mgr
 
     def _mode(self):
@@ -136,8 +141,8 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(r1.is_error)
         self.assertTrue(r2.is_error)
-        # The sync fallback listing ran exactly once, not per call.
-        mock_mgr.get_active_tools.assert_called_once()
+        # The listing ran exactly once, not per call.
+        mock_mgr.get_active_tools_async.assert_called_once()
 
     def test_remember_and_forget_helpers(self):
         from tools import registry

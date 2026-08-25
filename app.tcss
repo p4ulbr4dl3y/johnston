@@ -177,7 +177,7 @@ WelcomeWidget {
     margin-top: 0;
 }
 
-.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-bash, .tool-invoke_subagent {
+.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-invoke_subagent {
     color: #d4d4d8;
 }
 
@@ -572,8 +572,7 @@ ModalScreen {
     scrollbar-size: 0 0 !important;
 }
 
-#help-body,
-#help-body-md {
+#help-body {
     margin-top: 0;
     margin-bottom: 0;
     padding: 0 1;
@@ -867,10 +866,6 @@ DiffScreen {
     padding: 0;
     margin: 0;
     text-wrap: wrap;
-}
-
-#modal-dialog.bash-confirm-dialog .modal-diff-view.modal-qa-block {
-    margin-bottom: 1;
 }
 
 #modal-dialog #console-log,

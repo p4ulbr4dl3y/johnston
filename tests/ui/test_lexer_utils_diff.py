@@ -45,11 +45,6 @@ class TestBuildEditDiffText(unittest.TestCase):
         self.assertIn("-b", out)
         self.assertIn("+c", out)
 
-    def test_old_string_new_string_alias(self):
-        out = build_edit_diff_text({"old_string": "foo", "new_string": "bar"}, "x.py")
-        self.assertIn("-foo", out)
-        self.assertIn("+bar", out)
-
     def test_non_dict_args_returns_empty(self):
         self.assertEqual(build_edit_diff_text("not a dict", "x.py"), "")
 

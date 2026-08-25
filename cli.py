@@ -10,14 +10,6 @@ except ImportError:  # pragma: no cover - Python < 3.11
 from core.infrastructure.platform.paths import CONFIG_DIR
 
 
-def __getattr__(name: str):
-    if name == "ProviderManager":
-        from core.provider_manager import ProviderManager
-
-        return ProviderManager
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
 def get_version() -> str:
     """Get application version dynamically from metadata or pyproject.toml"""
     try:
@@ -36,8 +28,9 @@ def get_version() -> str:
 
 def print_models():
     """Print available providers and models to stdout"""
-    pm_cls = getattr(sys.modules[__name__], "ProviderManager")
-    pm = pm_cls()
+    from core.provider_manager import ProviderManager
+
+    pm = ProviderManager()
     providers = pm.load_providers()
     active_key = pm.get_active_provider_key()
     print("Available Johnston Providers & Models:")
@@ -167,7 +160,7 @@ def print_rules():
 
     rules = RulesManager.get_instance().load_rules()
     for r in rules:
-        items.append(("rule", r.name, r.source, r.roles))
+        items.append(("rule", r.name, r.source))
 
     if not items:
         print("  No rules or project instruction files found (AGENTS.md, CLAUDE.md, .cursorrules, .johnston/rules/).")
@@ -179,11 +172,9 @@ def print_rules():
             print(f"  * {name} [project instruction]")
             print(f"    Path: {filepath} ({size} bytes)")
         else:
-            _, r_name, r_source, r_roles = item
+            _, r_name, r_source = item
             scope = f"[{r_source}]"
             print(f"  * {r_name} [rule] {scope}")
-            if r_roles:
-                print(f"    Roles: {', '.join(r_roles)}")
         if idx < len(items) - 1:
             print()
 

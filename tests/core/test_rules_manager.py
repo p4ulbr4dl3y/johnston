@@ -28,7 +28,7 @@ Always run uv instead of pip.""")
             rule = rules[0]
             self.assertEqual(rule.name, "Python UV")
             self.assertEqual(rule.content, "Always run uv instead of pip.")
-            active_rules = rm.get_active_rules(role="worker", project_dir=tmpdir, include_global=False)
+            active_rules = rm.get_active_rules(project_dir=tmpdir, include_global=False)
             self.assertEqual(len(active_rules), 1)
             self.assertEqual(active_rules[0].name, "Python UV")
 

@@ -188,7 +188,7 @@ def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
     """
     from core.application.rules.rules import RulesManager
 
-    rules = RulesManager.get_instance().get_active_rules(role=role, project_dir=cwd)
+    rules = RulesManager.get_instance().get_active_rules(project_dir=cwd)
     from core.infrastructure.runtime.prompt_markdown import format_rules_markdown
 
     return format_rules_markdown(rules)
