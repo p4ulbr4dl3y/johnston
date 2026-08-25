@@ -63,6 +63,7 @@ def _mock_mgr(servers):
     mgr.load_servers.return_value = servers
     mgr.clients = {}
     mgr.ensure_tools_ready_async = AsyncMock(return_value=[])
+    mgr.warm_server_async = AsyncMock(return_value=None)
     mgr.get_server_status.return_value = {"tools": 0, "error": None, "running": False}
     return mgr
 
@@ -264,8 +265,46 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(calls, ["alpha", "alpha"])
 
     async def test_toggle_enable_kicks_warmup_and_shows_tool_count(self):
-        # Enabling a server in the modal must refresh the row with "N tools"
-        # once the (async, coalesced) warmup lands — no reopen needed.
+        # Enabling a server in the modal must warm that exact server right away
+        # (bypassing the manager's 30s freshness window) and refresh the row
+        # with "N tools" once tools land — no reopen needed.
+        servers = [
+            {"name": "alpha", "command": "py", "enabled": False, "scope": "global"},
+        ]
+        mgr = _mock_mgr(servers)
+        state = {"enabled": False}
+        warm_calls = []
+
+        def toggle(name):
+            state["enabled"] = not state["enabled"]
+            return state["enabled"]
+
+        mgr.toggle_server = toggle
+        mgr.load_servers = lambda: [
+            {"name": "alpha", "command": "py", "enabled": state["enabled"], "scope": "global"}
+        ]
+
+        async def warm(name):
+            warm_calls.append(name)
+            mgr.get_server_status.return_value = {"tools": 2, "error": None, "running": True}
+
+        mgr.warm_server_async = warm
+        screen = _make_screen(mgr)
+        async with _MCPScreenHost(screen).run_test() as pilot:
+            await pilot.pause()
+            await self._wait_until(lambda: screen.filtered_servers)
+            opt_list = screen.query_one("#mcp-option-list", OptionList)
+            opt_list.highlighted = 1
+            await pilot.press("enter")
+            await self._wait_until(lambda: not screen._pending_toggles)
+            self.assertEqual(warm_calls, ["alpha"])
+            opt_list = screen.query_one("#mcp-option-list", OptionList)
+            texts = [str(opt_list.get_option_at_index(i).prompt) for i in range(opt_list.option_count)]
+            self.assertTrue(any("2 tools" in t for t in texts), texts)
+
+    async def test_toggle_enable_shows_error_badge_after_failed_start(self):
+        # When the targeted warm fails (e.g. cold npx start timeout), the row
+        # must show an ERR badge with the error kind instead of a bare ON.
         servers = [
             {"name": "alpha", "command": "py", "enabled": False, "scope": "global"},
         ]
@@ -281,11 +320,14 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             {"name": "alpha", "command": "py", "enabled": state["enabled"], "scope": "global"}
         ]
 
-        async def warmup():
-            mgr.get_server_status.return_value = {"tools": 2, "error": None, "running": True}
-            return []
+        async def warm(name):
+            mgr.get_server_status.return_value = {
+                "tools": 0,
+                "error": "Server start timed out after 15s",
+                "running": False,
+            }
 
-        mgr.ensure_tools_ready_async = warmup
+        mgr.warm_server_async = warm
         screen = _make_screen(mgr)
         async with _MCPScreenHost(screen).run_test() as pilot:
             await pilot.pause()
@@ -296,7 +338,8 @@ class TestMCPScreenRenderRegression(unittest.IsolatedAsyncioTestCase):
             await self._wait_until(lambda: not screen._pending_toggles)
             opt_list = screen.query_one("#mcp-option-list", OptionList)
             texts = [str(opt_list.get_option_at_index(i).prompt) for i in range(opt_list.option_count)]
-            self.assertTrue(any("2 tools" in t for t in texts), texts)
+            # "▲" is the ERR status tag; "Timeout" is the mapped error badge.
+            self.assertTrue(any("▲" in t and "Timeout" in t for t in texts), texts)
 
     async def test_modal_never_blank_while_background_load_queued(self):
         # Regression: a busy worker pool (long to_thread toggles from an
@@ -725,12 +768,12 @@ class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
         opt_list = MagicMock()
         screen._add_server_row(opt_list, {"name": "s", "command": "c"}, {})
 
-    async def test_do_toggle_enabled_warmup_callback(self):
+    async def test_do_toggle_enabled_warms_server(self):
+        # Enabling must run the targeted per-server warm (not the coalesced
+        # global warmup, which can skip inside its freshness window).
         mgr = MagicMock()
         mgr.toggle_server = lambda name: True
-        mgr.ensure_tools_ready_async = AsyncMock()
-        fut = asyncio.Future()
-        mgr._tools_refresh_task = fut
+        mgr.warm_server_async = AsyncMock()
         screen = MCPScreen.__new__(MCPScreen)
         screen.mm = mgr
         screen._pending_toggles = set()
@@ -740,8 +783,7 @@ class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
         host = _MCPToggleHost()
         async with host.run_test():
             await screen._do_toggle("s")
-            fut.set_result(None)
-            await asyncio.sleep(0.01)
+        mgr.warm_server_async.assert_awaited_once_with("s")
         self.assertGreater(host.footer_calls, 0)
 
     async def test_do_toggle_failure_notify(self):

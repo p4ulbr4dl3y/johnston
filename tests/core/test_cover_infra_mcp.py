@@ -29,6 +29,7 @@ def make_manager(project_dir=None) -> MCPManager:
     m._global_config_ensured = True
     m._start_locks = {}
     m._generation = 0
+    m._server_errors = {}
     return m
 
 

@@ -84,6 +84,11 @@ class MCPManager:
         # generation before starting a server and abort if it changed, so a
         # stopped manager can never re-spawn clients for a dead project.
         self._generation = 0
+        # Last fatal start error per server. A client that failed to start is
+        # torn down and popped from ``clients``, which would otherwise lose its
+        # ``last_error``; the UI reads this map via ``get_server_status`` to
+        # keep showing ERR/Timeout badges after a failed warmup.
+        self._server_errors: Dict[str, str] = {}
 
     def stop_all(self):
         """Stops all running MCP client processes and cancels background warmup.
@@ -96,6 +101,7 @@ class MCPManager:
         """
         self._generation += 1
         self._start_locks.clear()
+        self._server_errors.clear()
         task = self._tools_refresh_task
         if task is not None and not task.done():
             task.cancel()
@@ -113,6 +119,7 @@ class MCPManager:
         """Stops all running MCP client processes concurrently without blocking."""
         self._generation += 1
         self._start_locks.clear()
+        self._server_errors.clear()
         task = self._tools_refresh_task
         if task is not None and not task.done():
             task.cancel()
@@ -393,6 +400,10 @@ class MCPManager:
         if not new_enabled and name in self.clients:
             self.clients[name].stop()
             del self.clients[name]
+        if not new_enabled:
+            # Deliberate disable is not a failure: drop any remembered start
+            # error so re-enabling starts with a clean status.
+            self._server_errors.pop(name, None)
 
         return new_enabled
 
@@ -421,7 +432,11 @@ class MCPManager:
                 client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
                 if client.start():
                     self.clients[name] = client
+                    self._server_errors.pop(name, None)
                 else:
+                    err = getattr(client, "last_error", None)
+                    if err:
+                        self._server_errors[name] = err
                     continue
             else:
                 if self._tools_fetch_stale(name):
@@ -505,6 +520,9 @@ class MCPManager:
                     if self._generation != gen:
                         await self._teardown_unready_client(name, client)
                         return []
+                    # A previous failed attempt may have left a remembered
+                    # error; the server now started cleanly.
+                    self._server_errors.pop(name, None)
                 elif self._tools_fetch_stale(name):
                     try:
                         await asyncio.wait_for(client.fetch_tools_async(), timeout=timeout)
@@ -517,13 +535,41 @@ class MCPManager:
                 return []
 
     async def _teardown_unready_client(self, name: str, client: MCPProcessClient) -> None:
-        """Stop a client that must not stay alive and drop it from the cache."""
+        """Stop a client that must not stay alive and drop it from the cache.
+
+        The fatal ``last_error`` is remembered per server first: the client is
+        popped below, so without this the UI would show a bare ON row instead
+        of an ERR badge after a failed start.
+        """
+        err = getattr(client, "last_error", None)
+        if err:
+            self._server_errors[name] = err
         try:
             await client.stop_async()
         except Exception:
             logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
         finally:
             self.clients.pop(name, None)
+
+    async def warm_server_async(self, name: str) -> None:
+        """Start/refresh one enabled server immediately, bypassing warmup coalescing.
+
+        Used by UI toggles: enabling a server must fetch its tools right away.
+        The global warmup (``ensure_tools_ready_async``) skips spawning when a
+        previous refresh finished inside its freshness window, which left a
+        freshly-enabled server unstarted for up to 30s. Safe to run next to the
+        global warmup: per-server start locks serialize client creation.
+        """
+        servers = await self.load_servers_async()
+        target = next((s for s in servers if s.get("name") == name), None)
+        if target is None or not self.server_enabled(target):
+            return
+        try:
+            await self._load_server_tools_async(target)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.warning("Failed to warm MCP server %s", name, exc_info=True)
 
     async def get_active_tools_async(self) -> List[Dict[str, Any]]:
         servers = await self.load_servers_async()
@@ -574,11 +620,13 @@ class MCPManager:
 
         Returns the discovered tool count, last error and whether the client
         process is running. UI layers should use this instead of poking at
-        ``clients`` / ``client.tools`` / ``client.last_error`` directly.
+        ``clients`` / ``client.tools`` / ``client.last_error`` directly. Errors
+        from failed starts survive client teardown via the per-server error map.
         """
+        stored_err = self._server_errors.get(server_name)
         client = self.clients.get(server_name)
         if client is None:
-            return {"server": server_name, "tools": 0, "error": None, "running": False}
+            return {"server": server_name, "tools": 0, "error": stored_err, "running": False}
         proc = getattr(client, "process", None)
         running = False
         if proc is not None:
@@ -586,7 +634,7 @@ class MCPManager:
                 running = proc.poll() is None
             except Exception:
                 running = False
-        err = getattr(client, "last_error", None)
+        err = getattr(client, "last_error", None) or stored_err
         tools = getattr(client, "tools", None) or []
         return {"server": server_name, "tools": len(tools), "error": err, "running": running}
 

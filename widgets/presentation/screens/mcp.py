@@ -263,19 +263,16 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         try:
             enabled = await asyncio.to_thread(self.mm.toggle_server, name)
             if enabled:
-                # Freshly-enabled server: kick the (coalesced, async) warmup so
-                # the row can show "N tools" without reopening the modal.
+                # Freshly-enabled server: start it and fetch its tools right
+                # away so the row shows "N tools" without reopening the modal.
+                # A targeted warm is required here: the coalesced global warmup
+                # skips spawning when a previous refresh finished inside its
+                # 30s freshness window, which left the row stuck as a bare ON
+                # with no tool count (e.g. enabling right after app start).
+                # Runs off the UI thread and never blocks keystrokes; the
+                # in-flight toggle guard prevents duplicate warmups per server.
                 try:
-                    await self.mm.ensure_tools_ready_async()
-                    warm_task = getattr(self.mm, "_tools_refresh_task", None)
-                    if warm_task is not None and not warm_task.done():
-                        def _on_warmed(_done):
-                            if getattr(self, "is_mounted", True):
-                                self.refresh_list()
-                                if hasattr(self.app, "refresh_status_footer"):
-                                    self.app.refresh_status_footer()
-
-                        warm_task.add_done_callback(_on_warmed)
+                    await self.mm.warm_server_async(name)
                 except Exception:
                     pass
         except asyncio.CancelledError:

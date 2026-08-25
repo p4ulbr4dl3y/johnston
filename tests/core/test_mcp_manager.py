@@ -29,6 +29,7 @@ def make_manager(project_dir=None) -> MCPManager:
     m._global_config_ensured = True
     m._start_locks = {}
     m._generation = 0
+    m._server_errors = {}
     return m
 
 
@@ -762,6 +763,10 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("slow", m.clients)
         self.assertIn("timed out", hanging.last_error or "")
         hanging.stop_async.assert_awaited_once()
+        # The fatal error must survive client teardown so the UI keeps an
+        # ERR/Timeout badge instead of a bare ON row.
+        self.assertIn("timed out", m._server_errors.get("slow", ""))
+        self.assertEqual(m.get_server_status("slow")["error"], m._server_errors["slow"])
 
     async def test_call_async_after_stop_does_not_raise(self):
         # Regression: stop() failing the pending future (RuntimeError) while an
@@ -784,6 +789,132 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
 
         res = await scenario()
         self.assertIn("ERR: mcp 't': MCP server 's' stopped", res)
+
+
+    async def test_warm_server_async_bypasses_freshness_window(self):
+        # Regression: enabling a server right after a recent global warmup used
+        # to leave it unstarted for up to 30s — ensure_tools_ready_async hit
+        # its freshness window and skipped the fetch entirely, so the /mcp row
+        # stayed a bare ON with no tool count. The targeted warm must start the
+        # server regardless of that window.
+        m = make_manager(self.tmp)
+        m.load_servers = lambda: [{"name": "x", "command": "python", "cwd": self.tmp}]
+        m._tools_refresh_time = time.monotonic()  # a warmup finished just now
+
+        client = MagicMock()
+        client.start_async = AsyncMock(return_value=True)
+        client.stop_async = AsyncMock()
+        client.last_error = None
+        client.tools = [{"name": "t1"}]
+
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=client) as mk:
+            await m.warm_server_async("x")
+
+        mk.assert_called_once()
+        self.assertIn("x", m.clients)
+        self.assertNotIn("x", m._server_errors)
+
+    async def test_warm_server_async_ignores_disabled_or_unknown(self):
+        m = make_manager(self.tmp)
+        m.load_servers = lambda: [
+            {"name": "off", "command": "python", "enabled": False},
+            {"name": "other", "command": "python"},
+        ]
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient") as mk:
+            await m.warm_server_async("off")
+            await m.warm_server_async("missing")
+        mk.assert_not_called()
+        self.assertEqual(m.clients, {})
+
+    async def test_failed_start_error_survives_for_status_and_clears_on_success(self):
+        # The failed client is torn down and popped from clients; its fatal
+        # error must still reach get_server_status (UI ERR badge), then vanish
+        # once a later start succeeds.
+        m = make_manager(self.tmp)
+        servers = [{"name": "bad", "command": "python"}]
+        m.load_servers = lambda: servers
+
+        failed = MagicMock()
+        failed.start_async = AsyncMock(return_value=False)
+        failed.stop_async = AsyncMock()
+        failed.last_error = "Process start failed: boom"
+
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed):
+            await m.get_active_tools_async()
+
+        self.assertEqual(m._server_errors.get("bad"), "Process start failed: boom")
+        self.assertIs(m.clients.get("bad"), None)
+        self.assertEqual(m.get_server_status("bad")["error"], "Process start failed: boom")
+
+        ok_client = MagicMock()
+        ok_client.start_async = AsyncMock(return_value=True)
+        ok_client.stop_async = AsyncMock()
+        ok_client.last_error = None
+        ok_client.tools = [{"name": "t1"}]
+
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=ok_client):
+            await m.warm_server_async("bad")
+
+        self.assertNotIn("bad", m._server_errors)
+        self.assertIn("bad", m.clients)
+        self.assertEqual(m.get_server_status("bad")["error"], None)
+
+    def test_disable_clears_remembered_start_error(self):
+        # Disabling is deliberate, not a failure: any remembered start error
+        # must be dropped so re-enabling renders a clean status.
+        m = make_manager(self.tmp)
+        with open(m.global_file, "w", encoding="utf-8") as f:
+            json.dump({"mcpServers": {"srv": {"command": "py"}}}, f)
+        m._server_errors["srv"] = "boom"
+
+        self.assertFalse(m.toggle_server("srv"))
+        self.assertNotIn("srv", m._server_errors)
+
+    async def test_stop_all_variants_clear_remembered_start_errors(self):
+        # Both teardown entrypoints reset per-server start errors together with
+        # the clients, so no stale ERR badge survives a manager restart.
+        m = make_manager(self.tmp)
+        m._server_errors["a"] = "boom"
+        m.stop_all()
+        self.assertEqual(m._server_errors, {})
+
+        m._server_errors["b"] = "boom"
+
+        async def _never():
+            await asyncio.Event().wait()
+
+        m._tools_refresh_task = asyncio.create_task(_never())
+        await m.stop_all_async()
+        self.assertEqual(m._server_errors, {})
+        # Cancellation is delivered on the next loop pass; awaiting it both
+        # asserts it and retrieves the cancelled task cleanly.
+        with self.assertRaises(asyncio.CancelledError):
+            await m._tools_refresh_task
+
+    def test_sync_get_active_tools_records_and_clears_start_error(self):
+        # The sync fallback path must remember a fatal start error (for the UI
+        # ERR badge) and clear it once the same server starts successfully.
+        m = make_manager(self.tmp)
+        servers = [{"name": "s", "command": "python", "args": []}]
+        m.load_servers = lambda: servers
+
+        failed = MagicMock()
+        failed.start.return_value = False
+        failed.last_error = "start failed"
+        failed.tools = []
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed):
+            self.assertEqual(m.get_active_tools(), [])
+        self.assertEqual(m._server_errors.get("s"), "start failed")
+        self.assertNotIn("s", m.clients)
+
+        ok = MagicMock()
+        ok.start.return_value = True
+        ok.last_error = None
+        ok.tools = [{"name": "t1"}]
+        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=ok):
+            tools = m.get_active_tools()
+        self.assertEqual([t["function"]["name"] for t in tools], ["t1"])
+        self.assertNotIn("s", m._server_errors)
 
 
 class NamespaceResolutionEdge(unittest.TestCase):
