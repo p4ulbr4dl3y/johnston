@@ -131,13 +131,19 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         ]
         self.assertEqual(extract_subagent_progress(sess), "searching web (2)")
 
-    def test_extract_progress_completed_tool_means_generating(self):
+    def test_extract_progress_tool_result_preserves_tool_state(self):
         sess = MagicMock()
         sess.is_running = True
         sess.status = "running"
+        # Tool call followed by tool result retains tool state without flickering to generating...
         sess.messages = [
-            {"type": "tool", "tool_type": "read", "args": {"path": "a.py"}, "result_text": "contents of file"}
+            {"type": "tool", "tool_type": "read", "args": {"path": "a.py"}},
+            {"type": "tool", "result_text": "contents of file"},
         ]
+        self.assertEqual(extract_subagent_progress(sess), "reading file")
+
+        # Once bot text is streamed, it switches to generating...
+        sess.messages.append({"type": "bot", "text": "Analyzing the file content..."})
         self.assertEqual(extract_subagent_progress(sess), "generating...")
 
     def test_format_active_tool_generic(self):

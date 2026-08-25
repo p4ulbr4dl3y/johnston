@@ -362,15 +362,17 @@ def extract_subagent_progress(session: Any) -> str:
             tool_type = evt.get("tool_type") or ""
             args = evt.get("args") or {}
             target = evt.get("target") or ""
-            if "result_text" in evt:
-                return "generating..."
-            return _format_active_tool_progress(tool_type, args, target, turn_events=turn_events)
+            if tool_type:
+                return _format_active_tool_progress(tool_type, args, target, turn_events=turn_events)
+            continue
         elif etype == "thinking":
-            if evt.get("duration") is not None and evt.get("duration") > 0:
-                return "generating..."
-            return "thinking..."
+            if evt.get("duration") is None or evt.get("duration") == 0:
+                return "thinking..."
+            continue
         elif etype == "bot":
-            return "generating..."
+            txt = evt.get("text", "")
+            if isinstance(txt, str) and txt.strip():
+                return "generating..."
         elif etype == "user":
             return "starting..."
 
