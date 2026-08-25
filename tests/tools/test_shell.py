@@ -371,7 +371,7 @@ async def test_subagent_no_stdout_stream(tool, make_app_mock, make_tool_context)
 
     with patch.object(ShellTool, "_create_std_process", return_value=p):
         res = str(await tool.execute({"command": "true"}, ctx=ctx))
-        assert res == "(no output)"
+        assert _plain(res) == "(no output)"
 
 
 async def test_subagent_read_task_drain_timeout(tool, make_app_mock, make_tool_context):
@@ -390,7 +390,7 @@ async def test_subagent_read_task_drain_timeout(tool, make_app_mock, make_tool_c
         patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
     ):
         res = str(await tool.execute({"command": "true"}, ctx=ctx))
-        assert res == "(no output)"
+        assert _plain(res) == "(no output)"
 
 
 async def test_subagent_timeout_read_task_exception_ignored(tool, make_app_mock, make_tool_context):
@@ -560,6 +560,22 @@ def _ctx(make_tool_context, cwd=None, is_subagent=True):
     return make_tool_context(is_subagent=is_subagent, cwd=cwd)
 
 
+_SANDBOX_NOTICE = "[sandbox unavailable on this platform: executed unsandboxed]\n"
+
+
+def _plain(res) -> str:
+    """Drop the advisory degradation banner from a shell result.
+
+    Subagent contexts always request sandboxing; on hosts without a usable
+    backend the tool prepends the notice above. Exact-match assertions must
+    not depend on whether the running platform has a sandbox backend.
+    """
+    text = str(res)
+    if text.startswith(_SANDBOX_NOTICE):
+        text = text[len(_SANDBOX_NOTICE):]
+    return text
+
+
 # ---------- empty / whitespace / None command ----------
 
 
@@ -616,7 +632,7 @@ async def test_redirect_stdout_to_devnull_loses_output(tool, make_tool_context):
 @pytest.mark.skipif(os.name == "nt", reason="/dev/null is POSIX-only")
 async def test_redirect_append(tool, make_tool_context):
     res = str(await tool.execute({"command": "echo x >> /dev/null"}, ctx=_ctx(make_tool_context)))
-    assert res == "(no output)"
+    assert _plain(res) == "(no output)"
 
 
 @pytest.mark.skipif(os.name == "nt", reason="/dev/null and < redirection are POSIX-only")
@@ -663,7 +679,7 @@ async def test_wildcard_glob_expands(tool, make_tool_context):
 @pytest.mark.skipif(os.name == "nt", reason="PowerShell ~ is not an absolute path")
 async def test_tilde_expands(tool, make_tool_context):
     res = str(await tool.execute({"command": "echo ~"}, ctx=_ctx(make_tool_context)))
-    assert os.path.isabs(res.strip())
+    assert os.path.isabs(_plain(res).strip())
 
 
 async def test_nested_quotes(tool, make_tool_context):
@@ -716,7 +732,7 @@ async def test_false_exit_code_surfaced(tool, make_tool_context):
     # `false` exits 1 and the tool surfaces the exit code when there is no output.
     res = await tool.execute({"command": "false"}, ctx=_ctx(make_tool_context))
     assert res.returncode == 1
-    assert str(res) == "(exit code 1)"
+    assert _plain(res) == "(exit code 1)"
 
 
 @pytest.mark.skipif(os.name == "nt", reason="bash ; exit syntax is POSIX-only")
@@ -775,7 +791,7 @@ async def test_nonexistent_cwd_falls_back(tool, make_tool_context):
 @pytest.mark.skipif(os.name == "nt", reason="pwd output format is PowerShell-specific")
 async def test_relative_cwd(tool, make_tool_context):
     res = str(await tool.execute({"command": "pwd"}, ctx=_ctx(make_tool_context)))
-    assert os.path.isabs(res.strip())
+    assert os.path.isabs(_plain(res).strip())
 
 
 @pytest.mark.skipif(os.name == "nt", reason="cd && pwd is bash syntax")

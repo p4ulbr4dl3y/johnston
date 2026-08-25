@@ -219,17 +219,17 @@ async def test_absolute_path_outside_cwd(tmp_path, ctx):
 
 
 @pytest.mark.asyncio
-async def test_expanduser_tilde(tmp_path, ctx):
-    home = os.path.expanduser("~")
-    p = os.path.join(home, ".johnston_read_test_tmp.txt")
-    try:
-        with open(p, "w") as f:
-            f.write("tilde read\n")
-        res = str(await ReadTool().execute({"path": "~/.johnston_read_test_tmp.txt"}, ctx=ctx))
-        assert "tilde read" in res
-    finally:
-        if os.path.exists(p):
-            os.remove(p)
+async def test_expanduser_tilde(tmp_path, ctx, monkeypatch):
+    # Redirect HOME into tmp: the test only proves that "~" in a requested
+    # path expands to the user's home, and writing the real home directory is
+    # neither necessary nor allowed under sandboxed runs.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    p = os.path.join(str(tmp_path), ".johnston_read_test_tmp.txt")
+    with open(p, "w") as f:
+        f.write("tilde read\n")
+    res = str(await ReadTool().execute({"path": "~/.johnston_read_test_tmp.txt"}, ctx=ctx))
+    assert "tilde read" in res
 
 
 @pytest.mark.asyncio
