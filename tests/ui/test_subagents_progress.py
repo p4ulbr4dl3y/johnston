@@ -93,12 +93,18 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         # edit single
         sess.messages = [{"type": "tool", "tool_type": "edit", "args": {"path": "widgets/app.py"}}]
         self.assertEqual(extract_subagent_progress(sess), "editing file")
-        # edit multiple
+        # edit multiple to different files
         sess.messages = [
             {"type": "tool", "tool_type": "edit", "args": {"path": "a.py"}, "result_text": "ok"},
             {"type": "tool", "tool_type": "replace_file_content", "args": {"path": "b.py"}},
         ]
         self.assertEqual(extract_subagent_progress(sess), "editing 2 files")
+        # multiple edits to SAME file -> 1 file
+        sess.messages = [
+            {"type": "tool", "tool_type": "edit", "args": {"path": "widgets/app.py"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "replace_file_content", "args": {"path": "widgets/app.py"}},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "editing file")
 
         # shell single
         sess.messages = [{"type": "tool", "tool_type": "shell", "args": {"command": "uv run pytest -k test_app"}}]
@@ -109,6 +115,14 @@ class TestSubagentProgressDisplay(unittest.TestCase):
             {"type": "tool", "tool_type": "run_command", "args": {"command": "git status"}},
         ]
         self.assertEqual(extract_subagent_progress(sess), "running 2 commands")
+
+        # mixed tools in turn: reads followed by shell -> counts only active tool type (shell: 1)
+        sess.messages = [
+            {"type": "tool", "tool_type": "read", "args": {"path": "a.py"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "read", "args": {"path": "b.py"}, "result_text": "ok"},
+            {"type": "tool", "tool_type": "shell", "args": {"command": "git status"}},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "running command")
 
         # update_plan
         sess.messages = [
@@ -209,6 +223,69 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         self.assertIn("uv run pytest -n auto", row)
         self.assertIn("exit 0 • 42s", row)
         self.assertIn("[dim #71717a]", row)
+
+    def test_fake_streaming_full_lifecycle_and_followup(self):
+        from core.session_manager import AgentSession, SessionKind
+
+        sess = AgentSession(
+            "sub-sim-1",
+            kind=SessionKind.SUBAGENT,
+            role="worker",
+            description="Run refactoring and tests",
+            status="running",
+        )
+        # 1. Start turn
+        sess.add_event({"type": "user", "text": "Please refactor the code"})
+        self.assertEqual(extract_subagent_progress(sess), "starting...")
+
+        # 2. Thinking phase
+        sess.add_event({"type": "thinking", "text": "Analyzing codebase structure..."})
+        self.assertEqual(extract_subagent_progress(sess), "thinking...")
+
+        # 3. First tool: read file
+        sess.add_event({"type": "tool", "tool_type": "read", "args": {"path": "main.py"}})
+        self.assertEqual(extract_subagent_progress(sess), "reading file")
+
+        # 4. Tool result arrives (smoothly retains 'reading file', no flicker to generating)
+        sess.add_event({"type": "tool", "result_text": "def main(): pass"})
+        self.assertEqual(extract_subagent_progress(sess), "reading file")
+
+        # 5. Second tool: edit file
+        sess.add_event({"type": "tool", "tool_type": "edit", "args": {"path": "main.py"}})
+        self.assertEqual(extract_subagent_progress(sess), "editing file")
+
+        # 6. Tool result arrives
+        sess.add_event({"type": "tool", "result_text": "ok"})
+        self.assertEqual(extract_subagent_progress(sess), "editing file")
+
+        # 7. Third tool: run shell command
+        sess.add_event({"type": "tool", "tool_type": "shell", "args": {"command": "uv run pytest"}})
+        self.assertEqual(extract_subagent_progress(sess), "running command")
+
+        # 8. Tool result arrives
+        sess.add_event({"type": "tool", "result_text": "3 passed"})
+        self.assertEqual(extract_subagent_progress(sess), "running command")
+
+        # 9. Bot streams response text
+        sess.add_event({"type": "bot", "text": "All refactorings and tests are green!"})
+        self.assertEqual(extract_subagent_progress(sess), "generating...")
+
+        # 10. Subagent finishes first turn
+        sess.finish("completed")
+        self.assertEqual(extract_subagent_progress(sess), "done • 4 steps")
+
+        # 11. Follow-up send_message
+        sess.status = "running"
+        sess.add_event({"type": "user", "text": "Now add docs"})
+        self.assertEqual(extract_subagent_progress(sess), "starting...")
+
+        # 12. Follow-up tool: create README
+        sess.add_event({"type": "tool", "tool_type": "create", "args": {"path": "README.md"}})
+        self.assertEqual(extract_subagent_progress(sess), "creating file")
+
+        # 13. Follow-up finish
+        sess.finish("completed")
+        self.assertEqual(extract_subagent_progress(sess), "done • 5 steps")
 
 
 if __name__ == "__main__":
