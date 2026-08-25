@@ -29,6 +29,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
+            fit_content=True,
         )
 
     @staticmethod

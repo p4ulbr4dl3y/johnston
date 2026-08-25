@@ -22,6 +22,7 @@ from widgets.presentation.screens.constants import (
 )
 from widgets.tool_helpers import get_all_tool_types
 from widgets.utils.key_aliases import expand_bindings
+from widgets.utils.responsive import apply_modal_fit, modal_content_width
 
 _SELECTABLE_TYPES = ("tool",)
 
@@ -63,6 +64,7 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield Label("enter/space/tab: toggle • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
+        self._apply_dialog_fit()
         self.refresh_list()
         try:
             self.query_one(MODAL_SEARCH_INPUT, Input).focus()
@@ -70,6 +72,25 @@ class PermissionsScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             pass
         # Non-blocking background refresh of MCP tools (server connect may be slow).
         self._mcp_task = asyncio.create_task(self._load_mcp_tools_async())
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._apply_dialog_fit()
+
+    def _apply_dialog_fit(self) -> None:
+        """Hug dialog to permission rows / hint instead of stretching to 90%."""
+        try:
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+        except Exception:
+            return
+        # Selectable rows render as "{status_tag} {label}"; headers/separators
+        # render bare, so the tag prefix is only a small overestimate there.
+        rows = [f"✓ {it['label']}" for it in self._get_items() if it.get("label")]
+        content_width = modal_content_width(
+            rows,
+            "### **Manage Tool Permissions**",
+            "enter/space/tab: toggle • ↑↓: nav • esc: close",
+        )
+        apply_modal_fit(dialog, content_width)
 
     def on_unmount(self) -> None:
         if self._mcp_task and not self._mcp_task.done():

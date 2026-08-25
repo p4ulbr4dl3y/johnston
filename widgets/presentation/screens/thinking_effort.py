@@ -17,4 +17,5 @@ class ThinkingEffortScreen(BaseSelectionScreen[str]):
             items,
             current,
             show_search=False,
+            fit_content=True,
         )

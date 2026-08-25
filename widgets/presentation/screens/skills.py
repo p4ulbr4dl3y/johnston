@@ -22,6 +22,7 @@ from widgets.presentation.screens.constants import (
     TAB_KEYS,
 )
 from widgets.utils.key_aliases import expand_bindings
+from widgets.utils.responsive import apply_modal_fit, modal_content_width
 
 
 class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]]):
@@ -64,11 +65,28 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             yield Label("enter: select • space/tab: toggle • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
+        self._apply_dialog_fit()
         self.refresh_list(force_load=False)
         try:
             self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         except Exception:
             pass
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._apply_dialog_fit()
+
+    def _apply_dialog_fit(self) -> None:
+        """Hug dialog to skill rows / hint instead of stretching to 90%."""
+        try:
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+        except Exception:
+            return
+        content_width = modal_content_width(
+            self.options,
+            "### **Available Skills**",
+            "enter: select • space/tab: toggle • esc: close",
+        )
+        apply_modal_fit(dialog, content_width)
 
     def refresh_list(self, force_load: bool = True) -> None:
         if force_load:

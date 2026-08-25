@@ -5,19 +5,32 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from textual.app import App
 from textual.timer import Timer
+from textual.widgets.option_list import Option
 
 from widgets.command_suggestions import CommandSuggestions
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.diff import DiffFooter, DiffHeader
+from widgets.presentation.screens.model import ModelScreen
 from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+from widgets.presentation.screens.providers import ApiKeyInputScreen
+from widgets.presentation.screens.thinking_effort import ThinkingEffortScreen
 from widgets.status_footer import SubagentStatusFooter
 from widgets.utils.responsive import (
     BREAKPOINT_BANNER,
     BREAKPOINT_COMPACT,
     BREAKPOINT_HINT,
     DEFAULT_TERMINAL_WIDTH,
+    MODAL_CONTENT_GUTTER,
+    MODAL_MAX_WIDTH,
+    MODAL_MIN_WIDTH,
+    MODAL_WIDTH_RATIO,
+    apply_modal_fit,
+    fit_modal_width,
     is_compact_width,
+    modal_content_width,
+    resolve_screen_width,
     resolve_width,
 )
 
@@ -332,3 +345,119 @@ class TestCommandSuggestionsViewportAwareness:
 
         rows = asyncio.run(run())
         assert rows, "expected at least one suggestion row"
+
+
+# --- Modal dialog content-fit sizing (widgets/utils/responsive.py) ----------
+
+
+class _DialogStub:
+    """Dialog stand-in resolving terminal width only via ``_harness_app``."""
+
+    def __init__(self, screen_width):
+        self._harness_app = SimpleNamespace(size=SimpleNamespace(width=screen_width, height=24))
+        self.styles = SimpleNamespace(width=None)
+
+    @property
+    def app(self):
+        raise RuntimeError("not mounted")
+
+
+class _ExplodingStylesStub(_DialogStub):
+    """Stub whose ``styles`` assignment raises like an unmountable widget."""
+
+    class _Styles:
+        width = None
+
+        def __setattr__(self, name, value):
+            raise RuntimeError("no styles")
+
+    def __init__(self, screen_width):
+        super().__init__(screen_width)
+        self.styles = self._Styles()
+
+
+class TestModalFitHelpers:
+    def test_fit_hugs_content_when_terminal_is_wide(self):
+        assert fit_modal_width(45, 120) == 45
+
+    def test_fit_applies_floor_for_tiny_content(self):
+        assert fit_modal_width(20, 200) == MODAL_MIN_WIDTH
+
+    def test_fit_caps_at_max_width_for_huge_content(self):
+        assert fit_modal_width(500, 200) == MODAL_MAX_WIDTH
+
+    def test_fit_caps_at_ratio_of_screen_on_narrow_terminals(self):
+        screen = 46
+        fitted = fit_modal_width(60, screen)
+        assert fitted == min(MODAL_MAX_WIDTH, int(screen * MODAL_WIDTH_RATIO))
+        assert fitted < MODAL_MIN_WIDTH
+
+    def test_fit_guards_degenerate_input(self):
+        # Degenerate content falls back to the floor; unusable screen width
+        # skips the ratio cap instead of clamping to zero.
+        assert fit_modal_width(-5, 0) == MODAL_MIN_WIDTH
+
+    def test_content_width_strips_markdown_and_uses_widest_line(self):
+        width = modal_content_width(["● Auto", "  Medium"], "### **Select Thinking Effort**", "enter: select • esc: close")
+        assert width == len("enter: select • esc: close") + MODAL_CONTENT_GUTTER
+
+    def test_content_width_duck_types_option_prompt(self):
+        assert modal_content_width([Option("abcdefgh"), "ab"]) == 8 + MODAL_CONTENT_GUTTER
+
+    def test_resolve_screen_width_ignores_dialog_own_size(self):
+        stub = _WidthStub(size_width=999)
+        stub.app = SimpleNamespace(size=SimpleNamespace(width=120))
+        assert resolve_screen_width(stub) == 120
+
+    def test_resolve_screen_width_falls_back_to_harness_then_default(self):
+        assert resolve_screen_width(_UnmountedWidthStub(SimpleNamespace(size=SimpleNamespace(width=55)))) == 55
+        assert resolve_screen_width(_BadSizesStub()) == DEFAULT_TERMINAL_WIDTH
+
+    def test_apply_modal_fit_sets_imperative_width_and_returns_it(self):
+        dialog = _DialogStub(screen_width=120)
+        assert apply_modal_fit(dialog, 45) == 45
+        assert dialog.styles.width == 45
+
+    def test_apply_modal_fit_swallows_style_errors(self):
+        assert apply_modal_fit(_ExplodingStylesStub(screen_width=120), 45) == 0
+
+
+class _ModalHostApp(App[None]):
+    """Host app pushing a modal screen for pilot-based width assertions."""
+
+    def __init__(self, screen_to_test):
+        super().__init__()
+        self.screen_to_test = screen_to_test
+
+    def on_mount(self) -> None:
+        self.push_screen(self.screen_to_test)
+
+
+class TestModalFitPilot:
+    @staticmethod
+    async def _dialog_width(screen, size):
+        async with _ModalHostApp(screen).run_test(size=size) as pilot:
+            await pilot.pause()
+            return screen.query_one("#modal-dialog").region.width
+
+    async def test_thinking_effort_hugs_content_instead_of_stretching(self):
+        width = await self._dialog_width(ThinkingEffortScreen(), (120, 40))
+        # Widest content = 36-cell hint + gutter; previously this dialog took
+        # the full default cap (~75-78 cols on such a terminal).
+        assert MODAL_MIN_WIDTH <= width <= MODAL_MIN_WIDTH + 2
+        assert width < 70
+
+    async def test_thinking_effort_respects_ratio_cap_on_narrow_terminal(self):
+        width = await self._dialog_width(ThinkingEffortScreen(), (46, 20))
+        assert 0 < width <= int(46 * MODAL_WIDTH_RATIO)
+
+    async def test_model_search_modal_stays_bounded(self):
+        models_data = {"prov1": {"name": "Provider 1", "models": ["model-a", "model-b"]}}
+        screen = ModelScreen(models_data=models_data, current_model="model-a", current_provider="prov1")
+        width = await self._dialog_width(screen, (120, 40))
+        assert MODAL_MIN_WIDTH <= width < MODAL_MAX_WIDTH
+
+    async def test_api_key_modal_hugs_small_content(self):
+        screen = ApiKeyInputScreen("Prov", "prov", current_key="sk-abcdefgh12345678")
+        width = await self._dialog_width(screen, (120, 40))
+        assert MODAL_MIN_WIDTH <= width < MODAL_MAX_WIDTH

@@ -19,6 +19,7 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.utils.responsive import MODAL_MIN_WIDTH, apply_modal_fit, modal_content_width
 
 T = TypeVar("T")
 
@@ -106,6 +107,8 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         hint_text: str = "enter: select • ↑↓: nav • esc: close",
         option_list_id: str = MODAL_OPTION_LIST_ID,
         dialog_classes: str = "",
+        fit_content: bool = False,
+        min_dialog_width: int = MODAL_MIN_WIDTH,
     ):
         super().__init__()
         self.title = title
@@ -117,6 +120,10 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         self.hint_text = hint_text
         self.option_list_id = option_list_id
         self.dialog_classes = dialog_classes
+        # Content-hugging dialog width (see widgets/utils/responsive.py):
+        # small selection modals opt in instead of stretching to 90% width.
+        self.fit_content = fit_content
+        self.min_dialog_width = min_dialog_width
         self.filtered_items = list(items)
         self.filtered_options = list(options)
         self._norm_targets: dict[int, str] = {}
@@ -130,6 +137,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             yield Label(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
+        self._apply_dialog_fit()
         opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
         default_idx = None
         if self.default_value is not None and self.default_value in self.raw_items:
@@ -149,6 +157,20 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         else:
             opt_list.focus()
+
+    def _apply_dialog_fit(self) -> None:
+        """Hug dialog to content when ``fit_content`` is set (mount + resize)."""
+        if not getattr(self, "fit_content", False):
+            return
+        try:
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+        except Exception:
+            return
+        content_width = modal_content_width(self.raw_options, self.title, self.hint_text)
+        apply_modal_fit(dialog, content_width, min_width=getattr(self, "min_dialog_width", MODAL_MIN_WIDTH))
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._apply_dialog_fit()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         query_raw = event.value.strip().lower()
