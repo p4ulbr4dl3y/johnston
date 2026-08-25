@@ -182,22 +182,3 @@ class TestPermissionManagerPatterns(unittest.TestCase):
                 # Read normal file -> allow via tool default
                 dec_read_py = self.pm.check_permission("read", {"path": "/app/src/main.py"})
                 self.assertEqual(dec_read_py.action, PermissionAction.ALLOW)
-
-    def test_update_pattern_permission(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            cfg_file = os.path.join(tmpdir, "config.json")
-            with open(cfg_file, "w", encoding="utf-8") as f:
-                json.dump({"permissions": {}}, f)
-
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                self.pm.update_pattern_permission("shell", "cargo test*", "allow")
-
-                dec = self.pm.check_permission("shell", {"command": "cargo test --all"})
-                self.assertEqual(dec.action, PermissionAction.ALLOW)
-
-                with open(cfg_file, "r", encoding="utf-8") as f:
-                    saved = json.load(f)
-                self.assertEqual(
-                    saved["permissions"]["patterns"]["shell"],
-                    [{"pattern": "cargo test*", "action": "allow"}],
-                )

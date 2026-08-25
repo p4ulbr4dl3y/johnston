@@ -172,24 +172,6 @@ class TestPermissionManager(unittest.TestCase):
         action = self.pm.check_permission("web_fetch").action
         self.assertEqual(action, "allow")
 
-    def test_update_permission_validation(self):
-        with self.assertRaises(ValueError):
-            self.pm.update_permission("tool", "web_fetch", "bogus")
-        with self.assertRaises(ValueError):
-            self.pm.update_permission("not_a_type", "web_fetch", "allow")
-        with self.assertRaises(ValueError):
-            self.pm.update_permission("group", "read", "allow")
-
-    def test_update_permission_writes_global_config(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            cfg_file = os.path.join(tmpdir, "config.json")
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                self.pm.update_permission("tool", "web_fetch", "deny")
-
-                # Tool permission persisted globally
-                action = self.pm.check_permission("web_fetch").action
-                self.assertEqual(action, "deny")
-
     def test_normalize_action(self):
         self.assertEqual(normalize_action("  ALLOW "), "allow")
         self.assertEqual(normalize_action("deny"), "deny")

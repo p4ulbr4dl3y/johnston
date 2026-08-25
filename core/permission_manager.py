@@ -14,7 +14,6 @@ from core.domain.policies.permission_policy import (
     normalize_execution_mode,
 )
 from core.infrastructure.platform.paths import CONFIG_FILE
-from core.infrastructure.platform.platform_utils import atomic_write_json
 from core.infrastructure.runtime.tool_name import normalize_tool_name
 
 
@@ -55,26 +54,6 @@ class PermissionManager:
         """Sets a runtime session execution mode override ('review', 'edits', 'yolo')."""
         norm = normalize_execution_mode(mode)
         self.session_mode = norm
-        return norm
-
-    def set_execution_mode(self, mode: Any) -> ExecutionMode:
-        """Alias for set_session_mode."""
-        return self.set_session_mode(mode)
-
-    def update_execution_mode(self, mode: Any) -> ExecutionMode:
-        """Updates and persists the default execution mode in global config (~/.johnston/config.json)."""
-        norm = normalize_execution_mode(mode)
-        self.session_mode = norm
-
-        file_path = CONFIG_FILE
-        data = self._load_json_config(file_path)
-        if "permissions" not in data or not isinstance(data["permissions"], dict):
-            data["permissions"] = {}
-        data["permissions"]["mode"] = norm.value
-
-        atomic_write_json(file_path, data)
-        self._cached_effective_perms = None
-        self._cached_effective_perms_id = None
         return norm
 
     def set_session_override(self, tool_name: str, action: str) -> None:
@@ -120,68 +99,6 @@ class PermissionManager:
 
         data = cached_json_read(filepath, {})
         return data if isinstance(data, dict) else {}
-
-    def update_permission(self, target_type: str, target_name: str, action: str) -> None:
-        """
-        Updates a global tool permission setting to action.
-        Raises ValueError on invalid target_type or action.
-        Saves to the global config file (~/.johnston/config.json).
-        """
-        if target_type != "tool":
-            raise ValueError(f"Invalid target_type: '{target_type}'")
-
-        target_name = self._normalize_name(target_name)
-
-        # Validate the raw value BEFORE normalization: normalize_action() would
-        # turn junk into the valid 'ask' default and mask the error.
-        raw = (action or "").strip().lower()
-        if raw not in self.VALID_ACTIONS:
-            raise ValueError(f"Invalid action '{action}' for {target_type} '{target_name}'")
-        action = raw
-
-        file_path = CONFIG_FILE
-        data = self._load_json_config(file_path)
-        if "permissions" not in data or not isinstance(data["permissions"], dict):
-            data["permissions"] = {}
-        perms = data["permissions"]
-
-        if "tools" not in perms or not isinstance(perms["tools"], dict):
-            perms["tools"] = {}
-        perms["tools"][target_name] = action
-
-        atomic_write_json(file_path, data)
-        self._cached_effective_perms = None
-        self._cached_effective_perms_id = None
-
-    def update_pattern_permission(self, target_name: str, pattern: str, action: str) -> None:
-        """
-        Appends or updates a pattern permission in global config (~/.johnston/config.json).
-        """
-        target_name = self._normalize_name(target_name)
-        raw_action = (action or "").strip().lower()
-        if raw_action not in self.VALID_ACTIONS:
-            raise ValueError(f"Invalid action '{action}' for pattern '{pattern}' on '{target_name}'")
-        pat = (pattern or "").strip()
-        if not pat:
-            raise ValueError("Pattern cannot be empty")
-
-        file_path = CONFIG_FILE
-        data = self._load_json_config(file_path)
-        if "permissions" not in data or not isinstance(data["permissions"], dict):
-            data["permissions"] = {}
-        perms = data["permissions"]
-
-        if "patterns" not in perms or not isinstance(perms["patterns"], dict):
-            perms["patterns"] = {}
-        if target_name not in perms["patterns"] or not isinstance(perms["patterns"][target_name], list):
-            perms["patterns"][target_name] = []
-
-        existing = [r for r in perms["patterns"][target_name] if isinstance(r, dict) and r.get("pattern") != pat]
-        perms["patterns"][target_name] = [{"pattern": pat, "action": raw_action}] + existing
-
-        atomic_write_json(file_path, data)
-        self._cached_effective_perms = None
-        self._cached_effective_perms_id = None
 
     def get_effective_permissions(self) -> Dict[str, Any]:
         """Merges global config on top of DEFAULT_PERMISSIONS (cached by config snapshot)."""

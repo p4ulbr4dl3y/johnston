@@ -178,23 +178,6 @@ def test_empty_override_cleared_recheck(pm):
 
 
 
-def test_update_permission_overwrites_and_removes_duplicates(pm):
-    pm_obj, cfg = pm
-    pm_obj.update_permission("tool", "web_fetch", "deny")
-    pm_obj.update_permission("tool", "web_fetch", "allow")  # overwrite
-    action = pm_obj.check_permission("web_fetch").action
-    assert action == "allow"
-    data = json.load(open(cfg, encoding="utf-8"))
-    assert data["permissions"]["tools"]["web_fetch"] == "allow"
-
-
-def test_update_permission_trailing_slash_and_uppercase(pm):
-    pm_obj, cfg = pm
-    pm_obj.update_permission("tool", "  WEB_FETCH  ", "deny")
-    action = pm_obj.check_permission("WEB_FETCH").action
-    assert action == "deny"
-
-
 # ===========================================================================
 # SESSION MANAGER edge cases
 # ===========================================================================
