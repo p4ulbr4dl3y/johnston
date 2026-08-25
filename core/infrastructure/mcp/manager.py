@@ -537,19 +537,26 @@ class MCPManager:
     async def _teardown_unready_client(self, name: str, client: MCPProcessClient) -> None:
         """Stop a client that must not stay alive and drop it from the cache.
 
-        The fatal ``last_error`` is remembered per server first: the client is
-        popped below, so without this the UI would show a bare ON row instead
-        of an ERR badge after a failed start.
+        Remembering its fatal ``last_error`` keeps the UI showing an ERR badge
+        after a failed start instead of a bare ON row — but only when this
+        attempt still owns the cache slot (see the guard below).
         """
-        err = getattr(client, "last_error", None)
-        if err:
-            self._server_errors[name] = err
         try:
             await client.stop_async()
         except Exception:
             logger.debug("Failed to stop unready MCP client %s", name, exc_info=True)
         finally:
-            self.clients.pop(name, None)
+            # The spawned process itself must always be stopped above, but the
+            # shared caches are only mutated when this attempt still owns the
+            # slot: a stale attempt that lost the post-start generation race
+            # (stop_all + a newer successful warmup) would otherwise pop the
+            # replacement client — leaking its live subprocess — and overwrite
+            # the fresh server's clean status with its own remembered error.
+            if self.clients.get(name) is client:
+                err = getattr(client, "last_error", None)
+                if err:
+                    self._server_errors[name] = err
+                self.clients.pop(name, None)
 
     async def warm_server_async(self, name: str) -> None:
         """Start/refresh one enabled server immediately, bypassing warmup coalescing.

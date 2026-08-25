@@ -916,6 +916,57 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([t["function"]["name"] for t in tools], ["t1"])
         self.assertNotIn("s", m._server_errors)
 
+    async def test_stale_teardown_does_not_evict_replacement_client(self):
+        # A stale warmup that lost the post-start generation race tears down ITS
+        # old client while a newer attempt already cached a replacement under
+        # the same name. The stale subprocess must still be stopped, but the
+        # replacement must survive in clients (a by-key pop would leak its live
+        # process) and the fresh error-free status must not be corrupted by the
+        # stale last_error.
+        m = make_manager(self.tmp)
+        new_client = MagicMock()
+        new_client.last_error = None
+        m.clients["x"] = new_client
+
+        old_client = MagicMock()
+        old_client.last_error = "boom"
+        old_client.stop_async = AsyncMock()
+
+        await m._teardown_unready_client("x", old_client)
+
+        self.assertIs(m.clients["x"], new_client)
+        old_client.stop_async.assert_awaited_once()
+        self.assertNotIn("x", m._server_errors)
+
+    async def test_teardown_of_own_slot_still_pops_and_records_error(self):
+        # When the torn-down client still owns the cache slot, behavior is
+        # unchanged: the slot is dropped and the fatal last_error is remembered
+        # so the UI keeps an ERR badge instead of a bare ON row.
+        m = make_manager(self.tmp)
+        own = MagicMock()
+        own.last_error = "boom"
+        own.stop_async = AsyncMock()
+        m.clients["y"] = own
+
+        await m._teardown_unready_client("y", own)
+
+        self.assertNotIn("y", m.clients)
+        self.assertEqual(m._server_errors["y"], "boom")
+
+    async def test_teardown_own_slot_without_error_leaves_status_clean(self):
+        # No fatal error means nothing reaches _server_errors; the owned slot is
+        # still dropped.
+        m = make_manager(self.tmp)
+        own = MagicMock()
+        own.last_error = None
+        own.stop_async = AsyncMock()
+        m.clients["y"] = own
+
+        await m._teardown_unready_client("y", own)
+
+        self.assertNotIn("y", m.clients)
+        self.assertEqual(m._server_errors, {})
+
 
 class NamespaceResolutionEdge(unittest.TestCase):
     """Exact-match-before-split resolution for tool names containing ``__``."""
