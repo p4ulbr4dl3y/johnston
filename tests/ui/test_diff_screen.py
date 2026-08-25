@@ -156,6 +156,18 @@ class TestDiffScreen(unittest.TestCase):
             screen.on_input_submitted(mock_event)
             self.assertEqual(screen.compact_view, "diff")
 
+    def test_sidebar_row_width_compact_stays_full_width(self):
+        items = [("test_modal_badge_adaptivity.py", "diff1", 1, 0)]
+        screen = DiffScreen(items)
+
+        with patch("widgets.presentation.screens.diff.resolve_width", return_value=60):
+            # Row width must use screen width (60 - 2 = 58), not fallback 31
+            self.assertEqual(screen._sidebar_row_width(), 58)
+            options = screen._format_sidebar_options(screen._sidebar_row_width())
+            # Filename fits completely in 58 columns without truncation (was truncated at 31)
+            self.assertIn("test_modal_badge_adaptivity.py", options[0])
+
+
 
 
 class TestDiffCommand(unittest.IsolatedAsyncioTestCase):

@@ -47,10 +47,14 @@ class DiffHeader(ResizeDebounceMixin, Static):
         esc_label = "esc: back" if self.from_rewind else "esc: close"
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
+            max_stat_len = max(10, width - 24)
+            stat = self.stats_summary
+            if len(stat) > max_stat_len:
+                stat = stat[: max_stat_len - 1] + "…"
             left_text = (
                 f"[bold #ffffff]Diff[/]  [#71717a]•[/]  "
-                f"[#f4f4f5]{escape(self.title_text[:20])}[/]  "
-                f"[#71717a]({escape(self.stats_summary)})[/]"
+                f"[#f4f4f5]{escape(self.title_text[:14])}[/]  "
+                f"[#71717a]({escape(stat)})[/]"
             )
             right_text = "[#71717a]esc[/]"
         else:
@@ -206,6 +210,10 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         return options
 
     def _sidebar_row_width(self) -> int:
+        screen_w = resolve_width(self)
+        is_compact = is_compact_width(screen_w, breakpoint=BREAKPOINT_COMPACT)
+        if is_compact:
+            return max(20, screen_w - 2)
         try:
             sidebar = self.query_one("#diff-sidebar", Vertical)
             width = sidebar.size.width
