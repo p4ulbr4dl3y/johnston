@@ -295,7 +295,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
             "update_plan", "plan", args={"plan": [{"status": "completed"}, {"status": "pending"}]}
         )
         widget.render_header()
-        self.assertIn("[1/2 completed]", str(widget.header_label.render()))
+        self.assertIn("1/2 done", str(widget.header_label.render()))
 
         widget2 = self._widget(
             "update_plan",
@@ -303,7 +303,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
             args={"plan": [{"status": "completed"}, {"status": "pending"}, {"step": "x", "status": "in_progress"}]},
         )
         widget2.render_header()
-        self.assertIn("[1/3 completed]", str(widget2.header_label.render()))
+        self.assertIn("1/3: x", str(widget2.header_label.render()))
 
         widget3 = self._widget("update_plan", "plan", args={"plan": "nope"})
         widget3.render_header()

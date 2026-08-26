@@ -697,20 +697,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def render_header(self) -> None:
         c = self._get_status_color()
-        if self.canonical_tool == "update_plan":
-            target_str = ""
-            if self.args and isinstance(self.args, dict):
-                plan_data = self.args.get("plan")
-                if isinstance(plan_data, list):
-                    total = len(plan_data)
-                    completed = sum(
-                        1
-                        for item in plan_data
-                        if isinstance(item, dict) and item.get("status") == "completed"
-                    )
-                    target_str = f"[{completed}/{total} completed]"
-            self.header_label.update(f"[{c}]● [bold]UpdatePlan[/bold][/{c}]({escape(target_str)})")
-        elif self.canonical_tool in self.SYSTEM_TOOLS or self.canonical_tool in (
+        if self.canonical_tool in self.SYSTEM_TOOLS or self.canonical_tool in (
             "invoke_subagent",
             "manage_subagent",
             "manage_shell",
@@ -719,7 +706,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             display_name = self.DISPLAY_NAMES.get(self.canonical_tool, self.tool_type or "Tool")
             from core.infrastructure.presentation.tool_display import extract_tool_display
 
-            target_str = extract_tool_display(self.canonical_tool, self.args) if self.args else self.target
+            target_str = (
+                extract_tool_display(self.canonical_tool, self.args)
+                if (self.args or self.canonical_tool == "update_plan")
+                else self.target
+            )
             self.header_label.update(f"[{c}]● [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
         else:
             # MCP/custom tool: single format — ToolName({k: v, ...}).

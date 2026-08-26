@@ -169,12 +169,29 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
 
     if name == "update_plan":
         plan_data = args.get("plan")
-        if isinstance(plan_data, list):
+        if isinstance(plan_data, list) and plan_data:
             total = len(plan_data)
             completed = sum(
                 1 for item in plan_data if isinstance(item, dict) and item.get("status") == "completed"
             )
-            return f"[{completed}/{total} completed]"
+            if completed == total:
+                return f"{completed}/{total} done"
+
+            active_step = ""
+            for item in plan_data:
+                if isinstance(item, dict) and item.get("status") == "in_progress":
+                    active_step = str(item.get("step") or "").strip()
+                    break
+
+            if not active_step and completed == 0:
+                for item in plan_data:
+                    if isinstance(item, dict) and item.get("status") == "pending":
+                        active_step = str(item.get("step") or "").strip()
+                        break
+
+            if active_step:
+                return truncate(f"{completed}/{total}: {active_step}")
+            return f"{completed}/{total} done"
         return ""
 
     if name == "read":

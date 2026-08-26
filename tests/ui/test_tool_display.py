@@ -81,7 +81,43 @@ class TestToolDisplay(unittest.TestCase):
             extract_tool_display(
                 "update_plan", {"explanation": "phase one", "plan": [{"status": "completed"}, {"status": "pending"}]}
             ),
-            "[1/2 completed]",
+            "1/2 done",
+        )
+        self.assertEqual(
+            extract_tool_display(
+                "update_plan",
+                {
+                    "plan": [
+                        {"step": "Setup DB", "status": "completed"},
+                        {"step": "Write tests", "status": "in_progress"},
+                    ]
+                },
+            ),
+            "1/2: Write tests",
+        )
+        self.assertEqual(
+            extract_tool_display(
+                "update_plan",
+                {
+                    "plan": [
+                        {"step": "Setup DB", "status": "pending"},
+                        {"step": "Write tests", "status": "pending"},
+                    ]
+                },
+            ),
+            "0/2: Setup DB",
+        )
+        self.assertEqual(
+            extract_tool_display(
+                "update_plan",
+                {
+                    "plan": [
+                        {"step": "Setup DB", "status": "completed"},
+                        {"step": "Write tests", "status": "completed"},
+                    ]
+                },
+            ),
+            "2/2 done",
         )
         self.assertEqual(extract_tool_display("update_plan", {"explanation": "phase one"}), "")
 
