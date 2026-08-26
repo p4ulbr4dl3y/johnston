@@ -16,9 +16,34 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         app = MagicMock()
         app.current_session_id = "non_existent"
         app.sm.get.return_value = None
+        app.sm.create_main.side_effect = Exception("failed")
         cmd = RenameCommand()
         await cmd.execute(app)
         app.notify.assert_called_with("Session not found", severity="error")
+
+    async def test_rename_command_creates_session_on_fresh_startup(self):
+        app = MagicMock()
+        app.current_session_id = "fresh_sess_id"
+        app.role = "worker"
+        app.sm.get.return_value = None
+        fresh_sess = MagicMock()
+        fresh_sess.description = ""
+        fresh_sess.messages = []
+        app.sm.create_main.return_value = fresh_sess
+        app.sm._title_from_messages.return_value = "Untitled"
+
+        def push_screen_mock(screen, callback):
+            self.assertEqual(screen.current_title, "")
+            callback("Startup Session Name")
+
+        app.push_screen = push_screen_mock
+        cmd = RenameCommand()
+        await cmd.execute(app)
+
+        app.sm.create_main.assert_called_with("fresh_sess_id", role="worker")
+        self.assertEqual(fresh_sess.description, "Startup Session Name")
+        app.sm.save.assert_called_with(fresh_sess)
+        app.notify.assert_called_with("Session renamed", severity="info")
 
     async def test_rename_command_successful_rename(self):
         app = MagicMock()

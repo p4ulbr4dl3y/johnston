@@ -137,10 +137,17 @@ class LifecycleMixin:
         try:
             from tools.registry import aclose_tools
 
-            if loop is not None and loop.is_running():
-                loop.create_task(aclose_tools())
-            else:
-                asyncio.run(aclose_tools())
+            close_coro = aclose_tools()
+            try:
+                if loop is not None and loop.is_running():
+                    loop.create_task(close_coro)
+                else:
+                    asyncio.run(close_coro)
+            except Exception:
+                # Scheduling failed (e.g. loop closed): drop the coroutine so it
+                # never surfaces as an "never awaited" runtime warning.
+                close_coro.close()
+                raise
         except Exception as err:
             logger.debug(f"Tool instance cleanup error: {err}")
 

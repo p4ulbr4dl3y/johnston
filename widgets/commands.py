@@ -446,6 +446,12 @@ class RenameCommand(BaseCommand):
 
         sess = app.sm.get(curr_sid)
         if not sess:
+            try:
+                role = getattr(app, "role", "worker") or "worker"
+                sess = app.sm.create_main(curr_sid, role=role)
+            except Exception:
+                sess = None
+        if not sess:
             app.notify("Session not found", severity="error")
             return
 
