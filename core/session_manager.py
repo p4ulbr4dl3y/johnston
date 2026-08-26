@@ -793,7 +793,14 @@ class SessionStore:
             return None
         new_id = self.generate_session_id()
         parent_id = source.id if source.kind == SessionKind.MAIN else source.parent_id
-        fork_desc = new_title or (f"{source.description} (fork)" if source.description else "Forked session")
+        if new_title:
+            fork_desc = new_title
+        elif source.description:
+            base = source.description.removesuffix(" (fork)")
+            fork_desc = f"{base} (fork)"
+        else:
+            base = source.title.removesuffix(" (fork)")
+            fork_desc = f"{base} (fork)"
         new_sess = AgentSession(
             session_id=new_id,
             kind=source.kind,

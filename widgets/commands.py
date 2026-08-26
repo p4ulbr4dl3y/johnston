@@ -398,7 +398,18 @@ class ForkCommand(BaseCommand):
                 app.query_one(MESSAGE_INPUT).focus()
                 return
 
-            forked = app.sm.fork_session(curr_sid, up_to_msg_index=seq_idx)
+            fork_title = None
+            if seq_idx > 0 and msg_text:
+                clean_msg = " ".join(msg_text.replace("\n", " ").replace("\r", " ").split())
+                if clean_msg:
+                    fork_title = clean_msg[:55] + "..." if len(clean_msg) > 55 else clean_msg
+            elif seq_idx == 0:
+                parent_sess = app.sm.get(curr_sid)
+                if parent_sess:
+                    base = parent_sess.title.removesuffix(" (fork)")
+                    fork_title = f"{base} (fork)"
+
+            forked = app.sm.fork_session(curr_sid, new_title=fork_title, up_to_msg_index=seq_idx)
             if not forked:
                 app.notify("Failed to fork session", severity="error")
                 app.query_one(MESSAGE_INPUT).focus()
