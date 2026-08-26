@@ -7,16 +7,37 @@ from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT
 from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, option_list_row_width
 
 
+def _order_sessions_hierarchically(sessions: list[dict]) -> list[dict]:
+    parent_map: dict[str, list[dict]] = {}
+    roots: list[dict] = []
+    session_ids = {str(s.get("id")) for s in sessions}
+
+    for s in sessions:
+        pid = s.get("parent_id")
+        if pid and str(pid) in session_ids:
+            parent_map.setdefault(str(pid), []).append(s)
+        else:
+            roots.append(s)
+
+    ordered = []
+    for root in roots:
+        ordered.append(root)
+        children = parent_map.get(str(root.get("id")), [])
+        ordered.extend(children)
+    return ordered
+
+
 class ResumeScreen(BaseSelectionScreen[str]):
     """Modal session resume screen (/resume)"""
 
     def __init__(self, sessions: list[dict], current_session_id: str | None = None):
-        self.sessions = sessions
+        ordered_sessions = _order_sessions_hierarchically(sessions)
+        self.sessions = ordered_sessions
         self.current_session_id = current_session_id
         self.has_active = bool(
-            current_session_id and any(str(s.get("id")) == str(current_session_id) for s in sessions)
+            current_session_id and any(str(s.get("id")) == str(current_session_id) for s in ordered_sessions)
         )
-        items = [str(s.get("id")) for s in sessions]
+        items = [str(s.get("id")) for s in ordered_sessions]
 
         if current_session_id and str(current_session_id) in items:
             default_val = str(current_session_id)
@@ -46,16 +67,22 @@ class ResumeScreen(BaseSelectionScreen[str]):
     def _format_all_options(self, target_width: int) -> list[str]:
         options = []
         has_indicator = self.has_active or any(s.get("is_locked") for s in self.sessions)
+        session_ids = {str(s.get("id")) for s in self.sessions}
         for s in self.sessions:
             sid = str(s.get("id"))
             is_active = self.has_active and sid == str(self.current_session_id)
             is_locked = bool(s.get("is_locked")) and not is_active
+            is_fork = bool(s.get("parent_id") and str(s.get("parent_id")) in session_ids)
+
             if is_active:
-                prefix = f"{status_tag('ACTIVE')} "
+                status_pfx = f"{status_tag('ACTIVE')} "
             elif is_locked:
-                prefix = f"{status_tag('LOCKED')} "
+                status_pfx = f"{status_tag('LOCKED')} "
             else:
-                prefix = "  " if has_indicator else ""
+                status_pfx = "  " if has_indicator else ""
+
+            branch_pfx = "[dim #71717a]└─ [/]" if is_fork else ""
+            prefix = f"{status_pfx}{branch_pfx}"
             title = str(s.get("title", ""))
             count = s.get("message_count", 0)
             step_str = "step" if count == 1 else "steps"

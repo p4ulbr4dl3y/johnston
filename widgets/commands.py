@@ -21,6 +21,7 @@ from core.infrastructure.mcp import get_mcp_manager
 from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
 from widgets.presentation.screens.constants import MESSAGE_INPUT
+from widgets.presentation.screens.fork import ForkScreen
 from widgets.presentation.screens.help import HelpScreen
 from widgets.presentation.screens.mcp import MCPScreen
 from widgets.presentation.screens.model import ModelScreen
@@ -360,6 +361,77 @@ class RewindCommand(BaseCommand):
             await result
 
 
+class ForkCommand(BaseCommand):
+    name = "/fork"
+    aliases = ["/branch"]
+    description = "Fork session from a selected message"
+
+    async def execute(self, app) -> None:
+        chat_view = app.query_one(ChatView)
+        user_msgs = chat_view.get_user_messages()
+        if not user_msgs:
+            app.notify("History is empty: no messages to fork", severity="warning")
+            return
+
+        curr_sid = getattr(app, "current_session_id", None)
+        if not curr_sid or not hasattr(app, "sm"):
+            app.notify("No active session to fork", severity="warning")
+            return
+
+        def on_fork_selected(selected_child_idx: int | None) -> None:
+            if selected_child_idx is None:
+                app.query_one(MESSAGE_INPUT).focus()
+                return
+
+            found = False
+            msg_text = ""
+            seq_idx = 0
+            for i, (child_idx, text) in enumerate(user_msgs):
+                if child_idx == selected_child_idx:
+                    msg_text = text
+                    seq_idx = i
+                    found = True
+                    break
+
+            if not found:
+                app.query_one(MESSAGE_INPUT).focus()
+                return
+
+            forked = app.sm.fork_session(curr_sid, up_to_msg_index=seq_idx)
+            if not forked:
+                app.notify("Failed to fork session", severity="error")
+                app.query_one(MESSAGE_INPUT).focus()
+                return
+
+            try:
+                if hasattr(app, "workers"):
+                    for w in app.workers:
+                        if getattr(w, "is_running", False):
+                            w.cancel()
+            except Exception:
+                pass
+            app.is_generating = False
+            if hasattr(app, "message_queue"):
+                app.message_queue.clear()
+
+            app.load_session_ui(forked.id)
+
+            chat_input = app.query_one(MESSAGE_INPUT, ChatInput)
+            if msg_text:
+                chat_input.load_text(msg_text)
+                lines = chat_input.text.split("\n")
+                chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+            chat_input.focus()
+            app.notify("Session forked", severity="info")
+
+        result = app.push_screen(
+            ForkScreen(user_msgs),
+            callback=on_fork_selected,
+        )
+        if asyncio.iscoroutine(result):
+            await result
+
+
 class ResumeCommand(BaseCommand):
     name = "/resume"
     aliases = ["/sessions", "/load"]
@@ -676,6 +748,7 @@ COMMAND_CLASSES = [
     ModelsCommand,
     ThinkingEffortCommand,
     RewindCommand,
+    ForkCommand,
     ResumeCommand,
     SubagentsCommand,
     ShellTasksCommand,

@@ -143,9 +143,45 @@ class TestSessionStoreLockingAndFork(unittest.TestCase):
         self.assertEqual(forked.messages[0]["text"], "hello")
         self.assertEqual(forked.tokens_input, 100)
         self.assertIn("(fork)", forked.description)
+        self.assertEqual(forked.parent_id, sess.id)
 
         # Forking invalid session returns None
         self.assertIsNone(self.store.fork_session("non_existent"))
+
+    def test_store_fork_session_with_slicing(self):
+        sess = self.store.create_main()
+        sess.description = "Task multi"
+        sess.messages = [
+            {"type": "user", "text": "turn 0"},
+            {"type": "bot", "text": "bot 0"},
+            {"type": "user", "text": "turn 1"},
+            {"type": "bot", "text": "bot 1"},
+            {"type": "user", "text": "turn 2"},
+            {"type": "bot", "text": "bot 2"},
+        ]
+        sess.agent_history = [
+            {"role": "user", "content": "turn 0"},
+            {"role": "assistant", "content": "bot 0"},
+            {"role": "user", "content": "turn 1"},
+            {"role": "assistant", "content": "bot 1"},
+            {"role": "user", "content": "turn 2"},
+            {"role": "assistant", "content": "bot 2"},
+        ]
+        self.store.save(sess)
+
+        # Fork before turn 1 -> keeps turn 0 and bot 0
+        forked = self.store.fork_session(sess.id, up_to_msg_index=1)
+        self.assertIsNotNone(forked)
+        self.assertEqual(forked.parent_id, sess.id)
+        self.assertEqual(len(forked.messages), 2)
+        self.assertEqual(forked.messages[0]["text"], "turn 0")
+        self.assertEqual(forked.messages[1]["text"], "bot 0")
+        self.assertEqual(len(forked.agent_history), 2)
+
+        # Fork at 0 -> clean slate
+        forked_zero = self.store.fork_session(sess.id, up_to_msg_index=0)
+        self.assertEqual(len(forked_zero.messages), 0)
+        self.assertEqual(len(forked_zero.agent_history), 0)
 
     def test_list_main_sessions_annotates_locked(self):
         sess1 = self.store.create_main()

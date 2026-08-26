@@ -596,6 +596,7 @@ class SessionStore:
 
                 return {
                     "id": first.get("id", ""),
+                    "parent_id": first.get("parent_id"),
                     "title": title,
                     "created_at": created_at,
                     "updated_at": updated_at,
@@ -622,6 +623,7 @@ class SessionStore:
                 sessions.append(
                     {
                         "id": sess.id,
+                        "parent_id": sess.parent_id,
                         "title": title,
                         "created_at": sess.created_at,
                         "updated_at": sess.updated_at,
@@ -832,33 +834,87 @@ class SessionStore:
             return True
         return False
 
-    def fork_session(self, session_id: str, new_title: Optional[str] = None) -> Optional[AgentSession]:
-        """Create a duplicate copy of a session under a fresh session ID."""
+    def fork_session(
+        self,
+        session_id: str,
+        new_title: Optional[str] = None,
+        up_to_msg_index: Optional[int] = None,
+    ) -> Optional[AgentSession]:
+        """Create a duplicate or branched copy of a session under a fresh session ID."""
         import copy
 
         source = self.get(session_id)
         if not source:
             return None
         new_id = self.generate_session_id()
+        parent_id = source.id if source.kind == SessionKind.MAIN else source.parent_id
         fork_desc = new_title or (f"{source.description} (fork)" if source.description else "Forked session")
         new_sess = AgentSession(
             session_id=new_id,
             kind=source.kind,
-            parent_id=source.parent_id,
+            parent_id=parent_id,
             role=source.role,
-            status=source.status,
+            status=SessionStatus.ACTIVE,
             project_key=self.project_key,
             description=fork_desc,
             prompt=source.prompt,
         )
-        new_sess.messages = copy.deepcopy(source.messages)
-        new_sess.agent_history = copy.deepcopy(source.agent_history)
-        new_sess.tokens_input = source.tokens_input
-        new_sess.tokens_output = source.tokens_output
-        new_sess.total_tokens = source.total_tokens
-        new_sess.cost_usd = source.cost_usd
-        new_sess.last_context_tokens = source.last_context_tokens
-        new_sess.tokens_cache_read = source.tokens_cache_read
+        if up_to_msg_index is None:
+            new_sess.messages = copy.deepcopy(source.messages)
+            new_sess.agent_history = copy.deepcopy(source.agent_history)
+            new_sess.tokens_input = source.tokens_input
+            new_sess.tokens_output = source.tokens_output
+            new_sess.total_tokens = source.total_tokens
+            new_sess.cost_usd = source.cost_usd
+            new_sess.last_context_tokens = source.last_context_tokens
+            new_sess.tokens_cache_read = source.tokens_cache_read
+        else:
+            seq_idx = up_to_msg_index
+            if seq_idx <= 0:
+                new_sess.messages = []
+                new_sess.agent_history = []
+            else:
+                visible = 0
+                cutoff = len(source.messages)
+                for idx, msg in enumerate(source.messages):
+                    if not isinstance(msg, dict) or msg.get("type") != "user":
+                        continue
+                    if msg.get("show_in_ui") is False:
+                        continue
+                    text = str(msg.get("text", ""))
+                    if text.startswith(("[System Notification]", "[System Note:")):
+                        continue
+                    if visible == seq_idx:
+                        cutoff = idx
+                        break
+                    visible += 1
+                kept_messages = source.messages[:cutoff]
+                new_sess.messages = copy.deepcopy(
+                    [
+                        m
+                        for m in kept_messages
+                        if not (
+                            isinstance(m, dict)
+                            and m.get("type") == "user"
+                            and str(m.get("text", "")).startswith("[System Note:")
+                        )
+                    ]
+                )
+
+                real_user_count = 0
+                history_cutoff = len(source.agent_history)
+                for idx, msg in enumerate(source.agent_history):
+                    if isinstance(msg, dict) and msg.get("role") == "user":
+                        content = msg.get("content", "")
+                        if isinstance(content, str) and (
+                            "<conversation-checkpoint>" in content or content.startswith("[System Note:")
+                        ):
+                            continue
+                        if real_user_count == seq_idx:
+                            history_cutoff = idx
+                            break
+                        real_user_count += 1
+                new_sess.agent_history = copy.deepcopy(source.agent_history[:history_cutoff])
         new_sess.project_dir = source.project_dir
         new_sess.branch_name = source.branch_name
         self.save(new_sess)
