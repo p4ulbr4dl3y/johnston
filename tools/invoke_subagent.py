@@ -207,7 +207,7 @@ class InvokeSubagentTool(BaseTool):
         notification_hdr = format_background_notification(
             "Background subagent", title, session_id, "{result_text}"
         )
-        notification_ftr = f"(Note: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', session_id='{session_id}', message='...')`.)"
+        notification_ftr = f"[Hint: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', session_id='{session_id}', message='...')`.]"
 
         bg_task = asyncio.create_task(
             run_subagent_stream_bg(

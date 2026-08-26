@@ -154,41 +154,6 @@ class FormattingMixin:
         diff_text = self._clean_hints_for_ui(diff_text)
         return format_edit_diff(diff_text, file_path)
 
-    def _format_read_content(self, text: str, default_file_path: str) -> tuple[str, int, str]:
-        lines = text.splitlines()
-        if not lines:
-            return "", 1, default_file_path
-
-        start_line = 1
-        file_path = default_file_path
-
-        header_match = re.match(r"^===\s+Lines\s+(\d+)-\d+\s+of\s+\d+\s+in\s+([^\s=]+)", lines[0])
-        if header_match:
-            start_line = int(header_match.group(1))
-            file_path = header_match.group(2)
-            lines = lines[1:]
-
-        clean_code_lines = []
-        for line in lines:
-            stripped = line.strip()
-            if stripped.startswith("[Hint:") and stripped.endswith("]"):
-                continue
-            cleaned_line = re.sub(r"^(?:\s*\d+\s*\|\s?)+", "", line)
-            clean_code_lines.append(cleaned_line)
-
-        return "\n".join(clean_code_lines), start_line, file_path
-
-    def _fix_markdown_nested_lists(self, text: str) -> str:
-        if not text:
-            return ""
-        lines = text.splitlines()
-        fixed = []
-        for line in lines:
-            # Fix double list markers (e.g. "  - * text" or "1. * text") from LLM transcribing
-            line = re.sub(r"^(\s*(?:[-*]|\d+\.)\s+)[-*]\s+", r"\1", line)
-            fixed.append(line)
-        return "\n".join(fixed)
-
     def _clean_bash_output(self, text: str) -> str:
         return _format_truncation_for_ui(text)
 
@@ -875,70 +840,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 return "raw", self._format_plan_display(plan_items, explanation)
             elif self.canonical_tool == "ask_user":
                 return "raw", self._format_ask_user_display()
-            elif self.canonical_tool == "web_fetch":
-                raw_text = self.result_text or ""
-                if self._is_error(raw_text):
-                    return "raw", Text(raw_text.strip(), style="bold #ffffff")
-                default_target = self.args.get("url") or file_path or "page.md"
-                clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
-                lexer = self._guess_lexer(fpath)
-                raw_mode = bool(self.args.get("raw", False))
-
-                is_code_file = lexer not in ("markdown", "text") and lexer != "html"
-                if is_code_file or raw_mode:
-                    if clean_code:
-                        clean_code = clean_code.rstrip("\r\n")
-                        try:
-                            syntax = TransparentSyntax(
-                                clean_code,
-                                lexer if lexer != "html" else "html",
-                                theme=CODE_THEME,
-                                line_numbers=True,
-                                start_line=start_line,
-                                word_wrap=True,
-                                background_color="default",
-                            )
-                            return "raw", syntax
-                        except Exception:
-                            return "raw", self._format_code_with_line_numbers(clean_code)
-                    return "markup", self._clean_markup_text(self.result_text or "(No content)")
-                clean_code = self._fix_markdown_nested_lists(clean_code)
-                return "md", clean_code.rstrip("\r\n") or "(No content)"
-            elif self.canonical_tool == "read":
-                raw_text = self.result_text or ""
-                if self._is_error(raw_text):
-                    return "raw", Text(raw_text.strip(), style="bold #ffffff")
-                default_target = file_path or "file.txt"
-                clean_code, start_line, fpath = self._format_read_content(raw_text, default_target)
-
-                if not clean_code.strip() and fpath:
-                    from widgets.utils.file_reader import read_file_content
-
-                    disk_content = read_file_content(fpath)
-                    if disk_content is not None:
-                        clean_code = disk_content
-                        start_line = 1
-
-                lexer = self._guess_lexer(fpath)
-                if lexer == "markdown":
-                    clean_code = self._fix_markdown_nested_lists(clean_code)
-                    return "md", clean_code.rstrip("\r\n") or "(No content)"
-                if clean_code:
-                    clean_code = clean_code.rstrip("\r\n")
-                    try:
-                        syntax = TransparentSyntax(
-                            clean_code,
-                            lexer,
-                            theme=CODE_THEME,
-                            line_numbers=True,
-                            start_line=start_line,
-                            word_wrap=True,
-                            background_color="default",
-                        )
-                        return "raw", syntax
-                    except Exception:
-                        return "raw", self._format_code_with_line_numbers(clean_code)
-                return "markup", self._clean_markup_text(self.result_text or "(No content)")
             elif self.tool_type == "shell":
                 output_text = self._clean_bash_output(self.result_text)
                 log_match = re.search(r"Full Log:\s*([^\s\(\)]+)", self.result_text or "")

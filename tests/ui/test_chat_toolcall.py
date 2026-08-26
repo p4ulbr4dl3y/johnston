@@ -207,25 +207,6 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
             "Explanation",
         )
 
-    def test_format_read_content(self):
-        widget = ToolCallWidget("read", "f.py")
-        self.assertEqual(widget._format_read_content("", "f.py"), ("", 1, "f.py"))
-        header = "=== Lines 5-10 of 100 in /path/file.py\n  5 | line one\n  6 | line two"
-        content, start, path = widget._format_read_content(header, "default.py")
-        self.assertEqual(start, 5)
-        self.assertEqual(path, "/path/file.py")
-        self.assertIn("line one", content)
-        with_hint = "line\n[Hint: skip me]"
-        content2, _, _ = widget._format_read_content(with_hint, "f.py")
-        self.assertNotIn("Hint", content2)
-
-    def test_fix_markdown_nested_lists(self):
-        widget = ToolCallWidget("read", "f.py")
-        self.assertEqual(widget._fix_markdown_nested_lists(""), "")
-        fixed = widget._fix_markdown_nested_lists("  - * item\n1. * numbered")
-        self.assertIn("- item", fixed)
-        self.assertIn("1. numbered", fixed)
-
     def test_clean_bash_output(self):
         widget = ToolCallWidget("shell", "cmd")
         text = (
@@ -657,90 +638,18 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("s", plan_text.plain)
         self.assertIn("done step", plan_text.plain)
 
-    def test_render_content_web_fetch(self):
-        w = self._widget("web_fetch", "error: failed", args={"url": "http://x"})
+    def test_render_content_generic_tool(self):
+        w = self._widget("custom_tool", "output text", args={})
         w.render_content()
+        self.assertTrue(w.content_widget.display)
 
-        w2 = self._widget("web_fetch", "print(1)\nprint(2)", args={"url": "http://x/code.py"})
+        w2 = self._widget("custom_tool", '{"key": "value"}', args={})
         w2.render_content()
+        self.assertTrue(w2.content_widget.display)
 
-        w3 = self._widget("web_fetch", "# Title\n\nbody", args={"url": "http://x/page.md"})
+        w3 = self._widget("custom_tool", "", args={})
         w3.render_content()
-
-        w4 = self._widget("web_fetch", "<html><body>hi</body></html>", args={"url": "http://x/page.html", "raw": True})
-        w4.render_content()
-
-        w5 = self._widget("web_fetch", "", args={"url": "http://x/page.md"})
-        w5.render_content()
-
-    def test_render_content_web_fetch_error_and_empty_code(self):
-        w = self._widget("web_fetch", "Error: could not fetch", args={"url": "http://x/code.py"})
-        with patch.object(w.content_widget, "update") as upd:
-            w.render_content()
-        upd.assert_called_once()
-        self.assertTrue(w.content_widget.display)
-        self.assertFalse(w.md_widget.display)
-
-        w2 = self._widget("web_fetch", "", args={"url": "http://x/code.py", "raw": True})
-        w2.render_content()
-
-        w3 = self._widget("web_fetch", "def f():\n    pass", args={"url": "http://x/code.py", "raw": True})
-        with patch("widgets.chat_toolcall.TransparentSyntax", side_effect=Exception("boom")):
-            w3.render_content()
-
-    def test_render_content_read_error_and_fallback(self):
-        w = self._widget("read", "Error: file missing", args={"path": "nope.py"})
-        with patch.object(w.content_widget, "update") as upd:
-            w.render_content()
-        upd.assert_called_once()
-        self.assertTrue(w.content_widget.display)
-        self.assertFalse(w.md_widget.display)
-
-        w2 = self._widget("read", "", args={"path": "missing_file.py"})
-        w2.render_content()
-
-        w3 = self._widget("read", "def f():\n    return 1", args={"path": "f.py"})
-        with patch("widgets.chat_toolcall.TransparentSyntax", side_effect=Exception("boom")):
-            w3.render_content()
         self.assertTrue(w3.content_widget.display)
-
-    def test_render_content_read_file_exception(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            fpath = os.path.join(tmp, "notes.md")
-            with open(fpath, "w") as f:
-                f.write("## From file\n")
-            w = self._widget("read", "", args={"path": fpath})
-            with patch("builtins.open", side_effect=Exception("boom")):
-                w.render_content()
-
-    def test_render_content_read_branches(self):
-        w = self._widget("read", "Error: cannot read", args={"path": "f.py"})
-        w.render_content()
-
-        w2 = self._widget("read", "# Doc\n\ncontent", args={"path": "doc.md"})
-        w2.render_content()
-
-        w3 = self._widget("read", "def f():\n    return 1", args={"path": "f.py"})
-        w3.render_content()
-
-        w4 = self._widget("read", "", args={})
-        w4.render_content()
-
-        with tempfile.TemporaryDirectory() as tmp:
-            fpath = os.path.join(tmp, "notes.md")
-            with open(fpath, "w") as f:
-                f.write("## From file\n")
-            w5 = self._widget("read", "", args={"path": fpath})
-            w5.render_content()
-
-    def test_render_content_read_file_fallback_from_disk(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            fpath = os.path.join(tmp, "script.py")
-            with open(fpath, "w") as f:
-                f.write("print('disk')\n")
-            w = self._widget("read", "", args={"path": fpath})
-            w.render_content()
-            self.assertTrue(w.content_widget.display)
 
     def test_render_content_shell_branches(self):
         w = self._widget("shell", "some output\nlines")
