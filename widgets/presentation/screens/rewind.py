@@ -29,7 +29,9 @@ class RewindSelection:
     restore_code: bool = True
 
 
-def format_rewind_files(changed_files: list[str], git_stats: str = "", max_show: int = 4) -> Text:
+def format_rewind_files(
+    changed_files: list[str], git_stats: str = "", max_show: int = 4, max_width: int = 0
+) -> Text:
     """Format rewind file list with rich styling without bullet/indent noise."""
     t = Text()
     if not changed_files:
@@ -42,7 +44,8 @@ def format_rewind_files(changed_files: list[str], git_stats: str = "", max_show:
 
     lines: list[tuple[str, str]] = []
     for f in changed_files[:max_show]:
-        lines.append((f"  {f}", "#a1a1aa"))
+        display_f = ellipsize(f, max(15, max_width - 4)) if max_width > 0 else f
+        lines.append((f"  {display_f}", "#a1a1aa"))
 
     if len(changed_files) > max_show:
         rem = len(changed_files) - max_show
@@ -98,26 +101,24 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             from widgets.utils.responsive import MODAL_WIDE_MAX_WIDTH, apply_modal_fit, modal_content_width
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-            if self.step == 1:
-                sample_items = []
-                for msg in self.user_messages:
-                    clean = " ".join(msg.text.replace("\n", " ").replace("\r", " ").split())
-                    badge = msg.git_stats if (self.checkpoints_enabled and msg.git_stats) else ""
-                    if badge:
-                        sample_items.append(f"{clean}   {badge}")
-                    else:
-                        sample_items.append(clean)
-                title = self.title
-                hint = self.hint_text
-            else:
-                sample_items = [
-                    "Rollback conversation & files   revert code",
-                    "Rollback conversation only   keep current code",
-                    "View changes diff   inspect code changes",
-                ]
-                clean_preview = self.selected_entry.text[:40] if self.selected_entry else ""
+            sample_items = []
+            for msg in self.user_messages:
+                clean = " ".join(msg.text.replace("\n", " ").replace("\r", " ").split())
+                badge = msg.git_stats if (self.checkpoints_enabled and msg.git_stats) else ""
+                if badge:
+                    sample_items.append(f"{clean}   {badge}")
+                else:
+                    sample_items.append(clean)
+
+            if self.step == 2 and self.selected_entry:
+                clean_preview = ellipsize(self.selected_entry.text, 65)
                 title = f"### **Rollback: {clean_preview}**"
                 hint = "enter: select • ↑↓: nav • esc: back to messages"
+                if self.selected_entry.changed_files:
+                    sample_items.extend(f"  {f}" for f in self.selected_entry.changed_files[:4])
+            else:
+                title = self.title
+                hint = self.hint_text
 
             content_w = modal_content_width(sample_items, title, hint)
             apply_modal_fit(dialog, content_w, max_width=MODAL_WIDE_MAX_WIDTH)
@@ -140,12 +141,11 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         return options
 
     def _format_step2_options(self, target_width: int) -> list[str]:
-        raw_step2 = [
-            ("Rollback conversation & files", "revert code"),
-            ("Rollback conversation only", "keep current code"),
-            ("View changes diff", "inspect code changes"),
+        return [
+            "Rollback conversation & files [dim #71717a](revert code)[/]",
+            "Rollback conversation only [dim #71717a](keep current code)[/]",
+            "View changes diff [dim #71717a](inspect code changes)[/]",
         ]
-        return [format_badge_row(title, badge, target_width=target_width) for title, badge in raw_step2]
 
     def _refresh_options(self) -> None:
         target_w = self._row_width()
@@ -203,18 +203,12 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         opt_list.focus()
         self._refresh_options()
 
-    def on_resize(self, event: events.Resize) -> None:
-        self._apply_dialog_fit()
-        self._refresh_options()
-
-    def _show_step_2(self, entry: RewindEntry) -> None:
-        self.step = 2
-        self.selected_entry = entry
-
-        clean = " ".join(entry.text.replace("\n", " ").replace("\r", " ").split())
-        if len(clean) > 40:
-            clean = clean[:40] + "..."
-        clean_preview = clean or "(empty message)"
+    def _update_step2_display(self) -> None:
+        if self.step != 2 or not self.selected_entry:
+            return
+        clean = " ".join(self.selected_entry.text.replace("\n", " ").replace("\r", " ").split())
+        target_w = self._row_width()
+        clean_preview = ellipsize(clean, max(12, target_w - 12)) if clean else "(empty message)"
 
         try:
             md = self.query_one(f".{MODAL_MARKDOWN}", Markdown)
@@ -224,17 +218,32 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
 
         try:
             files_widget = self.query_one("#rewind-files", Static)
-            if entry.changed_files:
-                files_widget.update(format_rewind_files(entry.changed_files, entry.git_stats))
+            if self.selected_entry.changed_files:
+                files_widget.update(
+                    format_rewind_files(
+                        self.selected_entry.changed_files,
+                        self.selected_entry.git_stats,
+                        max_width=target_w,
+                    )
+                )
                 files_widget.display = True
             else:
                 files_widget.display = False
         except Exception:
             pass
 
+    def on_resize(self, event: events.Resize) -> None:
+        self._apply_dialog_fit()
+        self._refresh_options()
+        self._update_step2_display()
+
+    def _show_step_2(self, entry: RewindEntry) -> None:
+        self.step = 2
+        self.selected_entry = entry
         self.filtered_items = ["both", "conversation", "diff"]
         self._apply_dialog_fit()
         self._refresh_options()
+        self._update_step2_display()
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
             opt_list.highlighted = 0
@@ -262,9 +271,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
                 diff_items = []
 
         clean = " ".join(entry.text.replace("\n", " ").replace("\r", " ").split())
-        if len(clean) > 30:
-            clean = clean[:30] + "..."
-        clean_preview = clean or "(empty message)"
+        clean_preview = ellipsize(clean, 60) if clean else "(empty message)"
 
         try:
             app = self.app

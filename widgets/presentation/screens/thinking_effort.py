@@ -6,11 +6,17 @@ from widgets.presentation.screens.base_selection import BaseSelectionScreen
 class ThinkingEffortScreen(BaseSelectionScreen[str]):
     def __init__(self, current_effort: str = EFFORT_AUTO):
         current = display_thinking_effort(current_effort)
-        items = [EFFORT_AUTO, "low", "medium", "high"]
+        items_with_hints = [
+            (EFFORT_AUTO, "Auto", "model default"),
+            ("low", "Low", "fast, minimal reasoning"),
+            ("medium", "Medium", "balanced"),
+            ("high", "High", "deep reasoning"),
+        ]
+        items = [item for item, _, _ in items_with_hints]
         options = []
-        for item in items:
+        for item, label, hint in items_with_hints:
             prefix = f"{status_tag('ACTIVE')} " if item == current else "  "
-            options.append(f"{prefix}{item.capitalize()}")
+            options.append(f"{prefix}{label} [dim #71717a]({hint})[/]")
         super().__init__(
             "### **Select Thinking Effort**",
             options,

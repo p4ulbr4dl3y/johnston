@@ -244,7 +244,7 @@ class BaseTasksListScreen(BaseModalScreen[None]):
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
             sample_items = [
-                f"● {t.get('command', '')[:50]}   {t.get('progress_badge', '') or 'running'}"
+                f"● {' '.join(str(t.get('command', '')).split())}   {t.get('progress_badge', '') or 'running'}"
                 for t in self.filtered_tasks
             ]
             content_w = modal_content_width(

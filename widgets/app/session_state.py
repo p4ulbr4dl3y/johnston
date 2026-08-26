@@ -29,7 +29,7 @@ def collect_session_data(app: Any) -> Optional[dict]:
         if isinstance(msg, dict) and msg.get("type") == "user" and is_ui_visible_user_message(msg):
             first_msg = str(msg.get("display_text") or msg.get("text", "")).strip()
             clean = " ".join(first_msg.split())
-            title = clean[:55] + "..." if len(clean) > 55 else clean
+            title = clean
             break
     if not title:
         return None

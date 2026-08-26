@@ -478,19 +478,17 @@ def test_message_count_diff_and_history(store):
 
 
 def test_title_from_messages_edge(store):
-    """Title fallback for empty/no-user-msg sessions is 'Untitled'; long user msg truncated."""
+    """Title fallback for empty/no-user-msg sessions is 'Untitled'; long user msg preserved."""
     sess = store.create_main("t")
     assert sess.title == "Untitled"
     sess.messages = [{"type": "user", "text": "x" * 100}]
-    title = sess.title
-    assert title.endswith("...")
+    assert sess.title == "x" * 100
 
 
 def test_title_from_messages_unicode_surrogate(store):
     sess = store.create_main("tu")
     sess.messages = [{"type": "user", "text": "éäöü😀" * 10}]
-    title = sess.title
-    assert len(title) <= 58
+    assert sess.title == "éäöü😀" * 10
 
 
 def test_search_empty(store):

@@ -22,7 +22,7 @@ from widgets.utils.responsive import (
     modal_content_width,
     resolve_width,
 )
-from widgets.utils.row_format import display_width
+from widgets.utils.row_format import display_width, ellipsize
 
 
 class RejectReasonInput(Input):
@@ -269,9 +269,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
             if self.suggested_pattern:
                 pat_clean = " ".join(self.suggested_pattern.split())
-                if len(pat_clean) > 36:
-                    pat_clean = pat_clean[:33] + "..."
-                pat_escaped = escape(pat_clean)
+                pat_escaped = escape(ellipsize(pat_clean, 56))
                 options.append(f"Allow pattern [dim]({pat_escaped})[/dim]")
                 self._option_keys.append(f"pattern:{self.suggested_pattern}")
 
@@ -301,9 +299,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         ]
         if self.suggested_pattern:
             pat_clean = " ".join(self.suggested_pattern.split())
-            if len(pat_clean) > 36:
-                pat_clean = pat_clean[:33] + "..."
-            options.append(f"Allow pattern ({pat_clean})")
+            options.append(f"Allow pattern ({ellipsize(pat_clean, 56)})")
 
         hint = self._build_hint_text()
         title = "Confirm Tool Action"

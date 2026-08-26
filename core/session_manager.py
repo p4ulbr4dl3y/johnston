@@ -270,13 +270,13 @@ class AgentSession:
         if self.description:
             clean = " ".join(str(self.description).split())
             if clean:
-                return clean[:55] + "..." if len(clean) > 55 else clean
+                return clean
         for m in self.messages:
             if isinstance(m, dict) and m.get("type") == "user":
                 text = str(m.get("display_text") or m.get("text", "")).strip()
                 if text:
                     clean = " ".join(text.split())
-                    return clean[:55] + "..." if len(clean) > 55 else clean
+                    return clean
         return "Untitled"
 
     @property
