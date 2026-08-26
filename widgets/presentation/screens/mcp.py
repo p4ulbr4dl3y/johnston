@@ -74,7 +74,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
             sample_items = [
-                f"{s.get('name', '')}   {s.get('command', '')}   running"
+                f"○ {s.get('name', '')}  (99 tools)"
                 for s in getattr(self, "servers", [])
             ]
             content_w = modal_content_width(
