@@ -90,14 +90,12 @@ def parse_tool_result_step(step: Sequence) -> ToolResultEvent:
 class ToolResult:
     """First-class structured result of a tool execution.
 
-    ``content`` is the string the LLM/UI sees (never raw metadata). Status and
-    error text are kept separate; ``is_error`` is derived from ``status`` so the
-    two can never drift. ``str(result)`` yields ``content`` (or ``""``) so code
-    that expects a string keeps working where that is strategically acceptable,
-    but callers should prefer explicit ``-> ToolResult`` annotations.
+    ``content`` is the XML token-efficient string the LLM sees.
+    ``display`` is the optional human-friendly renderable text for the UI.
     """
 
     content: Optional[str] = None
+    display: Optional[str] = None
     status: ToolResultStatus = ToolResultStatus.DONE
     returncode: Optional[int] = None
 
@@ -106,8 +104,9 @@ class ToolResult:
         return bool(self.status == ToolResultStatus.ERROR)
 
     @classmethod
-    def done(cls, content: str = "", returncode: Optional[int] = None) -> "ToolResult":
-        return cls(content=content or "", status=ToolResultStatus.DONE, returncode=returncode)
+    def done(cls, content: str = "", display: Optional[str] = None, returncode: Optional[int] = None) -> "ToolResult":
+        c = content or ""
+        return cls(content=c, display=display if display is not None else c, status=ToolResultStatus.DONE, returncode=returncode)
 
     @classmethod
     def error(
@@ -116,16 +115,20 @@ class ToolResult:
         detail: str = "",
         name: str = "",
         returncode: Optional[int] = None,
+        display: Optional[str] = None,
     ) -> "ToolResult":
+        formatted = format_tool_error(kind, detail=detail, name=name)
         return cls(
-            content=format_tool_error(kind, detail=detail, name=name),
+            content=formatted,
+            display=display if display is not None else formatted,
             status=ToolResultStatus.ERROR,
             returncode=returncode,
         )
 
     @classmethod
-    def cancelled(cls, content: str = "") -> "ToolResult":
-        return cls(content=content or "", status=ToolResultStatus.CANCELLED, returncode=None)
+    def cancelled(cls, content: str = "", display: Optional[str] = None) -> "ToolResult":
+        c = content or ""
+        return cls(content=c, display=display if display is not None else c, status=ToolResultStatus.CANCELLED, returncode=None)
 
     def __str__(self) -> str:
         return self.content or ""

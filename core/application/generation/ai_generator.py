@@ -392,7 +392,7 @@ async def _handle_interruption(
         partial = (getattr(bot_handle, "content", "") if bot_handle else "").strip()
         if partial:
             agent.history.append({"role": "assistant", "content": partial})
-        agent.history.append({"role": "user", "content": "[System Note: Response interrupted by user]"})
+        agent.history.append({"role": "user", "content": '<system_note type="interrupted">Response interrupted by user</system_note>'})
         try:
             from core.infrastructure.runtime.token_util import estimate_tokens
 

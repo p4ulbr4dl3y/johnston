@@ -8,17 +8,17 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("System prompt test", [], role="worker")
         sys_prompt = builder.build_system_prompt()
         self.assertIn("System prompt test", sys_prompt)
-        self.assertIn("## Environment Metadata", sys_prompt)
-        self.assertIn("- Working Directory:", sys_prompt)
-        self.assertIn("- Current Date:", sys_prompt)
-        self.assertIn("- Operating System:", sys_prompt)
-        self.assertIn("## Execution Mode: WORKER", sys_prompt)
+        self.assertIn("<environment", sys_prompt)
+        self.assertIn('cwd="', sys_prompt)
+        self.assertIn('date="', sys_prompt)
+        self.assertIn('os="', sys_prompt)
+        self.assertIn('<role name="worker"', sys_prompt)
 
     def test_build_system_prompt_explorer_mode(self):
         builder = PromptBuilder("System prompt test", [], role="explorer")
         sys_prompt = builder.build_system_prompt()
-        self.assertIn("## Execution Mode: EXPLORER", sys_prompt)
-        self.assertIn("read-only", sys_prompt)
+        self.assertIn('<role name="explorer"', sys_prompt)
+        self.assertIn("read_only", sys_prompt)
 
     def test_build_tools_explorer_mode_filters_create_edit(self):
         builder = PromptBuilder(
@@ -86,7 +86,7 @@ class TestPromptBuilder(unittest.TestCase):
         prompt_exp = pb_exp.build_system_prompt()
         tools_exp = pb_exp.build_tools()
         exp_tool_names = [t["function"]["name"] for t in tools_exp]
-        self.assertIn("## Execution Mode: EXPLORER", prompt_exp)
+        self.assertIn('<role name="explorer"', prompt_exp)
         self.assertNotIn("create", exp_tool_names)
         self.assertNotIn("edit", exp_tool_names)
         self.assertIn("read", exp_tool_names)
@@ -114,8 +114,8 @@ class TestPromptBuilder(unittest.TestCase):
         # the stable prefix is prompt-cacheable across turns.
         builder = PromptBuilder("Base instructions marker", [], role="worker")
         prompt = builder.build_system_prompt()
-        self.assertLess(prompt.index("Base instructions marker"), prompt.index("## Environment Metadata"))
-        self.assertLess(prompt.index("## Execution Mode: WORKER"), prompt.index("## Environment Metadata"))
+        self.assertLess(prompt.index("Base instructions marker"), prompt.index("<environment"))
+        self.assertLess(prompt.index('<role name="worker"'), prompt.index("<environment"))
 
     def test_build_system_prompt_substitutes_model_name(self):
         builder = PromptBuilder(
@@ -133,9 +133,9 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("Subagent base prompt", [], role="orchestrator", is_subagent=True)
         prompt = builder.build_system_prompt()
         self.assertIn("Subagent base prompt", prompt)
-        self.assertNotIn("## Execution Mode: ORCHESTRATOR", prompt)
-        self.assertNotIn("## Subagents (use as `subagent_type`", prompt)
-        self.assertIn("## Environment Metadata", prompt)
+        self.assertNotIn('<role name="orchestrator"', prompt)
+        self.assertNotIn("<subagents>", prompt)
+        self.assertIn("<environment", prompt)
 
     def test_build_tools_subagent_hardens_shell(self):
         from tools.shell import ShellTool
@@ -151,13 +151,12 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_sandbox_active(self):
         builder = PromptBuilder("Test", [], role="worker", sandbox_enabled=True)
         prompt = builder.build_system_prompt()
-        self.assertIn("- Sandbox: active", prompt)
-        self.assertIn("workspace & /tmp only", prompt)
+        self.assertIn('sandbox="active"', prompt)
 
     def test_build_system_prompt_sandbox_disabled(self):
         builder = PromptBuilder("Test", [], role="worker", sandbox_enabled=False)
         prompt = builder.build_system_prompt()
-        self.assertNotIn("- Sandbox: active", prompt)
+        self.assertNotIn('sandbox="active"', prompt)
 
 
 if __name__ == "__main__":

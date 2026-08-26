@@ -44,7 +44,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         # Test Create
         res_create = await execute_tool("create", {"path": file_path, "content": "hello world"})
-        self.assertIn("file", res_create.content)
+        self.assertIn("created", res_create.content)
         self.assertTrue(os.path.exists(file_path))
 
         # Test Read
@@ -76,9 +76,10 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3\nline4"})
 
         res_read = await execute_tool("read", {"path": file_path, "start_line": 2, "end_line": 3})
-        self.assertIn("Lines 2-3", res_read.content)
-        self.assertIn("2 | line2", res_read.content)
-        self.assertIn("3 | line3", res_read.content)
+        self.assertIn('start="2"', res_read.content)
+        self.assertIn('end="3"', res_read.content)
+        self.assertIn("2|line2", res_read.content)
+        self.assertIn("3|line3", res_read.content)
         self.assertNotIn("line1", res_read.content)
 
     async def test_edit_missing_text(self):
@@ -102,7 +103,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_shell_tool_sync(self):
         # Sync shell execution
         res_shell = await execute_tool("shell", {"command": "echo 'hello shell'"})
-        self.assertEqual(res_shell.content.strip(), "hello shell")
+        self.assertIn("hello shell", res_shell.content)
+        self.assertIn("<cmd exit=", res_shell.content)
 
     async def test_manage_shell_tool(self):
         class DummyApp:
@@ -113,7 +115,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)
-        self.assertIn("no tasks active", res_list.content)
+        self.assertEqual(res_list.content, "<tasks/>")
 
     async def test_task_tool_foreground(self):
         import tempfile
@@ -145,7 +147,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res = await execute_tool(
             "invoke_subagent", {"prompt": "do research", "title": "research task", "branch": "main"}, app=app
         )
-        self.assertIn("subagent 'research task' launched", res.content)
+        self.assertIn("<subagent", res.content)
+        self.assertIn('role="worker"', res.content)
 
     async def test_task_tool_background(self):
         import tempfile
@@ -189,7 +192,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             {"prompt": "bg task", "title": "bg job", "branch": "main"},
             app=app,
         )
-        self.assertIn("subagent 'bg job' launched", res.content)
+        self.assertIn("<subagent", res.content)
+        self.assertIn('role="worker"', res.content)
         sessions = _store.list(kind="subagent")
         self.assertEqual(len(sessions), 1)
         self.assertEqual(sessions[0].description, "bg job")

@@ -494,8 +494,12 @@ async def test_call_tool_async_no_match_returns_none():
 
 def test_system_prompt_snippet_skips_nameless_tool():
     m = make_manager()
-    m.get_cached_tools = lambda: [{"function": {"name": None}, "_mcp_server": "s"}, {"x": 1}]
-    assert m.get_system_prompt_snippet() == "## MCP Tools"
+    m.get_cached_tools = lambda: [
+        {"function": {"name": None}, "_mcp_server": "s"},
+        {"x": 1},
+        {"function": {"name": "f1"}, "_mcp_server": "s"},
+    ]
+    assert m.get_system_prompt_snippet() == '<mcp_servers>\n  <server name="s" tools="f1"/>\n</mcp_servers>'
 
 
 if __name__ == "__main__":

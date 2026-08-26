@@ -273,7 +273,7 @@ class ErrorHandlingMixin:
                         if isinstance(item, dict) and item.get("type") == "text" and item.get("text")
                     ]
                     clean_text = "\n".join(text_parts).strip()
-                    note = "[Note: User attached image(s), but this model does not support vision.]"
+                    note = '<system_note type="warning">User attached image(s), but this model does not support vision.</system_note>'
                     combined_text = f"{clean_text}\n{note}".strip() if clean_text else note
                     sanitized.append({"role": "user", "content": combined_text})
                     continue
@@ -285,7 +285,7 @@ class ErrorHandlingMixin:
                 if parsed_img:
                     is_img = True
                     img_path = parsed_img.get("path", "image")
-                elif isinstance(content, str) and ('"type": "image"' in content or "[Image file:" in content):
+                elif isinstance(content, str) and ('"type": "image"' in content or "<image " in content or "[Image file:" in content):
                     is_img = True
                     path_match = re.search(r"['\"]path['\"]\s*:\s*['\"]([^'\"]+)['\"]", content)
                     if path_match:
@@ -294,7 +294,7 @@ class ErrorHandlingMixin:
                 if is_img:
                     msg_copy = dict(msg)
                     msg_copy["content"] = (
-                        f"ERR: cannot read image '{img_path}' [Hint: You do not support vision. Tell user you cannot view images. Do not retry.]"
+                        f'<error type="vision_unsupported" file="{img_path}">You do not support vision. Tell user you cannot view images. Do not retry.</error>'
                     )
                     sanitized.append(msg_copy)
                     continue

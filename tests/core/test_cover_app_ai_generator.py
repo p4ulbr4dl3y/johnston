@@ -328,7 +328,7 @@ async def test_interruption_appends_partial_and_handles_callbacks():
         await generate_ai_response(agent, _fake_session(), canvas, session_id="s1", user_text="hi")
     # Partial assistant reply + interruption note recorded.
     assert any(m.get("content") == "partial reply" for m in agent.history if m.get("role") == "assistant")
-    assert any("[System Note: Response interrupted by user]" in m.get("content", "") for m in agent.history)
+    assert any('<system_note type="interrupted">' in m.get("content", "") for m in agent.history)
 
 
 async def stream_agent():

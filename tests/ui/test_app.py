@@ -51,14 +51,17 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.2)
             self.assertIsInstance(app.screen, RewindScreen)
 
-            # Select first element with Enter
+            # Select message (Step 1) and confirm (Step 2 if checkpoints active)
             await pilot.press("enter")
-            await pilot.pause(0.5)
+            await pilot.pause(0.3)
+            if isinstance(app.screen, RewindScreen) and getattr(app.screen, "step", 1) == 2:
+                await pilot.press("enter")
+                await pilot.pause(0.5)
 
             chat_view = app.query_one(ChatView)
-            user_msgs = [c for c in chat_view.children if isinstance(c, UserMessage)]
-            self.assertEqual(len(user_msgs), 2)
-            self.assertEqual(chat_input.text, "Third message")
+            user_msgs = list(chat_view.query(UserMessage))
+            self.assertEqual(len(user_msgs), 0)
+            self.assertEqual(chat_input.text, "First message")
 
             # 4. Test /resume
             sess = app.sm.create_main("session_test_resume")

@@ -204,12 +204,12 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
 
         # Close match hint
         res_match = str(await tool.execute({"path": os.path.join(parent_dir, "applc.txt")}))
-        self.assertIn("Did you mean one of these in", res_match)
+        self.assertIn("did you mean:", res_match)
         self.assertIn("apple.txt", res_match)
 
         # No match hint (fallback sample files list)
         res_sample = str(await tool.execute({"path": os.path.join(parent_dir, "1234567890")}))
-        self.assertIn("Files available in", res_sample)
+        self.assertIn("available files:", res_sample)
         self.assertIn("apple.txt", res_sample)
 
     async def test_read_empty_directory(self):
@@ -217,8 +217,8 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         empty_dir = os.path.join(self.test_dir, "empty_dir")
         os.makedirs(empty_dir, exist_ok=True)
 
-        res = str(await tool.execute({"path": empty_dir}))
-        self.assertIn("(empty directory)", res)
+        res = await tool.execute({"path": empty_dir})
+        self.assertIn('total="0"', res.content)
 
     async def test_read_directory_with_subdirs(self):
         tool = ReadTool()
@@ -322,18 +322,20 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "wb") as f:
             f.write(b"%PDF-1.4 dummy")
 
-        res = str(await tool.execute({"path": file_path}))
+        res = await tool.execute({"path": file_path})
 
-        self.assertIn("Full converted Markdown saved to", res)
-        self.assertIn(".md", res)
-        self.assertIn("Use shell (grep/tail) to inspect", res)
+        self.assertIn("converted_log=", res.content)
+        self.assertIn(".md", res.content)
 
         import asyncio
+        import re
 
         await asyncio.sleep(0.05)
 
         # Extract path and verify file exists on disk
-        saved_path = [w for w in res.split() if w.endswith(".md") or ".md." in w][0].rstrip(".").rstrip("]")
+        m = re.search(r'converted_log="([^"]+)"', res.content)
+        self.assertIsNotNone(m)
+        saved_path = m.group(1)
         self.assertTrue(os.path.exists(saved_path))
         with open(saved_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), long_md)

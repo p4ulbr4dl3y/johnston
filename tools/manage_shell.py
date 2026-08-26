@@ -47,7 +47,16 @@ class ManageShellTool(BaseTool):
         tasks = filter_to_session(tasks, curr_sid)
 
         if action == "list":
-            return ToolResult.done(list_lines(tasks))
+            if not tasks:
+                xml_content = "<tasks/>"
+            else:
+                task_xmls = []
+                for t in tasks:
+                    st = "running" if getattr(t, "is_running", True) else "finished"
+                    cmd_escaped = str(getattr(t, "command", "")).replace('"', "&quot;")
+                    task_xmls.append(f'<task id="{t.task_id}" status="{st}" cmd="{cmd_escaped}"/>')
+                xml_content = "<tasks>\n" + "\n".join(task_xmls) + "\n</tasks>"
+            return ToolResult.done(content=xml_content, display=list_lines(tasks))
 
         if action == "send_input":
             if not task_id:
@@ -63,7 +72,9 @@ class ManageShellTool(BaseTool):
             if not getattr(t, "is_running", False):
                 return ToolResult.error("notrunning", name=task_id)
             if hasattr(t, "send_input"):
-                return ToolResult.done(await t.send_input(input_text))
+                res = await t.send_input(input_text)
+                xml_content = f'<stdin_sent id="{task_id}" bytes="{len(input_text)}"/>'
+                return ToolResult.done(content=xml_content, display=res)
             return ToolResult.error("nowrite", name=task_id, detail="stdin not writable")
 
         elif action == "kill":
@@ -83,7 +94,8 @@ class ManageShellTool(BaseTool):
                     elif getattr(t, "process", None) and t.process.returncode is None:
                         t.process.kill()
                     ctx.refresh_status()
-                    return ToolResult.done(f"{task_id} killed")
+                    xml_content = f'<killed id="{task_id}"/>'
+                    return ToolResult.done(content=xml_content, display=f"{task_id} killed")
                 except Exception as e:
                     return ToolResult.error("kill", detail=str(e), name=task_id)
             return ToolResult.error("notrunning", name=task_id)

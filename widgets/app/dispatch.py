@@ -47,9 +47,12 @@ def _load_skill_blocks(loaded_skills) -> list[str]:
                 content = ""
         from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
 
+        escaped_name = escape_xml_attr(s.name or "")
         escaped_loc = escape_xml_attr(s.location or "")
         escaped_content = escape_xml(content)
-        blocks.append(f'<skill path="{escaped_loc}">\n{escaped_content}\n</skill>')
+        blocks.append(
+            f'<active_skill name="{escaped_name}" path="{escaped_loc}">\n{escaped_content}\n</active_skill>'
+        )
     return blocks
 
 
@@ -117,13 +120,16 @@ async def handle_slash_command(app, command_text: str) -> bool:
         loaded_skills = []
 
     if loaded_skills:
+        from core.infrastructure.runtime.xml_utils import escape_xml
+
         skill_blocks = await asyncio.to_thread(_load_skill_blocks, loaded_skills)
         skills_content = "\n\n".join(skill_blocks)
         user_request = " ".join(other_words).strip()
         if user_request:
-            prompt = f"The following skill(s) have been invoked:\n\n{skills_content}\n\nUser request: {user_request}"
+            escaped_user = escape_xml(user_request)
+            prompt = f"{skills_content}\n\n<user_request>\n{escaped_user}\n</user_request>"
         else:
-            prompt = f"The following skill(s) have been invoked:\n\n{skills_content}"
+            prompt = skills_content
 
         app.trigger_ai_response(prompt, show_in_ui=True, display_text=command_text)
         return True

@@ -395,12 +395,23 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
         sanitized_history = await sanitize_history_cached(self, self.history)
         if attachments:
-            text_parts = [user_text] if user_text else []
+            from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
+
+            img_tags = []
             for att in attachments:
                 att_path = getattr(att, "path", str(att))
-                if att_path and f"[Image file: '{att_path}']" not in user_text and f"@{att_path}" not in user_text:
-                    text_parts.append(f"[Image file: '{att_path}']")
-            text_content = "\n".join(text_parts) if text_parts else "What is in this image?"
+                if att_path:
+                    escaped_p = escape_xml_attr(att_path)
+                    img_tags.append(f'  <image path="{escaped_p}"/>')
+
+            xml_parts = []
+            if img_tags:
+                xml_parts.append("<attached_media>\n" + "\n".join(img_tags) + "\n</attached_media>")
+            if user_text:
+                escaped_user = escape_xml(user_text)
+                xml_parts.append(f"<user_request>\n{escaped_user}\n</user_request>")
+
+            text_content = "\n\n".join(xml_parts) if xml_parts else "What is in this image?"
             user_content: List[Dict[str, Any]] = [{"type": "text", "text": text_content}]
             for att in attachments:
                 att_path = getattr(att, "path", str(att))
@@ -866,7 +877,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     if parsed_img is not None and parsed_img.get("type") == "image":
                         display_result = parsed_img.get("summary", f"[Image file: {parsed_img.get('path')}]")
                     elif isinstance(tool_result, ToolResult):
-                        display_result = resolved.content or ""
+                        display_result = resolved.display if resolved.display is not None else (resolved.content or "")
 
                     yield (
                         "tool_result",

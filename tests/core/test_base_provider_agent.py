@@ -524,7 +524,10 @@ class TestAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         user_content = messages[1]["content"]
         self.assertEqual(
             user_content[0],
-            {"type": "text", "text": "Look\n[Image file: 'a.png']\n[Image file: 'bad.png']"},
+            {
+                "type": "text",
+                "text": "<attached_media>\n  <image path=\"a.png\"/>\n  <image path=\"bad.png\"/>\n</attached_media>\n\n<user_request>\nLook\n</user_request>",
+            },
         )
         self.assertEqual(
             user_content[1],
@@ -545,7 +548,10 @@ class TestAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
 
         messages = mock_create.call_args.kwargs["messages"]
         user_content = messages[1]["content"]
-        self.assertEqual(user_content[0], {"type": "text", "text": "[Image file: 'clip.png']"})
+        self.assertEqual(
+            user_content[0],
+            {"type": "text", "text": "<attached_media>\n  <image path=\"clip.png\"/>\n</attached_media>"},
+        )
         self.assertEqual(
             user_content[1],
             {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUFB", "detail": "high"}},

@@ -243,7 +243,7 @@ def test_build_system_prompt_empty_string_base():
     b = PromptBuilder("", [], role="worker")
     out = b.build_system_prompt()
     assert isinstance(out, str)
-    assert "## Environment Metadata" in out
+    assert "<environment" in out
 
 
 def test_build_system_prompt_unicode_emoji_allowed():
@@ -278,7 +278,7 @@ def test_build_system_prompt_whitespace_model_name_falls_back():
 def test_build_system_prompt_environment_metadata_last():
     b = PromptBuilder("STABLE_PREFIX", [], role="worker")
     out = b.build_system_prompt()
-    assert out.rindex("STABLE_PREFIX") < out.index("## Environment Metadata")
+    assert out.rindex("STABLE_PREFIX") < out.index("<environment")
 
 
 def test_build_system_prompt_deterministic_same_run():
@@ -290,7 +290,7 @@ def test_build_system_prompt_deterministic_same_run():
 def test_build_system_prompt_subagent_no_role_prompt_injected():
     b = PromptBuilder("Base", [], role="orchestrator", is_subagent=True)
     out = b.build_system_prompt()
-    assert "## Execution Mode: ORCHESTRATOR" not in out
+    assert '<role name="orchestrator"' not in out
 
 
 # ---------------------------------------------------------------------------

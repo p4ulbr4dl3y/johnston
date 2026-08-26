@@ -61,8 +61,9 @@ def _app(make_app_mock, tasks=None, session_id=None):
 
 async def test_list_no_tasks(tool, make_app_mock):
     app = _app(make_app_mock, tasks=[])
-    res = str(await tool.execute({"action": "list"}, ctx=app))
-    assert "no tasks active" in res
+    res = await tool.execute({"action": "list"}, ctx=app)
+    assert res.content == "<tasks/>"
+    assert "no tasks active" in res.display
 
 
 async def test_list_scoped_to_current_session(tool, make_app_mock):
@@ -80,12 +81,12 @@ async def test_list_with_tasks(tool, make_app_mock):
     t1 = _make_task("t1", "echo hello", proc=MagicMock())
     t2 = _make_task("t2", "ls -la", status=TaskStatus.COMPLETED)
     app = _app(make_app_mock, [t1, t2])
-    res = str(await tool.execute({"action": "list"}, ctx=app))
-    assert "Active Background Tasks" in res
-    assert "t1" in res
-    assert "RUNNING" in res
-    assert "t2" in res
-    assert "FINISHED" in res
+    res = await tool.execute({"action": "list"}, ctx=app)
+    assert "Active Background Tasks" in res.display
+    assert "t1" in res.content
+    assert "running" in res.content
+    assert "t2" in res.content
+    assert "finished" in res.content
 
 
 async def test_list_many_tasks_preserves_input_order(tool, make_app_mock):
@@ -113,9 +114,9 @@ async def test_background_task_already_finished_is_excluded_from_list(tool, make
     app = _app(make_app_mock, [t1, t2], session_id="s1")
     # Race: t1 finishes right before manage runs.
     t1.status = TaskStatus.COMPLETED
-    res = str(await tool.execute({"action": "list"}, ctx=app))
-    assert "tbkg" in res  # still listed as FINISHED (no crash)
-    assert "FINISHED" in res
+    res = await tool.execute({"action": "list"}, ctx=app)
+    assert "tbkg" in res.content
+    assert "finished" in res.content
 
 
 async def test_no_task_manager_no_app(tool):
@@ -153,8 +154,9 @@ async def test_kill_running_task(tool, make_app_mock):
 
     t.kill = _fake_kill
     app = _app(make_app_mock, [t])
-    res = str(await tool.execute({"action": "kill", "task_id": "t-kill"}, ctx=app))
-    assert "t-kill killed" in res
+    res = await tool.execute({"action": "kill", "task_id": "t-kill"}, ctx=app)
+    assert "t-kill" in res.content
+    assert "killed" in res.content
     assert not t.is_running
 
 
@@ -234,10 +236,10 @@ async def test_manage_shell_send_input(tool, make_app_mock):
     t = _make_task("task_interactive", "read name", proc=mock_proc, session_id="s1")
     app = _app(make_app_mock, [t], session_id="s1")
 
-    res = str(await tool.execute(
+    res = await tool.execute(
         {"action": "send_input", "task_id": "task_interactive", "input": "John Doe"}, ctx=app
-    ))
-    assert "OK: input sent to task_interactive" in res
+    )
+    assert "stdin_sent" in res.content
     mock_stdin.write.assert_called_once_with(b"John Doe\n")
 
 
@@ -259,8 +261,8 @@ async def test_send_input_empty_input_still_writes_newline(tool, make_app_mock):
     proc.stdin = mock_stdin
     t = _make_task("tsempty", "read name", proc=proc, session_id="s1")
     app = _app(make_app_mock, [t], session_id="s1")
-    res = str(await tool.execute({"action": "send_input", "task_id": "tsempty", "input": ""}, ctx=app))
-    assert "OK: input sent" in res
+    res = await tool.execute({"action": "send_input", "task_id": "tsempty", "input": ""}, ctx=app)
+    assert "stdin_sent" in res.content
     mock_stdin.write.assert_called_once_with(b"\n")
 
 
@@ -274,8 +276,8 @@ async def test_send_input_task_without_stdin(tool, make_app_mock):
 
     t.send_input = _send
     app = _app(make_app_mock, [t], session_id="s1")
-    res = str(await tool.execute({"action": "send_input", "task_id": "tsnoproc", "input": "x"}, ctx=app))
-    assert res == "HANDLED"
+    res = await tool.execute({"action": "send_input", "task_id": "tsnoproc", "input": "x"}, ctx=app)
+    assert res.display == "HANDLED"
 
 
 # --------------------------------------------------------------------------- #

@@ -251,7 +251,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         res = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0]["role"], "user")
-        self.assertIn("[Note: User attached image(s), but this model does not support vision.]", res[0]["content"])
+        self.assertIn('<system_note type="warning">', res[0]["content"])
 
     def test_sanitize_user_text_and_image_preserves_text(self):
         messages = [
@@ -267,7 +267,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0]["role"], "user")
         self.assertIn("What is in this image?", res[0]["content"])
-        self.assertIn("[Note: User attached image(s), but this model does not support vision.]", res[0]["content"])
+        self.assertIn('<system_note type="warning">', res[0]["content"])
 
     def test_sanitize_user_without_image_kept(self):
         messages = [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
@@ -278,7 +278,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         result = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(
             result[0]["content"],
-            "ERR: cannot read image '/tmp/a.png' [Hint: You do not support vision. Tell user you cannot view images. Do not retry.]",
+            '<error type="vision_unsupported" file="/tmp/a.png">You do not support vision. Tell user you cannot view images. Do not retry.</error>',
         )
 
     def test_sanitize_tool_image_dict_default_path(self):
@@ -286,7 +286,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         result = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(
             result[0]["content"],
-            "ERR: cannot read image 'image' [Hint: You do not support vision. Tell user you cannot view images. Do not retry.]",
+            '<error type="vision_unsupported" file="image">You do not support vision. Tell user you cannot view images. Do not retry.</error>',
         )
 
     def test_sanitize_tool_image_str_with_path(self):
@@ -294,7 +294,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         result = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(
             result[0]["content"],
-            "ERR: cannot read image '/tmp/img.png' [Hint: You do not support vision. Tell user you cannot view images. Do not retry.]",
+            '<error type="vision_unsupported" file="/tmp/img.png">You do not support vision. Tell user you cannot view images. Do not retry.</error>',
         )
 
     def test_sanitize_tool_image_str_without_path(self):
@@ -302,7 +302,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         result = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(
             result[0]["content"],
-            "ERR: cannot read image 'image' [Hint: You do not support vision. Tell user you cannot view images. Do not retry.]",
+            '<error type="vision_unsupported" file="image">You do not support vision. Tell user you cannot view images. Do not retry.</error>',
         )
 
     def test_sanitize_tool_plain_content_kept(self):

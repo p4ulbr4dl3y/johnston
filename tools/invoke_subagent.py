@@ -205,9 +205,8 @@ class InvokeSubagentTool(BaseTool):
         from tools.base import format_background_notification
 
         notification_hdr = format_background_notification(
-            "Background subagent", title, session_id, "{result_text}"
+            "subagent", title, session_id, "{result_text}"
         )
-        notification_ftr = f"[Hint: If details are missing or follow-up is needed, send a message via `manage_subagent(action='send_message', session_id='{session_id}', message='...')`.]"
 
         bg_task = asyncio.create_task(
             run_subagent_stream_bg(
@@ -218,7 +217,7 @@ class InvokeSubagentTool(BaseTool):
                 store,
                 cleanup_fn=cleanup_fn,
                 error_prefix="Subagent error",
-                notification_template=f"{notification_hdr}\n{notification_ftr}",
+                notification_template=notification_hdr,
                 session_id=session_id,
                 truncate_result=True,
             )
@@ -226,11 +225,11 @@ class InvokeSubagentTool(BaseTool):
         session.async_task = bg_task
         ctx.refresh_status()
 
-        # Launching is asynchronous: the subagent session is now running in the
-        # background, so the ToolResult carries RUNNING status. The presentation
-        # reads this structured status (yellow card) instead of guessing from the
-        # text. The completion callback later repaints it to DONE/ERROR/CANCELLED.
+        branch_attr = f' branch="{branch_name}"' if branch_name else ""
+        xml_content = f'<subagent id="{session_id}" role="{canonical_role}"{branch_attr} status="running"/>'
+        disp_content = f"subagent '{title}' launched (session_id: {session_id})"
         return ToolResult(
             status=ToolResultStatus.RUNNING,
-            content=f"subagent '{title}' launched (session_id: {session_id})",
+            content=xml_content,
+            display=disp_content,
         )

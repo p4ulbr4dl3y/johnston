@@ -10,40 +10,27 @@ from typing import Any, List
 
 
 def format_skills_markdown(skills: List[Any]) -> str:
-    """Build the ``## Skills`` block for the system prompt from skill objects.
+    """Build the ``<skills>`` block for the system prompt from skill objects.
 
     ``skills`` are structured ``Skill`` objects (name/description/scope attrs);
     accepts any object exposing those attributes so the infrastructure formatter
     stays decoupled from the application layer. Returns ``""`` when there are no
-    skills. Produces the exact Markdown shape previously emitted by the
-    SkillManager.
+    skills.
     """
     if not skills:
         return ""
 
-    global_skills = []
-    project_skills = []
+    from core.infrastructure.runtime.xml_utils import escape_xml_attr
 
+    skills_xml = []
     for s in skills:
-        desc = f": {s.description}" if s.description else ""
-        line = f"- `{s.name}`{desc}"
         scope_val = getattr(s.scope, "value", s.scope)
-        if scope_val == "project":
-            project_skills.append(line)
-        else:
-            global_skills.append(line)
+        attrs = [f'name="{escape_xml_attr(s.name)}"', f'scope="{escape_xml_attr(str(scope_val))}"']
+        if s.description:
+            attrs.append(f'desc="{escape_xml_attr(s.description)}"')
+        skills_xml.append(f"  <skill {' '.join(attrs)}/>")
 
-    lines = ["## Skills (read SKILL.md on user request or trigger)"]
-
-    if global_skills:
-        lines.append("\n### Global (`~/.johnston/skills/<name>/SKILL.md`)")
-        lines.extend(global_skills)
-
-    if project_skills:
-        lines.append("\n### Project (`.johnston/skills/<name>/SKILL.md`)")
-        lines.extend(project_skills)
-
-    return "\n".join(lines)
+    return "<skills>\n" + "\n".join(skills_xml) + "\n</skills>"
 
 
 def format_rules_markdown(rules: List[Any]) -> str:

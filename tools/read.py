@@ -313,10 +313,10 @@ class ReadTool(BaseTool):
                     entries = [e for e in os.listdir(parent_dir) if not e.startswith(".")]
                     matches = get_fuzzy_matches(filename, entries, n=3, cutoff=0.4)
                     if matches:
-                        hint = f" [Hint: Did you mean one of these in '{parent_dir}': {', '.join(matches)}?]"
+                        hint = f" (did you mean: {', '.join(matches)})"
                     elif entries:
                         sample = sorted(entries)[:5]
-                        hint = f" [Hint: Files available in '{parent_dir}': {', '.join(sample)}]"
+                        hint = f" (available files: {', '.join(sample)})"
                 return ToolResult.error("file", detail="not found" + hint, name=path)
 
             if os.path.isdir(path):
@@ -343,8 +343,19 @@ class ReadTool(BaseTool):
                     else:
                         content = "\n".join(formatted) if formatted else "(empty directory)"
 
+                    xml_entries = [f"<d>{e}</d>" for e in dirs] + [f"<f>{e}</f>" for e in files]
+                    if len(xml_entries) > MAX_DIR_ENTRIES:
+                        xml_body = "\n".join(xml_entries[:MAX_DIR_ENTRIES])
+                        xml_content = f'<dir path="{path}" total="{total_count}" truncated="1">\n{xml_body}\n</dir>'
+                    elif xml_entries:
+                        xml_body = "\n".join(xml_entries)
+                        xml_content = f'<dir path="{path}" total="{total_count}">\n{xml_body}\n</dir>'
+                    else:
+                        xml_content = f'<dir path="{path}" total="0"/>'
+
                     return ToolResult.done(
-                        f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}"
+                        content=xml_content,
+                        display=f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}",
                     )
                 except Exception as e:
                     return ToolResult.error("listing", detail=str(e), name=path)
@@ -377,7 +388,12 @@ class ReadTool(BaseTool):
             try:
                 detail_arg = args.get("detail")
                 image_json = await run_cancellable(process_image_file_sync, path, detail_arg)
-                return ToolResult.done(image_json)
+                import json
+                try:
+                    summary = json.loads(image_json).get("summary")
+                except Exception:
+                    summary = None
+                return ToolResult.done(content=image_json, display=summary)
             except Exception as e:
                 return ToolResult.error("image", detail=str(e), name=path)
 
@@ -450,15 +466,13 @@ class ReadTool(BaseTool):
         else:
             window_lines, total_lines, window_start = lines, None, None
 
-        return ToolResult.done(
-            format_line_pagination(
-                window_lines,
-                start_line=start_line,
-                end_line=end_line,
-                total_lines=total_lines,
-                window_start=window_start,
-                max_chars=100000,
-                path=path,
-                converted_path=converted_path,
-            )
+        return format_line_pagination(
+            window_lines,
+            start_line=start_line,
+            end_line=end_line,
+            total_lines=total_lines,
+            window_start=window_start,
+            max_chars=100000,
+            path=path,
+            converted_path=converted_path,
         )

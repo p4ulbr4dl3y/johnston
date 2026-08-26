@@ -106,7 +106,7 @@ async def test_compact_if_needed_failure_branch():
 
 # --- compact_history summarizer paths --------------------------------------
 
-_SUMMARY = "## Objective\n- done\n\n## Next Move\n1. proceed"
+_SUMMARY = "<objective>done</objective><next_steps>proceed</next_steps>"
 
 
 @pytest.mark.asyncio

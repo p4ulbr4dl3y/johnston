@@ -46,10 +46,11 @@ def _clean_truncation_marker(match: re.Match) -> str:
 
 
 def _format_truncation_for_ui(text: str) -> str:
-    """Format [Output truncated...] banners and strip [Hint:...] for UI display."""
-    if not text or "[" not in text:
-        return (text or "").strip()
-    cleaned = re.sub(r"\s*\[Hint:[\s\S]*$", "", text)
+    """Format truncation banners and strip hints for UI display."""
+    if not text:
+        return ""
+    cleaned = re.sub(r"\s*<hint[\s\S]*?</hint>", "", text)
+    cleaned = re.sub(r"\s*\[Hint:[\s\S]*$", "", cleaned)
     cleaned = re.sub(r"\s*\[Hint:[^\]]+\]", "", cleaned)
     return re.sub(
         r"(\.\.\.\s*)?\[Output truncated([^\]]*)\]",

@@ -1,5 +1,5 @@
 
-from core.domain.defaults.errors import format_tool_error
+from core.domain.defaults.errors import ToolResult
 from tools.base import try_int
 
 DEFAULT_LINE_WINDOW = 800
@@ -19,7 +19,6 @@ def truncate_leading(text: str, max_chars: int) -> tuple[str, int]:
     return truncated, shown_lines
 
 
-
 def format_line_pagination(
     lines: list[str],
     start_line: int | None = None,
@@ -29,24 +28,20 @@ def format_line_pagination(
     total_lines: int | None = None,
     window_start: int | None = None,
     converted_path: str | None = None,
-) -> str:
-    """Formats lines with 1-based line numbers and paginates by start_line/end_line range.
+) -> ToolResult:
+    """Formats lines with token-efficient XML for LLM and human-friendly display for UI.
 
     Enforces a default max window of 800 lines per call and stops at clean line boundaries
     before exceeding max_chars.
-
-    `total_lines` may be supplied when `lines` is only a window of a larger file (e.g. a
-    partial read) so the ran/pagination header and boundary hints stay accurate.
-    `window_start` is the 1-based line number of `lines[0]` when `lines` does not begin at
-    line 1 (partial read); content is then indexed as `lines[i - window_start]`.
     """
     total_lines = total_lines if total_lines is not None else len(lines)
     window_start = window_start if window_start is not None else 1
-    # When a window is passed, line content still begins at `window_start`, and we can
-    # only format the lines we actually have. Keep the existing 800-line cap too.
     effective_window = min(len(lines), DEFAULT_LINE_WINDOW)
     if total_lines == 0:
-        return f"=== 0 lines in {path} ===" if path else "=== 0 lines ==="
+        p_attr = f' path="{path}"' if path else ""
+        xml = f"<file{p_attr} lines=\"0\" total=\"0\"/>"
+        disp = f"=== 0 lines in {path} ===" if path else "=== 0 lines ==="
+        return ToolResult.done(content=xml, display=disp)
 
     if start_line is not None:
         start_line_int = try_int(start_line)
@@ -56,12 +51,11 @@ def format_line_pagination(
                 hint_str = "File has only 1 total line (e.g. minified JSON/log). Use start_line=1 and content_offset, or shell tools (jq/grep)."
             else:
                 hint_str = f"File has {total_lines} total lines. Use start_line=1..{total_lines}."
-            return format_tool_error(
-                "range",
+            err_msg = (
                 f"start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
-                f"[Hint: {hint_str}]",
-                name="read",
+                f"[Hint: {hint_str}]"
             )
+            return ToolResult.error("range", detail=err_msg, name="read")
         start_line = start_line_int
 
     if end_line is not None:
@@ -77,27 +71,44 @@ def format_line_pagination(
     else:
         end = min(total_lines, start + effective_window - 1)
 
-    output = []
+    xml_lines = []
+    disp_lines = []
     current_len = 0
     actual_end = start - 1
+    is_truncated = False
 
     for i in range(start, end + 1):
         idx = i - window_start
         if idx < 0 or idx >= len(lines):
             break
-        formatted_line = f"{i:5d} | {lines[idx]}"
-        added_len = len(formatted_line) + (1 if output else 0)
+        raw_ln = lines[idx]
+        formatted_xml = f"{i}|{raw_ln}"
+        formatted_disp = f"{i:5d} | {raw_ln}"
+        added_len = len(formatted_xml) + (1 if xml_lines else 0)
         if current_len + added_len > max_chars:
-            if not output:
-                output.append(formatted_line[:max_chars])
+            if not xml_lines:
+                xml_lines.append(formatted_xml[:max_chars])
+                disp_lines.append(formatted_disp[:max_chars])
                 actual_end = i
+            is_truncated = True
             break
-        output.append(formatted_line)
+        xml_lines.append(formatted_xml)
+        disp_lines.append(formatted_disp)
         current_len += added_len
         actual_end = i
 
-    result_body = "\n".join(output)
+    attrs = []
+    if path:
+        attrs.append(f'path="{path}"')
+    attrs.extend([f'start="{start}"', f'end="{actual_end}"', f'total="{total_lines}"'])
+    if is_truncated or actual_end < end:
+        attrs.append('truncated="1"')
+    if converted_path:
+        attrs.append(f'converted_log="{converted_path}"')
 
+    xml_content = f"<file {' '.join(attrs)}>\n" + "\n".join(xml_lines) + "\n</file>"
+
+    # Display content for UI
     header = f"=== Lines {start}-{actual_end} of {total_lines}"
     if path:
         header += f" in {path}"
@@ -108,11 +119,15 @@ def format_line_pagination(
         next_start = actual_end + 1
         next_end = min(total_lines, next_start + DEFAULT_LINE_WINDOW - 1)
         hints.append(f"[Hint: File has {total_lines} lines. Use start_line={next_start} end_line={next_end} to read next chunk.]")
-        if actual_end < end:
+        if actual_end < end or is_truncated:
             hints.append(f"[Warning: Output truncated at line {actual_end} before target line {end} due to character limit ({max_chars} chars).]")
         if converted_path:
             hints.append(f"[Full converted Markdown saved to {converted_path}. Use shell (grep/tail) to inspect or filter full output.]")
 
+    display_body = "\n".join(disp_lines)
     if hints:
-        return f"{header}\n" + "\n".join(hints) + f"\n{result_body}"
-    return f"{header}\n{result_body}"
+        disp_content = f"{header}\n" + "\n".join(hints) + f"\n{display_body}"
+    else:
+        disp_content = f"{header}\n{display_body}"
+
+    return ToolResult.done(content=xml_content, display=disp_content)

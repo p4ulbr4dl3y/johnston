@@ -79,7 +79,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("shell", tool_names)
         self.assertNotIn("create", tool_names)
         self.assertNotIn("edit", tool_names)
-        self.assertIn("## Execution Mode: EXPLORER", mock_agent.system_prompt)
+        self.assertIn('<role name="explorer"', mock_agent.system_prompt)
 
     async def test_subagent_tool_exclusion_of_manage_shell_and_recursion_guards(self):
         from unittest.mock import MagicMock

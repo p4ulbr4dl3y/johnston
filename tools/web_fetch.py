@@ -270,11 +270,15 @@ class WebFetchTool(BaseTool):
             else:
                 out_ext = ".md"
 
-        return ToolResult.done(
-            truncate_output(
-                text_content,
-                max_chars=8000,
-                tool_name="web_fetch",
-                ext=out_ext,
-            )
+        disp_text = truncate_output(
+            text_content,
+            max_chars=8000,
+            tool_name="web_fetch",
+            ext=out_ext,
         )
+        is_trunc = len(text_content) > 8000
+        trunc_attr = ' truncated="1"' if is_trunc else ""
+        xml_body = text_content[:8000].strip() if is_trunc else text_content.strip()
+        type_name = out_ext.lstrip(".")
+        xml_content = f'<page url="{url}" status="200" type="{type_name}"{trunc_attr}>\n{xml_body}\n</page>'
+        return ToolResult.done(content=xml_content, display=disp_text)

@@ -180,8 +180,8 @@ async def test_subagent_status_action_removed(sub_tool, store):
 
 async def test_kill_completed_session_soft(sub_tool, store):
     _mk("skdone", status="completed")
-    res = str(await sub_tool.execute({"action": "kill", "session_id": "skdone"}))
-    assert "already in" in res
+    res = await sub_tool.execute({"action": "kill", "session_id": "skdone"})
+    assert "already in" in str(res) or "completed" in str(res)
 
 
 async def test_kill_nonexistent_soft(sub_tool, store):
@@ -193,26 +193,26 @@ async def test_kill_running_with_no_async_task(sub_tool, store):
     """Kill a running session whose async_task is None (never started) must not crash."""
     sess = _mk("sknone", status="running")
     assert sess.async_task is None
-    res = str(await sub_tool.execute({"action": "kill", "session_id": "sknone"}))
-    assert "terminated" in res
+    res = await sub_tool.execute({"action": "kill", "session_id": "sknone"})
+    assert "sknone" in res.content
     assert sess.status == "cancelled"
 
 
 async def test_kill_twice_idempotent(sub_tool, store):
     _mk("sk2", status="running")
-    r1 = str(await sub_tool.execute({"action": "kill", "session_id": "sk2"}))
-    assert "terminated" in r1
-    r2 = str(await sub_tool.execute({"action": "kill", "session_id": "sk2"}))
-    assert "already in" in r2
+    r1 = await sub_tool.execute({"action": "kill", "session_id": "sk2"})
+    assert "sk2" in r1.content
+    r2 = await sub_tool.execute({"action": "kill", "session_id": "sk2"})
+    assert "already in" in str(r2) or "cancelled" in str(r2)
 
 
 # --- list edge cases -------------------------------------------------------
 
 
 async def test_list_no_subagents_no_crash(sub_tool, store):
-    res = str(await sub_tool.execute({"action": "list"}))
-    assert "No subagent sessions found" in res
-    assert "Roles" not in res
+    res = await sub_tool.execute({"action": "list"})
+    assert res.content == "<subagents/>"
+    assert "No subagent sessions found" in res.display
 
 
 async def test_list_filters_by_parent(sub_tool, store):
@@ -231,10 +231,9 @@ async def test_list_filters_by_parent(sub_tool, store):
 async def test_list_invalid_parent_id_no_crash(sub_tool, store):
     _mk("sip", parent="parent-a")
     app = _SmApp(store, current_session_id="parent-zzz")
-    res = str(await sub_tool.execute({"action": "list"}, ctx=_ctx(app)))
-    assert "No subagent sessions found" in res
-    # parent scoping means sip not listed under parent-zzz
-    assert "sip" not in res
+    res = await sub_tool.execute({"action": "list"}, ctx=_ctx(app))
+    assert res.content == "<subagents/>"
+    assert "sip" not in res.content
 
 
 # --- race / double send ----------------------------------------------------

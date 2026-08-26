@@ -77,8 +77,8 @@ def test_new_task_id():
 
 async def test_sleep_chain_no_remainder(tool):
     cmd = "sleep 0.001" if os.name != "nt" else "cd ."
-    res = str(await tool.execute({"command": cmd}))
-    assert res == "(no output)"
+    res = await tool.execute({"command": cmd})
+    assert _plain(res) == "(no output)" or '<cmd exit="0"/>' in str(res)
 
 
 async def test_sleep_chain_with_remainder(tool):
@@ -94,8 +94,8 @@ async def test_standard_pipe_execution(tool):
 
 async def test_normal_execution_empty_output(tool):
     # `true` is POSIX-only; `cd .` produces no output on both cmd/PowerShell and sh.
-    res = str(await tool.execute({"command": "true" if os.name != "nt" else "cd ."}))
-    assert res == "(no output)"
+    res = await tool.execute({"command": "true" if os.name != "nt" else "cd ."})
+    assert _plain(res) == "(no output)" or '<cmd exit="0"/>' in str(res)
 
 
 async def test_invalid_timeout_value_falls_back_to_default(tool):
@@ -221,9 +221,9 @@ async def test_move_to_background_during_sync_execution(tool, make_app_mock, mak
         task.output.append("server started on port 8080\n")
         task.move_to_background()
 
-        res = str(await exec_task)
-        assert "moved to background by user after" in res
-        assert "Recent Output:\nserver started on port 8080" in res
+        res = await exec_task
+        assert "moved to background by user after" in str(res.display)
+        assert "Recent Output:\nserver started on port 8080" in str(res.display)
         assert task.is_background
         assert len([t for t in app.task_manager]) == 1
 
@@ -305,8 +305,8 @@ async def test_main_sync_read_task_drain_timeout(tool, make_app_mock, make_tool_
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
     ):
-        res = str(await tool.execute({"command": "echo test"}, ctx=ctx))
-    assert res == "(no output)"
+        res = await tool.execute({"command": "echo test"}, ctx=ctx)
+    assert _plain(res) == "(no output)" or '<cmd exit="0"/>' in str(res)
 
 
 async def test_main_sync_not_registered_as_background_task(tool, make_app_mock, make_tool_context):
@@ -315,8 +315,8 @@ async def test_main_sync_not_registered_as_background_task(tool, make_app_mock, 
     p = _process(stdout=None)
 
     with patch.object(ShellTool, "_create_std_process", return_value=p):
-        res = str(await tool.execute({"command": "echo sync"}, ctx=ctx))
-        assert res == "(no output)"
+        res = await tool.execute({"command": "echo sync"}, ctx=ctx)
+        assert _plain(res) == "(no output)" or '<cmd exit="0"/>' in str(res)
         # Sync task is dropped from the manager after completion (never
         # converted to a persistent background task).
         assert len([t for t in app.task_manager]) == 0
@@ -462,10 +462,11 @@ async def test_explicit_run_in_background(tool, make_app_mock, make_tool_context
         patch("tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=p),
     ):
-        res = str(await tool.execute({"command": "tail -f log.txt", "background": True}, ctx=ctx))
-        assert "[Background Task ID:" in res
-        assert "moved to background." in res
-        assert "Recent Output:" not in res
+        res = await tool.execute({"command": "tail -f log.txt", "background": True}, ctx=ctx)
+        assert "<bg_task" in res.content
+        assert "[Background Task ID:" in res.display
+        assert "moved to background." in res.display
+        assert "Recent Output:" not in str(res.display)
         assert len([t for t in app.task_manager]) == 1
 
 
@@ -480,8 +481,8 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
 
     mgr = ManageShellTool()
     with patch("tools.shell.shell_executable", return_value="/bin/sh"):
-        res = str(await tool.execute({"command": "cat", "background": True}, ctx=app))
-    m = re.search(r"Task ID: (shell_\d+_\d+)", res)
+        res = await tool.execute({"command": "cat", "background": True}, ctx=app)
+    m = re.search(r'(?:Task ID: |id=")(shell_\d+_\d+)', str(res.content) + " " + str(res.display))
     assert m is not None
     task_id = m.group(1)
 
@@ -490,13 +491,13 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
     assert tasks[0].is_background
 
     # list: process alive -> RUNNING
-    r = str(await mgr.execute({"action": "list"}, ctx=app))
-    assert "RUNNING" in r
-    assert task_id in r
+    r = await mgr.execute({"action": "list"}, ctx=app)
+    assert "RUNNING" in r.display or "running" in r.content
+    assert task_id in r.content
 
     # send_input: writes to live stdin
-    r = str(await mgr.execute({"action": "send_input", "task_id": task_id, "input": "hello_manage"}, ctx=app))
-    assert "OK: input sent" in r
+    r = await mgr.execute({"action": "send_input", "task_id": task_id, "input": "hello_manage"}, ctx=app)
+    assert "stdin_sent" in r.content or "OK: input sent" in str(r.display)
     await asyncio.sleep(0.3)
 
     # background output is streamed into the task buffer (file log too)
@@ -504,8 +505,8 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
     assert "hello_manage" in streamed
 
     # kill: terminates the live process
-    r = str(await mgr.execute({"action": "kill", "task_id": task_id}, ctx=app))
-    assert "killed" in r
+    r = await mgr.execute({"action": "kill", "task_id": task_id}, ctx=app)
+    assert "killed" in r.content or "killed" in str(r.display)
 
 
 # --------------------------------------------------------------------------- #
@@ -564,16 +565,20 @@ _SANDBOX_NOTICE = "[sandbox unavailable on this platform: executed unsandboxed]\
 
 
 def _plain(res) -> str:
-    """Drop the advisory degradation banner from a shell result.
-
-    Subagent contexts always request sandboxing; on hosts without a usable
-    backend the tool prepends the notice above. Exact-match assertions must
-    not depend on whether the running platform has a sandbox backend.
-    """
-    text = str(res)
+    """Drop the advisory degradation banner from a shell result."""
+    from core.domain.defaults.errors import ToolResult
+    if isinstance(res, ToolResult):
+        text = res.display if res.display is not None else (res.content or "")
+    else:
+        text = str(res)
     if text.startswith(_SANDBOX_NOTICE):
         text = text[len(_SANDBOX_NOTICE):]
-    return text
+    m = re.match(r"^<cmd[^>]*>\s*(.*?)\s*</cmd>$", text, re.DOTALL)
+    if m:
+        text = m.group(1)
+    elif "<cmd" in text and "/>" in text:
+        text = "(no output)"
+    return text.strip()
 
 
 # ---------- empty / whitespace / None command ----------

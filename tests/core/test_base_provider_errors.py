@@ -160,13 +160,11 @@ class TestRetryableErrors(unittest.IsolatedAsyncioTestCase):
         user_msg = sanitized[3]
         self.assertEqual(user_msg["role"], "user")
         self.assertIn("Preview:", user_msg["content"])
-        self.assertIn("[Note: User attached image(s), but this model does not support vision.]", user_msg["content"])
+        self.assertIn('<system_note type="warning">', user_msg["content"])
         # Verify tool content was replaced with hint
         tool_msg = sanitized[2]
         self.assertEqual(tool_msg["role"], "tool")
-        self.assertIn(
-            "[Hint: You do not support vision. Tell user you cannot view images. Do not retry.]", tool_msg["content"]
-        )
+        self.assertIn('<error type="vision_unsupported"', tool_msg["content"])
 
     async def test_stream_cancelled_error_records_tokens(self):
         agent = BaseAgent(api_key="t", model="m", base_url="http://t", provider_key="tprov")

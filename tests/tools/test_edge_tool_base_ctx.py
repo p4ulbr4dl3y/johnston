@@ -75,11 +75,11 @@ class TestFormatEdge(unittest.TestCase):
 
     def test_background_no_result(self):
         res = format_background_notification("kind", "name", "id", "")
-        self.assertIn("<task_result>\n\n</task_result>", res)
+        self.assertIn('<task_notification kind="kind" name="name" id="id">\n\n</task_notification>', res)
 
     def test_background_unicode(self):
         res = format_background_notification("к", "имя", "1", "résultat")
-        self.assertIn("имя", res)
+        self.assertIn('name="имя"', res)
 
 
 class TestResolvePathEdge(unittest.TestCase):
@@ -230,37 +230,33 @@ class TestToolContextEdge(unittest.TestCase):
 class TestFormatLinePaginationEdge(unittest.TestCase):
     def test_empty_lines_zero_total(self):
         res = format_line_pagination([], total_lines=0)
-        self.assertEqual(res, "=== 0 lines ===")
+        self.assertEqual(res.display, "=== 0 lines ===")
+        self.assertEqual(res.content, '<file lines="0" total="0"/>')
 
     def test_empty_lines_positive_total(self):
         res = format_line_pagination([], total_lines=5)
-        self.assertIn("of 5", res)
+        self.assertIn("of 5", res.display)
 
     def test_start_line_exceeds_total(self):
         res = format_line_pagination(["a"], total_lines=1, start_line=50)
-        self.assertIn("ERR: range", res)
+        self.assertIn("ERR: range", res.display)
 
     def test_unicode_lines(self):
         res = format_line_pagination(["привет", "😀"], start_line=1, end_line=2)
-        self.assertIn("привет", res)
-        self.assertIn("😀", res)
+        self.assertIn("привет", res.content)
+        self.assertIn("😀", res.content)
 
     def test_non_string_line(self):
         res = format_line_pagination([1, 2, 3], start_line=1, end_line=2)
-        self.assertIn("1 | 1", res)
+        self.assertIn("1|1", res.content)
 
     def test_window_shorter_than_total_lines_crash(self):
-        # BUG FOUND (RED): partial-read window (lines has fewer entries than
-        # total_lines) + start_line beyond the window -> IndexError crash.
-        # tools/utils.py format_line_pagination accesses lines[i - window_start]
-        # without bounds check. Expected: safe truncation, actual: crash.
         res = format_line_pagination(["a", "b"], total_lines=5000, start_line=4900)
-        self.assertIn("of 5000", res)
+        self.assertIn("total=\"5000\"", res.content)
 
     def test_window_shorter_than_total_lines_near_end(self):
-        # same bug, different trigger
         res = format_line_pagination(["a", "b"], total_lines=5000, start_line=4999)
-        self.assertIn("of 5000", res)
+        self.assertIn("total=\"5000\"", res.content)
 
 
 class TestPathTraversalContext(unittest.TestCase):

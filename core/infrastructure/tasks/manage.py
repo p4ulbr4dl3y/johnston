@@ -36,8 +36,8 @@ def not_found_message(task_id: str, tasks: List[Any], manager_name: str) -> str:
     active_ids = [t.task_id for t in tasks if getattr(t, "is_running", True)]
     if active_ids:
         ids_str = ", ".join(f"'{i}'" for i in active_ids)
-        return format_tool_error("notfound", detail=f"[Hint: Active IDs: {ids_str}]", name=task_id)
-    return format_tool_error("notfound", detail=f"[Hint: No active {manager_name} tasks]", name=task_id)
+        return format_tool_error("notfound", detail=f"active IDs: {ids_str}", name=task_id)
+    return format_tool_error("notfound", detail=f"no active {manager_name} tasks", name=task_id)
 
 
 def find_any(tasks: List[Any], task_id: str) -> Any:

@@ -319,11 +319,10 @@ def test_format_skills_markdown_full():
         Skill("g1", "", Scope("global")),
     ]
     md = format_skills_markdown(skills)
-    assert "## Skills" in md
-    assert "### Global (`~/.johnston/skills" in md
-    assert "### Project (`.johnston/skills" in md
-    assert "- `p1`: Proj desc" in md
-    assert "- `g1`" in md
+    assert "<skills>" in md
+    assert '<skill name="p1" scope="project" desc="Proj desc"/>' in md
+    assert '<skill name="g1" scope="global"/>' in md
+    assert "</skills>" in md
 
 
 if __name__ == "__main__":

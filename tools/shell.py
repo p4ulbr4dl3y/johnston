@@ -187,11 +187,12 @@ class ShellTool(BaseTool):
         ctx.add_background_task(task)
         task.start_reading(on_completed=callback)
 
-        content = _format_background_task_response(task_id, cmd, log_path=task.log_path)
+        xml_content = f'<bg_task id="{task_id}" log="{task.log_path}" status="running"/>'
+        disp_content = _format_background_task_response(task_id, cmd, log_path=task.log_path)
         notice = _sandbox_fallback_notice(ctx)
         if notice:
-            content = notice + content
-        return ToolResult(status=ToolResultStatus.RUNNING, content=content)
+            disp_content = notice + disp_content
+        return ToolResult(status=ToolResultStatus.RUNNING, content=xml_content, display=disp_content)
 
     async def _run_sync(self, p: Any, ctx: Any, cmd: str, timeout: int) -> ToolResult:
         """Run a process synchronously: stream output into a bounded tail buffer,
@@ -235,9 +236,11 @@ class ShellTool(BaseTool):
                 elapsed = max(0.1, round(time.monotonic() - start_time, 1))
                 raw_out = task.get_formatted_output().strip()
                 recent_str = f"\n\nRecent Output:\n{tail_output(raw_out, max_chars=2000)}" if raw_out else None
+                xml_content = f'<bg_task id="{task_id}" log="{task.log_path}" status="running" elapsed="{elapsed}s"/>'
                 return ToolResult(
                     status=ToolResultStatus.RUNNING,
-                    content=_format_background_task_response(
+                    content=xml_content,
+                    display=_format_background_task_response(
                         task_id,
                         cmd,
                         recent_output_str=recent_str,
@@ -255,11 +258,14 @@ class ShellTool(BaseTool):
             res = task.get_formatted_output()
             raw_rc = p.returncode if p.returncode is not None else getattr(task, "returncode", None)
             returncode = raw_rc if isinstance(raw_rc, int) else None
+            rc_attr = f' exit="{returncode}"' if returncode is not None else ' exit="0"'
             if not res.strip():
-                if returncode is not None and returncode != 0:
-                    return ToolResult.done(f"(exit code {returncode})", returncode=returncode)
-                return ToolResult.done("(no output)", returncode=returncode)
-            return ToolResult.done(_truncate_output(res), returncode=returncode)
+                xml_content = f"<cmd{rc_attr}/>"
+                disp = f"(exit code {returncode})" if (returncode is not None and returncode != 0) else "(no output)"
+                return ToolResult.done(content=xml_content, display=disp, returncode=returncode)
+            truncated = _truncate_output(res)
+            xml_content = f"<cmd{rc_attr}>\n{truncated.strip()}\n</cmd>"
+            return ToolResult.done(content=xml_content, display=truncated, returncode=returncode)
         except asyncio.TimeoutError:
             await terminate_process(p)
             if read_task:

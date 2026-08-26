@@ -61,12 +61,12 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="Question: Q?\nAnswer: A")
-        res = str(await tool.execute(
+        res = await tool.execute(
             {"questions": '[{"question": "Q?", "options": ["A", "B"]}]'},
             ctx=mock_app,
-        ))
-        self.assertIn("Question: Q?", res)
-        self.assertIn("Answer: A", res)
+        )
+        self.assertIn("Question: Q?", res.display)
+        self.assertIn("Answer: A", res.display)
 
     async def test_flat_single_question_dict_rejected(self):
         tool = AskUserTool()
@@ -91,29 +91,29 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="Question: Choose item\nAnswer: Option A")
-        res = str(await tool.execute(
+        res = await tool.execute(
             {"questions": [{"question": "Choose item", "options": ["Option A", "Option B"]}]},
             ctx=mock_app,
-        ))
-        self.assertIn("Question: Choose item", res)
-        self.assertIn("Answer: Option A", res)
+        )
+        self.assertIn("Question: Choose item", res.display)
+        self.assertIn("Answer: Option A", res.display)
 
     async def test_cancelled_flow(self):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="cancelled by user")
-        res = str(await tool.execute(
+        res = await tool.execute(
             {"questions": [{"question": "Cancel this?", "options": []}]},
             ctx=mock_app,
-        ))
-        self.assertEqual(res, "cancelled by user")
+        )
+        self.assertIn("cancelled by user", res.display)
 
     async def test_unknown_status_cancels(self):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="cancelled by user")
-        res = str(await tool.execute({"questions": [{"question": "Q?", "options": ["a"]}]}, ctx=mock_app))
-        self.assertIn("cancelled by user", res)
+        res = await tool.execute({"questions": [{"question": "Q?", "options": ["a"]}]}, ctx=mock_app)
+        self.assertIn("cancelled by user", res.display)
 
     async def test_execute_sorts_options_before_display(self):
         tool = AskUserTool()
@@ -142,12 +142,12 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             return "Question: Choice?\nAnswer: Opt1"
 
         mock_app.ask_user = fake_ask_user
-        res = str(await tool.execute(
+        res = await tool.execute(
             {"questions": [{"question": "Choice?", "options": ["Opt1"]}]},
             ctx=mock_app,
-        ))
-        self.assertIn("Question: Choice?", res)
-        self.assertIn("Answer: Opt1", res)
+        )
+        self.assertIn("Question: Choice?", res.display)
+        self.assertIn("Answer: Opt1", res.display)
 
     async def test_minimized_then_esc_clears_pending_and_re_raises(self):
         # User minimizes the wizard (pending saved), then the agent run is cancelled.

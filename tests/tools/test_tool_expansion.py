@@ -139,17 +139,17 @@ class TestToolExpansion(unittest.TestCase):
 
     def test_hints_stripped_from_ui_display_but_retained_in_result_text(self):
         full_text = (
-            "ERR: target not found.\n\n[Hint: Nearest matching code in 'test.py' around line 15]:\nline 1\nline 2"
+            "ERR: target not found.\n\n<hint file='test.py' line='15'>\nline 1\nline 2\n</hint>"
         )
         widget = ToolCallWidget(tool_type="edit", target="test.py", result_text=full_text, args={"path": "test.py"})
         widget.set_result(full_text, is_error=True)
-        # result_text must keep [Hint:] for agent
+        # result_text must keep <hint> for agent
         self.assertEqual(widget.result_text, full_text)
         # Error results are not expandable, but building content directly still
-        # strips [Hint:] while keeping the ERR: line for the UI.
+        # strips <hint> while keeping the ERR: line for the UI.
         widget.render_content()
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertNotIn("[Hint:", content)
+        self.assertNotIn("<hint", content)
         self.assertIn("ERR: target not found.", content)
 
     def test_create_tool_error_display(self):

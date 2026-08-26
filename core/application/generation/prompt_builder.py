@@ -245,20 +245,19 @@ class PromptBuilder:
         os_info = f"{platform.system()} {platform.release()}"
         git_info = get_git_info(self.cwd)
 
-        env_lines = [
-            "## Environment Metadata",
-            f"- Working Directory: {cwd}",
-            f"- Current Date: {now_str}",
-            f"- Operating System: {os_info}",
+        from core.infrastructure.runtime.xml_utils import escape_xml_attr
+
+        env_attrs = [
+            f'cwd="{escape_xml_attr(cwd)}"',
+            f'date="{now_str}"',
+            f'os="{escape_xml_attr(os_info)}"',
         ]
         if git_info:
-            env_lines.append(f"- Git Context: {git_info}")
+            env_attrs.append(f'git_branch="{escape_xml_attr(git_info)}"')
         if self.sandbox_enabled:
-            env_lines.append(
-                "- Sandbox: active (write: workspace & /tmp only; read: system & repo allowed, sensitive credentials blocked; net: allowed)"
-            )
+            env_attrs.append('sandbox="active"')
 
-        env_block = "\n".join(env_lines)
+        env_block = f"<environment {' '.join(env_attrs)}/>"
 
         stable_core = self._build_stable_core(mcp_snippet, skills_snippet, subagents_snippet)
 
@@ -297,20 +296,19 @@ class PromptBuilder:
         os_info = f"{platform.system()} {platform.release()}"
         git_info = await get_git_info_async(self.cwd)
 
-        env_lines = [
-            "## Environment Metadata",
-            f"- Working Directory: {cwd}",
-            f"- Current Date: {now_str}",
-            f"- Operating System: {os_info}",
+        from core.infrastructure.runtime.xml_utils import escape_xml_attr
+
+        env_attrs = [
+            f'cwd="{escape_xml_attr(cwd)}"',
+            f'date="{now_str}"',
+            f'os="{escape_xml_attr(os_info)}"',
         ]
         if git_info:
-            env_lines.append(f"- Git Context: {git_info}")
+            env_attrs.append(f'git_branch="{escape_xml_attr(git_info)}"')
         if self.sandbox_enabled:
-            env_lines.append(
-                "- Sandbox: active (write: workspace & /tmp only; read: system & repo allowed, sensitive credentials blocked; net: allowed)"
-            )
+            env_attrs.append('sandbox="active"')
 
-        env_block = "\n".join(env_lines)
+        env_block = f"<environment {' '.join(env_attrs)}/>"
 
         stable_core = await self._build_stable_core_async(mcp_snippet, skills_snippet, subagents_snippet)
 

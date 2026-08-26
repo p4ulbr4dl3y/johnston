@@ -124,10 +124,10 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = mock_client
 
         tool = WebFetchTool()
-        res = str(await tool.execute({"url": "https://example.com/long"}))
+        res = await tool.execute({"url": "https://example.com/long"})
 
-        self.assertIn("Output truncated: showing first 8000 chars", res)
-        self.assertIn("Full log:", res)
+        self.assertIn('truncated="1"', res.content)
+        self.assertIn("Full log:", res.display)
 
     async def test_convert_content_to_md_sync_unlink_oserror(self):
         # A failing tmp-file cleanup must be swallowed while the converted
@@ -250,9 +250,10 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = _make_stream_client(body, "text/html")
 
         tool = WebFetchTool()
-        res = str(await tool.execute({"url": "https://example.com/page"}))
-        self.assertIn("Full log:", res)
-        self.assertIn(".md", res)
+        res = await tool.execute({"url": "https://example.com/page"})
+        self.assertIn('truncated="1"', res.content)
+        self.assertIn(".md", res.display)
+        self.assertIn("Full log:", res.display)
 
     @patch("httpx.AsyncClient")
     async def test_truncation_raw_html_saves_html(self, mock_client_cls):
@@ -260,9 +261,10 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value = _make_stream_client(body, "text/html")
 
         tool = WebFetchTool()
-        res = str(await tool.execute({"url": "https://example.com/raw_page", "raw": True}))
-        self.assertIn("Full log:", res)
-        self.assertIn(".html", res)
+        res = await tool.execute({"url": "https://example.com/raw_page", "raw": True})
+        self.assertIn('truncated="1"', res.content)
+        self.assertIn(".html", res.display)
+        self.assertIn("Full log:", res.display)
 
     @patch("httpx.AsyncClient")
     @patch("socket.getaddrinfo")

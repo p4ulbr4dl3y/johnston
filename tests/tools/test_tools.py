@@ -44,8 +44,8 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
     async def test_create_allows_johnston_config(self):
         tool = CreateTool()
         target = os.path.join(self.test_dir, ".johnston", "config.json")
-        res = str(await tool.execute({"path": target, "content": '{"permissions": {}}'}))
-        self.assertIn("file", res)
+        res = await tool.execute({"path": target, "content": '{"permissions": {}}'})
+        self.assertIn("created", res.content)
         self.assertTrue(os.path.exists(target))
 
     async def test_edit_allows_johnston_config(self):
@@ -72,30 +72,31 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             f.write("Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n")
 
         # Full read
-        res = str(await tool.execute({"path": file_path}))
-        self.assertIn("Line 1", res)
-        self.assertIn("Line 5", res)
+        res = await tool.execute({"path": file_path})
+        self.assertIn("Line 1", res.content)
+        self.assertIn("Line 5", res.content)
 
         # Range read
-        res_range = str(await tool.execute({"path": file_path, "start_line": 2, "end_line": 4}))
-        self.assertIn("Lines 2-4", res_range)
-        self.assertIn("Line 2", res_range)
-        self.assertNotIn("Line 5", res_range)
+        res_range = await tool.execute({"path": file_path, "start_line": 2, "end_line": 4})
+        self.assertIn('start="2"', res_range.content)
+        self.assertIn('end="4"', res_range.content)
+        self.assertIn("Line 2", res_range.content)
+        self.assertNotIn("Line 5", res_range.content)
 
         # Start line out of bounds
-        res_oob = str(await tool.execute({"path": file_path, "start_line": 50}))
-        self.assertIn("exceeds total file line count", res_oob)
-        self.assertIn("[Hint:", res_oob)
+        res_oob = await tool.execute({"path": file_path, "start_line": 50})
+        self.assertIn("exceeds total file line count", res_oob.display)
+        self.assertIn("[Hint:", res_oob.display)
 
         # Non-existent file
-        res_err = str(await tool.execute({"path": os.path.join(self.test_dir, "missing.txt")}))
-        self.assertIn("ERR:", res_err)
+        res_err = await tool.execute({"path": os.path.join(self.test_dir, "missing.txt")})
+        self.assertIn("ERR:", str(res_err))
 
         # Directory read (should auto-list directory contents with hint)
-        dir_res = str(await tool.execute({"path": self.test_dir}))
-        self.assertIn("is a directory", dir_res)
-        self.assertIn("sample.txt", dir_res)
-        self.assertIn("Hint:", dir_res)
+        dir_res = await tool.execute({"path": self.test_dir})
+        self.assertIn("<dir", dir_res.content)
+        self.assertIn("<f>sample.txt</f>", dir_res.content)
+        self.assertIn("Hint:", dir_res.display)
 
         # Directory truncation test (>60 items)
         large_dir = os.path.join(self.test_dir, "large_folder")
@@ -103,9 +104,9 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         for i in range(70):
             with open(os.path.join(large_dir, f"file_{i:02d}.txt"), "w") as f:
                 f.write("test")
-        large_dir_res = str(await tool.execute({"path": large_dir}))
-        self.assertIn("items truncated", large_dir_res)
-        self.assertIn("Total: 70 items", large_dir_res)
+        large_dir_res = await tool.execute({"path": large_dir})
+        self.assertIn('truncated="1"', large_dir_res.content)
+        self.assertIn('total="70"', large_dir_res.content)
 
         # External file outside workspace allowed
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as ext_f:
@@ -235,7 +236,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Test capitalized tool name "Create"
         res_create = await execute_tool("Create", {"path": file_path, "content": "Case Content"})
-        self.assertIn("file", res_create.content)
+        self.assertIn("created", res_create.content)
         self.assertTrue(os.path.exists(file_path))
 
         # Aliases are no longer resolved: 'write' is unknown, only 'create' works.
@@ -270,30 +271,26 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         lines = ["line 1", "line 2", "line 3", "line 4"]
         res = format_line_pagination(lines, start_line="2", end_line="3")
-        self.assertIn("line 2", res)
-        self.assertIn("line 3", res)
-        self.assertNotIn("line 1", res)
+        self.assertIn("line 2", res.content)
+        self.assertIn("line 3", res.content)
+        self.assertNotIn("line 1", res.content)
 
     async def test_format_line_pagination_max_800_cap(self):
         from tools.utils import format_line_pagination
 
         lines = [f"line {i}" for i in range(1, 1500)]
         res = format_line_pagination(lines, start_line=1, end_line=1200)
-        self.assertIn("Lines 1-800 of 1499", res)
+        self.assertIn('end="800"', res.content)
+        self.assertIn('total="1499"', res.content)
 
     async def test_format_line_pagination_char_limit_line_boundary(self):
         from tools.utils import format_line_pagination
 
         long_line = "x" * 100
         lines = [long_line for _ in range(500)]
-        # max_chars=300 -> each line formatted is ~109 chars ("    1 | x...x")
-        # 2 complete lines ~219 chars fit, 3 lines exceed 300
         res = format_line_pagination(lines, start_line=1, end_line=500, max_chars=300)
-        self.assertIn("Lines 1-2 of 500", res)
-        self.assertIn("Use start_line=3", res)
-        self.assertIn(
-            "Warning: Output truncated at line 2 before target line 500 due to character limit (300 chars)", res
-        )
+        self.assertIn('end="2"', res.content)
+        self.assertIn('truncated="1"', res.content)
 
     async def test_ask_user_validation(self):
         from tools.ask_user import AskUserTool
@@ -416,11 +413,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             f.writelines(lines)
 
         tool = ReadTool()
-        res = str(await tool.execute({"path": file_path}))
-        self.assertIn("=== Lines 1-800 of 1000", res)
-        self.assertIn("[Hint: File has 1000 lines. Use start_line=801 end_line=1000 to read next chunk.]", res)
-        self.assertIn("Line 800", res)
-        self.assertNotIn("Line 801", res)
+        res = await tool.execute({"path": file_path})
+        self.assertIn('start="1"', res.content)
+        self.assertIn('end="800"', res.content)
+        self.assertIn('total="1000"', res.content)
+        self.assertIn("Line 800", res.content)
+        self.assertNotIn("Line 801", res.content)
 
     async def test_read_tool_doc_caching(self):
         from tools.read import convert_doc_to_markdown_sync

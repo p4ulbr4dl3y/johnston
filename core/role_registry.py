@@ -6,7 +6,6 @@ from typing import Callable, Dict, Optional
 from core.domain.policies.role_policy import (
     AgentRole,
     RoleScope,
-    RoleSource,
     normalize_role_scope,
 )
 from core.infrastructure.runtime.frontmatter import parse_csv_list, parse_frontmatter
@@ -20,10 +19,11 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="Worker",
         description="Execution mode: creation, editing, and shell command execution.",
         prompt=(
-            "## Execution Mode: WORKER\n\n"
-            "1. Surgical Execution: Modify only what the task strictly requires. NEVER make unsolicited changes, speculative additions, or touch unrelated items.\n"
-            "2. State Preservation: Preserve existing structure, conventions, and functional integrity unless explicitly instructed to alter them.\n"
-            "3. Safety: NEVER perform irreversible destruction or accidental data loss; operate strictly within the assigned task boundaries."
+            '<role name="worker" mode="execution">\n'
+            '  <rule id="surgical">Modify only what the task strictly requires. NEVER make unsolicited changes, speculative additions, or touch unrelated items.</rule>\n'
+            '  <rule id="preservation">Preserve existing structure, conventions, and functional integrity unless explicitly instructed to alter them.</rule>\n'
+            '  <rule id="safety">NEVER perform irreversible destruction or accidental data loss; operate strictly within the assigned task boundaries.</rule>\n'
+            '</role>'
         ),
         scope="any",
         source="builtin",
@@ -33,10 +33,11 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="Explorer",
         description="Read-only mode for information gathering, research, analysis, and action planning.",
         prompt=(
-            "## Execution Mode: EXPLORER\n\n"
-            "1. Strictly Read-Only: strictly read-only mode. NEVER modify state or run destructive operations. If asked to modify, decline and provide an actionable execution plan instead.\n"
-            "2. Evidence-Backed: Anchor all findings, architectures, and diagnoses in exact file references and data.\n"
-            "3. Actionable Plans: When designing solutions, provide Goal, Trade-offs, Dependencies, Step-by-step Execution, and Verification steps."
+            '<role name="explorer" mode="read_only">\n'
+            '  <rule id="read_only">Strictly read-only mode. NEVER modify state or run destructive operations. If asked to modify, decline and provide an actionable execution plan instead.</rule>\n'
+            '  <rule id="evidence">Anchor all findings, architectures, and diagnoses in exact file references and data.</rule>\n'
+            '  <rule id="plans">When designing solutions, provide Goal, Trade-offs, Dependencies, Step-by-step Execution, and Verification steps.</rule>\n'
+            '</role>'
         ),
         read_only=True,
         scope="any",
@@ -122,34 +123,20 @@ class RoleRegistry:
         if not subagent_roles:
             return ""
 
-        builtins = []
-        globals_list = []
-        project_list = []
+        from core.infrastructure.runtime.xml_utils import escape_xml_attr
 
+        roles_xml = []
         for role in subagent_roles.values():
-            tools_info = f" (Tools: {', '.join(role.allowed_tools)})" if role.allowed_tools else ""
-            prov_info = f" (provider: {role.provider})" if role.provider else ""
-            desc = f": {role.description}" if role.description else ""
-            line = f"- `{role.key}`{desc}{tools_info}{prov_info}"
-            if role.source == RoleSource.BUILTIN:
-                builtins.append(line)
-            elif role.source == RoleSource.GLOBAL:
-                globals_list.append(line)
-            elif role.source == RoleSource.PROJECT:
-                project_list.append(line)
+            attrs = [f'type="{escape_xml_attr(role.key)}"']
+            if role.allowed_tools:
+                attrs.append(f'tools="{escape_xml_attr(",".join(role.allowed_tools))}"')
+            if role.provider:
+                attrs.append(f'provider="{escape_xml_attr(role.provider)}"')
+            if role.description:
+                attrs.append(f'desc="{escape_xml_attr(role.description)}"')
+            roles_xml.append(f"  <subagent {' '.join(attrs)}/>")
 
-        lines = ["## Subagents (use as `type` in `invoke_subagent`)"]
-        if builtins:
-            lines.append("\n### Builtin")
-            lines.extend(builtins)
-        if globals_list:
-            lines.append("\n### Global (`~/.johnston/roles/<name>.md`)")
-            lines.extend(globals_list)
-        if project_list:
-            lines.append("\n### Project (`.johnston/roles/<name>.md`)")
-            lines.extend(project_list)
-
-        return "\n".join(lines)
+        return "<subagents>\n" + "\n".join(roles_xml) + "\n</subagents>"
 
     def _parse_md_role(self, fpath: str, source: str) -> Optional[AgentRole]:
         try:

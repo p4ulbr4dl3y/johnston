@@ -98,12 +98,12 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
             end_snip = min(len(file_lines), match_line_num + len(target_lines) + 2)
             snippet_lines = file_lines[start_snip - 1 : end_snip]
             snippet_str = "\n".join(
-                f"{i:4d} | {line_item}" for i, line_item in enumerate(snippet_lines, start=start_snip)
+                f"{i}|{line_item}" for i, line_item in enumerate(snippet_lines, start=start_snip)
             )
             return (
-                f"\n\n[Hint: Nearest matching code in '{path}' around line {match_line_num}]:\n"
+                f'\n<hint file="{path}" line="{match_line_num}">\n'
                 f"{snippet_str}\n"
-                f"[Re-try with old_str matching this snippet and include 2-4 lines of surrounding context]"
+                f"</hint>"
             )
     return ""
 
@@ -216,7 +216,14 @@ class EditTool(BaseTool):
 
             new_content, diff = apply_edit(content, old_str, new_str, replace_all, path)
             write_file_text(path, new_content)
-            return ToolResult.done(diff)
+            repl_count = content.count(old_str) if replace_all else 1
+            diff_clean = diff.strip() if diff else ""
+            xml_content = (
+                f'<edited path="{path}" replacements="{repl_count}">\n{diff_clean}\n</edited>'
+                if diff_clean
+                else f'<edited path="{path}" replacements="{repl_count}"/>'
+            )
+            return ToolResult.done(content=xml_content, display=diff)
 
         try:
             return await run_cancellable(_do_edit)

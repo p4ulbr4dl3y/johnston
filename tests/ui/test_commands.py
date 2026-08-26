@@ -555,7 +555,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertTrue(show_in_ui)
         self.assertEqual(app.ai_kwargs[0].get("display_text"), "/johnston-guide")
-        self.assertIn('<skill path=', prompt)
+        self.assertIn('<active_skill name="johnston-guide" path=', prompt)
 
     async def test_multiple_skills_command(self):
         from unittest.mock import patch
@@ -572,8 +572,10 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertTrue(show_in_ui)
         self.assertEqual(app.ai_kwargs[0].get("display_text"), "/foo /bar analyze project")
-        self.assertIn('<skill path=', prompt)
-        self.assertIn("User request: analyze project", prompt)
+        self.assertIn('<active_skill name="foo" path=', prompt)
+        self.assertIn('<active_skill name="bar" path=', prompt)
+        self.assertIn('<user_request>', prompt)
+        self.assertIn("analyze project", prompt)
 
     async def test_models_command_non_vision_warning(self):
         from widgets.commands import ModelsCommand

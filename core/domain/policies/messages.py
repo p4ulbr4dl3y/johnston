@@ -18,10 +18,17 @@ from typing import Any, List, Optional
 
 USER_EVENT_TYPE = "user"
 
-# Synthetic user-shaped events that carry the "user" type but are not real
-# user turns: background-shell notifications and interruption notes.
-TRANSCRIPT_HIDDEN_PREFIXES = ("[System Notification]", "[System Note:")
-STALE_NOTE_PREFIX = "[System Note:"
+TRANSCRIPT_HIDDEN_PREFIXES = (
+    "[System Notification]",
+    "[System Note:",
+    "<system_note",
+    "<task_notification",
+    "<system_notification",
+)
+STALE_NOTE_PREFIX = (
+    "[System Note:",
+    "<system_note",
+)
 
 
 def is_ui_visible_user_message(msg: Any) -> bool:
@@ -82,7 +89,12 @@ def transcript_before_turn(messages: List[Any], seq_idx: int) -> List[Any]:
 
 # Compaction embeds summaries into history as fake user messages.
 HISTORY_CHECKPOINT_MARKERS = ("<conversation_checkpoint>", "<summary>")
-HISTORY_NOTE_PREFIX = "[System Note:"
+HISTORY_NOTE_PREFIX = (
+    "[System Note:",
+    "<system_note",
+    "<task_notification",
+    "<system_notification",
+)
 
 
 def is_checkpoint_message(msg: Any) -> bool:

@@ -180,9 +180,9 @@ class TestMCPManager(unittest.TestCase):
         self.assertEqual(len(all_tools), 2)
 
         snippet = mm.get_system_prompt_snippet()
-        self.assertIn("## MCP Tools", snippet)
-        self.assertIn("- serverA: search", snippet)
-        self.assertIn("- serverB: search_tool", snippet)
+        self.assertIn("<mcp_servers>", snippet)
+        self.assertIn('<server name="serverA" tools="search"/>', snippet)
+        self.assertIn('<server name="serverB" tools="search_tool"/>', snippet)
 
         # Call tool explicitly via call_tool
         res = mm.call_tool("search_tool", {}, target_server="serverB")

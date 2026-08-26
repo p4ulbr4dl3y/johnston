@@ -56,7 +56,7 @@ class TestNotFoundMessage(unittest.TestCase):
 
     def test_empty(self):
         msg = not_found_message("ghost", [], "background")
-        self.assertIn("No active background tasks", msg)
+        self.assertIn("no active background tasks", msg.lower())
 
 
 if __name__ == "__main__":

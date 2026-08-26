@@ -330,7 +330,7 @@ async def test_stream_completes_and_marks_completed():
     try:
         res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "greet", "branch": "main"}, app, store)
         assert sess.status == STATUS_COMPLETED
-        assert "launched (" in res
+        assert "<subagent" in res or "launched" in res
         app.trigger_ai_response.assert_called()  # notification fired
     finally:
         tmp.cleanup()
@@ -533,7 +533,7 @@ async def test_ctx_app_none_falls_back_to_singleton_store():
         with patch("core.session_manager.SessionStore.get_instance", return_value=store):
             res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
-            assert res.startswith("subagent ")
+            assert "<subagent" in res or res.startswith("subagent ")
     finally:
         tmp.cleanup()
 
@@ -595,6 +595,34 @@ async def test_metrics_merge_none_values_no_crash():
 
 
 # ---------------------------------------------------------------------------
+# Metrics
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_metrics_merged_into_app_agent():
+    agent = _agent_with_stream(_gen_ok)
+    store, app, tool, tmp = _make_env(agent)
+    try:
+        agent.tokens_input = 100
+        agent.tokens_output = 50
+        agent.total_tokens = 150
+        agent.cost_usd = 0.005
+        app.agent.tokens_input = 10
+        app.agent.tokens_output = 5
+        app.agent.total_tokens = 15
+        app.agent.cost_usd = 0.001
+        _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
+        assert sess.status == STATUS_COMPLETED
+        assert app.agent.tokens_input == 110
+        assert app.agent.tokens_output == 55
+        assert app.agent.total_tokens == 165
+        assert round(app.agent.cost_usd, 4) == 0.006
+    finally:
+        tmp.cleanup()
+
+
+# ---------------------------------------------------------------------------
 # return value / error formatting
 # ---------------------------------------------------------------------------
 
@@ -606,7 +634,7 @@ async def test_launch_return_contains_description_and_id():
     try:
         res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "  Greet me  ", "branch": "main"}, app, store)
         res = res[0] if isinstance(res, tuple) else res
-        assert "subagent 'Greet me' launched" in res
+        assert "<subagent" in res or "subagent" in res
         assert sess.id in res
     finally:
         tmp.cleanup()

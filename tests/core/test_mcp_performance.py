@@ -44,8 +44,8 @@ class TestMCPPerformance(unittest.IsolatedAsyncioTestCase):
 
         snippet = manager.get_system_prompt_snippet()
 
-        self.assertIn("## MCP Tools", snippet)
-        self.assertIn("- docs: search", snippet)
+        self.assertIn("<mcp_servers>", snippet)
+        self.assertIn('<server name="docs" tools="search"/>', snippet)
         manager.get_active_tools.assert_not_called()
 
     async def test_concurrent_async_refreshes_are_coalesced(self):
