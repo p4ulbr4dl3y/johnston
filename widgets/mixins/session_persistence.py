@@ -15,14 +15,23 @@ _global_session_write_lock = threading.Lock()
 class SessionPersistenceMixin:
     """Session UI loading and persistence for JohnstonApp."""
 
-    def load_session_ui(self, session_id: str) -> None:
+    def load_session_ui(self, session_id: str, read_only: bool = False) -> None:
         """Load session state into UI and agent history"""
         session = self.sm.get(session_id)
         if not session:
             return
 
+        old_sid = getattr(self, "current_session_id", None)
+        if old_sid and old_sid != session_id and hasattr(self.sm, "release_session_lock"):
+            self.sm.release_session_lock(old_sid)
+
         self.current_session_id = session_id
-        self.sm.set_active_session_id(session_id)
+        self.is_read_only = read_only
+
+        if not read_only:
+            if hasattr(self.sm, "acquire_session_lock"):
+                self.sm.acquire_session_lock(session_id)
+            self.sm.set_active_session_id(session_id)
 
         chat_view = self.query_one(ChatView)
         chat_view.loading = True
@@ -163,6 +172,8 @@ class SessionPersistenceMixin:
 
     def _write_session_data(self, session_data: dict) -> None:
         """Write collected session data into the store (no UI access — safe for threads)."""
+        if getattr(self, "is_read_only", False):
+            return
         with _global_session_write_lock:
             session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
             session.description = session.description or session_data.get("title", "")

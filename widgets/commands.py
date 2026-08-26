@@ -70,13 +70,21 @@ class NewCommand(BaseCommand):
             from core.application.session.stream import cancel_running_subagents
             cancel_running_subagents(app.sm)
 
+        old_id = getattr(app, "current_session_id", None)
+        if old_id and hasattr(app.sm, "release_session_lock"):
+            app.sm.release_session_lock(old_id)
+
         new_id = await new_session(
             app.sm, app.agent,
             cancel_workers=cancel_workers, kill_all_tasks=kill_all_tasks, cancel_subagents=cancel_subagents,
         )
 
+        if hasattr(app.sm, "acquire_session_lock"):
+            app.sm.acquire_session_lock(new_id)
+
         # UI state
         app.is_generating = False
+        app.is_read_only = False
         app.message_queue.clear()
         app.current_session_id = new_id
         app.role = getattr(app.agent, "role", "worker") if app.agent else "worker"
@@ -363,20 +371,48 @@ class ResumeCommand(BaseCommand):
             app.notify("No saved sessions in this project", severity="warning")
             return
 
-        def on_resume_selected(selected_sid: str) -> None:
-            if selected_sid:
-                try:
-                    if hasattr(app, "workers"):
-                        for w in app.workers:
-                            if getattr(w, "is_running", False):
-                                w.cancel()
-                except Exception:
-                    pass
-                app.is_generating = False
-                if hasattr(app, "message_queue"):
-                    app.message_queue.clear()
-                app.load_session_ui(selected_sid)
+        def _apply_selected(sid: str, read_only: bool = False) -> None:
+            try:
+                if hasattr(app, "workers"):
+                    for w in app.workers:
+                        if getattr(w, "is_running", False):
+                            w.cancel()
+            except Exception:
+                pass
+            app.is_generating = False
+            if hasattr(app, "message_queue"):
+                app.message_queue.clear()
+            if read_only:
+                app.load_session_ui(sid, read_only=True)
+            else:
+                app.load_session_ui(sid)
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
+
+        def on_resume_selected(selected_sid: str) -> None:
+            if not selected_sid:
+                app.query_one(MESSAGE_INPUT, ChatInput).focus()
+                return
+
+            if hasattr(app, "sm") and app.sm.is_session_locked(selected_sid) is True:
+                from widgets.presentation.screens.session_conflict import SessionConflictScreen
+
+                def on_conflict_choice(choice: str | None) -> None:
+                    if choice == "fork":
+                        forked = app.sm.fork_session(selected_sid)
+                        if forked:
+                            _apply_selected(forked.id)
+                    elif choice == "steal":
+                        app.sm.steal_session_lock(selected_sid)
+                        _apply_selected(selected_sid)
+                    elif choice == "readonly":
+                        _apply_selected(selected_sid, read_only=True)
+                    else:
+                        app.query_one(MESSAGE_INPUT, ChatInput).focus()
+
+                app.push_screen(SessionConflictScreen(selected_sid), callback=on_conflict_choice)
+                return
+
+            _apply_selected(selected_sid)
 
         curr_sid = getattr(app, "current_session_id", None)
         app.push_screen(ResumeScreen(sessions, current_session_id=curr_sid), callback=on_resume_selected)

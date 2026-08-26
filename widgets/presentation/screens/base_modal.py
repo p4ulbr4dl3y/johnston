@@ -11,13 +11,11 @@ STATUS_TAG_MAP = {
     "ACTIVE": "●",
     "ON": "●",
     "OFF": "○",
-    "ALLOW": "✓",
-    "DENY": "✕",
-    "ASK": "?",
     "AUTH": " ",
     "ERR": "▲",
     "VISIBLE": "●",
     "HIDDEN": "○",
+    "LOCKED": "◆",
 }
 
 

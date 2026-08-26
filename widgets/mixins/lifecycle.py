@@ -31,7 +31,27 @@ class LifecycleMixin:
         self.is_app_active = True
         self.query_one("#message-input", ChatInput).focus()
         if getattr(self, "resume_session_id", None):
-            self.load_session_ui(self.resume_session_id)
+            res_id = self.resume_session_id
+            if hasattr(self, "sm") and self.sm.is_session_locked(res_id) is True:
+                from widgets.presentation.screens.session_conflict import SessionConflictScreen
+
+                def on_init_conflict(choice: str | None) -> None:
+                    if choice == "fork":
+                        forked = self.sm.fork_session(res_id)
+                        if forked:
+                            self.load_session_ui(forked.id)
+                    elif choice == "steal":
+                        self.sm.steal_session_lock(res_id)
+                        self.load_session_ui(res_id)
+                    elif choice == "readonly":
+                        self.load_session_ui(res_id, read_only=True)
+
+                self.push_screen(SessionConflictScreen(res_id), callback=on_init_conflict)
+            else:
+                self.load_session_ui(res_id)
+        elif getattr(self, "current_session_id", None) and hasattr(self, "sm"):
+            if hasattr(self.sm, "acquire_session_lock"):
+                self.sm.acquire_session_lock(self.current_session_id)
         from core.infrastructure.mcp import get_mcp_manager
 
         self.refresh_status_footer()
@@ -117,6 +137,12 @@ class LifecycleMixin:
                     pass
         except Exception as err:
             logger.debug(f"Catalog cleanup error: {err}")
+
+        try:
+            if hasattr(self, "sm") and hasattr(self.sm, "release_all_locks"):
+                self.sm.release_all_locks()
+        except Exception as err:
+            logger.debug(f"Session lock cleanup error: {err}")
 
     async def _kill_all_tasks(self) -> None:
         try:

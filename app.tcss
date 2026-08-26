@@ -617,7 +617,7 @@ ModalScreen {
     content-align: left top !important;
     text-align: left !important;
     color: #e4e4e7;
-    margin: 0;
+    margin: 0 0 1 0;
 }
 
 .modal-markdown-centered MarkdownBulletList,

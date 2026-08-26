@@ -14,6 +14,7 @@ from core.domain.entities.session import (
 )
 from core.infrastructure.platform.paths import PROJECTS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json, atomic_write_jsonl, read_json
+from core.infrastructure.platform.session_lock import SessionLock
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_hash
 
 logger = logging.getLogger(__name__)
@@ -352,6 +353,7 @@ class SessionStore:
         self.config_file = os.path.join(self.project_dir, "config.json")
 
         self._sessions: Dict[str, AgentSession] = {}
+        self._active_locks: Dict[str, SessionLock] = {}
         # In-memory cache of the parsed disk session tree, keyed by a signature
         # of (relpath, mtime_ns, size) across all session JSONL files. Avoids
         # re-reading/parsing every file on each list()/children() call.
@@ -640,6 +642,9 @@ class SessionStore:
                         sessions.append(summary)
 
         sessions.sort(key=lambda s: (s["updated_at"], s["created_at"], s["id"]), reverse=True)
+        for s in sessions:
+            sid = s.get("id")
+            s["is_locked"] = self.is_session_locked(sid) if sid else False
         return sessions
 
     @staticmethod
@@ -767,5 +772,96 @@ class SessionStore:
                     return sess
 
         return None
+
+    # -- locking & forking ----------------------------------------------------
+
+    def _lock_path(self, session_id: str) -> str:
+        safe_id = os.path.basename(session_id or "default")
+        return os.path.join(self.sessions_dir, f"{safe_id}.lock")
+
+    def is_session_locked(self, session_id: str) -> bool:
+        """Check if session is currently locked by another active process."""
+        if not session_id:
+            return False
+        if session_id in self._active_locks:
+            return False
+        is_locked, _ = SessionLock.probe(self._lock_path(session_id))
+        return is_locked
+
+    def get_session_lock_info(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get metadata of process currently holding lock on session, if any."""
+        if not session_id:
+            return None
+        _, meta = SessionLock.probe(self._lock_path(session_id))
+        return meta
+
+    def acquire_session_lock(self, session_id: str) -> bool:
+        """Acquire exclusive lock on session. Returns True on success."""
+        if not session_id:
+            return False
+        if session_id in self._active_locks:
+            return True
+        lock = SessionLock(self._lock_path(session_id))
+        if lock.acquire():
+            self._active_locks[session_id] = lock
+            return True
+        return False
+
+    def release_session_lock(self, session_id: str) -> None:
+        """Release lock held by this process on session."""
+        if not session_id:
+            return
+        lock = self._active_locks.pop(session_id, None)
+        if lock:
+            lock.release()
+
+    def release_all_locks(self) -> None:
+        """Release all locks held by this process."""
+        for lock in list(self._active_locks.values()):
+            lock.release()
+        self._active_locks.clear()
+
+    def steal_session_lock(self, session_id: str) -> bool:
+        """Steal lock from other process and acquire it for this process."""
+        if not session_id:
+            return False
+        self.release_session_lock(session_id)
+        lock = SessionLock.steal(self._lock_path(session_id))
+        if lock:
+            self._active_locks[session_id] = lock
+            return True
+        return False
+
+    def fork_session(self, session_id: str, new_title: Optional[str] = None) -> Optional[AgentSession]:
+        """Create a duplicate copy of a session under a fresh session ID."""
+        import copy
+
+        source = self.get(session_id)
+        if not source:
+            return None
+        new_id = self.generate_session_id()
+        fork_desc = new_title or (f"{source.description} (fork)" if source.description else "Forked session")
+        new_sess = AgentSession(
+            session_id=new_id,
+            kind=source.kind,
+            parent_id=source.parent_id,
+            role=source.role,
+            status=source.status,
+            project_key=self.project_key,
+            description=fork_desc,
+            prompt=source.prompt,
+        )
+        new_sess.messages = copy.deepcopy(source.messages)
+        new_sess.agent_history = copy.deepcopy(source.agent_history)
+        new_sess.tokens_input = source.tokens_input
+        new_sess.tokens_output = source.tokens_output
+        new_sess.total_tokens = source.total_tokens
+        new_sess.cost_usd = source.cost_usd
+        new_sess.last_context_tokens = source.last_context_tokens
+        new_sess.tokens_cache_read = source.tokens_cache_read
+        new_sess.project_dir = source.project_dir
+        new_sess.branch_name = source.branch_name
+        self.save(new_sess)
+        return new_sess
 
 

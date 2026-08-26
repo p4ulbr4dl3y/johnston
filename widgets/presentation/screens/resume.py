@@ -45,10 +45,17 @@ class ResumeScreen(BaseSelectionScreen[str]):
 
     def _format_all_options(self, target_width: int) -> list[str]:
         options = []
+        has_indicator = self.has_active or any(s.get("is_locked") for s in self.sessions)
         for s in self.sessions:
             sid = str(s.get("id"))
             is_active = self.has_active and sid == str(self.current_session_id)
-            prefix = f"{status_tag('ACTIVE')} " if is_active else ("  " if self.has_active else "")
+            is_locked = bool(s.get("is_locked")) and not is_active
+            if is_active:
+                prefix = f"{status_tag('ACTIVE')} "
+            elif is_locked:
+                prefix = f"{status_tag('LOCKED')} "
+            else:
+                prefix = "  " if has_indicator else ""
             title = str(s.get("title", ""))
             count = s.get("message_count", 0)
             step_str = "step" if count == 1 else "steps"

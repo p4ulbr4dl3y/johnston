@@ -117,6 +117,8 @@ class ToolContext:
     @property
     def is_read_only(self) -> bool:
         """Returns whether the current role or execution context is read-only."""
+        if getattr(self.host, "is_read_only", False):
+            return True
         try:
             from core.role_registry import RoleRegistry
 
