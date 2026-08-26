@@ -25,6 +25,7 @@ from widgets.presentation.screens.fork import ForkScreen
 from widgets.presentation.screens.help import HelpScreen
 from widgets.presentation.screens.mcp import MCPScreen
 from widgets.presentation.screens.model import ModelScreen
+from widgets.presentation.screens.rename_session import RenameSessionScreen
 from widgets.presentation.screens.resume import ResumeScreen
 from widgets.presentation.screens.rewind import RewindScreen, RewindSelection
 from widgets.presentation.screens.skills import SkillsScreen
@@ -432,6 +433,45 @@ class ForkCommand(BaseCommand):
             await result
 
 
+class RenameCommand(BaseCommand):
+    name = "/rename"
+    aliases = ["/title", "/name"]
+    description = "Rename the active chat session"
+
+    async def execute(self, app) -> None:
+        curr_sid = getattr(app, "current_session_id", None)
+        if not curr_sid or not hasattr(app, "sm"):
+            app.notify("No active session to rename", severity="warning")
+            return
+
+        sess = app.sm.get(curr_sid)
+        if not sess:
+            app.notify("Session not found", severity="error")
+            return
+
+        current_title = sess.description or app.sm._title_from_messages(sess)
+        if current_title == "Untitled":
+            current_title = ""
+
+        def on_renamed(new_title: str | None) -> None:
+            if new_title is not None:
+                new_title = new_title.strip()
+                if new_title:
+                    sess.description = new_title
+                    app.sm.save(sess)
+                    if hasattr(app, "refresh_status_footer"):
+                        app.refresh_status_footer()
+                    app.notify("Session renamed", severity="info")
+            app.query_one(MESSAGE_INPUT).focus()
+
+        result = app.push_screen(
+            RenameSessionScreen(current_title=current_title),
+            callback=on_renamed,
+        )
+        if asyncio.iscoroutine(result):
+            await result
+
+
 class ResumeCommand(BaseCommand):
     name = "/resume"
     aliases = ["/sessions", "/load"]
@@ -749,6 +789,7 @@ COMMAND_CLASSES = [
     ThinkingEffortCommand,
     RewindCommand,
     ForkCommand,
+    RenameCommand,
     ResumeCommand,
     SubagentsCommand,
     ShellTasksCommand,

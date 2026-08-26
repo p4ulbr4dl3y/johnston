@@ -93,7 +93,7 @@ You run tests and report coverage.""")
         self.assertIsNotNone(role_tool_error(role_ro, "edit"))
 
     def test_tool_name_normalizer_no_alias_resolution(self):
-        from tools.registry import normalize_tool_name
+        from core.infrastructure.runtime.tool_name import normalize_tool_name
 
         role_ro = AgentRole(
             key="reviewer",

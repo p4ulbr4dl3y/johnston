@@ -102,6 +102,10 @@ def _schedule_background(coro: Any) -> None:
 # Hard cap on a single snapshot log so a runaway tool output cannot fill disk.
 MAX_SNAPSHOT_LOG_BYTES = 50 * 1024 * 1024
 
+# Shared default cap for tool output handed to the model (truncate_output and
+# the registry's post-MCall truncation must stay in sync).
+MAX_TOOL_OUTPUT_CHARS = 8000
+
 
 def _write_output_log(log_content: str, *, tool_name: str = "", ext: str = ".log") -> Optional[str]:
     """Writes full output to a unique snapshot file under LOGS_DIR and returns its path.
@@ -143,7 +147,7 @@ def _write_output_log(log_content: str, *, tool_name: str = "", ext: str = ".log
 
 def truncate_output(
     text: str,
-    max_chars: int = 8000,
+    max_chars: int = MAX_TOOL_OUTPUT_CHARS,
     hint: str = "",
     save_log: bool = True,
     tool_name: str = "",
@@ -269,6 +273,25 @@ def check_mcp_role_policy(ctx_or_app: Any, target: str) -> Optional[ToolResult]:
     role = getattr(role_source, "role", "worker") if role_source is not None else "worker"
     role_def = RoleRegistry.get_instance().get_role(str(role).lower())
     return role_tool_error(role_def, target)
+
+
+def resolve_subagent_identity(*sources: Any) -> tuple[bool, str]:
+    """Detect subagent execution from any of ``sources`` (context/agent/host).
+
+    Returns ``(is_subagent, subagent_role)``. The role falls back to ``"worker"``
+    when running as a subagent but no role attribute is found on any source.
+    Shared by the registry's permission gate and ``confirm_permission`` so the
+    detection rules cannot drift between the two call sites.
+    """
+    live_sources = [s for s in sources if s is not None]
+    is_sub = any(getattr(s, "is_subagent", False) is True for s in live_sources)
+    raw_role = ""
+    for source in live_sources:
+        candidate = getattr(source, "subagent_role", "") or getattr(source, "role", "")
+        if isinstance(candidate, str) and candidate:
+            raw_role = candidate
+            break
+    return is_sub, (raw_role or ("worker" if is_sub else ""))
 
 
 async def confirm_permission(

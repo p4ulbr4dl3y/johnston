@@ -583,13 +583,13 @@ class SessionStore:
                 if not has_content:
                     return None
 
+                desc = str(first.get("description") or "").strip()
+                if desc:
+                    clean_desc = " ".join(desc.split())
+                    title = clean_desc[:55] + "..." if len(clean_desc) > 55 else clean_desc
+
                 if not title:
-                    desc = str(first.get("description") or "").strip()
-                    if desc:
-                        clean_desc = " ".join(desc.split())
-                        title = clean_desc[:55] + "..." if len(clean_desc) > 55 else clean_desc
-                    else:
-                        title = "Untitled"
+                    title = "Untitled"
 
                 created_at = _coerce_float(first.get("created_at")) or 0.0
                 updated_at = _coerce_float(first.get("updated_at")) or created_at
@@ -651,6 +651,10 @@ class SessionStore:
 
     @staticmethod
     def _title_from_messages(sess: AgentSession) -> str:
+        if sess.description:
+            clean = " ".join(str(sess.description).split())
+            if clean:
+                return clean[:55] + "..." if len(clean) > 55 else clean
         for m in sess.messages:
             if isinstance(m, dict) and m.get("type") == "user":
                 text = str(m.get("display_text") or m.get("text", "")).strip()

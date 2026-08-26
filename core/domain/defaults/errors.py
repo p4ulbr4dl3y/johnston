@@ -1,7 +1,9 @@
 """Pure error-string helpers and the structured tool-result entity for the domain layer. No IO, no state."""
+import inspect
+import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 __all__ = [
     "ToolResult",
@@ -10,6 +12,7 @@ __all__ = [
     "FormattedToolError",
     "format_tool_error",
     "parse_tool_result_step",
+    "normalize_tool_result",
 ]
 
 
@@ -126,3 +129,29 @@ class ToolResult:
 
     def __str__(self) -> str:
         return self.content or ""
+
+
+async def normalize_tool_result(result: Any) -> ToolResult:
+    """Normalize a raw tool-execution result into a :class:`ToolResult`.
+
+    Single shared implementation for every execution path (native tools via
+    ``tools.registry``, MCP adapter output, agent-side normalization). Accepts
+    one result value or an awaitable. Structured ``ToolResult`` objects pass
+    through unchanged; raw ``str``/``None``/dict values (e.g. MCP adapter
+    output) are normalized by inspecting the ``ERR:`` prefix convention, never
+    treated as errors otherwise.
+    """
+    if inspect.isawaitable(result):
+        result = await result
+    if isinstance(result, ToolResult):
+        return result
+    if result is None:
+        return ToolResult.done("")
+    if isinstance(result, Exception):
+        return ToolResult.error("execute", detail=str(result))
+    if isinstance(result, (dict, list)):
+        return ToolResult.done(json.dumps(result, ensure_ascii=False))
+    text = str(result)
+    if text.lstrip().lower().startswith("err:"):
+        return ToolResult(content=text, status=ToolResultStatus.ERROR)
+    return ToolResult.done(text)

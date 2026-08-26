@@ -741,10 +741,10 @@ class MCPProcessClient:
         """Helper to parse MCP tool call JSON-RPC response or error dict into string output.
 
         Every failure path returns an ``ERR:``-prefixed string so upper layers
-        (``tools.registry._wrap_execute``, agent ``_normalize_tool_result``)
-        classify it as an error just like native-tool failures. Per the MCP
-        spec, a result with ``isError: true`` is a tool-level failure even
-        though the JSON-RPC round-trip itself succeeded.
+        (``normalize_tool_result`` in the registry and agent loop) classify it
+        as an error just like native-tool failures. Per the MCP spec, a result
+        with ``isError: true`` is a tool-level failure even though the JSON-RPC
+        round-trip itself succeeded.
         """
         if not res:
             return format_tool_error("mcp", detail=f"No response from MCP server '{self.name}'", name=tool_name)

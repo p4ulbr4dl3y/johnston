@@ -453,9 +453,10 @@ class ProviderManager:
         thinking_effort = self.get_provider_thinking_effort(provider_key, model_val) if provider_key else EFFORT_AUTO
 
         from core.base_provider import BaseAgent
+        from core.infrastructure.runtime.tool_name import normalize_tool_name
         from tools.invoke_subagent import InvokeSubagentTool
         from tools.read import process_image_file_sync
-        from tools.registry import execute_tool, get_default_tools, normalize_tool_name
+        from tools.registry import execute_tool, get_default_tools
 
         agent = BaseAgent(
             api_key=stored_key or (pdef.api_key if pdef else ""),

@@ -858,7 +858,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         else:
                             tool_result = ToolResult.error("error", "tool_executor not provided", t_name)
 
-                    resolved = self._normalize_tool_result(tool_result)
+                    resolved = await self._normalize_tool_result(tool_result)
 
                     source_for_image = resolved.content if isinstance(tool_result, ToolResult) else tool_result
                     display_result = tool_result

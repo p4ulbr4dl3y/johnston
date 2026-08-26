@@ -1,4 +1,3 @@
-import json
 from typing import Any, Dict, List, Tuple
 
 from core.application.generation.prompt_builder import PromptBuilder
@@ -21,26 +20,15 @@ class ToolMixin:
             return normalizer(tool_name or "")
         return normalize_tool_name(tool_name)
 
-    def _normalize_tool_result(self, result: Any) -> Any:
+    async def _normalize_tool_result(self, result: Any) -> Any:
         """Normalize a raw tool result into a :class:`ToolResult`.
 
-        Accepts ``ToolResult`` (returned as-is), a raw ``ERR:`` string (kept
-        verbatim and marked as an explicit error), a dict/list (JSON-serialized
-        so the model message stays a string), ``None`` -> empty, and any other
-        value -> ``str()``. Guarantees a plain string ``content`` for the model.
+        Thin delegation to the shared domain-level normalizer so the registry,
+        MCP adapter path and agent loop can never drift apart.
         """
-        from core.domain.defaults.errors import ToolResult, ToolResultStatus
+        from core.domain.defaults.errors import normalize_tool_result
 
-        if isinstance(result, ToolResult):
-            return result
-        if result is None:
-            return ToolResult.done("")
-        if isinstance(result, (dict, list)):
-            return ToolResult.done(json.dumps(result, ensure_ascii=False))
-        text = str(result)
-        if text.lstrip().lower().startswith("err:"):
-            return ToolResult(content=text, status=ToolResultStatus.ERROR)
-        return ToolResult.done(text)
+        return await normalize_tool_result(result)
 
     def _tool_policy_error(self, tool_name: str, mode_def: Any) -> Any:
         from core.domain.policies.role_policy import role_tool_error

@@ -2,7 +2,8 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.domain.policies.permission_policy import PermissionAction, PermissionDecision
-from tools.registry import REGISTRY, execute_tool, get_default_tools, normalize_tool_name
+from core.infrastructure.runtime.tool_name import normalize_tool_name
+from tools.registry import REGISTRY, execute_tool, get_default_tools
 
 
 class TestRegistry(unittest.IsolatedAsyncioTestCase):

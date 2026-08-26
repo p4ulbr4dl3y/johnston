@@ -29,6 +29,7 @@ COMMANDS_DATA: list[tuple[str, str]] = [
     ("/questions", "Resume pending user questions wizard"),
     ("/rewind", "Rollback chat history to a selected message"),
     ("/fork", "Fork session from a selected message"),
+    ("/rename", "Rename the active chat session"),
     ("/resume", "Switch and resume saved session dialogs"),
     ("/help", "Open this help screen"),
 ]

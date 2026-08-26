@@ -124,8 +124,8 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
 
 
 def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
+    from core.infrastructure.runtime.tool_name import normalize_tool_name as _normalize
     from tools.registry import REGISTRY
-    from tools.registry import normalize_tool_name as _normalize
 
     name = _normalize(tool_name)
     args = args if isinstance(args, dict) else {}
@@ -205,7 +205,7 @@ def _format_active_tool_progress(
     turn_events: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """Format an active tool invocation into a short, human-like activity badge."""
-    from tools.registry import normalize_tool_name as _normalize
+    from core.infrastructure.runtime.tool_name import normalize_tool_name as _normalize
 
     name = _normalize(tool_name) if tool_name else ""
     if not isinstance(args, dict):

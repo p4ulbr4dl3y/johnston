@@ -135,6 +135,16 @@ class LifecycleMixin:
             logger.debug(f"Catalog cleanup error: {err}")
 
         try:
+            from tools.registry import aclose_tools
+
+            if loop is not None and loop.is_running():
+                loop.create_task(aclose_tools())
+            else:
+                asyncio.run(aclose_tools())
+        except Exception as err:
+            logger.debug(f"Tool instance cleanup error: {err}")
+
+        try:
             if hasattr(self, "sm") and hasattr(self.sm, "release_all_locks"):
                 self.sm.release_all_locks()
         except Exception as err:

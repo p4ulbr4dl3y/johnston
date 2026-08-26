@@ -36,9 +36,9 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
     def __init__(self, resume_session_id: str | None = None):
         super().__init__()
+        from core.infrastructure.runtime.tool_name import normalize_tool_name
         from core.permission_manager import PermissionManager
         from core.role_registry import RoleRegistry
-        from tools.registry import normalize_tool_name
 
         PermissionManager.configure_instance(tool_name_normalizer=normalize_tool_name)
         RoleRegistry._instance = RoleRegistry(tool_name_normalizer=normalize_tool_name)

@@ -1,10 +1,9 @@
 import difflib
 import inspect
-import json
 import time
 from typing import Any, Dict, Type
 
-from core.domain.defaults.errors import ToolResult, ToolResultStatus
+from core.domain.defaults.errors import ToolResult, normalize_tool_result
 from core.infrastructure.runtime.tool_name import normalize_tool_name
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool, _resolve_app
@@ -198,7 +197,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             if err:
                 return err
 
-            return await _wrap_execute(tool_inst.execute(args, ctx))
+            return await normalize_tool_result(tool_inst.execute(args, ctx))
         except Exception as e:
             return ToolResult.error("execute", detail=str(e), name=name)
 
@@ -287,7 +286,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         target_server = target_entry.get("_mcp_server") if isinstance(target_entry, dict) else None
         mcp_res = await execute_mcp_tool(mcp_mgr, name, args, target_server=target_server)
         if mcp_res is not None:
-            tool_res = await _wrap_execute(mcp_res)
+            tool_res = await normalize_tool_result(mcp_res)
             if not tool_res.is_error and tool_res.content and len(tool_res.content) > 8000:
                 tool_res.content = truncate_output(
                     tool_res.content,
@@ -300,27 +299,3 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return ToolResult.error("mcp", detail=str(e), name=name)
 
     return ToolResult.error("unknown", name=name)
-
-
-async def _wrap_execute(result: Any) -> ToolResult:
-    """Wrap a raw tool ``execute()`` result into a :class:`ToolResult`.
-
-    Accepts one result value (already awaited) or an awaitable. Tools now return
-    structured ``ToolResult`` objects, which pass through unchanged; raw ``str``/
-    ``None``/dict values (e.g. MCP adapter output) are normalized by inspecting
-    the ``ERR:`` prefix convention, never treated as errors otherwise.
-    """
-    if inspect.isawaitable(result):
-        result = await result
-    if isinstance(result, ToolResult):
-        return result
-    if result is None:
-        return ToolResult.done("")
-    if isinstance(result, Exception):
-        return ToolResult.error("execute", detail=str(result))
-    if isinstance(result, (dict, list)):
-        return ToolResult.done(json.dumps(result, ensure_ascii=False))
-    text = str(result)
-    if text.lstrip().lower().startswith("err:"):
-        return ToolResult(content=text, status=ToolResultStatus.ERROR)
-    return ToolResult.done(text)

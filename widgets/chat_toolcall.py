@@ -345,7 +345,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     }
 
     def is_expandable(self) -> bool:
-        from tools.registry import normalize_tool_name
+        from core.infrastructure.runtime.tool_name import normalize_tool_name
 
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
         # Shell output is always useful to the user (return code / stdout),
@@ -398,7 +398,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if is_sequential:
             classes += " tool-sequential"
         super().__init__(classes=classes)
-        from tools.registry import normalize_tool_name
+        from core.infrastructure.runtime.tool_name import normalize_tool_name
 
         self.is_sequential = is_sequential
         self.tool_type = tool_type
