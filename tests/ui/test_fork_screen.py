@@ -61,3 +61,23 @@ class TestForkScreen(unittest.TestCase):
         screen.on_option_list_option_selected(mock_event)
 
         self.assertEqual(dismissed_val, FORK_CURRENT_STATE)
+
+    def test_fork_screen_search_filtering(self):
+        user_messages = [
+            (0, "apple banana"),
+            (1, "cherry orange"),
+        ]
+        screen = ForkScreen(user_messages)
+        self.assertTrue(screen.show_search)
+
+        screen._filter_options("banana")
+        self.assertEqual(len(screen.filtered_items), 1)
+        self.assertEqual(screen.filtered_items[0], 0)
+
+        screen._filter_options("cherry")
+        self.assertEqual(len(screen.filtered_items), 1)
+        self.assertEqual(screen.filtered_items[0], 1)
+
+        screen._filter_options("")
+        self.assertEqual(len(screen.filtered_items), 3)
+

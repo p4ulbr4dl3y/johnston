@@ -1,7 +1,7 @@
 from rich.table import Table
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Horizontal, Vertical
 from textual.widgets import Label, Markdown, Static
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
@@ -123,7 +123,8 @@ class HelpScreen(BaseModalScreen[None]):
         try:
             scroll_box = self.query_one("#help-scroll-box")
             screen_h = self.app.size.height if getattr(self, "app", None) else 24
-            scroll_box.styles.max_height = max(5, min(16, screen_h - 9))
+            max_items = max(len(COMMANDS_DATA), len(KEYBINDINGS_DATA))
+            scroll_box.styles.max_height = max(5, min(max_items, screen_h - 9))
         except Exception:
             pass
 
@@ -136,7 +137,9 @@ class HelpScreen(BaseModalScreen[None]):
                 id="help-header-md",
                 classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}",
             )
-            yield Static(self._get_tabs_markup(), id="help-tabs", classes=MODAL_MARKDOWN)
+            with Horizontal(id="help-tabs"):
+                yield Static("Commands", id="help-tab-commands", classes="help-tab active")
+                yield Static("Keybindings", id="help-tab-keybindings", classes="help-tab")
             with ToolScrollBox(id="help-scroll-box"):
                 yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
             yield Label("tab / ←→: switch • esc: close", id=MODAL_HINT_ID)
@@ -153,8 +156,15 @@ class HelpScreen(BaseModalScreen[None]):
         try:
             from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
 
-            tabs_static = self.query_one("#help-tabs", Static)
-            tabs_static.update(self._get_tabs_markup())
+            tab_cmd = self.query_one("#help-tab-commands", Static)
+            tab_keys = self.query_one("#help-tab-keybindings", Static)
+            if self.active_tab == 0:
+                tab_cmd.set_class(True, "active")
+                tab_keys.set_class(False, "active")
+            else:
+                tab_cmd.set_class(False, "active")
+                tab_keys.set_class(True, "active")
+
             body_static = self.query_one("#help-body", Static)
             body_static.update(self._get_active_table())
 
@@ -163,6 +173,21 @@ class HelpScreen(BaseModalScreen[None]):
             hint_lbl.update("tab/←→: switch • esc" if is_compact else "tab / ←→: switch • esc: close")
         except Exception:
             pass
+
+    def on_click(self, event: events.Click) -> None:
+        target = event.widget
+        if target is None:
+            return
+        if target.id == "help-tab-commands":
+            if self.active_tab != 0:
+                self.active_tab = 0
+                self._refresh_view()
+            event.stop()
+        elif target.id == "help-tab-keybindings":
+            if self.active_tab != 1:
+                self.active_tab = 1
+                self._refresh_view()
+            event.stop()
 
     async def _on_key(self, event: events.Key) -> None:
         if event.key in ("left", "right", "tab", "backtab"):

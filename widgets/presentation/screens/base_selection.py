@@ -117,6 +117,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         fit_content: bool = False,
         min_dialog_width: int = MODAL_MIN_WIDTH,
         max_dialog_width: int | None = None,
+        max_options_height: int = 12,
     ):
         super().__init__()
         self.title = title
@@ -133,6 +134,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         self.fit_content = fit_content
         self.min_dialog_width = min_dialog_width
         self.max_dialog_width = max_dialog_width
+        self.max_options_height = max_options_height
         self.filtered_items = list(items)
         self.filtered_options = list(options)
         self._norm_targets: dict[int, str] = {}
@@ -209,7 +211,8 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
                 overhead = 8 if not self.show_search else 10
 
             opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
-            opt_list.styles.max_height = max(2, usable_h - overhead)
+            max_opt_h = getattr(self, "max_options_height", 12)
+            opt_list.styles.max_height = max(2, min(max_opt_h, usable_h - overhead))
         except Exception:
             pass
 

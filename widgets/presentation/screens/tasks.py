@@ -4,7 +4,7 @@ from typing import Any, Optional
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Label, Markdown, OptionList, RichLog
+from textual.widgets import Input, Label, Markdown, OptionList, RichLog
 from textual.widgets.option_list import Option
 
 from core.infrastructure.presentation.tool_display import (
@@ -13,12 +13,15 @@ from core.infrastructure.presentation.tool_display import (
 )
 from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
 from widgets.presentation.screens.base_modal import BaseModalScreen
-from widgets.presentation.screens.base_selection import HeaderWrapOptionList
+from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
     MODAL_MARKDOWN_CENTERED,
+    MODAL_SEARCH_INPUT,
+    MODAL_SEARCH_INPUT_ID,
+    TAB_KEYS,
 )
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, format_badge_row, option_list_row_width
@@ -223,12 +226,12 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self.dismiss()
 
 
-class BaseTasksListScreen(BaseModalScreen[None]):
+class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     """Base modal screen for listing and managing background items (shell tasks, subagents)."""
 
     BINDINGS = expand_bindings([
         ("escape", "close", "Close"),
-        ("k", "kill_task", "Kill Task"),
+        ("ctrl+k", "kill_task", "Kill Task"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ])
@@ -236,12 +239,14 @@ class BaseTasksListScreen(BaseModalScreen[None]):
     title_id: str = "tasks-title"
     option_list_id: str = "tasks-option-list"
     hint_action_name: str = "enter: select"
+    search_nav_filtered_attr: str = "filtered_tasks"
 
     def __init__(self):
         super().__init__()
         self.search_query = ""
         self.filtered_tasks = []
         self._last_signatures = None
+        self.search_nav_option_list_id = self.option_list_id
 
     def _get_header_md(self) -> str:
         raise NotImplementedError
@@ -274,17 +279,48 @@ class BaseTasksListScreen(BaseModalScreen[None]):
             yield Markdown(
                 self._get_header_md(), id=self.title_id, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
+            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id=self.option_list_id)
             yield Label(f"{self.hint_action_name} • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
+        self.search_nav_option_list_id = self.option_list_id
         self._last_signatures = None
         self.update_tasks_list()
         try:
-            self._get_option_list().focus()
+            self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         except Exception:
-            pass
+            try:
+                self._get_option_list().focus()
+            except Exception:
+                pass
         self.set_interval(0.5, self.update_tasks_list)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        self.search_query = event.value
+        self._last_signatures = None
+        self.update_tasks_list()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        opt_list = self._get_option_list()
+        idx = opt_list.highlighted
+        if idx is not None and 0 <= idx < len(self.filtered_tasks):
+            item = self.filtered_tasks[idx]
+            if item is not None:
+                self._on_task_selected(item)
+                return
+        for item in self.filtered_tasks:
+            if item is not None:
+                self._on_task_selected(item)
+                return
+
+    def _on_key(self, event: events.Key) -> None:
+        if event.key in TAB_KEYS:
+            event.prevent_default()
+            event.stop()
+            return
+        if self._handle_search_navigation(event):
+            return
 
     def _update_hint(self) -> None:
         try:
@@ -303,13 +339,13 @@ class BaseTasksListScreen(BaseModalScreen[None]):
             action_short = self.hint_action_name.split(":")[0]
             if is_compact:
                 hint_str = (
-                    f"{action_short} • k: kill • esc"
+                    f"{action_short} • c-k: kill • esc"
                     if is_running
                     else f"{action_short} • ↑↓ • esc"
                 )
             else:
                 hint_str = (
-                    f"{self.hint_action_name} • ↑↓: nav • k: kill • esc: close"
+                    f"{self.hint_action_name} • ↑↓: nav • ctrl+k: kill • esc: close"
                     if is_running
                     else f"{self.hint_action_name} • ↑↓: nav • esc: close"
                 )
@@ -338,8 +374,16 @@ class BaseTasksListScreen(BaseModalScreen[None]):
         self._last_signatures = new_signatures
 
         if not tasks:
+            if not self.search_query:
+                self.filtered_tasks = []
+                self.dismiss()
+                return
+            try:
+                opt_list = self._get_option_list()
+                opt_list.clear_options()
+            except Exception:
+                pass
             self.filtered_tasks = []
-            self.dismiss()
             return
 
         try:

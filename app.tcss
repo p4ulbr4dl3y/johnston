@@ -561,15 +561,41 @@ ModalScreen {
 }
 
 #help-tabs {
+    width: 100%;
+    height: auto;
     margin-top: 0;
     margin-bottom: 1;
     padding: 0 1;
 }
 
+.help-tab {
+    width: auto;
+    height: 1;
+    color: #71717a;
+    padding: 0 1;
+    margin-right: 2;
+}
+
+.help-tab.active {
+    background: #27272a;
+    color: #ffffff;
+    text-style: bold;
+}
+
+.help-tab:hover {
+    background: #3f3f46;
+    color: #ffffff;
+}
+
+.help-tab.active:hover {
+    background: #27272a;
+    color: #ffffff;
+}
+
 #help-scroll-box {
     width: 100%;
     height: auto;
-    max-height: 15;
+    max-height: 20;
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-size: 0 0 !important;
@@ -652,6 +678,7 @@ ModalScreen {
 
 #wizard-summary,
 #rewind-files {
+    display: none;
     width: 100%;
     height: auto;
     margin-bottom: 0;

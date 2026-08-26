@@ -175,3 +175,24 @@ class TestRewindScreen(unittest.TestCase):
         res = format_rewind_files(["1.py", "2.py", "3.py", "4.py", "5.py"], max_show=4)
         plain = res.plain
         self.assertEqual(plain, "Files to revert:\n  1.py\n  2.py\n  3.py\n  4.py\n  ... and 1 more")
+
+    def test_rewind_screen_search_filtering(self):
+        user_messages = [
+            RewindEntry(0, "refactor database client", "+10 / -5"),
+            RewindEntry(1, "fix authentication bug", "+2 / -1"),
+            RewindEntry(2, "update documentation", "no changes"),
+        ]
+        screen = RewindScreen(user_messages, checkpoints_enabled=True)
+        self.assertEqual(len(screen.filtered_entries), 3)
+
+        screen._apply_filter("database")
+        self.assertEqual(len(screen.filtered_entries), 1)
+        self.assertEqual(screen.filtered_entries[0].index, 0)
+
+        screen._apply_filter("auth")
+        self.assertEqual(len(screen.filtered_entries), 1)
+        self.assertEqual(screen.filtered_entries[0].index, 1)
+
+        screen._apply_filter("")
+        self.assertEqual(len(screen.filtered_entries), 3)
+

@@ -22,6 +22,34 @@ class TestHelpScreen(unittest.TestCase):
         self.assertIn("escape", keys)
         self.assertIn("enter", keys)
 
+    def test_on_click_tab_switch(self):
+        s = HelpScreen()
+        s._refresh_view = MagicMock()
+
+        # Click on keybindings tab
+        target_keys = MagicMock()
+        target_keys.id = "help-tab-keybindings"
+        event_keys = MagicMock()
+        event_keys.widget = target_keys
+
+        s.on_click(event_keys)
+        self.assertEqual(s.active_tab, 1)
+        s._refresh_view.assert_called_once()
+        event_keys.stop.assert_called_once()
+
+        # Click on commands tab
+        s._refresh_view.reset_mock()
+        target_cmd = MagicMock()
+        target_cmd.id = "help-tab-commands"
+        event_cmd = MagicMock()
+        event_cmd.widget = target_cmd
+
+        s.on_click(event_cmd)
+        self.assertEqual(s.active_tab, 0)
+        s._refresh_view.assert_called_once()
+        event_cmd.stop.assert_called_once()
+
+
 
 class TestResumeScreen(unittest.TestCase):
     def test_init_with_sessions(self):
@@ -179,12 +207,12 @@ class TestTaskScreens(unittest.TestCase):
     def test_subagents_bindings(self):
         keys = [b[0] for b in SubagentsScreen.BINDINGS]
         self.assertIn("escape", keys)
-        self.assertIn("k", keys)
+        self.assertIn("ctrl+k", keys)
 
     def test_shell_bindings(self):
         keys = [b[0] for b in ShellTasksScreen.BINDINGS]
         self.assertIn("escape", keys)
-        self.assertIn("k", keys)
+        self.assertIn("ctrl+k", keys)
 
     def test_shell_tasks_screen_empty_dismisses(self):
         s = ShellTasksScreen()
@@ -276,6 +304,54 @@ class TestTaskScreens(unittest.TestCase):
         with patch.object(ShellTasksScreen, "is_mounted", new_callable=PropertyMock, return_value=True):
             asyncio.run(s.action_kill_task())
             s.update_tasks_list.assert_not_called()
+
+    def test_tasks_screen_search_and_nav(self):
+        from textual.widgets import Input
+
+        s = ShellTasksScreen()
+        mock_task1 = MagicMock()
+        mock_task1.is_background = True
+        mock_task1.is_running = True
+        mock_task1.task_id = "task-1"
+        mock_task1.kind = "shell"
+        mock_task1.command = "pytest tests"
+        mock_task1.session_id = "sess-1"
+
+        mock_task2 = MagicMock()
+        mock_task2.is_background = True
+        mock_task2.is_running = False
+        mock_task2.task_id = "task-2"
+        mock_task2.kind = "shell"
+        mock_task2.command = "ruff check"
+        mock_task2.session_id = "sess-1"
+
+        mock_app = MagicMock()
+        mock_app.task_manager = [mock_task1, mock_task2]
+        mock_app.current_session_id = "sess-1"
+
+        with patch.object(ShellTasksScreen, "app", new_callable=PropertyMock, return_value=mock_app):
+            tasks = s._get_filtered_tasks()
+            self.assertEqual(len(tasks), 2)
+
+            # Test search filter
+            s.search_query = "ruff"
+            filtered = s._get_filtered_tasks()
+            self.assertEqual(len(filtered), 1)
+            self.assertEqual(filtered[0]["id"], "task-2")
+
+        # Test input changed
+        s.update_tasks_list = MagicMock()
+        s.on_input_changed(Input.Changed(Input(), "pytest"))
+        self.assertEqual(s.search_query, "pytest")
+        s.update_tasks_list.assert_called_once()
+
+        # Test tab key suppression
+        tab_event = MagicMock()
+        tab_event.key = "tab"
+        s._on_key(tab_event)
+        tab_event.prevent_default.assert_called_once()
+        tab_event.stop.assert_called_once()
+
 
 
 

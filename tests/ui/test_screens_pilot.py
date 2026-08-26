@@ -311,8 +311,15 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app.run_test() as pilot:
             await pilot.pause()
+            await pilot.click("#help-tab-keybindings")
+            await pilot.pause()
+            self.assertEqual(screen.active_tab, 1)
+            await pilot.click("#help-tab-commands")
+            await pilot.pause()
+            self.assertEqual(screen.active_tab, 0)
             await pilot.press("tab")
             await pilot.pause()
+            self.assertEqual(screen.active_tab, 1)
             await pilot.press("escape")
             await pilot.pause()
 

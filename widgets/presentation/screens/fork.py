@@ -1,8 +1,9 @@
 from rich.markup import escape
 from textual import events
-from textual.widgets import OptionList
+from textual.widgets import Input
 
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
+from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT
 from widgets.utils.row_format import MODAL_DEFAULT_ROW_WIDTH, ellipsize, option_list_row_width
 
 FORK_CURRENT_STATE = -1
@@ -24,7 +25,8 @@ class ForkScreen(BaseSelectionScreen[int]):
             options=options,
             items=items,
             default_value=default_val,
-            show_search=False,
+            show_search=True,
+            search_placeholder="Search...",
             hint_text="enter: fork • ↑↓: nav • esc: cancel",
         )
 
@@ -47,16 +49,13 @@ class ForkScreen(BaseSelectionScreen[int]):
     def _refresh_options(self) -> None:
         target_w = self._row_width()
         self.raw_options = self._format_options(target_w)
-        self.filtered_options = list(self.raw_options)
-        try:
-            opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
-            saved_idx = opt_list.highlighted
-            opt_list.clear_options()
-            opt_list.add_options(self.filtered_options)
-            if saved_idx is not None and 0 <= saved_idx < len(self.filtered_options):
-                opt_list.highlighted = saved_idx
-        except Exception:
-            pass
+        query = ""
+        if self.show_search:
+            try:
+                query = self.query_one(MODAL_SEARCH_INPUT, Input).value
+            except Exception:
+                pass
+        self._filter_options(query)
 
     def on_resize(self, event: events.Resize) -> None:
         super().on_resize(event)
