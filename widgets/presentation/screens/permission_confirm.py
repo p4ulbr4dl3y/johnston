@@ -17,6 +17,8 @@ from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import (
     BREAKPOINT_HINT,
     MODAL_CONTENT_GUTTER,
+    MODAL_MIN_WIDTH,
+    MODAL_WIDE_MAX_WIDTH,
     apply_modal_fit,
     is_compact_width,
     modal_content_width,
@@ -373,7 +375,13 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         try:
             dialog = self.query_one("#modal-dialog")
             content_w = self._calculate_content_width()
-            apply_modal_fit(dialog, content_w, min_width=52, max_width=104)
+            apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_WIDE_MAX_WIDTH)
+        except Exception:
+            pass
+        try:
+            scroll_box = self.query_one(".tool-scroll-box")
+            screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            scroll_box.styles.max_height = max(4, min(18, screen_h - 12))
         except Exception:
             pass
 
@@ -394,14 +402,17 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         return "enter: select • ↑↓: nav • r: feedback • esc: deny"
 
     def on_resize(self, event) -> None:
+        self._apply_dialog_fit()
         try:
             inp = self.query_one("#reject-reason-input", Input)
-            if not inp.display:
-                hint_label = self.query_one("#modal-hint", Label)
-                hint_label.update(self._build_hint_text(event.size.width))
+            if inp.display:
+                self._focus_input()
         except Exception:
             pass
-        self._apply_dialog_fit()
+        try:
+            self.query_one("#modal-hint", Label).update(self._build_hint_text(resolve_width(self)))
+        except Exception:
+            pass
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         if not self.is_mounted:

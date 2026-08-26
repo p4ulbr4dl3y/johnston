@@ -16,7 +16,7 @@ from widgets.presentation.screens.base_selection import ModalSearchNavMixin
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import BREAKPOINT_COMPACT, BREAKPOINT_HINT, is_compact_width, resolve_width
-from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width
+from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width, ellipsize
 
 
 class DiffHeader(ResizeDebounceMixin, Static):
@@ -47,15 +47,18 @@ class DiffHeader(ResizeDebounceMixin, Static):
         esc_label = "esc: back" if self.from_rewind else "esc: close"
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
-            max_stat_len = max(10, width - 24)
-            stat = self.stats_summary
-            if len(stat) > max_stat_len:
-                stat = stat[: max_stat_len - 1] + "…"
-            left_text = (
-                f"[bold #ffffff]Diff[/]  [#71717a]•[/]  "
-                f"[#f4f4f5]{escape(self.title_text[:14])}[/]  "
-                f"[#71717a]({escape(stat)})[/]"
-            )
+            if width < 52:
+                title_short = escape(ellipsize(self.title_text, 12))
+                left_text = f"[bold #ffffff]Diff[/]  [#71717a]•[/]  [#f4f4f5]{title_short}[/]"
+            else:
+                max_stat_len = max(8, width - 30)
+                stat = ellipsize(self.stats_summary, max_stat_len)
+                title_short = escape(ellipsize(self.title_text, max(10, width // 4)))
+                left_text = (
+                    f"[bold #ffffff]Diff[/]  [#71717a]•[/]  "
+                    f"[#f4f4f5]{title_short}[/]  "
+                    f"[#71717a]({escape(stat)})[/]"
+                )
             right_text = "[#71717a]esc[/]"
         else:
             left_text = (
@@ -130,10 +133,12 @@ class DiffFooter(ResizeDebounceMixin, Static):
             left_text = "[dim #71717a]No file selected[/]"
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
-            if self.compact_view == "diff":
-                right_text = "[#71717a]esc: files  •  pgup/pgdn: scroll[/]"
+            if width < 52:
+                right_text = "[#71717a]esc: back[/]" if self.compact_view == "diff" else "[#71717a]enter • esc[/]"
+            elif self.compact_view == "diff":
+                right_text = "[#71717a]esc: files  •  pgup/dn[/]"
             else:
-                right_text = "[#71717a]enter: view diff  •  esc: close[/]"
+                right_text = "[#71717a]enter: view  •  esc: close[/]"
         elif width >= BREAKPOINT_HINT:
             right_text = "[#71717a]↑↓: files  •  tab: toggle sidebar  •  pgup/pgdn: scroll[/]"
         else:

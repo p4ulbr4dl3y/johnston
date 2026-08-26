@@ -10,6 +10,7 @@ from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 from widgets.utils.responsive import BREAKPOINT_COMPACT, is_compact_width, resolve_width
+from widgets.utils.row_format import ellipsize
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
 STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
@@ -335,7 +336,8 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             # Row 1 (LLM): ⠋ Action • claude-3.7  <left> | <right> 45% ctx • $0.02
             row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
             if is_connected and clean_model and clean_model != "[Select model: /models]":
-                disp_model = clean_model if len(clean_model) <= 18 else clean_model[:17] + "…"
+                max_model_len = 10 if width < 50 else 18
+                disp_model = ellipsize(clean_model, max_model_len)
                 row1_left_parts.append(f"[{THEME_SECONDARY}]{disp_model}[/]")
             row1_left = STATUS_SEP_COMPACT.join(row1_left_parts)
 
@@ -350,17 +352,19 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
 
             # Row 2 (Env): johnston • main (+3/-1) • sb:on • mode  <left> | <right> ⚡ 2a • 1s
-            dir_basename = os.path.basename(os.path.abspath(directory)) or directory
+            dir_raw = os.path.basename(os.path.abspath(directory)) or directory
+            dir_basename = ellipsize(dir_raw, 12 if width < 50 else 24)
             row2_left_parts = [f"[{THEME_SECONDARY}]{dir_basename}[/]"]
-            if branch and diff_text:
+            if branch and diff_text and width >= 50:
                 row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/] [{THEME_SECONDARY}]({diff_text})[/]")
             elif branch:
                 row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
             elif diff_text:
                 row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
-            row2_left_parts.append(f"[{THEME_PRIMARY}]sb:on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sb:off[/]")
-            if execution_mode:
-                row2_left_parts.append(f"[{THEME_SECONDARY}]{execution_mode}[/]")
+            if width >= 50:
+                row2_left_parts.append(f"[{THEME_PRIMARY}]sb:on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sb:off[/]")
+                if execution_mode:
+                    row2_left_parts.append(f"[{THEME_SECONDARY}]{execution_mode}[/]")
             row2_left = STATUS_SEP_COMPACT.join(row2_left_parts)
 
             task_parts = []
@@ -722,10 +726,7 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
             description = (getattr(session, "description", "") or "").strip()
             if description:
                 max_desc = max(8, width - len(role_str) - (12 if is_compact else 22))
-                if len(description) > max_desc:
-                    clean_desc = description[: max_desc - 1] + "…"
-                else:
-                    clean_desc = description
+                clean_desc = ellipsize(description, max_desc)
                 role_part += f": [{THEME_SECONDARY}]{clean_desc}[/]"
 
             row_left = role_part

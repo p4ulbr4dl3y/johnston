@@ -141,8 +141,15 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
             yield Label("esc: back", id=MODAL_HINT_ID)
 
+    def _apply_dynamic_log_height(self) -> None:
+        if not self.log_widget:
+            return
+        screen_h = self.app.size.height if getattr(self, "app", None) else 24
+        self.log_widget.styles.max_height = max(5, min(18, screen_h - 8))
+
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#console-log", RichLog)
+        self._apply_dynamic_log_height()
         self.log_widget.auto_scroll = False
         self.log_widget.focus()
         # Backfill the history already buffered, then go live: subscribing after
@@ -151,6 +158,9 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             self._consume(strip_ansi(chunk))
         self.log_widget.scroll_end(animate=False)
         self.bg_task.add_listener(self._on_output)
+
+    def on_resize(self, event: events.Resize) -> None:
+        self._apply_dynamic_log_height()
 
     def on_unmount(self) -> None:
         if self.bg_task is not None:

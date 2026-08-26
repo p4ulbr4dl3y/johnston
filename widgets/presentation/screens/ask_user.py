@@ -274,7 +274,29 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             input_field.display = False
             self.focus()
 
+        self._apply_dialog_fit()
         self._update_wizard_hint()
+
+    def _apply_dialog_fit(self) -> None:
+        try:
+            from widgets.utils.responsive import (
+                MODAL_MEDIUM_MAX_WIDTH,
+                MODAL_MIN_WIDTH,
+                apply_modal_fit,
+                modal_content_width,
+            )
+
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+            if self.q_idx < len(self.questions):
+                sample_items = [f"[✓] {o}" for o in self.options] if self.options else ["Type custom answer..."]
+                title_text = self.questions[self.q_idx].get("question", "")
+            else:
+                sample_items = ["Confirm your answers"]
+                title_text = "Confirm Your Answers"
+            content_w = modal_content_width(sample_items, title_text, "enter: confirm • esc: cancel")
+            apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_MEDIUM_MAX_WIDTH)
+        except Exception:
+            pass
 
     def _update_wizard_hint(self) -> None:
         try:

@@ -13,15 +13,14 @@ from widgets.presentation.widgets.chat_markdown import (
     clean_markdown_for_rendering,
     safe_update_markdown,
 )
+from widgets.utils.row_format import ellipsize
 
 logger = logging.getLogger(__name__)
 
 
 def _clean_divider_title(title: str, max_len: int = 100) -> str:
     cleaned = " ".join((title or "").split())
-    if len(cleaned) > max_len:
-        return cleaned[: max_len - 3] + "..."
-    return cleaned
+    return ellipsize(cleaned, max_len)
 
 
 class EventDivider(Static):

@@ -51,6 +51,7 @@ Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, T
 
 #chat-view {
     height: 1fr;
+    min-height: 3;
     padding: 0 2 1 2;
     background: #09090b;
     scrollbar-size: 0 0;
@@ -293,6 +294,8 @@ MarkdownFence .fence-lang {
     text-style: bold;
     height: 1;
     width: 1fr;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 CustomMarkdownFence .fence-copy-btn,
@@ -814,7 +817,7 @@ DiffScreen {
     max-width: 104;
     height: auto;
     max-height: 85%;
-    overflow-y: hidden;
+    overflow-y: auto;
 }
 
 #modal-dialog.bash-confirm-dialog .modal-markdown {
@@ -870,7 +873,8 @@ DiffScreen {
 
 #modal-dialog #console-log,
 ModalScreen #console-log {
-    height: 18;
+    height: auto;
+    max-height: 18;
     margin: 0;
     border-left: solid #3f3f46;
     padding: 0 1;

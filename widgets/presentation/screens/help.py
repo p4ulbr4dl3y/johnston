@@ -120,6 +120,13 @@ class HelpScreen(BaseModalScreen[None]):
         except Exception:
             pass
 
+        try:
+            scroll_box = self.query_one("#help-scroll-box")
+            screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            scroll_box.styles.max_height = max(5, min(16, screen_h - 9))
+        except Exception:
+            pass
+
     def compose(self) -> ComposeResult:
         from widgets.chat_toolcall import ToolScrollBox
 
