@@ -668,6 +668,10 @@ ModalScreen {
     scrollbar-size: 0 0 !important;
 }
 
+#modal-dialog.wizard-dialog #wizard-summary-scroll {
+    margin: 0;
+}
+
 DiffScreen {
     background: #09090b;
 }
