@@ -424,6 +424,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             else:
                 inp.display = False
                 inp.can_focus = False
+                self.query_one("#modal-hint", Label).update(self._build_hint_text(resolve_width(self)))
         except Exception:
             pass
 
@@ -467,7 +468,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 opt_list.highlighted = max(0, len(self._option_keys) - 2)
             opt_list.focus()
             hint = self.query_one("#modal-hint", Label)
-            hint.update(self._build_hint_text())
+            hint.update(self._build_hint_text(resolve_width(self)))
         except Exception:
             self.focus()
 
