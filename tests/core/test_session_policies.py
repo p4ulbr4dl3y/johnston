@@ -46,9 +46,9 @@ TRANSCRIPT = [
 ]
 
 HISTORY = [
-    {"role": "user", "content": "<conversation-checkpoint>\nEarlier summary."},
+    {"role": "user", "content": "<conversation_checkpoint>\nEarlier summary."},
     {"role": "assistant", "content": "summary text"},
-    {"role": "user", "content": [{"type": "text", "text": "<conversation-checkpoint> list form"}]},
+    {"role": "user", "content": [{"type": "text", "text": "<conversation_checkpoint> list form"}]},
     {"role": "user", "content": "[System Note: interrupted]"},
     {"role": "user", "content": "first"},
     {"role": "assistant", "content": "reply1"},
@@ -95,10 +95,10 @@ class TestTranscriptPolicy(unittest.TestCase):
 
 class TestHistoryPolicy(unittest.TestCase):
     def test_is_checkpoint_message_matches_list_content_and_summary(self):
-        self.assertTrue(is_checkpoint_message({"role": "user", "content": "<conversation-checkpoint> x"}))
+        self.assertTrue(is_checkpoint_message({"role": "user", "content": "<conversation_checkpoint> x"}))
         self.assertTrue(is_checkpoint_message({"role": "user", "content": "<summary> x"}))
         self.assertTrue(
-            is_checkpoint_message({"role": "user", "content": [{"type": "text", "text": "<conversation-checkpoint>"}]})
+            is_checkpoint_message({"role": "user", "content": [{"type": "text", "text": "<conversation_checkpoint>"}]})
         )
         self.assertFalse(is_checkpoint_message({"role": "user", "content": "plain"}))
         self.assertFalse(is_checkpoint_message(None))
@@ -157,7 +157,7 @@ class TestForkRewindEquivalence(unittest.TestCase):
     def test_fork_history_prefix_skips_hidden_entries(self):
         forked = self.store.fork_session(self.sid, up_to_msg_index=2)
         contents = [m.get("content") for m in forked.agent_history]
-        self.assertIn("<conversation-checkpoint>\nEarlier summary.", contents)
+        self.assertIn("<conversation_checkpoint>\nEarlier summary.", contents)
         self.assertIn("second", contents)
         self.assertNotIn("fourth", contents)
 

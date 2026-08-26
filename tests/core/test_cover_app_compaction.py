@@ -130,7 +130,7 @@ async def test_compact_history_adapter_streaming_success():
 
     with patch("core.adapters.get_adapter", return_value=_FakeAdapter()):
         success, msg = await agent.compact_history()
-    assert any("<conversation-checkpoint>" in m.get("content", "") for m in agent.history)
+    assert any("<conversation_checkpoint>" in m.get("content", "") for m in agent.history)
 
 
 @pytest.mark.asyncio

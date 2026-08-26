@@ -226,7 +226,7 @@ class TestSessionManagerPureReader(unittest.TestCase):
         sid = self.store.generate_session_id()
         sess = self.store.create_main(sid)
         sess.messages = [
-            {"type": "user", "text": "The following skill(s) have been invoked: <SKILL>...", "display_text": "/caveman help"}
+            {"type": "user", "text": "The following skill(s) have been invoked: <skill>...", "display_text": "/caveman help"}
         ]
         title = sess.title
         self.assertEqual(title, "/caveman help")

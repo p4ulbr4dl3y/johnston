@@ -146,7 +146,7 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
                 if content:
                     if len(content) > 20000:
                         content = content[:20000] + "\n... [Project instructions truncated at 20000 chars]"
-                    found_snippets.append(f"## Project Instructions ({name})\n{content}")
+                    found_snippets.append(f'<project_instructions file="{name}">\n{content}\n</project_instructions>')
             except Exception:
                 pass
 
@@ -372,7 +372,7 @@ class PromptBuilder:
         if project_snippet:
             sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
         if rules_snippet:
-            sys_prompt = f"{sys_prompt}\n\n## User Rules\n{rules_snippet}"
+            sys_prompt = f"{sys_prompt}\n\n{rules_snippet}"
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
         if subagents_snippet:
@@ -432,7 +432,7 @@ class PromptBuilder:
         if project_snippet:
             sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
         if rules_snippet:
-            sys_prompt = f"{sys_prompt}\n\n## User Rules\n{rules_snippet}"
+            sys_prompt = f"{sys_prompt}\n\n{rules_snippet}"
         if skills_snippet:
             sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
         if subagents_snippet:

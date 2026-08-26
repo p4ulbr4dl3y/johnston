@@ -273,15 +273,15 @@ async def test_user_message_with_display_text():
         session,
         canvas,
         session_id="s1",
-        user_text="full prompt with skill <SKILL>...",
+        user_text="full prompt with skill <skill>...",
         show_in_ui=True,
         display_text="/caveman test",
     )
-    assert seen == ["full prompt with skill <SKILL>..."]
+    assert seen == ["full prompt with skill <skill>..."]
     canvas.add_user_message.assert_awaited_once_with("/caveman test", None)
     assert {
         "type": "user",
-        "text": "full prompt with skill <SKILL>...",
+        "text": "full prompt with skill <skill>...",
         "display_text": "/caveman test",
         "show_in_ui": True,
     } in session.events

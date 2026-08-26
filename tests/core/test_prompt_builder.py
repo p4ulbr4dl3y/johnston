@@ -75,7 +75,7 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_includes_project_instructions(self):
         builder = PromptBuilder("System prompt test", [], role="worker")
         sys_prompt = builder.build_system_prompt()
-        self.assertIn("## Project Instructions", sys_prompt)
+        self.assertIn("<project_instructions file=", sys_prompt)
 
     def test_build_system_prompt_explorer_filters_write_tools(self):
         pb_exp = PromptBuilder(
@@ -105,8 +105,8 @@ class TestPromptBuilder(unittest.TestCase):
             with patch("os.getcwd", return_value=tmpdir):
                 builder = PromptBuilder("Test", [], role="worker")
                 prompt = builder.build_system_prompt()
-                self.assertIn("## User Rules", prompt)
-                self.assertIn("### Rule: custom_rule", prompt)
+                self.assertIn("<rules>", prompt)
+                self.assertIn('<rule name="custom_rule">', prompt)
                 self.assertIn("Always use pytest", prompt)
 
     def test_build_system_prompt_env_metadata_last(self):

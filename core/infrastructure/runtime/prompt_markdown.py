@@ -47,14 +47,17 @@ def format_skills_markdown(skills: List[Any]) -> str:
 
 
 def format_rules_markdown(rules: List[Any]) -> str:
-    """Build the ``### Rule:`` block body for the system prompt.
+    """Build the ``<rules>`` block for the system prompt.
 
     ``rules`` is the ordered list of active ``RuleDefinition`` objects (the
     application layer filters by role and returns data). Returns ``""`` when
     there are no matching rules.
     """
+    if not rules:
+        return ""
+
     matching = []
     for r in rules:
-        matching.append(f"### Rule: {r.name}\n{r.content}")
+        matching.append(f'<rule name="{r.name}">\n{r.content}\n</rule>')
 
-    return "\n\n".join(matching)
+    return "<rules>\n" + "\n\n".join(matching) + "\n</rules>"

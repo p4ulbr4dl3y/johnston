@@ -144,22 +144,22 @@ async def test_queued_user_message_with_display_text_renders_command():
     session = _fake_session()
 
     async def stream(prompt, attachments=None):
-        yield ("queued_user_message", "<SKILL path='/tmp/s/SKILL.md'>full body</SKILL>", None, True, "/johnston-guide")
+        yield ("queued_user_message", "<skill path='/tmp/s/SKILL.md'>full body</skill>", None, True, "/johnston-guide")
         yield ("bot_text", "done", "")
 
     await generate_ai_response(_FakeAgent(stream), session, canvas, session_id="sid1", user_text="hi")
 
-    # UI renders the short command, not the expanded SKILL block. The initial
+    # UI renders the short command, not the expanded skill block. The initial
     # "hi" prompt and the queued item each produce one add_user_message call.
     rendered_texts = [c.args[0] for c in canvas.add_user_message.await_args_list]
     assert "/johnston-guide" in rendered_texts
-    assert "<SKILL path='/tmp/s/SKILL.md'>full body</SKILL>" not in rendered_texts
+    assert "<skill path='/tmp/s/SKILL.md'>full body</skill>" not in rendered_texts
 
     # Transcript keeps both the full prompt text and the display_text override.
     event = [
         e
         for e in session.events
-        if e.get("type") == "user" and e.get("text") == "<SKILL path='/tmp/s/SKILL.md'>full body</SKILL>"
+        if e.get("type") == "user" and e.get("text") == "<skill path='/tmp/s/SKILL.md'>full body</skill>"
     ]
     assert event
     assert event[0].get("display_text") == "/johnston-guide"
@@ -172,13 +172,13 @@ async def test_queued_user_message_without_display_text_renders_full_text():
     session = _fake_session()
 
     async def stream(prompt, attachments=None):
-        yield ("queued_user_message", "<SKILL path='/tmp/s/SKILL.md'>full body</SKILL>", None, True)
+        yield ("queued_user_message", "<skill path='/tmp/s/SKILL.md'>full body</skill>", None, True)
         yield ("bot_text", "done", "")
 
     await generate_ai_response(_FakeAgent(stream), session, canvas, session_id="sid1", user_text="hi")
 
     rendered_texts = [c.args[0] for c in canvas.add_user_message.await_args_list]
-    assert "<SKILL path='/tmp/s/SKILL.md'>full body</SKILL>" in rendered_texts
+    assert "<skill path='/tmp/s/SKILL.md'>full body</skill>" in rendered_texts
 
 
 @pytest.mark.asyncio

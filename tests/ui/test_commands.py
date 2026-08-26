@@ -447,7 +447,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.sm.get.return_value = session
         # Compacted history: checkpoint replaced A+B; only Tail 0 survived.
         app.agent.history = [
-            {"role": "user", "content": "<conversation-checkpoint>\n<summary>early</summary>\n</conversation-checkpoint>"},
+            {"role": "user", "content": "<conversation_checkpoint>\n<summary>early</summary>\n</conversation_checkpoint>"},
             {"role": "user", "content": "Tail 0"},
             {"role": "assistant", "content": "Resp"},
         ]
@@ -555,7 +555,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertTrue(show_in_ui)
         self.assertEqual(app.ai_kwargs[0].get("display_text"), "/johnston-guide")
-        self.assertIn('<SKILL path=', prompt)
+        self.assertIn('<skill path=', prompt)
 
     async def test_multiple_skills_command(self):
         from unittest.mock import patch
@@ -572,7 +572,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertTrue(show_in_ui)
         self.assertEqual(app.ai_kwargs[0].get("display_text"), "/foo /bar analyze project")
-        self.assertIn('<SKILL path=', prompt)
+        self.assertIn('<skill path=', prompt)
         self.assertIn("User request: analyze project", prompt)
 
     async def test_models_command_non_vision_warning(self):

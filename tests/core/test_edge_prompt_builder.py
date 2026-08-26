@@ -333,7 +333,7 @@ def test_project_snippet_cached_until_mtime_change(tmp_path):
 
     out1 = pb.get_project_instructions_snippet(str(tmp_path))
     out2 = pb.get_project_instructions_snippet(str(tmp_path))
-    assert out1 == out2 == "## Project Instructions (AGENTS.md)\nv1"
+    assert out1 == out2 == '<project_instructions file="AGENTS.md">\nv1\n</project_instructions>'
 
     # Cache populated for this cwd after the reads.
     # Editing the file changes its mtime/size signature -> next read re-reads.

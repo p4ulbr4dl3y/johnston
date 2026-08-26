@@ -455,7 +455,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 messages.append({"role": "user", "content": item[0]})
                                 # Carry the queued item's display_text (item[4]) so the UI
                                 # can render the short command instead of the full prompt text
-                                # (e.g. "/skill-name" vs the expanded <SKILL ...> block).
+                                # (e.g. "/skill-name" vs the expanded <skill ...> block).
                                 yield (
                                     "queued_user_message",
                                     item[0],

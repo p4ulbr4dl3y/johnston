@@ -45,7 +45,7 @@ def _load_skill_blocks(loaded_skills) -> list[str]:
                 content = body.strip()
             except Exception:
                 content = ""
-        blocks.append(f'<SKILL path="{s.location}">\n{content}\n</SKILL>')
+        blocks.append(f'<skill path="{s.location}">\n{content}\n</skill>')
     return blocks
 
 
