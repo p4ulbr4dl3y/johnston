@@ -494,7 +494,7 @@ ModalScreen {
     padding: 1 2;
     border: solid #27272a;
     background: #18181b;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 #modal-dialog.modal-dialog-medium,
