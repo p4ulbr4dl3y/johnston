@@ -271,6 +271,8 @@ class ResumeScreen(BaseSelectionScreen[str]):
             self.dismiss(f"{choice}:{sid}")
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        event.stop()
+        event.prevent_default()
         try:
             opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
             idx = opt_list.highlighted
@@ -281,5 +283,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
         self._handle_selection(idx)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        event.stop()
+        event.prevent_default()
         self._handle_selection(event.option_index)
 

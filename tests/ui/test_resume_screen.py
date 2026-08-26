@@ -111,3 +111,43 @@ class TestResumeScreen(unittest.TestCase):
         screen.on_input_submitted(input_ev)
         self.assertEqual(screen.step, 2)
 
+
+class TestResumeScreenPilot(unittest.IsolatedAsyncioTestCase):
+    async def test_resume_screen_locked_flow_pilot(self):
+        from textual.app import App
+
+        class PilotApp(App):
+            def __init__(self, sessions):
+                super().__init__()
+                self.sessions = sessions
+                self.resume_screen = ResumeScreen(sessions)
+
+            async def on_mount(self):
+                self.push_screen(self.resume_screen)
+
+        sessions = [
+            {"id": "s1", "title": "Free Session", "is_locked": False},
+            {"id": "s2", "title": "Locked Session", "is_locked": True},
+        ]
+        app = PilotApp(sessions)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            self.assertEqual(app.resume_screen.step, 1)
+
+            # Move down to session 2 (locked) and press enter
+            await pilot.press("down")
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Must transition to Step 2 without dismissing the screen
+            self.assertEqual(app.resume_screen.step, 2)
+            self.assertEqual(app.resume_screen.filtered_items, ["readonly", "steal"])
+            self.assertEqual(app.screen, app.resume_screen)
+
+            # Esc returns to Step 1
+            await pilot.press("escape")
+            await pilot.pause()
+            self.assertEqual(app.resume_screen.step, 1)
+            self.assertEqual(app.resume_screen.filtered_items, ["s1", "s2"])
+
+
