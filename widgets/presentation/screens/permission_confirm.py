@@ -503,17 +503,21 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         try:
             return self.query_one(".tool-scroll-box")
         except Exception:
-            return self.query_one("#modal-dialog")
+            return None
 
     def action_page_up(self) -> None:
         try:
-            self._get_scroll_target().scroll_page_up(animate=False)
+            target = self._get_scroll_target()
+            if target is not None:
+                target.scroll_page_up(animate=False)
         except Exception:
             pass
 
     def action_page_down(self) -> None:
         try:
-            self._get_scroll_target().scroll_page_down(animate=False)
+            target = self._get_scroll_target()
+            if target is not None:
+                target.scroll_page_down(animate=False)
         except Exception:
             pass
 
