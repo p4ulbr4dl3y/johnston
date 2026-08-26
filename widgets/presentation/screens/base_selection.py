@@ -168,29 +168,50 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             opt_list.focus()
 
     def _apply_dialog_fit(self) -> None:
-        """Hug dialog to content when ``fit_content`` is set (mount + resize)."""
-        if not getattr(self, "fit_content", False):
-            return
+        """Hug dialog to content and budget height (mount + resize)."""
         try:
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
         except Exception:
             return
-        content_width = modal_content_width(self.raw_options, self.title, self.hint_text)
-        max_w = getattr(self, "max_dialog_width", None)
-        if max_w is None:
-            classes = getattr(self, "dialog_classes", "") or ""
-            if "modal-dialog-wide" in classes:
-                max_w = MODAL_WIDE_MAX_WIDTH
-            elif "modal-dialog-medium" in classes or "wizard-dialog" in classes:
-                max_w = MODAL_MEDIUM_MAX_WIDTH
+
+        if getattr(self, "fit_content", False):
+            content_width = modal_content_width(self.raw_options, self.title, self.hint_text)
+            max_w = getattr(self, "max_dialog_width", None)
+            if max_w is None:
+                classes = getattr(self, "dialog_classes", "") or ""
+                if "modal-dialog-wide" in classes:
+                    max_w = MODAL_WIDE_MAX_WIDTH
+                elif "modal-dialog-medium" in classes or "wizard-dialog" in classes:
+                    max_w = MODAL_MEDIUM_MAX_WIDTH
+                else:
+                    max_w = MODAL_MAX_WIDTH
+            apply_modal_fit(
+                dialog,
+                content_width,
+                min_width=getattr(self, "min_dialog_width", MODAL_MIN_WIDTH),
+                max_width=max_w,
+            )
+
+        try:
+            screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            if not isinstance(screen_h, int) or screen_h <= 0:
+                screen_h = 24
+
+            if screen_h < 18:
+                dialog.styles.padding = (0, 1)
+                dialog.styles.max_height = max(7, screen_h - 1)
+                usable_h = screen_h - 1
+                overhead = 6 if not self.show_search else 8
             else:
-                max_w = MODAL_MAX_WIDTH
-        apply_modal_fit(
-            dialog,
-            content_width,
-            min_width=getattr(self, "min_dialog_width", MODAL_MIN_WIDTH),
-            max_width=max_w,
-        )
+                dialog.styles.padding = (1, 2)
+                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
+                usable_h = screen_h - 2
+                overhead = 8 if not self.show_search else 10
+
+            opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
+            opt_list.styles.max_height = max(2, usable_h - overhead)
+        except Exception:
+            pass
 
     def on_resize(self, event: events.Resize) -> None:
         self._apply_dialog_fit()

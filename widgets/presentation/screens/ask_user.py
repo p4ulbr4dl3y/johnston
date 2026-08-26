@@ -203,8 +203,11 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
 
         if self.q_idx < len(self.questions):
             title_md.remove_class("confirm-summary")
-            summary_scroll = self.query_one("#wizard-summary-scroll")
-            summary_scroll.display = False
+            try:
+                summary_scroll = self.query_one("#wizard-summary-scroll", ToolScrollBox)
+                summary_scroll.display = False
+            except Exception:
+                pass
             q = self.questions[self.q_idx]
             q_text = q.get("question", "")
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n{q_text}")
@@ -517,6 +520,9 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
         if self.q_idx < len(self.questions):
             self.q_idx += 1
             self.update_step()
+        else:
+            self.submit_current_step()
+
     def _on_key(self, event: events.Key) -> None:
         if self.q_idx >= len(self.questions):
             if event.key in ("up", "down", "pageup", "pagedown"):
