@@ -61,6 +61,26 @@ class RejectReasonInput(Input):
         await super()._on_key(event)
 
 
+class PermissionOptionList(HeaderWrapOptionList):
+    """OptionList that routes PageUp/PageDown to the inner tool code scroll box."""
+
+    def action_page_up(self) -> None:
+        if self.screen and hasattr(self.screen, "_get_scroll_target"):
+            target = getattr(self.screen, "_get_scroll_target")()
+            if target is not None:
+                target.scroll_page_up(animate=False)
+                return
+        super().action_page_up()
+
+    def action_page_down(self) -> None:
+        if self.screen and hasattr(self.screen, "_get_scroll_target"):
+            target = getattr(self.screen, "_get_scroll_target")()
+            if target is not None:
+                target.scroll_page_down(animate=False)
+                return
+        super().action_page_down()
+
+
 class PermissionConfirmScreen(BaseModalScreen[str]):
     """Modal screen asking user for permission before executing a tool in human-friendly format."""
 
@@ -284,7 +304,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             options.append("Reject with feedback...")
             self._option_keys.append("reject_reason")
 
-            yield HeaderWrapOptionList(*options, id="permission-options-list")
+            yield PermissionOptionList(*options, id="permission-options-list")
 
             inp = RejectReasonInput(placeholder="Type feedback for agent and press Enter...", id="reject-reason-input")
             inp.display = False
