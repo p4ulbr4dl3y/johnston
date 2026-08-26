@@ -17,6 +17,7 @@ from typing import Any
 
 from rich.cells import cell_len
 from rich.markup import escape
+from rich.text import Text
 
 MODAL_MEDIUM_ROW_WIDTH = 78
 MODAL_DEFAULT_ROW_WIDTH = 70
@@ -51,7 +52,12 @@ def option_list_row_width(opt_list: Any, default: int) -> int:
 
 
 def display_width(text: str) -> int:
-    """Visible terminal-cell width of plain text (wide chars count 2)."""
+    """Visible terminal-cell width of text, stripping rich markup if present."""
+    if "[" in text and "]" in text:
+        try:
+            return cell_len(Text.from_markup(text).plain)
+        except Exception:
+            return cell_len(text)
     return cell_len(text)
 
 

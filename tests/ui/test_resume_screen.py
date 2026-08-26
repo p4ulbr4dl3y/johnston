@@ -16,6 +16,9 @@ class TestResumeScreen(unittest.TestCase):
         self.assertEqual(ordered_ids, ["p1", "c1", "c2", "p2"])
 
     def test_resume_screen_fork_branch_prefix(self):
+        from rich.cells import cell_len
+        from rich.text import Text
+
         sessions = [
             {"id": "p1", "title": "Parent 1", "message_count": 5},
             {"id": "c1", "parent_id": "p1", "title": "Fork of P1", "message_count": 2},
@@ -25,3 +28,8 @@ class TestResumeScreen(unittest.TestCase):
         self.assertNotIn("└─", screen.raw_options[0])
         self.assertIn("└─", screen.raw_options[1])
         self.assertIn("Fork of P1", screen.raw_options[1])
+
+        # Both parent and fork rows must have identical visible cell width for flush-right alignment
+        len_p = cell_len(Text.from_markup(screen.raw_options[0]).plain)
+        len_c = cell_len(Text.from_markup(screen.raw_options[1]).plain)
+        self.assertEqual(len_p, len_c)

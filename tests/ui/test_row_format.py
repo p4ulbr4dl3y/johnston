@@ -79,6 +79,12 @@ class TestFormatBadgeRow(unittest.TestCase):
         self.assertEqual(visible_len(row), 30)
         self.assertTrue(row.startswith("● sess one"))
 
+    def test_prefix_with_rich_markup_keeps_badge_aligned(self):
+        prefix = "[dim #71717a]└─ [/]"
+        row = format_badge_row("Forked session title", "14 steps", target_width=60, prefix=prefix)
+        self.assertEqual(visible_len(row), 60)
+        self.assertIn("14 steps", row)
+
     def test_whitespace_collapsed_and_escaped(self):
         row = format_badge_row("multi\nline\rtab  x [br]", "done", target_width=60)
         self.assertNotIn("\n", row)
