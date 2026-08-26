@@ -402,7 +402,7 @@ class ForkCommand(BaseCommand):
             if seq_idx > 0 and msg_text:
                 clean_msg = " ".join(msg_text.replace("\n", " ").replace("\r", " ").split())
                 if clean_msg:
-                    fork_title = clean_msg[:55] + "..." if len(clean_msg) > 55 else clean_msg
+                    fork_title = clean_msg
             elif seq_idx == 0:
                 parent_sess = app.sm.get(curr_sid)
                 if parent_sess:

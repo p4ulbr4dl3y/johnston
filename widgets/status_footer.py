@@ -355,12 +355,13 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
 
             # Row 2 (Env): johnston • main (+3/-1) • sb:on • mode  <left> | <right> ⚡ 2a • 1s
             dir_raw = os.path.basename(os.path.abspath(directory)) or directory
-            dir_basename = ellipsize(dir_raw, 12 if width < 50 else 24)
+            dir_basename = ellipsize(dir_raw, max(12, width // 3))
             row2_left_parts = [f"[{THEME_SECONDARY}]{dir_basename}[/]"]
-            if branch and diff_text and width >= 50:
-                row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/] [{THEME_SECONDARY}]({diff_text})[/]")
-            elif branch:
-                row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+            branch_disp = ellipsize(branch, max(10, width // 3)) if branch else ""
+            if branch_disp and diff_text and width >= 50:
+                row2_left_parts.append(f"[{THEME_PRIMARY}]{branch_disp}[/] [{THEME_SECONDARY}]({diff_text})[/]")
+            elif branch_disp:
+                row2_left_parts.append(f"[{THEME_PRIMARY}]{branch_disp}[/]")
             elif diff_text:
                 row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
             if width >= 50:
