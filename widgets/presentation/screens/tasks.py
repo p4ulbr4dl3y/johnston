@@ -97,8 +97,20 @@ def format_shell_task_row(
 def format_subagent_task_row(
     cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_WIDE_ROW_WIDTH
 ) -> str:
-    """Format a subagent row with human-like activity/status badge on the right."""
+    """Format a subagent row with role prefix and human-like activity/status badge on the right."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(subagent task)"
+    if session is not None:
+        agent = getattr(session, "agent", None)
+        role = getattr(agent, "role", None) if agent else getattr(session, "role", None)
+        if (
+            role
+            and isinstance(role, str)
+            and role.strip()
+            and role.strip().lower() not in ("worker", "subagent", "default")
+        ):
+            role_clean = role.strip()
+            if not clean.lower().startswith(role_clean.lower()):
+                clean = f"{role_clean}: {clean}"
     badge_plain = (
         extract_subagent_progress(session)
         if session is not None
@@ -570,10 +582,27 @@ class SubagentsScreen(BaseTasksListScreen):
             st_str = (getattr(s, "status", "") or "unknown").upper()
             is_run = is_subagent_running(s)
             badge = extract_subagent_progress(s)
+            desc = getattr(s, "description", None) or getattr(s, "prompt", None) or getattr(s, "id", "")
+            agent = getattr(s, "agent", None)
+            role = getattr(agent, "role", None) if agent else getattr(s, "role", None)
+            if (
+                role
+                and isinstance(role, str)
+                and role.strip()
+                and role.strip().lower() not in ("worker", "subagent", "default")
+            ):
+                role_clean = role.strip()
+                if not desc.lower().startswith(role_clean.lower()):
+                    display_cmd = f"{role_clean}: {desc}"
+                else:
+                    display_cmd = desc
+            else:
+                display_cmd = desc
+
             items.append(
                 {
                     "id": getattr(s, "id", ""),
-                    "command": getattr(s, "description", None) or getattr(s, "prompt", None) or getattr(s, "id", ""),
+                    "command": display_cmd,
                     "is_running": is_run,
                     "status_str": st_str,
                     "progress_badge": badge,
