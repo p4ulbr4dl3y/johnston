@@ -60,3 +60,54 @@ class TestResumeScreen(unittest.TestCase):
         self.assertEqual(screen.current_session_id, "s1")
         self.assertTrue(screen.raw_options[0].startswith("● "))
         self.assertTrue(screen.raw_options[1].startswith("  "))
+
+    def test_resume_screen_step2_locked_transition(self):
+        from unittest.mock import MagicMock
+
+        from textual.widgets import OptionList
+
+        sessions = [
+            {"id": "s1", "title": "Free Session", "message_count": 2, "is_locked": False},
+            {"id": "s2", "title": "Locked Session", "message_count": 5, "is_locked": True},
+        ]
+        screen = ResumeScreen(sessions)
+        screen.dismiss = MagicMock()
+
+        # Step 1: select unlocked session -> dismiss with sid
+        ev1 = MagicMock(spec=OptionList.OptionSelected)
+        ev1.option_index = 0
+        screen.on_option_list_option_selected(ev1)
+        screen.dismiss.assert_called_once_with("s1")
+
+        # Step 1: select locked session -> enter Step 2
+        screen.dismiss.reset_mock()
+        screen.query_one = MagicMock()
+        ev2 = MagicMock(spec=OptionList.OptionSelected)
+        ev2.option_index = 1
+        screen.on_option_list_option_selected(ev2)
+        self.assertEqual(screen.step, 2)
+        screen.dismiss.assert_not_called()
+        self.assertEqual(screen.filtered_items, ["readonly", "steal"])
+
+        # Step 2: select steal -> dismiss with steal:s2
+        ev_steal = MagicMock(spec=OptionList.OptionSelected)
+        ev_steal.option_index = 1
+        screen.on_option_list_option_selected(ev_steal)
+        screen.dismiss.assert_called_once_with("steal:s2")
+
+        # Step 2: esc -> back to Step 1
+        screen._show_step_2(sessions[1])
+        self.assertEqual(screen.step, 2)
+        esc_event = MagicMock(key="escape")
+        screen._on_key(esc_event)
+        self.assertEqual(screen.step, 1)
+        self.assertEqual(screen.filtered_items, ["s1", "s2"])
+
+        # Test on_input_submitted on locked session
+        opt_list = MagicMock()
+        opt_list.highlighted = 1
+        screen.query_one = MagicMock(return_value=opt_list)
+        input_ev = MagicMock()
+        screen.on_input_submitted(input_ev)
+        self.assertEqual(screen.step, 2)
+

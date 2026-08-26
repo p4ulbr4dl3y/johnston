@@ -522,45 +522,22 @@ class ResumeCommand(BaseCommand):
                 app.load_session_ui(sid)
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
-        def on_resume_selected(selected_sid: str) -> None:
-            if not selected_sid:
+        def on_resume_selected(result: str | None) -> None:
+            if not result:
                 app.query_one(MESSAGE_INPUT, ChatInput).focus()
                 return
 
-            if hasattr(app, "sm") and app.sm.is_session_locked(selected_sid) is True:
-                from widgets.presentation.screens.session_conflict import SessionConflictScreen
-
-                def on_conflict_choice(choice: str | None) -> None:
-                    if choice == "steal":
-                        app.sm.steal_session_lock(selected_sid)
-                        _apply_selected(selected_sid)
-                    elif choice == "readonly":
-                        _apply_selected(selected_sid, read_only=True)
-                    else:
-                        app.push_screen(
-                            ResumeScreen(
-                                sessions,
-                                current_session_id=curr_sid,
-                                initial_selected_id=selected_sid,
-                            ),
-                            callback=on_resume_selected,
-                        )
-                target_sess = next((s for s in sessions if str(s.get("id")) == str(selected_sid)), None)
-                target_title = target_sess.get("title", "") if target_sess else ""
-                resume_w = 78
-                try:
-                    cur_screen = getattr(app, "screen", None)
-                    if isinstance(cur_screen, ResumeScreen):
-                        resume_w = cur_screen._row_width() + 8
-                except Exception:
-                    pass
-                app.push_screen(
-                    SessionConflictScreen(selected_sid, session_title=target_title, min_dialog_width=resume_w),
-                    callback=on_conflict_choice,
-                )
+            if ":" in result and (result.startswith("steal:") or result.startswith("readonly:")):
+                choice, sid = result.split(":", 1)
+                if choice == "steal":
+                    if hasattr(app, "sm"):
+                        app.sm.steal_session_lock(sid)
+                    _apply_selected(sid)
+                elif choice == "readonly":
+                    _apply_selected(sid, read_only=True)
                 return
 
-            _apply_selected(selected_sid)
+            _apply_selected(result)
 
         curr_sid = getattr(app, "current_session_id", None)
         app.push_screen(ResumeScreen(sessions, current_session_id=curr_sid), callback=on_resume_selected)

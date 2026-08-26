@@ -42,7 +42,6 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         app.sm.list_main_sessions.return_value = [
             {"id": "s_locked", "title": "Busy Task", "message_count": 4, "is_locked": True}
         ]
-        app.sm.is_session_locked.return_value = True
 
         cmd = ResumeCommand()
         await cmd.execute(app)
@@ -51,25 +50,18 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         app.push_screen.assert_called()
         resume_callback = app.push_screen.call_args[1]["callback"]
 
-        # User selects locked session
-        with patch("widgets.presentation.screens.session_conflict.SessionConflictScreen"):
-            resume_callback("s_locked")
-            # SessionConflictScreen pushed
-            app.push_screen.assert_called()
-            conflict_cb = app.push_screen.call_args[1]["callback"]
+        # 1. Test Steal
+        resume_callback("steal:s_locked")
+        app.sm.steal_session_lock.assert_called_with("s_locked")
+        app.load_session_ui.assert_called_with("s_locked")
 
-            # 1. Test Steal
-            conflict_cb("steal")
-            app.sm.steal_session_lock.assert_called_with("s_locked")
-            app.load_session_ui.assert_called_with("s_locked")
+        # 2. Test ReadOnly
+        resume_callback("readonly:s_locked")
+        app.load_session_ui.assert_called_with("s_locked", read_only=True)
 
-            # 2. Test ReadOnly
-            conflict_cb("readonly")
-            app.load_session_ui.assert_called_with("s_locked", read_only=True)
-
-            # 3. Test Cancel / Esc: returns back to ResumeScreen
-            conflict_cb(None)
-            self.assertIsInstance(app.push_screen.call_args[0][0], ResumeScreen)
+        # 3. Test Normal Unlocked Session
+        resume_callback("s_normal")
+        app.load_session_ui.assert_called_with("s_normal")
 
     async def test_new_command_resets_read_only_and_manages_locks(self):
         from widgets.commands import NewCommand
