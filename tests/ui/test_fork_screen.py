@@ -7,12 +7,13 @@ from widgets.presentation.screens.fork import ForkScreen
 
 
 class TestForkScreen(unittest.TestCase):
-    def test_fork_screen_formatting(self):
+    def test_fork_screen_formatting_and_fit(self):
         user_messages = [
             (0, "first message\nwith multiline"),
             (1, "second message"),
         ]
         screen = ForkScreen(user_messages)
+        self.assertTrue(screen.fit_content)
         self.assertEqual(len(screen.raw_options), 2)
         self.assertNotIn("\n", screen.raw_options[0])
         self.assertIn("first message with multiline", screen.raw_options[0])
