@@ -545,8 +545,19 @@ class ResumeCommand(BaseCommand):
                             ),
                             callback=on_resume_selected,
                         )
-
-                app.push_screen(SessionConflictScreen(selected_sid), callback=on_conflict_choice)
+                target_sess = next((s for s in sessions if str(s.get("id")) == str(selected_sid)), None)
+                target_title = target_sess.get("title", "") if target_sess else ""
+                resume_w = 78
+                try:
+                    cur_screen = getattr(app, "screen", None)
+                    if isinstance(cur_screen, ResumeScreen):
+                        resume_w = cur_screen._row_width() + 8
+                except Exception:
+                    pass
+                app.push_screen(
+                    SessionConflictScreen(selected_sid, session_title=target_title, min_dialog_width=resume_w),
+                    callback=on_conflict_choice,
+                )
                 return
 
             _apply_selected(selected_sid)
