@@ -403,9 +403,23 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         width = resolve_width(self)
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             self.compact_view = "diff" if self.compact_view == "files" else "files"
+            show_sidebar = self.compact_view == "files"
         else:
             self.sidebar_visible = not self.sidebar_visible
+            show_sidebar = self.sidebar_visible
+
         self._update_layout()
+
+        if show_sidebar:
+            try:
+                self.query_one("#diff-search-input", Input).focus()
+            except Exception:
+                pass
+        else:
+            try:
+                self.focus()
+            except Exception:
+                pass
 
     def action_page_up(self) -> None:
         try:
@@ -422,17 +436,60 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
             pass
 
     def _on_key(self, event: events.Key) -> None:
-        if self._handle_search_navigation(event):
+        if event.key in ("tab", "backtab"):
+            self.action_toggle_sidebar()
+            event.prevent_default()
+            event.stop()
             return
+
         if event.key in ("pageup", "pagedown"):
+            if event.key == "pageup":
+                self.action_page_up()
+            else:
+                self.action_page_down()
+            event.prevent_default()
+            event.stop()
+            return
+
+        is_compact = is_compact_width(resolve_width(self), breakpoint=BREAKPOINT_COMPACT)
+        sidebar_active = self.sidebar_visible and not (is_compact and self.compact_view == "diff")
+
+        if event.key in ("up", "down"):
+            if sidebar_active:
+                try:
+                    opt_list = self.query_one("#diff-file-list", OptionList)
+                    if self.filtered_indices:
+                        if opt_list.highlighted is None:
+                            opt_list.highlighted = 0
+                        elif event.key == "down":
+                            opt_list.action_cursor_down()
+                        else:
+                            opt_list.action_cursor_up()
+                except Exception:
+                    pass
+            else:
+                try:
+                    scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
+                    if event.key == "down":
+                        scroll_box.scroll_down(animate=False)
+                    else:
+                        scroll_box.scroll_up(animate=False)
+                except Exception:
+                    pass
+            event.prevent_default()
+            event.stop()
+            return
+
+        if not sidebar_active and event.key in ("home", "end"):
             try:
                 scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
-                if event.key == "pageup":
-                    scroll_box.scroll_page_up(animate=False)
+                if event.key == "home":
+                    scroll_box.scroll_home(animate=False)
                 else:
-                    scroll_box.scroll_page_down(animate=False)
+                    scroll_box.scroll_end(animate=False)
                 event.prevent_default()
                 event.stop()
+                return
             except Exception:
                 pass
 

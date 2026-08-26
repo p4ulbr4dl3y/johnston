@@ -167,6 +167,63 @@ class TestDiffScreen(unittest.TestCase):
             # Filename fits completely in 58 columns without truncation (was truncated at 31)
             self.assertIn("test_modal_badge_adaptivity.py", options[0])
 
+    def test_keyboard_navigation_after_tab(self):
+        items = [("file1.py", "diff1", 1, 0), ("file2.py", "diff2", 2, 0)]
+        screen = DiffScreen(items)
+        screen._update_layout = MagicMock()
+
+        opt_list = MagicMock()
+        opt_list.highlighted = 0
+        scroll_box = MagicMock()
+        search_input = MagicMock()
+
+        def fake_qo(selector, *args, **kwargs):
+            if "diff-file-list" in str(selector):
+                return opt_list
+            if "diff-scroll-box" in str(selector):
+                return scroll_box
+            if "diff-search-input" in str(selector):
+                return search_input
+            return MagicMock()
+
+        screen.query_one = MagicMock(side_effect=fake_qo)
+        screen.focus = MagicMock()
+
+        # Tab: sidebar hides, focus shifts to screen
+        tab_event = MagicMock(key="tab")
+        screen._on_key(tab_event)
+        self.assertFalse(screen.sidebar_visible)
+        tab_event.prevent_default.assert_called()
+
+        # Up/Down with hidden sidebar: scrolls diff scroll_box
+        down_event = MagicMock(key="down")
+        screen._on_key(down_event)
+        scroll_box.scroll_down.assert_called_with(animate=False)
+
+        up_event = MagicMock(key="up")
+        screen._on_key(up_event)
+        scroll_box.scroll_up.assert_called_with(animate=False)
+
+        # PgUp / PgDn with hidden sidebar: page scrolls scroll_box
+        pgdn_event = MagicMock(key="pagedown")
+        screen._on_key(pgdn_event)
+        scroll_box.scroll_page_down.assert_called_with(animate=False)
+
+        pgup_event = MagicMock(key="pageup")
+        screen._on_key(pgup_event)
+        scroll_box.scroll_page_up.assert_called_with(animate=False)
+
+        # Tab again: sidebar restores, focus to search_input
+        screen._on_key(tab_event)
+        self.assertTrue(screen.sidebar_visible)
+        search_input.focus.assert_called()
+
+        # Up/Down with visible sidebar: moves option list
+        down_event = MagicMock(key="down")
+        screen._on_key(down_event)
+        opt_list.action_cursor_down.assert_called()
+
+
 
 
 
