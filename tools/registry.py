@@ -94,7 +94,7 @@ def get_default_tools() -> list[Dict[str, Any]]:
     for cls in TOOL_CLASSES:
         if getattr(cls, "schema", None):
             try:
-                inst = cls()
+                inst = _get_tool_instance(cls)
                 tools.append(inst.get_schema() if hasattr(inst, "get_schema") else cls.schema)
             except Exception:
                 tools.append(cls.schema)
@@ -114,7 +114,7 @@ async def check_and_confirm_permission(
     """
     from core.domain.policies.permission_policy import PermissionAction
     from core.permission_manager import PermissionManager
-    from tools.base import confirm_permission
+    from tools.base import confirm_permission, resolve_subagent_identity
 
     pm = PermissionManager.get_instance()
     app_obj = _resolve_app(context_or_app)
@@ -123,17 +123,7 @@ async def check_and_confirm_permission(
     if decision.action == PermissionAction.DENY:
         return ToolResult.error("denied", name=display_name, detail="by permission policy")
     elif decision.action == PermissionAction.ASK:
-        is_sub = (
-            getattr(context_or_app, "is_subagent", False) is True
-            or (app_obj is not None and getattr(app_obj, "is_subagent", False) is True)
-        )
-        raw_sub_role = (
-            getattr(context_or_app, "subagent_role", "")
-            or getattr(context_or_app, "role", "")
-            or (getattr(app_obj, "subagent_role", "") if app_obj else "")
-            or (getattr(app_obj, "role", "") if app_obj else "")
-        )
-        sub_role = raw_sub_role if isinstance(raw_sub_role, str) and raw_sub_role else ("worker" if is_sub else "")
+        is_sub, sub_role = resolve_subagent_identity(context_or_app, app_obj)
         if app_obj and (hasattr(app_obj, "push_screen_wait") or callable(getattr(app_obj, "confirm_permission", None))):
             screen_name = confirm_tool_name or target_perm_name
             confirmed = await confirm_permission(
@@ -217,7 +207,9 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
                 active_mcp_tools = cached_tools
     except Exception as e:
         return ToolResult.error("mcp", detail=f"failed to read cached tools: {e}", name=name)
-    is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools)
+    # Case-insensitive match on the canonical (stripped+lowercased) name so the
+    # MCP lookup follows the same normalization rules as builtin dispatch.
+    is_mcp = any((t.get("function", {}).get("name") or "").lower() == clean_name for t in active_mcp_tools)
 
     if not is_mcp:
         # Short-circuit: only check the capability lookup when the name wasn't
@@ -244,7 +236,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
                 listed_tools = mcp_mgr.get_active_tools() or []
             if listed_tools:
                 active_mcp_tools = list(listed_tools)
-            is_mcp = any(t.get("function", {}).get("name") == name for t in active_mcp_tools)
+            is_mcp = any((t.get("function", {}).get("name") or "").lower() == clean_name for t in active_mcp_tools)
             if is_mcp:
                 _forget_mcp_miss(name)
             else:
@@ -263,12 +255,13 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return policy_err
 
     # Determine the exposed MCP tool name (namespaced as "server__tool" on name
-    # collisions) so permissions are stored and checked under that name.
+    # collisions) so permissions are stored and checked under that name. The
+    # comparison is case-insensitive, matching the lookup rules above.
     exposed_name = clean_name
     target_entry = None
     for t in active_mcp_tools:
         fn_name = t.get("function", {}).get("name")
-        if fn_name in (name, clean_name, resolved_name):
+        if fn_name is not None and fn_name.lower() == clean_name:
             exposed_name = fn_name
             target_entry = t
             break
@@ -278,7 +271,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return perm_err
 
     try:
-        from tools.base import execute_mcp_tool, truncate_output
+        from tools.base import MAX_TOOL_OUTPUT_CHARS, execute_mcp_tool, truncate_output
 
         # Execute against the exact server that owns the permission-checked
         # exposed name, so the permission decision and the executed tool can
@@ -287,10 +280,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         mcp_res = await execute_mcp_tool(mcp_mgr, name, args, target_server=target_server)
         if mcp_res is not None:
             tool_res = await normalize_tool_result(mcp_res)
-            if not tool_res.is_error and tool_res.content and len(tool_res.content) > 8000:
+            if not tool_res.is_error and tool_res.content and len(tool_res.content) > MAX_TOOL_OUTPUT_CHARS:
                 tool_res.content = truncate_output(
                     tool_res.content,
-                    max_chars=8000,
+                    max_chars=MAX_TOOL_OUTPUT_CHARS,
                     hint="Refine parameters or request partial data if complete response is needed.",
                     tool_name=name,
                 )

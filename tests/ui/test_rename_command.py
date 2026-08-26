@@ -38,3 +38,24 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         app.sm.save.assert_called_with(mock_sess)
         app.refresh_status_footer.assert_called()
         app.notify.assert_called_with("Session renamed", severity="info")
+
+    async def test_rename_command_empty_welcome_session(self):
+        app = MagicMock()
+        app.current_session_id = "empty_sess"
+        empty_sess = MagicMock()
+        empty_sess.description = ""
+        empty_sess.messages = []
+        app.sm.get.return_value = empty_sess
+        app.sm._title_from_messages.return_value = "Untitled"
+
+        def push_screen_mock(screen, callback):
+            self.assertEqual(screen.current_title, "")
+            callback("Planned Architecture Refactor")
+
+        app.push_screen = push_screen_mock
+        cmd = RenameCommand()
+        await cmd.execute(app)
+
+        self.assertEqual(empty_sess.description, "Planned Architecture Refactor")
+        app.sm.save.assert_called_with(empty_sess)
+        app.notify.assert_called_with("Session renamed", severity="info")

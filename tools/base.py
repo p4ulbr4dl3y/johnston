@@ -21,6 +21,7 @@ __all__ = [
     "execute_mcp_tool",
     "check_mcp_role_policy",
     "confirm_permission",
+    "resolve_subagent_identity",
     "_resolve_app",
     "BaseTool",
 ]
@@ -310,11 +311,12 @@ async def confirm_permission(
     UI-independent. ``ctx_or_app`` may be a ToolContext, agent, or host app; it is
     unwrapped with ``_resolve_app`` before calling.
     """
-    if not is_subagent:
-        is_subagent = getattr(ctx_or_app, "is_subagent", False)
-    if not subagent_role and is_subagent:
-        raw_sub = getattr(ctx_or_app, "subagent_role", "") or getattr(ctx_or_app, "role", "")
-        subagent_role = raw_sub if isinstance(raw_sub, str) and raw_sub else "worker"
+    if not is_subagent or not subagent_role:
+        detected_is_sub, detected_role = resolve_subagent_identity(ctx_or_app)
+        if not is_subagent:
+            is_subagent = detected_is_sub
+        if not subagent_role and is_subagent:
+            subagent_role = detected_role or "worker"
 
     confirm = getattr(_resolve_app(ctx_or_app), "confirm_permission", None)
     if callable(confirm):
@@ -342,7 +344,7 @@ async def execute_mcp_tool(mcp_mgr: Any, tool_name: str, arguments: Dict[str, An
 class BaseTool:
     name: str = ""
     description: str = ""
-    schema: Dict[str, Any] = None
+    schema: Optional[Dict[str, Any]] = None
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
