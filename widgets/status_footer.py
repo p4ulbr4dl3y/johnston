@@ -10,7 +10,7 @@ from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 from widgets.utils.responsive import BREAKPOINT_COMPACT, is_compact_width, resolve_width
-from widgets.utils.row_format import ellipsize
+from widgets.utils.row_format import display_width, ellipsize
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
 STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
@@ -333,14 +333,6 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             branch = self._git_branch(cwd=directory)
             diff_text = self._git_diff_stats(cwd=directory)
 
-            # Row 1 (LLM): ⠋ Action • claude-3.7  <left> | <right> 45% ctx • $0.02
-            row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
-            if is_connected and clean_model and clean_model != "[Select model: /models]":
-                max_model_len = 10 if width < 50 else 18
-                disp_model = ellipsize(clean_model, max_model_len)
-                row1_left_parts.append(f"[{THEME_SECONDARY}]{disp_model}[/]")
-            row1_left = STATUS_SEP_COMPACT.join(row1_left_parts)
-
             if is_connected and bool(model_name):
                 pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
                 pct = min(100.0, max(0.0, pct))
@@ -350,6 +342,16 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 row1_right = f"[{THEME_SECONDARY}]{pct_str} ctx[/]{STATUS_SEP_COMPACT}[{THEME_SECONDARY}]{right_val}[/]"
             else:
                 row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
+
+            # Row 1 (LLM): ⠋ Action • claude-3.7  <left> | <right> 45% ctx • $0.02
+            row1_left_parts = [f"[bold {THEME_PRIMARY}]{role_formatted}[/]"]
+            if is_connected and clean_model and clean_model != "[Select model: /models]":
+                role_len = display_width(role_formatted) + 3
+                right_len = 16
+                max_model_len = max(10, width - role_len - right_len - 3)
+                disp_model = ellipsize(clean_model, max_model_len)
+                row1_left_parts.append(f"[{THEME_SECONDARY}]{disp_model}[/]")
+            row1_left = STATUS_SEP_COMPACT.join(row1_left_parts)
 
             # Row 2 (Env): johnston • main (+3/-1) • sb:on • mode  <left> | <right> ⚡ 2a • 1s
             dir_raw = os.path.basename(os.path.abspath(directory)) or directory
