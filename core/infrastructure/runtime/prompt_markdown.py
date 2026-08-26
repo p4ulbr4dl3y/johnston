@@ -26,6 +26,9 @@ def format_skills_markdown(skills: List[Any]) -> str:
     for s in skills:
         scope_val = getattr(s.scope, "value", s.scope)
         attrs = [f'name="{escape_xml_attr(s.name)}"', f'scope="{escape_xml_attr(str(scope_val))}"']
+        loc = getattr(s, "location", None) or getattr(s, "path", None)
+        if loc:
+            attrs.append(f'path="{escape_xml_attr(str(loc))}"')
         if s.description:
             attrs.append(f'desc="{escape_xml_attr(s.description)}"')
         skills_xml.append(f"  <skill {' '.join(attrs)}/>")
