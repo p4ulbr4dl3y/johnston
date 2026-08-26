@@ -54,17 +54,14 @@ class ManageSubagentTool(BaseTool):
         if action == "list":
             target_sessions = store.children(curr_session_id) if curr_session_id else store.list(kind="subagent")
             if not target_sessions:
-                return ToolResult.done(content="<subagents/>", display="No subagent sessions found for current session.")
-            sub_xmls = []
+                return ToolResult.done("No subagent sessions found for current session.")
             lines = ["Active/Past Subagent Sessions:"]
             for sess in target_sessions:
-                title_esc = str(sess.description or "").replace('"', "&quot;")
-                sub_xmls.append(f'<subagent id="{sess.id}" role="{sess.role}" status="{sess.status}" title="{title_esc}"/>')
                 lines.append(
                     f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {sess.role} | Title: {sess.description}"
                 )
-            xml_content = "<subagents>\n" + "\n".join(sub_xmls) + "\n</subagents>"
-            return ToolResult.done(content=xml_content, display="\n".join(lines))
+            msg = "\n".join(lines)
+            return ToolResult.done(content=msg, display=msg)
 
         if not session_id:
             return ToolResult.error(
@@ -79,8 +76,8 @@ class ManageSubagentTool(BaseTool):
 
         if action == "kill":
             if session.status != "running":
-                xml_content = f'<subagent_status id="{session.id}" status="{session.status}"/>'
-                return ToolResult.done(content=xml_content, display=f"{session.id} already in '{session.status}'")
+                msg = f"{session.id} already in '{session.status}'"
+                return ToolResult.done(content=msg, display=msg)
 
             if session.async_task and not session.async_task.done():
                 try:
@@ -90,8 +87,8 @@ class ManageSubagentTool(BaseTool):
 
             session.finish(SessionStatus.CANCELLED, "Cancelled via subagent tool")
             store.save(session)
-            xml_content = f'<subagent_killed id="{session.id}"/>'
-            return ToolResult.done(content=xml_content, display=f"{session.id} terminated")
+            msg = f"{session.id} terminated"
+            return ToolResult.done(content=msg, display=msg)
 
         elif action == "send_message":
             if not message:

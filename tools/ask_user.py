@@ -99,23 +99,8 @@ class AskUserTool(BaseTool):
         try:
             res = await ctx.ask_user(validated_questions)
             if isinstance(res, str) and res.strip().lower() in ("cancelled", "cancelled by user", "cancelled by user."):
-                return ToolResult.cancelled(content='<cancelled by="user"/>', display=res)
-
-            xml_items = []
-            cur_q = None
-            for line in (res or "").splitlines():
-                if line.startswith("Question:"):
-                    cur_q = line.split(":", 1)[1].strip()
-                elif line.startswith("Answer:") and cur_q is not None:
-                    ans = line.split(":", 1)[1].strip()
-                    q_esc = cur_q.replace('"', "&quot;")
-                    xml_items.append(f'<q text="{q_esc}">{ans}</q>')
-                    cur_q = None
-            if xml_items:
-                xml_content = "<answers>\n" + "\n".join(xml_items) + "\n</answers>"
-            else:
-                xml_content = f"<answers>{res}</answers>" if res else "<answers/>"
-            return ToolResult.done(content=xml_content, display=res)
+                return ToolResult.cancelled(content="cancelled by user", display=res)
+            return ToolResult.done(content=res or "", display=res or "")
         except asyncio.CancelledError:
             # A real task cancellation (e.g. the agent run being interrupted): clear
             # any pending wizard state, then re-raise so cooperative cancellation

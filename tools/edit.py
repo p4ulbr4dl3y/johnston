@@ -216,14 +216,7 @@ class EditTool(BaseTool):
 
             new_content, diff = apply_edit(content, old_str, new_str, replace_all, path)
             write_file_text(path, new_content)
-            repl_count = content.count(old_str) if replace_all else 1
-            diff_clean = diff.strip() if diff else ""
-            xml_content = (
-                f'<edited path="{path}" replacements="{repl_count}">\n{diff_clean}\n</edited>'
-                if diff_clean
-                else f'<edited path="{path}" replacements="{repl_count}"/>'
-            )
-            return ToolResult.done(content=xml_content, display=diff)
+            return ToolResult.done(content=diff, display=diff)
 
         try:
             return await run_cancellable(_do_edit)

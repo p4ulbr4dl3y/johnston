@@ -39,7 +39,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_list_action(self):
         tool = ManageSubagentTool()
         res_empty = await tool.execute({"action": "list"})
-        self.assertEqual(res_empty.content, "<subagents/>")
+        self.assertIn("No subagent sessions found for current session", res_empty.content)
         self.assertIn("No subagent sessions found for current session", res_empty.display)
 
         self._mk_subagent("sub-1", "Search files", "find python files", role="explorer")
@@ -52,13 +52,13 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         sess = self._mk_subagent("sub-3", "Long running task", "do heavy work", role="worker")
 
         res_kill = await tool.execute({"action": "kill", "session_id": "sub-3"})
-        self.assertIn('id="sub-3"', res_kill.content)
+        self.assertIn("sub-3 terminated", res_kill.content)
         self.assertEqual(sess.status, "cancelled")
 
         # Second kill on finished task
         res_kill_again = await tool.execute({"action": "kill", "session_id": "sub-3"})
         self.assertIn("already in 'cancelled'", res_kill_again.display)
-        self.assertIn('status="cancelled"', res_kill_again.content)
+        self.assertIn("already in 'cancelled'", res_kill_again.content)
 
     def test_agent_session_deserialization(self):
         data = {

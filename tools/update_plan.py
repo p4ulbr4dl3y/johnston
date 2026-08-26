@@ -91,6 +91,4 @@ class UpdatePlanTool(BaseTool):
         if explanation:
             summary += f" {explanation}"
 
-        note_attr = f' note="{explanation}"' if explanation else ""
-        xml_content = f'<plan done="{completed_count}" total="{total_count}"{note_attr}/>'
-        return ToolResult.done(content=xml_content, display=summary)
+        return ToolResult.done(content=summary, display=summary)

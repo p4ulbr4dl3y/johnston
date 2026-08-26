@@ -81,18 +81,12 @@ class CreateTool(BaseTool):
 
         try:
             diff_text = await run_cancellable(_write_and_diff)
-            line_count = len(content.splitlines()) if content else 0
             if file_existed:
                 diff_part = f"\n\n{diff_text.strip()}" if diff_text and diff_text.strip() else ""
-                xml_content = (
-                    f'<updated path="{path}" lines="{line_count}">\n{diff_text.strip()}\n</updated>'
-                    if diff_text and diff_text.strip()
-                    else f'<updated path="{path}" lines="{line_count}"/>'
-                )
-                return ToolResult.done(content=xml_content, display=f"file '{path}' updated.{diff_part}")
+                msg = f"file '{path}' updated.{diff_part}"
+                return ToolResult.done(content=msg, display=msg)
             else:
-                byte_count = len(content.encode("utf-8"))
-                xml_content = f'<created path="{path}" lines="{line_count}" bytes="{byte_count}"/>'
-                return ToolResult.done(content=xml_content, display=f"file '{path}' created.")
+                msg = f"file '{path}' created."
+                return ToolResult.done(content=msg, display=msg)
         except Exception as e:
             return ToolResult.error("file", detail=str(e), name=path)

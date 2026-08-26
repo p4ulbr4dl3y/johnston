@@ -62,7 +62,7 @@ def _app(make_app_mock, tasks=None, session_id=None):
 async def test_list_no_tasks(tool, make_app_mock):
     app = _app(make_app_mock, tasks=[])
     res = await tool.execute({"action": "list"}, ctx=app)
-    assert res.content == "<tasks/>"
+    assert "no tasks active" in res.content
     assert "no tasks active" in res.display
 
 
@@ -84,9 +84,9 @@ async def test_list_with_tasks(tool, make_app_mock):
     res = await tool.execute({"action": "list"}, ctx=app)
     assert "Active Background Tasks" in res.display
     assert "t1" in res.content
-    assert "running" in res.content
+    assert "RUNNING" in res.content
     assert "t2" in res.content
-    assert "finished" in res.content
+    assert "FINISHED" in res.content
 
 
 async def test_list_many_tasks_preserves_input_order(tool, make_app_mock):
@@ -116,7 +116,7 @@ async def test_background_task_already_finished_is_excluded_from_list(tool, make
     t1.status = TaskStatus.COMPLETED
     res = await tool.execute({"action": "list"}, ctx=app)
     assert "tbkg" in res.content
-    assert "finished" in res.content
+    assert "FINISHED" in res.content
 
 
 async def test_no_task_manager_no_app(tool):
@@ -239,7 +239,7 @@ async def test_manage_shell_send_input(tool, make_app_mock):
     res = await tool.execute(
         {"action": "send_input", "task_id": "task_interactive", "input": "John Doe"}, ctx=app
     )
-    assert "stdin_sent" in res.content
+    assert "sent" in res.content
     mock_stdin.write.assert_called_once_with(b"John Doe\n")
 
 
@@ -262,7 +262,7 @@ async def test_send_input_empty_input_still_writes_newline(tool, make_app_mock):
     t = _make_task("tsempty", "read name", proc=proc, session_id="s1")
     app = _app(make_app_mock, [t], session_id="s1")
     res = await tool.execute({"action": "send_input", "task_id": "tsempty", "input": ""}, ctx=app)
-    assert "stdin_sent" in res.content
+    assert "sent" in res.content
     mock_stdin.write.assert_called_once_with(b"\n")
 
 

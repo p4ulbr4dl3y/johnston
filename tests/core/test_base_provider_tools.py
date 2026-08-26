@@ -115,7 +115,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)
-        self.assertEqual(res_list.content, "<tasks/>")
+        self.assertEqual(res_list.content, "no tasks active")
 
     async def test_task_tool_foreground(self):
         import tempfile
