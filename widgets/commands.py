@@ -397,11 +397,7 @@ class ResumeCommand(BaseCommand):
                 from widgets.presentation.screens.session_conflict import SessionConflictScreen
 
                 def on_conflict_choice(choice: str | None) -> None:
-                    if choice == "fork":
-                        forked = app.sm.fork_session(selected_sid)
-                        if forked:
-                            _apply_selected(forked.id)
-                    elif choice == "steal":
+                    if choice == "steal":
                         app.sm.steal_session_lock(selected_sid)
                         _apply_selected(selected_sid)
                     elif choice == "readonly":

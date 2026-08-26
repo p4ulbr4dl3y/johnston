@@ -36,11 +36,7 @@ class LifecycleMixin:
                 from widgets.presentation.screens.session_conflict import SessionConflictScreen
 
                 def on_init_conflict(choice: str | None) -> None:
-                    if choice == "fork":
-                        forked = self.sm.fork_session(res_id)
-                        if forked:
-                            self.load_session_ui(forked.id)
-                    elif choice == "steal":
+                    if choice == "steal":
                         self.sm.steal_session_lock(res_id)
                         self.load_session_ui(res_id)
                     elif choice == "readonly":

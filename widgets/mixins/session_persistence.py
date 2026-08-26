@@ -28,6 +28,16 @@ class SessionPersistenceMixin:
         self.current_session_id = session_id
         self.is_read_only = read_only
 
+        try:
+            from widgets.chat_input import ChatInput
+            chat_input = self.query_one("#message-input", ChatInput)
+            if read_only:
+                chat_input.placeholder = "Type a message to fork & continue..."
+            else:
+                chat_input.placeholder = "Type a message or / for commands..."
+        except Exception:
+            pass
+
         if not read_only:
             if hasattr(self.sm, "acquire_session_lock"):
                 self.sm.acquire_session_lock(session_id)

@@ -79,6 +79,19 @@ class MessageFlowMixin:
         chat_input = self.query_one("#message-input", ChatInput)
         chat_input.focus()
 
+        if getattr(self, "is_read_only", False) and hasattr(self, "sm"):
+            curr_id = getattr(self, "current_session_id", None)
+            if curr_id and hasattr(self.sm, "fork_session"):
+                forked = self.sm.fork_session(curr_id)
+                if forked:
+                    self.current_session_id = forked.id
+                    if hasattr(self.sm, "acquire_session_lock"):
+                        self.sm.acquire_session_lock(forked.id)
+                    if hasattr(self.sm, "set_active_session_id"):
+                        self.sm.set_active_session_id(forked.id)
+                    self.is_read_only = False
+                    chat_input.placeholder = "Type a message or / for commands..."
+
         if not user_text and attachments:
             user_text = "What is in this image?"
 

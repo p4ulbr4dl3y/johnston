@@ -1,8 +1,9 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.app import App, ComposeResult
 
+from widgets.chat_input import ChatInput
 from widgets.commands import ResumeCommand
 from widgets.presentation.screens.resume import ResumeScreen
 from widgets.presentation.screens.session_conflict import SessionConflictScreen
@@ -18,10 +19,10 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         app = ConflictTestApp()
         async with app.run_test():
             screen = SessionConflictScreen(session_id="s1")
-            self.assertEqual(screen.raw_items, ["fork", "steal", "readonly"])
-            self.assertIn("Fork", screen.raw_options[0])
+            self.assertEqual(screen.raw_items, ["readonly", "steal"])
+            self.assertEqual(screen.default_value, "readonly")
+            self.assertIn("read-only", screen.raw_options[0])
             self.assertIn("Steal", screen.raw_options[1])
-            self.assertIn("read-only", screen.raw_options[2])
 
     async def test_resume_screen_locked_icon(self):
         sessions = [
@@ -57,24 +58,16 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
             app.push_screen.assert_called()
             conflict_cb = app.push_screen.call_args[1]["callback"]
 
-            # 1. Test Fork
-            app.sm.fork_session.return_value = MagicMock(id="s_forked")
-            conflict_cb("fork")
-            app.sm.fork_session.assert_called_with("s_locked")
-            app.load_session_ui.assert_called_with("s_forked")
-
-            # 2. Test Steal
+            # 1. Test Steal
             conflict_cb("steal")
             app.sm.steal_session_lock.assert_called_with("s_locked")
             app.load_session_ui.assert_called_with("s_locked")
 
-            # 3. Test ReadOnly
+            # 2. Test ReadOnly
             conflict_cb("readonly")
             app.load_session_ui.assert_called_with("s_locked", read_only=True)
 
     async def test_new_command_resets_read_only_and_manages_locks(self):
-        from unittest.mock import AsyncMock
-
         from widgets.commands import NewCommand
 
         app = MagicMock()
@@ -94,3 +87,31 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
             app.sm.acquire_session_lock.assert_called_with("new_sess")
             self.assertFalse(app.is_read_only)
             self.assertEqual(app.current_session_id, "new_sess")
+
+    async def test_message_flow_auto_forks_when_read_only(self):
+        from widgets.mixins.message_flow import MessageFlowMixin
+
+        class TestApp(MessageFlowMixin):
+            def __init__(self):
+                self.is_generating = False
+                self.is_read_only = True
+                self.current_session_id = "orig_sess"
+                self.sm = MagicMock()
+                self.trigger_ai_response = MagicMock()
+                self._input = MagicMock()
+                self._input.placeholder = ""
+                self.query_one = lambda sel, cls=None: self._input
+
+        test_app = TestApp()
+        forked_mock = MagicMock(id="orig_sess_fork")
+        test_app.sm.fork_session.return_value = forked_mock
+
+        ev = ChatInput.Submitted("hello from readonly")
+        await test_app.on_chat_input_submitted(ev)
+
+        test_app.sm.fork_session.assert_called_with("orig_sess")
+        self.assertEqual(test_app.current_session_id, "orig_sess_fork")
+        test_app.sm.acquire_session_lock.assert_called_with("orig_sess_fork")
+        test_app.sm.set_active_session_id.assert_called_with("orig_sess_fork")
+        self.assertFalse(test_app.is_read_only)
+        test_app.trigger_ai_response.assert_called_with("hello from readonly", show_in_ui=True)
