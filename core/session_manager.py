@@ -273,6 +273,40 @@ class AgentSession:
         sess.branch_name = data.get("branch_name", "")
         return sess
 
+    @property
+    def title(self) -> str:
+        if self.description:
+            clean = " ".join(str(self.description).split())
+            if clean:
+                return clean[:55] + "..." if len(clean) > 55 else clean
+        for m in self.messages:
+            if isinstance(m, dict) and m.get("type") == "user":
+                text = str(m.get("display_text") or m.get("text", "")).strip()
+                if text:
+                    clean = " ".join(text.split())
+                    return clean[:55] + "..." if len(clean) > 55 else clean
+        return "Untitled"
+
+    @property
+    def message_count(self) -> int:
+        """Count assistant iterations in history or UI messages."""
+        if self.agent_history:
+            assistant_msgs = [m for m in self.agent_history if isinstance(m, dict) and m.get("role") == "assistant"]
+            if assistant_msgs:
+                return len(assistant_msgs)
+        bot_msgs = [m for m in self.messages if isinstance(m, dict) and m.get("type") == "bot"]
+        return len(bot_msgs)
+
+    def to_summary_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "parent_id": self.parent_id,
+            "title": self.title,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "message_count": self.message_count,
+        }
+
     @classmethod
     def from_file(cls, fpath: str) -> Optional["AgentSession"]:
         if not fpath or not os.path.exists(fpath):
@@ -535,81 +569,14 @@ class SessionStore:
                 sessions[sess.id] = sess
         except Exception:
             logger.warning("Failed to load session file: %s", fpath, exc_info=True)
-
-    @staticmethod
-    def _read_session_summary_from_file(fpath: str) -> Optional[Dict[str, Any]]:
-        """Reads session metadata and title/count without deserializing all history/message objects."""
-        if not fpath or not os.path.exists(fpath):
+    def _read_session_summary_from_file(self, fpath: str) -> Optional[Dict[str, Any]]:
+        """Fast session summary read for list_main_sessions using unified AgentSession domain logic."""
+        sess = AgentSession.from_file(fpath)
+        if not sess or sess.kind != SessionKind.MAIN:
             return None
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                first_line = f.readline().strip()
-                if not first_line:
-                    return None
-                try:
-                    first = json.loads(first_line)
-                except Exception:
-                    return None
-
-                if not isinstance(first, dict) or first.get("_type") != "meta":
-                    return None
-
-                if first.get("kind", SessionKind.MAIN.value) != SessionKind.MAIN.value:
-                    return None
-
-                title = ""
-                has_content = False
-                assistant_history_count = 0
-                bot_msg_count = 0
-
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    has_content = True
-                    if '"_type": "msg"' in line or '"_type":"msg"' in line:
-                        if not title:
-                            try:
-                                entry = json.loads(line)
-                                data = entry.get("data")
-                                if isinstance(data, dict) and data.get("type") == "user":
-                                    text = str(data.get("display_text") or data.get("text", "")).strip()
-                                    if text:
-                                        clean = " ".join(text.split())
-                                        title = clean[:55] + "..." if len(clean) > 55 else clean
-                            except Exception:
-                                pass
-                        if '"type": "bot"' in line or '"type":"bot"' in line:
-                            bot_msg_count += 1
-                    elif '"role": "assistant"' in line or '"role":"assistant"' in line:
-                        assistant_history_count += 1
-
-                if not has_content:
-                    return None
-
-                message_count = assistant_history_count if assistant_history_count > 0 else bot_msg_count
-
-                desc = str(first.get("description") or "").strip()
-                if desc:
-                    clean_desc = " ".join(desc.split())
-                    title = clean_desc[:55] + "..." if len(clean_desc) > 55 else clean_desc
-
-                if not title:
-                    title = "Untitled"
-
-                created_at = _coerce_float(first.get("created_at")) or 0.0
-                updated_at = _coerce_float(first.get("updated_at")) or created_at
-
-                return {
-                    "id": first.get("id", ""),
-                    "parent_id": first.get("parent_id"),
-                    "title": title,
-                    "created_at": created_at,
-                    "updated_at": updated_at,
-                    "message_count": message_count,
-                }
-        except Exception:
+        if not sess.messages and not sess.agent_history:
             return None
+        return sess.to_summary_dict()
 
     def list_main_sessions(self) -> List[Dict[str, Any]]:
         """Return NON-EMPTY main sessions sorted by updated time (for /resume UI)."""
@@ -622,22 +589,9 @@ class SessionStore:
                 seen_ids.add(sid)
                 if not sess.messages and not sess.agent_history:
                     continue
-                title = self._title_from_messages(sess)
-                if title == "Untitled" and sess.description:
-                    desc = " ".join(str(sess.description).split())
-                    title = desc[:55] + "..." if len(desc) > 55 else desc
-                sessions.append(
-                    {
-                        "id": sess.id,
-                        "parent_id": sess.parent_id,
-                        "title": title,
-                        "created_at": sess.created_at,
-                        "updated_at": sess.updated_at,
-                        "message_count": self._message_count(sess),
-                    }
-                )
+                sessions.append(sess.to_summary_dict())
 
-        # 2. Fast header/metadata read from on-disk JSONL files
+        # 2. Fast read from on-disk JSONL files
         if os.path.isdir(self.sessions_dir):
             for fname in sorted(os.listdir(self.sessions_dir)):
                 if fname.endswith(".jsonl"):
@@ -657,27 +611,11 @@ class SessionStore:
 
     @staticmethod
     def _title_from_messages(sess: AgentSession) -> str:
-        if sess.description:
-            clean = " ".join(str(sess.description).split())
-            if clean:
-                return clean[:55] + "..." if len(clean) > 55 else clean
-        for m in sess.messages:
-            if isinstance(m, dict) and m.get("type") == "user":
-                text = str(m.get("display_text") or m.get("text", "")).strip()
-                if text:
-                    clean = " ".join(text.split())
-                    return clean[:55] + "..." if len(clean) > 55 else clean
-        return "Untitled"
+        return sess.title
 
     @staticmethod
     def _message_count(sess: AgentSession) -> int:
-        """Count agent loop iterations: assistant messages in history or bot messages."""
-        if sess.agent_history:
-            assistant_msgs = [m for m in sess.agent_history if isinstance(m, dict) and m.get("role") == "assistant"]
-            if assistant_msgs:
-                return len(assistant_msgs)
-        bot_msgs = [m for m in sess.messages if isinstance(m, dict) and m.get("type") == "bot"]
-        return len(bot_msgs)
+        return sess.message_count
 
     def children(self, parent_id: str) -> List[AgentSession]:
         return [s for s in self.list() if s.parent_id == parent_id]
