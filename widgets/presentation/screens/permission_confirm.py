@@ -401,17 +401,25 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 screen_h = 24
             num_opts = len(self._option_keys) if hasattr(self, "_option_keys") else 4
 
+            input_overhead = 0
+            try:
+                inp = self.query_one("#reject-reason-input", Input)
+                if inp.display:
+                    input_overhead = 2
+            except Exception:
+                pass
+
             if screen_h < 18:
                 dialog.styles.padding = (0, 1)
                 dialog.styles.max_height = max(7, screen_h - 1)
-                opt_h = min(num_opts, max(2, screen_h - 10))
-                overhead = 8 + opt_h
+                opt_h = min(num_opts, max(2, screen_h - 10 - input_overhead))
+                overhead = 8 + opt_h + input_overhead
                 opt_list_h = opt_h
                 usable_h = screen_h - 1
             else:
                 dialog.styles.padding = (1, 2)
                 dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.92)))
-                overhead = 12 + num_opts
+                overhead = 12 + num_opts + input_overhead
                 opt_list_h = None
                 usable_h = screen_h - 2
 
@@ -468,8 +476,10 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             if hasattr(self, "_option_keys") and event.option_index == len(self._option_keys) - 1:
                 self.focus_reject_input()
             else:
-                inp.display = False
-                inp.can_focus = False
+                if inp.display:
+                    inp.display = False
+                    inp.can_focus = False
+                    self._apply_dialog_fit()
                 self.query_one("#modal-hint", Label).update(self._build_hint_text(resolve_width(self)))
         except Exception:
             pass
@@ -499,6 +509,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             inp.display = True
             inp.can_focus = True
             inp.focus()
+            self._apply_dialog_fit()
             hint = self.query_one("#modal-hint", Label)
             hint.update("enter: send feedback • ↑: options • esc: deny")
         except Exception:
@@ -513,6 +524,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             if hasattr(self, "_option_keys"):
                 opt_list.highlighted = max(0, len(self._option_keys) - 2)
             opt_list.focus()
+            self._apply_dialog_fit()
             hint = self.query_one("#modal-hint", Label)
             hint.update(self._build_hint_text(resolve_width(self)))
         except Exception:
@@ -526,6 +538,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             opt_list = self.query_one("#permission-options-list", OptionList)
             opt_list.highlighted = 0
             opt_list.focus()
+            self._apply_dialog_fit()
         except Exception:
             self.focus()
 
