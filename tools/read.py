@@ -278,7 +278,7 @@ class ReadTool(BaseTool):
                         "type": "integer",
                         "description": (
                             "Byte offset to continue reading large or minified single-line files. "
-                            "Pass the exact offset number provided in the truncation message."
+                            "Seeks directly to byte position."
                         ),
                     },
                     "detail": {

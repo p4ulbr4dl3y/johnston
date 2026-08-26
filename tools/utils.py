@@ -53,11 +53,9 @@ def format_line_pagination(
         if start_line_int is not None and start_line_int > total_lines:
             path_str = f" in '{path}'" if path else ""
             if total_lines == 1:
-                hint_str = "File has only 1 total line (e.g. minified JSON/log). Re-run read tool with start_line=1 and content_offset, or use shell tools (jq/grep)."
+                hint_str = "File has only 1 total line (e.g. minified JSON/log). Use start_line=1 and content_offset, or shell tools (jq/grep)."
             else:
-                hint_str = (
-                    f"File has {total_lines} total lines. Re-run read tool with start_line between 1 and {total_lines}"
-                )
+                hint_str = f"File has {total_lines} total lines. Use start_line=1..{total_lines}."
             return format_tool_error(
                 "range",
                 f"start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
@@ -105,14 +103,16 @@ def format_line_pagination(
         header += f" in {path}"
     header += " ==="
 
+    hints = []
     if actual_end < total_lines:
         next_start = actual_end + 1
         next_end = min(total_lines, next_start + DEFAULT_LINE_WINDOW - 1)
-        hint_text = f"\n[Hint: File has {total_lines} lines. Use start_line={next_start} end_line={next_end} to read next chunk.]"
+        hints.append(f"[Hint: File has {total_lines} lines. Use start_line={next_start} end_line={next_end} to read next chunk.]")
         if actual_end < end:
-            hint_text += f" [Warning: Output truncated at line {actual_end} before target line {end} due to character limit ({max_chars} chars).]"
+            hints.append(f"[Warning: Output truncated at line {actual_end} before target line {end} due to character limit ({max_chars} chars).]")
         if converted_path:
-            hint_text += f" [Full converted Markdown saved to {converted_path}. Use shell (grep/tail) to inspect or filter full output.]"
-        header += hint_text
+            hints.append(f"[Full converted Markdown saved to {converted_path}. Use shell (grep/tail) to inspect or filter full output.]")
 
+    if hints:
+        return f"{header}\n" + "\n".join(hints) + f"\n{result_body}"
     return f"{header}\n{result_body}"

@@ -34,10 +34,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         description="Read-only mode for information gathering, research, analysis, and action planning.",
         prompt=(
             "## Execution Mode: EXPLORER\n\n"
-            "1. Read-Only: Strictly read-only mode. NEVER execute state-changing actions, mutations, or write operations.\n"
-            "2. Evidence-Backed: Anchor all findings and diagnoses in exact sources, data, or references.\n"
-            "3. Action Plans: When planning, provide Goal, Trade-offs, Key Dependencies, and Step-by-step Execution with verification criteria.\n"
-            "4. Mutation Requests: When requested to modify state, decline mutation and provide the actionable execution plan instead."
+            "1. Strictly Read-Only: strictly read-only mode. NEVER modify state or run destructive operations. If asked to modify, decline and provide an actionable execution plan instead.\n"
+            "2. Evidence-Backed: Anchor all findings, architectures, and diagnoses in exact file references and data.\n"
+            "3. Actionable Plans: When designing solutions, provide Goal, Trade-offs, Dependencies, Step-by-step Execution, and Verification steps."
         ),
         read_only=True,
         scope="any",
