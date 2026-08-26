@@ -90,7 +90,7 @@ def _truncate_output(res: str) -> str:
 class ShellTool(BaseTool):
     name = "shell"
     description = (
-        "Execute non-interactive shell command. Always specify explicit path (e.g. 'rg foo .') "
+        "Execute non-interactive shell command. ALWAYS specify explicit path (e.g. 'rg foo .') "
         "to avoid stdin hang. Set background=true for servers/long jobs. Use unbuffered output "
         "(flush/flags) for long scripts, loops, and streaming logs. Manage, send stdin, or kill via 'manage_shell'."
     )
