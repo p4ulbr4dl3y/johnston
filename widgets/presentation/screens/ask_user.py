@@ -5,6 +5,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList, Static
 
+from widgets.chat_toolcall import ToolScrollBox
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
@@ -103,10 +104,11 @@ class WriteInInput(Input):
 
 
 class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
-    """Unified modal screen that handles multi-question wizard without flickering."""
+    """Multi-step interactive wizard screen for `ask_user` questions."""
 
+    AUTO_FOCUS = ""
+    ALLOW_SELECT = False
     BINDINGS = expand_bindings([
-        ("escape", "cancel", "Cancel"),
         ("tab", "minimize", "Minimize"),
         ("left", "go_back", "Back"),
         ("right", "go_next", "Next"),
@@ -127,7 +129,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="wizard-dialog"):
             yield Markdown("", id="wizard-title", classes=MODAL_MARKDOWN)
-            yield Static("", id="wizard-summary", classes=f"{MODAL_MARKDOWN} wizard-summary", markup=False)
+            with ToolScrollBox(id="wizard-summary-scroll", classes="tool-scroll-box"):
+                yield Static("", id="wizard-summary", classes=f"{MODAL_MARKDOWN} wizard-summary", markup=False)
             yield HeaderWrapOptionList(id=OPTIONS_LIST_ID)
             yield WriteInInput(placeholder="Type custom answer and press Enter...", id=WRITE_IN_INPUT_ID)
             yield Label("", id=MODAL_HINT_ID)
@@ -200,7 +203,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
 
         if self.q_idx < len(self.questions):
             title_md.remove_class("confirm-summary")
-            summary_static.display = False
+            summary_scroll = self.query_one("#wizard-summary-scroll")
+            summary_scroll.display = False
             q = self.questions[self.q_idx]
             q_text = q.get("question", "")
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n{q_text}")
@@ -269,7 +273,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             title_md.add_class("confirm-summary")
             title_md.update("### **Confirm Your Answers**")
             summary_static.update(format_ask_user_display(self.questions, self.answers))
-            summary_static.display = True
+            summary_scroll = self.query_one("#wizard-summary-scroll")
+            summary_scroll.display = True
             opt_list.display = False
             input_field.display = False
             self.focus()
@@ -323,6 +328,13 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 opt_list.styles.max_height = max(2, usable_h - overhead)
             except Exception:
                 pass
+
+            try:
+                summary_scroll = self.query_one("#wizard-summary-scroll")
+                summary_overhead = 4 if screen_h < 18 else 6
+                summary_scroll.styles.max_height = max(3, usable_h - summary_overhead)
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -335,7 +347,9 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
 
             hint = self.query_one(MODAL_HINT, Label)
             if self.q_idx >= len(self.questions):
-                hint.update("enter • ← • esc" if is_compact else "enter: confirm • ←: back • esc: cancel")
+                hint.update(
+                    "enter • ← • ↑↓ • esc" if is_compact else "enter: confirm • ←: back • ↑↓/PgUp: scroll • esc: cancel"
+                )
                 return
 
             q = self.questions[self.q_idx] if 0 <= self.q_idx < len(self.questions) else {}
@@ -503,10 +517,24 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
         if self.q_idx < len(self.questions):
             self.q_idx += 1
             self.update_step()
-        else:
-            self.submit_current_step()
-
     def _on_key(self, event: events.Key) -> None:
+        if self.q_idx >= len(self.questions):
+            if event.key in ("up", "down", "pageup", "pagedown"):
+                try:
+                    scroll_box = self.query_one("#wizard-summary-scroll", ToolScrollBox)
+                    if event.key == "up":
+                        scroll_box.scroll_up(animate=False)
+                    elif event.key == "down":
+                        scroll_box.scroll_down(animate=False)
+                    elif event.key == "pageup":
+                        scroll_box.scroll_page_up(animate=False)
+                    elif event.key == "pagedown":
+                        scroll_box.scroll_page_down(animate=False)
+                    event.prevent_default()
+                    event.stop()
+                    return
+                except Exception:
+                    pass
         if event.key in SHIFT_TAB_KEYS:
             event.prevent_default()
             event.stop()

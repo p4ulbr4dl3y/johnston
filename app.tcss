@@ -654,8 +654,18 @@ ModalScreen {
 #rewind-files {
     width: 100%;
     height: auto;
-    margin-bottom: 1;
-    display: none;
+    margin-bottom: 0;
+}
+
+#modal-dialog.wizard-dialog .tool-scroll-box {
+    margin: 1 0 0 0;
+    max-height: 18;
+    overflow-y: auto;
+    overflow-x: auto;
+    background: transparent;
+    border: none;
+    padding: 0;
+    scrollbar-size: 0 0 !important;
 }
 
 DiffScreen {
