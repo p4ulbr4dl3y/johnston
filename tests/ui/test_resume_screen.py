@@ -50,3 +50,14 @@ class TestResumeScreen(unittest.TestCase):
         dots_pos_p = plain_p.find("...")
         dots_pos_c = plain_c.find("...")
         self.assertEqual(dots_pos_p, dots_pos_c)
+
+    def test_resume_screen_initial_selected_id(self):
+        sessions = [
+            {"id": "s1", "title": "Active Session", "message_count": 5},
+            {"id": "s2", "title": "Target Session", "message_count": 2},
+        ]
+        screen = ResumeScreen(sessions, current_session_id="s1", initial_selected_id="s2")
+        self.assertEqual(screen.default_value, "s2")
+        self.assertEqual(screen.current_session_id, "s1")
+        self.assertTrue(screen.raw_options[0].startswith("● "))
+        self.assertTrue(screen.raw_options[1].startswith("  "))

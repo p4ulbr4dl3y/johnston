@@ -35,7 +35,12 @@ def _order_sessions_hierarchically(sessions: list[dict]) -> list[dict]:
 class ResumeScreen(BaseSelectionScreen[str]):
     """Modal session resume screen (/resume)"""
 
-    def __init__(self, sessions: list[dict], current_session_id: str | None = None):
+    def __init__(
+        self,
+        sessions: list[dict],
+        current_session_id: str | None = None,
+        initial_selected_id: str | None = None,
+    ):
         ordered_sessions = _order_sessions_hierarchically(sessions)
         self.sessions = ordered_sessions
         self.current_session_id = current_session_id
@@ -44,8 +49,9 @@ class ResumeScreen(BaseSelectionScreen[str]):
         )
         items = [str(s.get("id")) for s in ordered_sessions]
 
-        if current_session_id and str(current_session_id) in items:
-            default_val = str(current_session_id)
+        highlight_target = initial_selected_id or current_session_id
+        if highlight_target and str(highlight_target) in items:
+            default_val = str(highlight_target)
         else:
             default_val = items[0] if items else ""
 

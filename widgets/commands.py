@@ -535,7 +535,11 @@ class ResumeCommand(BaseCommand):
                         _apply_selected(selected_sid, read_only=True)
                     else:
                         app.push_screen(
-                            ResumeScreen(sessions, current_session_id=curr_sid),
+                            ResumeScreen(
+                                sessions,
+                                current_session_id=curr_sid,
+                                initial_selected_id=selected_sid,
+                            ),
                             callback=on_resume_selected,
                         )
 
