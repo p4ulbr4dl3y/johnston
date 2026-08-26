@@ -17,19 +17,6 @@ logger = logging.getLogger(__name__)
 
 # ── API key / provider credentials ──────────────────────────────────────
 
-
-def fetch_api_key_and_provider_info(
-    pm: ProviderManager,
-    provider_key: str,
-) -> Tuple[str, str]:
-    """Return ``(provider_name, current_api_key)`` for the given key."""
-    providers = pm.load_providers(include_disabled=True)
-    p_info = providers.get(provider_key, {})
-    p_name: str = p_info.get("name", provider_key)
-    current_key: str = pm.get_api_key(provider_key)
-    return p_name, current_key
-
-
 def _refresh_models_background(pm: ProviderManager) -> None:
     """Fire-and-forget model refresh so the UI is not blocked."""
     if hasattr(pm, "fetch_models_grouped"):

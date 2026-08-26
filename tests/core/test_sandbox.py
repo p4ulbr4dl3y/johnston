@@ -7,7 +7,6 @@ from core.infrastructure.platform.sandbox import (
     _escape_sbpl_path,
     build_sandboxed_command,
     generate_seatbelt_profile,
-    get_sandbox_backend_name,
     is_path_readable_in_sandbox,
     is_path_writable_in_sandbox,
     is_sandbox_supported,
@@ -40,7 +39,6 @@ def test_is_sandbox_supported():
         patch("core.infrastructure.platform.sandbox._check_seatbelt", return_value=True),
     ):
         assert is_sandbox_supported() is True
-        assert get_sandbox_backend_name() == "seatbelt"
 
     with (
         patch("platform.system", return_value="Linux"),
@@ -48,15 +46,12 @@ def test_is_sandbox_supported():
         patch("core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
     ):
         assert is_sandbox_supported() is True
-        assert get_sandbox_backend_name() == "bubblewrap"
 
     with patch("platform.system", return_value="Windows"):
         assert is_sandbox_supported() is True
-        assert get_sandbox_backend_name() == "windows_safer"
 
     with patch("platform.system", return_value="FreeBSD"):
         assert is_sandbox_supported() is False
-        assert get_sandbox_backend_name() == "none"
 
 
 def test_build_sandboxed_command_darwin():

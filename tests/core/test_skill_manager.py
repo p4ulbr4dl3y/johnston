@@ -4,19 +4,27 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.application.skills.manager import SkillManager, get_skill_manager, reset_skill_managers
+from core.application.skills.manager import SkillManager, get_skill_manager
 from core.infrastructure.runtime.frontmatter import parse_frontmatter
+
+
+def _reset_skill_managers() -> None:
+    """Clear cached skill managers between tests (replaces removed prod helper)."""
+    import core.application.skills.manager as _skm
+    with _skm._registry_lock:
+        _skm._SKILL_MANAGERS.clear()
+        _skm._bundled_provisioned = False
 
 
 class TestSkillManager(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        reset_skill_managers()
+        _reset_skill_managers()
         self.test_dir = tempfile.mkdtemp()
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
 
     def tearDown(self):
-        reset_skill_managers()
+        _reset_skill_managers()
         os.chdir(self.old_cwd)
         shutil.rmtree(self.test_dir)
 
@@ -142,15 +150,11 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("helper", skill_names)
 
     async def test_skill_slash_command_execution(self):
+        from tests.ui.test_commands import MockApp
         from widgets.app.dispatch import handle_slash_command
 
-        try:
-            from tests.core.test_commands import MockApp
-        except ImportError:
-            from tests.ui.test_commands import MockApp
-
         os.chdir(self.old_cwd)
-        reset_skill_managers()
+        _reset_skill_managers()
         app = MockApp()
         handled = await handle_slash_command(app, "/johnston-guide configure MCP")
         self.assertTrue(handled)
@@ -159,15 +163,11 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("configure MCP", app.ai_prompts[0][0])
 
     async def test_multi_skill_slash_command_execution(self):
+        from tests.ui.test_commands import MockApp
         from widgets.app.dispatch import handle_slash_command
 
-        try:
-            from tests.core.test_commands import MockApp
-        except ImportError:
-            from tests.ui.test_commands import MockApp
-
         os.chdir(self.old_cwd)
-        reset_skill_managers()
+        _reset_skill_managers()
         app = MockApp()
         handled = await handle_slash_command(app, "/johnston-guide /caveman refactor code")
         self.assertTrue(handled)
@@ -205,7 +205,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         mock_makedirs.assert_not_called()
 
     def test_get_skill_manager_provisions_bundled_skill(self):
-        reset_skill_managers()
+        _reset_skill_managers()
         with patch(
             "core.application.skills.manager.GLOBAL_SKILLS_DIR",
             os.path.join(self.test_dir, "global-skills"),

@@ -940,15 +940,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.render_content()
             self._scroll_if_needed()
 
-    def flush_shell_output(self) -> None:
-        if getattr(self, "_shell_update_handle", None) is not None:
-            try:
-                self._shell_update_handle.cancel()
-            except Exception:
-                pass
-            self._shell_update_handle = None
-        if getattr(self, "_shell_update_scheduled", False) or hasattr(self, "_raw_bash_buffer"):
-            self._flush_shell_update()
 
     def _compute_content(self) -> tuple:
         """Pure content computation (safe to run in a thread); returns (kind, value).

@@ -5,7 +5,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 
-from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
+from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
@@ -306,42 +306,3 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
                 event.stop()
                 return
         super()._on_key(event)
-
-
-class ApiKeyInputScreen(BaseModalScreen[str | None]):
-    """Modal API key input screen"""
-
-    def __init__(self, provider_name: str, provider_key: str, current_key: str = ""):
-        super().__init__()
-        self.provider_name = provider_name
-        self.provider_key = provider_key
-        self.current_key = current_key
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
-            yield Markdown(
-                f"### **Connect {self.provider_name}**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
-            )
-            if self.current_key:
-                if len(self.current_key) > 8:
-                    masked = f"{self.current_key[:4]}...{self.current_key[-4:]}"
-                else:
-                    masked = self.current_key
-                yield Markdown(f"Current API Key: `{masked}`", id="api-key-current", classes=MODAL_MARKDOWN)
-            yield Input(placeholder="API Key...", value="", password=True, id="api-key-input")
-            yield Label("enter: save • esc: cancel", id=MODAL_HINT_ID)
-
-    def on_mount(self) -> None:
-        self.query_one("#api-key-input", Input).focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value.strip())
-
-    def _on_key(self, event: events.Key) -> None:
-        if event.key in TAB_KEYS:
-            event.prevent_default()
-            event.stop()
-            return
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)

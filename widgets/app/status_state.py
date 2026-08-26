@@ -16,7 +16,7 @@ import os
 import time
 
 from core.infrastructure.runtime.thinking_effort import display_thinking_effort
-from core.models_catalog import catalog, format_context_tokens
+from core.models_catalog import catalog
 
 
 def get_mcp_manager():
@@ -214,94 +214,3 @@ def build_status_kwargs(app, widget=None) -> dict:
         "execution_mode": execution_mode,
     }
 
-
-def build_subagent_status_kwargs(
-    app,
-    session,
-    *,
-    widget=None,
-    spinner_running: bool = False,
-    spinner_idx: int = 0,
-) -> tuple:
-    """State builder for the subagent screen status bar and header.
-
-    Pure aggregator: reads the subagent ``AgentSession`` and returns
-    ``(role_formatted, provider_display, clean_model, is_connected,
-    model_name, context_used, total_tokens, context_limit, context_window, cost_usd,
-    thinking_effort, directory)``.
-
-    ``spinner_running`` / ``spinner_idx`` are passed in; the widget decides
-    whether the spinner is shown and manages its timer — this function only
-    renders the spinner frame into ``role_formatted`` when told to.
-    """
-    from widgets.status_footer import SPINNER_FRAMES
-
-    agent = getattr(session, "agent", None)
-    app_agent = getattr(app, "agent", None) if app else None
-    role = getattr(agent, "role", "worker") if agent else getattr(session, "role", "worker")
-    effort_val = getattr(agent, "thinking_effort", None) if agent else getattr(app_agent, "thinking_effort", None)
-    thinking_effort = display_thinking_effort(effort_val) if effort_val else "auto"
-    metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
-    provider_key = (
-        getattr(agent, "provider_key", "")
-        if agent
-        else (getattr(app_agent, "provider_key", "") if app_agent else "")
-    )
-
-    pm = getattr(app, "pm", None)
-    if not provider_key and pm:
-        provider_key = pm.get_active_provider_key()
-    providers = None
-    if widget is not None:
-        providers = getattr(widget, "_st_cached_providers", None)
-    if providers is None and app:
-        providers = getattr(app, "_st_cached_providers", None)
-    if providers is None:
-        providers = pm.load_providers() if pm else {}
-    provider_info = providers.get(provider_key, {}) if isinstance(providers, dict) else {}
-    provider_display = provider_info.get("name", provider_key) if provider_info else provider_key
-    is_connected = pm.is_provider_connected(provider_key, provider_info) if (pm and provider_key) else False
-
-    model_name = (
-        getattr(agent, "model", "")
-        if agent
-        else (getattr(app_agent, "model", "") if app_agent else provider_info.get("model", ""))
-    )
-    clean_model = catalog.get_model_display_name(provider_key, model_name) if model_name else ""
-    if not clean_model:
-        clean_model = "[Select model: /models]"
-
-    directory = getattr(session, "project_dir", "") or os.path.basename(os.path.realpath(os.getcwd()))
-    if os.path.basename(directory) != directory:
-        directory = os.path.basename(os.path.normpath(directory)) or directory
-
-    context_used = metrics.get("context_used") or getattr(session, "last_context_tokens", 0)
-    total_tokens = metrics.get("total_tokens") or getattr(session, "total_tokens", 0)
-    cost_usd = metrics.get("cost_usd") or getattr(session, "cost_usd", 0.0)
-    context_limit = (
-        metrics.get("context_limit")
-        or getattr(agent, "context_limit", None)
-        or getattr(app_agent, "context_limit", 128000)
-        or 128000
-    )
-    context_window = metrics.get("context") or format_context_tokens(context_limit)
-
-    role_formatted = (
-        f"{SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]} " if spinner_running else ""
-    )
-    role_formatted += role.capitalize()
-
-    return (
-        role_formatted,
-        provider_display or provider_key.capitalize(),
-        clean_model or "[Select model: /models]",
-        is_connected,
-        model_name,
-        context_used,
-        total_tokens,
-        context_limit,
-        context_window,
-        cost_usd,
-        thinking_effort,
-        directory,
-    )

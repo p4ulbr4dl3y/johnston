@@ -32,7 +32,6 @@ __all__ = [
     "SkillManager",
     "SkillScope",
     "get_skill_manager",
-    "reset_skill_managers",
 ]
 
 
@@ -328,10 +327,3 @@ def get_skill_manager(project_dir: Optional[str] = None) -> SkillManager:
             _SKILL_MANAGERS[key] = mgr
         return mgr
 
-
-def reset_skill_managers() -> None:
-    """Drop cached managers and the provisioned flag (intended for tests)."""
-    global _bundled_provisioned
-    with _registry_lock:
-        _SKILL_MANAGERS.clear()
-        _bundled_provisioned = False

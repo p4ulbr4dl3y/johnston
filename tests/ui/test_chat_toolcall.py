@@ -232,26 +232,6 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         render_mock.assert_called_once()
         scroll_mock.assert_called_once()
 
-    def test_append_shell_output_debounced_and_flush(self):
-        widget = ToolCallWidget("shell", "cmd")
-        widget.is_expanded = True
-        with patch("asyncio.get_running_loop") as mock_loop:
-            fake_loop = MagicMock()
-            fake_handle = MagicMock()
-            fake_loop.call_later.return_value = fake_handle
-            mock_loop.return_value = fake_loop
-            widget.append_shell_output("chunk1")
-            self.assertTrue(widget._shell_update_scheduled)
-            self.assertEqual(widget._shell_update_handle, fake_handle)
-            # Second call while scheduled does not schedule second timer
-            widget.append_shell_output("chunk2")
-            self.assertEqual(fake_loop.call_later.call_count, 1)
-            # flush_shell_output flushes pending buffer and cancels timer
-            widget.flush_shell_output()
-            fake_handle.cancel.assert_called_once()
-            self.assertFalse(widget._shell_update_scheduled)
-            self.assertIn("chunk1chunk2", widget.result_text)
-
     def test_on_unmount_cancels_shell_timer(self):
         widget = ToolCallWidget("shell", "cmd")
         handle = MagicMock()

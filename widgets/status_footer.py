@@ -261,10 +261,6 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
         except Exception:
             self.refresh_footer()
 
-    def _poll_mcp_refresh(self) -> None:
-        """MCP refresh trigger: updates footer when server tool discovery completes."""
-        self._on_mcp_event()
-
     def refresh_footer(self) -> None:
         if not self.app:
             return

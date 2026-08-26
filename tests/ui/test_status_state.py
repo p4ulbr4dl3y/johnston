@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 from widgets.app.status_state import (
     _ensure_cache,
     build_status_kwargs,
-    build_subagent_status_kwargs,
     refresh_footer_cache,
 )
 
@@ -109,51 +108,6 @@ class TestStatusState(unittest.IsolatedAsyncioTestCase):
             kwargs = build_status_kwargs(app, widget=None)
         self.assertEqual(kwargs["provider_key"], "openai")
         self.assertEqual(kwargs["mcp_total"], 1)
-
-    def test_build_subagent_kwargs_with_agent(self):
-        app = self._status_app()
-        agent = MagicMock()
-        agent.role = "explorer"
-        agent.thinking_effort = "high"
-        agent.provider_key = "openai"
-        agent.model = "gpt-4o"
-        agent.get_metrics.return_value = {
-            "context_used": 10,
-            "total_tokens": 20,
-            "context": "128k",
-            "context_limit": 128000,
-            "cost_usd": 0.1,
-        }
-        session = MagicMock()
-        session.agent = agent
-        session.project_dir = "/tmp/sub"
-        session.branch_name = "feat"
-        app.pm.is_provider_connected.return_value = True
-        with patch("widgets.app.status_state.catalog.get_model_display_name", return_value="GPT-4o"):
-            kwargs = build_subagent_status_kwargs(
-                app, session, spinner_running=True, spinner_idx=1
-            )
-        self.assertIn("Explorer", kwargs[0])
-        self.assertEqual(kwargs[3], True)
-
-    def test_build_subagent_kwargs_app_agent_fallback(self):
-        app = self._status_app()
-        app.agent = None
-        cm = MagicMock()
-        cm.get_active_provider_key.return_value = "openai"
-        cm.load_providers.return_value = {}
-        cm.is_provider_connected.return_value = False
-        app.pm = cm
-        session = MagicMock()
-        session.agent = None
-        session.role = "worker"
-        session.project_dir = "worktrees"
-        session.branch_name = ""
-        with patch("widgets.app.status_state.catalog.get_model_display_name", return_value=""):
-            kwargs = build_subagent_status_kwargs(
-                app, session, spinner_running=False, spinner_idx=0
-            )
-        self.assertIn("Worker", kwargs[0])
 
 
 # ---------------------------------------------------------------------------

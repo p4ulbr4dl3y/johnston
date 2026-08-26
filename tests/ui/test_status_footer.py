@@ -243,15 +243,6 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                     provider_key="openai", provider_display="OpenAI", is_connected=True, model_name="gpt-4o"
                 )
 
-    async def test_poll_mcp_refresh_triggers_on_loading(self):
-        footer = StatusFooter()
-        mgr = MagicMock()
-        mgr.is_warming_up.return_value = True
-        with patch("core.infrastructure.mcp._mcp_manager_instance", mgr):
-            with patch.object(footer, "refresh_footer") as mock_rf:
-                footer._poll_mcp_refresh()
-                mock_rf.assert_called_once()
-
     async def test_subagent_footer_mount_unmount_and_update(self):
         from widgets.status_footer import SubagentStatusFooter
 

@@ -81,11 +81,6 @@ class TestStatusFooterCoverage(unittest.TestCase):
         self.assertEqual(footer._spinner_idx, 0)
         rf.assert_called_once()
 
-    def test_poll_mcp_refresh_exception(self):
-        footer = FooterHarness()
-        with patch("core.infrastructure.mcp._mcp_manager_instance", side_effect=Exception("boom")):
-            footer._poll_mcp_refresh()  # must not raise
-
     def test_on_unmount_timer_stop_raises(self):
         footer = FooterHarness()
         stop_err = MagicMock()

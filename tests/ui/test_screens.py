@@ -7,7 +7,7 @@ from core.application.session.actions import RewindEntry
 from core.application.skills.manager import Skill, SkillScope
 from widgets.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
 from widgets.presentation.screens.help import HelpScreen
-from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
+from widgets.presentation.screens.providers import ProvidersScreen
 from widgets.presentation.screens.resume import ResumeScreen
 from widgets.presentation.screens.rewind import RewindScreen
 from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
@@ -470,34 +470,6 @@ class TestProvidersEdge(unittest.TestCase):
         except (KeyError, AttributeError, TypeError) as exc:
             self.fail(f"None provider value raised {type(exc).__name__}: {exc}")
         self.assertEqual(s.raw_items, [])
-
-
-class TestApiKeyInputScreen(unittest.TestCase):
-    def test_init_with_key(self):
-        s = ApiKeyInputScreen("MyProvider", "myprov", "sk-abcdefghij123456")
-        self.assertEqual(s.provider_name, "MyProvider")
-        self.assertEqual(s.current_key, "sk-abcdefghij123456")
-
-    def test_init_without_key(self):
-        s = ApiKeyInputScreen("NewProvider", "newprov", "")
-        self.assertEqual(s.current_key, "")
-
-    def test_bindings(self):
-        keys = [b[0] for b in ApiKeyInputScreen.BINDINGS]
-        self.assertIn("escape", keys)
-
-    def test_blocks_shift_tab(self):
-        screen = ApiKeyInputScreen(provider_name="Test", provider_key="test")
-
-        for key_name in ("shift+tab", "backtab", "shift_tab"):
-            event = Key(key=key_name, character=None)
-            event.prevent_default = MagicMock()
-            event.stop = MagicMock()
-
-            screen._on_key(event)
-
-            event.prevent_default.assert_called_once()
-            event.stop.assert_called_once()
 
 
 class TestSkillScreens(unittest.TestCase):

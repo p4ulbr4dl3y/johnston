@@ -12,7 +12,7 @@ from core.infrastructure.tasks.manager import TaskManager
 from widgets.presentation.screens.help import HelpScreen
 from widgets.presentation.screens.mcp import MCPScreen
 from widgets.presentation.screens.model import ModelScreen
-from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
+from widgets.presentation.screens.providers import ProvidersScreen
 from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
 
@@ -82,15 +82,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
     async def test_providers_screen_pilot(self):
         providers = {"opencode": {"key": "opencode", "name": "OpenCode"}, "openai": {"key": "openai", "name": "OpenAI"}}
         screen = ProvidersScreen(providers=providers, active_key="opencode", configured_keys={})
-        app = DummyHostApp(screen)
-
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            await pilot.press("escape")
-            await pilot.pause()
-
-    async def test_api_key_input_screen_pilot(self):
-        screen = ApiKeyInputScreen("OpenAI", "openai", "sk-12345")
         app = DummyHostApp(screen)
 
         async with app.run_test() as pilot:

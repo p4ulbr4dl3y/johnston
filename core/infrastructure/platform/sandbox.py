@@ -88,17 +88,6 @@ def is_sandbox_supported() -> bool:
     return False
 
 
-def get_sandbox_backend_name() -> str:
-    """Return the name of the sandbox backend available on this host."""
-    if platform.system() == "Darwin" and is_sandbox_supported():
-        return "seatbelt"
-    if platform.system() == "Linux" and is_sandbox_supported():
-        return "bubblewrap"
-    if platform.system() == "Windows":
-        return "windows_safer"
-    return "none"
-
-
 _cached_default_deny_paths: Optional[List[str]] = None
 
 
