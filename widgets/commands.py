@@ -464,6 +464,8 @@ class RenameCommand(BaseCommand):
                 new_title = new_title.strip()
                 if new_title:
                     sess.description = new_title
+                    if hasattr(app, "agent") and getattr(app.agent, "history", None):
+                        sess.agent_history = list(app.agent.history)
                     app.sm.save(sess)
                     if hasattr(app, "refresh_status_footer"):
                         app.refresh_status_footer()

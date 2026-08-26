@@ -559,29 +559,35 @@ class SessionStore:
 
                 title = ""
                 has_content = False
-                message_count = 0
+                assistant_history_count = 0
+                bot_msg_count = 0
 
                 for line in f:
                     line = line.strip()
                     if not line:
                         continue
                     has_content = True
-                    if not title and ('"_type": "msg"' in line or '"_type":"msg"' in line):
-                        try:
-                            entry = json.loads(line)
-                            data = entry.get("data")
-                            if isinstance(data, dict) and data.get("type") == "user":
-                                text = str(data.get("display_text") or data.get("text", "")).strip()
-                                if text:
-                                    clean = " ".join(text.split())
-                                    title = clean[:55] + "..." if len(clean) > 55 else clean
-                        except Exception:
-                            pass
-                    if '"role": "assistant"' in line or '"role":"assistant"' in line:
-                        message_count += 1
+                    if '"_type": "msg"' in line or '"_type":"msg"' in line:
+                        if not title:
+                            try:
+                                entry = json.loads(line)
+                                data = entry.get("data")
+                                if isinstance(data, dict) and data.get("type") == "user":
+                                    text = str(data.get("display_text") or data.get("text", "")).strip()
+                                    if text:
+                                        clean = " ".join(text.split())
+                                        title = clean[:55] + "..." if len(clean) > 55 else clean
+                            except Exception:
+                                pass
+                        if '"type": "bot"' in line or '"type":"bot"' in line:
+                            bot_msg_count += 1
+                    elif '"role": "assistant"' in line or '"role":"assistant"' in line:
+                        assistant_history_count += 1
 
                 if not has_content:
                     return None
+
+                message_count = assistant_history_count if assistant_history_count > 0 else bot_msg_count
 
                 desc = str(first.get("description") or "").strip()
                 if desc:
@@ -665,16 +671,13 @@ class SessionStore:
 
     @staticmethod
     def _message_count(sess: AgentSession) -> int:
-        """Count agent loop iterations: assistant messages in history.
-
-        Each assistant message = one LLM call in the agent loop (user request,
-        tool executions, then final answer).
-        """
+        """Count agent loop iterations: assistant messages in history or bot messages."""
         if sess.agent_history:
             assistant_msgs = [m for m in sess.agent_history if isinstance(m, dict) and m.get("role") == "assistant"]
             if assistant_msgs:
                 return len(assistant_msgs)
-        return 0
+        bot_msgs = [m for m in sess.messages if isinstance(m, dict) and m.get("type") == "bot"]
+        return len(bot_msgs)
 
     def children(self, parent_id: str) -> List[AgentSession]:
         return [s for s in self.list() if s.parent_id == parent_id]
