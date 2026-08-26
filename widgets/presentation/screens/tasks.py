@@ -248,21 +248,29 @@ class BaseTasksListScreen(BaseModalScreen[None]):
     async def _kill_item(self, item: dict) -> None:
         raise NotImplementedError
 
-    def _apply_dialog_fit(self) -> None:
+    def _apply_dialog_fit(self, tasks: list | None = None) -> None:
         try:
-            from widgets.utils.responsive import MODAL_WIDE_MAX_WIDTH, apply_modal_fit, modal_content_width
+            from widgets.utils.responsive import (
+                MODAL_MIN_WIDTH,
+                MODAL_WIDE_MAX_WIDTH,
+                apply_modal_fit,
+                modal_content_width,
+            )
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+            if tasks is None:
+                tasks = [t for t in self.filtered_tasks if t]
             sample_items = [
                 f"● {' '.join(str(t.get('command', '')).split())}   {t.get('progress_badge', '') or 'running'}"
-                for t in self.filtered_tasks
+                for t in tasks
+                if t and isinstance(t, dict)
             ]
             content_w = modal_content_width(
                 sample_items,
                 self._get_header_md(),
                 f"{self.hint_action_name} • ↑↓: nav • k: kill • esc: close",
             )
-            apply_modal_fit(dialog, content_w, max_width=MODAL_WIDE_MAX_WIDTH)
+            apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_WIDE_MAX_WIDTH)
         except Exception:
             pass
 
@@ -327,7 +335,7 @@ class BaseTasksListScreen(BaseModalScreen[None]):
         if not self.is_mounted:
             return
         tasks = self._get_filtered_tasks()
-        self._apply_dialog_fit()
+        self._apply_dialog_fit(tasks)
         row_width = self._row_width()
         new_signatures = [
             (item["id"], item["is_running"], item["command"], item.get("progress_badge", ""), row_width)
