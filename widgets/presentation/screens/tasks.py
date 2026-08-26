@@ -166,10 +166,19 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self.log_widget.focus()
         # Backfill the history already buffered, then go live: subscribing after
         # the synchronous backfill keeps the two ordered in the event loop.
-        for chunk in self.bg_task.output.history:
+        has_history = False
+        for chunk in getattr(getattr(self.bg_task, "output", None), "history", []):
+            if chunk.strip():
+                has_history = True
             self._consume(strip_ansi(chunk))
+        if not has_history:
+            if getattr(self.bg_task, "is_running", False):
+                self.log_widget.write("(Waiting for command output...)")
+            else:
+                self.log_widget.write("(No output produced)")
         self.log_widget.scroll_end(animate=False)
-        self.bg_task.add_listener(self._on_output)
+        if hasattr(self.bg_task, "add_listener"):
+            self.bg_task.add_listener(self._on_output)
 
     def on_resize(self, event: events.Resize) -> None:
         self._apply_dynamic_log_height()
