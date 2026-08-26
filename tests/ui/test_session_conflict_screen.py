@@ -67,6 +67,10 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
             conflict_cb("readonly")
             app.load_session_ui.assert_called_with("s_locked", read_only=True)
 
+            # 3. Test Cancel / Esc: returns back to ResumeScreen
+            conflict_cb(None)
+            self.assertIsInstance(app.push_screen.call_args[0][0], ResumeScreen)
+
     async def test_new_command_resets_read_only_and_manages_locks(self):
         from widgets.commands import NewCommand
 

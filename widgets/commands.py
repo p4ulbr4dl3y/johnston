@@ -534,7 +534,10 @@ class ResumeCommand(BaseCommand):
                     elif choice == "readonly":
                         _apply_selected(selected_sid, read_only=True)
                     else:
-                        app.query_one(MESSAGE_INPUT, ChatInput).focus()
+                        app.push_screen(
+                            ResumeScreen(sessions, current_session_id=curr_sid),
+                            callback=on_resume_selected,
+                        )
 
                 app.push_screen(SessionConflictScreen(selected_sid), callback=on_conflict_choice)
                 return
