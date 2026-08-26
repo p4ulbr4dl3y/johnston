@@ -85,7 +85,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self.filtered_items = list(self.raw_items)
         self.default_value = self.raw_items[-1] if self.raw_items else -1
         self.option_list_id = MODAL_OPTION_LIST_ID
-        self.dialog_classes = "modal-dialog-medium"
+        self.option_list_id = MODAL_OPTION_LIST_ID
 
     def _row_width(self) -> int:
         try:
@@ -93,6 +93,27 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         except Exception:
             opt_list = self
         return option_list_row_width(opt_list, MODAL_MEDIUM_ROW_WIDTH)
+
+    def _apply_dialog_fit(self) -> None:
+        try:
+            from widgets.utils.responsive import apply_modal_fit, modal_content_width
+
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+            sample_items = []
+            for msg in self.user_messages:
+                clean = " ".join(msg.text.replace("\n", " ").replace("\r", " ").split())
+                badge = msg.git_stats or "no checkpoint" if self.checkpoints_enabled else ""
+                sample_items.append(f"{clean}   {badge}")
+            raw_step2 = [
+                "Rollback conversation & files   revert code",
+                "Rollback conversation only   keep current code",
+                "View changes diff   inspect code changes",
+            ]
+            sample_items.extend(raw_step2)
+            content_w = modal_content_width(sample_items, self.title, self.hint_text)
+            apply_modal_fit(dialog, content_w)
+        except Exception:
+            pass
 
     def _format_step1_options(self, target_width: int) -> list[str]:
         options = []
@@ -149,13 +170,14 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             pass
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID, classes=self.dialog_classes):
+        with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Static("", id="rewind-files", classes=MODAL_MARKDOWN, markup=False)
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             yield Label(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
+        self._apply_dialog_fit()
         opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
         default_idx = None
         if self.default_value is not None and self.default_value in self.raw_items:
@@ -173,6 +195,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self._refresh_options()
 
     def on_resize(self, event: events.Resize) -> None:
+        self._apply_dialog_fit()
         self._refresh_options()
 
     def _show_step_2(self, entry: RewindEntry) -> None:

@@ -65,7 +65,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
-            dialog_classes="modal-dialog-medium",
+            fit_content=True,
         )
 
     def _row_width(self) -> int:

@@ -238,8 +238,26 @@ class BaseTasksListScreen(BaseModalScreen[None]):
     async def _kill_item(self, item: dict) -> None:
         raise NotImplementedError
 
+    def _apply_dialog_fit(self) -> None:
+        try:
+            from widgets.utils.responsive import apply_modal_fit, modal_content_width
+
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+            sample_items = [
+                f"{t.get('command', '')}   {t.get('progress_badge', '') or 'running'}"
+                for t in self.filtered_tasks
+            ]
+            content_w = modal_content_width(
+                sample_items,
+                self._get_header_md(),
+                f"{self.hint_action_name} • ↑↓: nav • k: kill • esc: close",
+            )
+            apply_modal_fit(dialog, content_w)
+        except Exception:
+            pass
+
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
+        with Vertical(id=MODAL_DIALOG_ID):
             yield Markdown(
                 self._get_header_md(), id=self.title_id, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )
@@ -248,6 +266,7 @@ class BaseTasksListScreen(BaseModalScreen[None]):
 
     def on_mount(self) -> None:
         self._last_signatures = None
+        self._apply_dialog_fit()
         self.update_tasks_list()
         try:
             self._get_option_list().focus()
@@ -291,12 +310,14 @@ class BaseTasksListScreen(BaseModalScreen[None]):
 
     def on_resize(self, event: events.Resize) -> None:
         self._last_signatures = None
+        self._apply_dialog_fit()
         self.update_tasks_list()
 
     def update_tasks_list(self) -> None:
         if not self.is_mounted:
             return
         tasks = self._get_filtered_tasks()
+        self._apply_dialog_fit()
         row_width = self._row_width()
         new_signatures = [
             (item["id"], item["is_running"], item["command"], item.get("progress_badge", ""), row_width)
