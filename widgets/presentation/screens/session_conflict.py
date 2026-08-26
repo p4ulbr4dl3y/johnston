@@ -8,16 +8,15 @@ class SessionConflictScreen(BaseSelectionScreen[str]):
         self.session_id = session_id
         items = ["readonly", "steal"]
         options = [
-            "Open read-only [dim #71717a](forks on message)[/]",
+            "Open read-only [dim #71717a](fork on edit)[/]",
             "Steal session [dim #71717a](take over)[/]",
         ]
-        title = "### **Session Busy**\n\nSession is open in another terminal"
         super().__init__(
-            title=title,
+            title="### **Session is Open in Another Terminal**",
             options=options,
             items=items,
             default_value="readonly",
             show_search=False,
             hint_text="enter: select • ↑↓: nav • esc: back",
-            dialog_classes="modal-dialog-medium",
+            fit_content=True,
         )
