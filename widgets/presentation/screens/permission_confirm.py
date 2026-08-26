@@ -376,12 +376,28 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             dialog = self.query_one("#modal-dialog")
             content_w = self._calculate_content_width()
             apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_WIDE_MAX_WIDTH)
+            screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            if screen_h < 18:
+                dialog.styles.max_height = max(6, screen_h - 1)
+                dialog.styles.padding = (0, 1)
+            else:
+                dialog.styles.max_height = None
+                dialog.styles.padding = (1, 2)
         except Exception:
             pass
         try:
             scroll_box = self.query_one(".tool-scroll-box")
             screen_h = self.app.size.height if getattr(self, "app", None) else 24
-            scroll_box.styles.max_height = max(4, min(18, screen_h - 12))
+            scroll_box.styles.max_height = max(1, min(18, screen_h - 11))
+        except Exception:
+            pass
+        try:
+            opt_list = self.query_one("#permission-options-list", OptionList)
+            screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            if screen_h < 18:
+                opt_list.styles.max_height = max(3, screen_h - 6)
+            else:
+                opt_list.styles.max_height = None
         except Exception:
             pass
 
