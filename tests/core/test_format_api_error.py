@@ -278,7 +278,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         result = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(
             result[0]["content"],
-            '<error type="vision_unsupported" file="/tmp/a.png">You do not support vision. Tell user you cannot view images. Do not retry.</error>',
+            "ERR: vision_unsupported '/tmp/a.png': You do not support vision. Tell user you cannot view images. Do not retry.",
         )
 
     def test_sanitize_tool_image_dict_default_path(self):
@@ -286,7 +286,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         result = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(
             result[0]["content"],
-            '<error type="vision_unsupported" file="image">You do not support vision. Tell user you cannot view images. Do not retry.</error>',
+            "ERR: vision_unsupported 'image': You do not support vision. Tell user you cannot view images. Do not retry.",
         )
 
     def test_sanitize_tool_image_str_with_path(self):
@@ -294,7 +294,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         result = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(
             result[0]["content"],
-            '<error type="vision_unsupported" file="/tmp/img.png">You do not support vision. Tell user you cannot view images. Do not retry.</error>',
+            "ERR: vision_unsupported '/tmp/img.png': You do not support vision. Tell user you cannot view images. Do not retry.",
         )
 
     def test_sanitize_tool_image_str_without_path(self):
@@ -302,7 +302,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         result = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(
             result[0]["content"],
-            '<error type="vision_unsupported" file="image">You do not support vision. Tell user you cannot view images. Do not retry.</error>',
+            "ERR: vision_unsupported 'image': You do not support vision. Tell user you cannot view images. Do not retry.",
         )
 
     def test_sanitize_tool_plain_content_kept(self):

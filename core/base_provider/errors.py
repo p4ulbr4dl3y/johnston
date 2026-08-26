@@ -292,9 +292,13 @@ class ErrorHandlingMixin:
                         img_path = path_match.group(1)
 
                 if is_img:
+                    from core.domain.defaults.errors import format_tool_error
+
                     msg_copy = dict(msg)
-                    msg_copy["content"] = (
-                        f'<error type="vision_unsupported" file="{img_path}">You do not support vision. Tell user you cannot view images. Do not retry.</error>'
+                    msg_copy["content"] = format_tool_error(
+                        "vision_unsupported",
+                        name=img_path,
+                        detail="You do not support vision. Tell user you cannot view images. Do not retry.",
                     )
                     sanitized.append(msg_copy)
                     continue

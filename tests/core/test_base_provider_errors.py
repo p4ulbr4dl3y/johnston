@@ -164,7 +164,7 @@ class TestRetryableErrors(unittest.IsolatedAsyncioTestCase):
         # Verify tool content was replaced with hint
         tool_msg = sanitized[2]
         self.assertEqual(tool_msg["role"], "tool")
-        self.assertIn('<error type="vision_unsupported"', tool_msg["content"])
+        self.assertIn("ERR: vision_unsupported", tool_msg["content"])
 
     async def test_stream_cancelled_error_records_tokens(self):
         agent = BaseAgent(api_key="t", model="m", base_url="http://t", provider_key="tprov")
