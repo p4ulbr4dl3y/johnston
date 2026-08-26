@@ -123,6 +123,99 @@ def format_ask_user_display(questions: list[dict], answers: dict[int, dict] | di
     return t
 
 
+def format_manage_shell_display(result_text: str) -> Text:
+    """Format manage_shell list output into a monochrome rich Text renderable."""
+    raw = (result_text or "").strip()
+    if not raw or raw.lower() in ("no tasks active", "no active tasks", "(no active tasks)"):
+        return Text("(No active tasks)", style="#e4e4e7")
+
+    t = Text()
+    lines = raw.splitlines()
+    task_lines = []
+    for line in lines:
+        line_clean = line.strip()
+        if not line_clean or line_clean.lower().startswith("active background tasks:"):
+            continue
+        # Pattern: "- ID: {id} | Status: {status} | Command: {cmd}"
+        m = re.match(
+            r"^[-\*]?\s*ID:\s*([^\s|]+)\s*\|\s*Status:\s*([^\s|]+)\s*\|\s*Command:\s*(.*)$",
+            line_clean,
+            re.IGNORECASE,
+        )
+        if m:
+            t_id, status, cmd = m.group(1), m.group(2).upper(), m.group(3).strip()
+            if status == "RUNNING":
+                task_t = Text("[>] ", style="#ffffff") + Text(f"{t_id}  ", style="bold #ffffff") + Text(cmd, style="#a1a1aa")
+            else:
+                task_t = Text("[x] ", style="dim #71717a") + Text(f"{t_id}  ", style="dim #71717a") + Text(cmd, style="dim #71717a")
+            task_lines.append(task_t)
+        else:
+            task_lines.append(Text(line_clean, style="#e4e4e7"))
+
+    if not task_lines:
+        return Text("(No active tasks)", style="#e4e4e7")
+
+    for i, tl in enumerate(task_lines):
+        t.append(tl)
+        if i < len(task_lines) - 1:
+            t.append("\n")
+    return t
+
+
+def format_manage_subagent_display(result_text: str) -> Text:
+    """Format manage_subagent list output into a monochrome rich Text renderable."""
+    raw = (result_text or "").strip()
+    if not raw or "no subagent sessions found" in raw.lower() or raw.lower() in ("no tasks active", "(no active subagents)"):
+        return Text("(No active subagents)", style="#e4e4e7")
+
+    t = Text()
+    lines = raw.splitlines()
+    subagent_lines = []
+    for line in lines:
+        line_clean = line.strip()
+        if not line_clean or line_clean.lower().startswith("active/past subagent sessions:"):
+            continue
+        # Pattern: "• ID: {id} | Status: {status} | Type: {role} | Title: {title}"
+        m = re.match(
+            r"^[•\-\*]?\s*ID:\s*([^\s|]+)\s*\|\s*Status:\s*([^\s|]+)\s*\|\s*Type:\s*([^|]*?)\s*\|\s*Title:\s*(.*)$",
+            line_clean,
+            re.IGNORECASE,
+        )
+        if m:
+            s_id, status, role, title = (
+                m.group(1).strip(),
+                m.group(2).strip().upper(),
+                m.group(3).strip(),
+                m.group(4).strip(),
+            )
+            has_role = bool(role and role.lower() not in ("worker", "subagent", "default", "none", ""))
+            desc = f"{role}: {title}" if has_role and title else (title or role or "(no description)")
+            if status == "RUNNING":
+                item_t = (
+                    Text("[>] ", style="#ffffff")
+                    + Text(f"{s_id}  ", style="bold #ffffff")
+                    + Text(desc, style="#a1a1aa")
+                )
+            else:
+                item_t = (
+                    Text("[x] ", style="dim #71717a")
+                    + Text(f"{s_id}  ", style="dim #71717a")
+                    + Text(desc, style="dim #71717a")
+                )
+            subagent_lines.append(item_t)
+        else:
+            subagent_lines.append(Text(line_clean, style="#e4e4e7"))
+
+    if not subagent_lines:
+        return Text("(No active subagents)", style="#e4e4e7")
+
+    for i, sl in enumerate(subagent_lines):
+        t.append(sl)
+        if i < len(subagent_lines) - 1:
+            t.append("\n")
+    return t
+
+
 class FormattingMixin:
     """Read/Edit/Plan formatting helpers"""
 
@@ -149,6 +242,12 @@ class FormattingMixin:
         if not display:
             display.append(self._clean_hints_for_ui(self.result_text or "(No answers)"))
         return display
+
+    def _format_manage_shell_display(self) -> Any:
+        return format_manage_shell_display(self.result_text or "")
+
+    def _format_manage_subagent_display(self) -> Any:
+        return format_manage_subagent_display(self.result_text or "")
 
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Any:
         diff_text = self._clean_hints_for_ui(diff_text)
@@ -318,11 +417,15 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if canonical == "ask_user":
             # Expandable inline when completed (has answers); minimized wizard is resumed via modal.
             return "Answer:" in (self.result_text or "")
+        if canonical == "manage_shell":
+            action = (self.args if isinstance(self.args, dict) else {}).get("action", "list")
+            return (action or "list").lower() == "list"
+        if canonical == "manage_subagent":
+            action = (self.args if isinstance(self.args, dict) else {}).get("action", "list")
+            return (action or "list").lower() == "list"
         if canonical in (
             "read",
             "web_fetch",
-            "manage_shell",
-            "manage_subagent",
             "invoke_subagent",
         ):
             return False
@@ -339,7 +442,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             )
         return (
             self.is_expandable()
-            or self.canonical_tool in ("invoke_subagent", "ask_user")
+            or self.canonical_tool in ("invoke_subagent", "manage_subagent", "ask_user")
         )
 
     def __init__(
@@ -635,6 +738,20 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             args = self.args if isinstance(self.args, dict) else {}
             session_id = getattr(self, "subagent_session_id", None)
             identifier = session_id or args.get("title") or args.get("prompt") or self.target
+            store = getattr(self.app, "sm", None) if self.app else None
+            if store is None:
+                from core.session_manager import SessionStore
+
+                store = SessionStore.get_instance()
+            curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
+            session = store.find_session_by_description_or_id(identifier, parent_id=curr_session_id) if store else None
+            if not session and store:
+                session = store.find_session_by_description_or_id(identifier)
+            if not session:
+                if hasattr(self.app, "notify"):
+                    self.app.notify("Subagent session not found", severity="warning")
+                event.stop()
+                return
             try:
                 from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
@@ -643,6 +760,82 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 pass
             event.stop()
             return
+        if self.canonical_tool == "manage_subagent":
+            args = self.args if isinstance(self.args, dict) else {}
+            session_id = getattr(self, "subagent_session_id", None) or args.get("session_id")
+            if session_id:
+                store = getattr(self.app, "sm", None) if self.app else None
+                if store is None:
+                    from core.session_manager import SessionStore
+
+                    store = SessionStore.get_instance()
+                curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
+                session = (
+                    store.find_session_by_description_or_id(session_id, parent_id=curr_session_id)
+                    if store
+                    else None
+                )
+                if not session and store:
+                    session = store.find_session_by_description_or_id(session_id)
+                if not session:
+                    if hasattr(self.app, "notify"):
+                        self.app.notify("Subagent session not found", severity="warning")
+                    event.stop()
+                    return
+                try:
+                    from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+
+                    self.app.push_screen(SubagentViewScreen(session_id))
+                except Exception:
+                    pass
+                event.stop()
+                return
+            else:
+                action = (args.get("action") or "list").lower()
+                if action == "list":
+                    store = getattr(self.app, "sm", None) if self.app else None
+                    if store is None:
+                        from core.session_manager import SessionStore
+
+                        store = SessionStore.get_instance()
+                    curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
+                    subagents = (
+                        store.children(curr_session_id)
+                        if curr_session_id and store
+                        else (store.list(kind="subagent") if store else [])
+                    )
+                    has_active = any(getattr(s, "status", "") == "running" for s in (subagents or []))
+                    if has_active:
+                        try:
+                            from widgets.presentation.screens.tasks import SubagentsScreen
+
+                            self.app.push_screen(SubagentsScreen())
+                            event.stop()
+                            return
+                        except Exception:
+                            pass
+        if self.canonical_tool == "manage_shell":
+            args = self.args if isinstance(self.args, dict) else {}
+            action = (args.get("action") or "list").lower()
+            if action == "list":
+                app = getattr(self, "app", None)
+                tasks = getattr(app, "task_manager", []) if app else []
+                curr_sid = getattr(app, "current_session_id", None) if app else None
+                has_active = any(
+                    getattr(t, "kind", "") == "shell"
+                    and getattr(t, "is_background", False)
+                    and (getattr(t, "session_id", None) == curr_sid if curr_sid else True)
+                    for t in (tasks or [])
+                )
+                if has_active:
+                    try:
+                        from widgets.presentation.screens.tasks import ShellTasksScreen
+
+                        self.app.push_screen(ShellTasksScreen())
+                        event.stop()
+                        return
+                    except Exception:
+                        pass
         if self.canonical_tool == "ask_user":
             if getattr(self.app, "_pending_ask_user", None) is not None:
                 self._resume_ask_user_wizard()
@@ -840,6 +1033,20 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 return "raw", self._format_plan_display(plan_items, explanation)
             elif self.canonical_tool == "ask_user":
                 return "raw", self._format_ask_user_display()
+            elif self.canonical_tool == "manage_shell":
+                args = self.args if isinstance(self.args, dict) else {}
+                action = (args.get("action") or "list").lower()
+                if action == "list":
+                    return "raw", self._format_manage_shell_display()
+                clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
+                return "markup", self._clean_markup_text(clean_res)
+            elif self.canonical_tool == "manage_subagent":
+                args = self.args if isinstance(self.args, dict) else {}
+                action = (args.get("action") or "list").lower()
+                if action == "list":
+                    return "raw", self._format_manage_subagent_display()
+                clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
+                return "markup", self._clean_markup_text(clean_res)
             elif self.tool_type == "shell":
                 output_text = self._clean_bash_output(self.result_text)
                 log_match = re.search(r"Full Log:\s*([^\s\(\)]+)", self.result_text or "")

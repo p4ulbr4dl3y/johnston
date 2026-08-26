@@ -361,13 +361,36 @@ class TestToolCallWidgetRendering(unittest.TestCase):
     def test_on_click_invoke_subagent_pushes_screen(self):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
         event = MagicMock()
+        mock_store = MagicMock()
+        mock_store.find_session_by_description_or_id.return_value = MagicMock()
         with (
             patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
-            app_prop.return_value = MagicMock()
+            app = MagicMock()
+            app.sm = mock_store
+            app.current_session_id = None
+            app_prop.return_value = app
             widget.on_click(event)
         screen_cls.assert_called_once()
+        event.stop.assert_called_once()
+
+    def test_on_click_invoke_subagent_session_not_found_notifies(self):
+        widget = self._widget("invoke_subagent", "prompt", args={"session_id": "missing"})
+        event = MagicMock()
+        mock_store = MagicMock()
+        mock_store.find_session_by_description_or_id.return_value = None
+        with (
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.sm = mock_store
+            app.current_session_id = None
+            app_prop.return_value = app
+            widget.on_click(event)
+        screen_cls.assert_not_called()
+        app.notify.assert_called_once_with("Subagent session not found", severity="warning")
         event.stop.assert_called_once()
 
     def test_on_click_invoke_subagent_error_not_clickable(self):
@@ -400,16 +423,129 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         screen_cls.assert_not_called()
         event.stop.assert_not_called()
 
-    def test_on_click_manage_shell_no_longer_clickable(self):
-        widget = self._widget("manage_shell", "t", args={"description": "desc"})
+    def test_on_click_manage_shell_non_list_not_clickable(self):
+        widget = self._widget("manage_shell", "t", args={"action": "kill", "task_id": "1"})
+        self.assertFalse(widget.is_clickable_header())
         event = MagicMock()
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen"),
+            patch("widgets.presentation.screens.tasks.ShellTasksScreen"),
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app_prop.return_value = MagicMock()
             widget.on_click(event)
         event.stop.assert_not_called()
+
+    def test_on_click_manage_shell_list_with_active_tasks_opens_shell_tasks_screen(self):
+        widget = self._widget("manage_shell", "list", args={"action": "list"})
+        self.assertTrue(widget.is_clickable_header())
+        event = MagicMock()
+        dummy_task = MagicMock(kind="shell", is_background=True, is_running=True, session_id=None)
+        with (
+            patch("widgets.presentation.screens.tasks.ShellTasksScreen") as shell_screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.task_manager = [dummy_task]
+            app.current_session_id = None
+            app_prop.return_value = app
+            widget.on_click(event)
+        shell_screen_cls.assert_called_once()
+        app.push_screen.assert_called_once()
+        event.stop.assert_called_once()
+
+    def test_on_click_manage_shell_list_without_active_tasks_toggles_expanded(self):
+        widget = self._widget("manage_shell", "list", args={"action": "list"})
+        self.assertTrue(widget.is_clickable_header())
+        event = MagicMock()
+        with (
+            patch("widgets.presentation.screens.tasks.ShellTasksScreen") as shell_screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.task_manager = []
+            app.current_session_id = None
+            app_prop.return_value = app
+            widget.on_click(event)
+        shell_screen_cls.assert_not_called()
+        self.assertTrue(widget.is_expanded)
+        event.stop.assert_called_once()
+
+    def test_on_click_manage_subagent_list_with_active_opens_subagents_screen(self):
+        widget = self._widget("manage_subagent", "list", args={"action": "list"})
+        self.assertTrue(widget.is_clickable_header())
+        event = MagicMock()
+        mock_store = MagicMock()
+        mock_sub = MagicMock(status="running")
+        mock_store.children.return_value = [mock_sub]
+        with (
+            patch("widgets.presentation.screens.tasks.SubagentsScreen") as subagents_screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.sm = mock_store
+            app.current_session_id = "parent_1"
+            app_prop.return_value = app
+            widget.on_click(event)
+        subagents_screen_cls.assert_called_once()
+        app.push_screen.assert_called_once()
+        event.stop.assert_called_once()
+
+    def test_on_click_manage_subagent_list_without_active_toggles_expanded(self):
+        widget = self._widget("manage_subagent", "list", args={"action": "list"})
+        self.assertTrue(widget.is_clickable_header())
+        event = MagicMock()
+        mock_store = MagicMock()
+        mock_store.children.return_value = []
+        with (
+            patch("widgets.presentation.screens.tasks.SubagentsScreen") as subagents_screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.sm = mock_store
+            app.current_session_id = "parent_1"
+            app_prop.return_value = app
+            widget.on_click(event)
+        subagents_screen_cls.assert_not_called()
+        self.assertTrue(widget.is_expanded)
+        event.stop.assert_called_once()
+
+    def test_on_click_manage_subagent_with_session_id_opens_subagent_view_screen(self):
+        widget = self._widget("manage_subagent", "sess_123", args={"action": "send_message", "session_id": "sess_123"})
+        self.assertTrue(widget.is_clickable_header())
+        event = MagicMock()
+        mock_store = MagicMock()
+        mock_store.find_session_by_description_or_id.return_value = MagicMock()
+        with (
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as subagent_view_screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.sm = mock_store
+            app.current_session_id = None
+            app_prop.return_value = app
+            widget.on_click(event)
+        subagent_view_screen_cls.assert_called_once_with("sess_123")
+        app.push_screen.assert_called_once()
+        event.stop.assert_called_once()
+
+    def test_on_click_manage_subagent_session_not_found_notifies(self):
+        widget = self._widget("manage_subagent", "sess_123", args={"action": "send_message", "session_id": "sess_123"})
+        self.assertTrue(widget.is_clickable_header())
+        event = MagicMock()
+        mock_store = MagicMock()
+        mock_store.find_session_by_description_or_id.return_value = None
+        with (
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as subagent_view_screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.sm = mock_store
+            app.current_session_id = None
+            app_prop.return_value = app
+            widget.on_click(event)
+        subagent_view_screen_cls.assert_not_called()
+        app.notify.assert_called_once_with("Subagent session not found", severity="warning")
+        event.stop.assert_called_once()
 
     def test_on_click_ask_user_resumes_pending(self):
         widget = self._widget("ask_user", "q", args={"questions": [{"question": "Q", "options": ["A"]}]})
@@ -705,6 +841,71 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
             w.set_result("**Result**", status="done")
             self.assertFalse(w._should_scroll_on_render)
             render_mock.assert_called_once()
+
+    def test_format_manage_shell_display(self):
+        from widgets.chat_toolcall import format_manage_shell_display
+
+        # Empty
+        t_empty = format_manage_shell_display("no tasks active")
+        self.assertIn("(No active tasks)", t_empty.plain)
+
+        # Active tasks
+        output = (
+            "Active Background Tasks:\n"
+            "- ID: task-1 | Status: RUNNING | Command: uv run pytest\n"
+            "- ID: task-2 | Status: FINISHED | Command: npm run build\n"
+        )
+        t = format_manage_shell_display(output)
+        self.assertIn("[>]", t.plain)
+        self.assertIn("task-1", t.plain)
+        self.assertIn("uv run pytest", t.plain)
+        self.assertIn("[x]", t.plain)
+        self.assertIn("task-2", t.plain)
+
+    def test_render_content_manage_shell_list(self):
+        w = self._widget(
+            "manage_shell",
+            "- ID: t1 | Status: RUNNING | Command: pytest",
+            args={"action": "list"},
+        )
+        with patch.object(w.content_widget, "update") as upd:
+            w.render_content()
+        upd.assert_called_once()
+        text_obj = upd.call_args[0][0]
+        self.assertIn("t1", text_obj.plain)
+
+    def test_format_manage_subagent_display(self):
+        from widgets.chat_toolcall import format_manage_subagent_display
+
+        # Empty
+        t_empty = format_manage_subagent_display("No subagent sessions found for current session.")
+        self.assertIn("(No active subagents)", t_empty.plain)
+
+        # Active subagents
+        output = (
+            "Active/Past Subagent Sessions:\n"
+            "• ID: sess_123 | Status: RUNNING | Type: explore | Title: search files\n"
+            "• ID: sess_456 | Status: COMPLETED | Type: code_editor | Title: refactor auth\n"
+        )
+        t = format_manage_subagent_display(output)
+        self.assertIn("[>]", t.plain)
+        self.assertIn("sess_123", t.plain)
+        self.assertIn("explore: search files", t.plain)
+        self.assertIn("[x]", t.plain)
+        self.assertIn("sess_456", t.plain)
+        self.assertIn("code_editor: refactor auth", t.plain)
+
+    def test_render_content_manage_subagent_list(self):
+        w = self._widget(
+            "manage_subagent",
+            "• ID: s1 | Status: RUNNING | Type: explore | Title: find bugs",
+            args={"action": "list"},
+        )
+        with patch.object(w.content_widget, "update") as upd:
+            w.render_content()
+        upd.assert_called_once()
+        text_obj = upd.call_args[0][0]
+        self.assertIn("s1", text_obj.plain)
 
 
 if __name__ == "__main__":
