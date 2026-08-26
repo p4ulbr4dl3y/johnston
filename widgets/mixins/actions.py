@@ -97,6 +97,7 @@ class ActionsMixin:
 
     def on_mouse_up(self, event: events.MouseUp) -> None:
         """On mouse up, copy selected fragment and clear selection"""
+        down_pos = getattr(self, "_mouse_down_pos", None)
         self._mouse_down_pos = None
 
         try:
@@ -114,6 +115,17 @@ class ActionsMixin:
                 self.screen.clear_selection()
                 return
             curr = getattr(curr, "parent", None)
+
+        is_drag = True
+        if down_pos is not None:
+            dx = abs(event.screen_x - down_pos[0])
+            dy = abs(event.screen_y - down_pos[1])
+            if dx == 0 and dy == 0:
+                is_drag = False
+
+        if not is_drag:
+            self.screen.clear_selection()
+            return
 
         selected_text = self.screen.get_selected_text()
         if not selected_text:

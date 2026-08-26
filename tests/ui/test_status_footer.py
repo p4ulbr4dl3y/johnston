@@ -82,6 +82,8 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             footer = app.query_one(StatusFooter)
             self.assertIsNotNone(footer)
+            self.assertFalse(getattr(footer, "ALLOW_SELECT", True))
+            self.assertFalse(footer.allow_select)
 
             # Mount triggers refresh_footer
             footer.refresh_footer()

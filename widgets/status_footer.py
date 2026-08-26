@@ -175,6 +175,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
     """Two-line status footer below chat"""
 
     can_focus = False
+    ALLOW_SELECT = False
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
