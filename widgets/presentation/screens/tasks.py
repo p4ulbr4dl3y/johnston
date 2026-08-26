@@ -353,7 +353,7 @@ class BaseTasksListScreen(BaseModalScreen[None]):
         self.update_tasks_list()
 
     def update_tasks_list(self) -> None:
-        if not self.is_mounted:
+        if not self.is_mounted or getattr(self, "_is_dismissed", False):
             return
         tasks = self._get_filtered_tasks()
         self._apply_dialog_fit(tasks)
@@ -419,6 +419,8 @@ class BaseTasksListScreen(BaseModalScreen[None]):
             if item is None:
                 return
             await self._kill_item(item)
+            if getattr(self, "_is_dismissed", False) or not self.is_mounted:
+                return
             self._last_signatures = None
             self.update_tasks_list()
 

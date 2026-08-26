@@ -63,8 +63,8 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget._clean_markup_text(""), "")
         self.assertEqual(widget._clean_markup_text(None), "")
 
-    def test_strip_hints_and_background_truncation(self):
-        from widgets.chat_toolcall import _strip_hints_and_background
+    def test_format_truncation_for_ui(self):
+        from widgets.chat_toolcall import _format_truncation_for_ui
 
         # Shell truncation header with log path & LLM hint
         header = (
@@ -72,7 +72,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
             "Full log: /Users/yegor/.johnston/logs/shell-c14f.log. "
             "Pipe command to grep/head, or read full log.]\n...\ndiff content"
         )
-        cleaned = _strip_hints_and_background(header)
+        cleaned = _format_truncation_for_ui(header)
         self.assertEqual(
             cleaned,
             "[Output truncated: showing last 4000 chars | Log: /Users/yegor/.johnston/logs/shell-c14f.log]\n...\ndiff content",
@@ -83,7 +83,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
             "diff content\n... [Output truncated: showing first 8000 chars (lines 1-100 of 500). "
             "Full log: /path/to/log. Use read to inspect.]"
         )
-        cleaned_footer = _strip_hints_and_background(footer)
+        cleaned_footer = _format_truncation_for_ui(footer)
         self.assertEqual(
             cleaned_footer,
             "diff content\n... [Output truncated: showing first 8000 chars | Log: /path/to/log]",
@@ -91,10 +91,10 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
 
         # Truncated without log
         recent = "[Output truncated: showing recent output]\nsome output"
-        self.assertEqual(_strip_hints_and_background(recent), "[Output truncated: showing recent output]\nsome output")
+        self.assertEqual(_format_truncation_for_ui(recent), "[Output truncated: showing recent output]\nsome output")
 
         # Double cleaning / idempotency
-        double_cleaned = _strip_hints_and_background(cleaned)
+        double_cleaned = _format_truncation_for_ui(cleaned)
         self.assertEqual(double_cleaned, cleaned)
 
 
@@ -229,13 +229,15 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
     def test_clean_bash_output(self):
         widget = ToolCallWidget("shell", "cmd")
         text = (
-            "[Background Task ID: 42] Command running\n"
-            "Command is running in the background\n"
-            "You will be notified automatically\n"
-            "real output"
+            "real output\n"
+            "... [Output truncated: showing last 4000 chars (lines 1-100 of 500). "
+            "Full log: /path/to.log. Use read to inspect.]\n"
+            "[Hint: foo]"
         )
         cleaned = widget._clean_bash_output(text)
-        self.assertEqual(cleaned, "real output")
+        self.assertIn("real output", cleaned)
+        self.assertIn("Log: /path/to.log", cleaned)
+        self.assertNotIn("Hint:", cleaned)
         self.assertEqual(widget._clean_bash_output(""), "")
 
     def test_append_shell_output(self):
@@ -558,8 +560,8 @@ class TestToolCallWidgetRendering(unittest.TestCase):
 
 
 class TestToolCallWidgetRenderContent(unittest.TestCase):
-    def _widget(self, tool_type, result_text="", args=None):
-        return ToolCallWidget(tool_type, "target", result_text=result_text, args=args)
+    def _widget(self, tool_type, result_text="", args=None, status=None):
+        return ToolCallWidget(tool_type, "target", result_text=result_text, args=args, status=status)
 
     def test_render_content_create_branches(self):
         # error
@@ -745,39 +747,15 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         w.render_content()
         self.assertTrue(w.content_widget.display)
 
-        from core.infrastructure.tasks.manager import TaskManager
-
-        empty_mgr = TaskManager()
-        w2 = self._widget("shell", "")
-        with (
-            patch.object(ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(task_manager=empty_mgr)),
-            patch.object(w2.content_widget, "update") as upd,
-        ):
+        w2 = self._widget("shell", "", status="done")
+        with patch.object(w2.content_widget, "update") as upd:
             w2.render_content()
         upd.assert_called_once_with("(No output)")
 
-        w3 = self._widget("shell", "[Background Task ID: 7] running")
-        task = MagicMock()
-        task.id = "7"
-        task.task_id = "7"
-        task.kind = "shell"
-        task.is_running = True
-        running_mgr = TaskManager()
-        running_mgr.register(task)
-        with (
-            patch.object(
-                ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(task_manager=running_mgr)
-            ),
-            patch.object(w3.content_widget, "update") as upd,
-        ):
+        w3 = self._widget("shell", "", status="running")
+        with patch.object(w3.content_widget, "update") as upd:
             w3.render_content()
-        self.assertIn("Running command", str(upd.call_args.args[0]))
-
-        w4 = self._widget("shell", "")
-        with patch.object(
-            ToolCallWidget, "app", new_callable=PropertyMock, return_value=MagicMock(task_manager=empty_mgr)
-        ):
-            w4.render_content()
+        upd.assert_called_once_with("(No output)")
 
     def test_render_content_other_tools(self):
         w = self._widget("some_tool", '{"data": [1, 2]}')

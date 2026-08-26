@@ -238,6 +238,45 @@ class TestTaskScreens(unittest.TestCase):
             self.assertIsNone(s._tasks_cache_ts)
             mock_app.call_from_thread.assert_called_once_with(s.update_tasks_list)
 
+    def test_base_modal_screen_dismiss_safety(self):
+        from widgets.presentation.screens.base_modal import BaseModalScreen
+
+        screen = BaseModalScreen()
+        mock_app = MagicMock()
+        mock_app._screen_stack = [MagicMock()]  # only base screen
+        screen._app = mock_app
+
+        # Should not raise ScreenStackError when stack has only 1 screen
+        screen.dismiss()
+        self.assertFalse(getattr(screen, "_is_dismissed", False))
+
+        # When screen is in stack
+        mock_app._screen_stack = [mock_app._screen_stack[0], screen]
+        screen.dismiss()
+        self.assertTrue(getattr(screen, "_is_dismissed", False))
+
+        # Subsequent calls are ignored
+        screen.dismiss()
+
+    def test_shell_tasks_screen_kill_task_dismiss_guard(self):
+        import asyncio
+
+        s = ShellTasksScreen()
+        s.filtered_tasks = [{"id": "1", "raw_obj": MagicMock()}]
+        mock_opt = MagicMock()
+        mock_opt.highlighted = 0
+        s._get_option_list = MagicMock(return_value=mock_opt)
+
+        async def fake_kill(item):
+            s._is_dismissed = True
+
+        s._kill_item = fake_kill
+        s.update_tasks_list = MagicMock()
+
+        with patch.object(ShellTasksScreen, "is_mounted", new_callable=PropertyMock, return_value=True):
+            asyncio.run(s.action_kill_task())
+            s.update_tasks_list.assert_not_called()
+
 
 
 class TestProvidersScreen(unittest.TestCase):

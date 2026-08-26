@@ -45,24 +45,18 @@ def _clean_truncation_marker(match: re.Match) -> str:
     return match.group(0)
 
 
-def _strip_hints_and_background(text: str) -> str:
-    """Strip [Hint:…] and [Background Task:…] markers and simplify truncation boilerplate for UI."""
-    if not text:
-        return ""
-    if "[" not in text and "Command is running" not in text and "You will be notified" not in text:
-        return text.strip()
+def _format_truncation_for_ui(text: str) -> str:
+    """Format [Output truncated...] banners and strip [Hint:...] for UI display."""
+    if not text or "[" not in text:
+        return (text or "").strip()
     cleaned = re.sub(r"\s*\[Hint:[\s\S]*$", "", text)
     cleaned = re.sub(r"\s*\[Hint:[^\]]+\]", "", cleaned)
-    cleaned = re.sub(r"\[Background Task ID:[^\]]+\][^\[\n]*", "", cleaned)
-    cleaned = re.sub(r"Command is running in the background[^\n]*", "", cleaned)
-    cleaned = re.sub(r"You will be notified automatically[^\n]*", "", cleaned)
-    cleaned = re.sub(
+    return re.sub(
         r"(\.\.\.\s*)?\[Output truncated([^\]]*)\]",
         _clean_truncation_marker,
         cleaned,
         flags=re.IGNORECASE,
-    )
-    return cleaned.strip()
+    ).strip()
 
 
 def build_synthetic_create_diff(file_path: str, content: str) -> str:
@@ -196,7 +190,7 @@ class FormattingMixin:
         return "\n".join(fixed)
 
     def _clean_bash_output(self, text: str) -> str:
-        return _strip_hints_and_background(text)
+        return _format_truncation_for_ui(text)
 
     def _format_code_with_line_numbers(self, code: str) -> str:
         lines = code.splitlines()
@@ -430,7 +424,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.scroll_box = ToolScrollBox(self.content_widget, self.md_widget, classes=TOOL_SCROLL_BOX)
 
     def _clean_hints_for_ui(self, text: str) -> str:
-        return _strip_hints_and_background(text)
+        return _format_truncation_for_ui(text)
 
     def _clean_markup_text(self, text: str) -> str:
         if not text:
@@ -960,20 +954,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         except Exception:
                             pass
                 if not output_text.strip():
-                    if self.app and hasattr(self.app, "task_manager"):
-                        bg_match = re.search(r"Background Task ID:\s*([^\s\]]+)", self.result_text or "")
-                        if bg_match:
-                            tid = bg_match.group(1)
-                            for t in self.app.task_manager:
-                                if (
-                                    getattr(t, "task_id", "") == tid
-                                    and getattr(t, "kind", "") == "shell"
-                                    and getattr(t, "is_running", False)
-                                ):
-                                    output_text = "(Running command...)"
-                                    break
-                    if not output_text:
-                        output_text = "(No output)"
+                    output_text = "(No output)"
                 return "markup", self._clean_markup_text(output_text)
             else:
                 clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")

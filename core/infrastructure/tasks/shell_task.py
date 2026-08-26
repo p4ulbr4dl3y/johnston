@@ -241,7 +241,6 @@ class ShellTask(BaseTask):
 
     async def kill(self) -> None:
         self.was_killed = True
-        self.is_background = False
         await self.close_log_async()
         if self.process is not None:
             await terminate_process(self.process)
@@ -253,7 +252,6 @@ class ShellTask(BaseTask):
     def kill_sync(self) -> None:
         """Synchronous kill used by exit paths that run outside the event loop."""
         self.was_killed = True
-        self.is_background = False
         self.close_log()
         if self.process is not None:
             try:

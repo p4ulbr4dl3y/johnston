@@ -41,3 +41,21 @@ class BaseModalScreen(ModalScreen[T]):
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+    def dismiss(self, result: T = None) -> None:
+        try:
+            if getattr(self, "_is_dismissed", False):
+                return
+            app = None
+            try:
+                app = self.app
+            except Exception:
+                app = getattr(self, "_app", None)
+            if app is not None:
+                stack = getattr(app, "_screen_stack", [])
+                if len(stack) <= 1 or not any(x is self for x in stack):
+                    return
+            self._is_dismissed = True
+            super().dismiss(result)
+        except Exception:
+            pass

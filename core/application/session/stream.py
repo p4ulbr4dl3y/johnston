@@ -275,12 +275,18 @@ async def run_subagent_stream_bg(
 
         if notification_template:
             sid = session_id or session.id
+            is_cancelled = str(getattr(session, "status", "")).lower() == "cancelled"
             if truncate_result:
                 from core.infrastructure.tasks.output import truncate_subagent_result
 
-                result_text = truncate_subagent_result(acc[0], sid) or "Completed with no text output."
+                base_text = truncate_subagent_result(acc[0], sid)
             else:
-                result_text = acc[0].strip() or "Completed with no text output."
+                base_text = acc[0].strip()
+
+            if is_cancelled:
+                result_text = f"{base_text}\n\n[Subagent cancelled by user]" if base_text else "[Subagent cancelled by user]"
+            else:
+                result_text = base_text or "Completed with no text output."
 
             msg = notification_template.format(
                 session_id=sid,

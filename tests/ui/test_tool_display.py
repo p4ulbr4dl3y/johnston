@@ -171,9 +171,10 @@ class TestToolDisplay(unittest.TestCase):
 
         widget = ToolCallWidget("shell", "echo test", args={"command": "echo test"})
         cleaned = widget._clean_bash_output(
-            "Command is running in the background [Background Task ID: task-1]\nYou will be notified automatically\nreal output"
+            "real output\n... [Output truncated: showing last 100 chars (lines 1-10 of 10). Full log: /tmp/log. Use read to inspect.]"
         )
-        self.assertEqual(cleaned, "real output")
+        self.assertIn("real output", cleaned)
+        self.assertIn("Log: /tmp/log", cleaned)
 
 
     def test_format_edit_diff_unspaced_context_lines(self):
