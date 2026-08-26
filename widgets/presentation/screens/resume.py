@@ -4,7 +4,13 @@ from textual.widgets import Input, OptionList
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT
-from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, option_list_row_width
+from widgets.utils.row_format import (
+    MODAL_MEDIUM_ROW_WIDTH,
+    display_width,
+    ellipsize,
+    format_badge_row,
+    option_list_row_width,
+)
 
 
 def _order_sessions_hierarchically(sessions: list[dict]) -> list[dict]:
@@ -84,6 +90,11 @@ class ResumeScreen(BaseSelectionScreen[str]):
             branch_pfx = "[dim #71717a]└─ [/]" if is_fork else ""
             prefix = f"{status_pfx}{branch_pfx}"
             title = str(s.get("title", ""))
+            if is_fork:
+                max_fork_title = max(10, 55 - display_width(branch_pfx))
+                if display_width(title) > max_fork_title or title.endswith("..."):
+                    clean_text = title[:-3] if title.endswith("...") else title
+                    title = ellipsize(clean_text, max_fork_title)
             count = s.get("message_count", 0)
             step_str = "step" if count == 1 else "steps"
             badge_plain = f"{count} {step_str}"
