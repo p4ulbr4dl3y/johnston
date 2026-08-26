@@ -4,7 +4,14 @@ from typing import Any, Callable, List, Optional, Tuple
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus, format_tool_error
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
-from core.infrastructure.runtime.tool_name import normalize_tool_name
+
+
+def _canonical_tool_name(name: str) -> str:
+    """Canonical tool-name form (strip + lower), mirroring runtime.normalize_tool_name.
+
+    Local copy keeps this domain module free of infrastructure imports.
+    """
+    return (name or "").strip().lower()
 
 
 class RoleScope(str, Enum):
@@ -77,7 +84,7 @@ def _tool_policy_result(
     """
     if not tool_name:
         return True, None
-    clean = normalize_tool_name(tool_name)
+    clean = _canonical_tool_name(tool_name)
 
     try:
         resolved = tool_name_normalizer(clean) if tool_name_normalizer else clean

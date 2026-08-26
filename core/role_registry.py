@@ -1,3 +1,5 @@
+import copy
+import logging
 import os
 from typing import Callable, Dict, Optional
 
@@ -9,6 +11,8 @@ from core.domain.policies.role_policy import (
 )
 from core.infrastructure.runtime.frontmatter import parse_csv_list, parse_frontmatter
 from core.infrastructure.runtime.markdown_scanner import MarkdownScannerCache
+
+logger = logging.getLogger(__name__)
 
 BUILTIN_ROLES: Dict[str, AgentRole] = {
     "worker": AgentRole(
@@ -42,6 +46,12 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
 }
 
 
+def _fresh_builtins() -> Dict[str, AgentRole]:
+    """Deep-copy the BUILTIN_ROLES template so registry instances never share
+    mutable AgentRole objects with each other or with the module-level dict."""
+    return {key: copy.deepcopy(role) for key, role in BUILTIN_ROLES.items()}
+
+
 class RoleRegistry:
     """Unified registry managing agent execution roles."""
 
@@ -49,7 +59,7 @@ class RoleRegistry:
 
     def __init__(self, tool_name_normalizer: Optional[Callable[[str], str]] = None):
         self.tool_name_normalizer = tool_name_normalizer
-        self.roles: Dict[str, AgentRole] = dict(BUILTIN_ROLES)
+        self.roles: Dict[str, AgentRole] = _fresh_builtins()
         self._apply_normalizer(self.roles)
         self.current_project_dir: Optional[str] = None
         self._cache = MarkdownScannerCache(subpath="roles")
@@ -72,7 +82,7 @@ class RoleRegistry:
         p_dir = self.current_project_dir or os.getcwd()
 
         def _build(_dirs, files):
-            roles: Dict[str, AgentRole] = dict(BUILTIN_ROLES)
+            roles: Dict[str, AgentRole] = _fresh_builtins()
             for fpath, source in files:
                 role = self._parse_md_role(fpath, source)
                 if role:
@@ -182,5 +192,6 @@ class RoleRegistry:
                 tool_name_normalizer=self.tool_name_normalizer,
                 read_only=read_only,
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("Skipping invalid role file %s: %s", fpath, exc)
             return None

@@ -560,10 +560,10 @@ class TestApplyRole:
         from core import role_registry
 
         class FakeReg:
-            def load_roles(self, project_dir=None):
+            def load_roles(self, project_dir=None, include_global=True):
                 pass
 
-            def get_role(self, key):
+            def get_role(self, key, project_dir=None):
                 return roles.get(key, roles.get("worker"))
 
         monkeypatch.setattr(role_registry.RoleRegistry, "get_instance", lambda: FakeReg())

@@ -2,13 +2,14 @@
 
 from typing import Any, Optional
 
+from core.domain.policies.role_policy import AgentRole
 from core.roles.prompt import apply_prompt
 from core.roles.provider import apply_provider
 from core.roles.resolve import resolve_role
 from core.roles.tools import apply_role_tools
 
 
-def apply_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) -> Any:
+def apply_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) -> AgentRole:
     """Apply a role definition to a subagent agent.
 
     Resolves the effective role (with main->worker fallback), switches provider

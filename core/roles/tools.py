@@ -1,8 +1,9 @@
 """Tool filtering and hardening applied to a role's subagent tools."""
 
 import copy
+from typing import Any
 
-from core.domain.policies.role_policy import role_tool_error
+from core.domain.policies.role_policy import AgentRole, role_tool_error
 
 HARDENED_SHELL_DESCRIPTION = (
     "Run a synchronous terminal command with a configurable timeout (default 120s, max 600s). "
@@ -10,7 +11,7 @@ HARDENED_SHELL_DESCRIPTION = (
 )
 
 
-def apply_role_tools(subagent, definition) -> None:
+def apply_role_tools(subagent: Any, definition: AgentRole) -> None:
     """Filter the subagent's tools by role and harden the shell description.
 
     Disables nested subagent spawning, background task management, UI questions,

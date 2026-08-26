@@ -1,7 +1,11 @@
 """System-prompt and model wiring for a role's subagent."""
 
+from typing import Any
 
-def apply_prompt(subagent, definition) -> None:
+from core.domain.policies.role_policy import AgentRole
+
+
+def apply_prompt(subagent: Any, definition: AgentRole) -> None:
     """Set the subagent's role-aware system prompt and pinned model (if any)."""
     from core.application.generation.prompt_builder import SUBAGENT_DEFAULT_SYSTEM_PROMPT
 
