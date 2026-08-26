@@ -816,7 +816,7 @@ DiffScreen {
     width: 90%;
     max-width: 104;
     height: auto;
-    max-height: 85%;
+    max-height: 95%;
     overflow: hidden;
 }
 

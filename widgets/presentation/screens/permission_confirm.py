@@ -397,25 +397,25 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             content_w = self._calculate_content_width()
             apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_WIDE_MAX_WIDTH)
             screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            if not isinstance(screen_h, int) or screen_h <= 0:
+                screen_h = 24
             num_opts = len(self._option_keys) if hasattr(self, "_option_keys") else 4
 
-            if screen_h < 20:
+            if screen_h < 18:
                 dialog.styles.padding = (0, 1)
-                max_dialog_h = max(8, screen_h - 1)
+                dialog.styles.max_height = max(7, screen_h - 1)
+                opt_h = min(num_opts, max(2, screen_h - 10))
+                overhead = 8 + opt_h
+                opt_list_h = opt_h
+                usable_h = screen_h - 1
             else:
                 dialog.styles.padding = (1, 2)
-                max_dialog_h = max(8, min(screen_h - 2, int(screen_h * 0.90)))
+                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.92)))
+                overhead = 12 + num_opts
+                opt_list_h = None
+                usable_h = screen_h - 2
 
-            dialog.styles.max_height = max_dialog_h
-
-            if screen_h < 16:
-                opt_list_h = min(num_opts, max(2, screen_h - 10))
-                overhead = 9 + opt_list_h
-                scroll_box_h = max(1, max_dialog_h - overhead)
-            else:
-                opt_list_h = num_opts
-                overhead = 10 + opt_list_h
-                scroll_box_h = max(2, min(18, max_dialog_h - overhead))
+            scroll_box_h = max(1, min(18, usable_h - overhead))
 
             try:
                 scroll_box = self.query_one(".tool-scroll-box")
@@ -425,10 +425,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
             try:
                 opt_list = self.query_one("#permission-options-list", OptionList)
-                if screen_h < 16:
-                    opt_list.styles.max_height = opt_list_h
-                else:
-                    opt_list.styles.max_height = None
+                opt_list.styles.max_height = opt_list_h
             except Exception:
                 pass
         except Exception:
