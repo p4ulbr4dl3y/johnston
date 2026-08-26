@@ -177,7 +177,46 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
             return f"[{completed}/{total} completed]"
         return ""
 
-    if name in ("read", "create", "edit"):
+    if name == "read":
+        val = args.get("path")
+        if isinstance(val, str) and val:
+            path_str = val.strip()
+
+            def _to_int(v: Any) -> Optional[int]:
+                if isinstance(v, int):
+                    return v
+                if isinstance(v, str) and v.strip().isdigit():
+                    try:
+                        return int(v.strip())
+                    except ValueError:
+                        return None
+                return None
+
+            s_line = _to_int(args.get("start_line"))
+            e_line = _to_int(args.get("end_line"))
+            offset = _to_int(args.get("content_offset"))
+
+            if s_line is not None and e_line is not None:
+                suffix = f":{s_line}" if s_line == e_line else f":{s_line}-{e_line}"
+            elif s_line is not None:
+                suffix = f":{s_line}+"
+            elif e_line is not None:
+                suffix = f":1-{e_line}"
+            elif offset is not None and offset > 0:
+                if offset >= 1024 * 1024:
+                    mb = offset / (1024 * 1024)
+                    suffix = f":+{mb:.1f}MB" if mb != int(mb) else f":+{int(mb)}MB"
+                elif offset >= 1024:
+                    kb = offset / 1024
+                    suffix = f":+{kb:.1f}KB" if kb != int(kb) else f":+{int(kb)}KB"
+                else:
+                    suffix = f":+{offset}B"
+            else:
+                suffix = ""
+            return truncate(f"{path_str}{suffix}")
+        return ""
+
+    if name in ("create", "edit"):
         val = args.get("path")
         if isinstance(val, str) and val:
             return truncate(val.strip())

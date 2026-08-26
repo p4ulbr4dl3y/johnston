@@ -12,6 +12,13 @@ class TestToolDisplay(unittest.TestCase):
 
     def test_read_path(self):
         self.assertEqual(extract_tool_display("read", {"path": "x.py"}), "x.py")
+        self.assertEqual(extract_tool_display("read", {"path": "x.py", "start_line": 10, "end_line": 50}), "x.py:10-50")
+        self.assertEqual(extract_tool_display("read", {"path": "x.py", "start_line": 42, "end_line": 42}), "x.py:42")
+        self.assertEqual(extract_tool_display("read", {"path": "x.py", "start_line": 100}), "x.py:100+")
+        self.assertEqual(extract_tool_display("read", {"path": "x.py", "end_line": 80}), "x.py:1-80")
+        self.assertEqual(extract_tool_display("read", {"path": "x.py", "content_offset": 512}), "x.py:+512B")
+        self.assertEqual(extract_tool_display("read", {"path": "x.py", "content_offset": 4096}), "x.py:+4KB")
+        self.assertEqual(extract_tool_display("read", {"path": "x.py", "content_offset": 1572864}), "x.py:+1.5MB")
 
     @pytest.mark.skipif(sys.platform == "win32", reason="expects POSIX-style separators")
     def test_path_formatting_relative_and_absolute(self):
