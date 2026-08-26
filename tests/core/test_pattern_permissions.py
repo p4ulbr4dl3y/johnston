@@ -119,6 +119,30 @@ class TestPatternPolicyHelpers(unittest.TestCase):
         self.assertIsNotNone(dec)
         self.assertEqual(dec.action, PermissionAction.ASK)
 
+    def test_evaluate_pattern_rules_fail_closed_priority(self):
+        """Mixed matches resolve DENY > ASK > ALLOW for target-based tools."""
+        rules = [
+            {"pattern": "*.txt", "action": "allow"},
+            {"pattern": "secret*", "action": "deny"},
+            {"pattern": "draft*", "action": "ask"},
+        ]
+
+        # Both allow and deny match -> deny wins
+        dec = evaluate_pattern_rules("read", {"path": "/data/secret.txt"}, rules)
+        self.assertEqual(dec.action, PermissionAction.DENY)
+
+        # Both allow and ask match -> ask wins
+        dec = evaluate_pattern_rules("read", {"path": "/data/draft.txt"}, rules)
+        self.assertEqual(dec.action, PermissionAction.ASK)
+
+        # Only allow matches -> allow
+        dec = evaluate_pattern_rules("read", {"path": "/data/notes.txt"}, rules)
+        self.assertEqual(dec.action, PermissionAction.ALLOW)
+
+        # Nothing matches -> None (fallback to tool level)
+        dec = evaluate_pattern_rules("read", {"path": "/data/image.png"}, rules)
+        self.assertIsNone(dec)
+
 
 class TestPermissionManagerPatterns(unittest.TestCase):
     def setUp(self):

@@ -4,7 +4,7 @@ import re
 import shlex
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 class PermissionAction(str, Enum):
@@ -100,7 +100,7 @@ class PermissionDecision:
 # the configured default action (ask/deny). MCP tools (not in this set) default
 # to 'allow'. Used as the fallback when no builtin_tool_names frozenset is
 # injected via DI.
-_BUILTIN_TOOLS = frozenset(
+BUILTIN_TOOLS = frozenset(
     {
         "read",
         "create",
@@ -220,9 +220,7 @@ def match_pattern(value: str, pattern: str) -> bool:
     """Matches a string value against a wildcard pattern."""
     if not pattern:
         return False
-    val = value.strip()
-    pat = pattern.strip()
-    return fnmatch.fnmatch(val, pat) or fnmatch.fnmatchcase(val, pat)
+    return fnmatch.fnmatch(value.strip(), pattern.strip())
 
 
 def match_path_pattern(path: str, pattern: str) -> bool:
@@ -284,6 +282,72 @@ def suggest_pattern(tool_name: str, args: Optional[Dict[str, Any]]) -> Optional[
     return None
 
 
+def _fail_closed_decision(matched: List[Tuple[PermissionAction, str]]) -> Optional[PermissionDecision]:
+    """Picks a decision from collected (action, reason) matches.
+
+    Applies the fail-closed priority DENY > ASK > ALLOW. Returns None when
+    nothing matched, allowing callers to fall back to tool-level permission.
+    """
+    if not matched:
+        return None
+    for priority in (PermissionAction.DENY, PermissionAction.ASK):
+        for act, reason in matched:
+            if act == priority:
+                return PermissionDecision(act, reason)
+    return PermissionDecision(PermissionAction.ALLOW, matched[0][1])
+
+
+def _iter_rules(rules: List[Dict[str, Any]]) -> List[Tuple[str, PermissionAction]]:
+    """Normalizes raw rule dicts into valid (pattern, action) pairs."""
+    pairs: List[Tuple[str, PermissionAction]] = []
+    for r in rules:
+        if not isinstance(r, dict):
+            continue
+        pat = str(r.get("pattern", "")).strip()
+        if not pat:
+            continue
+        pairs.append((pat, PermissionAction(normalize_action(r.get("action", "ask")))))
+    return pairs
+
+
+def _evaluate_shell_rules(cmd: str, rules: List[Dict[str, Any]]) -> Optional[PermissionDecision]:
+    if has_unsafe_shell_syntax(cmd):
+        return PermissionDecision(
+            PermissionAction.ASK,
+            f"Shell command contains dynamic/unsafe constructs: '{cmd}'",
+        )
+    subcmds = extract_shell_subcommands(cmd)
+    if not subcmds:
+        return None
+
+    rule_pairs = _iter_rules(rules)
+    matched: List[Tuple[PermissionAction, str]] = []
+    for sub in subcmds:
+        sig = extract_command_signature(sub)
+        hit = next((pair for pair in rule_pairs if match_pattern(sub, pair[0]) or match_pattern(sig, pair[0])), None)
+        if hit is None:
+            # If any subcommand is not covered by pattern rules, fall back to tool level
+            return None
+        pat, act = hit
+        matched.append((act, f"Subcommand '{sub}' matched {act.value} pattern '{pat}'"))
+    return _fail_closed_decision(matched)
+
+
+def _evaluate_target_rules(
+    target: str,
+    rules: List[Dict[str, Any]],
+    matcher: Callable[[str, str], bool],
+    subject: str,
+) -> Optional[PermissionDecision]:
+    """Evaluates target-based rules (paths, urls) for a single primary target value."""
+    matched = [
+        (act, f"{subject} matched {act.value} pattern '{pat}'")
+        for pat, act in _iter_rules(rules)
+        if matcher(target, pat)
+    ]
+    return _fail_closed_decision(matched)
+
+
 def evaluate_pattern_rules(
     tool_name: str,
     args: Optional[Dict[str, Any]],
@@ -305,126 +369,28 @@ def evaluate_pattern_rules(
     canonical = (tool_name or "").strip().lower()
 
     if canonical == "shell":
-        if has_unsafe_shell_syntax(target):
-            return PermissionDecision(
-                PermissionAction.ASK,
-                f"Shell command contains dynamic/unsafe constructs: '{target}'",
-            )
-        subcmds = extract_shell_subcommands(target)
-        if not subcmds:
-            return None
-
-        matched_decisions: List[Tuple[PermissionAction, str, str]] = []
-        for sub in subcmds:
-            sig = extract_command_signature(sub)
-            sub_matched = False
-            for r in rules:
-                if not isinstance(r, dict):
-                    continue
-                pat = str(r.get("pattern", "")).strip()
-                if not pat:
-                    continue
-                if match_pattern(sub, pat) or match_pattern(sig, pat):
-                    act = PermissionAction(normalize_action(r.get("action", "ask")))
-                    matched_decisions.append((act, sub, pat))
-                    sub_matched = True
-                    break
-            if not sub_matched:
-                # If any subcommand is not covered by pattern rules, fall back to tool level
-                return None
-
-        # Fail-closed priority: DENY > ASK > ALLOW
-        for act, sub, pat in matched_decisions:
-            if act == PermissionAction.DENY:
-                return PermissionDecision(
-                    PermissionAction.DENY,
-                    f"Subcommand '{sub}' matched deny pattern '{pat}'",
-                )
-        for act, sub, pat in matched_decisions:
-            if act == PermissionAction.ASK:
-                return PermissionDecision(
-                    PermissionAction.ASK,
-                    f"Subcommand '{sub}' matched ask pattern '{pat}'",
-                )
-        return PermissionDecision(
-            PermissionAction.ALLOW,
-            f"All subcommands matched allow patterns: '{target}'",
-        )
+        return _evaluate_shell_rules(target, rules)
 
     if canonical in ("create", "edit", "read"):
-        # Collect all matching rules, then apply fail-closed priority: DENY > ASK > ALLOW
-        matched: List[Tuple[PermissionAction, str]] = []
-        for r in rules:
-            if not isinstance(r, dict):
-                continue
-            pat = str(r.get("pattern", "")).strip()
-            if not pat:
-                continue
-            if match_path_pattern(target, pat):
-                act = PermissionAction(normalize_action(r.get("action", "ask")))
-                matched.append((act, pat))
-        # Apply priority
-        for act, pat in matched:
-            if act == PermissionAction.DENY:
-                return PermissionDecision(
-                    PermissionAction.DENY,
-                    f"Path '{target}' matched deny pattern '{pat}' for '{canonical}'",
-                )
-        for act, pat in matched:
-            if act == PermissionAction.ASK:
-                return PermissionDecision(
-                    PermissionAction.ASK,
-                    f"Path '{target}' matched ask pattern '{pat}' for '{canonical}'",
-                )
-        # All matched are ALLOW
-        if matched:
-            return PermissionDecision(
-                PermissionAction.ALLOW,
-                f"Path '{target}' matched allow patterns: '{target}' for '{canonical}'",
-            )
-        return None
+        return _evaluate_target_rules(target, rules, match_path_pattern, subject=f"Path '{target}'")
 
     if canonical == "web_fetch":
-        # Collect all matching rules, then apply fail-closed priority: DENY > ASK > ALLOW
-        matched: List[Tuple[PermissionAction, str]] = []
-        for r in rules:
-            if not isinstance(r, dict):
-                continue
-            pat = str(r.get("pattern", "")).strip()
-            if not pat:
-                continue
-            if match_pattern(target, pat):
-                act = PermissionAction(normalize_action(r.get("action", "ask")))
-                matched.append((act, pat))
-        # Apply priority
-        for act, pat in matched:
-            if act == PermissionAction.DENY:
-                return PermissionDecision(
-                    PermissionAction.DENY,
-                    f"URL '{target}' matched deny pattern '{pat}'",
-                )
-        for act, pat in matched:
-            if act == PermissionAction.ASK:
-                return PermissionDecision(
-                    PermissionAction.ASK,
-                    f"URL '{target}' matched ask pattern '{pat}'",
-                )
-        # All matched are ALLOW
-        if matched:
-            return PermissionDecision(
-                PermissionAction.ALLOW,
-                f"URL '{target}' matched allow patterns",
-            )
-        return None
+        return _evaluate_target_rules(target, rules, match_pattern, subject=f"URL '{target}'")
 
     return None
 
 
-def _merge_perms(base: Dict[str, Any], override: Dict[str, Any]) -> None:
+def merge_perms(base: Dict[str, Any], override: Dict[str, Any]) -> None:
+    """Merges a permissions config override into base, in place.
+
+    Tool actions are normalized to 'allow'/'ask'/'deny' (invalid values fail
+    closed to 'ask'). The 'default' key is kept raw on purpose: consumers must
+    distinguish a configured deny/lock-down from invalid junk that fails closed.
+    """
     if not override:
         return
     if "default" in override and isinstance(override["default"], str):
-        base["default"] = normalize_action(override["default"])
+        base["default"] = override["default"]
     if "tools" in override and isinstance(override["tools"], dict):
         if "tools" not in base or not isinstance(base["tools"], dict):
             base["tools"] = {}
@@ -436,12 +402,14 @@ def _merge_perms(base: Dict[str, Any], override: Dict[str, Any]) -> None:
             base["patterns"] = {}
         for t, rule_list in override["patterns"].items():
             if isinstance(rule_list, list):
-                norm_rules = []
-                for r in rule_list:
-                    if isinstance(r, dict) and "pattern" in r:
-                        pat = str(r["pattern"]).strip()
-                        act = normalize_action(str(r.get("action", "ask")))
-                        if pat and act in VALID_ACTIONS:
-                            norm_rules.append({"pattern": pat, "action": act})
+                norm_rules = [
+                    {"pattern": pat, "action": act}
+                    for pat, act in (
+                        (str(r["pattern"]).strip(), normalize_action(str(r.get("action", "ask"))))
+                        for r in rule_list
+                        if isinstance(r, dict) and "pattern" in r
+                    )
+                    if pat
+                ]
                 base["patterns"][t.lower()] = norm_rules
 

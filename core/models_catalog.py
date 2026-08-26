@@ -26,7 +26,11 @@ from core.infrastructure.adapters.models_source import (
     extract_provider_def,
 )
 from core.infrastructure.platform.paths import CONFIG_DIR
-from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from core.infrastructure.platform.platform_utils import (
+    atomic_write_json,
+    cached_json_read,
+    read_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,34 +79,6 @@ def _get_match(cache: "OrderedDict", key: tuple):
         cache.move_to_end(key)
         return cache[key]
     return None
-
-
-_json_read_cache: Dict[str, tuple] = {}
-
-
-def invalidate_json_read_cache(path: Optional[str] = None) -> None:
-    """Invalidate cached JSON file entries."""
-    if path is None:
-        _json_read_cache.clear()
-    else:
-        _json_read_cache.pop(path, None)
-
-
-def cached_json_read(path: str, default: Any = None) -> Any:
-    """Reads a JSON file, returning a cache value when the file mtime is unchanged."""
-    if not os.path.exists(path):
-        _json_read_cache.pop(path, None)
-        return default
-    try:
-        mtime = os.path.getmtime(path)
-    except OSError:
-        mtime = None
-    cached = _json_read_cache.get(path)
-    if cached is not None and cached[0] == mtime:
-        return cached[1]
-    data = read_json(path, default)
-    _json_read_cache[path] = (mtime, data)
-    return data
 
 
 def _set_match(cache: "OrderedDict", key: tuple, value: str) -> None:

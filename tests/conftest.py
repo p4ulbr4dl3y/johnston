@@ -92,7 +92,6 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     monkeypatch.setattr("tools.base.LOGS_DIR", logs_dir)
 
     # 4. Reset singletons before test
-    import core.models_catalog as models_catalog_mod
     from core.application.rules.rules import RulesManager
     from core.application.skills.manager import SkillManager
     from core.infrastructure.mcp.manager import MCPManager
@@ -106,7 +105,8 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     RoleRegistry._instance = None
     SkillManager._dirs_ensured = False
     MCPManager._mcp_manager_instance = None
-    models_catalog_mod._json_read_cache.clear()
+    from core.infrastructure.platform.platform_utils import _json_read_cache as _jrc
+    _jrc.clear()
 
     yield
 
@@ -117,7 +117,8 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     RoleRegistry._instance = None
     SkillManager._dirs_ensured = False
     MCPManager._mcp_manager_instance = None
-    models_catalog_mod._json_read_cache.clear()
+    from core.infrastructure.platform.platform_utils import _json_read_cache as _jrc
+    _jrc.clear()
 
 
 

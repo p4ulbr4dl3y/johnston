@@ -186,7 +186,7 @@ class TestPermissionManager(unittest.TestCase):
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                from core.models_catalog import _json_read_cache
+                from core.infrastructure.platform.platform_utils import _json_read_cache
 
                 self.pm.check_permission("web_fetch")
                 self.pm.check_permission("web_fetch")
@@ -209,6 +209,38 @@ class TestPermissionManager(unittest.TestCase):
                 st = os.stat(cfg_file)
                 os.utime(cfg_file, (st.st_atime, st.st_mtime + 2))
                 self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
+
+    def test_deleted_config_falls_back_to_defaults(self):
+        """Removing the config file must drop the cached snapshot (no stale deny)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.assertEqual(self.pm.check_permission("web_fetch").action, "deny")
+                os.remove(cfg_file)
+                # Missing file -> no cached snapshot -> review-mode baseline.
+                self.assertEqual(self.pm.check_permission("web_fetch").action, "ask")
+
+    def test_explicit_tool_config_case_insensitive(self):
+        """Tool keys in config are matched case-insensitively (merge lowercases them)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"WEB_FETCH": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.assertEqual(self.pm.check_permission("Web_Fetch").action, "deny")
+
+    def test_configure_instance_replaces_singleton(self):
+        """configure_instance wires a fresh singleton instead of poking _instance."""
+        previous = PermissionManager.get_instance()
+        try:
+            configured = PermissionManager.configure_instance(tool_name_normalizer=str.upper)
+            self.assertIs(PermissionManager.get_instance(), configured)
+            self.assertEqual(configured.tool_name_normalizer, str.upper)
+            self.assertEqual(configured._normalize_name("shell"), "SHELL")
+        finally:
+            PermissionManager._instance = previous
 
 
 if __name__ == "__main__":

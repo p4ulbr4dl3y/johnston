@@ -9,7 +9,12 @@ from typing import Any, Dict, List, Optional
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
 from core.infrastructure.adapters.models_source import extract_context_length
 from core.infrastructure.platform.paths import CACHE_DIR, CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
-from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from core.infrastructure.platform.platform_utils import (
+    atomic_write_json,
+    cached_json_read,
+    invalidate_json_read_cache,
+    read_json,
+)
 from core.infrastructure.runtime.background import spawn_background_task
 from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 from core.infrastructure.secrets import (
@@ -18,7 +23,7 @@ from core.infrastructure.secrets import (
     interpolate_secrets_in_obj,
     save_secret,
 )
-from core.models_catalog import cached_json_read, catalog, invalidate_json_read_cache
+from core.models_catalog import catalog
 
 logger = logging.getLogger(__name__)
 

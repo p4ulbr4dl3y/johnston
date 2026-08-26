@@ -40,7 +40,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         from core.role_registry import RoleRegistry
         from tools.registry import normalize_tool_name
 
-        PermissionManager._instance = PermissionManager(tool_name_normalizer=normalize_tool_name)
+        PermissionManager.configure_instance(tool_name_normalizer=normalize_tool_name)
         RoleRegistry._instance = RoleRegistry(tool_name_normalizer=normalize_tool_name)
 
         self.pm = ProviderManager()
