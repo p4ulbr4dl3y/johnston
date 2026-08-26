@@ -56,8 +56,12 @@ def format_rules_markdown(rules: List[Any]) -> str:
     if not rules:
         return ""
 
+    from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
+
     matching = []
     for r in rules:
-        matching.append(f'<rule name="{r.name}">\n{r.content}\n</rule>')
+        r_name = escape_xml_attr(getattr(r, "name", str(r)))
+        r_content = escape_xml(getattr(r, "content", ""))
+        matching.append(f'<rule name="{r_name}">\n{r_content}\n</rule>')
 
     return "<rules>\n" + "\n\n".join(matching) + "\n</rules>"

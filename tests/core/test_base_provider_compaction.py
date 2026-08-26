@@ -231,8 +231,8 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             self.assertLessEqual(len(agent.history), 6)
             self.assertEqual(agent.history[0]["content"], "Fix all 50 issues")
             self.assertIn("<conversation_checkpoint>", agent.history[1]["content"])
-            self.assertIn("## Key Decisions & User Constraints", agent.history[1]["content"])
-            self.assertIn("## Relevant Files & Context", agent.history[1]["content"])
+            self.assertIn("## Key Decisions &amp; User Constraints", agent.history[1]["content"])
+            self.assertIn("## Relevant Files &amp; Context", agent.history[1]["content"])
 
     async def test_auto_compaction_trigger(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])

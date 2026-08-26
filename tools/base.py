@@ -77,7 +77,13 @@ def format_background_notification(kind: str, name: str, task_id: str, result: s
     Emitted as a user message when a background shell/subagent finishes:
     `[System Notification] <kind> '<name>' (ID: <task_id>) completed.\n<task_result>\n<result>\n</task_result>`
     """
-    return f"[System Notification] {kind} '{name}' (ID: {task_id}) completed.\n<task_result>\n{result}\n</task_result>"
+    from core.infrastructure.runtime.xml_utils import escape_xml
+
+    escaped_result = escape_xml(result)
+    return (
+        f"[System Notification] {kind} '{name}' (ID: {task_id}) completed.\n"
+        f"<task_result>\n{escaped_result}\n</task_result>"
+    )
 
 
 def _get_running_loop() -> Any:

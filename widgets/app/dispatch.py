@@ -45,7 +45,11 @@ def _load_skill_blocks(loaded_skills) -> list[str]:
                 content = body.strip()
             except Exception:
                 content = ""
-        blocks.append(f'<skill path="{s.location}">\n{content}\n</skill>')
+        from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
+
+        escaped_loc = escape_xml_attr(s.location or "")
+        escaped_content = escape_xml(content)
+        blocks.append(f'<skill path="{escaped_loc}">\n{escaped_content}\n</skill>')
     return blocks
 
 

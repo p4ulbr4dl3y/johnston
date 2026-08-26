@@ -144,9 +144,15 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
                 with open(filepath, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
                 if content:
+                    from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
+
                     if len(content) > 20000:
                         content = content[:20000] + "\n... [Project instructions truncated at 20000 chars]"
-                    found_snippets.append(f'<project_instructions file="{name}">\n{content}\n</project_instructions>')
+                    escaped_name = escape_xml_attr(name)
+                    escaped_content = escape_xml(content)
+                    found_snippets.append(
+                        f'<project_instructions file="{escaped_name}">\n{escaped_content}\n</project_instructions>'
+                    )
             except Exception:
                 pass
 
