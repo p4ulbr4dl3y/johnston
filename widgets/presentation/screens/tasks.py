@@ -21,7 +21,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
 )
 from widgets.utils.key_aliases import expand_bindings
-from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, option_list_row_width
+from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, format_badge_row, option_list_row_width
 
 
 def _format_duration(seconds: float) -> str:
@@ -82,7 +82,7 @@ def extract_shell_task_progress(task: Any) -> str:
 
 
 def format_shell_task_row(
-    cmd: str, task: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_MEDIUM_ROW_WIDTH
+    cmd: str, task: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_WIDE_ROW_WIDTH
 ) -> str:
     """Format a shell task row with human-like activity/status badge on the right."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(shell task)"
@@ -95,7 +95,7 @@ def format_shell_task_row(
 
 
 def format_subagent_task_row(
-    cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_MEDIUM_ROW_WIDTH
+    cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_WIDE_ROW_WIDTH
 ) -> str:
     """Format a subagent row with human-like activity/status badge on the right."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(subagent task)"
@@ -221,7 +221,7 @@ class BaseTasksListScreen(BaseModalScreen[None]):
             opt = self._get_option_list()
         except Exception:
             opt = self
-        return option_list_row_width(opt, MODAL_MEDIUM_ROW_WIDTH)
+        return option_list_row_width(opt, MODAL_WIDE_ROW_WIDTH)
 
     def _get_option_list(self) -> OptionList:
         return self.query_one(f"#{self.option_list_id}", OptionList)
@@ -240,7 +240,7 @@ class BaseTasksListScreen(BaseModalScreen[None]):
 
     def _apply_dialog_fit(self) -> None:
         try:
-            from widgets.utils.responsive import apply_modal_fit, modal_content_width
+            from widgets.utils.responsive import MODAL_WIDE_MAX_WIDTH, apply_modal_fit, modal_content_width
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
             sample_items = [
@@ -252,12 +252,12 @@ class BaseTasksListScreen(BaseModalScreen[None]):
                 self._get_header_md(),
                 f"{self.hint_action_name} • ↑↓: nav • k: kill • esc: close",
             )
-            apply_modal_fit(dialog, content_w)
+            apply_modal_fit(dialog, content_w, max_width=MODAL_WIDE_MAX_WIDTH)
         except Exception:
             pass
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
             yield Markdown(
                 self._get_header_md(), id=self.title_id, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
             )

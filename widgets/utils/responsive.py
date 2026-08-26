@@ -40,6 +40,8 @@ DEFAULT_TERMINAL_WIDTH = 80
 # and never claim more than MODAL_WIDTH_RATIO of the terminal width.
 MODAL_MIN_WIDTH = 44
 MODAL_MAX_WIDTH = 78
+MODAL_MEDIUM_MAX_WIDTH = 86
+MODAL_WIDE_MAX_WIDTH = 104
 MODAL_WIDTH_RATIO = 0.9
 
 # dialog padding (1 2) + border (2) + option row padding (0 1): 4 + 2 + 2

@@ -1,7 +1,7 @@
 from rich.markup import escape
 
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
-from widgets.utils.row_format import MODAL_DEFAULT_ROW_WIDTH, ellipsize
+from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, ellipsize
 
 
 class ForkScreen(BaseSelectionScreen[int]):
@@ -16,7 +16,7 @@ class ForkScreen(BaseSelectionScreen[int]):
         for _, text in user_messages:
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
             opt_text = clean or "(empty message)"
-            options.append(escape(ellipsize(opt_text, MODAL_DEFAULT_ROW_WIDTH)))
+            options.append(escape(ellipsize(opt_text, MODAL_WIDE_ROW_WIDTH)))
 
         super().__init__(
             title="### **Select Message to Fork From**",
@@ -25,5 +25,6 @@ class ForkScreen(BaseSelectionScreen[int]):
             default_value=default_val,
             show_search=False,
             hint_text="enter: fork • ↑↓: nav • esc: cancel",
+            dialog_classes="modal-dialog-wide",
             fit_content=True,
         )

@@ -20,7 +20,7 @@ from widgets.presentation.screens.constants import (
     MODAL_OPTION_LIST,
     MODAL_OPTION_LIST_ID,
 )
-from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, ellipsize, format_badge_row, option_list_row_width
+from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, ellipsize, format_badge_row, option_list_row_width
 
 
 @dataclass
@@ -75,7 +75,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self.selected_entry: Optional[RewindEntry] = None
         self.selected_step1_index: Optional[int] = None
 
-        options = self._format_step1_options(MODAL_MEDIUM_ROW_WIDTH)
+        options = self._format_step1_options(MODAL_WIDE_ROW_WIDTH)
 
         self.title = "### **Select Message to Rollback To**"
         self.hint_text = "enter: select • ↑↓: nav • esc: cancel"
@@ -85,18 +85,17 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self.filtered_items = list(self.raw_items)
         self.default_value = self.raw_items[-1] if self.raw_items else -1
         self.option_list_id = MODAL_OPTION_LIST_ID
-        self.option_list_id = MODAL_OPTION_LIST_ID
 
     def _row_width(self) -> int:
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
         except Exception:
             opt_list = self
-        return option_list_row_width(opt_list, MODAL_MEDIUM_ROW_WIDTH)
+        return option_list_row_width(opt_list, MODAL_WIDE_ROW_WIDTH)
 
     def _apply_dialog_fit(self) -> None:
         try:
-            from widgets.utils.responsive import apply_modal_fit, modal_content_width
+            from widgets.utils.responsive import MODAL_WIDE_MAX_WIDTH, apply_modal_fit, modal_content_width
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
             if self.step == 1:
@@ -121,7 +120,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
                 hint = "enter: select • ↑↓: nav • esc: back to messages"
 
             content_w = modal_content_width(sample_items, title, hint)
-            apply_modal_fit(dialog, content_w)
+            apply_modal_fit(dialog, content_w, max_width=MODAL_WIDE_MAX_WIDTH)
         except Exception:
             pass
 
@@ -180,7 +179,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             pass
 
     def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID):
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
             yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Static("", id="rewind-files", classes=MODAL_MARKDOWN, markup=False)
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)

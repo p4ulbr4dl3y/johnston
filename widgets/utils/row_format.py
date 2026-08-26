@@ -19,6 +19,7 @@ from rich.cells import cell_len
 from rich.markup import escape
 from rich.text import Text
 
+MODAL_WIDE_ROW_WIDTH = 96
 MODAL_MEDIUM_ROW_WIDTH = 78
 MODAL_DEFAULT_ROW_WIDTH = 70
 DIFF_SIDEBAR_ROW_WIDTH = 31

@@ -19,7 +19,14 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
-from widgets.utils.responsive import MODAL_MIN_WIDTH, apply_modal_fit, modal_content_width
+from widgets.utils.responsive import (
+    MODAL_MAX_WIDTH,
+    MODAL_MEDIUM_MAX_WIDTH,
+    MODAL_MIN_WIDTH,
+    MODAL_WIDE_MAX_WIDTH,
+    apply_modal_fit,
+    modal_content_width,
+)
 
 T = TypeVar("T")
 
@@ -109,6 +116,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         dialog_classes: str = "",
         fit_content: bool = False,
         min_dialog_width: int = MODAL_MIN_WIDTH,
+        max_dialog_width: int | None = None,
     ):
         super().__init__()
         self.title = title
@@ -124,6 +132,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         # small selection modals opt in instead of stretching to 90% width.
         self.fit_content = fit_content
         self.min_dialog_width = min_dialog_width
+        self.max_dialog_width = max_dialog_width
         self.filtered_items = list(items)
         self.filtered_options = list(options)
         self._norm_targets: dict[int, str] = {}
@@ -167,7 +176,21 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         except Exception:
             return
         content_width = modal_content_width(self.raw_options, self.title, self.hint_text)
-        apply_modal_fit(dialog, content_width, min_width=getattr(self, "min_dialog_width", MODAL_MIN_WIDTH))
+        max_w = getattr(self, "max_dialog_width", None)
+        if max_w is None:
+            classes = getattr(self, "dialog_classes", "") or ""
+            if "modal-dialog-wide" in classes:
+                max_w = MODAL_WIDE_MAX_WIDTH
+            elif "modal-dialog-medium" in classes or "wizard-dialog" in classes:
+                max_w = MODAL_MEDIUM_MAX_WIDTH
+            else:
+                max_w = MODAL_MAX_WIDTH
+        apply_modal_fit(
+            dialog,
+            content_width,
+            min_width=getattr(self, "min_dialog_width", MODAL_MIN_WIDTH),
+            max_width=max_w,
+        )
 
     def on_resize(self, event: events.Resize) -> None:
         self._apply_dialog_fit()

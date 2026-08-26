@@ -5,7 +5,7 @@ from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT
 from widgets.utils.row_format import (
-    MODAL_MEDIUM_ROW_WIDTH,
+    MODAL_WIDE_ROW_WIDTH,
     display_width,
     format_badge_row,
     option_list_row_width,
@@ -56,7 +56,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             default_val = items[0] if items else ""
 
         # Pre-format initial options with safe width
-        options = self._format_all_options(MODAL_MEDIUM_ROW_WIDTH)
+        options = self._format_all_options(MODAL_WIDE_ROW_WIDTH)
 
         super().__init__(
             title="### **Select Session to Resume**",
@@ -65,6 +65,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
+            dialog_classes="modal-dialog-wide",
             fit_content=True,
         )
 
@@ -73,7 +74,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
         except Exception:
             opt_list = self
-        return option_list_row_width(opt_list, MODAL_MEDIUM_ROW_WIDTH)
+        return option_list_row_width(opt_list, MODAL_WIDE_ROW_WIDTH)
 
     def _format_all_options(self, target_width: int) -> list[str]:
         options = []
