@@ -149,9 +149,15 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
         return ""
 
     if name == "invoke_subagent":
-        title = args.get("title")
-        if isinstance(title, str) and title:
+        title = str(args.get("title") or "").strip()
+        role = str(args.get("type") or args.get("role") or "").strip()
+        has_role = bool(role and role.lower() not in ("worker", "subagent", "default", "none"))
+        if has_role and title:
+            return truncate(f'{role}: "{title}"')
+        if title:
             return truncate(f'"{title}"')
+        if has_role:
+            return truncate(role)
         return ""
     if name in ("manage_shell", "manage_subagent"):
         act = args.get("action") or ""

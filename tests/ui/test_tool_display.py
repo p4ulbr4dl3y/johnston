@@ -38,6 +38,12 @@ class TestToolDisplay(unittest.TestCase):
     def test_subagent_title(self):
         res = extract_tool_display("invoke_subagent", {"title": "find bugs", "prompt": "long prompt"})
         self.assertEqual(res, '"find bugs"')
+        res2 = extract_tool_display("invoke_subagent", {"title": "find bugs", "type": "worker"})
+        self.assertEqual(res2, '"find bugs"')
+        res3 = extract_tool_display("invoke_subagent", {"title": "find bugs", "type": "explorer"})
+        self.assertEqual(res3, 'explorer: "find bugs"')
+        res4 = extract_tool_display("invoke_subagent", {"title": "find bugs", "role": "reviewer"})
+        self.assertEqual(res4, 'reviewer: "find bugs"')
 
     def test_subagent_prompt_only_empty_parens(self):
         # No title -> empty parens, prompt is not a fallback.
