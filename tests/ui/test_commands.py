@@ -710,9 +710,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
             if callback and screen.__class__.__name__ == "ProvidersScreen":
                 if not seen_provider_screen:
                     seen_provider_screen = True
-                    callback("new")
-            elif callback and screen.__class__.__name__ == "ApiKeyInputScreen":
-                callback("secret")
+                    callback(("new", "secret"))
 
         app.push_screen = push_screen
 
@@ -1077,7 +1075,6 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         cm.get_disabled_providers.return_value = []
         app.pm = cm
 
-        entered_keys = []
         invoked_once = {"done": False}
 
         def push_screen(screen, callback=None):
@@ -1085,18 +1082,12 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             app.pushed.append(name)
             if not callback:
                 return
-            if name == "ApiKeyInputScreen":
-                entered_keys.append(callback)
-                callback("secret")
-            elif not invoked_once["done"]:
+            if not invoked_once["done"]:
                 invoked_once["done"] = True
-                callback("p")
+                callback(("p", "secret"))
 
         app.push_screen = push_screen
-        with patch(
-            "widgets.commands.fetch_api_key_and_provider_info",
-            return_value=("P", ""),
-        ), patch("widgets.commands.set_provider_credentials", return_value=""):
+        with patch("widgets.commands.set_provider_credentials", return_value=""):
             await ProvidersCommand().execute(app)
 
         # Flush the asyncio.create_task(_open_with_key) scheduled on failure path.
@@ -1106,7 +1097,6 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             if app.pushed.count("ProvidersScreen") >= 2:
                 break
             await asyncio.sleep(0.01)
-        self.assertEqual(len(entered_keys), 1)
         self.assertGreaterEqual(app.pushed.count("ProvidersScreen"), 2)
 
     async def test_open_with_key_normal_path(self):

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from textual.widgets import OptionList
 
-from widgets.presentation.screens.fork import ForkScreen
+from widgets.presentation.screens.fork import FORK_CURRENT_STATE, ForkScreen
 
 
 class TestForkScreen(unittest.TestCase):
@@ -14,10 +14,13 @@ class TestForkScreen(unittest.TestCase):
         ]
         screen = ForkScreen(user_messages)
         self.assertFalse(screen.fit_content)
-        self.assertEqual(len(screen.raw_options), 2)
+        self.assertEqual(len(screen.raw_options), 3)
         self.assertNotIn("\n", screen.raw_options[0])
         self.assertIn("first message with multiline", screen.raw_options[0])
         self.assertIn("second message", screen.raw_options[1])
+        self.assertIn("Current state", screen.raw_options[2])
+        self.assertEqual(screen.default_value, FORK_CURRENT_STATE)
+        self.assertEqual(screen.raw_items[-1], FORK_CURRENT_STATE)
 
     def test_fork_screen_selection(self):
         user_messages = [
@@ -38,3 +41,23 @@ class TestForkScreen(unittest.TestCase):
         screen.on_option_list_option_selected(mock_event)
 
         self.assertEqual(dismissed_val, 1)
+
+    def test_fork_screen_selection_current_state(self):
+        user_messages = [
+            (0, "first message"),
+            (1, "second message"),
+        ]
+        screen = ForkScreen(user_messages)
+        dismissed_val = None
+
+        def mock_dismiss(val):
+            nonlocal dismissed_val
+            dismissed_val = val
+
+        screen.dismiss = mock_dismiss
+
+        mock_event = MagicMock(spec=OptionList.OptionSelected)
+        mock_event.option_index = 2
+        screen.on_option_list_option_selected(mock_event)
+
+        self.assertEqual(dismissed_val, FORK_CURRENT_STATE)

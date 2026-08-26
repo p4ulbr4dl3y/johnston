@@ -241,6 +241,25 @@ class TestSessionManagerPureReader(unittest.TestCase):
         self.assertEqual(len(sess.messages), 2)
 
 
+    def test_list_main_sessions_includes_forks(self):
+        sid = self.store.generate_session_id()
+        s1 = self.store.create_main(sid)
+        s1.messages = [{"type": "user", "text": "turn 1"}]
+        self.store.save(s1)
+
+        forked = self.store.fork_session(sid, new_title="Forked turn")
+        self.assertIsNotNone(forked)
+        self.assertEqual(forked.parent_id, sid)
+
+        sessions = self.store.list_main_sessions()
+        session_ids = [s["id"] for s in sessions]
+        self.assertIn(sid, session_ids)
+        self.assertIn(forked.id, session_ids)
+
+        fork_summary = next(s for s in sessions if s["id"] == forked.id)
+        self.assertEqual(fork_summary["parent_id"], sid)
+
+
 if __name__ == "__main__":
     unittest.main()
 

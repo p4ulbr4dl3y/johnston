@@ -576,8 +576,7 @@ class SessionStore:
 
         sessions = []
         for sess in merged.values():
-            # Guard parent_id too: legacy kind-less subagent files default to MAIN.
-            if sess.kind != SessionKind.MAIN or sess.parent_id:
+            if sess.kind != SessionKind.MAIN:
                 continue
             if not sess.messages and not sess.agent_history:
                 continue

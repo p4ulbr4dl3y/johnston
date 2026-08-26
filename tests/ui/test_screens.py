@@ -326,6 +326,56 @@ class TestProvidersScreen(unittest.TestCase):
         event.prevent_default.assert_called_once()
         event.stop.assert_called_once()
 
+    def test_step_transitions_and_esc_back(self):
+        providers = {"p1": {"key": "p1", "name": "P1"}}
+        s = ProvidersScreen(providers=providers, active_key="p1", configured_keys={"p1": "secret123456"})
+        dismissed = []
+        s.dismiss = lambda val: dismissed.append(val)
+
+        # Mock widgets
+        mock_widgets = {
+            "#providers-markdown": MagicMock(),
+            "#modal-search-input": MagicMock(),
+            f"#{s.option_list_id}": MagicMock(),
+            "#providers-key-current": MagicMock(),
+            "#providers-key-input": MagicMock(),
+            "#modal-hint": MagicMock(),
+        }
+        s.query_one = lambda selector, *args: mock_widgets.get(selector, MagicMock())
+
+        # Select option in step 1 -> transitions to step 2
+        mock_ev = MagicMock()
+        mock_ev.option_index = 0
+        s.on_option_list_option_selected(mock_ev)
+        self.assertEqual(s.step, 2)
+        self.assertEqual(s.selected_key, "p1")
+        mock_widgets["#providers-key-input"].display = True
+
+        # Esc in step 2 -> returns to step 1
+        esc_ev = MagicMock(key="escape")
+        s._on_key(esc_ev)
+        self.assertEqual(s.step, 1)
+        self.assertIsNone(s.selected_key)
+        self.assertEqual(len(dismissed), 0)
+
+        # Action cancel on step 1 -> dismisses None
+        s.action_cancel()
+        self.assertEqual(dismissed, [None])
+
+    def test_input_submitted_step_2_dismisses_tuple(self):
+        providers = {"p1": {"key": "p1", "name": "P1"}}
+        s = ProvidersScreen(providers=providers, active_key="p1", configured_keys={})
+        dismissed = []
+        s.dismiss = lambda val: dismissed.append(val)
+        s._show_step_2("p1")
+
+        submit_ev = MagicMock()
+        submit_ev.input.id = "providers-key-input"
+        submit_ev.value = "my-new-key"
+        s.on_input_submitted(submit_ev)
+
+        self.assertEqual(dismissed, [("p1", "my-new-key")])
+
 
 class TestProvidersEdge(unittest.TestCase):
     def test_provider_missing_key_uses_get(self):

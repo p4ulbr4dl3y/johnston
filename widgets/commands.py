@@ -3,7 +3,6 @@ import logging
 from typing import Any
 
 from core.application.provider.actions import (
-    fetch_api_key_and_provider_info,
     fetch_grouped_models,
     get_current_thinking_effort,
     select_model,
@@ -21,7 +20,7 @@ from core.infrastructure.mcp import get_mcp_manager
 from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
 from widgets.presentation.screens.constants import MESSAGE_INPUT
-from widgets.presentation.screens.fork import ForkScreen
+from widgets.presentation.screens.fork import FORK_CURRENT_STATE, ForkScreen
 from widgets.presentation.screens.help import HelpScreen
 from widgets.presentation.screens.mcp import MCPScreen
 from widgets.presentation.screens.model import ModelScreen
@@ -104,7 +103,7 @@ class ProvidersCommand(BaseCommand):
     description = "Manage AI providers (API keys, active status, enable/disable)"
 
     async def execute(self, app) -> None:
-        from widgets.presentation.screens.providers import ApiKeyInputScreen, ProvidersScreen
+        from widgets.presentation.screens.providers import ProvidersScreen
 
         try:
             provs = await asyncio.to_thread(app.pm.load_providers, True)
@@ -122,22 +121,25 @@ class ProvidersCommand(BaseCommand):
 
         act_key, cfg_keys, dis_provs = await asyncio.to_thread(_load_cfg)
 
-        def on_provider_selected(selected_key: str | None) -> None:
-            if not selected_key:
+        def on_provider_selected(result: tuple[str, str] | str | None) -> None:
+            if not result:
                 app.query_one(MESSAGE_INPUT, ChatInput).focus()
                 return
 
-            p_name, curr_key = fetch_api_key_and_provider_info(app.pm, selected_key)
+            if isinstance(result, tuple):
+                selected_key, entered_key = result
+            elif isinstance(result, str):
+                selected_key, entered_key = result, ""
+            else:
+                app.query_one(MESSAGE_INPUT, ChatInput).focus()
+                return
 
-            def on_key_entered(entered_key: str | None) -> None:
-                if entered_key is not None:
-                    fetched = set_provider_credentials(app.pm, selected_key, entered_key, app)
-                    if fetched:
-                        asyncio.create_task(ModelsCommand().execute(app))
-                    else:
-                        open_providers_screen(focus_key=selected_key)
-
-            app.push_screen(ApiKeyInputScreen(p_name, selected_key, curr_key), callback=on_key_entered)
+            if entered_key is not None:
+                fetched = set_provider_credentials(app.pm, selected_key, entered_key, app)
+                if fetched:
+                    asyncio.create_task(ModelsCommand().execute(app))
+                else:
+                    open_providers_screen(focus_key=selected_key)
 
         def open_providers_screen(focus_key: str | None = None) -> None:
             if focus_key:
@@ -174,7 +176,7 @@ class ProvidersCommand(BaseCommand):
         app.push_screen(
             ProvidersScreen(
                 provs,
-                act_key,
+                focus_key or act_key,
                 cfg_keys,
                 disabled_providers=dis_provs,
                 pm=app.pm,
@@ -384,32 +386,42 @@ class ForkCommand(BaseCommand):
                 app.query_one(MESSAGE_INPUT).focus()
                 return
 
-            found = False
-            msg_text = ""
-            seq_idx = 0
-            for i, (child_idx, text) in enumerate(user_msgs):
-                if child_idx == selected_child_idx:
-                    msg_text = text
-                    seq_idx = i
-                    found = True
-                    break
-
-            if not found:
-                app.query_one(MESSAGE_INPUT).focus()
-                return
-
-            fork_title = None
-            if seq_idx > 0 and msg_text:
-                clean_msg = " ".join(msg_text.replace("\n", " ").replace("\r", " ").split())
-                if clean_msg:
-                    fork_title = clean_msg
-            elif seq_idx == 0:
+            if selected_child_idx == FORK_CURRENT_STATE:
+                up_to_idx = None
+                msg_text = ""
                 parent_sess = app.sm.get(curr_sid)
+                fork_title = None
                 if parent_sess:
-                    base = parent_sess.title.removesuffix(" (fork)")
+                    base = (parent_sess.description or parent_sess.title or "Session").removesuffix(" (fork)")
                     fork_title = f"{base} (fork)"
+            else:
+                found = False
+                msg_text = ""
+                seq_idx = 0
+                for i, (child_idx, text) in enumerate(user_msgs):
+                    if child_idx == selected_child_idx:
+                        msg_text = text
+                        seq_idx = i
+                        found = True
+                        break
 
-            forked = app.sm.fork_session(curr_sid, new_title=fork_title, up_to_msg_index=seq_idx)
+                if not found:
+                    app.query_one(MESSAGE_INPUT).focus()
+                    return
+
+                up_to_idx = seq_idx
+                fork_title = None
+                if seq_idx > 0 and msg_text:
+                    clean_msg = " ".join(msg_text.replace("\n", " ").replace("\r", " ").split())
+                    if clean_msg:
+                        fork_title = clean_msg
+                elif seq_idx == 0:
+                    parent_sess = app.sm.get(curr_sid)
+                    if parent_sess:
+                        base = parent_sess.title.removesuffix(" (fork)")
+                        fork_title = f"{base} (fork)"
+
+            forked = app.sm.fork_session(curr_sid, new_title=fork_title, up_to_msg_index=up_to_idx)
             if not forked:
                 app.notify("Failed to fork session", severity="error")
                 app.query_one(MESSAGE_INPUT).focus()
@@ -436,6 +448,8 @@ class ForkCommand(BaseCommand):
                 chat_input.load_text(msg_text)
                 lines = chat_input.text.split("\n")
                 chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+            else:
+                chat_input.load_text("")
             chat_input.focus()
             app.notify("Session forked", severity="info")
 

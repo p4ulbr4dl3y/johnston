@@ -5,6 +5,8 @@ from textual.widgets import OptionList
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.utils.row_format import MODAL_DEFAULT_ROW_WIDTH, ellipsize, option_list_row_width
 
+FORK_CURRENT_STATE = -1
+
 
 class ForkScreen(BaseSelectionScreen[int]):
     """Modal session fork screen (/fork)."""
@@ -12,7 +14,8 @@ class ForkScreen(BaseSelectionScreen[int]):
     def __init__(self, user_messages: list[tuple[int, str]]):
         self.user_messages = user_messages
         items = [idx for idx, _ in user_messages]
-        default_val = items[-1] if items else -1
+        items.append(FORK_CURRENT_STATE)
+        default_val = FORK_CURRENT_STATE
 
         options = self._format_options(MODAL_DEFAULT_ROW_WIDTH)
 
@@ -38,6 +41,7 @@ class ForkScreen(BaseSelectionScreen[int]):
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
             opt_text = clean or "(empty message)"
             options.append(escape(ellipsize(opt_text, max(10, target_width - 2))))
+        options.append("Current state [dim #71717a](keep full history)[/]")
         return options
 
     def _refresh_options(self) -> None:
