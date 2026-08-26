@@ -302,6 +302,27 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             hint = "enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel"
             content_w = modal_content_width(sample_items, max_q_title or "### **Confirm Your Answers**", hint)
             apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_MEDIUM_MAX_WIDTH)
+
+            screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            if not isinstance(screen_h, int) or screen_h <= 0:
+                screen_h = 24
+
+            if screen_h < 18:
+                dialog.styles.padding = (0, 1)
+                dialog.styles.max_height = max(7, screen_h - 1)
+                usable_h = screen_h - 1
+                overhead = 9
+            else:
+                dialog.styles.padding = (1, 2)
+                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
+                usable_h = screen_h - 2
+                overhead = 11
+
+            try:
+                opt_list = self.query_one(OPTIONS_LIST, OptionList)
+                opt_list.styles.max_height = max(2, usable_h - overhead)
+            except Exception:
+                pass
         except Exception:
             pass
 
