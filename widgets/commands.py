@@ -219,7 +219,7 @@ class ModelsCommand(BaseCommand):
                 app.refresh_status_footer()
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
-        app.push_screen(ModelScreen(grouped_models, curr_model, curr_provider), callback=on_model_selected)
+        app.push_screen(ModelScreen(grouped_models, curr_model, curr_provider, pm=app.pm), callback=on_model_selected)
 
 
 class ThinkingEffortCommand(BaseCommand):

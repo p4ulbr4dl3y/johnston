@@ -1,21 +1,33 @@
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+from textual.widgets import Input
 from textual.widgets.option_list import Option
 
 from core.models_catalog import catalog
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
+from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT_ID
+from widgets.utils.key_aliases import expand_bindings
 
 
 class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
     """Modal model selection screen (/models)"""
+
+    BINDINGS = expand_bindings([
+        ("escape", "cancel", "Cancel"),
+        ("ctrl+r", "refresh_models", "Refresh"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(
         self,
         models_data: Union[List[str], Dict[str, Dict[str, Any]]],
         current_model: str = "",
         current_provider: str = "",
+        pm: Optional[Any] = None,
     ):
+        self.pm = pm
         self.models_data = models_data
         self.current_model = current_model
         self.current_provider = current_provider
@@ -29,7 +41,44 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
+            hint_text="enter: select • ctrl+r: refresh • ↑↓: nav • esc: close",
         )
+
+    async def action_refresh_models(self) -> None:
+        """Fetch fresh model catalog with force_refresh=True and re-render."""
+        pm = self.pm
+        if pm is None:
+            try:
+                pm = getattr(self.app, "pm", None)
+            except Exception:
+                pm = getattr(self, "_app", None)
+                if pm is not None:
+                    pm = getattr(pm, "pm", None)
+
+        if not pm:
+            self.notify("Provider manager not available", severity="warning")
+            return
+
+        try:
+            new_data = await pm.fetch_models_grouped(force_refresh=True)
+            if new_data:
+                self.models_data = new_data
+                self.raw_options, self.raw_items, self.default_value = self._build_data()
+                self._norm_targets.clear()
+
+                search_val = ""
+                if self.show_search:
+                    try:
+                        search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+                        search_val = search_input.value
+                    except Exception:
+                        pass
+                self._filter_options(search_val)
+                self.notify("Models refreshed")
+            else:
+                self.notify("No models found", severity="warning")
+        except Exception as e:
+            self.notify(f"Failed to refresh models: {e}", severity="error")
 
     @staticmethod
     def _is_active_model(p_key: str, m: str, target_prov: str, target_model: str) -> bool:

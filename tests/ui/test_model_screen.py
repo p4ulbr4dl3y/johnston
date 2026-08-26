@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.app import App
 from textual.widgets.option_list import Option
@@ -121,6 +121,63 @@ class TestModelScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(screen.filtered_items, [None, ("prov1", "model-b", "Provider 1")])
             await pilot.press("escape")
             await pilot.pause()
+
+    async def test_refresh_models_via_keybinding(self):
+        initial_data = {"prov1": {"name": "Provider 1", "models": ["model-a"]}}
+        refreshed_data = {
+            "prov1": {"name": "Provider 1", "models": ["model-a", "model-b", "model-c"]}
+        }
+        mock_pm = MagicMock()
+        mock_pm.fetch_models_grouped = AsyncMock(return_value=refreshed_data)
+
+        screen = ModelScreen(models_data=initial_data, current_model="", current_provider="", pm=mock_pm)
+        app = ModelHostApp(screen)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            self.assertEqual(len(screen.filtered_items), 2)  # [None, model-a]
+            await pilot.press("ctrl+r")
+            await pilot.pause()
+            mock_pm.fetch_models_grouped.assert_called_once_with(force_refresh=True)
+            self.assertEqual(len(screen.filtered_items), 4)  # [None, model-a, model-b, model-c]
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+class TestModelScreenRefreshAction(unittest.IsolatedAsyncioTestCase):
+    async def test_action_refresh_no_pm(self):
+        screen = ModelScreen(models_data=["model-a"])
+        screen.notify = MagicMock()
+        await screen.action_refresh_models()
+        screen.notify.assert_called_once_with("Provider manager not available", severity="warning")
+
+    async def test_action_refresh_success(self):
+        mock_pm = MagicMock()
+        mock_pm.fetch_models_grouped = AsyncMock(return_value={
+            "prov1": {"name": "P1", "models": ["model-new"]}
+        })
+        screen = ModelScreen(models_data=["old-model"], pm=mock_pm)
+        screen.notify = MagicMock()
+        await screen.action_refresh_models()
+        mock_pm.fetch_models_grouped.assert_called_once_with(force_refresh=True)
+        self.assertIn(("prov1", "model-new", "P1"), screen.raw_items)
+        screen.notify.assert_any_call("Models refreshed")
+
+    async def test_action_refresh_empty_data(self):
+        mock_pm = MagicMock()
+        mock_pm.fetch_models_grouped = AsyncMock(return_value={})
+        screen = ModelScreen(models_data=["old-model"], pm=mock_pm)
+        screen.notify = MagicMock()
+        await screen.action_refresh_models()
+        screen.notify.assert_any_call("No models found", severity="warning")
+
+    async def test_action_refresh_exception(self):
+        mock_pm = MagicMock()
+        mock_pm.fetch_models_grouped = AsyncMock(side_effect=RuntimeError("Network error"))
+        screen = ModelScreen(models_data=["old-model"], pm=mock_pm)
+        screen.notify = MagicMock()
+        await screen.action_refresh_models()
+        screen.notify.assert_any_call("Failed to refresh models: Network error", severity="error")
 
 
 if __name__ == "__main__":
