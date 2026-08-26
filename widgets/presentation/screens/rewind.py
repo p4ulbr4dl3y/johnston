@@ -99,18 +99,28 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             from widgets.utils.responsive import apply_modal_fit, modal_content_width
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-            sample_items = []
-            for msg in self.user_messages:
-                clean = " ".join(msg.text.replace("\n", " ").replace("\r", " ").split())
-                badge = msg.git_stats or "no checkpoint" if self.checkpoints_enabled else ""
-                sample_items.append(f"{clean}   {badge}")
-            raw_step2 = [
-                "Rollback conversation & files   revert code",
-                "Rollback conversation only   keep current code",
-                "View changes diff   inspect code changes",
-            ]
-            sample_items.extend(raw_step2)
-            content_w = modal_content_width(sample_items, self.title, self.hint_text)
+            if self.step == 1:
+                sample_items = []
+                for msg in self.user_messages:
+                    clean = " ".join(msg.text.replace("\n", " ").replace("\r", " ").split())
+                    badge = msg.git_stats if (self.checkpoints_enabled and msg.git_stats) else ""
+                    if badge:
+                        sample_items.append(f"{clean}   {badge}")
+                    else:
+                        sample_items.append(clean)
+                title = self.title
+                hint = self.hint_text
+            else:
+                sample_items = [
+                    "Rollback conversation & files   revert code",
+                    "Rollback conversation only   keep current code",
+                    "View changes diff   inspect code changes",
+                ]
+                clean_preview = self.selected_entry.text[:40] if self.selected_entry else ""
+                title = f"### **Rollback: {clean_preview}**"
+                hint = "enter: select • ↑↓: nav • esc: back to messages"
+
+            content_w = modal_content_width(sample_items, title, hint)
             apply_modal_fit(dialog, content_w)
         except Exception:
             pass
@@ -224,6 +234,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             pass
 
         self.filtered_items = ["both", "conversation", "diff"]
+        self._apply_dialog_fit()
         self._refresh_options()
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
@@ -282,6 +293,7 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
 
         self.filtered_options = list(self.raw_options)
         self.filtered_items = list(self.raw_items)
+        self._apply_dialog_fit()
 
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
