@@ -336,14 +336,14 @@ class TestApiKeyInputScreen(unittest.TestCase):
 
 
 class TestSkillScreens(unittest.TestCase):
-    @patch("widgets.presentation.screens.skills.SkillManager")
-    def test_list_init_with_skills(self, mock_sm_cls):
+    @patch("widgets.presentation.screens.skills.get_skill_manager")
+    def test_list_init_with_skills(self, mock_get_sm):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = [
             Skill("skill-a", "", "", "", SkillScope.GLOBAL, False),
             Skill("skill-b", "", "", "", SkillScope.PROJECT, False),
         ]
-        mock_sm_cls.return_value = mock_sm
+        mock_get_sm.return_value = mock_sm
         from widgets.presentation.screens.skills import SkillsScreen
 
         s = SkillsScreen()
@@ -353,22 +353,22 @@ class TestSkillScreens(unittest.TestCase):
         self.assertIn("skill-b", s.options[1])
         self.assertIn("●", s.options[1])
 
-    @patch("widgets.presentation.screens.skills.SkillManager")
-    def test_list_init_no_skills(self, mock_sm_cls):
+    @patch("widgets.presentation.screens.skills.get_skill_manager")
+    def test_list_init_no_skills(self, mock_get_sm):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = []
-        mock_sm_cls.return_value = mock_sm
+        mock_get_sm.return_value = mock_sm
         from widgets.presentation.screens.skills import SkillsScreen
 
         s = SkillsScreen()
         self.assertEqual(s.options, [])
 
-    @patch("widgets.presentation.screens.skills.SkillManager")
-    def test_skills_screen_toggle_hidden(self, mock_sm_cls):
+    @patch("widgets.presentation.screens.skills.get_skill_manager")
+    def test_skills_screen_toggle_hidden(self, mock_get_sm):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = [Skill("skill-a", "", "", "", SkillScope.GLOBAL, True)]
         mock_sm.toggle_hidden.return_value = False
-        mock_sm_cls.return_value = mock_sm
+        mock_get_sm.return_value = mock_sm
         from widgets.presentation.screens.skills import SkillsScreen
 
         s = SkillsScreen()

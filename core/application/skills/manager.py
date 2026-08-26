@@ -7,6 +7,7 @@ Each skill is a directory whose SKILL.md carries optional YAML frontmatter
 
 import logging
 import os
+import threading
 import time
 from dataclasses import dataclass
 from enum import Enum
@@ -15,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
 from core.domain.defaults.skills.loader import BundledSkill, get_bundled_skill, list_bundled_skills
 from core.infrastructure.platform.paths import CONFIG_DIR
+from core.infrastructure.platform.platform_utils import atomic_write_text
 from core.infrastructure.runtime.frontmatter import parse_frontmatter
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_recursive
 
@@ -22,6 +24,16 @@ logger = logging.getLogger(__name__)
 
 GLOBAL_SKILLS_DIR = os.path.join(CONFIG_DIR, "skills")
 PROJECT_SKILLS_DIR_NAME = os.path.join(".johnston", "skills")
+
+__all__ = [
+    "GLOBAL_SKILLS_DIR",
+    "PROJECT_SKILLS_DIR_NAME",
+    "Skill",
+    "SkillManager",
+    "SkillScope",
+    "get_skill_manager",
+    "reset_skill_managers",
+]
 
 
 class SkillScope(Enum):
@@ -55,7 +67,11 @@ class Skill:
 
 
 class SkillManager:
-    _dirs_ensured: bool = False
+    """Discovers skills in the global and project trees with signature-based caching.
+
+    Construction is side-effect free; use :func:`get_skill_manager` to obtain the
+    shared, provisioning instance.
+    """
 
     _CACHE_TTL = 2.0  # seconds
 
@@ -66,33 +82,6 @@ class SkillManager:
         self._scan_signature: Optional[tuple] = None
         self._scan_cache: Optional[List[Skill]] = None
         self._scan_ts: float = 0.0
-        if not SkillManager._dirs_ensured:
-            self.ensure_dirs()
-            SkillManager._dirs_ensured = True
-
-    def ensure_dirs(self):
-        os.makedirs(self.global_dir, exist_ok=True)
-        from core.infrastructure.platform.platform_utils import atomic_write_text
-
-        # Provision bundled default skills (johnston-guide) into
-        # the user's global skills dir. Each skill is a directory with SKILL.md
-        # and optional extra files. Existing files are left untouched so users
-        # can edit/remove their local copies.
-        for name in list_bundled_skills():
-            self._provision_skill(get_bundled_skill(name), atomic_write_text)
-
-    def _provision_skill(self, skill: BundledSkill, write_func):
-        """Write a bundled skill's files into the global skills dir if missing."""
-        skill_dir = os.path.join(self.global_dir, skill.name)
-        for rel_path, content in skill.files.items():
-            target_path = os.path.join(skill_dir, rel_path)
-            if os.path.exists(target_path):
-                continue
-            try:
-                os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                write_func(target_path, content)
-            except Exception:
-                logger.warning("Failed to write skill file: %s", target_path, exc_info=True)
 
     def list_skills(
         self,
@@ -181,6 +170,7 @@ class SkillManager:
                     with open(filepath, "r", encoding="utf-8") as file:
                         raw_content = file.read()
                 except Exception:
+                    logger.debug("Skipping unreadable skill file: %s", filepath, exc_info=True)
                     continue
 
                 fm, body = parse_frontmatter(raw_content)
@@ -231,19 +221,22 @@ class SkillManager:
     def toggle_hidden(self, name: str) -> bool:
         """
         Toggles the 'hidden' attribute of a skill in its frontmatter.
-        Returns True if now hidden, False if visible.
+        Returns the new hidden state (True = hidden, False = visible).
+
+        Raises KeyError for an unknown skill. Write failures are logged and
+        re-raised so callers stay in sync with disk instead of silently
+        diverging from it.
         """
         skill = self.get_skill(name, include_hidden=True)
         if not skill or not skill.location:
-            return False
+            raise KeyError(f"Unknown skill: {name!r}")
 
         filepath = skill.location
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            is_currently_hidden = skill.hidden
-            new_hidden = not is_currently_hidden
+            new_hidden = not skill.hidden
 
             if content.startswith("---"):
                 parts = content.split("---", 2)
@@ -271,14 +264,13 @@ class SkillManager:
             else:
                 new_content = f"---\nhidden: {str(new_hidden).lower()}\n---\n{content}"
 
-            from core.infrastructure.platform.platform_utils import atomic_write_text
-
             atomic_write_text(filepath, new_content)
             self.invalidate_cache()
 
             return new_hidden
         except Exception:
-            return skill.hidden
+            logger.warning("Failed to toggle hidden for skill %r (%s)", name, filepath, exc_info=True)
+            raise
 
     def get_system_prompt_skills(self) -> List[Skill]:
         """Return non-hidden skills for the system prompt.
@@ -287,3 +279,59 @@ class SkillManager:
         application module does not own rendering output.
         """
         return self.list_skills(include_hidden=False, for_system_prompt=True)
+
+
+# Shared per-process managers keyed by resolved project dir, so every consumer
+# (UI screens, command providers, prompt builder) shares one scan cache and one
+# provisioning step instead of each instantiating its own manager.
+_SKILL_MANAGERS: Dict[str, SkillManager] = {}
+_registry_lock = threading.Lock()
+_bundled_provisioned = False
+
+
+def _provision_skill_files(skill: BundledSkill) -> None:
+    """Write a bundled skill's files into the global skills dir if missing.
+
+    Existing files are left untouched so users can edit/remove their local
+    copies. Individual failures are logged and skipped.
+    """
+    skill_dir = os.path.join(GLOBAL_SKILLS_DIR, skill.name)
+    for rel_path, content in skill.files.items():
+        target_path = os.path.join(skill_dir, rel_path)
+        if os.path.exists(target_path):
+            continue
+        try:
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            atomic_write_text(target_path, content)
+        except Exception:
+            logger.warning("Failed to write skill file: %s", target_path, exc_info=True)
+
+
+def get_skill_manager(project_dir: Optional[str] = None) -> SkillManager:
+    """Return the shared SkillManager for ``project_dir`` (defaults to cwd).
+
+    Managers are cached by resolved project dir so repeated calls reuse one
+    scan cache/TTL window. The first call also creates the global skills dir
+    and provisions bundled default skills into it (once per process).
+    """
+    global _bundled_provisioned
+    key = os.path.realpath(project_dir or os.getcwd())
+    with _registry_lock:
+        mgr = _SKILL_MANAGERS.get(key)
+        if mgr is None:
+            if not _bundled_provisioned:
+                os.makedirs(GLOBAL_SKILLS_DIR, exist_ok=True)
+                for name in list_bundled_skills():
+                    _provision_skill_files(get_bundled_skill(name))
+                _bundled_provisioned = True
+            mgr = SkillManager(project_dir=key)
+            _SKILL_MANAGERS[key] = mgr
+        return mgr
+
+
+def reset_skill_managers() -> None:
+    """Drop cached managers and the provisioned flag (intended for tests)."""
+    global _bundled_provisioned
+    with _registry_lock:
+        _SKILL_MANAGERS.clear()
+        _bundled_provisioned = False

@@ -189,6 +189,18 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
                 screen.action_toggle_hidden()
                 mock_toggle.assert_called_once_with("reviewer")
 
+    async def test_toggle_hidden_failure_keeps_visible_state(self):
+        # Write failure must not flip the row tag: UI stays in sync with disk.
+        with patch.object(SkillManager, "toggle_hidden", side_effect=OSError("disk full")):
+            async for app, screen, pilot in self._run():
+                opt_list = screen.query_one("#skills-option-list", OptionList)
+                highlighted = opt_list.highlighted
+                target = screen.filtered_skills[highlighted]
+                screen.action_toggle_hidden()
+                self.assertFalse(target["hidden"])  # reviewer was visible, still is
+                self.assertIn("●", str(screen.filtered_options[highlighted]))
+                self.assertNotIn("○", str(screen.filtered_options[highlighted]))
+
     async def test_toggle_hidden_on_header_noop(self):
         async for app, screen, pilot in self._run():
             opt_list = screen.query_one("#skills-option-list", OptionList)

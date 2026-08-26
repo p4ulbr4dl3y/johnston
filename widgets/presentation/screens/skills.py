@@ -7,7 +7,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
-from core.application.skills.manager import SkillManager
+from core.application.skills.manager import get_skill_manager
 from core.domain.defaults.config import THEME_MUTED
 from core.infrastructure.platform.paths import CONFIG_DIR
 from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
@@ -41,7 +41,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
 
     def __init__(self):
         super().__init__()
-        self.sm = SkillManager()
+        self.sm = get_skill_manager()
         self.skills = []
         self.options: list[str] = []
         self.filtered_skills: list = []
@@ -185,22 +185,29 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             opt_list = self.query_one("#skills-option-list", OptionList)
             highlighted = opt_list.highlighted
             target = self.filtered_skills[highlighted] if highlighted is not None and 0 <= highlighted < len(self.filtered_skills) else None
-            if target is None:
-                return
-            s_name = target["name"]
-            self.sm.toggle_hidden(s_name)
-            target["hidden"] = not target.get("hidden", False)
-            stat_t = status_tag("HIDDEN" if target["hidden"] else "VISIBLE")
-            new_opt = f"{stat_t} {s_name}"
-            if highlighted < len(self.filtered_options):
-                self.filtered_options[highlighted] = new_opt
-            try:
-                opt_list.replace_option_prompt_at_index(highlighted, new_opt)
-            except Exception:
-                self.refresh_list()
-                opt_list.highlighted = highlighted
         except Exception:
-            pass
+            return
+        if target is None:
+            return
+
+        s_name = target["name"]
+        try:
+            now_hidden = self.sm.toggle_hidden(s_name)
+        except Exception:
+            # Disk state unchanged; keep showing the old tag.
+            self.notify(f"Failed to toggle hidden for skill '{s_name}'", severity="error")
+            return
+
+        target["hidden"] = now_hidden
+        stat_t = status_tag("HIDDEN" if now_hidden else "VISIBLE")
+        new_opt = f"{stat_t} {s_name}"
+        if highlighted < len(self.filtered_options):
+            self.filtered_options[highlighted] = new_opt
+        try:
+            opt_list.replace_option_prompt_at_index(highlighted, new_opt)
+        except Exception:
+            self.refresh_list()
+            opt_list.highlighted = highlighted
 
     def action_cancel(self) -> None:
         self.dismiss(None)

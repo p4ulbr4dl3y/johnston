@@ -16,7 +16,7 @@ from core.application.session.actions import (
     new_session,
     rewind_session,
 )
-from core.application.skills.manager import SkillManager
+from core.application.skills.manager import get_skill_manager
 from core.infrastructure.mcp import get_mcp_manager
 from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
@@ -465,7 +465,7 @@ class SkillsCommand(BaseCommand):
     description = "Browse and activate available skills"
 
     async def execute(self, app) -> None:
-        skills = await asyncio.to_thread(SkillManager().list_skills)
+        skills = await asyncio.to_thread(get_skill_manager().list_skills)
         if not skills:
             app.notify("No available skills found", severity="warning")
             return

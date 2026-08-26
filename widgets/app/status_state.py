@@ -34,9 +34,9 @@ def _collect_cache(app):
     except Exception:
         providers = {}
     try:
-        from core.application.skills.manager import SkillManager
+        from core.application.skills.manager import get_skill_manager
 
-        all_skills = SkillManager().list_skills(include_hidden=True)
+        all_skills = get_skill_manager().list_skills(include_hidden=True)
         skills_total = len(all_skills)
         skills_visible = sum(1 for s in all_skills if not s.hidden)
     except Exception:

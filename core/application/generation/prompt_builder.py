@@ -6,7 +6,7 @@ import time
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.application.skills.manager import SkillManager
+from core.application.skills.manager import get_skill_manager
 from core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT, SUBAGENT_DEFAULT_SYSTEM_PROMPT
 
 INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
@@ -34,9 +34,9 @@ _PROJECT_INSTRUCTION_CACHE: Dict[str, Tuple[tuple, str]] = {}
 # skills / instructions / mcp tool map actually change.
 _STABLE_CORE_CACHE: "OrderedDict[tuple, str]" = OrderedDict()
 
-# Reused SkillManager instances keyed by project dir, so the agent loop does not
+# Reused SkillManager instances live in the manager module registry
+# (get_skill_manager), keyed by project dir, so the agent loop does not
 # re-provision/re-scan skills on every turn.
-_SKILL_MANAGERS: Dict[str, SkillManager] = {}
 
 # Pre-sorted tool schema cache keyed by a content identity (tool object ids +
 # role flags). build_tools deepcopy+sorts only on cache miss.
@@ -48,16 +48,6 @@ def _cache_set(cache, key, value, max_size: int) -> None:
     cache.move_to_end(key)
     while len(cache) > max_size:
         cache.popitem(last=False)
-
-
-def _get_skill_manager(cwd: Optional[str]) -> SkillManager:
-    key = os.path.realpath(cwd) if cwd else os.getcwd()
-    mgr = _SKILL_MANAGERS.get(key)
-    if mgr is None:
-        mgr = SkillManager(project_dir=key)
-        _SKILL_MANAGERS[key] = mgr
-    return mgr
-
 
 
 def _cached_git_info(cwd: Optional[str] = None) -> Optional[str]:
@@ -240,7 +230,7 @@ class PromptBuilder:
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
         from core.infrastructure.runtime.prompt_markdown import format_skills_markdown
 
-        skills_snippet = format_skills_markdown(_get_skill_manager(self.cwd).get_system_prompt_skills())
+        skills_snippet = format_skills_markdown(get_skill_manager(self.cwd).get_system_prompt_skills())
         subagents_snippet = (
             "" if self.is_subagent else RoleRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
         )
@@ -291,7 +281,7 @@ class PromptBuilder:
         from core.infrastructure.runtime.prompt_markdown import format_skills_markdown
 
         skills_snippet = format_skills_markdown(
-            await asyncio.to_thread(_get_skill_manager(self.cwd).get_system_prompt_skills)
+            await asyncio.to_thread(get_skill_manager(self.cwd).get_system_prompt_skills)
         )
         subagents_snippet = (
             "" if self.is_subagent else RoleRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)

@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from core.application.skills.manager import SkillManager
+from core.application.skills.manager import get_skill_manager
 from widgets.app.dispatch import COMMAND_REGISTRY
 
 _command_suggestions_cache: list[tuple[str, str]] = []
@@ -27,7 +27,7 @@ def _build_command_suggestions() -> list[tuple[str, str]]:
         registered.add(name)
 
     try:
-        sm = SkillManager()
+        sm = get_skill_manager()
         skills = sm.list_skills()
         for s in skills:
             s_cmd = f"/{s.name}"

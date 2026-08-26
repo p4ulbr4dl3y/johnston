@@ -2,19 +2,21 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from core.application.skills.manager import SkillManager, parse_frontmatter
+from core.application.skills.manager import SkillManager, get_skill_manager, reset_skill_managers
+from core.infrastructure.runtime.frontmatter import parse_frontmatter
 
 
 class TestSkillManager(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        SkillManager._instance = None
+        reset_skill_managers()
         self.test_dir = tempfile.mkdtemp()
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
 
     def tearDown(self):
-        SkillManager._instance = None
+        reset_skill_managers()
         os.chdir(self.old_cwd)
         shutil.rmtree(self.test_dir)
 
@@ -119,7 +121,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/johnston-guide", cmd_names)
 
     def test_johnston_guide_references_created(self):
-        sm = SkillManager()
+        sm = get_skill_manager()
         guide_dir = os.path.join(sm.global_dir, "johnston-guide")
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "SKILL.md")))
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "cli_flags.md")))
@@ -148,7 +150,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
             from tests.ui.test_commands import MockApp
 
         os.chdir(self.old_cwd)
-        SkillManager._instance = None
+        reset_skill_managers()
         app = MockApp()
         handled = await handle_slash_command(app, "/johnston-guide configure MCP")
         self.assertTrue(handled)
@@ -165,7 +167,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
             from tests.ui.test_commands import MockApp
 
         os.chdir(self.old_cwd)
-        SkillManager._instance = None
+        reset_skill_managers()
         app = MockApp()
         handled = await handle_slash_command(app, "/johnston-guide /caveman refactor code")
         self.assertTrue(handled)
@@ -183,6 +185,42 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
             # Within TTL window, calling list_skills() must use cached result without computing signature
             skills = sm.list_skills()
             self.assertIsInstance(skills, list)
+
+    def test_get_skill_manager_shares_instance_per_project_dir(self):
+        sm1 = get_skill_manager(self.old_cwd)
+        sm2 = get_skill_manager(self.old_cwd)
+        self.assertIs(sm1, sm2)
+
+        other_dir = tempfile.mkdtemp()
+        try:
+            sm_other = get_skill_manager(other_dir)
+            self.assertIsNot(sm1, sm_other)
+            self.assertEqual(sm_other.project_dir, os.path.realpath(other_dir))
+        finally:
+            shutil.rmtree(other_dir)
+
+    def test_skill_manager_construction_has_no_side_effects(self):
+        with patch("core.application.skills.manager.os.makedirs") as mock_makedirs:
+            SkillManager(project_dir=self.test_dir)
+        mock_makedirs.assert_not_called()
+
+    def test_get_skill_manager_provisions_bundled_skill(self):
+        reset_skill_managers()
+        with patch(
+            "core.application.skills.manager.GLOBAL_SKILLS_DIR",
+            os.path.join(self.test_dir, "global-skills"),
+        ):
+            get_skill_manager()
+            guide_md = os.path.join(self.test_dir, "global-skills", "johnston-guide", "SKILL.md")
+            self.assertTrue(os.path.exists(guide_md))
+            # Second call must not re-provision (flag set), and returns the cached manager.
+            sm_cached = get_skill_manager()
+            self.assertIs(get_skill_manager(), sm_cached)
+
+    def test_toggle_hidden_unknown_skill_raises_key_error(self):
+        sm = SkillManager(project_dir=self.test_dir)
+        with self.assertRaises(KeyError):
+            sm.toggle_hidden("no-such-skill")
 
 
 if __name__ == "__main__":

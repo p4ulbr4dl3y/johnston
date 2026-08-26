@@ -11,7 +11,12 @@ from unittest.mock import patch
 
 import pytest
 
-from core.application.skills.manager import Skill, SkillManager, SkillScope
+from core.application.skills.manager import (
+    Skill,
+    SkillManager,
+    SkillScope,
+    _provision_skill_files,
+)
 from core.domain.defaults.skills.loader import get_bundled_skill
 
 
@@ -46,14 +51,14 @@ def harness(tmp_path):
     return _SkillManagerHarness(tmp_path)
 
 
-def test_provision_skill_write_error_is_swallowed(harness):
+def test_provision_skill_write_error_is_swallowed(tmp_path):
     skill = get_bundled_skill("johnston-guide")
 
-    def boom(path, content):
-        raise OSError("disk full")
-
-    harness.sm._provision_skill(skill, boom)
-    # Any files that raised simply get logged; no exception propagates.
+    with patch("core.application.skills.manager.GLOBAL_SKILLS_DIR", str(tmp_path)), patch(
+        "core.application.skills.manager.atomic_write_text", side_effect=OSError("disk full")
+    ):
+        # Any files that raised simply get logged; no exception propagates.
+        _provision_skill_files(skill)
     assert skill.files  # sanity: bundled skill has files to attempt
 
 
@@ -134,8 +139,9 @@ def test_scan_skills_derives_description_from_body(harness):
     assert s.content == "# Heading\n\nUseful description\nmore"
 
 
-def test_toggle_hidden_missing_skill_returns_false(harness):
-    assert harness.sm.toggle_hidden("nonexistent") is False
+def test_toggle_hidden_missing_skill_raises_key_error(harness):
+    with pytest.raises(KeyError):
+        harness.sm.toggle_hidden("nonexistent")
 
 
 def test_toggle_hidden_updates_user_invocable(harness):
@@ -189,14 +195,18 @@ def test_toggle_hidden_no_frontmatter(harness):
         assert f.read().startswith("---\nhidden: true\n---")
 
 
-def test_toggle_hidden_write_error_returns_previous_state(harness):
+def test_toggle_hidden_write_error_raises_and_keeps_disk_state(harness):
     sm = harness.sm
-    _write_skill(sm.global_dir, "errorskill", None, ["name: errorskill", "description: d", "hidden: true"])
+    skill_dir = _write_skill(sm.global_dir, "errorskill", None, ["name: errorskill", "description: d", "hidden: true"])
+    target = os.path.join(skill_dir, "SKILL.md")
+    before = open(target, encoding="utf-8").read()
     with patch(
-        "core.infrastructure.platform.platform_utils.atomic_write_text", side_effect=OSError("nope")
+        "core.application.skills.manager.atomic_write_text", side_effect=OSError("nope")
     ):
-        # toggle on true hidden -> new_hidden False; save fails -> returns old hidden True.
-        assert sm.toggle_hidden("errorskill") is True
+        # Write failure must surface to the caller instead of returning stale state.
+        with pytest.raises(OSError):
+            sm.toggle_hidden("errorskill")
+    assert open(target, encoding="utf-8").read() == before  # disk untouched
 
 
 def test_system_prompt_skills_empty(harness):

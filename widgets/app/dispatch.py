@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from core.application.skills.manager import SkillManager
+from core.application.skills.manager import get_skill_manager
 
 
 def _resolve_skills(sm, norm_skill_words):
@@ -39,7 +39,7 @@ def _load_skill_blocks(loaded_skills) -> list[str]:
             try:
                 with open(s.location, "r", encoding="utf-8") as f:
                     raw_c = f.read()
-                from core.application.skills.manager import parse_frontmatter
+                from core.infrastructure.runtime.frontmatter import parse_frontmatter
 
                 _, body = parse_frontmatter(raw_c)
                 content = body.strip()
@@ -107,7 +107,7 @@ async def handle_slash_command(app, command_text: str) -> bool:
     skill_words = [w[1:].lower() for w in words if w.startswith("/")]
     norm_skill_words = ["".join(homoglyphs.get(c, c) for c in raw) for raw in skill_words]
     if norm_skill_words:
-        loaded_skills, unresolved = await asyncio.to_thread(_resolve_skills, SkillManager(), norm_skill_words)
+        loaded_skills, unresolved = await asyncio.to_thread(_resolve_skills, get_skill_manager(), norm_skill_words)
         other_words.extend(f"/{norm}" for norm in unresolved)
     else:
         loaded_skills = []
