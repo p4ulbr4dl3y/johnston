@@ -18,5 +18,5 @@ class SessionConflictScreen(BaseSelectionScreen[str]):
             default_value="readonly",
             show_search=False,
             hint_text="enter: select • ↑↓: nav • esc: back",
-            fit_content=True,
+            dialog_classes="modal-dialog-medium",
         )
