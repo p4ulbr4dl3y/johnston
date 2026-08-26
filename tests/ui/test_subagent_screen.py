@@ -414,6 +414,18 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             footer.update_session(sess)
             self.assertEqual(mock_est.call_count, 2)
 
+    async def test_subagent_screen_modal_key_isolation(self):
+        self._mk("task-bind-test", "Bind Agent", "Prompt bind")
+        screen = SubagentViewScreen("task-bind-test")
+        app = DummyHostApp(screen, store=self.store)
+        app.action_background_all = unittest.mock.MagicMock()
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            await pilot.press("ctrl+b")
+            await pilot.pause()
+            self.assertFalse(app.action_background_all.called)
+
 
 if __name__ == "__main__":
     unittest.main()
