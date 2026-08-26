@@ -287,13 +287,20 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             )
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-            if self.q_idx < len(self.questions):
-                sample_items = [f"[✓] {o}" for o in self.options] if self.options else ["Type custom answer..."]
-                title_text = self.questions[self.q_idx].get("question", "")
-            else:
-                sample_items = ["Confirm your answers"]
-                title_text = "Confirm Your Answers"
-            content_w = modal_content_width(sample_items, title_text, "enter: confirm • esc: cancel")
+            sample_items = []
+            max_q_title = ""
+            for q in self.questions:
+                q_text = q.get("question", "")
+                if len(q_text) > len(max_q_title):
+                    max_q_title = q_text
+                for opt in q.get("options") or []:
+                    sample_items.append(f"[✓] {opt}")
+
+            if not sample_items:
+                sample_items = ["Type custom answer..."]
+
+            hint = "enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel"
+            content_w = modal_content_width(sample_items, max_q_title or "### **Confirm Your Answers**", hint)
             apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_MEDIUM_MAX_WIDTH)
         except Exception:
             pass
