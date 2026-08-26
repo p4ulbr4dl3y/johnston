@@ -96,35 +96,6 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             opt_list = self
         return option_list_row_width(opt_list, MODAL_WIDE_ROW_WIDTH)
 
-    def _apply_dialog_fit(self) -> None:
-        try:
-            from widgets.utils.responsive import MODAL_WIDE_MAX_WIDTH, apply_modal_fit, modal_content_width
-
-            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-            sample_items = []
-            for msg in self.user_messages:
-                clean = " ".join(msg.text.replace("\n", " ").replace("\r", " ").split())
-                badge = msg.git_stats if (self.checkpoints_enabled and msg.git_stats) else ""
-                if badge:
-                    sample_items.append(f"{clean}   {badge}")
-                else:
-                    sample_items.append(clean)
-
-            if self.step == 2 and self.selected_entry:
-                clean_preview = ellipsize(self.selected_entry.text, 65)
-                title = f"### **Rollback: {clean_preview}**"
-                hint = "enter: select • ↑↓: nav • esc: back to messages"
-                if self.selected_entry.changed_files:
-                    sample_items.extend(f"  {f}" for f in self.selected_entry.changed_files[:4])
-            else:
-                title = self.title
-                hint = self.hint_text
-
-            content_w = modal_content_width(sample_items, title, hint)
-            apply_modal_fit(dialog, content_w, max_width=MODAL_WIDE_MAX_WIDTH)
-        except Exception:
-            pass
-
     def _format_step1_options(self, target_width: int) -> list[str]:
         options = []
         for msg in self.user_messages:
@@ -186,7 +157,6 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             yield Label(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
-        self._apply_dialog_fit()
         opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
         default_idx = None
         if self.default_value is not None and self.default_value in self.raw_items:
@@ -233,7 +203,6 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
             pass
 
     def on_resize(self, event: events.Resize) -> None:
-        self._apply_dialog_fit()
         self._refresh_options()
         self._update_step2_display()
 
@@ -241,7 +210,6 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
         self.step = 2
         self.selected_entry = entry
         self.filtered_items = ["both", "conversation", "diff"]
-        self._apply_dialog_fit()
         self._refresh_options()
         self._update_step2_display()
         try:
@@ -299,7 +267,6 @@ class RewindScreen(BaseModalScreen[Optional[RewindSelection]]):
 
         self.filtered_options = list(self.raw_options)
         self.filtered_items = list(self.raw_items)
-        self._apply_dialog_fit()
 
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)

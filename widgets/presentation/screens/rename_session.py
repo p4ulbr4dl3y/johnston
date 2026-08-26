@@ -11,7 +11,6 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     TAB_KEYS,
 )
-from widgets.utils.responsive import apply_modal_fit, modal_content_width
 
 
 class RenameSessionScreen(BaseModalScreen[str | None]):
@@ -32,27 +31,9 @@ class RenameSessionScreen(BaseModalScreen[str | None]):
             yield Label("enter: save • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
-        self._apply_dialog_fit()
         inp = self.query_one("#session-rename-input", Input)
         inp.focus()
         inp.cursor_position = len(inp.value)
-
-    def on_resize(self, event: events.Resize) -> None:
-        self._apply_dialog_fit()
-
-    def _apply_dialog_fit(self) -> None:
-        """Hug dialog to title and input content."""
-        try:
-            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-        except Exception:
-            return
-        options = [self.current_title] if self.current_title else []
-        content_width = modal_content_width(
-            options,
-            "### **Rename Session**",
-            "enter: save • esc: cancel",
-        )
-        apply_modal_fit(dialog, content_width, min_width=50, max_width=78)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.dismiss(event.value.strip())

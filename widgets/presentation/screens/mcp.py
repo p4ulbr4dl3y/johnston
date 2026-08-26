@@ -68,26 +68,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield HeaderWrapOptionList(id="mcp-option-list")
             yield Label("enter/space/tab: toggle • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
 
-    def _apply_dialog_fit(self) -> None:
-        try:
-            from widgets.utils.responsive import apply_modal_fit, modal_content_width
-
-            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-            sample_items = [
-                f"○ {s.get('name', '')}  (99 tools)"
-                for s in getattr(self, "servers", [])
-            ]
-            content_w = modal_content_width(
-                sample_items,
-                "### **Manage MCP Servers**",
-                "enter/space/tab: toggle • ↑↓: nav • esc: close",
-            )
-            apply_modal_fit(dialog, content_w)
-        except Exception:
-            pass
-
     def on_mount(self) -> None:
-        self._apply_dialog_fit()
         self.refresh_list()
         try:
             self.query_one(MODAL_SEARCH_INPUT, Input).focus()
@@ -98,7 +79,6 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         self._warmup_task = asyncio.create_task(self._warmup_tools())
 
     def on_resize(self, event: events.Resize) -> None:
-        self._apply_dialog_fit()
         if getattr(self, "is_mounted", True):
             self._render_from_cache()
 

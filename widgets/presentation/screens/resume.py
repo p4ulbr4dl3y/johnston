@@ -4,16 +4,9 @@ from textual.widgets import Input, Label, Markdown, OptionList
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.constants import (
-    MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
     MODAL_SEARCH_INPUT,
-)
-from widgets.utils.responsive import (
-    MODAL_MIN_WIDTH,
-    MODAL_WIDE_MAX_WIDTH,
-    apply_modal_fit,
-    modal_content_width,
 )
 from widgets.utils.row_format import (
     MODAL_WIDE_ROW_WIDTH,
@@ -80,7 +73,6 @@ class ResumeScreen(BaseSelectionScreen[str]):
             show_search=True,
             search_placeholder="Search...",
             dialog_classes="modal-dialog-wide",
-            fit_content=True,
         )
 
     def _row_width(self) -> int:
@@ -89,29 +81,6 @@ class ResumeScreen(BaseSelectionScreen[str]):
         except Exception:
             opt_list = self
         return option_list_row_width(opt_list, MODAL_WIDE_ROW_WIDTH)
-
-    def _apply_dialog_fit(self) -> None:
-        """Fit dialog width using session list on both steps so geometry is 100% stable."""
-        try:
-            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-        except Exception:
-            return
-        sample_items = []
-        for s in self.sessions:
-            title = str(s.get("title", ""))
-            count = s.get("message_count", 0)
-            sample_items.append(f"● {title}   {count} steps")
-        content_w = modal_content_width(
-            sample_items or self.raw_options,
-            "### **Select Session to Resume**",
-            "enter: resume • ↑↓: nav • esc: close",
-        )
-        apply_modal_fit(
-            dialog,
-            content_w,
-            min_width=MODAL_MIN_WIDTH,
-            max_width=MODAL_WIDE_MAX_WIDTH,
-        )
 
     def _format_all_options(self, target_width: int) -> list[str]:
         options = []

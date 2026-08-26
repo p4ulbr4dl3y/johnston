@@ -3,7 +3,7 @@ from textual import events
 from textual.widgets import OptionList
 
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
-from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, ellipsize, option_list_row_width
+from widgets.utils.row_format import MODAL_DEFAULT_ROW_WIDTH, ellipsize, option_list_row_width
 
 
 class ForkScreen(BaseSelectionScreen[int]):
@@ -14,7 +14,7 @@ class ForkScreen(BaseSelectionScreen[int]):
         items = [idx for idx, _ in user_messages]
         default_val = items[-1] if items else -1
 
-        options = self._format_options(MODAL_WIDE_ROW_WIDTH)
+        options = self._format_options(MODAL_DEFAULT_ROW_WIDTH)
 
         super().__init__(
             title="### **Select Message to Fork From**",
@@ -23,8 +23,6 @@ class ForkScreen(BaseSelectionScreen[int]):
             default_value=default_val,
             show_search=False,
             hint_text="enter: fork • ↑↓: nav • esc: cancel",
-            dialog_classes="modal-dialog-wide",
-            fit_content=True,
         )
 
     def _row_width(self) -> int:
@@ -32,7 +30,7 @@ class ForkScreen(BaseSelectionScreen[int]):
             opt_list = self.query_one(f"#{self.option_list_id}")
         except Exception:
             opt_list = self
-        return option_list_row_width(opt_list, MODAL_WIDE_ROW_WIDTH)
+        return option_list_row_width(opt_list, MODAL_DEFAULT_ROW_WIDTH)
 
     def _format_options(self, target_width: int) -> list[str]:
         options = []

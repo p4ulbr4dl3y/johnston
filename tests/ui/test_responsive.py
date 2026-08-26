@@ -2,6 +2,7 @@
 widgets/mixins/resize_debounce.py) and the widgets refactored onto them."""
 
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -12,9 +13,8 @@ from textual.widgets.option_list import Option
 from widgets.command_suggestions import CommandSuggestions
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.diff import DiffFooter, DiffHeader
-from widgets.presentation.screens.model import ModelScreen
 from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
-from widgets.presentation.screens.providers import ApiKeyInputScreen
+from widgets.presentation.screens.session_conflict import SessionConflictScreen
 from widgets.presentation.screens.thinking_effort import ThinkingEffortScreen
 from widgets.status_footer import SubagentStatusFooter
 from widgets.utils.responsive import (
@@ -422,8 +422,13 @@ class TestModalFitHelpers:
         assert apply_modal_fit(_ExplodingStylesStub(screen_width=120), 45) == 0
 
 
+_APP_CSS_PATH = str(Path(__file__).resolve().parents[2] / "app.tcss")
+
+
 class _ModalHostApp(App[None]):
     """Host app pushing a modal screen for pilot-based width assertions."""
+
+    CSS_PATH = _APP_CSS_PATH
 
     def __init__(self, screen_to_test):
         super().__init__()
@@ -451,13 +456,10 @@ class TestModalFitPilot:
         width = await self._dialog_width(ThinkingEffortScreen(), (46, 20))
         assert 0 < width <= int(46 * MODAL_WIDTH_RATIO)
 
-    async def test_model_search_modal_stays_bounded(self):
-        models_data = {"prov1": {"name": "Provider 1", "models": ["model-a", "model-b"]}}
-        screen = ModelScreen(models_data=models_data, current_model="model-a", current_provider="prov1")
-        width = await self._dialog_width(screen, (120, 40))
-        assert MODAL_MIN_WIDTH <= width < MODAL_MAX_WIDTH
+    async def test_session_conflict_hugs_content(self):
+        width = await self._dialog_width(SessionConflictScreen("sess-1"), (120, 40))
+        assert width == 78
 
-    async def test_api_key_modal_hugs_small_content(self):
-        screen = ApiKeyInputScreen("Prov", "prov", current_key="sk-abcdefgh12345678")
-        width = await self._dialog_width(screen, (120, 40))
-        assert MODAL_MIN_WIDTH <= width < MODAL_MAX_WIDTH
+    async def test_session_conflict_respects_ratio_cap_on_narrow_terminal(self):
+        width = await self._dialog_width(SessionConflictScreen("sess-1"), (46, 20))
+        assert 0 < width <= int(46 * MODAL_WIDTH_RATIO)

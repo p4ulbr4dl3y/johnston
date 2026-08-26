@@ -15,7 +15,6 @@ from widgets.presentation.screens.constants import (
     TAB_KEYS,
 )
 from widgets.utils.key_aliases import KEY_TOGGLE_DISABLED, expand_bindings
-from widgets.utils.responsive import apply_modal_fit, modal_content_width
 
 
 class ProvidersScreen(BaseSelectionScreen[str]):
@@ -39,7 +38,6 @@ class ProvidersScreen(BaseSelectionScreen[str]):
             show_search=True,
             search_placeholder="Search...",
             hint_text="enter: connect • space/tab: toggle • esc: close",
-            fit_content=True,
         )
 
     def _build_options(self):
@@ -154,24 +152,7 @@ class ApiKeyInputScreen(BaseModalScreen[str | None]):
             yield Label("enter: save • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
-        self._apply_dialog_fit()
         self.query_one("#api-key-input", Input).focus()
-
-    def on_resize(self, event: events.Resize) -> None:
-        self._apply_dialog_fit()
-
-    def _apply_dialog_fit(self) -> None:
-        """Hug dialog to its title / masked key / hint content."""
-        try:
-            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-        except Exception:
-            return
-        masked = self.current_key
-        if len(masked) > 8:
-            masked = f"{masked[:4]}...{masked[-4:]}"
-        options = [f"Current API Key: `{masked}`"] if self.current_key else []
-        content_width = modal_content_width(options, f"### **Connect {self.provider_name}**", "enter: save • esc: cancel")
-        apply_modal_fit(dialog, content_width)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.dismiss(event.value.strip())

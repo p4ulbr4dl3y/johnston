@@ -13,7 +13,7 @@ class TestForkScreen(unittest.TestCase):
             (1, "second message"),
         ]
         screen = ForkScreen(user_messages)
-        self.assertTrue(screen.fit_content)
+        self.assertFalse(screen.fit_content)
         self.assertEqual(len(screen.raw_options), 2)
         self.assertNotIn("\n", screen.raw_options[0])
         self.assertIn("first message with multiline", screen.raw_options[0])
