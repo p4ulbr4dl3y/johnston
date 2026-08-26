@@ -4,10 +4,10 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 
+from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.status_footer import SubagentHeader, SubagentStatusFooter
 from widgets.utils.key_aliases import expand_bindings
-from widgets.utils.message_visibility import is_ui_visible_user_message
 
 
 class SubagentViewScreen(ModalScreen[None]):

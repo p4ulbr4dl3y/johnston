@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import Any, Dict, List, Tuple
 
+from core.domain.policies.messages import is_checkpoint_message, is_system_note
 from core.infrastructure.runtime.token_util import estimate_tokens
 from core.models_catalog import catalog, get_context_window
 
@@ -13,30 +14,6 @@ def should_compact(history_len: int, sys_overhead: int, history_tokens: int, thr
     "should I compact" decision is computed exactly one way.
     """
     return history_len > 4 and (sys_overhead + history_tokens) > threshold
-
-
-def is_checkpoint_message(msg: Any) -> bool:
-    """Check if message is a compaction checkpoint or previous summary."""
-    if not isinstance(msg, dict):
-        return False
-    content = msg.get("content", "")
-    if isinstance(content, str):
-        return "<conversation-checkpoint>" in content or "<summary>" in content
-    if isinstance(content, list):
-        for part in content:
-            if isinstance(part, dict) and ("<conversation-checkpoint>" in str(part.get("text", "")) or "<summary>" in str(part.get("text", ""))):
-                return True
-    return False
-
-
-def is_system_note(msg: Any) -> bool:
-    """Check if message is a synthetic system note (e.g. interruption)."""
-    if not isinstance(msg, dict):
-        return False
-    content = msg.get("content", "")
-    if isinstance(content, str) and content.startswith("[System Note:"):
-        return True
-    return False
 
 
 def collect_user_messages(

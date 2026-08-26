@@ -28,9 +28,9 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         app.sm.get.return_value = None
         fresh_sess = MagicMock()
         fresh_sess.description = ""
+        fresh_sess.title = ""
         fresh_sess.messages = []
         app.sm.create_main.return_value = fresh_sess
-        app.sm._title_from_messages.return_value = "Untitled"
 
         def push_screen_mock(screen, callback):
             self.assertEqual(screen.current_title, "")
@@ -69,9 +69,9 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         app.current_session_id = "empty_sess"
         empty_sess = MagicMock()
         empty_sess.description = ""
+        empty_sess.title = "Untitled"
         empty_sess.messages = []
         app.sm.get.return_value = empty_sess
-        app.sm._title_from_messages.return_value = "Untitled"
 
         def push_screen_mock(screen, callback):
             self.assertEqual(screen.current_title, "")

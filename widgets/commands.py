@@ -422,6 +422,9 @@ class ForkCommand(BaseCommand):
                             w.cancel()
             except Exception:
                 pass
+            # Unlike /new and /rewind, fork deliberately does NOT kill background
+            # shell tasks or running subagents: the source session stays resumable
+            # and those tasks are app-scoped, so killing them would discard live work.
             app.is_generating = False
             if hasattr(app, "message_queue"):
                 app.message_queue.clear()
@@ -466,7 +469,7 @@ class RenameCommand(BaseCommand):
             app.notify("Session not found", severity="error")
             return
 
-        current_title = sess.description or app.sm._title_from_messages(sess)
+        current_title = sess.description or sess.title
         if current_title == "Untitled":
             current_title = ""
 

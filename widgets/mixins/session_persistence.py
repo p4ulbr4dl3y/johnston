@@ -4,8 +4,8 @@ import threading
 import time
 from typing import Optional
 
+from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.presentation.widgets.chat_container import ChatView
-from widgets.utils.message_visibility import is_ui_visible_user_message
 
 logger = logging.getLogger(__name__)
 

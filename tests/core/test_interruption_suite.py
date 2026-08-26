@@ -23,11 +23,11 @@ from core.application.generation.ai_generator import (
     generate_ai_response,
 )
 from core.base_provider import BaseAgent
-from core.base_provider.compaction import collect_user_messages, is_system_note
+from core.base_provider.compaction import collect_user_messages
+from core.domain.policies.messages import is_system_note, is_ui_visible_user_message
 from core.session_manager import AgentSession
 from widgets.chat_input import KEY_QUIT, ChatInput
 from widgets.chat_toolcall import ToolCallWidget
-from widgets.utils.message_visibility import is_ui_visible_user_message
 
 
 def _make_canvas(**overrides) -> GenCanvas:

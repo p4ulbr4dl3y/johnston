@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from core.domain.policies.messages import is_ui_visible_user_message
 from core.session_manager import SessionStore
-from widgets.utils.message_visibility import is_ui_visible_user_message
 
 
 def _make_store(test_dir: str, project_name: str = "my_project") -> SessionStore:
@@ -51,12 +51,12 @@ class TestSessionManager(unittest.TestCase):
             {"role": "tool", "tool_call_id": "1", "content": "ok"},
             {"role": "assistant", "content": "done"},
         ]
-        self.assertEqual(self.store._message_count(sess), 2)
+        self.assertEqual(self.store.get(sid).message_count, 2)
 
     def test_message_count_empty(self):
         sid = self.store.generate_session_id()
         sess = self.store.create_main(sid)
-        self.assertEqual(self.store._message_count(sess), 0)
+        self.assertEqual(sess.message_count, 0)
 
     def test_from_dict_preserves_canonical_messages(self):
         sess = self.store.create_subagent(parent_id="main", subagent_id="legacy-1", role="worker")
@@ -228,7 +228,7 @@ class TestSessionManagerPureReader(unittest.TestCase):
         sess.messages = [
             {"type": "user", "text": "The following skill(s) have been invoked: <SKILL>...", "display_text": "/caveman help"}
         ]
-        title = self.store._title_from_messages(sess)
+        title = sess.title
         self.assertEqual(title, "/caveman help")
 
     def test_add_event_deduplicates_consecutive_event_dividers(self):

@@ -9,6 +9,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Optional
 
+from core.domain.policies.messages import (
+    count_history_user_turns,
+    drop_stale_system_notes,
+    find_visible_user_cutoff,
+)
 from core.session_manager import SessionStore
 
 logger = logging.getLogger(__name__)
@@ -37,7 +42,7 @@ class CompactionOutcome:
     status: CompactionStatus
     message: str = ""
     title: str = ""
-    tokens: CompactionTokens = None
+    tokens: Optional[CompactionTokens] = None
 
     @property
     def success(self) -> bool:
@@ -278,7 +283,7 @@ async def get_session_diff(
 
 
 # ---------------------------------------------------------------------------
-# rewind_session
+# rewind helpers (_reset_token_counters, _truncate_transcript)
 # ---------------------------------------------------------------------------
 
 def _reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
@@ -305,42 +310,19 @@ def _truncate_transcript(session: Any, seq_idx: int) -> None:
     """Drop stored transcript events from the selected UI-visible user turn onward.
 
     ``seq_idx`` is the UI position of the selected user message (0-indexed over
-    visible user widgets). The transcript may contain non-visible user events
-    (``show_in_ui=False``, system notifications/notes), so the walk skips them
-    to keep the index space aligned with the UI.
+    visible user widgets). Which events count as a visible turn is defined by
+    the shared policy in ``core.domain.policies.messages``, keeping this index
+    space aligned with fork, checkpoints and the chat UI. A selection beyond
+    the last turn is a no-op.
     """
     if session is None or not getattr(session, "messages", None):
         return
-    messages = session.messages
-    visible = 0
-    cutoff = len(messages)
-    for idx, msg in enumerate(messages):
-        if not isinstance(msg, dict) or msg.get("type") != "user":
-            continue
-        if msg.get("show_in_ui") is False:
-            continue
-        text = str(msg.get("text", ""))
-        if text.startswith(("[System Notification]", "[System Note:")):
-            continue
-        if visible == seq_idx:
-            cutoff = idx
-            break
-        visible += 1
     if seq_idx == 0:
         session.messages = []
-    elif visible >= seq_idx:
-        kept = messages[:cutoff]
-        # Mirror the agent-history policy: drop stale interruption notes that
-        # are not real user turns.
-        session.messages = [
-            m
-            for m in kept
-            if not (
-                isinstance(m, dict)
-                and m.get("type") == "user"
-                and str(m.get("text", "")).startswith("[System Note:")
-            )
-        ]
+        return
+    cutoff = find_visible_user_cutoff(session.messages, seq_idx)
+    if cutoff is not None:
+        session.messages = drop_stale_system_notes(session.messages[:cutoff])
 
 
 # ---------------------------------------------------------------------------
@@ -407,15 +389,7 @@ def rewind_session(
         # messages in history, so only the tail can be truncated by index.
         # A selection inside the compacted region cannot be restored from
         # history and is rolled back to a clean slate.
-        real_tail = 0
-        for msg in agent.history:
-            if msg.get("role") == "user":
-                content = msg.get("content", "")
-                if isinstance(content, str) and (
-                    "<conversation-checkpoint>" in content or content.startswith("[System Note:")
-                ):
-                    continue
-                real_tail += 1
+        real_tail = count_history_user_turns(agent.history)
         tail_start = len(user_msgs) - real_tail
         if seq_idx >= tail_start:
             truncate_idx = max(0, seq_idx - tail_start)

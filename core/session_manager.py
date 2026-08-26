@@ -12,6 +12,10 @@ from core.domain.entities.session import (
     _coerce_float,
     _coerce_int,
 )
+from core.domain.policies.messages import (
+    history_before_turn,
+    transcript_before_turn,
+)
 from core.infrastructure.platform.paths import PROJECTS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json, atomic_write_jsonl, read_json
 from core.infrastructure.platform.session_lock import SessionLock
@@ -97,18 +101,6 @@ class AgentSession:
         self.project_dir: str = ""
         self.branch_name: str = ""
         self.background: bool = True
-
-    @property
-    def scratch_dir(self) -> str:
-        """Isolated scratchpad directory for this session's temporary files."""
-        if not self.project_key:
-            return SessionStore.get_instance().get_scratch_dir(self.id)
-        project_dir = os.path.join(PROJECTS_DIR, self.project_key)
-        scratch_base = os.path.join(project_dir, "scratch")
-        safe_id = os.path.basename(self.id or "default")
-        sdir = os.path.join(scratch_base, safe_id)
-        os.makedirs(sdir, exist_ok=True)
-        return sdir
 
     # -- live event streaming (subagents) ---------------------------------
 
@@ -388,6 +380,7 @@ class SessionStore:
 
         self._sessions: Dict[str, AgentSession] = {}
         self._active_locks: Dict[str, SessionLock] = {}
+        self._written_active_session_id: Optional[str] = None
         # In-memory cache of the parsed disk session tree, keyed by a signature
         # of (relpath, mtime_ns, size) across all session JSONL files. Avoids
         # re-reading/parsing every file on each list()/children() call.
@@ -569,53 +562,32 @@ class SessionStore:
                 sessions[sess.id] = sess
         except Exception:
             logger.warning("Failed to load session file: %s", fpath, exc_info=True)
-    def _read_session_summary_from_file(self, fpath: str) -> Optional[Dict[str, Any]]:
-        """Fast session summary read for list_main_sessions using unified AgentSession domain logic."""
-        sess = AgentSession.from_file(fpath)
-        if not sess or sess.kind != SessionKind.MAIN:
-            return None
-        if not sess.messages and not sess.agent_history:
-            return None
-        return sess.to_summary_dict()
-
     def list_main_sessions(self) -> List[Dict[str, Any]]:
-        """Return NON-EMPTY main sessions sorted by updated time (for /resume UI)."""
-        sessions = []
-        seen_ids = set()
+        """Return NON-EMPTY main sessions sorted by updated time (for /resume UI).
 
-        # 1. In-memory active sessions for the current project
+        Reads through the shared disk cache (signature-invalidated) instead of
+        re-parsing every JSONL file on each call; live in-memory sessions win
+        over their disk copies.
+        """
+        merged: Dict[str, AgentSession] = dict(self._load_disk_sessions())
         for sid, sess in self._sessions.items():
-            if sess.project_key == self.project_key and sess.kind == SessionKind.MAIN:
-                seen_ids.add(sid)
-                if not sess.messages and not sess.agent_history:
-                    continue
-                sessions.append(sess.to_summary_dict())
+            if sess.project_key == self.project_key:
+                merged[sid] = sess
 
-        # 2. Fast read from on-disk JSONL files
-        if os.path.isdir(self.sessions_dir):
-            for fname in sorted(os.listdir(self.sessions_dir)):
-                if fname.endswith(".jsonl"):
-                    sid = fname[:-6]
-                    if sid in seen_ids:
-                        continue
-                    fpath = os.path.join(self.sessions_dir, fname)
-                    summary = self._read_session_summary_from_file(fpath)
-                    if summary and summary.get("id"):
-                        sessions.append(summary)
+        sessions = []
+        for sess in merged.values():
+            # Guard parent_id too: legacy kind-less subagent files default to MAIN.
+            if sess.kind != SessionKind.MAIN or sess.parent_id:
+                continue
+            if not sess.messages and not sess.agent_history:
+                continue
+            summary = sess.to_summary_dict()
+            sid = summary.get("id")
+            summary["is_locked"] = self.is_session_locked(sid) if sid else False
+            sessions.append(summary)
 
         sessions.sort(key=lambda s: (s["updated_at"], s["created_at"], s["id"]), reverse=True)
-        for s in sessions:
-            sid = s.get("id")
-            s["is_locked"] = self.is_session_locked(sid) if sid else False
         return sessions
-
-    @staticmethod
-    def _title_from_messages(sess: AgentSession) -> str:
-        return sess.title
-
-    @staticmethod
-    def _message_count(sess: AgentSession) -> int:
-        return sess.message_count
 
     def children(self, parent_id: str) -> List[AgentSession]:
         return [s for s in self.list() if s.parent_id == parent_id]
@@ -662,9 +634,13 @@ class SessionStore:
         self._invalidate_disk_cache()
 
     def set_active_session_id(self, session_id: str) -> None:
+        # Skip the config rewrite when unchanged: saves call this on every write.
+        if session_id == self._written_active_session_id:
+            return
         cfg = read_json(self.config_file, {})
         cfg["active_session_id"] = session_id
         atomic_write_json(self.config_file, cfg)
+        self._written_active_session_id = session_id
 
     # -- search ---------------------------------------------------------------
 
@@ -826,47 +802,10 @@ class SessionStore:
                 new_sess.messages = []
                 new_sess.agent_history = []
             else:
-                visible = 0
-                cutoff = len(source.messages)
-                for idx, msg in enumerate(source.messages):
-                    if not isinstance(msg, dict) or msg.get("type") != "user":
-                        continue
-                    if msg.get("show_in_ui") is False:
-                        continue
-                    text = str(msg.get("text", ""))
-                    if text.startswith(("[System Notification]", "[System Note:")):
-                        continue
-                    if visible == seq_idx:
-                        cutoff = idx
-                        break
-                    visible += 1
-                kept_messages = source.messages[:cutoff]
-                new_sess.messages = copy.deepcopy(
-                    [
-                        m
-                        for m in kept_messages
-                        if not (
-                            isinstance(m, dict)
-                            and m.get("type") == "user"
-                            and str(m.get("text", "")).startswith("[System Note:")
-                        )
-                    ]
-                )
-
-                real_user_count = 0
-                history_cutoff = len(source.agent_history)
-                for idx, msg in enumerate(source.agent_history):
-                    if isinstance(msg, dict) and msg.get("role") == "user":
-                        content = msg.get("content", "")
-                        if isinstance(content, str) and (
-                            "<conversation-checkpoint>" in content or content.startswith("[System Note:")
-                        ):
-                            continue
-                        if real_user_count == seq_idx:
-                            history_cutoff = idx
-                            break
-                        real_user_count += 1
-                new_sess.agent_history = copy.deepcopy(source.agent_history[:history_cutoff])
+                # Turn positions are defined by the shared user-turn policy so a
+                # fork's cutoff always matches rewind and checkpoint indexing.
+                new_sess.messages = copy.deepcopy(transcript_before_turn(source.messages, seq_idx))
+                new_sess.agent_history = copy.deepcopy(history_before_turn(source.agent_history, seq_idx))
         new_sess.project_dir = source.project_dir
         new_sess.branch_name = source.branch_name
         self.save(new_sess)
