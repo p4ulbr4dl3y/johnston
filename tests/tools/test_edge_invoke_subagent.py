@@ -330,7 +330,7 @@ async def test_stream_completes_and_marks_completed():
     try:
         res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "greet", "branch": "main"}, app, store)
         assert sess.status == STATUS_COMPLETED
-        assert "<subagent" in res or "launched" in res
+        assert "[subagent" in res or "subagent" in res or "launched" in res
         app.trigger_ai_response.assert_called()  # notification fired
     finally:
         tmp.cleanup()
@@ -533,7 +533,7 @@ async def test_ctx_app_none_falls_back_to_singleton_store():
         with patch("core.session_manager.SessionStore.get_instance", return_value=store):
             res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
-            assert "<subagent" in res or res.startswith("subagent ")
+            assert "[subagent" in res or res.startswith("subagent ") or "subagent" in res
     finally:
         tmp.cleanup()
 
@@ -550,6 +550,7 @@ async def test_app_has_no_sm_uses_singleton():
         with patch("core.session_manager.SessionStore.get_instance", return_value=store):
             res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
+            assert "[subagent" in res or "subagent" in res
     finally:
         tmp.cleanup()
 

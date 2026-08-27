@@ -85,7 +85,7 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
                 False,
                 "dummy.py",
             )
-        self.assertIn('<hint file="dummy.py"', str(ctx.exception))
+        self.assertIn("Closest match in 'dummy.py'", str(ctx.exception))
 
     def test_match_failure_raises_formatted_tool_error(self):
         # Match errors must be FormattedToolError (pre-formatted ERR: text), not

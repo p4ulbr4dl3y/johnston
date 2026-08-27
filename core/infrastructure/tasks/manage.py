@@ -29,26 +29,25 @@ def list_lines(tasks: List[Any], *, header: str = "Active Background Tasks:") ->
     return "\n".join(lines)
 
 
-def format_tasks_xml(tasks: List[Any]) -> str:
-    """Render a canonical XML representation of tasks for LLM consumption."""
-    from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
+def format_tasks_plain(tasks: List[Any]) -> str:
+    """Render a canonical plain representation of tasks for LLM consumption."""
     if not tasks:
-        return '<bg_tasks total="0"/>'
+        return "no active background tasks"
 
     items = []
     for t in tasks:
-        tid = escape_xml_attr(str(getattr(t, "task_id", getattr(t, "id", ""))))
+        tid = str(getattr(t, "task_id", getattr(t, "id", "")))
         is_running = getattr(t, "is_running", True)
         status = "running" if is_running else "finished"
-        cmd = escape_xml_attr(str(getattr(t, "command", "")))
+        cmd = str(getattr(t, "command", ""))
         raw_log = getattr(t, "log_path", None)
-        attrs = [f'id="{tid}"', f'status="{status}"', f'cmd="{cmd}"']
-        if raw_log and str(raw_log).strip():
-            attrs.append(f'log="{escape_xml_attr(str(raw_log))}"')
-        items.append(f"  <task {' '.join(attrs)}/>")
+        log_part = f" | log: {raw_log}" if raw_log and str(raw_log).strip() else ""
+        items.append(f"- ID: {tid} | status: {status} | cmd: {cmd}{log_part}")
 
-    return f'<bg_tasks total="{len(tasks)}">\n' + "\n".join(items) + "\n</bg_tasks>"
+    return f"Active Background Tasks ({len(tasks)}):\n" + "\n".join(items)
+
+
+format_tasks_xml = format_tasks_plain
 
 
 def not_found_message(task_id: str, tasks: List[Any], manager_name: str) -> str:

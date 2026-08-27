@@ -101,9 +101,8 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
                 f"{i}|{line_item}" for i, line_item in enumerate(snippet_lines, start=start_snip)
             )
             return (
-                f'\n<hint file="{path}" line="{match_line_num}">\n'
-                f"{snippet_str}\n"
-                f"</hint>"
+                f"\nClosest match in '{path}' at line {match_line_num}:\n"
+                f"{snippet_str}"
             )
     return ""
 

@@ -39,7 +39,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_list_action(self):
         tool = ManageSubagentTool()
         res_empty = await tool.execute({"action": "list"})
-        self.assertEqual(res_empty.content, '<subagents total="0"/>')
+        self.assertEqual(res_empty.content, "no active subagents")
         self.assertIn("No subagent sessions found for current session", res_empty.display)
 
         self._mk_subagent("sub-1", "Search files", "find python files", role="explorer")

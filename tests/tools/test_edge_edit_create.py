@@ -288,7 +288,7 @@ class TestEditToolFiles(_Base):
             }
         ))
         self.assertIn("ERR:", res)
-        self.assertIn("<hint file=", res)
+        self.assertIn("Closest match in", res)
 
 
 # ---------------------------------------------------------------------------

@@ -218,7 +218,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         os.makedirs(empty_dir, exist_ok=True)
 
         res = await tool.execute({"path": empty_dir})
-        self.assertIn('total="0"', res.content)
+        self.assertIn("empty", res.content)
 
     async def test_read_directory_with_subdirs(self):
         tool = ReadTool()
@@ -324,7 +324,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
 
         res = await tool.execute({"path": file_path})
 
-        self.assertIn("converted_log=", res.content)
+        self.assertIn("converted_log: ", res.content)
         self.assertIn(".md", res.content)
 
         import asyncio
@@ -333,7 +333,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.05)
 
         # Extract path and verify file exists on disk
-        m = re.search(r'converted_log="([^"]+)"', res.content)
+        m = re.search(r'converted_log:\s*([^\]\s]+)', res.content)
         self.assertIsNotNone(m)
         saved_path = m.group(1)
         self.assertTrue(os.path.exists(saved_path))

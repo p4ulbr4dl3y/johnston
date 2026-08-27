@@ -237,11 +237,11 @@ class TestToolContextEdge(unittest.TestCase):
 class TestFormatLinePaginationEdge(unittest.TestCase):
     def test_empty_lines_zero_total(self):
         res = format_line_pagination([], total_lines=0)
-        self.assertEqual(res.content, '<file lines="0" total="0"/>')
+        self.assertEqual(res.content, '[empty file]')
 
     def test_empty_lines_positive_total(self):
         res = format_line_pagination([], total_lines=5)
-        self.assertIn('total="5"', res.content)
+        self.assertIn("of 5", res.content)
 
     def test_start_line_exceeds_total(self):
         res = format_line_pagination(["a"], total_lines=1, start_line=50)
@@ -258,11 +258,11 @@ class TestFormatLinePaginationEdge(unittest.TestCase):
 
     def test_window_shorter_than_total_lines_crash(self):
         res = format_line_pagination(["a", "b"], total_lines=5000, start_line=4900)
-        self.assertIn("total=\"5000\"", res.content)
+        self.assertIn("of 5000", res.content)
 
     def test_window_shorter_than_total_lines_near_end(self):
         res = format_line_pagination(["a", "b"], total_lines=5000, start_line=4999)
-        self.assertIn("total=\"5000\"", res.content)
+        self.assertIn("of 5000", res.content)
 
 
 class TestPathTraversalContext(unittest.TestCase):

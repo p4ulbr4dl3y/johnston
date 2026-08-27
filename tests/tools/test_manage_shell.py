@@ -62,7 +62,7 @@ def _app(make_app_mock, tasks=None, session_id=None):
 async def test_list_no_tasks(tool, make_app_mock):
     app = _app(make_app_mock, tasks=[])
     res = await tool.execute({"action": "list"}, ctx=app)
-    assert res.content == '<bg_tasks total="0"/>'
+    assert res.content == "no active background tasks"
     assert "no tasks active" in res.display
 
 
@@ -83,10 +83,10 @@ async def test_list_with_tasks(tool, make_app_mock):
     app = _app(make_app_mock, [t1, t2])
     res = await tool.execute({"action": "list"}, ctx=app)
     assert "Active Background Tasks" in res.display
-    assert 'id="t1"' in res.content
-    assert 'status="running"' in res.content
-    assert 'id="t2"' in res.content
-    assert 'status="finished"' in res.content
+    assert "ID: t1" in res.content
+    assert "status: running" in res.content
+    assert "ID: t2" in res.content
+    assert "status: finished" in res.content
 
 
 async def test_list_many_tasks_preserves_input_order(tool, make_app_mock):
@@ -115,8 +115,8 @@ async def test_background_task_already_finished_is_excluded_from_list(tool, make
     # Race: t1 finishes right before manage runs.
     t1.status = TaskStatus.COMPLETED
     res = await tool.execute({"action": "list"}, ctx=app)
-    assert 'id="tbkg"' in res.content
-    assert 'status="finished"' in res.content
+    assert "ID: tbkg" in res.content
+    assert "status: finished" in res.content
 
 
 async def test_no_task_manager_no_app(tool):

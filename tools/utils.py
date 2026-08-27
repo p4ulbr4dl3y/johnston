@@ -38,11 +38,8 @@ def format_line_pagination(
     window_start = window_start if window_start is not None else 1
     effective_window = min(len(lines), DEFAULT_LINE_WINDOW)
     if total_lines == 0:
-        from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-        p_attr = f' path="{escape_xml_attr(path)}"' if path else ""
-        xml = f"<file{p_attr} lines=\"0\" total=\"0\"/>"
-        return ToolResult.done(content=xml, display="")
+        p_info = f"{path}: " if path else ""
+        return ToolResult.done(content=f"[{p_info}empty file]", display="")
 
     if start_line is not None:
         start_line_int = try_int(start_line)
@@ -72,7 +69,7 @@ def format_line_pagination(
     else:
         end = min(total_lines, start + effective_window - 1)
 
-    xml_lines = []
+    out_lines = []
     current_len = 0
     actual_end = start - 1
     is_truncated = False
@@ -82,28 +79,27 @@ def format_line_pagination(
         if idx < 0 or idx >= len(lines):
             break
         raw_ln = lines[idx]
-        formatted_xml = f"{i}|{raw_ln}"
-        added_len = len(formatted_xml) + (1 if xml_lines else 0)
+        formatted_line = f"{i}|{raw_ln}"
+        added_len = len(formatted_line) + (1 if out_lines else 0)
         if current_len + added_len > max_chars:
-            if not xml_lines:
-                xml_lines.append(formatted_xml[:max_chars])
+            if not out_lines:
+                out_lines.append(formatted_line[:max_chars])
                 actual_end = i
             is_truncated = True
             break
-        xml_lines.append(formatted_xml)
+        out_lines.append(formatted_line)
         current_len += added_len
         actual_end = i
 
-    from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-    attrs = []
+    meta_parts = []
     if path:
-        attrs.append(f'path="{escape_xml_attr(path)}"')
-    attrs.extend([f'start="{start}"', f'end="{actual_end}"', f'total="{total_lines}"'])
+        meta_parts.append(path)
+    meta_parts.append(f"lines {start}..{actual_end} of {total_lines}")
     if is_truncated or actual_end < end:
-        attrs.append('truncated="1"')
+        meta_parts.append("truncated")
     if converted_path:
-        attrs.append(f'converted_log="{escape_xml_attr(converted_path)}"')
+        meta_parts.append(f"converted_log: {converted_path}")
 
-    xml_content = f"<file {' '.join(attrs)}>\n" + "\n".join(xml_lines) + "\n</file>"
-    return ToolResult.done(content=xml_content, display="")
+    header = f"[{' | '.join(meta_parts)}]"
+    content_str = f"{header}\n" + "\n".join(out_lines) if out_lines else header
+    return ToolResult.done(content=content_str, display="")

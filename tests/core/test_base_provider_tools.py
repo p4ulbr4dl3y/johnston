@@ -76,8 +76,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         await execute_tool("create", {"path": file_path, "content": "line1\nline2\nline3\nline4"})
 
         res_read = await execute_tool("read", {"path": file_path, "start_line": 2, "end_line": 3})
-        self.assertIn('start="2"', res_read.content)
-        self.assertIn('end="3"', res_read.content)
+        self.assertIn("lines 2..3 of 4", res_read.content)
         self.assertIn("2|line2", res_read.content)
         self.assertIn("3|line3", res_read.content)
         self.assertNotIn("line1", res_read.content)
@@ -104,7 +103,6 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         # Sync shell execution
         res_shell = await execute_tool("shell", {"command": "echo 'hello shell'"})
         self.assertIn("hello shell", res_shell.content)
-        self.assertIn("<cmd exit=", res_shell.content)
 
     async def test_manage_shell_tool(self):
         class DummyApp:
@@ -115,7 +113,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)
-        self.assertEqual(res_list.content, '<bg_tasks total="0"/>')
+        self.assertEqual(res_list.content, "no active background tasks")
 
     async def test_task_tool_foreground(self):
         import tempfile
@@ -147,8 +145,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res = await execute_tool(
             "invoke_subagent", {"prompt": "do research", "title": "research task", "branch": "main"}, app=app
         )
-        self.assertIn("<subagent", res.content)
-        self.assertIn('role="worker"', res.content)
+        self.assertIn("subagent started", res.content)
+        self.assertIn("role: worker", res.content)
 
     async def test_task_tool_background(self):
         import tempfile
@@ -192,8 +190,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             {"prompt": "bg task", "title": "bg job", "branch": "main"},
             app=app,
         )
-        self.assertIn("<subagent", res.content)
-        self.assertIn('role="worker"', res.content)
+        self.assertIn("subagent started", res.content)
+        self.assertIn("role: worker", res.content)
         sessions = _store.list(kind="subagent")
         self.assertEqual(len(sessions), 1)
         self.assertEqual(sessions[0].description, "bg job")

@@ -58,21 +58,21 @@ async def test_invalid_utf8_with_line_window(tmp_path, ctx):
 async def test_empty_file(tmp_path, ctx):
     p = wb(tmp_path, "empty.txt", b"")
     res = str(await ReadTool().execute({"path": p}, ctx=ctx))
-    assert 'lines="0"' in res or "0 lines" in res, res
+    assert "empty file" in res or "0 lines" in res, res
 
 
 @pytest.mark.asyncio
 async def test_empty_file_with_line_window(tmp_path, ctx):
     p = wb(tmp_path, "empty2.txt", b"")
     res = str(await ReadTool().execute({"path": p, "start_line": 1, "end_line": 5}, ctx=ctx))
-    assert 'lines="0"' in res or "0 lines" in res, res
+    assert "empty file" in res or "0 lines" in res, res
 
 
 @pytest.mark.asyncio
 async def test_file_no_trailing_newline_counts_as_line(tmp_path, ctx):
     p = wb(tmp_path, "nonl.txt", b"only one line")
     res = str(await ReadTool().execute({"path": p}, ctx=ctx))
-    assert 'total="1"' in res or "1 line" in res or "Lines 1-1 of 1" in res, res
+    assert "of 1" in res or "1 line" in res or "Lines 1-1 of 1" in res, res
 
 
 @pytest.mark.asyncio
@@ -194,7 +194,7 @@ async def test_path_with_quotes_and_escaped(ctx, tmp_path):
 async def test_directory_path_returns_listing(tmp_path, ctx):
     os.makedirs(os.path.join(tmp_path, "adir"), exist_ok=True)
     res = str(await ReadTool().execute({"path": os.path.join(tmp_path, "adir")}, ctx=ctx))
-    assert "<dir" in res or "is a directory" in res
+    assert "[dir:" in res or "is a directory" in res
 
 
 @pytest.mark.asyncio

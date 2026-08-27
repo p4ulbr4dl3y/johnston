@@ -291,7 +291,7 @@ async def test_main_sync_timeout_with_output(tool, make_app_mock, make_tool_cont
     ):
         res = await tool.execute({"command": "tail -f x", "timeout": 1}, ctx=ctx)
         assert "ERR: timeout 'shell': timed out after 1s" in str(res)
-        assert "<cmd>\n" in res.content
+        assert "Partial Output:" in res.content
         assert "Partial Output:" in res.display
         mock_term.assert_called_once()
 
@@ -468,7 +468,7 @@ async def test_explicit_run_in_background(tool, make_app_mock, make_tool_context
         patch.object(ShellTool, "_create_std_process", return_value=p),
     ):
         res = await tool.execute({"command": "tail -f log.txt", "background": True}, ctx=ctx)
-        assert "<bg_task" in res.content
+        assert "background task started" in res.content
         assert "[Background Task ID:" in res.display
         assert "moved to background." in res.display
         assert "Recent Output:" not in str(res.display)

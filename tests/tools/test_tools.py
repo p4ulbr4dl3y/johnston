@@ -78,8 +78,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Range read
         res_range = await tool.execute({"path": file_path, "start_line": 2, "end_line": 4})
-        self.assertIn('start="2"', res_range.content)
-        self.assertIn('end="4"', res_range.content)
+        self.assertIn("lines 2..4 of 5", res_range.content)
         self.assertIn("Line 2", res_range.content)
         self.assertNotIn("Line 5", res_range.content)
 
@@ -94,8 +93,8 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Directory read (should auto-list directory contents)
         dir_res = await tool.execute({"path": self.test_dir})
-        self.assertIn("<dir", dir_res.content)
-        self.assertIn("<f>sample.txt</f>", dir_res.content)
+        self.assertIn("[dir:", dir_res.content)
+        self.assertIn("sample.txt", dir_res.content)
 
         # Directory truncation test (>60 items)
         large_dir = os.path.join(self.test_dir, "large_folder")
@@ -104,8 +103,8 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             with open(os.path.join(large_dir, f"file_{i:02d}.txt"), "w") as f:
                 f.write("test")
         large_dir_res = await tool.execute({"path": large_dir})
-        self.assertIn('truncated="1"', large_dir_res.content)
-        self.assertIn('total="70"', large_dir_res.content)
+        self.assertIn("truncated", large_dir_res.content)
+        self.assertIn("total 70", large_dir_res.content)
 
         # External file outside workspace allowed
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as ext_f:
@@ -279,8 +278,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         lines = [f"line {i}" for i in range(1, 1500)]
         res = format_line_pagination(lines, start_line=1, end_line=1200)
-        self.assertIn('end="800"', res.content)
-        self.assertIn('total="1499"', res.content)
+        self.assertIn("lines 1..800 of 1499", res.content)
 
     async def test_format_line_pagination_char_limit_line_boundary(self):
         from tools.utils import format_line_pagination
@@ -288,8 +286,8 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         long_line = "x" * 100
         lines = [long_line for _ in range(500)]
         res = format_line_pagination(lines, start_line=1, end_line=500, max_chars=300)
-        self.assertIn('end="2"', res.content)
-        self.assertIn('truncated="1"', res.content)
+        self.assertIn("lines 1..2 of 500", res.content)
+        self.assertIn("truncated", res.content)
 
     async def test_ask_user_validation(self):
         from tools.ask_user import AskUserTool
@@ -413,9 +411,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         tool = ReadTool()
         res = await tool.execute({"path": file_path})
-        self.assertIn('start="1"', res.content)
-        self.assertIn('end="800"', res.content)
-        self.assertIn('total="1000"', res.content)
+        self.assertIn("lines 1..800 of 1000", res.content)
         self.assertIn("Line 800", res.content)
         self.assertNotIn("Line 801", res.content)
 

@@ -186,12 +186,12 @@ class ShellTool(BaseTool):
         ctx.add_background_task(task)
         task.start_reading(on_completed=callback)
 
-        xml_content = f'<bg_task id="{task_id}" log="{task.log_path}" status="running"/>'
+        plain_content = f"[background task started | id: {task_id} | log: {task.log_path}]"
         disp_content = _format_background_task_response(task_id, cmd, log_path=task.log_path)
         notice = _sandbox_fallback_notice(ctx)
         if notice:
             disp_content = notice + disp_content
-        return ToolResult(status=ToolResultStatus.RUNNING, content=xml_content, display=disp_content)
+        return ToolResult(status=ToolResultStatus.RUNNING, content=plain_content, display=disp_content)
 
     async def _run_sync(self, p: Any, ctx: Any, cmd: str, timeout: int) -> ToolResult:
         """Run a process synchronously: stream output into a bounded tail buffer,
@@ -235,10 +235,10 @@ class ShellTool(BaseTool):
                 elapsed = max(0.1, round(time.monotonic() - start_time, 1))
                 raw_out = task.get_formatted_output().strip()
                 recent_str = f"\n\nRecent Output:\n{tail_output(raw_out, max_chars=2000)}" if raw_out else None
-                xml_content = f'<bg_task id="{task_id}" log="{task.log_path}" status="running" elapsed="{elapsed}s"/>'
+                plain_content = f"[background task running | id: {task_id} | log: {task.log_path} | elapsed: {elapsed}s]"
                 return ToolResult(
                     status=ToolResultStatus.RUNNING,
-                    content=xml_content,
+                    content=plain_content,
                     display=_format_background_task_response(
                         task_id,
                         cmd,
@@ -258,15 +258,11 @@ class ShellTool(BaseTool):
             res = task.get_formatted_output()
             raw_rc = p.returncode if p.returncode is not None else getattr(task, "returncode", None)
             returncode = raw_rc if isinstance(raw_rc, int) else None
-            rc_attr = f' exit="{returncode}"' if returncode is not None else ' exit="0"'
-            elapsed_attr = f' elapsed="{elapsed}s"'
             if not res.strip():
-                xml_content = f"<cmd{rc_attr}{elapsed_attr}/>"
-                disp = f"(exit code {returncode})" if (returncode is not None and returncode != 0) else "(no output)"
-                return ToolResult.done(content=xml_content, display=disp, returncode=returncode)
-            truncated = _truncate_output(res)
-            xml_content = f"<cmd{rc_attr}{elapsed_attr}>\n{truncated.strip()}\n</cmd>"
-            return ToolResult.done(content=xml_content, display=truncated, returncode=returncode)
+                content_str = f"(exit code {returncode})" if (returncode is not None and returncode != 0) else "(no output)"
+                return ToolResult.done(content=content_str, display=content_str, returncode=returncode)
+            truncated = _truncate_output(res).strip()
+            return ToolResult.done(content=truncated, display=truncated, returncode=returncode)
         except asyncio.TimeoutError:
             await terminate_process(p)
             if read_task:
@@ -274,10 +270,9 @@ class ShellTool(BaseTool):
                     await asyncio.wait_for(read_task, timeout=1.0)
                 except Exception:
                     pass
-            raw_out = _truncate_output(task.get_formatted_output())
-            partial_str = f"\n<cmd>\n{raw_out.strip()}\n</cmd>" if raw_out.strip() else ""
-            disp_partial = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
-            disp = f"ERR: timeout 'shell': timed out after {timeout}s{disp_partial}"
+            raw_out = _truncate_output(task.get_formatted_output()).strip()
+            partial_str = f"\n\nPartial Output:\n{raw_out}" if raw_out else ""
+            disp = f"ERR: timeout 'shell': timed out after {timeout}s{partial_str}"
             return ToolResult.error("timeout", f"timed out after {timeout}s{partial_str}", name="shell", display=disp)
         except asyncio.CancelledError:
             await terminate_process(p)
