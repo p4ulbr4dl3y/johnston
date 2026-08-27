@@ -555,25 +555,26 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertTrue(show_in_ui)
         self.assertEqual(app.ai_kwargs[0].get("display_text"), "/johnston-guide")
-        self.assertIn('<active_skill name="johnston-guide" path=', prompt)
+        self.assertIn('<skill name="johnston-guide"', prompt)
 
     async def test_multiple_skills_command(self):
         from unittest.mock import patch
 
-        from core.application.skills.manager import Skill, SkillScope
+        from core.application.skills.manager import Skill, SkillManager, SkillScope
 
         app = MockApp()
         skill_a = Skill(name="foo", description="Foo", location="/tmp/foo/SKILL.md", content="Foo body", scope=SkillScope.GLOBAL, hidden=False)
         skill_b = Skill(name="bar", description="Bar", location="/tmp/bar/SKILL.md", content="Bar body", scope=SkillScope.GLOBAL, hidden=False)
-        with patch("core.application.skills.manager.SkillManager.get_skill", side_effect=lambda n: {"foo": skill_a, "bar": skill_b}.get(n)):
+        orig_get_skill = SkillManager.get_skill
+        with patch("core.application.skills.manager.SkillManager.get_skill", autospec=True, side_effect=lambda s, n, *a, **kw: {"foo": skill_a, "bar": skill_b}.get(n) or orig_get_skill(s, n, *a, **kw)):
             handled = await handle_slash_command(app, "/foo /bar analyze project")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
         prompt, show_in_ui = app.ai_prompts[0]
         self.assertTrue(show_in_ui)
         self.assertEqual(app.ai_kwargs[0].get("display_text"), "/foo /bar analyze project")
-        self.assertIn('<active_skill name="foo" path=', prompt)
-        self.assertIn('<active_skill name="bar" path=', prompt)
+        self.assertIn('<skill name="foo"', prompt)
+        self.assertIn('<skill name="bar"', prompt)
         self.assertIn('<user_request>', prompt)
         self.assertIn("analyze project", prompt)
 
