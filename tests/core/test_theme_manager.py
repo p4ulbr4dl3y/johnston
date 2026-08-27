@@ -41,8 +41,10 @@ def test_builtin_themes_presence():
     assert "rose-pine" in names
     assert "monokai-pro" in names
     assert "solarized-dark" in names
+    assert "github-dark" in names
+    assert "github-light" in names
     assert "zinc-light" in names
-    assert len(BUILTIN_THEMES) == 11
+    assert len(BUILTIN_THEMES) == 13
 
 
 def test_theme_manager_registration_and_switching():
@@ -54,9 +56,9 @@ def test_theme_manager_registration_and_switching():
     assert dracula.name == "dracula"
     assert tm.current_theme.name == "dracula"
 
-    gruvbox = tm.set_theme("gruvbox")
-    assert gruvbox.name == "gruvbox"
-    assert tm.current_theme.name == "gruvbox"
+    gh = tm.set_theme("github-dark")
+    assert gh.name == "github-dark"
+    assert tm.current_theme.name == "github-dark"
 
     # Switch to unknown theme raises ValueError
     with pytest.raises(ValueError, match="Unknown theme"):

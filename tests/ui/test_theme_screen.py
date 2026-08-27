@@ -21,9 +21,9 @@ async def test_theme_screen_composition():
         await app.push_screen(screen)
         await pilot.pause()
 
-        # Check options loaded
+        # Check options loaded (13 themes)
         opt_list = screen.query_one(f"#{screen.option_list_id}", HeaderWrapOptionList)
-        assert opt_list.option_count == 11
+        assert opt_list.option_count == 13
         assert opt_list.highlighted == 0
 
         # Move down and select dracula (index 1)

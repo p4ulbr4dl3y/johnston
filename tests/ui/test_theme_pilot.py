@@ -28,9 +28,9 @@ async def test_theme_modal_full_workflow():
         assert isinstance(app.screen, ThemeScreen)
         theme_screen = app.screen
 
-        # 4. Check options count (all 11 themes)
+        # 4. Check options count (all 13 themes)
         opt_list = theme_screen.query_one(f"#{theme_screen.option_list_id}", HeaderWrapOptionList)
-        assert opt_list.option_count == 11
+        assert opt_list.option_count == 13
         assert opt_list.highlighted == 0
 
         # 5. Navigate to Dracula (index 1) and press Enter
@@ -57,18 +57,18 @@ async def test_theme_modal_full_workflow():
         opt_list = theme_screen.query_one(f"#{theme_screen.option_list_id}", HeaderWrapOptionList)
         assert opt_list.highlighted == 1
 
-        # 9. Navigate down to Gruvbox (index 5) and select
-        for _ in range(4):
+        # 9. Navigate down to GitHub Dark (index 10) and select
+        for _ in range(9):
             await pilot.press("down")
-        assert opt_list.highlighted == 5
+        assert opt_list.highlighted == 10
         await pilot.press("enter")
         await pilot.pause()
 
-        # 10. Verify switched to Gruvbox Dark
+        # 10. Verify switched to GitHub Dark
         assert not isinstance(app.screen, ThemeScreen)
-        assert app.theme == "gruvbox"
-        assert theme_manager.current_theme.name == "gruvbox"
-        assert app.screen.styles.background.hex.upper() == "#282828"
+        assert app.theme == "github-dark"
+        assert theme_manager.current_theme.name == "github-dark"
+        assert app.screen.styles.background.hex.upper() == "#0D1117"
 
         # Restore zinc
         app.set_app_theme("zinc")
