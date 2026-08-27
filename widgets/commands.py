@@ -822,21 +822,34 @@ class ThemeCommand(BaseCommand):
         from widgets.presentation.screens.theme import ThemeScreen
 
         def on_theme_selected(selected: str | None) -> None:
-            if selected:
-                theme = theme_manager.get(selected)
-                if theme:
-                    if hasattr(app, "set_app_theme"):
-                        app.set_app_theme(theme.name)
-                    else:
-                        theme_manager.set_theme(theme.name)
-                        if hasattr(app, "theme"):
-                            app.theme = theme.name
-                            if hasattr(app, "refresh_css"):
-                                app.refresh_css()
-                    if hasattr(app, "notify"):
-                        app.notify(f"Theme switched to {theme.label}", severity="information")
+            if not selected:
+                if hasattr(app, "query_one"):
+                    try:
+                        app.query_one(MESSAGE_INPUT, ChatInput).focus()
+                    except Exception:
+                        pass
+                return
 
-        app.push_screen(ThemeScreen(), callback=on_theme_selected)
+            theme = theme_manager.get(selected)
+            if theme:
+                if hasattr(app, "set_app_theme"):
+                    app.set_app_theme(theme.name)
+                else:
+                    theme_manager.set_theme(theme.name)
+                    if hasattr(app, "theme"):
+                        app.theme = theme.name
+                        if hasattr(app, "refresh_css"):
+                            app.refresh_css()
+                if hasattr(app, "notify"):
+                    app.notify(f"Theme switched to {theme.label}", severity="information")
+
+            if hasattr(app, "query_one"):
+                try:
+                    app.query_one(MESSAGE_INPUT, ChatInput).focus()
+                except Exception:
+                    pass
+
+        app.push_screen(ThemeScreen(theme_manager.current_theme.name), callback=on_theme_selected)
 
 COMMAND_CLASSES = [
     ThemeCommand,

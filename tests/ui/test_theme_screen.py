@@ -17,20 +17,18 @@ class ThemeTestApp(App):
 async def test_theme_screen_composition():
     app = ThemeTestApp()
     async with app.run_test() as pilot:
-        screen = ThemeScreen()
+        screen = ThemeScreen("zinc")
         await app.push_screen(screen)
         await pilot.pause()
 
         # Check options loaded
         opt_list = screen.query_one(f"#{screen.option_list_id}", HeaderWrapOptionList)
-        assert opt_list.option_count >= 5
+        assert opt_list.option_count == 6
+        assert opt_list.highlighted == 0
 
-        # Check search filtering
-        search_input = screen.query_one("#modal-search-input", Input)
-        search_input.value = "dracula"
-        await pilot.pause()
-
-        assert opt_list.option_count == 1
+        # Move down and select dracula (index 1)
+        await pilot.press("down")
+        assert opt_list.highlighted == 1
 
         # Cancel
         await pilot.press("escape")

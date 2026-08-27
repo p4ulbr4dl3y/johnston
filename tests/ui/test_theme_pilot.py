@@ -28,27 +28,24 @@ async def test_theme_modal_full_workflow():
         assert isinstance(app.screen, ThemeScreen)
         theme_screen = app.screen
 
-        # 4. Check options and active badge
+        # 4. Check options count
         opt_list = theme_screen.query_one(f"#{theme_screen.option_list_id}", HeaderWrapOptionList)
         assert opt_list.option_count == 6
+        assert opt_list.highlighted == 0
 
-        # 5. Search for "dracula"
-        search_input = theme_screen.query_one("#modal-search-input")
-        search_input.value = "dracula"
-        await pilot.pause()
-        assert opt_list.option_count == 1
-
-        # 6. Select Dracula via Enter
+        # 5. Navigate to Dracula (index 1) and press Enter
+        await pilot.press("down")
+        assert opt_list.highlighted == 1
         await pilot.press("enter")
         await pilot.pause()
 
-        # 7. Verify modal dismissed and theme switched to Dracula
+        # 6. Verify modal dismissed and theme switched to Dracula
         assert not isinstance(app.screen, ThemeScreen)
         assert app.theme == "dracula"
         assert theme_manager.current_theme.name == "dracula"
         assert app.screen.styles.background.hex.upper() == "#282A36"
 
-        # 8. Open via /themes alias
+        # 7. Open via /themes alias
         input_widget.text = "/themes"
         await pilot.press("enter")
         await pilot.pause()
@@ -56,10 +53,14 @@ async def test_theme_modal_full_workflow():
         assert isinstance(app.screen, ThemeScreen)
         theme_screen = app.screen
 
-        # 9. Search "tokyo" and select
-        search_input = theme_screen.query_one("#modal-search-input")
-        search_input.value = "tokyo"
-        await pilot.pause()
+        # 8. Dracula should now be highlighted (index 1)
+        opt_list = theme_screen.query_one(f"#{theme_screen.option_list_id}", HeaderWrapOptionList)
+        assert opt_list.highlighted == 1
+
+        # 9. Navigate down to Tokyo Night (index 3) and select
+        await pilot.press("down")
+        await pilot.press("down")
+        assert opt_list.highlighted == 3
         await pilot.press("enter")
         await pilot.pause()
 
