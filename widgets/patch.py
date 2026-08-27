@@ -210,6 +210,18 @@ def apply_textual_patches() -> None:
 
     RichVisual.render_strips = _new_rich_visual_render_strips
 
+    from textual.app import App
+
+    from core.domain.defaults.themes import ZINC_DARK
     from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
+
+    _old_get_theme_variable_defaults = getattr(App, 'get_theme_variable_defaults', lambda self: {})
+
+    def _patched_get_theme_variable_defaults(self) -> dict[str, str]:
+        res = dict(ZINC_DARK.tcss_vars)
+        res.update(_old_get_theme_variable_defaults(self))
+        return res
+
+    App.get_theme_variable_defaults = _patched_get_theme_variable_defaults
 
     _apply_chat_markdown_patches()
