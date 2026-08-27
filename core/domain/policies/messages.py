@@ -22,6 +22,7 @@ TRANSCRIPT_HIDDEN_PREFIXES = (
     "[System Notification]",
     "[System Note:",
     "<system_note",
+    "<notification",
     "<task_notification",
     "<system_notification",
 )
@@ -92,6 +93,7 @@ HISTORY_CHECKPOINT_MARKERS = ("<conversation_checkpoint>", "<summary>")
 HISTORY_NOTE_PREFIX = (
     "[System Note:",
     "<system_note",
+    "<notification",
     "<task_notification",
     "<system_notification",
 )

@@ -13,7 +13,6 @@ from core.infrastructure.platform.platform_utils import (
     shell_subprocess_kwargs,
     terminate_process,
 )
-from core.infrastructure.tasks.output import tail_output
 from core.infrastructure.tasks.shell_task import ShellTask
 from tools.base import BaseTool, truncate_output
 
@@ -45,7 +44,7 @@ def _new_task_id() -> str:
     return f"shell_{time.time_ns()}_{next(_TASK_ID_COUNTER)}"
 
 
-def _attach_shell_widget(host, task_id: str, widget) -> None:
+def _attach_shell_widget(host, task_id: str, widget, log_path: str = None) -> None:
     """Link the shell tool card to the task for the completion repaint.
 
     Live chunks stream to the card through the task's output listeners; this
@@ -55,26 +54,12 @@ def _attach_shell_widget(host, task_id: str, widget) -> None:
     if host is None or widget is None:
         return
     setattr(widget, "background_task_id", task_id)
+    if log_path:
+        setattr(widget, "log_path", log_path)
     reg = getattr(host, "_background_shell_widgets", None)
     if reg is None:
         reg = host._background_shell_widgets = {}
     reg[task_id] = widget
-
-
-def _format_background_task_response(
-    task_id: str,
-    cmd: str,
-    recent_output_str: str = None,
-    log_path: str = None,
-    by_user: bool = False,
-    elapsed: float = None,
-) -> str:
-    """Formats a background task status response."""
-    log_hint = f"\nFull Log: {log_path} (live; inspect via tail/grep)" if log_path else ""
-    suffix = f" by user after {elapsed}s" if by_user and elapsed is not None else (" by user" if by_user else "")
-    if recent_output_str is None:
-        return f"[Background Task ID: {task_id}] '{cmd}' moved to background{suffix}.{log_hint}"
-    return f"[Background Task ID: {task_id}] '{cmd}' moved to background{suffix}.{recent_output_str}{log_hint}"
 
 
 def _truncate_output(res: str) -> str:
@@ -179,7 +164,7 @@ class ShellTool(BaseTool):
         target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         if target_widget is not None:
             task.add_listener(target_widget.append_shell_output)
-        _attach_shell_widget(ctx.host, task_id, target_widget)
+        _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
         task.is_background = True
         task.open_log()
@@ -187,11 +172,10 @@ class ShellTool(BaseTool):
         task.start_reading(on_completed=callback)
 
         plain_content = f"[background task started | id: {task_id} | log: {task.log_path}]"
-        disp_content = _format_background_task_response(task_id, cmd, log_path=task.log_path)
         notice = _sandbox_fallback_notice(ctx)
         if notice:
-            disp_content = notice + disp_content
-        return ToolResult(status=ToolResultStatus.RUNNING, content=plain_content, display=disp_content)
+            plain_content = notice + plain_content
+        return ToolResult(status=ToolResultStatus.RUNNING, content=plain_content)
 
     async def _run_sync(self, p: Any, ctx: Any, cmd: str, timeout: int) -> ToolResult:
         """Run a process synchronously: stream output into a bounded tail buffer,
@@ -232,21 +216,25 @@ class ShellTool(BaseTool):
             if task.background_event.is_set() or getattr(task, "is_background", False):
                 task.is_background = True
                 task.open_log()
+                if target_widget is not None and task.log_path:
+                    setattr(target_widget, "log_path", task.log_path)
                 elapsed = max(0.1, round(time.monotonic() - start_time, 1))
                 raw_out = task.get_formatted_output().strip()
-                recent_str = f"\n\nRecent Output:\n{tail_output(raw_out, max_chars=2000)}" if raw_out else None
-                plain_content = f"[background task running | id: {task_id} | log: {task.log_path} | elapsed: {elapsed}s]"
+                if raw_out:
+                    truncated = truncate_output(
+                        raw_out, max_chars=2000, tool_name="shell", save_log=False, from_end=True
+                    ).strip()
+                    plain_content = (
+                        f"[background task moved to background by user | id: {task_id} | log: {task.log_path} | elapsed: {elapsed}s]\n\n"
+                        f"Recent Output:\n{truncated}"
+                    )
+                else:
+                    plain_content = (
+                        f"[background task moved to background by user | id: {task_id} | log: {task.log_path} | elapsed: {elapsed}s | no output yet]"
+                    )
                 return ToolResult(
                     status=ToolResultStatus.RUNNING,
                     content=plain_content,
-                    display=_format_background_task_response(
-                        task_id,
-                        cmd,
-                        recent_output_str=recent_str,
-                        log_path=task.log_path,
-                        by_user=True,
-                        elapsed=elapsed,
-                    ),
                 )
 
             if read_task:

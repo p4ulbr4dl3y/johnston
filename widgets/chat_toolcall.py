@@ -625,13 +625,13 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     pass
                 self._shell_update_handle = None
             self._shell_update_scheduled = False
-            is_bg_banner = "[Background Task ID:" in cleaned
+            is_bg_banner = "[Background Task ID:" in cleaned or "[background task" in cleaned
             if is_bg_banner:
-                bg_m = re.search(r"Background Task ID:\s*([^\s\]]+)", cleaned)
-                if bg_m:
+                bg_m = re.search(r"(?:Background Task ID:|id:)\s*([^\s\]\|]+)", cleaned)
+                if bg_m and not self.background_task_id:
                     self.background_task_id = bg_m.group(1)
-                log_m = re.search(r"Full Log:\s*([^\s\(\)]+)", cleaned)
-                if log_m:
+                log_m = re.search(r"(?:Full Log:|log:)\s*([^\s\(\)\|]+)", cleaned)
+                if log_m and not self.log_path:
                     self.log_path = log_m.group(1)
             # A background transition emits a transient RUNNING banner.
             # Never overwrite card content (live output or empty) with this system message.

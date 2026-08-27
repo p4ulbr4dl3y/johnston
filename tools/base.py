@@ -72,28 +72,25 @@ def get_fuzzy_matches(word: str, possibilities: list[str], n: int = 3, cutoff: f
 
 
 def format_background_notification(
-    kind: str,
-    name: str,
+    type_: str,
+    title: str,
     task_id: str,
     result: str,
-    *,
-    follow_up: Optional[str] = None,
 ) -> str:
     """Unified template for background-task completion notifications.
 
     Emitted as a synthetic user message when a background shell/subagent finishes:
-    `<task_notification kind="..." name="..." id="..." [follow_up="..."]>\n...\n</task_notification>`
+    `<notification type="..." id="..." title="...">\n...\n</notification>`
     """
     from core.infrastructure.runtime.xml_utils import escape_xml_attr
 
-    escaped_kind = escape_xml_attr(kind)
-    escaped_name = escape_xml_attr(name)
+    escaped_type = escape_xml_attr(type_)
+    escaped_title = escape_xml_attr(title)
     escaped_id = escape_xml_attr(task_id)
-    fu_attr = f' follow_up="{escape_xml_attr(follow_up)}"' if follow_up else ""
     return (
-        f'<task_notification kind="{escaped_kind}" name="{escaped_name}" id="{escaped_id}"{fu_attr}>\n'
+        f'<notification type="{escaped_type}" id="{escaped_id}" title="{escaped_title}">\n'
         f"{result}\n"
-        f"</task_notification>"
+        f"</notification>"
     )
 
 

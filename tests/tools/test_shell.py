@@ -222,10 +222,58 @@ async def test_move_to_background_during_sync_execution(tool, make_app_mock, mak
         task.move_to_background()
 
         res = await exec_task
-        assert "moved to background by user after" in str(res.display)
-        assert "Recent Output:\nserver started on port 8080" in str(res.display)
+        assert "background task moved to background by user" in res.content
+        assert "Recent Output:\nserver started on port 8080" in res.content
         assert task.is_background
         assert len([t for t in app.task_manager]) == 1
+
+
+async def test_move_to_background_no_output(tool, make_app_mock, make_tool_context):
+    app = _app(make_app_mock, task_manager=TaskManager())
+    ctx = make_tool_context(app=app)
+    p = _process(wait_result=asyncio.Future(), stdout=None)
+    p.returncode = None
+
+    with (
+        patch.object(ShellTool, "_create_std_process", return_value=p),
+        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+    ):
+        exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
+        await asyncio.sleep(0.02)
+
+        tasks = [t for t in app.task_manager]
+        assert len(tasks) == 1
+        tasks[0].move_to_background()
+
+        res = await exec_task
+        assert "background task moved to background by user" in res.content
+        assert "no output yet" in res.content
+        assert "Recent Output:" not in res.content
+
+
+async def test_move_to_background_truncated_output(tool, make_app_mock, make_tool_context):
+    app = _app(make_app_mock, task_manager=TaskManager())
+    ctx = make_tool_context(app=app)
+    p = _process(wait_result=asyncio.Future(), stdout=None)
+    p.returncode = None
+
+    with (
+        patch.object(ShellTool, "_create_std_process", return_value=p),
+        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+    ):
+        exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
+        await asyncio.sleep(0.02)
+
+        tasks = [t for t in app.task_manager]
+        tasks[0].output.append("line\n" * 1000)
+        tasks[0].move_to_background()
+
+        res = await exec_task
+        assert "background task moved to background by user" in res.content
+        assert "Recent Output:" in res.content
+        assert "Truncated: last 2000 chars" in res.content
 
 
 async def test_main_sync_task_visible_and_running_while_alive(tool, make_app_mock, make_tool_context):
@@ -469,9 +517,6 @@ async def test_explicit_run_in_background(tool, make_app_mock, make_tool_context
     ):
         res = await tool.execute({"command": "tail -f log.txt", "background": True}, ctx=ctx)
         assert "background task started" in res.content
-        assert "[Background Task ID:" in res.display
-        assert "moved to background." in res.display
-        assert "Recent Output:" not in str(res.display)
         assert len([t for t in app.task_manager]) == 1
 
 
@@ -487,7 +532,7 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
     mgr = ManageShellTool()
     with patch("tools.shell.shell_executable", return_value="/bin/sh"):
         res = await tool.execute({"command": "cat", "background": True}, ctx=app)
-    m = re.search(r'(?:Task ID: |id=")(shell_\d+_\d+)', str(res.content) + " " + str(res.display))
+    m = re.search(r'(?:Task ID: |id:\s*|id=")(shell_\d+_\d+)', str(res.content) + " " + str(res.display))
     assert m is not None
     task_id = m.group(1)
 

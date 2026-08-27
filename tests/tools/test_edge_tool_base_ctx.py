@@ -75,18 +75,13 @@ class TestFormatEdge(unittest.TestCase):
 
     def test_background_no_result(self):
         res = format_background_notification("kind", "name", "id", "")
-        self.assertIn('<task_notification kind="kind" name="name" id="id">\n\n</task_notification>', res)
+        self.assertIn('<notification type="kind" id="id" title="name">\n\n</notification>', res)
 
     def test_background_unicode(self):
         res = format_background_notification("к", "имя", "1", "résultat")
-        self.assertIn('name="имя"', res)
-
-    def test_background_with_follow_up(self):
-        res = format_background_notification(
-            "subagent", "test", "sub-1", "done", follow_up="manage_subagent(action='send_message')"
-        )
-        self.assertIn('follow_up="manage_subagent(action=&apos;send_message&apos;)"', res)
-        self.assertIn("done", res)
+        self.assertIn('title="имя"', res)
+        self.assertIn('type="к"', res)
+        self.assertIn("résultat", res)
 
 
 class TestResolvePathEdge(unittest.TestCase):

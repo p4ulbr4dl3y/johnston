@@ -54,7 +54,7 @@ class TestSubagentWorktreeManager(unittest.TestCase):
             self.repo_dir, wt_path, branch_name
         )
         self.assertTrue(has_changes)
-        self.assertIn("Worktree edit", diff_summary)
+        self.assertIn("branch 'feature-test-wt'", diff_summary)
 
         # Cleanup keeping branch
         SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=True)
@@ -108,8 +108,7 @@ class TestSubagentWorktreeManager(unittest.TestCase):
             self.repo_dir, wt_path, branch_name
         )
         self.assertTrue(has_changes)
-        self.assertIn("manual.txt", diff_summary)
-        self.assertIn("Manual commit contents", diff_summary)
+        self.assertIn("branch 'feature-manual-commit'", diff_summary)
 
         # Cleanup preserving branch
         SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=has_changes)
@@ -139,8 +138,7 @@ class TestSubagentWorktreeManager(unittest.TestCase):
             self.repo_dir, wt_path, branch_name
         )
         self.assertTrue(has_changes)
-        self.assertIn("feature.py", diff_summary)
-        self.assertIn("Updated README", diff_summary)
+        self.assertIn("branch 'feature-e2e-merge'", diff_summary)
 
         # Cleanup worktree directory, preserving branch
         SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=has_changes)
@@ -267,7 +265,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         self.assertEqual(diff_summary, "")
         self.assertFalse(has_changes)
 
-    def test_diff_truncated_at_4000(self):
+    def test_diff_summary_format(self):
         from unittest.mock import patch
 
         def fake_run(args, **kwargs):
@@ -275,7 +273,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
             if args and args[0] == "rev-parse":
                 return subprocess.CompletedProcess(args, 0, stdout="abc123", stderr="")
-            return subprocess.CompletedProcess(args, 0, stdout="x" * 5000, stderr="")
+            return subprocess.CompletedProcess(args, 0, stdout="file.py\n", stderr="")
 
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
@@ -285,8 +283,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
                 self.repo_dir, self.repo_dir, "branch-x"
             )
         self.assertTrue(has_changes)
-        self.assertIn("... [diff truncated]", diff_summary)
-        self.assertLessEqual(len(diff_summary), 4200)
+        self.assertIn("Changes saved on branch 'branch-x'", diff_summary)
 
     def test_get_worktree_diff_summary_exception(self):
         from unittest.mock import patch
@@ -329,7 +326,6 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         ):
             wt, branch = SubagentWorktreeManager.append_worktree_diff_to_acc(self.repo_dir, wt_path, "subagent-x", acc)
         self.assertEqual((wt, branch), (None, None))
-        self.assertIn("branch 'subagent-x'", acc[0])
         self.assertIn("Some diff", acc[0])
         mock_cleanup.assert_called_once_with(self.repo_dir, wt_path, "subagent-x", keep_branch=True)
 
@@ -347,7 +343,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
                 self.repo_dir, wt_path, "subagent-x", acc, is_followup=True
             )
         self.assertEqual((wt, branch), (None, None))
-        self.assertIn("Changes updated on branch 'subagent-x'", acc[0])
+        self.assertIn("Fu diff", acc[0])
         mock_cleanup.assert_called_once_with(self.repo_dir, wt_path, "subagent-x", keep_branch=True)
 
     def test_append_worktree_diff_to_acc_no_changes_returns_paths(self):

@@ -92,7 +92,7 @@ class InvokeSubagentTool(BaseTool):
                         "description": (
                             "Git branch name for worktree isolation. MUST be used for parallel write/edit tasks "
                             "to avoid file conflicts. Runs in an isolated worktree. On completion, changes stay on "
-                            "this branch and diff/status is returned in the notification for you to `git merge <branch>`. "
+                            "this branch for you to `git merge <branch>`. "
                             "If omitted or same as current branch, runs directly in main workspace."
                         ),
                     },
@@ -209,7 +209,6 @@ class InvokeSubagentTool(BaseTool):
             title,
             session_id,
             "{result_text}",
-            follow_up=f"manage_subagent(action='send_message', session_id='{session_id}', message='...')",
         )
 
         bg_task = asyncio.create_task(
