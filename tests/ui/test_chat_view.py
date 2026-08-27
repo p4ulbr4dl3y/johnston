@@ -569,22 +569,36 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(current, [f"msg_{i}" for i in range(12)])
             chat_view._is_loading_session = False
 
-    async def test_watch_scroll_y_triggers_load_older(self):
+    async def test_scroll_up_triggers_load_older(self):
         chat_view = ChatView()
         chat_view._unloaded_messages = [{"type": "user", "text": "older"}]
         chat_view.load_older_messages = MagicMock()
+        chat_view.scroll_page_up = MagicMock()
+        chat_view.scroll_home = MagicMock()
 
         # scroll_y > 2 does not trigger
-        chat_view.watch_scroll_y(10.0, 5.0)
-        chat_view.load_older_messages.assert_not_called()
+        with patch.object(type(chat_view), "scroll_y", new_callable=PropertyMock, return_value=10):
+            with patch.object(type(chat_view), "max_scroll_y", new_callable=PropertyMock, return_value=20):
+                chat_view.on_mouse_scroll_up(MagicMock())
+                chat_view.load_older_messages.assert_not_called()
 
-        # initial stationary scroll_y <= 2 (old_val == new_val) does not trigger
-        chat_view.watch_scroll_y(0.0, 0.0)
-        chat_view.load_older_messages.assert_not_called()
+        # scroll_y <= 2 triggers load_older_messages on scroll up
+        with patch.object(type(chat_view), "scroll_y", new_callable=PropertyMock, return_value=1):
+            with patch.object(type(chat_view), "max_scroll_y", new_callable=PropertyMock, return_value=20):
+                chat_view.on_mouse_scroll_up(MagicMock())
+                chat_view.load_older_messages.assert_called_once()
 
-        # scroll_y <= 2 while scrolling up triggers
-        chat_view.watch_scroll_y(5.0, 1.0)
-        chat_view.load_older_messages.assert_called_once()
+        chat_view.load_older_messages.reset_mock()
+        with patch.object(type(chat_view), "scroll_y", new_callable=PropertyMock, return_value=1):
+            with patch.object(type(chat_view), "max_scroll_y", new_callable=PropertyMock, return_value=20):
+                chat_view.scroll_up_page()
+                chat_view.load_older_messages.assert_called_once()
+
+        chat_view.load_older_messages.reset_mock()
+        with patch.object(type(chat_view), "scroll_y", new_callable=PropertyMock, return_value=1):
+            with patch.object(type(chat_view), "max_scroll_y", new_callable=PropertyMock, return_value=20):
+                chat_view.scroll_to_top()
+                chat_view.load_older_messages.assert_called_once()
 
     async def test_restore_message_all_types(self):
         chat_view = ChatView()

@@ -116,6 +116,8 @@ class ChatView(VerticalScroll):
         # keeps a single wheel tick from being undone by the next stream flush.
         if self.max_scroll_y > 0:
             self._auto_follow = False
+        if self.scroll_y <= 2 and self.has_older_messages() and not self._is_loading_older and not self._is_loading_session:
+            self.load_older_messages()
 
     def on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
         # The framework's own scroll for this tick runs after this handler;
@@ -134,6 +136,8 @@ class ChatView(VerticalScroll):
         """Scroll chat up by one page and pause auto-follow."""
         if self.max_scroll_y > 0:
             self._auto_follow = False
+        if self.scroll_y <= 2 and self.has_older_messages() and not self._is_loading_older and not self._is_loading_session:
+            self.load_older_messages()
         self.scroll_page_up(animate=False)
 
     def scroll_down_page(self) -> None:
@@ -145,6 +149,8 @@ class ChatView(VerticalScroll):
         """Scroll chat to top and pause auto-follow."""
         if self.max_scroll_y > 0:
             self._auto_follow = False
+        if self.has_older_messages() and not self._is_loading_older and not self._is_loading_session:
+            self.load_older_messages()
         self.scroll_home(animate=False)
 
     def scroll_to_bottom(self) -> None:
@@ -194,16 +200,6 @@ class ChatView(VerticalScroll):
                     pass
             self._has_welcome = False
 
-    def watch_scroll_y(self, old_val: float, new_val: float) -> None:
-        if (
-            new_val <= 2
-            and old_val > new_val
-            and self.has_older_messages()
-            and not self._is_loading_older
-            and not self._is_loading_session
-        ):
-            self.load_older_messages()
-
     def has_older_messages(self) -> bool:
         """True if there are older session messages that haven't been mounted yet."""
         return bool(self._unloaded_messages)
@@ -249,18 +245,28 @@ class ChatView(VerticalScroll):
             self._unloaded_messages = self._unloaded_messages[: -self.PAGE_SIZE]
             anchor = next((c for c in self.children if not isinstance(c, WelcomeWidget)), None)
             task_mgr = getattr(getattr(self, "app", None), "task_manager", None)
+            old_max_y = self.max_scroll_y
+            old_scroll_y = self.scroll_y
+
             if anchor is None:
                 for msg in chunk:
                     await self.restore_message(msg, task_manager=task_mgr)
             else:
                 for msg in chunk:
                     await self.restore_message(msg, before=anchor, task_manager=task_mgr)
-                if anchor.is_attached:
+
+                def _compensate_scroll():
                     try:
-                        self.scroll_to_widget(anchor, top=True, animate=False)
-                        self.call_after_refresh(lambda: self.scroll_to_widget(anchor, top=True, animate=False))
+                        delta = max(0, self.max_scroll_y - old_max_y)
+                        target_y = old_scroll_y + delta
+                        self.scroll_to(y=target_y, animate=False)
                     except Exception:
                         pass
+
+                if hasattr(self, "call_after_refresh"):
+                    self.call_after_refresh(_compensate_scroll)
+                else:
+                    _compensate_scroll()
         except Exception as e:
             logger.warning("Failed loading older chat messages: %s", e)
         finally:
