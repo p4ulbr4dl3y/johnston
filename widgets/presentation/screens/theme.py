@@ -10,19 +10,12 @@ class ThemeScreen(BaseSelectionScreen[str]):
 
     def __init__(self, current_theme: str | None = None) -> None:
         current = current_theme or theme_manager.current_theme.name
-        theme_items = [
-            ("zinc", "Zinc Dark"),
-            ("dracula", "Dracula"),
-            ("catppuccin-mocha", "Catppuccin Mocha"),
-            ("tokyo-night", "Tokyo Night"),
-            ("nord", "Nord"),
-            ("zinc-light", "Zinc Light"),
-        ]
-        items = [item for item, _ in theme_items]
+        themes = theme_manager.list_themes()
+        items = [t.name for t in themes]
         options = []
-        for item, label in theme_items:
-            prefix = f"{status_tag('ACTIVE')} " if item == current else "  "
-            options.append(f"{prefix}{label}")
+        for t in themes:
+            prefix = f"{status_tag('ACTIVE')} " if t.name == current else "  "
+            options.append(f"{prefix}{t.label}")
         super().__init__(
             "### **Select Theme**",
             options,
