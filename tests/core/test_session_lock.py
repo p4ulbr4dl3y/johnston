@@ -76,14 +76,24 @@ class TestSessionLock(unittest.TestCase):
         self.assertIsNone(meta)
 
     def test_steal_lock(self):
-        # Mock probe and kill to test stealing
+        # Mock probe and kill to test stealing. On Windows the holder is
+        # terminated via taskkill rather than os.kill, so assert the right
+        # mechanism for the platform.
         with patch.object(SessionLock, "probe", return_value=(True, {"pid": 12345, "hostname": platform.node()})):
-            with patch("os.kill") as mock_kill:
-                stolen = SessionLock.steal(self.lock_path)
-                self.assertIsNotNone(stolen)
-                self.assertTrue(stolen._is_owner)
-                mock_kill.assert_called()
-                stolen.release()
+            if os.name == "nt":
+                with patch("subprocess.run") as mock_run:
+                    stolen = SessionLock.steal(self.lock_path)
+                    self.assertIsNotNone(stolen)
+                    self.assertTrue(stolen._is_owner)
+                    mock_run.assert_called()
+                    stolen.release()
+            else:
+                with patch("os.kill") as mock_kill:
+                    stolen = SessionLock.steal(self.lock_path)
+                    self.assertIsNotNone(stolen)
+                    self.assertTrue(stolen._is_owner)
+                    mock_kill.assert_called()
+                    stolen.release()
 
 
 class TestSessionStoreLockingAndFork(unittest.TestCase):

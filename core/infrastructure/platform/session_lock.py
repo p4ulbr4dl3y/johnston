@@ -61,7 +61,9 @@ class SessionLock:
             except Exception:
                 pass
 
-            # Write lock metadata
+            # Write lock metadata. A sidecar <lock>.meta mirrors it so other
+            # handles can read holder info on Windows, where msvcrt blocks the
+            # locked byte region from a second open()/read().
             payload = {
                 "pid": os.getpid(),
                 "created_at": time.time(),
@@ -72,6 +74,11 @@ class SessionLock:
                 os.lseek(fd, 0, os.SEEK_SET)
                 os.write(fd, json.dumps(payload).encode("utf-8"))
                 os.fsync(fd)
+            except OSError:
+                pass
+            try:
+                with open(self.lock_path + ".meta", "w", encoding="utf-8") as _f:
+                    json.dump(payload, _f)
             except OSError:
                 pass
 
@@ -133,15 +140,18 @@ class SessionLock:
             test_lock.release()
             return False, None
 
-        # Lock is held — read metadata if possible
+        # Lock is held — read holder metadata. Prefer the sidecar (readable on
+        # Windows even while byte 0 is locked) and fall back to the lock file.
         meta: Optional[Dict[str, Any]] = None
-        try:
-            with open(lock_path, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-                if content:
-                    meta = json.loads(content)
-        except Exception:
-            pass
+        for candidate in (lock_path + ".meta", lock_path):
+            try:
+                with open(candidate, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        meta = json.loads(content)
+                        break
+            except Exception:
+                continue
 
         return True, meta
 

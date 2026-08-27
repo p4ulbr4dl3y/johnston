@@ -350,7 +350,9 @@ class GitCheckpointManager:
 
             sid_prefix = f"{cls.REF_PREFIX}/{session_id}/"
             archive_prefix = f"{cls.ARCHIVE_PREFIX}/{session_id}/"
-            stdin_cmds = []
+            # Individual update-ref calls (not `--stdin`) — git-for-Windows can
+            # reject `update-ref --stdin` input with a parse error, which would
+            # silently skip the ref moves and leave checkpoints restorable.
             for line in refs_res.stdout.splitlines():
                 line = line.strip()
                 if not line:
@@ -366,16 +368,8 @@ class GitCheckpointManager:
                     continue
                 if idx > target_message_index:
                     if sha:
-                        stdin_cmds.append(f"update {archive_prefix}{idx} {sha}")
-                    stdin_cmds.append(f"delete {ref}")
-
-            if stdin_cmds:
-                run_git(
-                    ["update-ref", "--stdin"],
-                    cwd=shadow_dir,
-                    input="\n".join(stdin_cmds) + "\n",
-                    timeout=5.0,
-                )
+                        run_git(["update-ref", f"{archive_prefix}{idx}", sha], cwd=shadow_dir, timeout=5.0)
+                    run_git(["update-ref", "-d", ref], cwd=shadow_dir, timeout=5.0)
 
             cls._prune_expired_archives(shadow_dir)
 
