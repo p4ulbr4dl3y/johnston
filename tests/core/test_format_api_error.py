@@ -251,7 +251,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         res = self.mixin._sanitize_vision_error_messages(messages)
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0]["role"], "user")
-        self.assertIn('<system_note type="warning">', res[0]["content"])
+        self.assertIn("<system_note>Images omitted: vision unsupported</system_note>", res[0]["content"])
 
     def test_sanitize_user_text_and_image_preserves_text(self):
         messages = [
@@ -267,7 +267,7 @@ class TestErrorHandlingMixin(unittest.TestCase):
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0]["role"], "user")
         self.assertIn("What is in this image?", res[0]["content"])
-        self.assertIn('<system_note type="warning">', res[0]["content"])
+        self.assertIn("<system_note>Images omitted: vision unsupported</system_note>", res[0]["content"])
 
     def test_sanitize_user_without_image_kept(self):
         messages = [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]

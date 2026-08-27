@@ -160,7 +160,7 @@ class TestRetryableErrors(unittest.IsolatedAsyncioTestCase):
         user_msg = sanitized[3]
         self.assertEqual(user_msg["role"], "user")
         self.assertIn("Preview:", user_msg["content"])
-        self.assertIn('<system_note type="warning">', user_msg["content"])
+        self.assertIn("<system_note>Images omitted: vision unsupported</system_note>", user_msg["content"])
         # Verify tool content was replaced with hint
         tool_msg = sanitized[2]
         self.assertEqual(tool_msg["role"], "tool")

@@ -273,7 +273,7 @@ class ErrorHandlingMixin:
                         if isinstance(item, dict) and item.get("type") == "text" and item.get("text")
                     ]
                     clean_text = "\n".join(text_parts).strip()
-                    note = '<system_note type="warning">User attached image(s), but this model does not support vision.</system_note>'
+                    note = "<system_note>Images omitted: vision unsupported</system_note>"
                     combined_text = f"{clean_text}\n{note}".strip() if clean_text else note
                     sanitized.append({"role": "user", "content": combined_text})
                     continue
