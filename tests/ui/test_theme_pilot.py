@@ -25,17 +25,17 @@ async def test_theme_modal_live_preview_and_confirm():
 
         assert isinstance(app.screen, ThemeScreen)
 
-        # 3. Navigate down to Catppuccin Mocha -> LIVE PREVIEW!
+        # 3. Navigate down to Charcoal Dark (#1E1E1E) -> LIVE PREVIEW!
+        await pilot.press("down")
+        await pilot.pause()
+        assert app.theme == "charcoal"
+        assert theme_manager.current_theme.name == "charcoal"
+
+        # 4. Navigate down to Catppuccin Mocha -> LIVE PREVIEW!
         await pilot.press("down")
         await pilot.pause()
         assert app.theme == "catppuccin-mocha"
         assert theme_manager.current_theme.name == "catppuccin-mocha"
-
-        # 4. Navigate down to Catppuccin Macchiato -> LIVE PREVIEW!
-        await pilot.press("down")
-        await pilot.pause()
-        assert app.theme == "catppuccin-macchiato"
-        assert theme_manager.current_theme.name == "catppuccin-macchiato"
 
         # 5. Press Escape -> CANCEL & REVERT to Zinc Dark!
         await pilot.press("escape")
@@ -52,16 +52,16 @@ async def test_theme_modal_live_preview_and_confirm():
 
         assert isinstance(app.screen, ThemeScreen)
 
-        # 7. Navigate down to Catppuccin Mocha and press Enter -> CONFIRM & SAVE!
+        # 7. Navigate down to Charcoal Dark and press Enter -> CONFIRM & SAVE!
         await pilot.press("down")
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
 
         assert not isinstance(app.screen, ThemeScreen)
-        assert app.theme == "catppuccin-mocha"
-        assert theme_manager.current_theme.name == "catppuccin-mocha"
-        assert app.screen.styles.background.hex[:7].upper() == "#1E1E2E"
+        assert app.theme == "charcoal"
+        assert theme_manager.current_theme.name == "charcoal"
+        assert app.screen.styles.background.hex[:7].upper() == "#1E1E1E"
 
         # Restore zinc
         app.set_app_theme("zinc")

@@ -32,6 +32,7 @@ def test_theme_entity_creation():
 def test_builtin_themes_presence():
     names = {t.name for t in BUILTIN_THEMES}
     assert "zinc" in names
+    assert "charcoal" in names
     assert "catppuccin-mocha" in names
     assert "catppuccin-macchiato" in names
     assert "catppuccin-latte" in names
@@ -51,7 +52,7 @@ def test_builtin_themes_presence():
     assert "nord" in names
     assert "one-dark" in names
     assert "zinc-light" in names
-    assert len(BUILTIN_THEMES) == 20
+    assert len(BUILTIN_THEMES) == 21
 
 
 def test_theme_manager_registration_and_switching():
@@ -59,9 +60,9 @@ def test_theme_manager_registration_and_switching():
     assert tm.current_theme.name == "zinc"
 
     # Switch theme
-    kanagawa = tm.set_theme("kanagawa-wave")
-    assert kanagawa.name == "kanagawa-wave"
-    assert tm.current_theme.name == "kanagawa-wave"
+    charcoal = tm.set_theme("charcoal")
+    assert charcoal.name == "charcoal"
+    assert tm.current_theme.name == "charcoal"
 
     gh = tm.set_theme("github-dark")
     assert gh.name == "github-dark"
@@ -110,8 +111,8 @@ def test_theme_persistence(tmp_path, monkeypatch):
 
     assert load_theme_config(cfg_file) is None
 
-    save_theme_config("kanagawa-wave", cfg_file)
-    assert load_theme_config(cfg_file) == "kanagawa-wave"
+    save_theme_config("charcoal", cfg_file)
+    assert load_theme_config(cfg_file) == "charcoal"
 
     save_theme_config("nord", cfg_file)
     assert load_theme_config(cfg_file) == "nord"
