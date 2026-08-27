@@ -5,21 +5,21 @@ from core.infrastructure.tasks.manager import TaskManager
 from tools.context import ToolContext
 
 
-class MockAgent:
+class DummyAgent:
     def __init__(self):
         self.role = "action"
 
 
 class MockProviderManager:
     def create_active_agent(self):
-        return MockAgent()
+        return DummyAgent()
 
 
-class MockApp:
+class DummyApp:
     def __init__(self):
         self.status_refreshed = False
         self.task_manager = TaskManager()
-        self.agent = MockAgent()
+        self.agent = DummyAgent()
         self.pm = MockProviderManager()
 
     def refresh_status_footer(self):
@@ -28,7 +28,7 @@ class MockApp:
 
 class TestToolContext(unittest.TestCase):
     def test_context_delegates_to_app(self):
-        app = MockApp()
+        app = DummyApp()
         ctx = ToolContext(app)
 
         task = MagicMock()
@@ -45,7 +45,7 @@ class TestToolContext(unittest.TestCase):
         self.assertIsNone(ctx.create_agent())
 
     def test_add_background_task_registers_in_manager(self):
-        app = MockApp()
+        app = DummyApp()
         ctx = ToolContext(app)
         task = MagicMock()
         task.task_id = "task_new"
@@ -77,10 +77,10 @@ class TestToolContextAdvanced(unittest.TestCase):
         ctx.trigger_ai_response("noop")  # should not raise
 
     def test_create_agent_with_pm(self):
-        app = MockApp()
+        app = DummyApp()
         ctx = ToolContext(app)
         agent = ctx.create_agent()
-        self.assertIsInstance(agent, MockAgent)
+        self.assertIsInstance(agent, DummyAgent)
 
     def test_create_agent_no_pm(self):
         class NoPmApp:
@@ -89,6 +89,31 @@ class TestToolContextAdvanced(unittest.TestCase):
         ctx = ToolContext(NoPmApp())
         self.assertIsNone(ctx.create_agent())
 
+    def test_sandbox_enabled_inherited_from_app_for_subagent(self):
+        app = DummyApp()
+        app.sandbox_enabled = False
+        ctx = ToolContext(app, is_subagent=True)
+        self.assertFalse(ctx.sandbox_enabled)
+
+        app.sandbox_enabled = True
+        ctx_on = ToolContext(app, is_subagent=True)
+        self.assertTrue(ctx_on.sandbox_enabled)
+
+    def test_sandbox_enabled_from_agent_app_wrapper(self):
+        app = DummyApp()
+        app.sandbox_enabled = True
+        agent = DummyAgent()
+        agent.app = app
+        agent.is_subagent = True
+        ctx = ToolContext(agent)
+        self.assertTrue(ctx.sandbox_enabled)
+        self.assertTrue(ctx.is_subagent)
+
+        app.sandbox_enabled = False
+        ctx_off = ToolContext(agent)
+        self.assertFalse(ctx_off.sandbox_enabled)
+
 
 if __name__ == "__main__":
     unittest.main()
+
