@@ -163,7 +163,8 @@ class EditTool(BaseTool):
                     },
                     "new_str": {
                         "type": "string",
-                        "description": "New replacement text. Use empty string to delete old_str.",
+                        "description": "New replacement text. Omit or set to empty string to delete old_str.",
+                        "default": "",
                     },
                     "replace_all": {
                         "type": "boolean",
@@ -171,7 +172,7 @@ class EditTool(BaseTool):
                         "default": False,
                     },
                 },
-                "required": ["path", "old_str", "new_str"],
+                "required": ["path", "old_str"],
             },
         },
     }
