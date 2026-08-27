@@ -1,4 +1,4 @@
-"""Theme selection screen with live preview and confirm-on-enter design."""
+"""Theme selection screen with live preview, search filter, and confirm-on-enter."""
 
 from textual.widgets import OptionList
 
@@ -8,7 +8,7 @@ from widgets.presentation.screens.base_selection import BaseSelectionScreen
 
 
 class ThemeScreen(BaseSelectionScreen[str]):
-    """Compact content-hugging modal screen with live theme preview on navigation."""
+    """Modal screen for selecting UI color themes with search and live preview."""
 
     def __init__(self, current_theme: str | None = None) -> None:
         current = current_theme or theme_manager.current_theme.name
@@ -20,19 +20,21 @@ class ThemeScreen(BaseSelectionScreen[str]):
             prefix = f"{status_tag('ACTIVE')} " if t.name == current else "  "
             options.append(f"{prefix}{t.label}")
         super().__init__(
-            "### **Select Theme**",
-            options,
-            items,
-            current,
-            show_search=False,
-            fit_content=True,
+            title="### **Select Theme**",
+            options=options,
+            items=items,
+            default_value=current,
+            show_search=True,
+            search_placeholder="Search themes...",
+            hint_text="enter: select • ↑↓: nav • esc: cancel",
+            dialog_classes="modal-dialog-medium",
         )
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
-        """Live preview theme as user scrolls/navigates options without persisting."""
-        if event.option_index is not None and 0 <= event.option_index < len(self.raw_items):
-            preview_theme = self.raw_items[event.option_index]
-            if hasattr(self.app, "set_app_theme"):
+        """Live preview theme as user scrolls or searches without persisting."""
+        if event.option_index is not None and 0 <= event.option_index < len(self.filtered_items):
+            preview_theme = self.filtered_items[event.option_index]
+            if preview_theme and hasattr(self.app, "set_app_theme"):
                 self.app.set_app_theme(preview_theme, persist=False)
 
     def action_cancel(self) -> None:
