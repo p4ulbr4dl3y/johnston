@@ -522,3 +522,94 @@ class TestChatViewAutoFollow(unittest.IsolatedAsyncioTestCase):
         bot3.content = "   "
         view._nodes = [user, bot1, bot2, bot3]
         self.assertEqual(view.get_last_bot_message_text(), "Second bot message")
+
+
+class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
+    async def test_pagination_initial_load_and_older_chunks(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            chat_view.PAGE_SIZE = 5
+
+            # Prepare 12 messages
+            msgs = [{"type": "user", "text": f"msg_{i}"} for i in range(12)]
+            chat_view._unloaded_messages = msgs[:-5]
+
+            # Mount initial latest 5 (indices 7..11) while loading session
+            chat_view._is_loading_session = True
+            for m in msgs[-5:]:
+                await chat_view.restore_message(m)
+            chat_view._is_loading_session = False
+            await pilot.pause()
+
+            # Now manually verify chunk loading
+            chat_view._is_loading_session = True
+            self.assertTrue(chat_view.has_older_messages())
+            self.assertEqual(len(chat_view._unloaded_messages), 7)
+            # Check currently mounted user messages
+            current = [text for _, text in chat_view.get_user_messages()]
+            self.assertEqual(current, [f"msg_{i}" for i in range(7, 12)])
+
+            # Trigger loading older chunk (indices 2..6)
+            await chat_view._load_older_messages_worker()
+            await pilot.pause()
+
+            self.assertTrue(chat_view.has_older_messages())
+            self.assertEqual(len(chat_view._unloaded_messages), 2)
+            current = [text for _, text in chat_view.get_user_messages()]
+            self.assertEqual(current, [f"msg_{i}" for i in range(2, 12)])
+
+            # Trigger loading final older chunk (indices 0..1)
+            await chat_view._load_older_messages_worker()
+            await pilot.pause()
+
+            self.assertFalse(chat_view.has_older_messages())
+            self.assertEqual(len(chat_view._unloaded_messages), 0)
+            current = [text for _, text in chat_view.get_user_messages()]
+            self.assertEqual(current, [f"msg_{i}" for i in range(12)])
+            chat_view._is_loading_session = False
+
+    async def test_watch_scroll_y_triggers_load_older(self):
+        chat_view = ChatView()
+        chat_view._unloaded_messages = [{"type": "user", "text": "older"}]
+        chat_view.load_older_messages = MagicMock()
+
+        # scroll_y > 2 does not trigger
+        chat_view.watch_scroll_y(10.0, 5.0)
+        chat_view.load_older_messages.assert_not_called()
+
+        # scroll_y <= 2 triggers
+        chat_view.watch_scroll_y(5.0, 1.0)
+        chat_view.load_older_messages.assert_called_once()
+
+    async def test_restore_message_all_types(self):
+        chat_view = ChatView()
+        chat_view._wait_until_attached = AsyncMock()
+        chat_view.mount = AsyncMock()
+
+        # user
+        u = await chat_view.restore_message({"type": "user", "text": "hi"})
+        self.assertIsInstance(u, UserMessage)
+
+        # bot
+        b = await chat_view.restore_message({"type": "bot", "text": "ans"})
+        self.assertIsInstance(b, BotMessage)
+
+        # thinking
+        t = await chat_view.restore_message({"type": "thinking", "duration": 2.0, "text": "think"})
+        self.assertIsInstance(t, ThinkingWidget)
+
+        # tool
+        tool = await chat_view.restore_message({"type": "tool", "tool_type": "shell", "target": "ls", "result_text": "ok"})
+        self.assertIsInstance(tool, ToolCallWidget)
+
+        # event divider
+        d = await chat_view.restore_message({"type": "event_divider", "text": "Compacted"})
+        self.assertIsInstance(d, EventDivider)
+
+        # invalid / hidden
+        none_msg = await chat_view.restore_message("not-a-dict")
+        self.assertIsNone(none_msg)
+
+        hidden_msg = await chat_view.restore_message({"type": "user", "text": "hi", "show_in_ui": False})
+        self.assertIsNone(hidden_msg)

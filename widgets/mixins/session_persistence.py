@@ -2,9 +2,8 @@ import asyncio
 import logging
 import threading
 import time
-from typing import Optional
+from typing import Any, Optional
 
-from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.presentation.widgets.chat_container import ChatView
 
 logger = logging.getLogger(__name__)
@@ -49,76 +48,30 @@ class SessionPersistenceMixin:
         for child in list(chat_view.children):
             child.remove()
 
-        # Restore complete element history in UI (user, bot, thinking, tool)
+        # Restore complete element history in UI (user, bot, thinking, tool) with pagination
         saved_msgs = session.messages
 
-        async def _restore_messages(msgs: list):
+        from widgets.presentation.widgets.chat_container import restore_message_item
+
+        async def _restore_messages(msgs: Any):
             try:
-                for msg in msgs:
+                msg_list = list(msgs) if msgs is not None else []
+                raw_page_size = getattr(chat_view, "PAGE_SIZE", 50)
+                page_size = raw_page_size if isinstance(raw_page_size, int) else 50
+                if len(msg_list) > page_size:
+                    chat_view._unloaded_messages = msg_list[:-page_size]
+                    msgs_to_render = msg_list[-page_size:]
+                else:
+                    chat_view._unloaded_messages = []
+                    msgs_to_render = msg_list
+
+                task_mgr = getattr(self, "task_manager", None)
+                for msg in msgs_to_render:
                     if not isinstance(msg, dict):
                         continue
                     try:
-                        mtype = msg.get("type")
-                        if mtype == "user":
-                            if not is_ui_visible_user_message(msg):
-                                continue
-                            text = msg.get("display_text") or msg.get("text", "")
-                            att_count = msg.get("attachments_count", 0)
-                            if not att_count and msg.get("attachments"):
-                                att_count = len(msg.get("attachments"))
-                            await chat_view.add_user_message(
-                                text,
-                                animate=False,
-                                attachments_count=att_count,
-                            )
-                        elif mtype == "bot":
-                            text = msg.get("text", "")
-                            if not text.strip():
-                                continue
-                            bm = await chat_view.add_bot_message(animate=False)
-                            await bm.set_final_content(text)
-                        elif mtype == "thinking":
-                            dur = msg.get("duration", 0.0)
-                            txt = msg.get("text", "")
-                            tw = await chat_view.add_thinking_widget(animate=False)
-                            tw.finish_thinking(dur, txt)
-                        elif mtype == "tool":
-                            ttype = msg.get("tool_type", "")
-                            target = msg.get("target", "")
-                            rtext = msg.get("result_text", "")
-                            targs = msg.get("args", {})
-                            status = msg.get("status")
-                            if not ttype and not target and not targs and status == "cancelled":
-                                continue
-                            if status == "running":
-                                task_id = None
-                                if "[Background Task ID:" in (rtext or ""):
-                                    import re
-
-                                    bg_m = re.search(r"Background Task ID:\s*([^\s\]]+)", rtext)
-                                    if bg_m:
-                                        task_id = bg_m.group(1)
-                                mgr = getattr(self, "task_manager", None)
-                                is_live = bool(task_id and mgr is not None and getattr(mgr, "_tasks", {}).get(task_id) is not None)
-                                if not is_live:
-                                    status = "done" if rtext else "cancelled"
-                            elif not status and not rtext:
-                                status = "cancelled"
-                            await chat_view.add_tool_call(
-                                ttype,
-                                target,
-                                result_text=rtext,
-                                args=targs,
-                                status=status,
-                                returncode=msg.get("returncode"),
-                                animate=False,
-                            )
-                        elif mtype == "event_divider":
-                            ctxt = msg.get("text", "Session Compacted")
-                            await chat_view.add_event_divider(ctxt, animate=False)
-                        elif mtype == "status_change":
-                            pass
-                        if len(chat_view.children) % 5 == 0:
+                        await restore_message_item(chat_view, msg, task_manager=task_mgr)
+                        if len(getattr(chat_view, "children", [])) % 5 == 0:
                             await asyncio.sleep(0)
                     except Exception as err:
                         logger.warning("Error restoring UI message item: %s", err)
@@ -128,12 +81,14 @@ class SessionPersistenceMixin:
                 except Exception:
                     pass
 
-            chat_view.check_welcome()
+            if hasattr(chat_view, "check_welcome") and callable(chat_view.check_welcome):
+                chat_view.check_welcome()
             await asyncio.sleep(0.15)
             chat_view._is_loading_session = False
             chat_view.loading = False
             try:
-                chat_view.call_after_refresh(chat_view.scroll_end, animate=False)
+                if hasattr(chat_view, "call_after_refresh") and callable(chat_view.call_after_refresh):
+                    chat_view.call_after_refresh(chat_view.scroll_end, animate=False)
             except Exception:
                 pass
 
