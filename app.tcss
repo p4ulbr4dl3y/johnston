@@ -676,7 +676,7 @@ ModalScreen {
     margin-bottom: 0;
 }
 
-#wizard-summary,
+#wizard-summary-scroll,
 #rewind-files {
     display: none;
     width: 100%;
@@ -1005,7 +1005,7 @@ ModalScreen OptionList > .option-list--option-hover {
 #write-in-input,
 #write-in-input:focus {
     margin: 0;
-    padding: 0 1 0 5;
+    padding: 0 1;
 }
 
 #modal-dialog #reject-reason-input,

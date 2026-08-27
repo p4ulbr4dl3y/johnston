@@ -293,7 +293,9 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
                     raw_target = f"{item} {opt_text}".lower()
                     norm_target = self._norm_targets.get(idx)
                     if norm_target is None:
-                        norm_target = _NORMALIZE_RE.sub(" ", raw_target)
+                        spaced = _NORMALIZE_RE.sub(" ", raw_target)
+                        stripped = _NORMALIZE_RE.sub("", raw_target)
+                        norm_target = f"{spaced} {stripped}"
                         if len(self._norm_targets) >= 512:
                             self._norm_targets.clear()
                         self._norm_targets[idx] = norm_target

@@ -206,6 +206,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             try:
                 summary_scroll = self.query_one("#wizard-summary-scroll", ToolScrollBox)
                 summary_scroll.display = False
+                summary_static.display = False
             except Exception:
                 pass
             q = self.questions[self.q_idx]
@@ -258,6 +259,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                     add_gap = has_multi and idx < len(self.options) - 1
                     opt_list.add_option(format_wizard_option(tag, opt, width=wrap_width, add_gap=add_gap))
 
+                input_field.placeholder = "Type custom answer and press Enter..."
                 opt_list.highlighted = highlight_idx
                 if highlight_idx == len(self.options) - 1:
                     self.focus_write_in_input()
@@ -267,6 +269,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
 
             else:
                 opt_list.display = False
+                input_field.placeholder = "Type your answer and press Enter..."
                 input_field.display = True
                 input_field.value = prev_answer
                 input_field.focus()
@@ -276,6 +279,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             title_md.add_class("confirm-summary")
             title_md.update("### **Confirm Your Answers**")
             summary_static.update(format_ask_user_display(self.questions, self.answers))
+            summary_static.display = True
             summary_scroll = self.query_one("#wizard-summary-scroll")
             summary_scroll.display = True
             opt_list.display = False
@@ -335,7 +339,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             try:
                 summary_scroll = self.query_one("#wizard-summary-scroll")
                 summary_overhead = 4 if screen_h < 18 else 6
-                summary_scroll.styles.max_height = max(3, usable_h - summary_overhead)
+                max_sum_h = 10 if screen_h < 18 else 14
+                summary_scroll.styles.max_height = max(3, min(max_sum_h, usable_h - summary_overhead))
             except Exception:
                 pass
         except Exception:
@@ -351,7 +356,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             hint = self.query_one(MODAL_HINT, Label)
             if self.q_idx >= len(self.questions):
                 hint.update(
-                    "enter • ← • ↑↓ • esc" if is_compact else "enter: confirm • ←: back • ↑↓/PgUp: scroll • esc: cancel"
+                    "enter • ← • ↑↓ • esc" if is_compact else "enter: confirm • ←: back • ↑↓/pgup: scroll • esc: cancel"
                 )
                 return
 
@@ -525,17 +530,21 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
 
     def _on_key(self, event: events.Key) -> None:
         if self.q_idx >= len(self.questions):
-            if event.key in ("up", "down", "pageup", "pagedown"):
+            if event.key in ("up", "down", "pageup", "pagedown", "home", "end", "j", "k"):
                 try:
                     scroll_box = self.query_one("#wizard-summary-scroll", ToolScrollBox)
-                    if event.key == "up":
+                    if event.key in ("up", "k"):
                         scroll_box.scroll_up(animate=False)
-                    elif event.key == "down":
+                    elif event.key in ("down", "j"):
                         scroll_box.scroll_down(animate=False)
                     elif event.key == "pageup":
                         scroll_box.scroll_page_up(animate=False)
                     elif event.key == "pagedown":
                         scroll_box.scroll_page_down(animate=False)
+                    elif event.key == "home":
+                        scroll_box.scroll_home(animate=False)
+                    elif event.key == "end":
+                        scroll_box.scroll_end(animate=False)
                     event.prevent_default()
                     event.stop()
                     return

@@ -121,14 +121,12 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
-            yield Markdown("", id="providers-key-current", classes=MODAL_MARKDOWN)
             yield Input(placeholder="API Key...", password=True, id="providers-key-input")
             yield Label(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         super().on_mount()
         try:
-            self.query_one("#providers-key-current", Markdown).display = False
             self.query_one("#providers-key-input", Input).display = False
         except Exception:
             pass
@@ -187,30 +185,21 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
         except Exception:
             pass
 
-        try:
-            curr_md = self.query_one("#providers-key-current", Markdown)
-            if curr_key:
-                if len(curr_key) > 8:
-                    masked = f"{curr_key[:4]}...{curr_key[-4:]}"
-                else:
-                    masked = curr_key
-                curr_md.update(f"Current API Key: `{masked}`")
-                curr_md.display = True
+        if curr_key:
+            if len(curr_key) > 8:
+                masked = f"{curr_key[:4]}...{curr_key[-4:]}"
             else:
-                curr_md.display = False
-        except Exception:
-            pass
+                masked = curr_key
+            placeholder = masked
+        else:
+            placeholder = "API Key..."
 
         try:
             key_inp = self.query_one("#providers-key-input", Input)
+            key_inp.placeholder = placeholder
             key_inp.value = ""
             key_inp.display = True
             key_inp.focus()
-            try:
-                from textual.widgets._input import Selection
-                key_inp.selection = Selection(0, 0)
-            except Exception:
-                pass
             self.clear_selection()
         except Exception:
             pass
@@ -248,7 +237,6 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             pass
 
         try:
-            self.query_one("#providers-key-current", Markdown).display = False
             self.query_one("#providers-key-input", Input).display = False
         except Exception:
             pass
@@ -264,7 +252,14 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             if self.selected_step1_index is not None and 0 <= self.selected_step1_index < len(self.filtered_items):
                 opt_list.highlighted = self.selected_step1_index
             if self.show_search:
-                self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input).focus()
+                s_inp = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+                s_inp.focus()
+                try:
+                    from textual.widgets._input import Selection
+
+                    s_inp.selection = Selection(0, len(s_inp.value))
+                except Exception:
+                    pass
             else:
                 opt_list.focus()
         except Exception:
@@ -284,7 +279,12 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             event.stop()
             event.prevent_default()
             key_val = event.value.strip()
-            self.dismiss((self.selected_key, key_val))
+            curr_key = (
+                self.configured_keys.get(self.selected_key or "")
+                or (self.pm.get_api_key(self.selected_key) if self.pm and self.selected_key else "")
+            )
+            final_key = key_val if key_val else curr_key
+            self.dismiss((self.selected_key, final_key))
             return
 
         if self.step == 1 and event.input.id == MODAL_SEARCH_INPUT_ID:

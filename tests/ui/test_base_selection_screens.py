@@ -200,6 +200,14 @@ class TestBaseSelectionCoverage(unittest.TestCase):
             mock_dismiss.assert_not_called()
         event.stop.assert_not_called()
 
+    def test_on_input_changed_stripped_punctuation_match(self):
+        screen = BaseSelectionScreen("t", ["B.AI", "GPT-4"], ["b-ai", "gpt-4"], "b-ai", show_search=True)
+        self._on_input(screen, "bai")
+        self.assertEqual(screen.filtered_items, ["b-ai"])
+
+        self._on_input(screen, "gpt4")
+        self.assertEqual(screen.filtered_items, ["gpt-4"])
+
 
 if __name__ == "__main__":
     unittest.main()
