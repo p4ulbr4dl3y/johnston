@@ -1,20 +1,20 @@
 import os
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from tools.context import ToolContext
 from tools.shell import ShellTool, _new_task_id
 
 
 class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
-    def test_task_ids_are_unique_with_same_timestamp(self):
-        with patch("tools.shell.time.time_ns", return_value=123):
-            first = _new_task_id()
-            second = _new_task_id()
+    def test_task_ids_are_unique(self):
+        first = _new_task_id()
+        second = _new_task_id()
 
         self.assertNotEqual(first, second)
-        self.assertTrue(first.startswith("shell_123_"))
-        self.assertTrue(second.startswith("shell_123_"))
+        self.assertTrue(first.startswith("shell-"))
+        self.assertTrue(second.startswith("shell-"))
+        self.assertEqual(len(first), len("shell-") + 4)
 
     async def test_pure_sleep(self):
         tool = ShellTool()

@@ -142,7 +142,9 @@ MAX_SNAPSHOT_LOG_BYTES = 50 * 1024 * 1024
 MAX_TOOL_OUTPUT_CHARS = 8000
 
 
-def _write_output_log(log_content: str, *, tool_name: str = "", ext: str = ".log") -> Optional[str]:
+def _write_output_log(
+    log_content: str, *, tool_name: str = "", ext: str = ".log", unique: bool = True
+) -> Optional[str]:
     """Writes full output to a unique snapshot file under LOGS_DIR and returns its path.
 
     Returns None if logging is skipped (empty content) or the write fails.
@@ -158,7 +160,7 @@ def _write_output_log(log_content: str, *, tool_name: str = "", ext: str = ".log
 
     from core.infrastructure.tasks.output import make_log_path
 
-    log_path = make_log_path(tool_name or "tool", unique=True, ext=ext)
+    log_path = make_log_path(tool_name or "tool", unique=unique, ext=ext)
     if not log_path:
         return None
 
@@ -189,6 +191,7 @@ def truncate_output(
     from_end: bool = False,
     ext: Optional[str] = None,
     log_path: Optional[str] = None,
+    unique: bool = True,
 ) -> str:
     """Truncates text safely if it exceeds max_chars, saving full output to a unique file."""
     if len(text) <= max_chars:
@@ -214,7 +217,7 @@ def truncate_output(
                 pass
 
         file_ext = ext if ext is not None else (".json" if is_json else ".log")
-        log_path = _write_output_log(log_content, tool_name=tool_name, ext=file_ext)
+        log_path = _write_output_log(log_content, tool_name=tool_name, ext=file_ext, unique=unique)
 
     total_lines = text.count("\n") + (1 if text else 0)
 

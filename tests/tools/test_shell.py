@@ -66,7 +66,8 @@ def _process(wait_result=0, stdout=None):
 def test_new_task_id():
     tid1 = _new_task_id()
     tid2 = _new_task_id()
-    assert tid1.startswith("shell_")
+    assert tid1.startswith("shell-")
+    assert len(tid1) == len("shell-") + 4
     assert tid1 != tid2
 
 
@@ -532,7 +533,7 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
     mgr = ManageShellTool()
     with patch("tools.shell.shell_executable", return_value="/bin/sh"):
         res = await tool.execute({"command": "cat", "background": True}, ctx=app)
-    m = re.search(r'(?:Task ID: |id:\s*|id=")(shell_\d+_\d+)', str(res.content) + " " + str(res.display))
+    m = re.search(r'(?:Task ID: |id:\s*|id=")(shell-[a-f0-9]+)', str(res.content) + " " + str(res.display))
     assert m is not None
     task_id = m.group(1)
 

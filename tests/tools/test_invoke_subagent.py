@@ -185,6 +185,11 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Truncated:", result)
         self.assertIn("Next: read(path=", result)
 
+    def test_truncate_subagent_result_with_session_id(self):
+        long_text = "x" * (MAX_SUBAGENT_RESULT_CHARS + 500)
+        result = truncate_subagent_result(long_text, session_id="subagent-3a1f9b")
+        self.assertIn("subagent-3a1f9b.md", result)
+
 
 if __name__ == "__main__":
     unittest.main()

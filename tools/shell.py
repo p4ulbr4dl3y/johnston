@@ -1,8 +1,8 @@
 import asyncio
-import itertools
 import logging
 import platform
 import time
+import uuid
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
@@ -17,8 +17,6 @@ from core.infrastructure.tasks.shell_task import ShellTask
 from tools.base import BaseTool, truncate_output
 
 logger = logging.getLogger(__name__)
-
-_TASK_ID_COUNTER = itertools.count(1)
 
 
 def _sandbox_fallback_notice(ctx: Any) -> str:
@@ -41,7 +39,7 @@ def _sandbox_fallback_notice(ctx: Any) -> str:
 
 
 def _new_task_id() -> str:
-    return f"shell_{time.time_ns()}_{next(_TASK_ID_COUNTER)}"
+    return f"shell-{uuid.uuid4().hex[:4]}"
 
 
 def _attach_shell_widget(host, task_id: str, widget, log_path: str = None) -> None:
