@@ -1,5 +1,3 @@
-import asyncio
-import atexit
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
@@ -24,35 +22,8 @@ class OllamaAdapter(BaseApiAdapter):
     eval token counts are parsed from each JSON line.
     """
 
-    def __init__(self) -> None:
-        self._clients: Dict[Tuple[str, str], httpx.AsyncClient] = {}
-        atexit.register(self.close)
-
-    def _get_client(self, base_url: str, api_key: str) -> httpx.AsyncClient:
-        key = (base_url or "", api_key or "")
-        client = self._clients.get(key)
-        if client is None or getattr(client, "is_closed", False):
-            client = httpx.AsyncClient()
-            self._clients[key] = client
-        return client
-
-    def close(self) -> None:
-        """Closes all cached httpx.AsyncClient clients to release HTTP connection pools."""
-        clients, self._clients = self._clients, {}
-        if not clients:
-            return
-        try:
-            asyncio.run(self._close_all(clients))
-        except Exception:
-            pass
-
-    @staticmethod
-    async def _close_all(clients: Dict[Tuple[str, str], httpx.AsyncClient]) -> None:
-        for client in clients.values():
-            try:
-                await client.aclose()
-            except Exception:
-                pass
+    def _create_client(self, base_url: str, api_key: str) -> httpx.AsyncClient:
+        return httpx.AsyncClient()
 
     @staticmethod
     def _to_ollama_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

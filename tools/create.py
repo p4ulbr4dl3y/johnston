@@ -3,7 +3,7 @@ from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.runtime.git_utils import make_git_diff
-from tools.base import BaseTool, read_file_text, resolve_path, write_file_text
+from tools.base import BaseTool, read_file_text, resolve_writable_path, write_file_text
 from tools.cancel import run_cancellable
 
 
@@ -32,14 +32,9 @@ class CreateTool(BaseTool):
         args = args or {}
         ctx = self._ensure_context(ctx)
         path_arg = args.get("path")
-        if not path_arg or not str(path_arg).strip():
-            return ToolResult.error("params", name="path", detail="missing or empty")
-        path = resolve_path(path_arg, cwd=ctx.cwd)
-        if getattr(ctx, "sandbox_enabled", False):
-            from core.infrastructure.platform.sandbox import is_path_writable_in_sandbox
-
-            if not is_path_writable_in_sandbox(path, cwd=ctx.cwd):
-                return ToolResult.error("permission", f"sandbox restriction: write not permitted to '{path}' outside workspace")
+        path, err = resolve_writable_path(ctx, path_arg)
+        if err is not None:
+            return err
 
         def _probe():
             """Run sync filesystem checks off the event loop, returning (existed, old_content)."""

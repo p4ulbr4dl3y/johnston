@@ -329,6 +329,18 @@ class PromptBuilder:
         snippet. Volatile environment metadata (date/git) stays out of this
         build so it stays cacheable across turns.
         """
+        project_snippet = get_project_instructions_snippet(self.cwd)
+        rules_snippet = get_rules_snippet(role=self.role, cwd=self.cwd)
+        return self._assemble_stable_core(
+            project_snippet, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet
+        )
+
+    def _assemble_stable_core(self, project_snippet, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet) -> str:
+        """Shared stable-prefix assembly for the sync and async builders.
+
+        Takes the already-fetched project/rules snippets so the sync and async
+        variants only differ in how those are read (direct vs worker thread).
+        """
         from core.role_registry import RoleRegistry
 
         sys_prompt = self.base_system_prompt if self.base_system_prompt else ""
@@ -339,9 +351,6 @@ class PromptBuilder:
                 else "an expert AI assistant"
             )
             sys_prompt = sys_prompt.replace("{model_name}", model_label)
-
-        project_snippet = get_project_instructions_snippet(self.cwd)
-        rules_snippet = get_rules_snippet(role=self.role, cwd=self.cwd)
 
         role_def = None
         if not self.is_subagent:
@@ -393,66 +402,11 @@ class PromptBuilder:
     async def _build_stable_core_async(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
         """Async variant: same stable-prefix assembly, but file reads (project
         instructions, rules) happen on a worker thread on cache miss."""
-        from core.role_registry import RoleRegistry
-
-        sys_prompt = self.base_system_prompt if self.base_system_prompt else ""
-        if "{model_name}" in sys_prompt:
-            model_label = (
-                self.model_name.strip()
-                if self.model_name and self.model_name.strip()
-                else "an expert AI assistant"
-            )
-            sys_prompt = sys_prompt.replace("{model_name}", model_label)
-
         project_snippet = await get_project_instructions_snippet_async(self.cwd)
         rules_snippet = await get_rules_snippet_async(role=self.role, cwd=self.cwd)
-
-        role_def = None
-        if not self.is_subagent:
-            role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=self.cwd or os.getcwd())
-            if getattr(role_def, "prompt", None):
-                p_text = role_def.prompt.strip()
-                if not p_text.startswith("<role"):
-                    sys_prompt += f'\n\n<role name="{self.role}">\n{p_text}\n</role>'
-                else:
-                    sys_prompt += f"\n\n{p_text}"
-
-        # Cache key from the stable components. role_def is represented by its
-        # content so the cache invalidates when the role definition changes even
-        # if registry internals were refreshed in place.
-        def _ident(obj):
-            if obj is None:
-                return None
-            return (id(obj), getattr(obj, "key", None), getattr(obj, "prompt", None))
-
-        key = (
-            sys_prompt,
-            project_snippet,
-            rules_snippet,
-            skills_snippet,
-            subagents_snippet,
-            mcp_snippet,
-            self.role,
-            _ident(role_def),
+        return self._assemble_stable_core(
+            project_snippet, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet
         )
-
-        cached = _STABLE_CORE_CACHE.get(key)
-        if cached is not None:
-            return cached
-
-        if project_snippet:
-            sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
-        if rules_snippet:
-            sys_prompt = f"{sys_prompt}\n\n{rules_snippet}"
-        if skills_snippet:
-            sys_prompt = f"{sys_prompt}\n\n{skills_snippet}"
-        if subagents_snippet:
-            sys_prompt = f"{sys_prompt}\n\n{subagents_snippet}"
-        if mcp_snippet:
-            sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
-
-        _cache_set(_STABLE_CORE_CACHE, key, sys_prompt, _STABLE_CORE_CACHE_MAX)
-        return sys_prompt
 
     def build_tools(self) -> List[Dict[str, Any]]:
         from core.domain.policies.role_policy import role_tool_error

@@ -261,6 +261,19 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
         except Exception:
             self.refresh_footer()
 
+    def _apply_two_row_grid(self, row1_left, row1_right, row2_left, row2_right) -> None:
+        """Render the two-line footer grid and cache its rows for spin re-draws."""
+        grid = Table.grid(expand=True)
+        grid.add_column(justify="left")
+        grid.add_column(justify="right")
+        grid.add_row(row1_left, row1_right)
+        grid.add_row(row2_left, row2_right)
+        self._last_grid_rows = [
+            (row1_left, row1_right),
+            (row2_left, row2_right),
+        ]
+        self.update(grid)
+
     def refresh_footer(self) -> None:
         if not self.app:
             return
@@ -376,18 +389,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 task_parts.append(f"[{THEME_SECONDARY}]{mcp_active}mcp[/]")
             row2_right = f"[{THEME_SECONDARY}]⚡[/] {STATUS_SEP_COMPACT.join(task_parts)}" if task_parts else ""
 
-            grid = Table.grid(expand=True)
-            grid.add_column(justify="left")
-            grid.add_column(justify="right")
-            grid.add_row(row1_left, row1_right)
-            grid.add_row(row2_left, row2_right)
-
-            self._last_grid_rows = [
-                (row1_left, row1_right),
-                (row2_left, row2_right),
-            ]
-            self.update(grid)
-            return
+            self._apply_two_row_grid(row1_left, row1_right, row2_left, row2_right)
         else:
             branch = self._git_branch(cwd=directory)
             diff_text = self._git_diff_stats(cwd=directory)
@@ -451,18 +453,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             else:
                 row2_right = ""
 
-            grid = Table.grid(expand=True)
-            grid.add_column(justify="left")
-            grid.add_column(justify="right")
-            grid.add_row(row1_left, row1_right)
-            grid.add_row(row2_left, row2_right)
-
-            self._last_grid_rows = [
-                (row1_left, row1_right),
-                (row2_left, row2_right),
-            ]
-            self.update(grid)
-            return
+            self._apply_two_row_grid(row1_left, row1_right, row2_left, row2_right)
 
     def _on_diff_updated(self) -> None:
         self.refresh_footer()

@@ -7,6 +7,25 @@ from typing import Any, Dict, List, Optional
 from core.infrastructure.adapters.base import extract_image_payload
 
 
+def _extract_error_fields(data: dict) -> tuple[str, str]:
+    """Extract ``(message, type/code)`` from an ``{"error": ...}`` payload.
+
+    Handles the nested ``{"error": {"error": {...}}}`` forms used by Anthropic
+    and OpenAI-compatible providers; returns ``("", "")`` when nothing matches.
+    """
+    err_obj = data.get("error")
+    if isinstance(err_obj, dict):
+        inner_err = err_obj.get("error")
+        if isinstance(inner_err, dict):
+            return inner_err.get("message") or "", inner_err.get("type") or inner_err.get("code") or ""
+        return err_obj.get("message") or "", err_obj.get("type") or err_obj.get("code") or ""
+    if isinstance(err_obj, str):
+        return err_obj, ""
+    if "message" in data:
+        return data["message"], ""
+    return "", ""
+
+
 def format_api_error(err: Exception) -> str:
     """Formats API exceptions into a clean, unified Markdown string.
 
@@ -25,19 +44,7 @@ def format_api_error(err: Exception) -> str:
 
     body = getattr(err, "body", None)
     if isinstance(body, dict):
-        err_obj = body.get("error")
-        if isinstance(err_obj, dict):
-            inner_err = err_obj.get("error")
-            if isinstance(inner_err, dict):
-                msg = inner_err.get("message") or ""
-                err_type = inner_err.get("type") or inner_err.get("code") or ""
-            else:
-                msg = err_obj.get("message") or ""
-                err_type = err_obj.get("type") or err_obj.get("code") or ""
-        elif isinstance(err_obj, str):
-            msg = err_obj
-        elif "message" in body:
-            msg = body["message"]
+        msg, err_type = _extract_error_fields(body)
 
     raw_str = str(err).strip()
     if not msg:
@@ -50,19 +57,7 @@ def format_api_error(err: Exception) -> str:
                 except Exception:
                     parsed_data = ast.literal_eval(raw_dict)
                 if isinstance(parsed_data, dict):
-                    err_obj = parsed_data.get("error")
-                    if isinstance(err_obj, dict):
-                        inner_err = err_obj.get("error")
-                        if isinstance(inner_err, dict):
-                            msg = inner_err.get("message") or ""
-                            err_type = inner_err.get("type") or inner_err.get("code") or ""
-                        else:
-                            msg = err_obj.get("message") or ""
-                            err_type = err_obj.get("type") or err_obj.get("code") or ""
-                    elif isinstance(err_obj, str):
-                        msg = err_obj
-                    elif "message" in parsed_data:
-                        msg = parsed_data["message"]
+                    msg, err_type = _extract_error_fields(parsed_data)
             except Exception:
                 pass
 

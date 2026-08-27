@@ -6,7 +6,7 @@ from core.domain.defaults.errors import FormattedToolError, ToolResult, format_t
 from core.infrastructure.runtime.git_utils import make_git_diff
 from tools.base import (
     BaseTool,
-    resolve_path,
+    resolve_writable_path,
     write_file_text,
 )
 from tools.cancel import run_cancellable
@@ -181,8 +181,9 @@ class EditTool(BaseTool):
         ctx = self._ensure_context(ctx)
 
         path_arg = args.get("path")
-        if not path_arg or not str(path_arg).strip():
-            return ToolResult.error("params", name="path", detail="missing or empty")
+        path, err = resolve_writable_path(ctx, path_arg)
+        if err is not None:
+            return err
 
         old_str = args.get("old_str")
 
@@ -193,13 +194,6 @@ class EditTool(BaseTool):
             new_str = ""
 
         replace_all = bool(args.get("replace_all", False))
-
-        path = resolve_path(str(path_arg), cwd=ctx.cwd)
-        if getattr(ctx, "sandbox_enabled", False):
-            from core.infrastructure.platform.sandbox import is_path_writable_in_sandbox
-
-            if not is_path_writable_in_sandbox(path, cwd=ctx.cwd):
-                return ToolResult.error("permission", f"sandbox restriction: write not permitted to '{path}' outside workspace")
 
         def _do_edit() -> ToolResult:
             if not path or not os.path.exists(path):

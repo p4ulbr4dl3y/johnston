@@ -1,5 +1,7 @@
 """Neutral adapter helpers shared by the engine and provider adapters."""
 
+import asyncio
+import atexit
 import json
 import uuid
 from dataclasses import dataclass
@@ -16,6 +18,60 @@ class BaseApiAdapter:
       - ("adapter_usage", dict)      : {"prompt_tokens", "completion_tokens",
                                         "total_tokens", "cache_read_tokens"}
     """
+
+    def __init__(self) -> None:
+        # Reuse transport clients across calls instead of creating one per
+        # stream_chat invocation (which previously leaked HTTP connection
+        # pools). Clients are cached per (base_url, api_key) pair so different
+        # providers reached through the adapter branch each get their own
+        # client.
+        self._clients: Dict[Tuple[str, str], Any] = {}
+        atexit.register(self.close)
+
+    def _create_client(self, base_url: str, api_key: str) -> Any:
+        """Create a fresh transport client for the given (base_url, api_key).
+
+        Subclasses override to instantiate their own client type.
+        """
+        raise NotImplementedError
+
+    def _client_is_closed(self, client: Any) -> bool:
+        """Whether a cached client is closed and should be recreated."""
+        return bool(getattr(client, "is_closed", False))
+
+    def _get_client(self, base_url: str, api_key: str) -> Any:
+        key = (base_url or "", api_key or "")
+        client = self._clients.get(key)
+        if client is None or self._client_is_closed(client):
+            client = self._create_client(base_url, api_key)
+            self._clients[key] = client
+        return client
+
+    def close(self) -> None:
+        """Closes all cached clients to release HTTP connection pools.
+
+        Sync best-effort hook (e.g. registered via ``atexit``). Real cleanup
+        happens through :meth:`_close_all`; this runs the async close in a fresh
+        event loop when no loop is currently running.
+        """
+        clients, self._clients = self._clients, {}
+        if not clients:
+            return
+        try:
+            asyncio.run(self._close_all(clients))
+        except Exception:
+            pass
+
+    @staticmethod
+    async def _close_all(clients: Dict[Tuple[str, str], Any]) -> None:
+        for client in clients.values():
+            closer = getattr(client, "aclose", None) or getattr(client, "close", None)
+            if closer is None:
+                continue
+            try:
+                await closer()
+            except Exception:
+                pass
 
     async def stream_chat(
         self,

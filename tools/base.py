@@ -11,6 +11,7 @@ from tools.context import ToolContext
 
 __all__ = [
     "resolve_path",
+    "resolve_writable_path",
     "write_file_text",
     "read_file_text",
     "try_int",
@@ -35,6 +36,25 @@ def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
     if os.path.isabs(path_str):
         return os.path.abspath(os.path.expanduser(path_str))
     return os.path.realpath(os.path.join(base, os.path.expanduser(path_str)))
+
+
+def resolve_writable_path(ctx: Any, path_arg: Any) -> tuple[str, "ToolResult | None"]:
+    """Resolves a path argument and rejects missing values or sandbox-blocked writes.
+
+    Shared by create/edit so the path validation and sandbox permission check
+    cannot drift between file-writing tools. Returns ``(resolved_path, None)`` on
+    success, or ``("", error)`` when the path is empty or writes are not permitted
+    by an active sandbox.
+    """
+    if not path_arg or not str(path_arg).strip():
+        return "", ToolResult.error("params", name="path", detail="missing or empty")
+    path = resolve_path(str(path_arg), cwd=ctx.cwd)
+    if getattr(ctx, "sandbox_enabled", False):
+        from core.infrastructure.platform.sandbox import is_path_writable_in_sandbox
+
+        if not is_path_writable_in_sandbox(path, cwd=ctx.cwd):
+            return "", ToolResult.error("permission", f"sandbox restriction: write not permitted to '{path}' outside workspace")
+    return path, None
 
 
 def write_file_text(path: str, content: str) -> None:
