@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from core.infrastructure.platform.paths import CONFIG_FILE
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
@@ -34,6 +34,31 @@ def save_sandbox_config(enabled: bool, config_file: str = CONFIG_FILE) -> None:
         if not isinstance(data, dict):
             data = {}
         data["sandbox_enabled"] = bool(enabled)
+        atomic_write_json(config_file, data, indent=2)
+    except Exception:
+        pass
+
+
+def load_theme_config(config_file: str = CONFIG_FILE) -> Optional[str]:
+    """Load persisted theme name from global config (~/.johnston/config.json)."""
+    try:
+        data = read_json(config_file, default={})
+        if isinstance(data, dict):
+            val = data.get("theme")
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+    except Exception:
+        pass
+    return None
+
+
+def save_theme_config(theme_name: str, config_file: str = CONFIG_FILE) -> None:
+    """Save active theme name to global config (~/.johnston/config.json)."""
+    try:
+        data = read_json(config_file, default={})
+        if not isinstance(data, dict):
+            data = {}
+        data["theme"] = str(theme_name).strip()
         atomic_write_json(config_file, data, indent=2)
     except Exception:
         pass

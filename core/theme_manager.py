@@ -23,7 +23,12 @@ class ThemeManager:
         self._listeners: list[Callable[[Theme], None]] = []
         for theme in BUILTIN_THEMES:
             self.register(theme)
-        self._current_theme: Theme = self._themes.get(default_theme, ZINC_DARK)
+
+        from core.infrastructure.config.config_helpers import load_theme_config
+
+        saved = load_theme_config()
+        chosen = saved if saved and saved in self._themes else default_theme
+        self._current_theme: Theme = self._themes.get(chosen, ZINC_DARK)
 
     @classmethod
     def get_instance(cls) -> ThemeManager:
@@ -44,11 +49,20 @@ class ThemeManager:
     def current_theme(self) -> Theme:
         return self._current_theme
 
-    def set_theme(self, name: str) -> Theme:
+    def set_theme(self, name: str, persist: bool = True) -> Theme:
         theme = self._themes.get(name)
         if not theme:
             raise ValueError(f"Unknown theme: {name}. Available: {list(self._themes.keys())}")
         self._current_theme = theme
+
+        if persist:
+            try:
+                from core.infrastructure.config.config_helpers import save_theme_config
+
+                save_theme_config(theme.name)
+            except Exception as e:
+                logger.warning("Failed to persist theme config: %s", e)
+
         for listener in list(self._listeners):
             try:
                 listener(theme)

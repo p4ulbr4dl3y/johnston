@@ -93,3 +93,18 @@ def test_theme_manager_textual_theme_conversion():
 
     all_tt = tm.get_all_textual_themes()
     assert len(all_tt) == len(BUILTIN_THEMES)
+
+
+def test_theme_persistence(tmp_path, monkeypatch):
+    cfg_file = str(tmp_path / "config.json")
+    monkeypatch.setattr("core.infrastructure.config.config_helpers.CONFIG_FILE", cfg_file)
+
+    from core.infrastructure.config.config_helpers import load_theme_config, save_theme_config
+
+    assert load_theme_config(cfg_file) is None
+
+    save_theme_config("dracula", cfg_file)
+    assert load_theme_config(cfg_file) == "dracula"
+
+    save_theme_config("nord", cfg_file)
+    assert load_theme_config(cfg_file) == "nord"
