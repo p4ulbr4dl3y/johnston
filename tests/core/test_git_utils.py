@@ -91,6 +91,19 @@ class TestMakeGitDiff(unittest.TestCase):
         self.assertIn("-b", d)
         self.assertIn("+c", d)
 
+    def test_fallback_when_git_surfaces_missing_binary(self):
+        # git binary missing yields rc=1 with empty stdout (caught inside run_git).
+        with patch(
+            "core.infrastructure.runtime.git_utils.run_git",
+            return_value=subprocess.CompletedProcess(
+                args=[], returncode=1, stdout="", stderr="[Errno 2] No such file or directory: 'git'"
+            ),
+        ):
+            d = make_git_diff("a\nb\n", "a\nc\n", fromfile="old", tofile="new")
+        self.assertIn("--- old\n+++ new", d)
+        self.assertIn("-b", d)
+        self.assertIn("+c", d)
+
     def test_identical_does_not_call_git(self):
         with patch("core.infrastructure.runtime.git_utils.run_git") as m:
             make_git_diff("a\n", "a\n")

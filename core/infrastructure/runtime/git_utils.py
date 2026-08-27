@@ -153,7 +153,8 @@ def make_git_diff(
                 raise RuntimeError(f"git diff failed: rc={res.returncode} stderr={res.stderr}")
             out = res.stdout
             if not out.strip():
-                return ""
+                # git unavailable or produced unusable output: fall back to difflib.
+                raise RuntimeError(f"git diff produced no output (stderr={res.stderr!r})")
             return _relabel_diff(out, fromfile, tofile)
     except Exception:
         diff_lines = list(

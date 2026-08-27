@@ -278,6 +278,18 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"url": "https://github.com/repo"}))
         self.assertIn("# GitHub", res)
 
+    @patch("httpx.AsyncClient")
+    @patch("socket.getaddrinfo")
+    async def test_fake_ip_ipv4_mapped_range_allowed(self, mock_gai, mock_client_cls):
+        # IPv4-mapped form of a fake-IP (::ffff:198.18.0.0/15) must not be blocked either.
+        mock_gai.return_value = [(2, 1, 6, "", ("::ffff:198.18.0.21", 0, 0, 0))]
+        body = b"<html><body><h1>OK</h1></body></html>"
+        mock_client_cls.return_value = _make_stream_client(body, "text/html")
+
+        tool = WebFetchTool()
+        res = str(await tool.execute({"url": "https://example.com/page"}))
+        self.assertIn("# OK", res)
+
     @patch("socket.getaddrinfo")
     async def test_private_lan_and_loopback_blocked(self, mock_gai):
         tool = WebFetchTool()

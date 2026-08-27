@@ -256,8 +256,11 @@ class ShellTool(BaseTool):
             if read_task and not read_task.done():
                 read_task.cancel()
                 try:
+                    # CancelledError is a BaseException since py3.8 and is not
+                    # caught by `except Exception`; swallowing the expected
+                    # cancellation of the stdout reader is required.
                     await asyncio.wait_for(read_task, timeout=0.2)
-                except Exception:
+                except (asyncio.CancelledError, Exception):
                     pass
             raw_out = _truncate_output(task.get_formatted_output()).strip()
             partial_str = f"\n\nPartial Output:\n{raw_out}" if raw_out else ""

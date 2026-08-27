@@ -31,6 +31,10 @@ _MAX_DNS_CACHE = 512
 
 def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     # 198.18.0.0/15 is used by transparent proxies / VPNs (Clash, Surge, Sing-box) as Fake-IP pool
+    # Normalize IPv4-mapped IPv6 (e.g. ::ffff:198.18.0.21) so the Fake-IP exemption
+    # (and private-address checks) apply uniformly.
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+        addr = addr.ipv4_mapped
     if isinstance(addr, ipaddress.IPv4Address) and addr in _FAKE_IP_NET:
         return False
     return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved
