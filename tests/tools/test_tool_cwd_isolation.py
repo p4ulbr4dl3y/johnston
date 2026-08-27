@@ -6,6 +6,20 @@ from tools.base import resolve_path
 from tools.context import ToolContext
 
 
+def _cwd_cmd() -> str:
+    """Build a cross-platform `python -c` command that echoes the real cwd.
+
+    On Windows the shell tool runs PowerShell, which needs the & call operator
+    to invoke a quoted executable path and uses single quotes for the script.
+    """
+    import sys
+
+    script = "import os; print(os.path.realpath(os.getcwd()))"
+    if os.name == "nt":
+        return '& "%s" -c \'%s\'' % (sys.executable, script)
+    return '"%s" -c \'%s\'' % (sys.executable, script)
+
+
 class MockTextualApp:
     """Minimal stand-in for the real Textual app (has push_screen)."""
 
@@ -79,19 +93,17 @@ class TestResolvePathCwd(unittest.TestCase):
 
 class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
     async def test_shell_uses_ctx_cwd_as_process_cwd(self):
-        import sys
 
         from tools.shell import ShellTool
 
         tool = ShellTool()
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
             ctx = ToolContext(None, is_subagent=True, cwd=base)
-            cmd = f'"{sys.executable}" -c "import os; print(os.path.realpath(os.getcwd()))"'
+            cmd = _cwd_cmd()
             res = str(await tool.execute({"command": cmd}, ctx))
             self.assertIn(os.path.basename(os.path.realpath(base)), res)
 
     async def test_shell_uses_cwd_from_agent(self):
-        import sys
 
         from tools.shell import ShellTool
 
@@ -99,7 +111,7 @@ class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
             host = MockTextualApp()
             agent = make_agent(host, cwd=base, is_subagent=True)
-            cmd = f'"{sys.executable}" -c "import os; print(os.path.realpath(os.getcwd()))"'
+            cmd = _cwd_cmd()
             res = str(await tool.execute({"command": cmd}, agent))
             self.assertIn(os.path.basename(os.path.realpath(base)), res)
 
