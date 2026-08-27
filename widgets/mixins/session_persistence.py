@@ -84,13 +84,23 @@ class SessionPersistenceMixin:
             if hasattr(chat_view, "check_welcome") and callable(chat_view.check_welcome):
                 chat_view.check_welcome()
             await asyncio.sleep(0.15)
-            chat_view._is_loading_session = False
-            chat_view.loading = False
+
+            def _finish_session_load():
+                try:
+                    if hasattr(chat_view, "scroll_end"):
+                        chat_view.scroll_end(animate=False)
+                except Exception:
+                    pass
+                chat_view._is_loading_session = False
+                chat_view.loading = False
+
             try:
                 if hasattr(chat_view, "call_after_refresh") and callable(chat_view.call_after_refresh):
-                    chat_view.call_after_refresh(chat_view.scroll_end, animate=False)
+                    chat_view.call_after_refresh(_finish_session_load)
+                else:
+                    _finish_session_load()
             except Exception:
-                pass
+                _finish_session_load()
 
         self.run_worker(_restore_messages(saved_msgs))
 

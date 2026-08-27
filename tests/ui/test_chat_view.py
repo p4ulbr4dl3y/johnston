@@ -578,7 +578,11 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
         chat_view.watch_scroll_y(10.0, 5.0)
         chat_view.load_older_messages.assert_not_called()
 
-        # scroll_y <= 2 triggers
+        # initial stationary scroll_y <= 2 (old_val == new_val) does not trigger
+        chat_view.watch_scroll_y(0.0, 0.0)
+        chat_view.load_older_messages.assert_not_called()
+
+        # scroll_y <= 2 while scrolling up triggers
         chat_view.watch_scroll_y(5.0, 1.0)
         chat_view.load_older_messages.assert_called_once()
 

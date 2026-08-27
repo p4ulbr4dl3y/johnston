@@ -99,7 +99,7 @@ def scroll_parent_if_needed(widget, force: bool = False) -> None:
     try:
         parent = getattr(widget, "parent", None)
         if isinstance(parent, VerticalScroll):
-            is_loading = getattr(parent, "_is_loading_session", False)
+            is_loading = getattr(parent, "_is_loading_session", False) or getattr(parent, "_is_loading_older", False)
             auto_follow = getattr(parent, "_auto_follow", True)
             should_schedule = not is_loading and (
                 force or (auto_follow and getattr(parent, "is_at_bottom", lambda: True)())
@@ -111,6 +111,7 @@ def scroll_parent_if_needed(widget, force: bool = False) -> None:
                     return (
                         getattr(parent, "_auto_follow", True)
                         and not getattr(parent, "_is_loading_session", False)
+                        and not getattr(parent, "_is_loading_older", False)
                     )
 
                 def _settle_rescroll():
@@ -141,7 +142,7 @@ def scroll_parent_to_widget(widget, top: bool = False) -> None:
     try:
         parent = getattr(widget, "parent", None)
         if isinstance(parent, VerticalScroll):
-            is_loading = getattr(parent, "_is_loading_session", False)
+            is_loading = getattr(parent, "_is_loading_session", False) or getattr(parent, "_is_loading_older", False)
             if not is_loading:
                 def _do_scroll():
                     try:

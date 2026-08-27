@@ -197,6 +197,7 @@ class ChatView(VerticalScroll):
     def watch_scroll_y(self, old_val: float, new_val: float) -> None:
         if (
             new_val <= 2
+            and old_val > new_val
             and self.has_older_messages()
             and not self._is_loading_older
             and not self._is_loading_session
@@ -242,6 +243,7 @@ class ChatView(VerticalScroll):
         if self._is_loading_older or not self._unloaded_messages:
             return
         self._is_loading_older = True
+        self._auto_follow = False
         try:
             chunk = self._unloaded_messages[-self.PAGE_SIZE :]
             self._unloaded_messages = self._unloaded_messages[: -self.PAGE_SIZE]
