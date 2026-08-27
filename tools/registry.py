@@ -1,5 +1,6 @@
 import difflib
 import inspect
+import logging
 import time
 from typing import Any, Dict, Type
 
@@ -31,6 +32,8 @@ TOOL_CLASSES = [
 ]
 
 REGISTRY: Dict[str, Type[BaseTool]] = {cls.name.lower(): cls for cls in TOOL_CLASSES}
+
+logger = logging.getLogger(__name__)
 
 
 def _build_close_match_candidates() -> list[str]:
@@ -189,6 +192,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
             return await normalize_tool_result(tool_inst.execute(args, ctx))
         except Exception as e:
+            logger.warning("Tool '%s' execution failed: %s", name, e, exc_info=True)
             return ToolResult.error("execute", detail=str(e), name=name)
 
     from core.infrastructure.mcp import get_mcp_manager
@@ -206,6 +210,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             if isinstance(cached_tools, list):
                 active_mcp_tools = cached_tools
     except Exception as e:
+        logger.warning("MCP cached tools read failed: %s", e, exc_info=True)
         return ToolResult.error("mcp", detail=f"failed to read cached tools: {e}", name=name)
     # Case-insensitive match on the canonical (stripped+lowercased) name so the
     # MCP lookup follows the same normalization rules as builtin dispatch.
@@ -219,6 +224,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             if mcp_mgr.get_capabilities_for_exposed_tool(name):
                 is_mcp = True
         except Exception as e:
+            logger.warning("MCP capability resolution failed for '%s': %s", name, e, exc_info=True)
             return ToolResult.error("mcp", detail=f"failed to resolve capabilities: {e}", name=name)
 
     if not is_mcp:
@@ -242,6 +248,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             else:
                 _remember_mcp_miss(name)
         except Exception as e:
+            logger.warning("MCP active tools listing failed: %s", e, exc_info=True)
             return ToolResult.error("mcp", detail=f"failed to list active tools: {e}", name=name)
 
     if not is_mcp:
@@ -288,6 +295,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
                 )
             return tool_res
     except Exception as e:
+        logger.warning("MCP tool '%s' execution failed: %s", name, e, exc_info=True)
         return ToolResult.error("mcp", detail=str(e), name=name)
 
     return ToolResult.error("unknown", name=name)

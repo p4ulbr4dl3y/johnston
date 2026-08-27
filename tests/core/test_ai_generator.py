@@ -1,6 +1,7 @@
 """Focused unit tests for the Textual-free AI generation engine core/application/generation/ai_generator.py."""
 
 import asyncio
+import logging
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 
@@ -90,6 +91,26 @@ async def test_user_message_not_rendered_when_hidden():
     )
     canvas.add_user_message.assert_not_called()
     assert {"type": "user", "text": "hi", "show_in_ui": False} in session.events
+
+
+@pytest.mark.asyncio
+async def test_generation_failure_logged_with_exception(caplog):
+    """A generic stream failure must persist its traceback, not just notify the UI."""
+
+    async def stream(prompt, attachments=None):
+        yield ("bot_delta", "partial", "")
+        raise ValueError("boom")
+
+    canvas = _canvas()
+    with caplog.at_level(logging.ERROR, logger="core.application.generation.ai_generator"):
+        await generate_ai_response(_FakeAgent(stream), _fake_session(), canvas, session_id="s1", user_text="hi")
+
+    canvas.notify.assert_called_once()
+    canvas.notify.assert_called_with("Generation failed: boom", severity="error")
+    recs = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert recs, "expected an ERROR record from the generation engine"
+    assert "AI generation failed" in recs[0].message
+    assert recs[0].exc_info is not None
 
 
 @pytest.mark.asyncio

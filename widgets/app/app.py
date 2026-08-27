@@ -8,6 +8,7 @@ from typing import Any
 
 from textual.app import App
 
+from core.infrastructure.platform.logging_setup import adopt_task_exception
 from core.infrastructure.tasks.manager import TaskManager
 from core.provider_manager import ProviderManager
 from core.session_manager import SessionStore
@@ -81,6 +82,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             task = loop.create_task(coro)
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
+            adopt_task_exception(task)
             return task
         except RuntimeError:
             return None

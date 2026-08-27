@@ -183,8 +183,9 @@ class MessageFlowMixin:
             # drain the queue.
             pass
         except Exception as e:
-            # The engine already called canvas.notify for generic exceptions.
-            logger.warning("AI generation failed: %s", e)
+            # The engine already called canvas.notify for generic exceptions;
+            # this catches the exceptions the engine re-raises (e.g. RuntimeError).
+            logger.exception("AI generation failed: %s", e)
         finally:
             try:
                 footer = self.query_one("#status-footer", StatusFooter)

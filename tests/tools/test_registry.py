@@ -67,8 +67,10 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         PermissionManager.get_instance().set_session_override("read", "allow")
         with patch.object(REGISTRY["read"], "execute", side_effect=RuntimeError("Execute failed")):
-            res = await execute_tool("read", {"path": "foo.txt"})
-            self.assertIn("ERR: execute 'read': Execute failed", res.content)
+            with self.assertLogs("tools.registry", level="WARNING") as cm:
+                res = await execute_tool("read", {"path": "foo.txt"})
+        self.assertIn("ERR: execute 'read': Execute failed", res.content)
+        self.assertTrue(any("Tool 'read' execution failed" in line for line in cm.output))
 
     async def test_execute_tool_unknown_with_direct_hint(self):
         # Match that maps directly to a registry tool name
@@ -158,9 +160,11 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         with (
             patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+            self.assertLogs("tools.registry", level="WARNING") as cm,
         ):
             res = await execute_tool("faulty_mcp", {})
-            self.assertIn("ERR: mcp 'faulty_mcp': MCP connection failed", res.content)
+        self.assertIn("ERR: mcp 'faulty_mcp': MCP connection failed", res.content)
+        self.assertTrue(any("MCP tool 'faulty_mcp' execution failed" in line for line in cm.output))
 
     async def test_execute_tool_mcp_returns_none(self):
         mock_mcp_mgr = self._mock_mcp_mgr(

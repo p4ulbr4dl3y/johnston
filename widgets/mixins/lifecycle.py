@@ -5,6 +5,7 @@ import os
 from textual.app import ComposeResult
 from textual.containers import Vertical
 
+from core.infrastructure.platform.logging_setup import install_asyncio_exception_handler
 from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
@@ -28,6 +29,7 @@ class LifecycleMixin:
 
     def on_mount(self) -> None:
         """Instant focus on start, background catalog refresh and status bar refresh"""
+        install_asyncio_exception_handler()
         self.is_app_active = True
         self.query_one("#message-input", ChatInput).focus()
         if getattr(self, "resume_session_id", None):

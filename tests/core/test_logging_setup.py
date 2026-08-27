@@ -1,10 +1,21 @@
 """Tests for core.infrastructure.platform.logging_setup."""
 
+import asyncio
 import logging
 import os
+import sys
 import time
 
-from core.infrastructure.platform.logging_setup import _quiet_noisy_loggers, cleanup_logs
+from core.infrastructure.platform.logging_setup import (
+    _asyncio_exception_handler,
+    _log_task_done,
+    _quiet_noisy_loggers,
+    _uncaught_exception_hook,
+    adopt_task_exception,
+    cleanup_logs,
+    install_asyncio_exception_handler,
+    install_excepthook,
+)
 
 
 def touch(path: str, age_days: float) -> None:
@@ -65,3 +76,102 @@ def test_quiet_noisy_loggers_raises_level_to_warning():
 
     for name in ("httpx", "httpcore", "openai", "anthropic", "urllib3", "asyncio", "PIL"):
         assert logging.getLogger(name).level == logging.WARNING
+
+
+# --- uncaught-exception / crash logging -------------------------------------
+
+
+def test_install_excepthook_registers_and_is_idempotent():
+    import core.infrastructure.platform.logging_setup as ls
+
+    original_hook = sys.excepthook
+    ls._excepthook_installed = False
+    try:
+        install_excepthook()
+        assert sys.excepthook is ls._uncaught_exception_hook
+
+        # Second call must not re-register (idempotent).
+        install_excepthook()
+        assert sys.excepthook is ls._uncaught_exception_hook
+    finally:
+        sys.excepthook = original_hook
+        ls._excepthook_installed = False
+
+
+def test_uncaught_exception_hook_logs_critical(caplog):
+    with caplog.at_level(logging.CRITICAL, logger="johnston.crash"):
+        _uncaught_exception_hook(ValueError, ValueError("boom"), None)
+    recs = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+    assert recs and "Uncaught exception" in recs[0].message
+    assert recs[0].exc_info is not None
+
+
+def test_uncaught_exception_hook_forwards_keyboard_interrupt(monkeypatch):
+    captured = []
+    monkeypatch.setattr(
+        "core.infrastructure.platform.logging_setup._ORIGINAL_EXCEPTHOOK",
+        lambda t, v, tb: captured.append(t),
+    )
+    _uncaught_exception_hook(KeyboardInterrupt, KeyboardInterrupt(), None)
+    assert captured == [KeyboardInterrupt]
+
+
+def test_asyncio_exception_handler_logs_critical_with_exception(caplog):
+    context = {"message": "Task failed", "exception": RuntimeError("boom")}
+    with caplog.at_level(logging.CRITICAL, logger="johnston.crash"):
+        _asyncio_exception_handler(None, context)
+    recs = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+    assert recs and "Unhandled exception in asyncio task" in recs[0].message
+
+
+def test_asyncio_exception_handler_logs_message_without_exception(caplog):
+    context = {"message": "Task failed"}
+    with caplog.at_level(logging.CRITICAL, logger="johnston.crash"):
+        _asyncio_exception_handler(None, context)
+    recs = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+    assert recs and "Unhandled exception in asyncio task" in recs[0].message
+
+
+def test_install_asyncio_exception_handler_sets_handler():
+    loop = asyncio.new_event_loop()
+    try:
+        install_asyncio_exception_handler(loop)
+        assert loop.get_exception_handler() is _asyncio_exception_handler
+    finally:
+        loop.close()
+
+
+def test_install_asyncio_exception_handler_noop_without_loop():
+    # No running loop -> must be a safe no-op, not raise.
+    install_asyncio_exception_handler(None)
+
+
+def test_adopt_task_exception_logs_unhandled_failure(caplog):
+    loop = asyncio.new_event_loop()
+    try:
+        async def fail():
+            await asyncio.sleep(0)
+            raise RuntimeError("boom")
+
+        task = loop.create_task(fail())
+        adopt_task_exception(task)
+        with caplog.at_level(logging.CRITICAL, logger="johnston.crash"):
+            loop.run_until_complete(asyncio.gather(task, return_exceptions=True))
+        recs = [r for r in caplog.records if r.levelno == logging.CRITICAL]
+        assert recs and "Background task failed" in recs[0].message
+    finally:
+        loop.close()
+
+
+def test_log_task_done_skips_successful_task():
+    loop = asyncio.new_event_loop()
+    try:
+        async def ok():
+            return 1
+
+        task = loop.create_task(ok())
+        loop.run_until_complete(task)
+        # A successfully-completed task must not raise when inspected.
+        _log_task_done(task)
+    finally:
+        loop.close()

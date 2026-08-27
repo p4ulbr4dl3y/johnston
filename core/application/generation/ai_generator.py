@@ -346,6 +346,7 @@ async def generate_ai_response(
         )
         raise
     except Exception as e:  # noqa: BLE001
+        logger.exception("AI generation failed: %s", e)
         canvas.notify(f"Generation failed: {e}", severity="error")
     finally:
         if thinking_handle is not None and getattr(thinking_handle, "is_thinking", False):

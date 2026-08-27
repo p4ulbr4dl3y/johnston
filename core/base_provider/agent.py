@@ -908,6 +908,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     yield ("thinking", "Context budget reached; compacted earlier tool history before continuing.", "")
 
         except Exception as err:
+            logger.exception("API request failed: %s", err)
             error_msg = format_api_error(err)
             clean_msg = error_msg.replace("**API Error:**", "API Error:").replace("**", "").replace("`", "").strip()
             clean_msg = " ".join(clean_msg.split())
