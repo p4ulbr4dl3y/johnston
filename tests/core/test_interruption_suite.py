@@ -114,7 +114,7 @@ class TestHandleInterruption:
         assert agent.history[1] == {"role": "assistant", "content": "Partial generated response from LLM"}
         assert agent.history[2] == {
             "role": "user",
-            "content": '<system_note type="interrupted">Response interrupted by user</system_note>',
+            "content": "<system_note>Interrupted</system_note>",
         }
 
         # Token accounting and UI refresh
@@ -154,7 +154,7 @@ class TestHandleInterruption:
         assert agent.history[0] == {"role": "user", "content": "Hello"}
         assert agent.history[1] == {
             "role": "user",
-            "content": '<system_note type="interrupted">Response interrupted by user</system_note>',
+            "content": "<system_note>Interrupted</system_note>",
         }
 
     @pytest.mark.asyncio
@@ -210,7 +210,7 @@ class TestHandleInterruption:
             start_time=time.time(),
         )
 
-        assert any('<system_note type="interrupted">' in m.get("content", "") for m in agent.history)
+        assert any("<system_note>Interrupted</system_note>" in m.get("content", "") for m in agent.history)
 
 
 # ============================================================================
@@ -222,7 +222,7 @@ class TestCompactionAndSanitization:
     """Tests for LLM history sanitization and compaction when interruptions occur."""
 
     def test_is_system_note_detection(self):
-        assert is_system_note({"role": "user", "content": '<system_note type="interrupted">Response interrupted by user</system_note>'}) is True
+        assert is_system_note({"role": "user", "content": "<system_note>Interrupted</system_note>"}) is True
         assert is_system_note({"role": "user", "content": "<system_note>Custom message</system_note>"}) is True
         assert is_system_note({"role": "user", "content": "Just a normal user message"}) is False
         assert is_system_note({"role": "assistant", "content": "Sure, here is the answer"}) is False
@@ -242,7 +242,7 @@ class TestCompactionAndSanitization:
                     {"id": "call_2", "type": "function", "function": {"name": "read_file", "arguments": '{"path":"a.txt"}'}},
                 ],
             },
-            {"role": "user", "content": '<system_note type="interrupted">Response interrupted by user</system_note>'},
+            {"role": "user", "content": "<system_note>Interrupted</system_note>"},
         ]
 
         sanitized = agent.sanitize_history_for_model(history)
@@ -260,7 +260,7 @@ class TestCompactionAndSanitization:
         assert tool_res_2["tool_call_id"] == "call_2"
         assert "interrupted or cancelled" in tool_res_2["content"]
 
-        assert sanitized[4]["content"] == '<system_note type="interrupted">Response interrupted by user</system_note>'
+        assert sanitized[4]["content"] == "<system_note>Interrupted</system_note>"
 
     def test_sanitize_history_partial_tool_completion_then_interrupted(self):
         # Scenario: call_1 completed, but call_2 was interrupted
@@ -276,7 +276,7 @@ class TestCompactionAndSanitization:
                 ],
             },
             {"role": "tool", "tool_call_id": "call_1", "name": "shell", "content": "file1.txt\nfile2.txt"},
-            {"role": "user", "content": '<system_note type="interrupted">Response interrupted by user</system_note>'},
+            {"role": "user", "content": "<system_note>Interrupted</system_note>"},
         ]
 
         sanitized = agent.sanitize_history_for_model(history)
@@ -292,7 +292,7 @@ class TestCompactionAndSanitization:
         history = [
             {"role": "user", "content": "Turn 1"},
             {"role": "assistant", "content": "Reply 1"},
-            {"role": "user", "content": '<system_note type="interrupted">Response interrupted by user</system_note>'},
+            {"role": "user", "content": "<system_note>Interrupted</system_note>"},
             {"role": "user", "content": "Turn 2"},
         ]
         collected = collect_user_messages(history)
@@ -304,7 +304,7 @@ class TestCompactionAndSanitization:
         agent.history = [
             {"role": "user", "content": "Turn 0"},
             {"role": "assistant", "content": "Resp 0"},
-            {"role": "user", "content": '<system_note type="interrupted">Response interrupted by user</system_note>'},
+            {"role": "user", "content": "<system_note>Interrupted</system_note>"},
             {"role": "user", "content": "Turn 1"},
             {"role": "assistant", "content": "Resp 1"},
         ]
@@ -499,7 +499,7 @@ class TestGeneratorStreamInterruptionFlow:
         # Divider added
         canvas.add_event_divider.assert_awaited_once_with("Response Interrupted")
         # System note in history
-        assert any('<system_note type="interrupted">' in m["content"] for m in agent.history)
+        assert any("<system_note>Interrupted</system_note>" in m["content"] for m in agent.history)
 
     @pytest.mark.asyncio
     async def test_cancellation_during_bot_delta_stream(self):
@@ -544,7 +544,7 @@ class TestGeneratorStreamInterruptionFlow:
         assert agent.history[1] == {"role": "assistant", "content": "Chunk 1 Chunk 2"}
         assert agent.history[2] == {
             "role": "user",
-            "content": '<system_note type="interrupted">Response interrupted by user</system_note>',
+            "content": "<system_note>Interrupted</system_note>",
         }
 
     @pytest.mark.asyncio
@@ -610,7 +610,7 @@ class TestGeneratorStreamInterruptionFlow:
         # Tool widget marked cancelled even on raw KeyboardInterrupt
         mock_tool_widget.mark_cancelled.assert_called_once()
         canvas.add_event_divider.assert_awaited_once_with("Response Interrupted")
-        assert any('<system_note type="interrupted">' in m["content"] for m in agent.history)
+        assert any("<system_note>Interrupted</system_note>" in m["content"] for m in agent.history)
 
     def test_ask_user_wizard_screen_has_quit_bindings(self):
         from widgets.presentation.screens.ask_user import AskUserWizardScreen
