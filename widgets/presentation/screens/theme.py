@@ -1,4 +1,4 @@
-"""Theme selection screen with live preview, search filter, and confirm-on-enter."""
+"""Theme selection screen with live preview, search filter, and fit-content modal."""
 
 from textual.widgets import OptionList
 
@@ -8,7 +8,7 @@ from widgets.presentation.screens.base_selection import BaseSelectionScreen
 
 
 class ThemeScreen(BaseSelectionScreen[str]):
-    """Modal screen for selecting UI color themes with search and live preview."""
+    """Modal screen for selecting UI color themes with search, live preview, and compact fit."""
 
     def __init__(self, current_theme: str | None = None) -> None:
         current = current_theme or theme_manager.current_theme.name
@@ -27,7 +27,7 @@ class ThemeScreen(BaseSelectionScreen[str]):
             show_search=True,
             search_placeholder="Search themes...",
             hint_text="enter: select • ↑↓: nav • esc: cancel",
-            dialog_classes="modal-dialog-medium",
+            fit_content=True,
         )
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
