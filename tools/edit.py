@@ -202,6 +202,15 @@ class EditTool(BaseTool):
             if os.path.isdir(path):
                 return ToolResult.error("file", name=path, detail="is a directory")
 
+            from tools.utils import MAX_TOOL_PAYLOAD_BYTES
+
+            try:
+                if os.path.getsize(path) > MAX_TOOL_PAYLOAD_BYTES:
+                    max_mb = MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)
+                    return ToolResult.error("file", name=path, detail=f"file exceeds maximum allowed size ({max_mb}MB)")
+            except OSError:
+                pass
+
             # Read with newline="" to keep \r\n line endings intact: the default
             # universal-newline mode would collapse CRLF -> LF and silently rewrite
             # the whole file in LF on write-back (regression: CRLF file edits).

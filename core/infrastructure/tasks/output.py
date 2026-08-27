@@ -68,6 +68,9 @@ class OutputBuffer:
         self._size = 0
         self._truncated = False
         self._byte_limit = byte_limit
+        self._version = 0
+        self._cached_version = -1
+        self._cached_formatted: Optional[str] = None
 
     # -- appending ----------------------------------------------------------
 
@@ -76,6 +79,7 @@ class OutputBuffer:
             return
         self._chunks.append(chunk)
         self._size += len(chunk)
+        self._version += 1
         if self._size > self._byte_limit:
             self._truncated = True
             # Drop old chunks from the front (tail preserved) until the size
@@ -97,9 +101,12 @@ class OutputBuffer:
         return self._size
 
     def formatted(self, max_chars: Optional[int] = None) -> str:
-        prefix = _OUTPUT_TRUNCATED_MARKER if self._truncated else ""
-        raw = prefix + "".join(self._chunks)
-        text = process_carriage_returns(strip_ansi(raw))
+        if self._cached_formatted is None or self._cached_version != self._version:
+            prefix = _OUTPUT_TRUNCATED_MARKER if self._truncated else ""
+            raw = prefix + "".join(self._chunks)
+            self._cached_formatted = process_carriage_returns(strip_ansi(raw))
+            self._cached_version = self._version
+        text = self._cached_formatted
         if max_chars is None or len(text) <= max_chars:
             return text
         return text[-max_chars:]

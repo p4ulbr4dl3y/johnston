@@ -5,7 +5,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
-from typing import Generator, List, Optional
+from typing import Generator, Optional
 
 from core.domain.defaults.git_excludes import DEFAULT_EXCLUDES
 from core.infrastructure.platform.paths import SHADOW_REPOS_DIR
@@ -341,34 +341,41 @@ class GitCheckpointManager:
                 return
 
             refs_res = run_git(
-                ["for-each-ref", "--format=%(refname)", f"{cls.REF_PREFIX}/{session_id}/*"], cwd=shadow_dir
+                ["for-each-ref", "--format=%(objectname) %(refname)", f"{cls.REF_PREFIX}/{session_id}/"],
+                cwd=shadow_dir,
+                timeout=5.0,
             )
             if refs_res.returncode != 0:
                 return
 
             sid_prefix = f"{cls.REF_PREFIX}/{session_id}/"
             archive_prefix = f"{cls.ARCHIVE_PREFIX}/{session_id}/"
-            for ref in refs_res.stdout.splitlines():
-                ref = ref.strip()
-                if not ref:
+            stdin_cmds = []
+            for line in refs_res.stdout.splitlines():
+                line = line.strip()
+                if not line:
                     continue
+                parts = line.split(maxsplit=1)
+                if len(parts) != 2:
+                    continue
+                sha, ref = parts[0], parts[1]
                 try:
                     idx_str = ref[len(sid_prefix):].rstrip("/")
                     idx = int(idx_str)
                 except ValueError:
                     continue
                 if idx > target_message_index:
-                    sha_res = run_git(["rev-parse", "--verify", ref], cwd=shadow_dir, timeout=2.0)
-                    if sha_res.returncode == 0 and sha_res.stdout.strip():
-                        # Rename to the archive namespace; overwriting an existing
-                        # archive slot for the same index is fine — the newest
-                        # divergent state wins.
-                        run_git(
-                            ["update-ref", f"{archive_prefix}{idx}", sha_res.stdout.strip()],
-                            cwd=shadow_dir,
-                            timeout=2.0,
-                        )
-                    run_git(["update-ref", "-d", ref], cwd=shadow_dir)
+                    if sha:
+                        stdin_cmds.append(f"update {archive_prefix}{idx} {sha}")
+                    stdin_cmds.append(f"delete {ref}")
+
+            if stdin_cmds:
+                run_git(
+                    ["update-ref", "--stdin"],
+                    cwd=shadow_dir,
+                    input="\n".join(stdin_cmds) + "\n",
+                    timeout=5.0,
+                )
 
             cls._prune_expired_archives(shadow_dir)
 
@@ -378,39 +385,50 @@ class GitCheckpointManager:
 
         Age is measured by the checkpoint commit's committer date (a conservative
         proxy for archive age). Unreachable loose objects are pruned at most once
-        per ``PRUNE_INTERVAL_SECONDS`` via a throttle marker file.
+        per ``PRUNE_INTERVAL_SECONDS`` per shadow repo.
         """
-        cutoff = int(time.time()) - cls.ARCHIVE_TTL_DAYS * 86400
+        # 1. Drop stale archived refs.
+        cutoff = time.time() - cls.ARCHIVE_TTL_DAYS * 86400.0
         refs_res = run_git(
-            ["for-each-ref", "--format=%(refname) %(committerdate:unix)", f"{cls.ARCHIVE_PREFIX}/"],
+            ["for-each-ref", "--format=%(refname) %(committerdate:raw)", cls.ARCHIVE_PREFIX],
             cwd=shadow_dir,
             timeout=5.0,
         )
-        if refs_res.returncode == 0:
+        if refs_res.returncode == 0 and refs_res.stdout.strip():
             for line in refs_res.stdout.splitlines():
-                ref, _, date_str = line.strip().rpartition(" ")
-                if not ref or not date_str.isdigit():
-                    continue
-                if int(date_str) < cutoff:
-                    run_git(["update-ref", "-d", ref], cwd=shadow_dir, timeout=2.0)
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    ref = parts[0]
+                    try:
+                        commit_ts = float(parts[1])
+                        if commit_ts < cutoff:
+                            run_git(["update-ref", "-d", ref], cwd=shadow_dir, timeout=2.0)
+                    except ValueError:
+                        pass
 
-        marker = os.path.join(shadow_dir, "johnston_last_prune")
+        # 2. Prune loose objects, throttled to at most once per interval.
+        prune_stamp = os.path.join(shadow_dir, ".last_prune")
+        now = time.time()
         try:
-            now = time.time()
-            if not os.path.exists(marker) or now - os.path.getmtime(marker) > cls.PRUNE_INTERVAL_SECONDS:
-                # Only unreachable objects older than the TTL are collected;
-                # live and archived checkpoints stay intact.
-                run_git(["prune", "--expire", f"{cls.ARCHIVE_TTL_DAYS}.days.ago"], cwd=shadow_dir, timeout=30.0)
-                with open(marker, "a"):
-                    os.utime(marker, (now, now))
-        except Exception:
+            if os.path.exists(prune_stamp):
+                last_prune = os.path.getmtime(prune_stamp)
+                if now - last_prune < cls.PRUNE_INTERVAL_SECONDS:
+                    return
+        except OSError:
+            pass
+
+        run_git(["prune", "--expire=now"], cwd=shadow_dir, timeout=30.0)
+        try:
+            with open(prune_stamp, "w") as f:
+                f.write(str(int(now)))
+        except OSError:
             pass
 
     @classmethod
     def get_diff_details_batch(
         cls,
         session_id: str,
-        message_indices: List[int],
+        message_indices: list[int],
         project_path: Optional[str] = None,
     ) -> dict[int, Optional[tuple[str, list[str]]]]:
         """Calculates line changes and changed files between checkpoints and current workspace.
@@ -430,22 +448,36 @@ class GitCheckpointManager:
             cls._ensure_shadow_exclude(shadow_dir)
 
             with cls._shadow_index_env(shadow_dir, cwd) as env:
-                add_res = run_git(["add", "-A"], cwd=cwd, env=env, timeout=10.0)
+                add_res = run_git(["add", "-A"], cwd=cwd, env=env)
                 if add_res.returncode != 0:
                     return results
 
+                refs_res = run_git(
+                    ["for-each-ref", "--format=%(objectname) %(refname)", f"{cls.REF_PREFIX}/{session_id}/"],
+                    cwd=shadow_dir,
+                    timeout=3.0,
+                )
+                ref_map: dict[str, str] = {}
+                if refs_res.returncode == 0:
+                    for line in refs_res.stdout.splitlines():
+                        parts = line.strip().split(maxsplit=1)
+                        if len(parts) == 2:
+                            ref_map[parts[1]] = parts[0]
+
                 for msg_idx in message_indices:
                     ref_name = cls.get_ref_name(session_id, msg_idx)
-                    rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=1.5)
-                    if rev_res.returncode != 0:
-                        continue
-                    commit_sha = rev_res.stdout.strip()
+                    commit_sha = ref_map.get(ref_name)
+                    if not commit_sha:
+                        rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=1.0)
+                        if rev_res.returncode != 0:
+                            continue
+                        commit_sha = rev_res.stdout.strip()
 
                     diff_res = run_git(
                         ["-c", "core.quotepath=off", "diff", "--cached", "--numstat", commit_sha],
                         cwd=cwd,
                         env=env,
-                        timeout=3.0,
+                        timeout=5.0,
                     )
                     if diff_res.returncode != 0:
                         continue

@@ -364,7 +364,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         cur_limit = getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT)
         threshold = int(cur_limit * CONTEXT_COMPACTION_THRESHOLD_RATIO)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
-        history_tokens = estimate_tokens(self.history) if self.history else 0
+        if self.history and len(self.history) > 10:
+            history_tokens = await asyncio.to_thread(estimate_tokens, self.history)
+        else:
+            history_tokens = estimate_tokens(self.history) if self.history else 0
         total_tokens = sys_overhead + history_tokens
 
         # 1. Model Downshift detection

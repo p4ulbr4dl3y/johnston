@@ -17,18 +17,21 @@ def run_git(
     cwd: Optional[str] = None,
     env: Optional[dict] = None,
     timeout: Optional[float] = None,
+    input: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
-    """Executes a git command safely with optional timeout and environment overrides."""
+    """Executes a git command safely with optional timeout, environment overrides and input."""
+    kwargs = {
+        "cwd": cwd,
+        "capture_output": True,
+        "text": True,
+        "encoding": "utf-8",
+        "env": env,
+        "timeout": timeout,
+    }
+    if input is not None:
+        kwargs["input"] = input
     try:
-        return subprocess.run(
-            ["git"] + args,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            env=env,
-            timeout=timeout,
-        )
+        return subprocess.run(["git"] + args, **kwargs)
     except subprocess.TimeoutExpired:
         return subprocess.CompletedProcess(args=["git"] + args, returncode=124, stdout="", stderr="timeout")
     except Exception as e:
@@ -40,13 +43,14 @@ async def run_git_async(
     cwd: Optional[str] = None,
     env: Optional[dict] = None,
     timeout: Optional[float] = None,
+    input: Optional[str] = None,
 ) -> subprocess.CompletedProcess:
     """Runs ``run_git`` off the event loop via ``asyncio.to_thread``.
 
     Git commands carry timeouts (5-15s) and must never be awaited synchronously
     on the event loop, so async callers should use this wrapper.
     """
-    return await asyncio.to_thread(run_git, args, cwd, env, timeout)
+    return await asyncio.to_thread(run_git, args, cwd, env, timeout, input)
 
 
 def is_git_repository(cwd: Optional[str] = None) -> bool:

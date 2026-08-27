@@ -79,19 +79,17 @@ class ChatInput(TextArea):
     def save_prompt_history(self) -> None:
         """Save global prompt history to disk asynchronously off the event loop."""
         history_copy = list(self.prompt_history)
+        self._pending_prompt_history = history_copy
         try:
             loop = asyncio.get_running_loop()
-            prev_task = getattr(self, "_save_task", None)
+            if getattr(self, "_save_task", None) is None or self._save_task.done():
+                async def _do_save():
+                    while getattr(self, "_pending_prompt_history", None) is not None:
+                        to_save = self._pending_prompt_history
+                        self._pending_prompt_history = None
+                        await asyncio.to_thread(self._save_prompt_history_to_disk, to_save)
 
-            async def _do_save():
-                if prev_task and not prev_task.done():
-                    try:
-                        await prev_task
-                    except Exception:
-                        pass
-                await asyncio.to_thread(self._save_prompt_history_to_disk, history_copy)
-
-            self._save_task = loop.create_task(_do_save())
+                self._save_task = loop.create_task(_do_save())
         except RuntimeError:
             self._save_prompt_history_to_disk(history_copy)
 
@@ -134,7 +132,9 @@ class ChatInput(TextArea):
                 margin_b = target_height + footer_offset + att_offset
 
                 sugg = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
-                sugg.styles.margin = (0, 0, margin_b, 0)
+                new_margin = (0, 0, margin_b, 0)
+                if sugg.styles.margin != new_margin:
+                    sugg.styles.margin = new_margin
         except Exception:
             pass
 

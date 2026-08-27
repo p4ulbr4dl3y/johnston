@@ -426,9 +426,10 @@ class ReadTool(BaseTool):
                             f.seek(offset)
                         if s_line is not None and s_line > 1:
                             # Skip to the requested first line without buffering the whole file.
-                            for _ in range(s_line - 1):
-                                if not f.readline():
-                                    break
+                            import itertools
+
+                            for _ in itertools.islice(f, s_line - 1):
+                                pass
                         if e_line is not None:
                             # Read only up to the requested end line.
                             remaining = max(1, e_line - max(1, s_line or 1) + 1)

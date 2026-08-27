@@ -292,7 +292,7 @@ class CompactionMixin:
         # (last_context_tokens) for "before" with the heuristic for "after"
         # produced misleading jumps on multilingual sessions (a small real
         # reduction looked like "65k -> 37k").
-        tokens_before = sys_tokens + estimate_tokens(self.history)
+        tokens_before = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
 
         # Preserved recent context tail: keep recent active tool sequence or user turn
         split_idx = None
@@ -350,7 +350,7 @@ class CompactionMixin:
 
         trimmed_history = self.history[start_idx:]
         # Native history serialization for summarizer (preserves exact KV prompt cache & tool structures like Codex)
-        sanitized_history_to_compact = self.sanitize_history_for_model(trimmed_history)
+        sanitized_history_to_compact = await asyncio.to_thread(self.sanitize_history_for_model, trimmed_history)
 
         summary_template = (
             "Create a structured handoff summary of the conversation for an AI agent to seamlessly continue the task.\n\n"
@@ -477,8 +477,8 @@ class CompactionMixin:
             preserved_prefix = [m for m in preserved_users if id(m) not in tail_ids]
 
             new_history = preserved_prefix + [checkpoint_item] + recent_tail
-            self.history = self.sanitize_history_for_model(new_history)
-            tokens_after = sys_tokens + estimate_tokens(self.history)
+            self.history = await asyncio.to_thread(self.sanitize_history_for_model, new_history)
+            tokens_after = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
             self.last_context_tokens = tokens_after
 
             from core.models_catalog import format_context_tokens

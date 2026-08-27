@@ -558,7 +558,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
             pm = getattr(cur_app, "pm", None) if cur_app else None
             if not provider_key and pm:
                 provider_key = pm.get_active_provider_key()
-            providers = pm.load_providers() if pm else {}
+            providers = getattr(pm, "providers", None) or (pm.load_providers() if pm else {})
             provider_info = providers.get(provider_key, {}) if isinstance(providers, dict) else {}
             provider_display = provider_info.get("name", provider_key) if provider_info else provider_key
             is_connected = pm.is_provider_connected(provider_key, provider_info) if (pm and provider_key) else False

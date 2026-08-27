@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import logging
@@ -607,6 +608,10 @@ class SessionStore:
                 self._disk_cache_ts = time.time()
         except Exception:
             logger.exception("Failed to save session %s", sess.id)
+
+    async def save_async(self, sess: AgentSession) -> None:
+        """Asynchronously save session off the event loop thread."""
+        await asyncio.to_thread(self.save, sess)
 
     def delete(self, session_id: str) -> None:
         sess = self.get(session_id)

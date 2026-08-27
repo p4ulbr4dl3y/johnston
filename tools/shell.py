@@ -253,9 +253,10 @@ class ShellTool(BaseTool):
             return ToolResult.done(content=truncated, display=truncated, returncode=returncode)
         except asyncio.TimeoutError:
             await terminate_process(p)
-            if read_task:
+            if read_task and not read_task.done():
+                read_task.cancel()
                 try:
-                    await asyncio.wait_for(read_task, timeout=1.0)
+                    await asyncio.wait_for(read_task, timeout=0.2)
                 except Exception:
                     pass
             raw_out = _truncate_output(task.get_formatted_output()).strip()

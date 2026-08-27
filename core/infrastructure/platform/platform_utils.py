@@ -119,6 +119,11 @@ def atomic_write_jsonl(path: str, data: Any) -> None:
     atomic_write_text(path, content)
 
 
+async def atomic_write_jsonl_async(path: str, data: Any) -> None:
+    """Writes JSONL content atomically in a background thread."""
+    await asyncio.to_thread(atomic_write_jsonl, path, data)
+
+
 def read_json(path: str, default: Any = None) -> Any:
     """Reads JSON file safely, returning default if missing, empty, or invalid."""
     if not path or not os.path.exists(path):
