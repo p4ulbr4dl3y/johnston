@@ -18,16 +18,23 @@ class ThemeManager:
 
     _instance: Optional[ThemeManager] = None
 
-    def __init__(self, default_theme: str = "zinc") -> None:
+    def __init__(self, default_theme: str = "zinc", load_config: bool = True) -> None:
         self._themes: dict[str, Theme] = {}
         self._listeners: list[Callable[[Theme], None]] = []
         for theme in BUILTIN_THEMES:
             self.register(theme)
 
-        from core.infrastructure.config.config_helpers import load_theme_config
+        chosen = default_theme
+        if load_config:
+            try:
+                from core.infrastructure.config.config_helpers import load_theme_config
 
-        saved = load_theme_config()
-        chosen = saved if saved and saved in self._themes else default_theme
+                saved = load_theme_config()
+                if saved and saved in self._themes:
+                    chosen = saved
+            except Exception:
+                pass
+
         self._current_theme: Theme = self._themes.get(chosen, ZINC_DARK)
 
     @classmethod
