@@ -1,4 +1,5 @@
 import re
+import time
 from typing import Generic, TypeVar
 
 from textual import events
@@ -36,12 +37,44 @@ _NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 class HeaderWrapOptionList(OptionList):
     """OptionList that keeps the first group's header in view on wrap-around."""
 
+    ALLOW_SELECT = False
+    _last_click_time: float = 0.0
+
+    def _get_option_at_event(self, event: events.MouseEvent) -> int | None:
+        style = getattr(event, "style", None)
+        option_index = getattr(style, "meta", {}).get("option")
+        if option_index is not None:
+            return option_index
+        try:
+            line_idx = self.scroll_offset.y + event.y
+            if 0 <= line_idx < len(self._lines):
+                return self._lines[line_idx][0]
+        except Exception:
+            pass
+        return None
+
     def _on_mouse_move(self, event: events.MouseMove) -> None:
         super()._on_mouse_move(event)
-        option_index = event.style.meta.get("option")
+        option_index = self._get_option_at_event(event)
         if option_index is not None and 0 <= option_index < len(self.options):
             if not self.options[option_index].disabled and self.highlighted != option_index:
                 self.highlighted = option_index
+
+    def _handle_click_select(self, event: events.MouseEvent) -> None:
+        now = time.time()
+        if now - getattr(self, "_last_click_time", 0.0) < 0.15:
+            return
+        clicked_option = self._get_option_at_event(event)
+        if clicked_option is None:
+            clicked_option = self.highlighted
+        if clicked_option is not None and 0 <= clicked_option < len(self._options):
+            if not self._options[clicked_option].disabled:
+                self._last_click_time = now
+                self.highlighted = clicked_option
+                self.action_select()
+
+    async def _on_click(self, event: events.Click) -> None:
+        self._handle_click_select(event)
 
     def action_cursor_down(self) -> None:
         last = find_last_enabled(self.options)
@@ -148,6 +181,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             yield Label(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
+        super().on_mount()
         self._apply_dialog_fit()
         opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
         default_idx = None
@@ -347,6 +381,10 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
                 pass
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        if hasattr(self, "_handle_selection"):
+            self._handle_selection(event.option_index)
+            event.stop()
+            return
         if 0 <= event.option_index < len(self.filtered_items):
             item = self.filtered_items[event.option_index]
             if item is not None:

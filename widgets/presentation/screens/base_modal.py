@@ -1,6 +1,8 @@
 from typing import TypeVar
 
+from textual import events
 from textual.screen import ModalScreen
+from textual.widgets import Input, TextArea
 
 from widgets.utils.key_aliases import expand_bindings
 
@@ -36,6 +38,29 @@ class BaseModalScreen(ModalScreen[T]):
         ("ctrl+q", "quit_app", "Quit"),
     ])
 
+    def on_mount(self) -> None:
+        try:
+            self.clear_selection()
+            for w in self.query("*"):
+                if not isinstance(w, (Input, TextArea)):
+                    w.ALLOW_SELECT = False
+        except Exception:
+            pass
+
+    async def _on_mouse_down(self, event: events.MouseDown) -> None:
+        try:
+            self.clear_selection()
+        except Exception:
+            pass
+        await super()._on_mouse_down(event)
+
+    async def _on_mouse_up(self, event: events.MouseUp) -> None:
+        try:
+            self.clear_selection()
+        except Exception:
+            pass
+        await super()._on_mouse_up(event)
+
     def action_quit_app(self) -> None:
         self.app.exit()
 
@@ -59,3 +84,4 @@ class BaseModalScreen(ModalScreen[T]):
             super().dismiss(result)
         except Exception:
             pass
+

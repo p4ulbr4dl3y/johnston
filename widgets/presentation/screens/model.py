@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from textual import events
 from textual.widgets import Input
 from textual.widgets.option_list import Option
 
@@ -8,6 +9,7 @@ from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT_ID
 from widgets.utils.key_aliases import expand_bindings
+from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, option_list_row_width
 
 
 class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
@@ -42,7 +44,39 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             show_search=True,
             search_placeholder="Search...",
             hint_text="enter: select • ctrl+r: refresh • ↑↓: nav • esc: close",
+            dialog_classes="modal-dialog-medium",
         )
+
+    def _row_width(self) -> int:
+        try:
+            opt_list = self.query_one(f"#{self.option_list_id}")
+            return option_list_row_width(opt_list, MODAL_MEDIUM_ROW_WIDTH)
+        except Exception:
+            return option_list_row_width(None, MODAL_MEDIUM_ROW_WIDTH)
+
+    def on_mount(self) -> None:
+        super().on_mount()
+        self.raw_options, self.raw_items, self.default_value = self._build_data()
+        search_val = ""
+        if self.show_search:
+            try:
+                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+                search_val = search_input.value
+            except Exception:
+                pass
+        self._filter_options(search_val)
+
+    def on_resize(self, event: events.Resize) -> None:
+        super().on_resize(event)
+        self.raw_options, self.raw_items, self.default_value = self._build_data()
+        search_val = ""
+        if self.show_search:
+            try:
+                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+                search_val = search_input.value
+            except Exception:
+                pass
+        self._filter_options(search_val)
 
     async def action_refresh_models(self) -> None:
         """Fetch fresh model catalog with force_refresh=True and re-render."""
@@ -103,6 +137,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         default_val: Union[str, Tuple[str, str], None] = None
 
         target_prov, target_model = self.current_provider, self.current_model
+        target_w = self._row_width()
 
         if isinstance(self.models_data, dict):
             first_group = True
@@ -131,7 +166,10 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 for idx, m in enumerate(p_models):
                     clean_m = catalog.get_model_display_name(p_key, m)
                     is_active = bool(active_idx is not None and idx == active_idx)
-                    opt_label = f"{status_tag('ACTIVE')} {clean_m}" if is_active else f"  {clean_m}"
+                    has_vis = catalog.has_vision(p_key, m)
+                    badge = "vision" if has_vis else ""
+                    prefix = f"{status_tag('ACTIVE')} " if is_active else "  "
+                    opt_label = format_badge_row(clean_m, badge=badge, target_width=target_w, prefix=prefix)
                     item_val = (p_key, m, p_name)
                     options.append(opt_label)
                     items.append(item_val)
@@ -151,7 +189,10 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             for idx, m in enumerate(p_models):
                 clean_m = catalog.get_model_display_name(self.current_provider, m)
                 is_active = bool(active_idx is not None and idx == active_idx)
-                opt_label = f"{status_tag('ACTIVE')} {clean_m}" if is_active else f"  {clean_m}"
+                has_vis = catalog.has_vision(self.current_provider, m)
+                badge = "vision" if has_vis else ""
+                prefix = f"{status_tag('ACTIVE')} " if is_active else "  "
+                opt_label = format_badge_row(clean_m, badge=badge, target_width=target_w, prefix=prefix)
                 options.append(opt_label)
                 items.append(m)
                 if is_active:

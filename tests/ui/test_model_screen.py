@@ -65,6 +65,13 @@ class TestModelScreenBuildData(unittest.TestCase):
         self.assertEqual(screen.default_value, "model-a")
         self.assertNotIn("●", screen.raw_options[0])
 
+    def test_build_data_vision_badge(self):
+        with patch("core.models_catalog.catalog.has_vision", side_effect=lambda prov, m: m == "gpt-4o"):
+            data = {"openai": {"name": "OpenAI", "models": ["gpt-4o", "gpt-3.5-turbo"]}}
+            screen = ModelScreen(models_data=data, current_model="", current_provider="openai")
+            self.assertIn("vision", screen.raw_options[1])
+            self.assertNotIn("vision", screen.raw_options[2])
+
 
 class ModelHostApp(App[None]):
     def __init__(self, screen):

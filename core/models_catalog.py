@@ -93,6 +93,7 @@ class ModelsCatalog:
         self._limits: Dict[str, int] = {}
         self._names: Dict[str, str] = {}
         self._pricing: Dict[str, Dict[str, float]] = {}
+        self._modalities: Dict[str, list[str]] = {}
         self._providers: Dict[str, Dict[str, Any]] = {}
         self._match_cache: "OrderedDict" = OrderedDict()
         self._updated_at: float = 0.0
@@ -115,6 +116,7 @@ class ModelsCatalog:
         model_limits: Dict[str, int] = None,
         model_names: Dict[str, str] = None,
         model_pricing: Dict[str, Dict[str, float]] = None,
+        model_modalities: Dict[str, list[str]] = None,
         providers: Dict[str, Dict[str, Any]] = None,
     ) -> None:
         await asyncio.to_thread(
@@ -122,6 +124,7 @@ class ModelsCatalog:
             model_limits=model_limits,
             model_names=model_names,
             model_pricing=model_pricing,
+            model_modalities=model_modalities,
             providers=providers,
         )
 
@@ -131,6 +134,7 @@ class ModelsCatalog:
             self._limits = data.get("model_limits", {})
             self._names = data.get("model_names", {})
             self._pricing = data.get("model_pricing", {})
+            self._modalities = data.get("model_modalities", {})
             self._providers = data.get("providers", {})
             self._updated_at = float(data.get("updated_at", 0.0))
             return True
@@ -141,6 +145,7 @@ class ModelsCatalog:
         model_limits: Dict[str, int] = None,
         model_names: Dict[str, str] = None,
         model_pricing: Dict[str, Dict[str, float]] = None,
+        model_modalities: Dict[str, list[str]] = None,
         providers: Dict[str, Dict[str, Any]] = None,
     ):
         try:
@@ -151,6 +156,7 @@ class ModelsCatalog:
                 "model_limits": model_limits if model_limits is not None else self._limits,
                 "model_names": model_names if model_names is not None else self._names,
                 "model_pricing": model_pricing if model_pricing is not None else self._pricing,
+                "model_modalities": model_modalities if model_modalities is not None else self._modalities,
                 "providers": providers if providers is not None else self._providers,
             }
             atomic_write_json(CACHE_FILE, payload, indent=2)
@@ -164,6 +170,7 @@ class ModelsCatalog:
         model_limits: Dict[str, int] = {}
         model_names: Dict[str, str] = {}
         model_pricing: Dict[str, Dict[str, float]] = {}
+        model_modalities: Dict[str, list[str]] = {}
         provider_catalog: Dict[str, Dict[str, Any]] = {}
 
         try:
@@ -228,6 +235,13 @@ class ModelsCatalog:
                                             pricing_item["cache_write"] = p_cw
                                         model_pricing[full_id] = pricing_item
                                         model_pricing[alias_id] = pricing_item
+
+                                modalities_info = m_info.get("modalities", {})
+                                if isinstance(modalities_info, dict):
+                                    in_mods = modalities_info.get("input", [])
+                                    if isinstance(in_mods, list) and in_mods:
+                                        model_modalities[full_id] = [str(x).lower() for x in in_mods]
+                                        model_modalities[alias_id] = [str(x).lower() for x in in_mods]
                 except Exception as e:
                     logger.warning("Error parsing models.dev response: %s", e)
 
@@ -263,12 +277,20 @@ class ModelsCatalog:
                                     pricing_item["cache_write"] = p_cw
                                 model_pricing.setdefault(m_id, pricing_item)
                                 model_pricing.setdefault(short_id, pricing_item)
+
+                            arch = m.get("architecture") if isinstance(m.get("architecture"), dict) else {}
+                            in_mods = arch.get("input_modalities", [])
+                            if isinstance(in_mods, list) and in_mods:
+                                normalized_mods = [str(x).lower() for x in in_mods]
+                                model_modalities.setdefault(m_id, normalized_mods)
+                                model_modalities.setdefault(short_id, normalized_mods)
                 except Exception as e:
                     logger.warning("Error parsing OpenRouter response: %s", e)
 
             self._limits = model_limits
             self._names = model_names
             self._pricing = model_pricing
+            self._modalities = model_modalities
             if provider_catalog:
                 self._providers = provider_catalog
             self._match_cache.clear()
@@ -299,6 +321,7 @@ class ModelsCatalog:
             self._limits,
             self._names,
             self._pricing,
+            self._modalities,
         )
 
     def _resolve_catalog_key(
@@ -325,6 +348,10 @@ class ModelsCatalog:
             hasattr(search_space, "__self__") and search_space.__self__ is self._pricing
         ):
             space_tag = "pricing"
+        elif search_space is self._modalities or (
+            hasattr(search_space, "__self__") and search_space.__self__ is self._modalities
+        ):
+            space_tag = "modalities"
         else:
             space_obj = getattr(search_space, "__self__", search_space)
             space_tag = id(space_obj) if space_obj is not None else id(self._limits)
@@ -534,6 +561,54 @@ class ModelsCatalog:
         pricing = self._pricing[resolved]
         half = total_tokens / 2.0
         return half * pricing.get("prompt", 0.0) + half * pricing.get("completion", 0.0)
+
+    def has_vision(self, provider_id: str, model_id: str) -> bool:
+        """Returns True if the model supports image/vision input."""
+        if not model_id:
+            return False
+        if not self._modalities and not self._limits:
+            self.load_cache()
+
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._modalities, tag="modalities")
+        if resolved and resolved in self._modalities:
+            mods = self._modalities[resolved]
+            if isinstance(mods, (list, tuple, set)):
+                return "image" in mods or "vision" in mods
+
+        # Heuristic fallback for common multimodal model naming conventions
+        m_low = model_id.lower()
+        if any(
+            kw in m_low
+            for kw in (
+                "vision",
+                "-vl",
+                "_vl",
+                "omni",
+                "4o",
+                "gemini",
+                "claude-3",
+                "claude-opus",
+                "claude-sonnet",
+            )
+        ):
+            return True
+        return False
+
+    def get_model_modalities(self, provider_id: str, model_id: str) -> list[str]:
+        """Returns input modalities supported by the model (e.g. ['text', 'image'])."""
+        if not model_id:
+            return ["text"]
+        if not self._modalities and not self._limits:
+            self.load_cache()
+
+        resolved = self._resolve_catalog_key(provider_id, model_id, self._modalities, tag="modalities")
+        if resolved and resolved in self._modalities:
+            mods = self._modalities[resolved]
+            if isinstance(mods, list):
+                return list(mods)
+        if self.has_vision(provider_id, model_id):
+            return ["text", "image"]
+        return ["text"]
 
 
 catalog = ModelsCatalog()

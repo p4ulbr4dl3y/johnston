@@ -830,3 +830,76 @@ def test_estimate_cost_scoped_provider_match():
     est_b = cat.estimate_cost_from_totals("beta", "m1", 100_000)
     assert est_a == pytest.approx(50_000 * 1e-06 + 50_000 * 1e-06)
     assert est_b == pytest.approx(50_000 * 3e-06 + 50_000 * 3e-06)
+
+
+def test_has_vision_and_modalities_catalog():
+    cat = ModelsCatalog()
+    cat._modalities = {
+        "openai/gpt-4o": ["text", "image", "pdf"],
+        "openai/gpt-3.5-turbo": ["text"],
+    }
+    assert cat.has_vision("openai", "openai/gpt-4o") is True
+    assert cat.has_vision("openai", "gpt-4o") is True
+    assert cat.has_vision("openai", "gpt-3.5-turbo") is False
+    assert cat.get_model_modalities("openai", "gpt-4o") == ["text", "image", "pdf"]
+    assert cat.get_model_modalities("openai", "gpt-3.5-turbo") == ["text"]
+
+
+def test_has_vision_heuristic_fallback():
+    cat = ModelsCatalog()
+    # Unlisted in catalog, fallback by name
+    assert cat.has_vision("custom", "llava-v1.6-7b") is False
+    assert cat.has_vision("custom", "qwen2-vl-7b-instruct") is True
+    assert cat.has_vision("custom", "claude-3-5-sonnet-20241022") is True
+    assert cat.has_vision("custom", "gemini-2.0-flash") is True
+    assert cat.has_vision("custom", "gpt-4o-mini") is True
+    assert cat.has_vision("custom", "deepseek-coder-v2") is False
+    assert cat.has_vision("custom", "") is False
+
+
+@pytest.mark.asyncio
+async def test_refresh_parses_modalities():
+    cat = ModelsCatalog()
+    mdev_resp = httpx.Response(
+        200,
+        json={
+            "openai": {
+                "name": "OpenAI",
+                "models": {
+                    "gpt-4o": {
+                        "name": "GPT-4o",
+                        "modalities": {"input": ["text", "image"]},
+                        "limit": {"context": 128000},
+                    }
+                },
+            }
+        },
+    )
+    openrouter_resp = httpx.Response(
+        200,
+        json={
+            "data": [
+                {
+                    "id": "anthropic/claude-3.5-sonnet",
+                    "name": "Claude 3.5 Sonnet",
+                    "context_length": 200000,
+                    "architecture": {
+                        "input_modalities": ["text", "image"],
+                        "output_modalities": ["text"],
+                    },
+                }
+            ]
+        },
+    )
+
+    with patch.object(cat, "get_client") as mock_get_client:
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = [mdev_resp, openrouter_resp]
+        mock_get_client.return_value = mock_client
+
+        await cat.refresh(force=True)
+
+        assert cat.has_vision("openai", "gpt-4o") is True
+        assert cat.has_vision("anthropic", "claude-3.5-sonnet") is True
+        assert cat._modalities["openai/gpt-4o"] == ["text", "image"]
+        assert cat._modalities["anthropic/claude-3.5-sonnet"] == ["text", "image"]

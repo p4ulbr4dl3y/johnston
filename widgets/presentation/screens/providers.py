@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 from textual import events
@@ -5,6 +6,9 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 
+from core.infrastructure.platform.paths import CONFIG_DIR
+from core.infrastructure.platform.platform_utils import cached_json_read
+from core.models_catalog import catalog
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
 from widgets.presentation.screens.constants import (
@@ -17,6 +21,7 @@ from widgets.presentation.screens.constants import (
     TAB_KEYS,
 )
 from widgets.utils.key_aliases import KEY_TOGGLE_DISABLED, expand_bindings
+from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, option_list_row_width
 
 
 class ProvidersScreen(BaseSelectionScreen[Any]):
@@ -43,11 +48,44 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             show_search=True,
             search_placeholder="Search...",
             hint_text="enter: connect • space/tab: toggle • esc: close",
+            dialog_classes="modal-dialog-medium",
         )
+
+    def _row_width(self) -> int:
+        try:
+            opt_list = self.query_one(f"#{self.option_list_id}")
+            return option_list_row_width(opt_list, MODAL_MEDIUM_ROW_WIDTH)
+        except Exception:
+            return option_list_row_width(None, MODAL_MEDIUM_ROW_WIDTH)
+
+    def _get_provider_model_count(self, key: str, p: dict) -> int:
+        models = p.get("models")
+        if isinstance(models, list) and models:
+            return len(models)
+        try:
+            cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{key}.json")
+            if os.path.exists(cache_path):
+                cdata = cached_json_read(cache_path, {})
+                if isinstance(cdata, dict):
+                    c_models = cdata.get("models", [])
+                    if isinstance(c_models, list) and c_models:
+                        return len(c_models)
+        except Exception:
+            pass
+        try:
+            cat_p = catalog.get_catalog_provider(key)
+            if isinstance(cat_p, dict):
+                cat_models = cat_p.get("models", [])
+                if isinstance(cat_models, list) and cat_models:
+                    return len(cat_models)
+        except Exception:
+            pass
+        return 0
 
     def _build_options(self):
         options = []
         items = []
+        target_w = self._row_width()
         for pkey, p in self.providers.items():
             if not isinstance(p, dict):
                 continue
@@ -66,7 +104,14 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             else:
                 stag = status_tag("AUTH")
 
-            options.append(f"{stag} {name}")
+            badge = ""
+            if not is_disabled and (is_active or has_key):
+                cnt = self._get_provider_model_count(key, p)
+                if cnt > 0:
+                    badge = f"{cnt} {'model' if cnt == 1 else 'models'}"
+
+            opt_str = format_badge_row(name, badge=badge, prefix=f"{stag} ", target_width=target_w)
+            options.append(opt_str)
             items.append(key)
         return options, items
 
@@ -87,6 +132,28 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             self.query_one("#providers-key-input", Input).display = False
         except Exception:
             pass
+        self.raw_options, self.raw_items = self._build_options()
+        search_val = ""
+        if self.show_search:
+            try:
+                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+                search_val = search_input.value
+            except Exception:
+                pass
+        self._filter_options(search_val)
+
+    def on_resize(self, event: events.Resize) -> None:
+        super().on_resize(event)
+        self.raw_options, self.raw_items = self._build_options()
+        search_val = ""
+        if self.show_search:
+            try:
+                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+                search_val = search_input.value
+            except Exception:
+                pass
+        self._filter_options(search_val)
+
 
     BINDINGS = expand_bindings([
         ("escape", "cancel", "Cancel"),
@@ -139,6 +206,12 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             key_inp.value = ""
             key_inp.display = True
             key_inp.focus()
+            try:
+                from textual.widgets._input import Selection
+                key_inp.selection = Selection(0, 0)
+            except Exception:
+                pass
+            self.clear_selection()
         except Exception:
             pass
 
@@ -151,6 +224,10 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
     def _show_step_1(self) -> None:
         self.step = 1
         self.selected_key = None
+        try:
+            self.clear_selection()
+        except Exception:
+            pass
 
         try:
             md = self.query_one("#providers-markdown", Markdown)
@@ -193,16 +270,14 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
         except Exception:
             pass
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if self.step == 1:
-            if 0 <= event.option_index < len(self.filtered_items):
-                item = self.filtered_items[event.option_index]
-                if item is not None:
-                    self.selected_step1_index = event.option_index
-                    self._show_step_2(item)
-            event.stop()
+    def _handle_selection(self, idx: int | None) -> None:
+        if idx is None or idx < 0 or idx >= len(self.filtered_items):
             return
-        super().on_option_list_option_selected(event)
+        if self.step == 1:
+            item = self.filtered_items[idx]
+            if item is not None:
+                self.selected_step1_index = idx
+                self._show_step_2(item)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "providers-key-input":
@@ -217,17 +292,9 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             event.prevent_default()
             opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
             idx = opt_list.highlighted
-            if idx is not None and 0 <= idx < len(self.filtered_items):
-                item = self.filtered_items[idx]
-                if item is not None:
-                    self.selected_step1_index = idx
-                    self._show_step_2(item)
-                    return
-            for i, item in enumerate(self.filtered_items):
-                if item is not None:
-                    self.selected_step1_index = i
-                    self._show_step_2(item)
-                    return
+            if idx is None and self.filtered_items:
+                idx = 0
+            self._handle_selection(idx)
             return
 
         super().on_input_submitted(event)

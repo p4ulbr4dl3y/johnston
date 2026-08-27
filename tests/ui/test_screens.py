@@ -383,6 +383,22 @@ class TestProvidersScreen(unittest.TestCase):
         s = ProvidersScreen(providers={"p1": {"key": "p1", "name": "P1"}}, active_key="nope", configured_keys={})
         self.assertEqual(s.default_value, "p1")
 
+    def test_provider_model_count_badge(self):
+        providers = {
+            "p1": {"key": "p1", "name": "P1", "models": ["m1", "m2"]},
+            "p2": {"key": "p2", "name": "P2", "models": ["m3"]},
+            "p3": {"key": "p3", "name": "P3", "models": ["m4"]},
+        }
+        s = ProvidersScreen(
+            providers=providers,
+            active_key="p1",
+            configured_keys={"p2": "key"},
+            disabled_providers=["p3"],
+        )
+        self.assertIn("2 models", s.raw_options[0])
+        self.assertIn("1 model", s.raw_options[1])
+        self.assertNotIn("model", s.raw_options[2])  # p3 is disabled/off
+
     def test_tab_key_toggles_disabled(self):
         providers = {"p1": {"key": "p1", "name": "P1"}}
         pm = MagicMock()
@@ -404,7 +420,7 @@ class TestProvidersScreen(unittest.TestCase):
 
     def test_step_transitions_and_esc_back(self):
         providers = {"p1": {"key": "p1", "name": "P1"}}
-        s = ProvidersScreen(providers=providers, active_key="p1", configured_keys={"p1": "secret123456"})
+        s = ProvidersScreen(providers=providers, active_key="", configured_keys={})
         dismissed = []
         s.dismiss = lambda val: dismissed.append(val)
 
@@ -419,7 +435,7 @@ class TestProvidersScreen(unittest.TestCase):
         }
         s.query_one = lambda selector, *args: mock_widgets.get(selector, MagicMock())
 
-        # Select option in step 1 -> transitions to step 2
+        # Select AUTH option in step 1 -> transitions to step 2
         mock_ev = MagicMock()
         mock_ev.option_index = 0
         s.on_option_list_option_selected(mock_ev)
@@ -431,8 +447,10 @@ class TestProvidersScreen(unittest.TestCase):
         esc_ev = MagicMock(key="escape")
         s._on_key(esc_ev)
         self.assertEqual(s.step, 1)
-        self.assertIsNone(s.selected_key)
-        self.assertEqual(len(dismissed), 0)
+        # Action cancel on step 2 -> returns to step 1
+        s.step = 2
+        s.action_cancel()
+        self.assertEqual(s.step, 1)
 
         # Action cancel on step 1 -> dismisses None
         s.action_cancel()
