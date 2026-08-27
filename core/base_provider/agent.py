@@ -395,23 +395,18 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
         sanitized_history = await sanitize_history_cached(self, self.history)
         if attachments:
-            from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
+            att_paths = [getattr(att, "path", str(att)) for att in attachments if getattr(att, "path", str(att))]
+            header_parts = []
+            if len(att_paths) == 1:
+                header_parts.append(f"[Attached: {att_paths[0]}]")
+            elif len(att_paths) > 1:
+                items_str = "\n".join(f"- {p}" for p in att_paths)
+                header_parts.append(f"[Attached:\n{items_str}]")
 
-            img_tags = []
-            for att in attachments:
-                att_path = getattr(att, "path", str(att))
-                if att_path:
-                    escaped_p = escape_xml_attr(att_path)
-                    img_tags.append(f'  <image path="{escaped_p}"/>')
+            if user_text and user_text.strip():
+                header_parts.append(user_text.strip())
 
-            xml_parts = []
-            if img_tags:
-                xml_parts.append("<attached_media>\n" + "\n".join(img_tags) + "\n</attached_media>")
-            if user_text:
-                escaped_user = escape_xml(user_text)
-                xml_parts.append(f"<user_request>\n{escaped_user}\n</user_request>")
-
-            text_content = "\n\n".join(xml_parts) if xml_parts else "What is in this image?"
+            text_content = "\n\n".join(header_parts) if header_parts else "What is in this image?"
             user_content: List[Dict[str, Any]] = [{"type": "text", "text": text_content}]
             for att in attachments:
                 att_path = getattr(att, "path", str(att))

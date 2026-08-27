@@ -526,7 +526,7 @@ class TestAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             user_content[0],
             {
                 "type": "text",
-                "text": "<attached_media>\n  <image path=\"a.png\"/>\n  <image path=\"bad.png\"/>\n</attached_media>\n\n<user_request>\nLook\n</user_request>",
+                "text": "[Attached:\n- a.png\n- bad.png]\n\nLook",
             },
         )
         self.assertEqual(
@@ -550,7 +550,7 @@ class TestAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         user_content = messages[1]["content"]
         self.assertEqual(
             user_content[0],
-            {"type": "text", "text": "<attached_media>\n  <image path=\"clip.png\"/>\n</attached_media>"},
+            {"type": "text", "text": "[Attached: clip.png]"},
         )
         self.assertEqual(
             user_content[1],

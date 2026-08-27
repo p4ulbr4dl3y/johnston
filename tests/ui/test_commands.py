@@ -575,7 +575,6 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.ai_kwargs[0].get("display_text"), "/foo /bar analyze project")
         self.assertIn('<skill name="foo"', prompt)
         self.assertIn('<skill name="bar"', prompt)
-        self.assertIn('<user_request>', prompt)
         self.assertIn("analyze project", prompt)
 
     async def test_models_command_non_vision_warning(self):

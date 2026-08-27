@@ -117,14 +117,11 @@ async def handle_slash_command(app, command_text: str) -> bool:
         loaded_skills = []
 
     if loaded_skills:
-        from core.infrastructure.runtime.xml_utils import escape_xml
-
         skill_blocks = await asyncio.to_thread(_load_skill_blocks, loaded_skills)
         skills_content = "\n\n".join(skill_blocks)
         user_request = " ".join(other_words).strip()
         if user_request:
-            escaped_user = escape_xml(user_request)
-            prompt = f"{skills_content}\n\n<user_request>\n{escaped_user}\n</user_request>"
+            prompt = f"{skills_content}\n\n{user_request}"
         else:
             prompt = skills_content
 
