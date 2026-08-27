@@ -5,6 +5,7 @@ guards and the compact_history adapter/fallback summarizer paths. All provider
 streaming is mocked; no real network calls.
 """
 
+import re
 import unittest.mock
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,6 +13,8 @@ import pytest
 
 from core.base_provider import BaseAgent
 from core.base_provider.compaction import CompactionMixin
+from core.infrastructure.runtime.token_util import estimate_tokens
+from core.models_catalog import format_context_tokens
 
 
 def _agent(history):
@@ -104,6 +107,33 @@ async def test_compact_if_needed_failure_branch():
     assert out == messages
 
 
+@pytest.mark.asyncio
+async def test_compact_if_needed_preserves_api_context_when_not_compacting():
+    """Regression: a non-compacting tool step must NOT overwrite the API-reported
+    context (last_context_tokens) with the heuristic estimate. Previously every
+    tool step clobbered the real prompt_tokens with estimate_tokens(), which made
+    the footer's context_used oscillate on multilingual sessions (e.g. 65000 ->
+    37000) even though no compaction happened."""
+    obj = _min_compactor((True, "done"))
+    messages = [
+        {"role": "system", "content": "s"},
+        {"role": "user", "content": "1"},
+        {"role": "assistant", "content": "2"},
+        {"role": "user", "content": "3"},
+        {"role": "assistant", "content": "4"},
+        {"role": "user", "content": "5"},
+        {"role": "assistant", "content": "6", "tool_calls": [{"id": "c", "function": {"name": "f", "arguments": "{}"}}]},
+        {"role": "tool", "tool_call_id": "c", "content": "ok"},
+    ]
+    obj.history = messages[1:]
+    obj.last_context_tokens = 65000  # real prompt_tokens reported by the API
+    # Huge threshold => no compaction is required.
+    out, compacted, msg = await obj._compact_messages_if_needed(messages, sys_overhead=0, threshold=10**9)
+    assert compacted is False
+    assert out == messages
+    assert obj.last_context_tokens == 65000  # API value preserved, not clobbered
+
+
 # --- compact_history summarizer paths --------------------------------------
 
 _SUMMARY = "<objective>done</objective><next_steps>proceed</next_steps>"
@@ -131,6 +161,50 @@ async def test_compact_history_adapter_streaming_success():
     with patch("core.adapters.get_adapter", return_value=_FakeAdapter()):
         success, msg = await agent.compact_history()
     assert any("<conversation_checkpoint>" in m.get("content", "") for m in agent.history)
+
+
+@pytest.mark.asyncio
+async def test_compact_history_report_before_after_same_method():
+    """Regression: the compaction report must measure before AND after with the
+    SAME estimation method. Previously ``tokens_before`` used a stale
+    API-reported ``last_context_tokens`` while ``tokens_after`` used the
+    heuristic, so a real (small) reduction showed up as a misleading jump like
+    "100M -> 25k" or "65k -> 37k"."""
+    history = [
+        {"role": "user", "content": "Fix bug"},
+        {"role": "assistant", "content": "Inspecting"},
+        {"role": "tool", "tool_call_id": "c", "name": "edit", "content": "ok"},
+        {"role": "user", "content": "more"},
+        {"role": "assistant", "content": "Done"},
+        {"role": "user", "content": "Submit"},
+    ]
+    agent = _agent(history)
+    agent._last_sys_tokens = 0
+    # A stale/huge API-reported value must NOT become ``before`` in the report.
+    agent.last_context_tokens = 99999999
+    sys_tokens = 100
+    expected_before = sys_tokens + estimate_tokens(history)
+
+    class _FakeAdapter:
+        async def stream_chat(self, *a, **k):
+            yield ("adapter_text", _SUMMARY)
+
+    def _fmt(t: int) -> str:
+        return f"{t:,}" if t < 10000 else format_context_tokens(t)
+
+    with (
+        patch("core.adapters.get_adapter", return_value=_FakeAdapter()),
+        patch("core.base_provider.tools.build_prompt_context_async", new_callable=AsyncMock) as mock_bpc,
+    ):
+        mock_bpc.return_value = ("sys", [], sys_tokens)
+        success, msg = await agent.compact_history()
+    assert success
+    m = re.search(r"\((.+?) → (.+?) tokens\)", msg)
+    assert m is not None, msg
+    before_fmt, _after_fmt = m.group(1).strip(), m.group(2).strip()
+    # before must be derived from the heuristic, NOT the inflated API value.
+    assert before_fmt == _fmt(expected_before)
+    assert "M" not in before_fmt
 
 
 @pytest.mark.asyncio

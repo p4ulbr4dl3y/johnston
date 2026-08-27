@@ -257,15 +257,17 @@ class CompactionMixin:
             history_tokens = await asyncio.to_thread(estimate_tokens, messages[1:])
         else:
             history_tokens = 0
-        current_context = sys_overhead + history_tokens
         if not should_compact(len(messages) - 1, sys_overhead, history_tokens, threshold):
-            self.last_context_tokens = current_context
+            # NOTE: do NOT clobber last_context_tokens here. When a step reports
+            # real prompt_tokens (API usage), the footer's context_used reflects
+            # the true context size; overwriting it with the heuristic
+            # estimate_tokens() on every non-compacting tool step made the
+            # counter oscillate on multilingual sessions (e.g. "65k" -> "37k").
             return messages, False, ""
 
         self.history = messages[1:]
         success, msg = await self.compact_history()
         if not success:
-            self.last_context_tokens = current_context
             return messages, False, msg
 
         compacted_history = await asyncio.to_thread(self.sanitize_history_for_model, self.history)
@@ -285,11 +287,12 @@ class CompactionMixin:
 
         sys_prompt, all_tools, sys_tokens = await build_prompt_context_async(self)
 
-        tokens_before = (
-            self.last_context_tokens
-            if getattr(self, "last_context_tokens", 0) > sys_tokens
-            else (sys_tokens + estimate_tokens(self.history))
-        )
+        # Measure before/after with the SAME estimation method so the reported
+        # delta is apples-to-apples. Mixing an API-reported prompt_tokens
+        # (last_context_tokens) for "before" with the heuristic for "after"
+        # produced misleading jumps on multilingual sessions (a small real
+        # reduction looked like "65k -> 37k").
+        tokens_before = sys_tokens + estimate_tokens(self.history)
 
         # Preserved recent context tail: keep recent active tool sequence or user turn
         split_idx = None
