@@ -38,10 +38,11 @@ def format_line_pagination(
     window_start = window_start if window_start is not None else 1
     effective_window = min(len(lines), DEFAULT_LINE_WINDOW)
     if total_lines == 0:
-        p_attr = f' path="{path}"' if path else ""
+        from core.infrastructure.runtime.xml_utils import escape_xml_attr
+
+        p_attr = f' path="{escape_xml_attr(path)}"' if path else ""
         xml = f"<file{p_attr} lines=\"0\" total=\"0\"/>"
-        disp = f"=== 0 lines in {path} ===" if path else "=== 0 lines ==="
-        return ToolResult.done(content=xml, display=disp)
+        return ToolResult.done(content=xml, display="")
 
     if start_line is not None:
         start_line_int = try_int(start_line)
@@ -53,7 +54,7 @@ def format_line_pagination(
                 hint_str = f"File has {total_lines} total lines. Use start_line=1..{total_lines}."
             err_msg = (
                 f"start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
-                f"[Hint: {hint_str}]"
+                f"{hint_str}"
             )
             return ToolResult.error("range", detail=err_msg, name="read")
         start_line = start_line_int
@@ -72,7 +73,6 @@ def format_line_pagination(
         end = min(total_lines, start + effective_window - 1)
 
     xml_lines = []
-    disp_lines = []
     current_len = 0
     actual_end = start - 1
     is_truncated = False
@@ -83,51 +83,27 @@ def format_line_pagination(
             break
         raw_ln = lines[idx]
         formatted_xml = f"{i}|{raw_ln}"
-        formatted_disp = f"{i:5d} | {raw_ln}"
         added_len = len(formatted_xml) + (1 if xml_lines else 0)
         if current_len + added_len > max_chars:
             if not xml_lines:
                 xml_lines.append(formatted_xml[:max_chars])
-                disp_lines.append(formatted_disp[:max_chars])
                 actual_end = i
             is_truncated = True
             break
         xml_lines.append(formatted_xml)
-        disp_lines.append(formatted_disp)
         current_len += added_len
         actual_end = i
 
+    from core.infrastructure.runtime.xml_utils import escape_xml_attr
+
     attrs = []
     if path:
-        attrs.append(f'path="{path}"')
+        attrs.append(f'path="{escape_xml_attr(path)}"')
     attrs.extend([f'start="{start}"', f'end="{actual_end}"', f'total="{total_lines}"'])
     if is_truncated or actual_end < end:
         attrs.append('truncated="1"')
     if converted_path:
-        attrs.append(f'converted_log="{converted_path}"')
+        attrs.append(f'converted_log="{escape_xml_attr(converted_path)}"')
 
     xml_content = f"<file {' '.join(attrs)}>\n" + "\n".join(xml_lines) + "\n</file>"
-
-    # Display content for UI
-    header = f"=== Lines {start}-{actual_end} of {total_lines}"
-    if path:
-        header += f" in {path}"
-    header += " ==="
-
-    hints = []
-    if actual_end < total_lines:
-        next_start = actual_end + 1
-        next_end = min(total_lines, next_start + DEFAULT_LINE_WINDOW - 1)
-        hints.append(f"[Hint: File has {total_lines} lines. Use start_line={next_start} end_line={next_end} to read next chunk.]")
-        if actual_end < end or is_truncated:
-            hints.append(f"[Warning: Output truncated at line {actual_end} before target line {end} due to character limit ({max_chars} chars).]")
-        if converted_path:
-            hints.append(f"[Full converted Markdown saved to {converted_path}. Use shell (grep/tail) to inspect or filter full output.]")
-
-    display_body = "\n".join(disp_lines)
-    if hints:
-        disp_content = f"{header}\n" + "\n".join(hints) + f"\n{display_body}"
-    else:
-        disp_content = f"{header}\n{display_body}"
-
-    return ToolResult.done(content=xml_content, display=disp_content)
+    return ToolResult.done(content=xml_content, display="")

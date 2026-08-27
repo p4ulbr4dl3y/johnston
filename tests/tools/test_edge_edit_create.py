@@ -329,7 +329,7 @@ class TestCreateTool(_Base):
         tool = CreateTool()
         p = os.path.join(self.tmp, "c.bin")
         res = str(await tool.execute({"path": p, "content": b"\x00\x01binary"}))
-        self.assertIn("created", res)
+        self.assertIn("--- /dev/null", res)
 
     async def test_create_parent_path_is_file_returns_err(self):
         tool = CreateTool()
@@ -382,7 +382,8 @@ class TestCreateTool(_Base):
         p = self.write("ov.txt", "original\n")
         res = str(await tool.execute({"path": p, "content": "replaced\n"}))
         self.assertNotIn("ERR:", res)
-        self.assertIn("updated", res)
+        self.assertIn("--- a/", res)
+        self.assertIn("+replaced", res)
         # create strips trailing \r\n (tools/create.py:48), so no trailing newline preserved
         self.assertEqual(self.read("ov.txt"), "replaced")
 

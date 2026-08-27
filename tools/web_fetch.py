@@ -11,7 +11,7 @@ from typing import Any, Dict
 import httpx
 
 from core.domain.defaults.errors import ToolResult
-from tools.base import BaseTool, truncate_output
+from tools.base import BaseTool
 from tools.cancel import run_cancellable
 from tools.utils import MAX_TOOL_PAYLOAD_BYTES
 
@@ -270,15 +270,19 @@ class WebFetchTool(BaseTool):
             else:
                 out_ext = ".md"
 
-        disp_text = truncate_output(
-            text_content,
-            max_chars=8000,
-            tool_name="web_fetch",
-            ext=out_ext,
-        )
+        from core.infrastructure.runtime.xml_utils import escape_xml_attr
+
         is_trunc = len(text_content) > 8000
         trunc_attr = ' truncated="1"' if is_trunc else ""
+        log_attr = ""
+        if is_trunc:
+            from tools.base import _write_output_log
+
+            log_path = _write_output_log(text_content, tool_name="web_fetch", ext=out_ext)
+            log_attr = f' log="{escape_xml_attr(log_path)}"'
+
         xml_body = text_content[:8000].strip() if is_trunc else text_content.strip()
         type_name = out_ext.lstrip(".")
-        xml_content = f'<page url="{url}" status="200" type="{type_name}"{trunc_attr}>\n{xml_body}\n</page>'
-        return ToolResult.done(content=xml_content, display=disp_text)
+        escaped_url = escape_xml_attr(url)
+        xml_content = f'<page url="{escaped_url}" status="200" type="{type_name}"{trunc_attr}{log_attr}>\n{xml_body}\n</page>'
+        return ToolResult.done(content=xml_content, display="")

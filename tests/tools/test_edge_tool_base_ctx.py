@@ -230,12 +230,11 @@ class TestToolContextEdge(unittest.TestCase):
 class TestFormatLinePaginationEdge(unittest.TestCase):
     def test_empty_lines_zero_total(self):
         res = format_line_pagination([], total_lines=0)
-        self.assertEqual(res.display, "=== 0 lines ===")
         self.assertEqual(res.content, '<file lines="0" total="0"/>')
 
     def test_empty_lines_positive_total(self):
         res = format_line_pagination([], total_lines=5)
-        self.assertIn("of 5", res.display)
+        self.assertIn('total="5"', res.content)
 
     def test_start_line_exceeds_total(self):
         res = format_line_pagination(["a"], total_lines=1, start_line=50)

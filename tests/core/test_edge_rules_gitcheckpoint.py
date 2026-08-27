@@ -39,22 +39,22 @@ class TestRulesManagerEdge(unittest.TestCase):
         _write_rule(self.tmpdir, "empty.md", "# Empty Rule\n")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         self.assertEqual(len(rules), 1)
-        self.assertEqual(rules[0].name, "Empty Rule")
-        self.assertEqual(rules[0].content, "")
+        self.assertEqual(rules[0].name, "empty")
+        self.assertEqual(rules[0].content, "# Empty Rule")
 
     def test_heading_with_leading_blank_lines(self):
         _write_rule(self.tmpdir, "spaced.md", "\n\n  \n# Spaced Rule\nSome rule content here.")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         self.assertEqual(len(rules), 1)
-        self.assertEqual(rules[0].name, "Spaced Rule")
-        self.assertEqual(rules[0].content, "Some rule content here.")
+        self.assertEqual(rules[0].name, "spaced")
+        self.assertEqual(rules[0].content, "# Spaced Rule\nSome rule content here.")
 
     def test_empty_heading_falls_back_to_filename(self):
         _write_rule(self.tmpdir, "fallback.md", "# \nActual body text")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         self.assertEqual(len(rules), 1)
         self.assertEqual(rules[0].name, "fallback")
-        self.assertEqual(rules[0].content, "Actual body text")
+        self.assertEqual(rules[0].content, "# \nActual body text")
 
     def test_load_rules_include_global_false(self):
         with mock.patch("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", self.tmpdir):
@@ -66,7 +66,7 @@ class TestRulesManagerEdge(unittest.TestCase):
             # project rule
             _write_rule(self.tmpdir, "p.md", "# Project\nproj content")
             rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
-            self.assertEqual([r.name for r in rules], ["Project"])
+            self.assertEqual([r.name for r in rules], ["p"])
 
     def test_cache_ttl_and_invalidate(self):
         _write_rule(self.tmpdir, "a.md", "# One\nfirst")
@@ -79,12 +79,12 @@ class TestRulesManagerEdge(unittest.TestCase):
         _write_rule(self.tmpdir, "a.md", "# One\nfirse")
         os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
-        self.assertEqual(rules[0].content, "first")
+        self.assertEqual(rules[0].content, "# One\nfirst")
 
         # invalidate_cache forces re-scan even with same signature
         self.rm.invalidate_cache()
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
-        self.assertEqual(rules[0].content, "firse")
+        self.assertEqual(rules[0].content, "# One\nfirse")
 
     def test_cache_same_size_same_mtime_not_detected(self):
         _write_rule(self.tmpdir, "a.md", "# One\nfirst")
@@ -95,7 +95,7 @@ class TestRulesManagerEdge(unittest.TestCase):
             f.write("# One\nsecon")
         os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
-        self.assertEqual(rules[0].content, "first")
+        self.assertEqual(rules[0].content, "# One\nfirst")
 
     def test_unreadable_file_returns_none(self):
         if not hasattr(os, "geteuid"):
@@ -116,14 +116,14 @@ class TestRulesManagerEdge(unittest.TestCase):
         _write_rule(self.tmpdir, "b.md", "# Dup\nsecond")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
         self.assertEqual(len(rules), 2)
-        self.assertEqual(rules[0].name, "Dup")
-        self.assertEqual(rules[1].name, "Dup")
+        self.assertEqual(rules[0].name, "a")
+        self.assertEqual(rules[1].name, "b")
 
     def test_unicode_rule_names(self):
-        _write_rule(self.tmpdir, "a.md", "# Рабочий Процесс\nсодержимое")
+        _write_rule(self.tmpdir, "рабочий_процесс.md", "# Рабочий Процесс\nсодержимое")
         rules = self.rm.load_rules(project_dir=self.tmpdir, include_global=False)
-        self.assertEqual(rules[0].name, "Рабочий Процесс")
-        self.assertEqual(rules[0].content, "содержимое")
+        self.assertEqual(rules[0].name, "рабочий_процесс")
+        self.assertEqual(rules[0].content, "# Рабочий Процесс\nсодержимое")
 
 
 class TestGitCheckpointEdge(unittest.TestCase):

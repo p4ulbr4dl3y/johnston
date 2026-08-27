@@ -110,5 +110,56 @@ class TestMakeGitDiff(unittest.TestCase):
         self.assertEqual(make_git_diff("a\nb\n", "a\nb\n"), "")
 
 
+class TestGitContextUtils(unittest.TestCase):
+    def test_is_git_repository_true(self):
+        from core.infrastructure.runtime.git_utils import is_git_repository
+
+        with patch("core.infrastructure.runtime.git_utils.run_git") as mock_git:
+            mock_git.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="true\n", stderr=""
+            )
+            self.assertTrue(is_git_repository("/tmp"))
+
+    def test_is_git_repository_false(self):
+        from core.infrastructure.runtime.git_utils import is_git_repository
+
+        with patch("core.infrastructure.runtime.git_utils.run_git") as mock_git:
+            mock_git.return_value = subprocess.CompletedProcess(
+                args=[], returncode=128, stdout="", stderr="fatal"
+            )
+            self.assertFalse(is_git_repository("/tmp"))
+
+    def test_format_git_branch_info_named_branch(self):
+        from core.infrastructure.runtime.git_utils import format_git_branch_info
+
+        with patch("core.infrastructure.runtime.git_utils.run_git") as mock_git:
+            mock_git.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="main\n", stderr=""
+            )
+            self.assertEqual(format_git_branch_info("/tmp"), "main")
+
+    def test_format_git_branch_info_detached_head(self):
+        from core.infrastructure.runtime.git_utils import format_git_branch_info
+
+        def side_effect(args, **kwargs):
+            if "--show-current" in args:
+                return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+            if "--short" in args:
+                return subprocess.CompletedProcess(args=args, returncode=0, stdout="abc1234\n", stderr="")
+            return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="")
+
+        with patch("core.infrastructure.runtime.git_utils.run_git", side_effect=side_effect):
+            self.assertEqual(format_git_branch_info("/tmp"), "detached HEAD (abc1234)")
+
+    def test_format_git_branch_info_not_repo(self):
+        from core.infrastructure.runtime.git_utils import format_git_branch_info
+
+        with patch("core.infrastructure.runtime.git_utils.run_git") as mock_git:
+            mock_git.return_value = subprocess.CompletedProcess(
+                args=[], returncode=128, stdout="", stderr="fatal"
+            )
+            self.assertEqual(format_git_branch_info("/tmp"), "")
+
+
 if __name__ == "__main__":
     unittest.main()

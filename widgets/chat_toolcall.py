@@ -189,8 +189,8 @@ def format_manage_subagent_display(result_text: str) -> Text:
                 m.group(3).strip(),
                 m.group(4).strip(),
             )
-            has_role = bool(role and role.lower() not in ("worker", "subagent", "default", "none", ""))
-            desc = f"{role}: {title}" if has_role and title else (title or role or "(no description)")
+            role_cap = role.capitalize() if role else "Worker"
+            desc = f"{role_cap}: {title}" if title else (role_cap or "(no description)")
             if status == "RUNNING":
                 item_t = (
                     Text("[>] ", style="#ffffff")
@@ -427,9 +427,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if canonical in (
             "read",
             "web_fetch",
-            "invoke_subagent",
         ):
             return False
+        if canonical == "invoke_subagent":
+            return True
         if canonical in self.EXPANDABLE_TOOLS:
             return True
         if hasattr(self, "SYSTEM_TOOLS") and self.tool_type not in self.SYSTEM_TOOLS:
@@ -726,71 +727,88 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def on_click(self, event) -> None:
         if not self.is_clickable_header():
             return
+
+        app = None
+        try:
+            app = self.app
+        except Exception:
+            pass
+
         if self.canonical_tool == "invoke_subagent":
             args = self.args if isinstance(self.args, dict) else {}
             session_id = getattr(self, "subagent_session_id", None)
             identifier = session_id or args.get("title") or args.get("prompt") or self.target
-            store = getattr(self.app, "sm", None) if self.app else None
+            store = getattr(app, "sm", None) if app else None
             if store is None:
                 from core.session_manager import SessionStore
 
                 store = SessionStore.get_instance()
-            curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
+            curr_session_id = getattr(app, "current_session_id", None) if app else None
             session = store.find_session_by_description_or_id(identifier, parent_id=curr_session_id) if store else None
             if not session and store:
                 session = store.find_session_by_description_or_id(identifier)
             if not session:
-                if hasattr(self.app, "notify"):
-                    self.app.notify("Subagent session not found", severity="warning")
+                if app and hasattr(app, "notify"):
+                    app.notify("Subagent session not found", severity="warning")
                 event.stop()
                 return
-            try:
-                from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+            if getattr(session, "status", "") == "running":
+                try:
+                    from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
-                self.app.push_screen(SubagentViewScreen(identifier))
-            except Exception:
-                pass
-            event.stop()
-            return
+                    if app:
+                        app.push_screen(SubagentViewScreen(identifier))
+                    event.stop()
+                    return
+                except Exception:
+                    pass
+            if self.is_expandable():
+                self.toggle_expanded()
+                event.stop()
+                return
         if self.canonical_tool == "manage_subagent":
             args = self.args if isinstance(self.args, dict) else {}
             session_id = getattr(self, "subagent_session_id", None) or args.get("session_id")
             if session_id:
-                store = getattr(self.app, "sm", None) if self.app else None
+                store = getattr(app, "sm", None) if app else None
                 if store is None:
                     from core.session_manager import SessionStore
 
                     store = SessionStore.get_instance()
-                curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
+                curr_session_id = getattr(app, "current_session_id", None) if app else None
                 session = (
                     store.find_session_by_description_or_id(session_id, parent_id=curr_session_id)
                     if store
                     else None
                 )
-                if not session and store:
-                    session = store.find_session_by_description_or_id(session_id)
                 if not session:
-                    if hasattr(self.app, "notify"):
-                        self.app.notify("Subagent session not found", severity="warning")
+                    if app and hasattr(app, "notify"):
+                        app.notify("Subagent session not found", severity="warning")
                     event.stop()
                     return
-                try:
-                    from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+                if getattr(session, "status", "") == "running":
+                    try:
+                        from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
-                    self.app.push_screen(SubagentViewScreen(session_id))
-                except Exception:
-                    pass
-                event.stop()
-                return
+                        if app:
+                            app.push_screen(SubagentViewScreen(session_id))
+                        event.stop()
+                        return
+                    except Exception:
+                        pass
+                if self.is_expandable():
+                    self.toggle_expanded()
+                    event.stop()
+                    return
             else:
                 action = (args.get("action") or "list").lower()
                 if action == "list":
-                    store = getattr(self.app, "sm", None) if self.app else None
+                    store = getattr(app, "sm", None) if app else None
                     if store is None:
                         from core.session_manager import SessionStore
 
                         store = SessionStore.get_instance()
-                    curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
+                    curr_session_id = getattr(app, "current_session_id", None) if app else None
                     subagents = (
                         store.children(curr_session_id)
                         if curr_session_id and store
@@ -801,7 +819,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         try:
                             from widgets.presentation.screens.tasks import SubagentsScreen
 
-                            self.app.push_screen(SubagentsScreen())
+                            if app:
+                                app.push_screen(SubagentsScreen())
                             event.stop()
                             return
                         except Exception:
@@ -810,12 +829,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             args = self.args if isinstance(self.args, dict) else {}
             action = (args.get("action") or "list").lower()
             if action == "list":
-                app = getattr(self, "app", None)
                 tasks = getattr(app, "task_manager", []) if app else []
                 curr_sid = getattr(app, "current_session_id", None) if app else None
                 has_active = any(
                     getattr(t, "kind", "") == "shell"
                     and getattr(t, "is_background", False)
+                    and getattr(t, "is_running", False)
                     and (getattr(t, "session_id", None) == curr_sid if curr_sid else True)
                     for t in (tasks or [])
                 )
@@ -823,13 +842,36 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     try:
                         from widgets.presentation.screens.tasks import ShellTasksScreen
 
-                        self.app.push_screen(ShellTasksScreen())
+                        if app:
+                            app.push_screen(ShellTasksScreen())
                         event.stop()
                         return
                     except Exception:
                         pass
+        if self.canonical_tool == "shell":
+            tasks = getattr(app, "task_manager", []) if app else []
+            curr_sid = getattr(app, "current_session_id", None) if app else None
+            task_id = getattr(self, "task_id", None)
+            is_bg_running = any(
+                getattr(t, "kind", "") == "shell"
+                and getattr(t, "is_background", False)
+                and getattr(t, "is_running", False)
+                and (t.task_id == task_id if task_id else True)
+                and (getattr(t, "session_id", None) == curr_sid if curr_sid else True)
+                for t in (tasks or [])
+            ) if (self.status == "running" or getattr(self, "is_background", False)) else False
+            if is_bg_running:
+                try:
+                    from widgets.presentation.screens.tasks import ShellTasksScreen
+
+                    if app:
+                        app.push_screen(ShellTasksScreen())
+                    event.stop()
+                    return
+                except Exception:
+                    pass
         if self.canonical_tool == "ask_user":
-            if getattr(self.app, "_pending_ask_user", None) is not None:
+            if getattr(app, "_pending_ask_user", None) is not None:
                 self._resume_ask_user_wizard()
                 event.stop()
                 return
@@ -1029,6 +1071,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 if action == "list":
                     return "raw", self._format_manage_subagent_display()
                 clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
+            elif self.canonical_tool == "invoke_subagent":
+                clean_res = self._clean_hints_for_ui(self.result_text or "")
+                if not clean_res.strip():
+                    prompt = (self.args if isinstance(self.args, dict) else {}).get("prompt", "")
+                    clean_res = prompt or "(Subagent task)"
                 return "markup", self._clean_markup_text(clean_res)
             elif self.tool_type == "shell":
                 output_text = self._clean_bash_output(self.result_text)

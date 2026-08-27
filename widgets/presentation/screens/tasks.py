@@ -102,18 +102,16 @@ def format_subagent_task_row(
 ) -> str:
     """Format a subagent row with role prefix and human-like activity/status badge on the right."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(subagent task)"
+    role_str = "Worker"
     if session is not None:
         agent = getattr(session, "agent", None)
         role = getattr(agent, "role", None) if agent else getattr(session, "role", None)
-        if (
-            role
-            and isinstance(role, str)
-            and role.strip()
-            and role.strip().lower() not in ("worker", "subagent", "default")
-        ):
-            role_clean = role.strip()
-            if not clean.lower().startswith(role_clean.lower()):
-                clean = f"{role_clean}: {clean}"
+        if role and isinstance(role, str) and role.strip():
+            role_str = role.strip().capitalize()
+    if not clean.lower().startswith(f"{role_str.lower()}:"):
+        clean = f"{role_str}: {clean}"
+    else:
+        clean = f"{role_str}:{clean[len(role_str)+1:]}"
     badge_plain = (
         extract_subagent_progress(session)
         if session is not None

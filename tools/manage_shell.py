@@ -1,7 +1,13 @@
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
-from core.infrastructure.tasks.manage import filter_to_session, find_any, list_lines, not_found_message
+from core.infrastructure.tasks.manage import (
+    filter_to_session,
+    find_any,
+    format_tasks_xml,
+    list_lines,
+    not_found_message,
+)
 from tools.base import BaseTool
 
 
@@ -47,8 +53,9 @@ class ManageShellTool(BaseTool):
         tasks = filter_to_session(tasks, curr_sid)
 
         if action == "list":
-            msg = list_lines(tasks)
-            return ToolResult.done(content=msg, display=msg)
+            content_xml = format_tasks_xml(tasks)
+            display_txt = list_lines(tasks)
+            return ToolResult.done(content=content_xml, display=display_txt)
 
         if action == "send_input":
             if not task_id:

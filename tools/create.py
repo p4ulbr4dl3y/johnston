@@ -66,7 +66,14 @@ class CreateTool(BaseTool):
         def _write_and_diff():
             write_file_text(path, content)
             if not file_existed:
-                return None
+                new_lines = content.splitlines()
+                cnt = len(new_lines) or 1
+                diff_lines = [
+                    "--- /dev/null",
+                    f"+++ b/{path}",
+                    f"@@ -0,0 +1,{cnt} @@",
+                ] + [f"+{line}" for line in new_lines]
+                return "\n".join(diff_lines)
             diff_text = make_git_diff(old_content, content, fromfile=f"a/{path}", tofile=f"b/{path}")
             if not diff_text:
                 new_lines = content.splitlines()
@@ -75,18 +82,13 @@ class CreateTool(BaseTool):
                     f"--- a/{path}",
                     f"+++ b/{path}",
                     f"@@ -1,{cnt} +1,{cnt} @@",
-                ] + [" " + line for line in new_lines]
+                ] + [f" {line}" for line in new_lines]
                 diff_text = "\n".join(diff_lines)
             return diff_text
 
         try:
             diff_text = await run_cancellable(_write_and_diff)
-            if file_existed:
-                diff_part = f"\n\n{diff_text.strip()}" if diff_text and diff_text.strip() else ""
-                msg = f"file '{path}' updated.{diff_part}"
-                return ToolResult.done(content=msg, display=msg)
-            else:
-                msg = f"file '{path}' created."
-                return ToolResult.done(content=msg, display=msg)
+            diff_text = diff_text.strip() if diff_text else ""
+            return ToolResult.done(content=diff_text, display=diff_text)
         except Exception as e:
             return ToolResult.error("file", detail=str(e), name=path)

@@ -333,29 +333,22 @@ class ReadTool(BaseTool):
                         else:
                             files.append(entry)
 
-                    formatted = dirs + files
-                    if len(formatted) > MAX_DIR_ENTRIES:
-                        shown = formatted[:MAX_DIR_ENTRIES]
-                        content = (
-                            "\n".join(shown)
-                            + f"\n... [{total_count - MAX_DIR_ENTRIES} items truncated. Total: {total_count} items. Use shell tools for deep listing]"
-                        )
-                    else:
-                        content = "\n".join(formatted) if formatted else "(empty directory)"
+                    from core.infrastructure.runtime.xml_utils import escape_xml_attr
 
+                    escaped_path = escape_xml_attr(path)
                     xml_entries = [f"<d>{e}</d>" for e in dirs] + [f"<f>{e}</f>" for e in files]
                     if len(xml_entries) > MAX_DIR_ENTRIES:
                         xml_body = "\n".join(xml_entries[:MAX_DIR_ENTRIES])
-                        xml_content = f'<dir path="{path}" total="{total_count}" truncated="1">\n{xml_body}\n</dir>'
+                        xml_content = f'<dir path="{escaped_path}" total="{total_count}" truncated="1">\n{xml_body}\n</dir>'
                     elif xml_entries:
                         xml_body = "\n".join(xml_entries)
-                        xml_content = f'<dir path="{path}" total="{total_count}">\n{xml_body}\n</dir>'
+                        xml_content = f'<dir path="{escaped_path}" total="{total_count}">\n{xml_body}\n</dir>'
                     else:
-                        xml_content = f'<dir path="{path}" total="0"/>'
+                        xml_content = f'<dir path="{escaped_path}" total="0"/>'
 
                     return ToolResult.done(
                         content=xml_content,
-                        display=f"Path '{path}' is a directory ({total_count} items). [Hint: Use shell tools for deep listing]:\n{content}",
+                        display="",
                     )
                 except Exception as e:
                     return ToolResult.error("listing", detail=str(e), name=path)

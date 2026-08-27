@@ -60,31 +60,9 @@ class RulesManager:
             if not raw:
                 return None
 
-            base_name = os.path.splitext(os.path.basename(fpath))[0]
-            name = base_name
-            fm, body = parse_frontmatter(raw)
-            if "name" in fm and fm["name"]:
-                name = str(fm["name"]).strip()
-
-            lines = body.splitlines()
-            idx = 0
-            while idx < len(lines) and not lines[idx].strip():
-                idx += 1
-
-            # Extract # Heading as rule name if present
-            if idx < len(lines):
-                first_line = lines[idx].strip()
-                if first_line.startswith("# ") or first_line == "#":
-                    header_title = first_line.lstrip("#").strip()
-                    if header_title:
-                        name = header_title
-                    content = "\n".join(lines[idx + 1 :]).strip()
-                else:
-                    content = "\n".join(lines[idx:]).strip()
-            else:
-                content = ""
-
-            return RuleDefinition(name=name, content=content, source=source)
+            name = os.path.splitext(os.path.basename(fpath))[0]
+            _, content = parse_frontmatter(raw)
+            return RuleDefinition(name=name, content=content.strip(), source=source)
         except Exception:
             return None
 

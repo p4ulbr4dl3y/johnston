@@ -29,6 +29,28 @@ def list_lines(tasks: List[Any], *, header: str = "Active Background Tasks:") ->
     return "\n".join(lines)
 
 
+def format_tasks_xml(tasks: List[Any]) -> str:
+    """Render a canonical XML representation of tasks for LLM consumption."""
+    from core.infrastructure.runtime.xml_utils import escape_xml_attr
+
+    if not tasks:
+        return '<bg_tasks total="0"/>'
+
+    items = []
+    for t in tasks:
+        tid = escape_xml_attr(str(getattr(t, "task_id", getattr(t, "id", ""))))
+        is_running = getattr(t, "is_running", True)
+        status = "running" if is_running else "finished"
+        cmd = escape_xml_attr(str(getattr(t, "command", "")))
+        raw_log = getattr(t, "log_path", None)
+        attrs = [f'id="{tid}"', f'status="{status}"', f'cmd="{cmd}"']
+        if raw_log and str(raw_log).strip():
+            attrs.append(f'log="{escape_xml_attr(str(raw_log))}"')
+        items.append(f"  <task {' '.join(attrs)}/>")
+
+    return f'<bg_tasks total="{len(tasks)}">\n' + "\n".join(items) + "\n</bg_tasks>"
+
+
 def not_found_message(task_id: str, tasks: List[Any], manager_name: str) -> str:
     """Build a scoped not-found error with a hint of the active task ids."""
     from core.domain.defaults.errors import format_tool_error

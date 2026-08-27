@@ -30,14 +30,15 @@ def format_skills_markdown(skills: List[Any]) -> str:
         if loc:
             attrs.append(f'path="{escape_xml_attr(str(loc))}"')
         if s.description:
-            attrs.append(f'desc="{escape_xml_attr(s.description)}"')
+            desc_clean = " ".join(s.description.split())
+            attrs.append(f'desc="{escape_xml_attr(desc_clean)}"')
         skills_xml.append(f"  <skill {' '.join(attrs)}/>")
 
     return "<skills>\n" + "\n".join(skills_xml) + "\n</skills>"
 
 
 def format_rules_markdown(rules: List[Any]) -> str:
-    """Build the ``<rules>`` block for the system prompt.
+    """Build the ``<project_rules>`` block for the system prompt.
 
     ``rules`` is the ordered list of active ``RuleDefinition`` objects (the
     application layer filters by role and returns data). Returns ``""`` when
@@ -46,12 +47,12 @@ def format_rules_markdown(rules: List[Any]) -> str:
     if not rules:
         return ""
 
-    from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
+    from core.infrastructure.runtime.xml_utils import escape_xml_attr
 
     matching = []
     for r in rules:
         r_name = escape_xml_attr(getattr(r, "name", str(r)))
-        r_content = escape_xml(getattr(r, "content", ""))
-        matching.append(f'<rule name="{r_name}">\n{r_content}\n</rule>')
+        r_content = getattr(r, "content", "")
+        matching.append(f'  <rule name="{r_name}">\n{r_content}\n  </rule>')
 
-    return "<rules>\n" + "\n\n".join(matching) + "\n</rules>"
+    return "<project_rules>\n" + "\n\n".join(matching) + "\n</project_rules>"

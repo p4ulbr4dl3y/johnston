@@ -81,11 +81,11 @@ def _forget_mcp_miss(name: str) -> None:
 
 
 def _unknown_tool_result(name: str, clean_name: str) -> ToolResult:
-    """Build the 'unknown tool' error, with a close-match hint when available."""
+    """Build the 'unknown tool' error, with a close-match suggestion when available."""
     matches = difflib.get_close_matches(clean_name, _close_match_candidates(), n=2, cutoff=0.4)
     hint = ""
     if matches:
-        hint = f" [Hint: Did you mean '{matches[0]}'?]"
+        hint = f" Did you mean '{matches[0]}'?"
     return ToolResult.error("unknown", detail=hint.strip(), name=name)
 
 

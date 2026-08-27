@@ -227,9 +227,8 @@ class InvokeSubagentTool(BaseTool):
 
         branch_attr = f' branch="{branch_name}"' if branch_name else ""
         xml_content = f'<subagent id="{session_id}" role="{canonical_role}"{branch_attr} status="running"/>'
-        disp_content = f"subagent '{title}' launched (session_id: {session_id})"
         return ToolResult(
             status=ToolResultStatus.RUNNING,
             content=xml_content,
-            display=disp_content,
+            display="",
         )

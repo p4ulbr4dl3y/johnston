@@ -77,15 +77,14 @@ def format_background_notification(kind: str, name: str, task_id: str, result: s
     Emitted as a synthetic user message when a background shell/subagent finishes:
     `<task_notification kind="..." name="..." id="...">\n...\n</task_notification>`
     """
-    from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
+    from core.infrastructure.runtime.xml_utils import escape_xml_attr
 
     escaped_kind = escape_xml_attr(kind)
     escaped_name = escape_xml_attr(name)
     escaped_id = escape_xml_attr(task_id)
-    escaped_result = escape_xml(result)
     return (
         f'<task_notification kind="{escaped_kind}" name="{escaped_name}" id="{escaped_id}">\n'
-        f"{escaped_result}\n"
+        f"{result}\n"
         f"</task_notification>"
     )
 

@@ -15,7 +15,7 @@ class TestSubagentRoles(unittest.TestCase):
 
         explorer_def = registry.get_role("explorer")
         self.assertEqual(explorer_def.name, "Explorer")
-        self.assertIn('<role name="explorer"', explorer_def.prompt)
+        self.assertIn('<active_role name="explorer"', explorer_def.prompt)
 
     def test_load_markdown_subagents(self):
         with tempfile.TemporaryDirectory() as tmpdir:

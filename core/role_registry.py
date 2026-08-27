@@ -19,11 +19,11 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="Worker",
         description="Execution mode: creation, editing, and shell command execution.",
         prompt=(
-            '<role name="worker" mode="execution">\n'
+            '<active_role name="worker">\n'
             '  <rule id="surgical">Modify only what the task strictly requires. NEVER make unsolicited changes, speculative additions, or touch unrelated items.</rule>\n'
             '  <rule id="preservation">Preserve existing structure, conventions, and functional integrity unless explicitly instructed to alter them.</rule>\n'
             '  <rule id="safety">NEVER perform irreversible destruction or accidental data loss; operate strictly within the assigned task boundaries.</rule>\n'
-            '</role>'
+            '</active_role>'
         ),
         scope="any",
         source="builtin",
@@ -33,11 +33,11 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="Explorer",
         description="Read-only mode for information gathering, research, analysis, and action planning.",
         prompt=(
-            '<role name="explorer" mode="read_only">\n'
+            '<active_role name="explorer" read_only="true">\n'
             '  <rule id="read_only">Strictly read-only mode. NEVER modify state or run destructive operations. If asked to modify, decline and provide an actionable execution plan instead.</rule>\n'
             '  <rule id="evidence">Anchor all findings, architectures, and diagnoses in exact file references and data.</rule>\n'
             '  <rule id="plans">When designing solutions, provide Goal, Trade-offs, Dependencies, Step-by-step Execution, and Verification steps.</rule>\n'
-            '</role>'
+            '</active_role>'
         ),
         read_only=True,
         scope="any",
@@ -133,7 +133,8 @@ class RoleRegistry:
             if role.provider:
                 attrs.append(f'provider="{escape_xml_attr(role.provider)}"')
             if role.description:
-                attrs.append(f'desc="{escape_xml_attr(role.description)}"')
+                desc_clean = " ".join(role.description.split())
+                attrs.append(f'desc="{escape_xml_attr(desc_clean)}"')
             roles_xml.append(f"  <subagent {' '.join(attrs)}/>")
 
         return "<subagents>\n" + "\n".join(roles_xml) + "\n</subagents>"

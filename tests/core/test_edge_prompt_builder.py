@@ -290,7 +290,7 @@ def test_build_system_prompt_deterministic_same_run():
 def test_build_system_prompt_subagent_no_role_prompt_injected():
     b = PromptBuilder("Base", [], role="orchestrator", is_subagent=True)
     out = b.build_system_prompt()
-    assert '<role name="orchestrator"' not in out
+    assert '<active_role name="orchestrator"' not in out
 
 
 # ---------------------------------------------------------------------------

@@ -56,15 +56,15 @@ def is_git_repository(cwd: Optional[str] = None) -> bool:
 
 
 def format_git_branch_info(cwd: Optional[str] = None) -> str:
-    """Returns a human-readable git context string for a working directory.
+    """Returns a human-readable git branch string for a working directory.
 
-    ``branch '<name>'`` when on a branch, ``detached HEAD (<sha>)`` when not,
+    ``<name>`` when on a branch, ``detached HEAD (<sha>)`` when not,
     or ``""`` when the directory is not a git repo. Pure git-format knowledge
     kept in infrastructure (used by the prompt builder's system prompt).
     """
     res = run_git(["branch", "--show-current"], cwd=cwd, timeout=1)
     if res.returncode == 0 and res.stdout.strip():
-        return f"branch '{res.stdout.strip()}'"
+        return res.stdout.strip()
 
     rev_res = run_git(["rev-parse", "--short", "HEAD"], cwd=cwd, timeout=1)
     if rev_res.returncode == 0 and rev_res.stdout.strip():

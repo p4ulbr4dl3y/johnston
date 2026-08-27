@@ -12,12 +12,12 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertIn('cwd="', sys_prompt)
         self.assertIn('date="', sys_prompt)
         self.assertIn('os="', sys_prompt)
-        self.assertIn('<role name="worker"', sys_prompt)
+        self.assertIn('<active_role name="worker"', sys_prompt)
 
     def test_build_system_prompt_explorer_mode(self):
         builder = PromptBuilder("System prompt test", [], role="explorer")
         sys_prompt = builder.build_system_prompt()
-        self.assertIn('<role name="explorer"', sys_prompt)
+        self.assertIn('<active_role name="explorer"', sys_prompt)
         self.assertIn("read_only", sys_prompt)
 
     def test_build_tools_explorer_mode_filters_create_edit(self):
@@ -86,7 +86,7 @@ class TestPromptBuilder(unittest.TestCase):
         prompt_exp = pb_exp.build_system_prompt()
         tools_exp = pb_exp.build_tools()
         exp_tool_names = [t["function"]["name"] for t in tools_exp]
-        self.assertIn('<role name="explorer"', prompt_exp)
+        self.assertIn('<active_role name="explorer"', prompt_exp)
         self.assertNotIn("create", exp_tool_names)
         self.assertNotIn("edit", exp_tool_names)
         self.assertIn("read", exp_tool_names)
@@ -105,7 +105,7 @@ class TestPromptBuilder(unittest.TestCase):
             with patch("os.getcwd", return_value=tmpdir):
                 builder = PromptBuilder("Test", [], role="worker")
                 prompt = builder.build_system_prompt()
-                self.assertIn("<rules>", prompt)
+                self.assertIn("<project_rules>", prompt)
                 self.assertIn('<rule name="custom_rule">', prompt)
                 self.assertIn("Always use pytest", prompt)
 
@@ -115,7 +115,7 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("Base instructions marker", [], role="worker")
         prompt = builder.build_system_prompt()
         self.assertLess(prompt.index("Base instructions marker"), prompt.index("<environment"))
-        self.assertLess(prompt.index('<role name="worker"'), prompt.index("<environment"))
+        self.assertLess(prompt.index('<active_role name="worker"'), prompt.index("<environment"))
 
     def test_build_system_prompt_substitutes_model_name(self):
         builder = PromptBuilder(
@@ -133,7 +133,7 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("Subagent base prompt", [], role="orchestrator", is_subagent=True)
         prompt = builder.build_system_prompt()
         self.assertIn("Subagent base prompt", prompt)
-        self.assertNotIn('<role name="orchestrator"', prompt)
+        self.assertNotIn('<active_role name="orchestrator"', prompt)
         self.assertNotIn("<subagents>", prompt)
         self.assertIn("<environment", prompt)
 

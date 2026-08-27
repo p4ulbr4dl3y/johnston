@@ -54,14 +54,27 @@ class ManageSubagentTool(BaseTool):
         if action == "list":
             target_sessions = store.children(curr_session_id) if curr_session_id else store.list(kind="subagent")
             if not target_sessions:
-                return ToolResult.done("No subagent sessions found for current session.")
-            lines = ["Active/Past Subagent Sessions:"]
-            for sess in target_sessions:
-                lines.append(
-                    f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {sess.role} | Title: {sess.description}"
+                return ToolResult.done(
+                    content='<subagents total="0"/>',
+                    display="No subagent sessions found for current session.",
                 )
-            msg = "\n".join(lines)
-            return ToolResult.done(content=msg, display=msg)
+            from core.infrastructure.runtime.xml_utils import escape_xml_attr
+
+            xml_items = []
+            disp_lines = ["Active/Past Subagent Sessions:"]
+            for sess in target_sessions:
+                s_id = escape_xml_attr(str(sess.id))
+                s_status = escape_xml_attr(str(sess.status))
+                s_role = escape_xml_attr(str(sess.role or "worker"))
+                s_desc = escape_xml_attr(str(sess.description or ""))
+                xml_items.append(f'  <subagent id="{s_id}" status="{s_status}" role="{s_role}" title="{s_desc}"/>')
+                disp_lines.append(
+                    f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {(sess.role or 'worker').capitalize()} | Title: {sess.description}"
+                )
+
+            content_xml = f'<subagents total="{len(target_sessions)}">\n' + "\n".join(xml_items) + "\n</subagents>"
+            display_txt = "\n".join(disp_lines)
+            return ToolResult.done(content=content_xml, display=display_txt)
 
         if not session_id:
             return ToolResult.error(

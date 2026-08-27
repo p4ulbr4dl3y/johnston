@@ -37,17 +37,17 @@ class TestToolDisplay(unittest.TestCase):
 
     def test_subagent_title(self):
         res = extract_tool_display("invoke_subagent", {"title": "find bugs", "prompt": "long prompt"})
-        self.assertEqual(res, '"find bugs"')
+        self.assertEqual(res, 'Worker: "find bugs"')
         res2 = extract_tool_display("invoke_subagent", {"title": "find bugs", "type": "worker"})
-        self.assertEqual(res2, '"find bugs"')
+        self.assertEqual(res2, 'Worker: "find bugs"')
         res3 = extract_tool_display("invoke_subagent", {"title": "find bugs", "type": "explorer"})
-        self.assertEqual(res3, 'explorer: "find bugs"')
+        self.assertEqual(res3, 'Explorer: "find bugs"')
         res4 = extract_tool_display("invoke_subagent", {"title": "find bugs", "role": "reviewer"})
-        self.assertEqual(res4, 'reviewer: "find bugs"')
+        self.assertEqual(res4, 'Reviewer: "find bugs"')
 
     def test_subagent_prompt_only_empty_parens(self):
-        # No title -> empty parens, prompt is not a fallback.
-        self.assertEqual(extract_tool_display("invoke_subagent", {"prompt": "long prompt"}), "")
+        # No title -> shows Worker
+        self.assertEqual(extract_tool_display("invoke_subagent", {"prompt": "long prompt"}), "Worker")
 
     def test_manage_shell_list_action(self):
         res = extract_tool_display("manage_shell", {"action": "list"})
@@ -70,7 +70,7 @@ class TestToolDisplay(unittest.TestCase):
         for name in ("read", "create", "edit", "shell", "web_fetch", "update_plan"):
             self.assertEqual(extract_tool_display(name, {}), "")
         self.assertEqual(extract_tool_display("ask_user", {}), "")
-        self.assertEqual(extract_tool_display("invoke_subagent", {}), "")
+        self.assertEqual(extract_tool_display("invoke_subagent", {}), "Worker")
         self.assertEqual(extract_tool_display("manage_shell", {}), "")
         self.assertEqual(extract_tool_display("manage_subagent", {}), "")
 

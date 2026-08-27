@@ -45,7 +45,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         tool = CreateTool()
         target = os.path.join(self.test_dir, ".johnston", "config.json")
         res = await tool.execute({"path": target, "content": '{"permissions": {}}'})
-        self.assertIn("created", res.content)
+        self.assertIn("--- /dev/null", res.content)
         self.assertTrue(os.path.exists(target))
 
     async def test_edit_allows_johnston_config(self):
@@ -86,17 +86,16 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Start line out of bounds
         res_oob = await tool.execute({"path": file_path, "start_line": 50})
         self.assertIn("exceeds total file line count", res_oob.display)
-        self.assertIn("[Hint:", res_oob.display)
+        self.assertIn("File has 5 total lines. Use start_line=1..5", res_oob.display)
 
         # Non-existent file
         res_err = await tool.execute({"path": os.path.join(self.test_dir, "missing.txt")})
         self.assertIn("ERR:", str(res_err))
 
-        # Directory read (should auto-list directory contents with hint)
+        # Directory read (should auto-list directory contents)
         dir_res = await tool.execute({"path": self.test_dir})
         self.assertIn("<dir", dir_res.content)
         self.assertIn("<f>sample.txt</f>", dir_res.content)
-        self.assertIn("Hint:", dir_res.display)
 
         # Directory truncation test (>60 items)
         large_dir = os.path.join(self.test_dir, "large_folder")
@@ -236,7 +235,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Test capitalized tool name "Create"
         res_create = await execute_tool("Create", {"path": file_path, "content": "Case Content"})
-        self.assertIn("created", res_create.content)
+        self.assertIn("--- /dev/null", res_create.content)
         self.assertTrue(os.path.exists(file_path))
 
         # Aliases are no longer resolved: 'write' is unknown, only 'create' works.

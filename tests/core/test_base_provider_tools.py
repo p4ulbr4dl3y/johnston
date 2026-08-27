@@ -44,7 +44,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         # Test Create
         res_create = await execute_tool("create", {"path": file_path, "content": "hello world"})
-        self.assertIn("created", res_create.content)
+        self.assertIn("--- /dev/null", res_create.content)
         self.assertTrue(os.path.exists(file_path))
 
         # Test Read
@@ -115,7 +115,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)
-        self.assertEqual(res_list.content, "no tasks active")
+        self.assertEqual(res_list.content, '<bg_tasks total="0"/>')
 
     async def test_task_tool_foreground(self):
         import tempfile

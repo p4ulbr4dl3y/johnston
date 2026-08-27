@@ -211,7 +211,7 @@ async def test_kill_twice_idempotent(sub_tool, store):
 
 async def test_list_no_subagents_no_crash(sub_tool, store):
     res = await sub_tool.execute({"action": "list"})
-    assert "No subagent sessions found" in res.content
+    assert res.content == '<subagents total="0"/>'
     assert "No subagent sessions found" in res.display
 
 
@@ -232,7 +232,7 @@ async def test_list_invalid_parent_id_no_crash(sub_tool, store):
     _mk("sip", parent="parent-a")
     app = _SmApp(store, current_session_id="parent-zzz")
     res = await sub_tool.execute({"action": "list"}, ctx=_ctx(app))
-    assert "No subagent sessions found" in res.content
+    assert res.content == '<subagents total="0"/>'
     assert "sip" not in res.content
 
 
