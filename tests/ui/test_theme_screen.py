@@ -22,7 +22,7 @@ async def test_theme_screen_composition():
         await pilot.pause()
 
         # Check options loaded
-        opt_list = screen.query_one("#theme-option-list", HeaderWrapOptionList)
+        opt_list = screen.query_one(f"#{screen.option_list_id}", HeaderWrapOptionList)
         assert opt_list.option_count >= 5
 
         # Check search filtering

@@ -28,7 +28,7 @@ async def test_theme_modal_full_workflow():
         theme_screen = app.screen
 
         # 4. Check options and active badge
-        opt_list = theme_screen.query_one("#theme-option-list", HeaderWrapOptionList)
+        opt_list = theme_screen.query_one(f"#{theme_screen.option_list_id}", HeaderWrapOptionList)
         assert opt_list.option_count == 6
 
         # 5. Search for "dracula"
