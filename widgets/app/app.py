@@ -103,3 +103,17 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
                 self.notify("Copied to clipboard", severity="information", timeout=1.5)
             except Exception:
                 pass
+
+    def set_app_theme(self, theme_name: str) -> None:
+        """Switch active theme across UI tokens, stylesheets and markdown renderers."""
+        from core.theme_manager import theme_manager
+        theme = theme_manager.set_theme(theme_name)
+        if hasattr(self, 'register_theme'):
+            if theme.name not in getattr(self, 'available_themes', {}):
+                self.register_theme(theme_manager.get_textual_theme(theme))
+            self.theme = theme.name
+        if hasattr(self, 'refresh_css'):
+            self.refresh_css()
+        if hasattr(self, 'refresh_status_footer'):
+            self.refresh_status_footer()
+

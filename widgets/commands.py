@@ -811,7 +811,35 @@ class CopyCommand(BaseCommand):
             app.notify("Failed to copy assistant response", severity="error")
 
 
+
+class ThemeCommand(BaseCommand):
+    name = "/theme"
+    aliases = ["/themes", "/color", "/colors"]
+    description = "Switch color theme (Zinc, Dracula, Catppuccin, Nord...)"
+
+    async def execute(self, app) -> None:
+        from core.theme_manager import theme_manager
+        from widgets.presentation.screens.theme import ThemeScreen
+
+        def on_theme_selected(selected: str | None) -> None:
+            if selected:
+                theme = theme_manager.get(selected)
+                if theme:
+                    if hasattr(app, "set_app_theme"):
+                        app.set_app_theme(theme.name)
+                    else:
+                        theme_manager.set_theme(theme.name)
+                        if hasattr(app, "theme"):
+                            app.theme = theme.name
+                            if hasattr(app, "refresh_css"):
+                                app.refresh_css()
+                    if hasattr(app, "notify"):
+                        app.notify(f"Theme switched to {theme.label}", severity="information")
+
+        app.push_screen(ThemeScreen(), callback=on_theme_selected)
+
 COMMAND_CLASSES = [
+    ThemeCommand,
     HelpCommand,
     NewCommand,
     CopyCommand,

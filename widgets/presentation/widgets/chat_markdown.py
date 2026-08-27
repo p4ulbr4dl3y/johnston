@@ -223,6 +223,24 @@ def _new_markdown_init(self, *args, **kwargs):
 _old_markdown_block_get_style = MarkdownBlock._get_style
 
 
+def sync_theme_styles(theme_obj: Any = None) -> None:
+    """Sync rich markdown and token styles with active Theme."""
+    from core.theme_manager import theme_manager
+    t = theme_obj or theme_manager.current_theme
+    if getattr(t, 'markdown_styles', None):
+        JOHNSTON_RICH_MARKDOWN_STYLES.update(t.markdown_styles)
+        try:
+            from rich.default_styles import DEFAULT_STYLES
+            from rich.style import Style as RichStyle
+            for k, v in t.markdown_styles.items():
+                DEFAULT_STYLES[k] = RichStyle.parse(v)
+        except Exception:
+            pass
+    if getattr(t, 'syntax_tokens', None):
+        TOKEN_COLORS.clear()
+        TOKEN_COLORS.update(t.syntax_tokens)
+
+
 JOHNSTON_RICH_MARKDOWN_STYLES = {
     "markdown.paragraph": "#f4f4f5",
     "markdown.text": "#f4f4f5",
@@ -262,6 +280,10 @@ def _apply_chat_markdown_patches() -> None:
     if _patched:
         return
     _patched = True
+    from core.theme_manager import theme_manager
+    theme_manager.add_listener(sync_theme_styles)
+    sync_theme_styles(theme_manager.current_theme)
+
 
     HighlightTheme.STYLES[Token.Name.Function] = "$text-warning"
     HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
