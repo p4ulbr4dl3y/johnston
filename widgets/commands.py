@@ -833,7 +833,7 @@ class ThemeCommand(BaseCommand):
             theme = theme_manager.get(selected)
             if theme:
                 if hasattr(app, "set_app_theme"):
-                    app.set_app_theme(theme.name)
+                    app.set_app_theme(theme.name, persist=True)
                 else:
                     theme_manager.set_theme(theme.name)
                     if hasattr(app, "theme"):
