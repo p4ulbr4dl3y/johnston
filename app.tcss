@@ -1,26 +1,26 @@
-/* Design Tokens (Defaults: Dracula) */
-$bg-app: #282a36;
-$bg-surface: #21222c;
-$bg-elevated: #44475a;
-$bg-hover: #6272a4;
+/* Design Tokens (Defaults: Zinc Monochrome) */
+$bg-app: #09090b;
+$bg-surface: #18181b;
+$bg-elevated: #27272a;
+$bg-hover: #3f3f46;
 
-$border-subtle: #44475a;
-$border-strong: #6272a4;
+$border-subtle: #27272a;
+$border-strong: #3f3f46;
 
-$fg-primary: #f8f8f2;
-$fg-body: #f8f8f2;
-$fg-secondary: #f8f8f2;
-$fg-card: #f8f8f2;
-$fg-muted: #bd93f9;
-$fg-dim: #6272a4;
-$fg-faint: #44475a;
+$fg-primary: #ffffff;
+$fg-body: #f4f4f5;
+$fg-secondary: #e4e4e7;
+$fg-card: #d4d4d8;
+$fg-muted: #a1a1aa;
+$fg-dim: #71717a;
+$fg-faint: #52525b;
 
-$fg-inverted: #282a36;
-$bg-inverted: #f8f8f2;
+$fg-inverted: #09090b;
+$bg-inverted: #ffffff;
 
-$toast-info: #8be9fd;
-$toast-warn: #f1fa8c;
-$toast-error: #ff5555;
+$toast-info: #61afef;
+$toast-warn: #e5c07b;
+$toast-error: #e06c75;
 
 /* Dynamic True Color Inversion Selection for all Screens, Input fields and TextAreas */
 .screen--selection,
