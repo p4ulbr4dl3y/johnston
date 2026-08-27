@@ -105,7 +105,7 @@ def test_theme_manager_textual_theme_conversion():
 
 def test_theme_persistence(tmp_path, monkeypatch):
     cfg_file = str(tmp_path / "config.json")
-    monkeypatch.setattr("core.infrastructure.config.config_helpers.CONFIG_FILE", cfg_file)
+    monkeypatch.setattr("core.infrastructure.platform.paths.CONFIG_FILE", cfg_file)
 
     from core.infrastructure.config.config_helpers import load_theme_config, save_theme_config
 

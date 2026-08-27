@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict, Optional
 
-from core.infrastructure.platform.paths import CONFIG_FILE
+from core.infrastructure.platform import paths
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 
 
@@ -12,8 +12,9 @@ def ensure_json_config(file_path: str, default_data: Dict[str, Any]) -> None:
         atomic_write_json(file_path, default_data, indent=2)
 
 
-def load_sandbox_config(config_file: str = CONFIG_FILE) -> bool:
+def load_sandbox_config(config_file: Optional[str] = None) -> bool:
     """Load sandbox_enabled boolean from global config (~/.johnston/config.json)."""
+    config_file = config_file or paths.CONFIG_FILE
     try:
         data = read_json(config_file, default={})
         if isinstance(data, dict):
@@ -27,8 +28,9 @@ def load_sandbox_config(config_file: str = CONFIG_FILE) -> bool:
     return False
 
 
-def save_sandbox_config(enabled: bool, config_file: str = CONFIG_FILE) -> None:
+def save_sandbox_config(enabled: bool, config_file: Optional[str] = None) -> None:
     """Save sandbox_enabled boolean to global config (~/.johnston/config.json)."""
+    config_file = config_file or paths.CONFIG_FILE
     try:
         data = read_json(config_file, default={})
         if not isinstance(data, dict):
@@ -39,8 +41,9 @@ def save_sandbox_config(enabled: bool, config_file: str = CONFIG_FILE) -> None:
         pass
 
 
-def load_theme_config(config_file: str = CONFIG_FILE) -> Optional[str]:
+def load_theme_config(config_file: Optional[str] = None) -> Optional[str]:
     """Load persisted theme name from global config (~/.johnston/config.json)."""
+    config_file = config_file or paths.CONFIG_FILE
     try:
         data = read_json(config_file, default={})
         if isinstance(data, dict):
@@ -52,8 +55,9 @@ def load_theme_config(config_file: str = CONFIG_FILE) -> Optional[str]:
     return None
 
 
-def save_theme_config(theme_name: str, config_file: str = CONFIG_FILE) -> None:
+def save_theme_config(theme_name: str, config_file: Optional[str] = None) -> None:
     """Save active theme name to global config (~/.johnston/config.json)."""
+    config_file = config_file or paths.CONFIG_FILE
     try:
         data = read_json(config_file, default={})
         if not isinstance(data, dict):
