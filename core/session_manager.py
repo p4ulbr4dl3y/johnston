@@ -44,7 +44,6 @@ class MessageType(str, Enum):
     THINKING = "thinking"
     TOOL = "tool"
     STATUS_CHANGE = "status_change"
-    USER = "user"
     EVENT_DIVIDER = "event_divider"
 
 
@@ -709,13 +708,6 @@ class SessionStore:
             return False
         is_locked, _ = SessionLock.probe(self._lock_path(session_id))
         return is_locked
-
-    def get_session_lock_info(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Get metadata of process currently holding lock on session, if any."""
-        if not session_id:
-            return None
-        _, meta = SessionLock.probe(self._lock_path(session_id))
-        return meta
 
     def acquire_session_lock(self, session_id: str) -> bool:
         """Acquire exclusive lock on session. Returns True on success."""

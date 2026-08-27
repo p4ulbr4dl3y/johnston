@@ -231,10 +231,6 @@ class OutputLog:
             return
         self._queue.join()
 
-    async def flush_now_async(self) -> None:
-        """Async variant of flush_now off the event loop."""
-        await asyncio.to_thread(self.flush_now)
-
     def close(self) -> None:
         if self._file is not None:
             self._file = None

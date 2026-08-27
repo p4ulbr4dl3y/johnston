@@ -18,7 +18,6 @@ from core.infrastructure.runtime.fs_signature import compute_dir_signature
 _CACHE_TTL = 2.0  # seconds
 
 MarkdownDirs = List[Tuple[str, str]]
-MarkdownScanResult = Tuple[Optional[Tuple], MarkdownDirs]
 
 
 def build_markdown_dirs(

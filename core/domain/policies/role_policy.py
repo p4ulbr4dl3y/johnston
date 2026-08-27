@@ -22,14 +22,6 @@ class RoleScope(str, Enum):
     SUBAGENT = "subagent"
 
 
-class RoleSource(str, Enum):
-    """Where a role definition originates."""
-
-    BUILTIN = "builtin"
-    GLOBAL = "global"
-    PROJECT = "project"
-
-
 def normalize_role_scope(scope: str) -> str:
     """Normalize a role scope value to its canonical short name."""
     return (scope or "").strip().lower() or "any"

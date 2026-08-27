@@ -28,12 +28,6 @@ class SessionLock:
         self._fd: Optional[int] = None
         self._is_owner = False
 
-    @classmethod
-    def for_session(cls, sessions_dir: str, session_id: str) -> "SessionLock":
-        safe_id = os.path.basename(session_id or "default")
-        lock_path = os.path.join(sessions_dir, f"{safe_id}.lock")
-        return cls(lock_path)
-
     def acquire(self) -> bool:
         """Attempt non-blocking acquisition of the session lock.
 

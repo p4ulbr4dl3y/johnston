@@ -95,11 +95,6 @@ class HelpScreen(BaseModalScreen[None]):
         super().__init__()
         self.active_tab = 0  # 0: Commands, 1: Keybindings
 
-    def _get_tabs_markup(self) -> str:
-        if self.active_tab == 0:
-            return "[bold #ffffff on #27272a]  Commands  [/]   [#71717a]  Keybindings  [/]"
-        return "[#71717a]  Commands  [/]   [bold #ffffff on #27272a]  Keybindings  [/]"
-
     def _get_active_table(self) -> Table:
         from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
 
