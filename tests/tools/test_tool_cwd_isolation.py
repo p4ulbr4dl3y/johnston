@@ -145,7 +145,7 @@ class TestPromptBuilderCwd(unittest.TestCase):
             builder = PromptBuilder("You are X.", [], model_name="m", cwd=base)
             prompt = builder.build_system_prompt()
             self.assertIn("Always use this subagent rule", prompt)
-            self.assertIn('name="pref"', prompt)
+            self.assertIn("- pref: Always use this subagent rule.", prompt)
 
 
 class TestGetRulesSnippetCwd(unittest.TestCase):
@@ -159,7 +159,7 @@ class TestGetRulesSnippetCwd(unittest.TestCase):
                 f.write("---\nname: wt-rule\n---\nWT-specific rule.\n")
             snippet = get_rules_snippet(role="action", cwd=wt)
             self.assertIn("WT-specific rule", snippet)
-            self.assertIn('name="r"', snippet)
+            self.assertIn("- r: WT-specific rule.", snippet)
             self.assertNotIn("WT-specific rule", get_rules_snippet(role="action", cwd=main))
 
 

@@ -15,7 +15,7 @@ class TestSubagentRoles(unittest.TestCase):
 
         explorer_def = registry.get_role("explorer")
         self.assertEqual(explorer_def.name, "Explorer")
-        self.assertIn('<active_role name="explorer"', explorer_def.prompt)
+        self.assertIn('<role name="explorer"', explorer_def.prompt)
 
     def test_load_markdown_subagents(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -65,10 +65,9 @@ You run tests and report coverage.""")
             self.assertIn("run tests and report coverage", tester_def.prompt)
 
             snippet = registry.get_system_prompt_snippet(project_dir=tmpdir)
-            self.assertIn("<subagents>", snippet)
-            self.assertIn('<subagent type="explorer"', snippet)
+            self.assertIn("- explorer: Read-only mode", snippet)
             self.assertIn(
-                '<subagent type="reviewer" tools="read,grep,glob" provider="clinepass" desc="Code reviewer subagent"/>',
+                "- reviewer (tools: read, grep, glob, provider: clinepass): Code reviewer subagent",
                 snippet,
             )
 

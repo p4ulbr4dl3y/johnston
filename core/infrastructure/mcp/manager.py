@@ -866,15 +866,9 @@ class MCPManager:
                 continue
             by_server.setdefault(server, []).append(name)
 
-        if not by_server:
-            return ""
-
-        from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-        servers_xml = []
+        items = []
         for server in sorted(by_server):
-            tools_str = escape_xml_attr(",".join(sorted(by_server[server])))
-            server_str = escape_xml_attr(server)
-            servers_xml.append(f'  <server name="{server_str}" tools="{tools_str}"/>')
+            tools_str = ", ".join(sorted(by_server[server]))
+            items.append(f"- {server}: {tools_str}")
 
-        return "<mcp_servers>\n" + "\n".join(servers_xml) + "\n</mcp_servers>"
+        return "<mcp_servers>\n" + "\n".join(items) + "\n</mcp_servers>"

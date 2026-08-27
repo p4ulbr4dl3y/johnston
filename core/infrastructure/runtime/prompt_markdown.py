@@ -10,49 +10,32 @@ from typing import Any, List
 
 
 def format_skills_markdown(skills: List[Any]) -> str:
-    """Build the ``<skills>`` block for the system prompt from skill objects.
-
-    ``skills`` are structured ``Skill`` objects (name/description/scope attrs);
-    accepts any object exposing those attributes so the infrastructure formatter
-    stays decoupled from the application layer. Returns ``""`` when there are no
-    skills.
-    """
+    """Build the ``<skills>`` block for the system prompt from skill objects."""
     if not skills:
         return ""
 
-    from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-    skills_xml = []
+    items = []
     for s in skills:
-        scope_val = getattr(s.scope, "value", s.scope)
-        attrs = [f'name="{escape_xml_attr(s.name)}"', f'scope="{escape_xml_attr(str(scope_val))}"']
         loc = getattr(s, "location", None) or getattr(s, "path", None)
-        if loc:
-            attrs.append(f'path="{escape_xml_attr(str(loc))}"')
-        if s.description:
-            desc_clean = " ".join(s.description.split())
-            attrs.append(f'desc="{escape_xml_attr(desc_clean)}"')
-        skills_xml.append(f"  <skill {' '.join(attrs)}/>")
+        path_part = f" ({loc})" if loc else ""
+        desc = getattr(s, "description", "") or ""
+        desc_clean = " ".join(desc.split()) if desc else ""
+        desc_part = f": {desc_clean}" if desc_clean else ""
+        items.append(f"- {s.name}{path_part}{desc_part}")
 
-    return "<skills>\n" + "\n".join(skills_xml) + "\n</skills>"
+    header = "To activate a skill, read its SKILL.md using `read` tool.\n\n"
+    return "<skills>\n" + header + "\n".join(items) + "\n</skills>"
 
 
 def format_rules_markdown(rules: List[Any]) -> str:
-    """Build the ``<project_rules>`` block for the system prompt.
-
-    ``rules`` is the ordered list of active ``RuleDefinition`` objects (the
-    application layer filters by role and returns data). Returns ``""`` when
-    there are no matching rules.
-    """
+    """Build the ``<user_rules>`` block for the system prompt."""
     if not rules:
         return ""
 
-    from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-    matching = []
+    items = []
     for r in rules:
-        r_name = escape_xml_attr(getattr(r, "name", str(r)))
-        r_content = getattr(r, "content", "")
-        matching.append(f'  <rule name="{r_name}">\n{r_content}\n  </rule>')
+        r_name = getattr(r, "name", str(r))
+        r_content = getattr(r, "content", "").strip()
+        items.append(f"- {r_name}: {r_content}")
 
-    return "<project_rules>\n" + "\n\n".join(matching) + "\n</project_rules>"
+    return "<user_rules>\n" + "\n".join(items) + "\n</user_rules>"

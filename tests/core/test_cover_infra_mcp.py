@@ -499,7 +499,7 @@ def test_system_prompt_snippet_skips_nameless_tool():
         {"x": 1},
         {"function": {"name": "f1"}, "_mcp_server": "s"},
     ]
-    assert m.get_system_prompt_snippet() == '<mcp_servers>\n  <server name="s" tools="f1"/>\n</mcp_servers>'
+    assert m.get_system_prompt_snippet() == "<mcp_servers>\n- s: f1\n</mcp_servers>"
 
 
 if __name__ == "__main__":

@@ -320,8 +320,8 @@ def test_format_skills_markdown_full():
     ]
     md = format_skills_markdown(skills)
     assert "<skills>" in md
-    assert '<skill name="p1" scope="project" desc="Proj desc"/>' in md
-    assert '<skill name="g1" scope="global"/>' in md
+    assert "- p1: Proj desc" in md
+    assert "- g1" in md
     assert "</skills>" in md
 
 

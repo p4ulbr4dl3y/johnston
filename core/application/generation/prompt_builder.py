@@ -347,7 +347,11 @@ class PromptBuilder:
         if not self.is_subagent:
             role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=self.cwd or os.getcwd())
             if getattr(role_def, "prompt", None):
-                sys_prompt += f"\n\n{role_def.prompt}"
+                p_text = role_def.prompt.strip()
+                if not p_text.startswith("<role"):
+                    sys_prompt += f'\n\n<role name="{self.role}">\n{p_text}\n</role>'
+                else:
+                    sys_prompt += f"\n\n{p_text}"
 
         # Cache key from the stable components. role_def is represented by its
         # content so the cache invalidates when the role definition changes even
@@ -407,7 +411,11 @@ class PromptBuilder:
         if not self.is_subagent:
             role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=self.cwd or os.getcwd())
             if getattr(role_def, "prompt", None):
-                sys_prompt += f"\n\n{role_def.prompt}"
+                p_text = role_def.prompt.strip()
+                if not p_text.startswith("<role"):
+                    sys_prompt += f'\n\n<role name="{self.role}">\n{p_text}\n</role>'
+                else:
+                    sys_prompt += f"\n\n{p_text}"
 
         # Cache key from the stable components. role_def is represented by its
         # content so the cache invalidates when the role definition changes even

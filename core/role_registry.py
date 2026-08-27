@@ -19,11 +19,11 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="Worker",
         description="Execution mode: creation, editing, and shell command execution.",
         prompt=(
-            '<active_role name="worker">\n'
-            '  <rule id="surgical">Modify only what the task strictly requires. NEVER make unsolicited changes, speculative additions, or touch unrelated items.</rule>\n'
-            '  <rule id="preservation">Preserve existing structure, conventions, and functional integrity unless explicitly instructed to alter them.</rule>\n'
-            '  <rule id="safety">NEVER perform irreversible destruction or accidental data loss; operate strictly within the assigned task boundaries.</rule>\n'
-            '</active_role>'
+            '<role name="worker">\n'
+            "1. Surgical: Modify only what the task strictly requires. NEVER make unsolicited changes or touch unrelated items.\n"
+            "2. Preservation: Preserve existing structure, conventions, and functional integrity unless explicitly instructed.\n"
+            "3. Safety: NEVER perform irreversible destruction or accidental data loss; operate strictly within assigned boundaries.\n"
+            "</role>"
         ),
         scope="any",
         source="builtin",
@@ -33,11 +33,11 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="Explorer",
         description="Read-only mode for information gathering, research, analysis, and action planning.",
         prompt=(
-            '<active_role name="explorer" read_only="true">\n'
-            '  <rule id="read_only">Strictly read-only mode. NEVER modify state or run destructive operations. If asked to modify, decline and provide an actionable execution plan instead.</rule>\n'
-            '  <rule id="evidence">Anchor all findings, architectures, and diagnoses in exact file references and data.</rule>\n'
-            '  <rule id="plans">When designing solutions, provide Goal, Trade-offs, Dependencies, Step-by-step Execution, and Verification steps.</rule>\n'
-            '</active_role>'
+            '<role name="explorer">\n'
+            "1. Read Only: Strictly read-only mode. NEVER modify state or run destructive operations. Decline and provide plan instead.\n"
+            "2. Evidence: Anchor all findings, architectures, and diagnoses in exact file references and data.\n"
+            "3. Plans: When designing solutions, provide Goal, Tradeoffs, Dependencies, Execution, and Verification steps.\n"
+            "</role>"
         ),
         read_only=True,
         scope="any",
@@ -123,21 +123,20 @@ class RoleRegistry:
         if not subagent_roles:
             return ""
 
-        from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-        roles_xml = []
+        items = []
         for role in subagent_roles.values():
-            attrs = [f'type="{escape_xml_attr(role.key)}"']
+            meta_parts = []
             if role.allowed_tools:
-                attrs.append(f'tools="{escape_xml_attr(",".join(role.allowed_tools))}"')
+                meta_parts.append(f"tools: {', '.join(role.allowed_tools)}")
             if role.provider:
-                attrs.append(f'provider="{escape_xml_attr(role.provider)}"')
-            if role.description:
-                desc_clean = " ".join(role.description.split())
-                attrs.append(f'desc="{escape_xml_attr(desc_clean)}"')
-            roles_xml.append(f"  <subagent {' '.join(attrs)}/>")
+                meta_parts.append(f"provider: {role.provider}")
+            meta_str = f" ({', '.join(meta_parts)})" if meta_parts else ""
+            desc = role.description or ""
+            desc_clean = " ".join(desc.split()) if desc else ""
+            desc_str = f": {desc_clean}" if desc_clean else ""
+            items.append(f"- {role.key}{meta_str}{desc_str}")
 
-        return "<subagents>\n" + "\n".join(roles_xml) + "\n</subagents>"
+        return "<subagents>\n" + "\n".join(items) + "\n</subagents>"
 
     def _parse_md_role(self, fpath: str, source: str) -> Optional[AgentRole]:
         try:
