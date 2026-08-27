@@ -128,3 +128,27 @@ class TestTruncateOutput(unittest.TestCase):
         self.assertIn("ERR: range 'read': start_line (140) exceeds line count (1)", res.display)
         self.assertIn("File has 1 line", res.display)
         self.assertIn("content_offset", res.display)
+
+    def test_truncate_output_with_explicit_log_path(self):
+        text = "LINE1\n" + ("LINE\n" * 50) + "LINE52"
+        # from_end=True with explicit log_path and save_log=False
+        res_end = truncate_output(
+            text,
+            max_chars=30,
+            from_end=True,
+            save_log=False,
+            log_path="/path/to/custom.log",
+        )
+        self.assertIn("Log: /path/to/custom.log", res_end)
+        self.assertIn("Truncated: last 30 chars", res_end)
+
+        # from_end=False with explicit log_path and save_log=False
+        res_lead = truncate_output(
+            text,
+            max_chars=30,
+            from_end=False,
+            save_log=False,
+            log_path="/path/to/custom.log",
+        )
+        self.assertIn("Log: /path/to/custom.log", res_lead)
+        self.assertIn("Next: read(path='/path/to/custom.log'", res_lead)

@@ -270,21 +270,3 @@ def truncate_subagent_result(text: str, session_id: str = "") -> str:
         tool_name=session_id or "subagent",
         ext=".md",
     )
-
-
-def _write_result_log(content: str, *, session_id: str = "", ext: str = ".md") -> Optional[str]:
-    """Writes full output to a unique file under LOGS_DIR and returns its path.
-
-    Returns None if logging is skipped (empty content) or the write fails.
-    """
-    if not (content or "").strip():
-        return None
-    log_path = make_log_path(session_id or "subagent", ext=ext)
-    if not log_path:
-        return None
-    try:
-        with open(log_path, "w", encoding="utf-8") as f:
-            f.write(content)
-    except Exception:
-        return None
-    return log_path

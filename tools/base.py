@@ -168,33 +168,32 @@ def truncate_output(
     tool_name: str = "",
     from_end: bool = False,
     ext: Optional[str] = None,
+    log_path: Optional[str] = None,
 ) -> str:
     """Truncates text safely if it exceeds max_chars, saving full output to a unique file."""
     if len(text) <= max_chars:
         return text
 
-    log_content = text
-    is_json = False
-    stripped = text.strip()
-    # Only attempt JSON parse when the output looks like JSON and is small enough to
-    # parse cheaply. For huge outputs, skipping the full parse avoids a costly
-    # json.loads/dumps round-trip of the entire string just to label its format.
-    looks_like_json = (stripped.startswith("{") and stripped.endswith("}")) or (
-        stripped.startswith("[") and stripped.endswith("]")
-    )
-    if looks_like_json and len(stripped) <= 1_000_000:
-        try:
-            parsed = json.loads(stripped)
-            if isinstance(parsed, (dict, list)):
-                is_json = True
-                log_content = json.dumps(parsed, indent=2, ensure_ascii=False)
-        except Exception:
-            pass
+    if log_path is None and save_log:
+        log_content = text
+        is_json = False
+        stripped = text.strip()
+        # Only attempt JSON parse when the output looks like JSON and is small enough to
+        # parse cheaply. For huge outputs, skipping the full parse avoids a costly
+        # json.loads/dumps round-trip of the entire string just to label its format.
+        looks_like_json = (stripped.startswith("{") and stripped.endswith("}")) or (
+            stripped.startswith("[") and stripped.endswith("]")
+        )
+        if looks_like_json and len(stripped) <= 1_000_000:
+            try:
+                parsed = json.loads(stripped)
+                if isinstance(parsed, (dict, list)):
+                    is_json = True
+                    log_content = json.dumps(parsed, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
 
-    file_ext = ext if ext is not None else (".json" if is_json else ".log")
-
-    log_path = None
-    if save_log:
+        file_ext = ext if ext is not None else (".json" if is_json else ".log")
         log_path = _write_output_log(log_content, tool_name=tool_name, ext=file_ext)
 
     total_lines = text.count("\n") + (1 if text else 0)
@@ -209,7 +208,7 @@ def truncate_output(
             line_info = f"{shown_lines} lines"
 
         parts = [f"Truncated: last {max_chars} chars ({line_info})"]
-        if save_log and log_path:
+        if log_path:
             parts.append(f"Log: {log_path}")
         if hint:
             parts.append(hint)
@@ -226,7 +225,7 @@ def truncate_output(
             line_info = f"{shown_lines} lines"
 
         parts = [f"Truncated: {line_info}"]
-        if save_log and log_path:
+        if log_path:
             parts.append(f"Log: {log_path}")
             if "\n" not in text:
                 parts.append(f"Next: read(path='{log_path}', content_offset={max_chars})")

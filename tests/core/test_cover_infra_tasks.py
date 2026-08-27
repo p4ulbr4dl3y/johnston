@@ -96,20 +96,6 @@ def test_output_log_context_manager(monkeypatch, tmp_path):
     assert not log.opened
 
 
-def test_write_result_log_empty_content():
-    assert _out._write_result_log("   ") is None
-
-
-def test_write_result_log_no_log_path(monkeypatch):
-    monkeypatch.setattr(_out, "make_log_path", lambda *a, **k: None)
-    assert _out._write_result_log("data") is None
-
-
-def test_write_result_log_open_failure(monkeypatch):
-    monkeypatch.setattr(_out, "make_log_path", lambda *a, **k: "/nonexistent_dir_xyz/file.log")
-    assert _out._write_result_log("data") is None
-
-
 # ---------------------------------------------------------------------------
 # shell_task.py
 # ---------------------------------------------------------------------------

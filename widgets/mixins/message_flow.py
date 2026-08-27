@@ -240,6 +240,15 @@ class MessageFlowMixin:
             self._update_background_shell_widget(task_id, result)
             from tools.base import format_background_notification, truncate_output
 
+            mgr = getattr(self, "task_manager", None)
+            task = None
+            if mgr is not None:
+                task = next(
+                    (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
+                    None,
+                )
+            task_log = getattr(task, "log_path", None)
+
             msg = format_background_notification(
                 "shell",
                 command_str,
@@ -250,6 +259,7 @@ class MessageFlowMixin:
                     tool_name="shell",
                     from_end=True,
                     save_log=False,
+                    log_path=task_log,
                 ),
             )
             curr_sid = getattr(self, "current_session_id", None)
@@ -267,17 +277,6 @@ class MessageFlowMixin:
         based on the shell task's terminal status. No-op when the task or its
         widget is unavailable.
         """
-        from tools.base import truncate_output
-
-        final_result = truncate_output(
-            result or "(no output)",
-            max_chars=4000,
-            hint="Pipe command to grep/head, or inspect full log if needed.",
-            tool_name="shell",
-            from_end=True,
-            save_log=False,
-        )
-
         mgr = getattr(self, "task_manager", None)
         task = None
         if mgr is not None:
@@ -285,6 +284,18 @@ class MessageFlowMixin:
                 (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
                 None,
             )
+        task_log = getattr(task, "log_path", None)
+
+        from tools.base import truncate_output
+
+        final_result = truncate_output(
+            result or "(no output)",
+            max_chars=4000,
+            tool_name="shell",
+            from_end=True,
+            save_log=False,
+            log_path=task_log,
+        )
         reg = getattr(self, "_background_shell_widgets", None)
         widget = (reg or {}).pop(task_id, None)
         task_status = (getattr(getattr(task, "status", None), "value", None) or "").lower() if task is not None else ""
