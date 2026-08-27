@@ -287,10 +287,23 @@ def test_get_default_writable_cache_roots(monkeypatch):
 
     monkeypatch.setenv("UV_CACHE_DIR", "/custom/uv/cache")
     monkeypatch.setenv("XDG_CACHE_HOME", "/custom/xdg/cache")
+    monkeypatch.setenv("NPM_CONFIG_CACHE", "/custom/npm/cache")
+    monkeypatch.setenv("CARGO_HOME", "/custom/cargo/home")
 
     roots = sbx.get_default_writable_cache_roots()
     assert os.path.abspath("/custom/uv/cache") in roots
     assert os.path.abspath("/custom/xdg/cache") in roots
+    assert os.path.abspath("/custom/npm/cache") in roots
+    assert os.path.abspath("/custom/cargo/home") in roots
+
+    # Test default home dirs when envs are cleared
+    monkeypatch.delenv("NPM_CONFIG_CACHE", raising=False)
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+    roots_default = sbx.get_default_writable_cache_roots()
+    home = os.path.expanduser("~")
+    assert os.path.join(home, ".npm") in roots_default
+    assert os.path.join(home, ".cargo", "registry") in roots_default
+    assert os.path.join(home, ".gradle") in roots_default
 
 
 def test_check_seatbelt_probes_and_caches(tmp_path):

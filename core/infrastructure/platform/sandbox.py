@@ -197,26 +197,95 @@ def get_git_worktree_writable_roots(workspace: str) -> List[str]:
 
 
 def get_default_writable_cache_roots() -> List[str]:
-    """Return common user cache roots (e.g. ~/.cache, ~/Library/Caches, UV_CACHE_DIR) for build tools & linters."""
+    """Return common user cache roots (e.g. ~/.cache, ~/.npm, ~/.cargo/registry, UV_CACHE_DIR) for build tools & linters."""
     roots: List[str] = []
-    uv_cache = os.environ.get("UV_CACHE_DIR")
-    if uv_cache:
-        roots.append(os.path.abspath(uv_cache))
 
-    xdg_cache = os.environ.get("XDG_CACHE_HOME")
-    if xdg_cache:
-        roots.append(os.path.abspath(xdg_cache))
-    else:
-        home = os.path.expanduser("~")
-        if home and home != "~":
+    # Environment variables overrides
+    cache_env_vars = [
+        "UV_CACHE_DIR",
+        "NPM_CONFIG_CACHE",
+        "PNPM_HOME",
+        "YARN_CACHE_FOLDER",
+        "CARGO_HOME",
+        "GOPATH",
+        "GOCACHE",
+        "GRADLE_USER_HOME",
+        "M2_HOME",
+        "NUGET_PACKAGES",
+        "CCACHE_DIR",
+        "DENO_DIR",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "XDG_STATE_HOME",
+    ]
+    for env_var in cache_env_vars:
+        val = os.environ.get(env_var)
+        if val:
+            roots.append(os.path.abspath(val))
+
+    home = os.path.expanduser("~")
+    if home and home != "~":
+        # Standard XDG & system caches
+        if not os.environ.get("XDG_CACHE_HOME"):
             roots.append(os.path.join(home, ".cache"))
+        if not os.environ.get("XDG_DATA_HOME"):
+            roots.append(os.path.join(home, ".local", "share"))
+        if not os.environ.get("XDG_STATE_HOME"):
+            roots.append(os.path.join(home, ".local", "state"))
 
-    if platform.system() == "Darwin":
-        home = os.path.expanduser("~")
-        if home and home != "~":
+        # Ecosystem-specific cache roots
+        common_cache_dirs = [
+            # JavaScript / TypeScript / Node / Bun / Deno
+            os.path.join(home, ".npm"),
+            os.path.join(home, ".pnpm-store"),
+            os.path.join(home, ".yarn"),
+            os.path.join(home, ".bun"),
+            os.path.join(home, ".deno"),
+            os.path.join(home, ".node-gyp"),
+            os.path.join(home, ".nvm"),
+            # Rust
+            os.path.join(home, ".cargo", "registry"),
+            os.path.join(home, ".cargo", "git"),
+            os.path.join(home, ".rustup"),
+            # Go
+            os.path.join(home, "go"),
+            # Python
+            os.path.join(home, ".virtualenvs"),
+            os.path.join(home, ".pyenv"),
+            os.path.join(home, ".pipx"),
+            # Java / Kotlin / Gradle / Maven / Android
+            os.path.join(home, ".gradle"),
+            os.path.join(home, ".m2", "repository"),
+            os.path.join(home, ".ivy2"),
+            os.path.join(home, ".sbt"),
+            os.path.join(home, ".android"),
+            # C / C++ / Zig
+            os.path.join(home, ".ccache"),
+            os.path.join(home, ".conan"),
+            os.path.join(home, ".conan2"),
+            os.path.join(home, ".vcpkg"),
+            os.path.join(home, ".zig-cache"),
+            # .NET
+            os.path.join(home, ".nuget"),
+            os.path.join(home, ".dotnet"),
+            # Ruby / PHP
+            os.path.join(home, ".bundle"),
+            os.path.join(home, ".composer"),
+        ]
+        roots.extend(common_cache_dirs)
+
+        if platform.system() == "Darwin":
             roots.append(os.path.join(home, "Library", "Caches"))
 
-    return roots
+    # Return deduplicated list
+    seen = set()
+    deduped: List[str] = []
+    for r in roots:
+        norm = os.path.normpath(r)
+        if norm not in seen:
+            seen.add(norm)
+            deduped.append(norm)
+    return deduped
 
 
 def is_path_writable_in_sandbox(
