@@ -94,6 +94,7 @@ def format_subagents_markdown(roles: List[Any]) -> str:
     header = (
         "Delegate bounded tasks to background subagents via `invoke_subagent`.\n\n"
         "Guidelines:\n"
+        "- Title: Use a concise noun phrase for 'title' (3-5 words, e.g. 'Key handling refactor', 'Streaming core audit', not imperative verbs).\n"
         "- Worktree Isolation: Pass `branch='<feature>'` for code edits to run in an isolated Git worktree and avoid file conflicts.\n"
         "- Reuse Context: Use `manage_subagent(action='send_message', session_id=...)` to continue an existing subagent rather than spawning new ones.\n"
         "- Reactive: Completion notifies automatically. Do NOT poll status in a loop; proceed with other work or end turn.\n"

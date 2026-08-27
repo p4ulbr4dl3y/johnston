@@ -77,7 +77,13 @@ class InvokeSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "title": {"type": "string", "description": "Short task title (3-5 words)"},
+                    "title": {
+                        "type": "string",
+                        "description": (
+                            "Short task title as a noun phrase (3-5 words, "
+                            "e.g. 'Key handling refactor', 'Streaming core audit', not verbs)"
+                        ),
+                    },
                     "prompt": {
                         "type": "string",
                         "description": "Task instructions with clear boundaries and expected output format",
