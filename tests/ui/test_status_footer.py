@@ -352,6 +352,26 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             branch = footer._git_branch(cwd="/some/dir")
             self.assertEqual(branch, "main")
 
+    def test_compute_branch_sync_bare_branch(self):
+        footer = StatusFooter()
+        with patch("core.application.generation.prompt_builder.get_git_info", return_value="main"):
+            self.assertEqual(footer._compute_branch_sync(cwd="/some/dir"), "main")
+
+    def test_compute_branch_sync_legacy_wrapped_branch(self):
+        footer = StatusFooter()
+        with patch("core.application.generation.prompt_builder.get_git_info", return_value="branch 'dev'"):
+            self.assertEqual(footer._compute_branch_sync(cwd="/some/dir"), "dev")
+
+    def test_compute_branch_sync_detached_head(self):
+        footer = StatusFooter()
+        with patch("core.application.generation.prompt_builder.get_git_info", return_value="detached HEAD (abc1234)"):
+            self.assertEqual(footer._compute_branch_sync(cwd="/some/dir"), "detached (abc1234)")
+
+    def test_compute_branch_sync_not_repo(self):
+        footer = StatusFooter()
+        with patch("core.application.generation.prompt_builder.get_git_info", return_value=""):
+            self.assertEqual(footer._compute_branch_sync(cwd="/some/dir"), "")
+
     def test_git_diff_stats_with_cwd_and_fallback(self):
         footer = StatusFooter()
         with patch("subprocess.run") as mock_run:
