@@ -32,19 +32,26 @@ def test_theme_entity_creation():
 def test_builtin_themes_presence():
     names = {t.name for t in BUILTIN_THEMES}
     assert "zinc" in names
-    assert "dracula" in names
     assert "catppuccin-mocha" in names
+    assert "catppuccin-macchiato" in names
+    assert "catppuccin-latte" in names
     assert "tokyo-night" in names
-    assert "nord" in names
-    assert "gruvbox" in names
-    assert "one-dark" in names
+    assert "tokyo-night-storm" in names
     assert "rose-pine" in names
-    assert "monokai-pro" in names
-    assert "solarized-dark" in names
+    assert "rose-pine-moon" in names
+    assert "rose-pine-dawn" in names
     assert "github-dark" in names
+    assert "github-dark-dimmed" in names
     assert "github-light" in names
+    assert "kanagawa-wave" in names
+    assert "kanagawa-dragon" in names
+    assert "everforest" in names
+    assert "ayu-dark" in names
+    assert "ayu-mirage" in names
+    assert "nord" in names
+    assert "one-dark" in names
     assert "zinc-light" in names
-    assert len(BUILTIN_THEMES) == 13
+    assert len(BUILTIN_THEMES) == 20
 
 
 def test_theme_manager_registration_and_switching():
@@ -52,9 +59,9 @@ def test_theme_manager_registration_and_switching():
     assert tm.current_theme.name == "zinc"
 
     # Switch theme
-    dracula = tm.set_theme("dracula")
-    assert dracula.name == "dracula"
-    assert tm.current_theme.name == "dracula"
+    kanagawa = tm.set_theme("kanagawa-wave")
+    assert kanagawa.name == "kanagawa-wave"
+    assert tm.current_theme.name == "kanagawa-wave"
 
     gh = tm.set_theme("github-dark")
     assert gh.name == "github-dark"
@@ -103,8 +110,8 @@ def test_theme_persistence(tmp_path, monkeypatch):
 
     assert load_theme_config(cfg_file) is None
 
-    save_theme_config("dracula", cfg_file)
-    assert load_theme_config(cfg_file) == "dracula"
+    save_theme_config("kanagawa-wave", cfg_file)
+    assert load_theme_config(cfg_file) == "kanagawa-wave"
 
     save_theme_config("nord", cfg_file)
     assert load_theme_config(cfg_file) == "nord"

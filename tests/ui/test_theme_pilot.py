@@ -28,22 +28,22 @@ async def test_theme_modal_full_workflow():
         assert isinstance(app.screen, ThemeScreen)
         theme_screen = app.screen
 
-        # 4. Check options count (all 13 themes)
+        # 4. Check options count (all 20 modern themes)
         opt_list = theme_screen.query_one(f"#{theme_screen.option_list_id}", HeaderWrapOptionList)
-        assert opt_list.option_count == 13
+        assert opt_list.option_count == 20
         assert opt_list.highlighted == 0
 
-        # 5. Navigate to Dracula (index 1) and press Enter
+        # 5. Navigate to Catppuccin Mocha (index 1) and press Enter
         await pilot.press("down")
         assert opt_list.highlighted == 1
         await pilot.press("enter")
         await pilot.pause()
 
-        # 6. Verify modal dismissed and theme switched to Dracula
+        # 6. Verify modal dismissed and theme switched to Catppuccin Mocha
         assert not isinstance(app.screen, ThemeScreen)
-        assert app.theme == "dracula"
-        assert theme_manager.current_theme.name == "dracula"
-        assert app.screen.styles.background.hex.upper() == "#282A36"
+        assert app.theme == "catppuccin-mocha"
+        assert theme_manager.current_theme.name == "catppuccin-mocha"
+        assert app.screen.styles.background.hex.upper() == "#1E1E2E"
 
         # 7. Open via /themes alias
         input_widget.text = "/themes"
@@ -53,22 +53,22 @@ async def test_theme_modal_full_workflow():
         assert isinstance(app.screen, ThemeScreen)
         theme_screen = app.screen
 
-        # 8. Dracula should now be highlighted (index 1)
+        # 8. Catppuccin Mocha should now be highlighted (index 1)
         opt_list = theme_screen.query_one(f"#{theme_screen.option_list_id}", HeaderWrapOptionList)
         assert opt_list.highlighted == 1
 
-        # 9. Navigate down to GitHub Dark (index 10) and select
-        for _ in range(9):
+        # 9. Navigate down to Kanagawa Wave (index 12) and select
+        for _ in range(11):
             await pilot.press("down")
-        assert opt_list.highlighted == 10
+        assert opt_list.highlighted == 12
         await pilot.press("enter")
         await pilot.pause()
 
-        # 10. Verify switched to GitHub Dark
+        # 10. Verify switched to Kanagawa Wave
         assert not isinstance(app.screen, ThemeScreen)
-        assert app.theme == "github-dark"
-        assert theme_manager.current_theme.name == "github-dark"
-        assert app.screen.styles.background.hex.upper() == "#0D1117"
+        assert app.theme == "kanagawa-wave"
+        assert theme_manager.current_theme.name == "kanagawa-wave"
+        assert app.screen.styles.background.hex.upper() == "#1F1F28"
 
         # Restore zinc
         app.set_app_theme("zinc")

@@ -25,6 +25,6 @@ async def test_theme_command_pushes_screen():
     assert isinstance(screen, ThemeScreen)
 
     # Trigger callback
-    callback("dracula")
-    app.set_app_theme.assert_called_once_with("dracula")
+    callback("catppuccin-mocha")
+    app.set_app_theme.assert_called_once_with("catppuccin-mocha")
     app.notify.assert_called_once()
