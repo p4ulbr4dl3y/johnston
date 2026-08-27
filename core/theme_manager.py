@@ -18,7 +18,7 @@ class ThemeManager:
 
     _instance: Optional[ThemeManager] = None
 
-    def __init__(self, default_theme: str = "zinc") -> None:
+    def __init__(self, default_theme: str = "dracula") -> None:
         self._themes: dict[str, Theme] = {}
         self._listeners: list[Callable[[Theme], None]] = []
         for theme in BUILTIN_THEMES:
