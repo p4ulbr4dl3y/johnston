@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, OptionList
@@ -70,11 +71,40 @@ class ThemeScreen(ModalSearchNavMixin, BaseModalScreen[Optional[str]]):
         super().on_mount()
         search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
         search_input.focus()
+        try:
+            opt_list = self.query_one("#theme-option-list", HeaderWrapOptionList)
+            current_name = theme_manager.current_theme.name
+            for i, t in enumerate(self.filtered_themes):
+                if t.name == current_name:
+                    opt_list.highlighted = i
+                    break
+            else:
+                if self.filtered_themes:
+                    opt_list.highlighted = 0
+        except Exception:
+            pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        query = event.value.strip().lower()
-        self.search_query = query
-        self.filter_options()
+        if event.input.id == MODAL_SEARCH_INPUT_ID:
+            query = event.value.strip().lower()
+            self.search_query = query
+            self.filter_options()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == MODAL_SEARCH_INPUT_ID:
+            try:
+                opt_list = self.query_one("#theme-option-list", HeaderWrapOptionList)
+                idx = opt_list.highlighted
+                if idx is not None and 0 <= idx < len(self.filtered_themes):
+                    selected_theme = self.filtered_themes[idx]
+                    self.dismiss(selected_theme.name)
+                    return
+            except Exception:
+                pass
+            self.dismiss(None)
+
+    def _on_key(self, event: events.Key) -> None:
+        self._handle_search_navigation(event)
 
     def filter_options(self) -> None:
         current_name = theme_manager.current_theme.name
@@ -94,6 +124,8 @@ class ThemeScreen(ModalSearchNavMixin, BaseModalScreen[Optional[str]]):
         option_list.clear_options()
         for opt, t in zip(self.filtered_options, self.filtered_themes):
             option_list.add_option(Option(opt, id=f"theme_{t.name}"))
+        if self.filtered_themes:
+            option_list.highlighted = 0
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option_id and event.option_id.startswith("theme_"):
