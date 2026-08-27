@@ -338,8 +338,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             res = await execute_tool("mcp_huge_tool", {"arg": "val"})
 
         self.assertFalse(res.is_error)
-        self.assertIn("[Output truncated: showing first 8000 chars", res.content)
-        self.assertIn("Refine parameters or request partial data", res.content)
+        self.assertIn("Truncated:", res.content)
+        self.assertIn("Log:", res.content)
 
     async def test_subagent_denies_ask_in_headless_mode(self):
         from tools.context import ToolContext

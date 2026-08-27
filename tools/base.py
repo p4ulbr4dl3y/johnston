@@ -71,19 +71,27 @@ def get_fuzzy_matches(word: str, possibilities: list[str], n: int = 3, cutoff: f
     return difflib.get_close_matches(word, possibilities, n=n, cutoff=cutoff)
 
 
-def format_background_notification(kind: str, name: str, task_id: str, result: str) -> str:
+def format_background_notification(
+    kind: str,
+    name: str,
+    task_id: str,
+    result: str,
+    *,
+    follow_up: Optional[str] = None,
+) -> str:
     """Unified template for background-task completion notifications.
 
     Emitted as a synthetic user message when a background shell/subagent finishes:
-    `<task_notification kind="..." name="..." id="...">\n...\n</task_notification>`
+    `<task_notification kind="..." name="..." id="..." [follow_up="..."]>\n...\n</task_notification>`
     """
     from core.infrastructure.runtime.xml_utils import escape_xml_attr
 
     escaped_kind = escape_xml_attr(kind)
     escaped_name = escape_xml_attr(name)
     escaped_id = escape_xml_attr(task_id)
+    fu_attr = f' follow_up="{escape_xml_attr(follow_up)}"' if follow_up else ""
     return (
-        f'<task_notification kind="{escaped_kind}" name="{escaped_name}" id="{escaped_id}">\n'
+        f'<task_notification kind="{escaped_kind}" name="{escaped_name}" id="{escaped_id}"{fu_attr}>\n'
         f"{result}\n"
         f"</task_notification>"
     )
@@ -192,7 +200,6 @@ def truncate_output(
     if save_log:
         log_path = _write_output_log(log_content, tool_name=tool_name, ext=file_ext)
 
-    format_desc = "Format: JSON." if is_json else ("Format: Single-line text." if "\n" not in text else "")
     total_lines = text.count("\n") + (1 if text else 0)
 
     if from_end:
@@ -202,24 +209,14 @@ def truncate_output(
         if total_lines > 1:
             line_info = f"lines {start_line_shown}-{total_lines} of {total_lines}"
         else:
-            line_info = f"{shown_lines} lines shown"
+            line_info = f"{shown_lines} lines"
 
-        header = f"[Output truncated: showing last {max_chars} chars ({line_info})."
+        parts = [f"Truncated: last {max_chars} chars ({line_info})"]
         if save_log and log_path:
-            header += f" Full log: {log_path}."
-            if format_desc:
-                header += f" {format_desc}"
-            if hint:
-                header += f" {hint}"
-            elif is_json:
-                header += f" Use read(path='{log_path}') or jq to inspect formatted JSON."
-            elif "\n" not in text:
-                header += f" Output is single-line. Use read(path='{log_path}') or shell to inspect."
-            else:
-                header += f" Use read(path='{log_path}') or shell (grep/head) to inspect full log."
-        elif hint:
-            header += f" {hint}"
-        header += "]\n...\n"
+            parts.append(f"Log: {log_path}")
+        if hint:
+            parts.append(hint)
+        header = f"[{' | '.join(parts)}]\n...\n"
         return header + truncated
     else:
         from tools.utils import truncate_leading
@@ -229,27 +226,18 @@ def truncate_output(
         if total_lines > 1:
             line_info = f"lines 1-{shown_lines} of {total_lines}"
         else:
-            line_info = f"{shown_lines} lines shown"
+            line_info = f"{shown_lines} lines"
 
-        footer = f"\n... [Output truncated: showing first {max_chars} chars ({line_info})."
+        parts = [f"Truncated: {line_info}"]
         if save_log and log_path:
-            footer += f" Full log: {log_path}."
-            if format_desc:
-                footer += f" {format_desc}"
-            if hint:
-                footer += f" {hint}"
-            elif is_json:
-                footer += f" Use read(path='{log_path}') or jq to inspect formatted JSON."
-            elif "\n" not in text:
-                footer += (
-                    f" Output is single-line. "
-                    f"Use read(path='{log_path}', content_offset={max_chars}) or shell to inspect next chunk."
-                )
+            parts.append(f"Log: {log_path}")
+            if "\n" not in text:
+                parts.append(f"Next: read(path='{log_path}', content_offset={max_chars})")
             else:
-                footer += f" Use read(path='{log_path}', start_line={next_line}) or shell (grep/tail) to inspect."
-        elif hint:
-            footer += f" {hint}"
-        footer += "]"
+                parts.append(f"Next: read(path='{log_path}', start_line={next_line})")
+        if hint:
+            parts.append(hint)
+        footer = f"\n... [{ ' | '.join(parts) }]"
         return truncated + footer
 
 

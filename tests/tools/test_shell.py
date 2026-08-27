@@ -78,7 +78,7 @@ def test_new_task_id():
 async def test_sleep_chain_no_remainder(tool):
     cmd = "sleep 0.001" if os.name != "nt" else "cd ."
     res = await tool.execute({"command": cmd})
-    assert _plain(res) == "(no output)" or '<cmd exit="0"/>' in str(res)
+    assert _plain(res) == "(no output)" or '<cmd exit="0"' in str(res)
 
 
 async def test_sleep_chain_with_remainder(tool):
@@ -95,7 +95,7 @@ async def test_standard_pipe_execution(tool):
 async def test_normal_execution_empty_output(tool):
     # `true` is POSIX-only; `cd .` produces no output on both cmd/PowerShell and sh.
     res = await tool.execute({"command": "true" if os.name != "nt" else "cd ."})
-    assert _plain(res) == "(no output)" or '<cmd exit="0"/>' in str(res)
+    assert _plain(res) == "(no output)" or '<cmd exit="0"' in str(res)
 
 
 async def test_invalid_timeout_value_falls_back_to_default(tool):
@@ -278,16 +278,21 @@ async def test_main_sync_timeout_with_output(tool, make_app_mock, make_tool_cont
 
     p = _process(wait_result=asyncio.Future(), stdout=None)
 
-    def _add_task(task):
-        task.output.append("A" * 5000)
+    orig_reg = app.task_manager.register
 
-    app.task_manager._add = _add_task  # placeholder (unused) - real registration streams live output
+    def _reg(task):
+        task.output.append("A" * 5000)
+        return orig_reg(task)
+
+    app.task_manager.register = _reg
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
     ):
-        res = str(await tool.execute({"command": "tail -f x", "timeout": 1}, ctx=ctx))
-        assert "ERR: timeout 'shell': timed out after 1s" in res
+        res = await tool.execute({"command": "tail -f x", "timeout": 1}, ctx=ctx)
+        assert "ERR: timeout 'shell': timed out after 1s" in str(res)
+        assert "<cmd>\n" in res.content
+        assert "Partial Output:" in res.display
         mock_term.assert_called_once()
 
 
@@ -306,7 +311,7 @@ async def test_main_sync_read_task_drain_timeout(tool, make_app_mock, make_tool_
         patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
     ):
         res = await tool.execute({"command": "echo test"}, ctx=ctx)
-    assert _plain(res) == "(no output)" or '<cmd exit="0"/>' in str(res)
+    assert _plain(res) == "(no output)" or '<cmd exit="0"' in str(res)
 
 
 async def test_main_sync_not_registered_as_background_task(tool, make_app_mock, make_tool_context):
@@ -316,7 +321,7 @@ async def test_main_sync_not_registered_as_background_task(tool, make_app_mock, 
 
     with patch.object(ShellTool, "_create_std_process", return_value=p):
         res = await tool.execute({"command": "echo sync"}, ctx=ctx)
-        assert _plain(res) == "(no output)" or '<cmd exit="0"/>' in str(res)
+        assert _plain(res) == "(no output)" or '<cmd exit="0"' in str(res)
         # Sync task is dropped from the manager after completion (never
         # converted to a persistent background task).
         assert len([t for t in app.task_manager]) == 0
@@ -778,7 +783,7 @@ async def test_crlf_normalized(tool, make_tool_context):
 async def test_very_large_output_truncated(tool, make_tool_context):
     cmd = "python3 -c 'import sys; sys.stdout.write(\"X\"*6000)'" if os.name != "nt" else "echo"
     res = str(await tool.execute({"command": cmd}, ctx=_ctx(make_tool_context)))
-    assert "Output truncated" in res
+    assert "Truncated:" in res
     assert "X" * 3900 in res  # tail preserved near 4000-char limit
 
 

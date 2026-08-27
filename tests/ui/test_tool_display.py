@@ -189,12 +189,12 @@ class TestToolDisplay(unittest.TestCase):
             "edit",
             "code.py",
             args={"path": "code.py"},
-            result_text="OK: file 'code.py' updated.\n\n--- a/code.py\n+++ b/code.py\n@@ -1,1 +1,1 @@\n-a\n+b\n[Hint: Some system hint]",
+            result_text="OK: file 'code.py' updated.\n\n--- a/code.py\n+++ b/code.py\n@@ -1,1 +1,1 @@\n-a\n+b\n",
         )
         diff_renderable = widget._format_edit_diff(widget.result_text, "code.py")
         formatted_text = "\n".join(t.plain for t in diff_renderable.formatted_lines)
         self.assertNotIn("OK: file", formatted_text)
-        self.assertNotIn("[Hint:", formatted_text)
+        self.assertIn("b", formatted_text)
 
     def test_format_edit_diff_monotonic_line_numbers(self):
         from widgets.presentation.widgets.chat_diff import format_edit_diff

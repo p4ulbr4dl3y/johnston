@@ -150,7 +150,7 @@ class SubagentWorktreeManager:
                 diff_text = diff_text[:4000] + "\n... [diff truncated]"
 
             status_block = f"Status:\n{changes}\n\n" if changes else ""
-            return f"{status_block}Diff:\n{diff_text}", True
+            return f"{status_block}<diff branch=\"{branch_name}\">\n{diff_text}\n</diff>", True
         except Exception:
             return "", False
 
@@ -252,15 +252,13 @@ class SubagentWorktreeManager:
             if has_changes and diff_text:
                 if is_followup:
                     acc[0] = acc[0].rstrip() + (
-                        f"\n\n[Worktree Branch '{wt_branch}']\n"
-                        f"Changes updated on branch '{wt_branch}'. Run `git merge {wt_branch}` to apply.\n"
+                        f"\n\nChanges updated on branch '{wt_branch}'. Run `git merge {wt_branch}` to apply.\n"
                         f"After merging, ask the user via the `ask_user` tool whether to delete the subagent-created branch '{wt_branch}' before continuing.\n\n"
                         f"{diff_text}"
                     )
                 else:
                     acc[0] += (
-                        f"\n\n[Worktree Branch '{wt_branch}']\n"
-                        f"Changes saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply, or `git diff {wt_branch}` for full diff.\n"
+                        f"\n\nChanges saved to git branch '{wt_branch}'. Run `git merge {wt_branch}` to apply, or `git diff {wt_branch}` for full diff.\n"
                         f"After merging, clean up the branch with `git branch -d {wt_branch}`.\n\n"
                         f"{diff_text}"
                     )

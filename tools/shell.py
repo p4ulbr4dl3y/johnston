@@ -81,7 +81,6 @@ def _truncate_output(res: str) -> str:
     return truncate_output(
         res,
         max_chars=4000,
-        hint="Pipe command to grep/head, or read full log.",
         tool_name="shell",
         from_end=True,
     )
@@ -255,16 +254,18 @@ class ShellTool(BaseTool):
                     await asyncio.wait_for(read_task, timeout=2.0)
                 except asyncio.TimeoutError:
                     pass
+            elapsed = max(0.1, round(time.monotonic() - start_time, 1))
             res = task.get_formatted_output()
             raw_rc = p.returncode if p.returncode is not None else getattr(task, "returncode", None)
             returncode = raw_rc if isinstance(raw_rc, int) else None
             rc_attr = f' exit="{returncode}"' if returncode is not None else ' exit="0"'
+            elapsed_attr = f' elapsed="{elapsed}s"'
             if not res.strip():
-                xml_content = f"<cmd{rc_attr}/>"
+                xml_content = f"<cmd{rc_attr}{elapsed_attr}/>"
                 disp = f"(exit code {returncode})" if (returncode is not None and returncode != 0) else "(no output)"
                 return ToolResult.done(content=xml_content, display=disp, returncode=returncode)
             truncated = _truncate_output(res)
-            xml_content = f"<cmd{rc_attr}>\n{truncated.strip()}\n</cmd>"
+            xml_content = f"<cmd{rc_attr}{elapsed_attr}>\n{truncated.strip()}\n</cmd>"
             return ToolResult.done(content=xml_content, display=truncated, returncode=returncode)
         except asyncio.TimeoutError:
             await terminate_process(p)
@@ -274,8 +275,10 @@ class ShellTool(BaseTool):
                 except Exception:
                     pass
             raw_out = _truncate_output(task.get_formatted_output())
-            partial_str = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
-            return ToolResult.error("timeout", f"timed out after {timeout}s{partial_str}", name="shell")
+            partial_str = f"\n<cmd>\n{raw_out.strip()}\n</cmd>" if raw_out.strip() else ""
+            disp_partial = f"\n\nPartial Output:\n{raw_out.strip()}" if raw_out.strip() else ""
+            disp = f"ERR: timeout 'shell': timed out after {timeout}s{disp_partial}"
+            return ToolResult.error("timeout", f"timed out after {timeout}s{partial_str}", name="shell", display=disp)
         except asyncio.CancelledError:
             await terminate_process(p)
             raise

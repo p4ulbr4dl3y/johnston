@@ -384,8 +384,8 @@ async def test_stream_huge_result_truncates():
         _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
         assert sess.status == STATUS_COMPLETED
         msg = app.trigger_ai_response.call_args.args[0]
-        assert "truncated at" in msg
-        assert "Use `read` tool" in msg
+        assert "Truncated:" in msg
+        assert "Next: read(path=" in msg
     finally:
         tmp.cleanup()
 

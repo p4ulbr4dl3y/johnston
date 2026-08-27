@@ -49,11 +49,11 @@ def format_line_pagination(
         if start_line_int is not None and start_line_int > total_lines:
             path_str = f" in '{path}'" if path else ""
             if total_lines == 1:
-                hint_str = "File has only 1 total line (e.g. minified JSON/log). Use start_line=1 and content_offset, or shell tools (jq/grep)."
+                hint_str = "File has 1 line. Use content_offset."
             else:
-                hint_str = f"File has {total_lines} total lines. Use start_line=1..{total_lines}."
+                hint_str = f"File has {total_lines} lines (range: 1..{total_lines})."
             err_msg = (
-                f"start_line ({start_line_int}) exceeds total file line count ({total_lines}){path_str}. "
+                f"start_line ({start_line_int}) exceeds line count ({total_lines}){path_str}. "
                 f"{hint_str}"
             )
             return ToolResult.error("range", detail=err_msg, name="read")

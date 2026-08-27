@@ -401,7 +401,11 @@ async def send_subagent_followup(
         )
 
         notification_hdr = format_background_notification(
-            "Subagent follow-up", session.description, session.id, "{result_text}"
+            "Subagent follow-up",
+            session.description,
+            session.id,
+            "{result_text}",
+            follow_up=f"manage_subagent(action='send_message', session_id='{session.id}', message='...')",
         )
 
         # The stream drains session.pending_messages inline, so only the

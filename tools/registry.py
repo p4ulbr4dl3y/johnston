@@ -284,7 +284,6 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
                 tool_res.content = truncate_output(
                     tool_res.content,
                     max_chars=MAX_TOOL_OUTPUT_CHARS,
-                    hint="Refine parameters or request partial data if complete response is needed.",
                     tool_name=name,
                 )
             return tool_res

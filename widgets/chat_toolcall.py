@@ -27,7 +27,19 @@ _MISSING = object()
 
 def _clean_truncation_marker(match: re.Match) -> str:
     prefix = match.group(1) or ""
-    inner = match.group(2)
+    tag_name = match.group(2) or "Truncated"
+    inner = match.group(3)
+    if "|" in inner:
+        parts = [p.strip() for p in inner.split("|") if p.strip()]
+        ui_parts = []
+        for p in parts:
+            if re.match(r"^Next:\s*", p, re.IGNORECASE):
+                continue
+            if re.match(r"^Use\s+.*to inspect", p, re.IGNORECASE):
+                continue
+            ui_parts.append(p)
+        if ui_parts:
+            return f"{prefix}[{tag_name}: {' | '.join(ui_parts)}]"
     showing_match = re.search(
         r"showing\s+(?:first|last|recent)\s+[^\s.(),|]+(?:\s+chars|\s+output)?",
         inner,
@@ -46,16 +58,13 @@ def _clean_truncation_marker(match: re.Match) -> str:
 
 
 def _format_truncation_for_ui(text: str) -> str:
-    """Format truncation banners and strip hints for UI display."""
+    """Format truncation banners for UI display."""
     if not text:
         return ""
-    cleaned = re.sub(r"\s*<hint[\s\S]*?</hint>", "", text)
-    cleaned = re.sub(r"\s*\[Hint:[\s\S]*$", "", cleaned)
-    cleaned = re.sub(r"\s*\[Hint:[^\]]+\]", "", cleaned)
     return re.sub(
-        r"(\.\.\.\s*)?\[Output truncated([^\]]*)\]",
+        r"(\.\.\.\s*)?\[(Output\s+truncated|Truncated):?\s*([^\]]*)\]",
         _clean_truncation_marker,
-        cleaned,
+        text,
         flags=re.IGNORECASE,
     ).strip()
 
@@ -617,17 +626,17 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self._shell_update_handle = None
             self._shell_update_scheduled = False
             is_bg_banner = "[Background Task ID:" in cleaned
-            # A ctrl+b transition emits a transient RUNNING banner ("moved to
-            # background..."). When live output already streams on the card,
-            # keep it instead of overwriting with the banner — chunks keep
-            # arriving and the completion repaint sets the final text anyway.
-            has_live_output = bool((self.result_text or "").strip())
-            if cleaned and not (status == "running" and is_bg_banner and has_live_output):
-                self.result_text = cleaned
             if is_bg_banner:
                 bg_m = re.search(r"Background Task ID:\s*([^\s\]]+)", cleaned)
                 if bg_m:
                     self.background_task_id = bg_m.group(1)
+                log_m = re.search(r"Full Log:\s*([^\s\(\)]+)", cleaned)
+                if log_m:
+                    self.log_path = log_m.group(1)
+            # A background transition emits a transient RUNNING banner.
+            # Never overwrite card content (live output or empty) with this system message.
+            if cleaned and not (status == "running" and is_bg_banner):
+                self.result_text = cleaned
         else:
             self.result_text = cleaned
 

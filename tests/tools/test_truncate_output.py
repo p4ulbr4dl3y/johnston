@@ -9,12 +9,13 @@ class TestTruncateOutput(unittest.TestCase):
         large_text = "A" * 5000
         res = truncate_output(large_text, max_chars=1000)
 
-        self.assertIn("Full log:", res)
-        self.assertIn("Use read(path=", res)
+        self.assertIn("Log:", res)
+        self.assertIn("Next: read(path=", res)
         log_path = (
-            [word for word in res.split() if word.endswith(".log") or ".log." in word or ".log]" in word][0]
+            [word for word in res.split() if word.endswith(".log") or ".log." in word or ".log]" in word or ".log|" in word or word.endswith(".log'")][0]
             .rstrip(".")
             .rstrip("]")
+            .rstrip("'")
         )
         self.assertTrue(os.path.exists(log_path))
 
@@ -26,7 +27,7 @@ class TestTruncateOutput(unittest.TestCase):
         multi_line_text = "\n".join([f"Line {i}" for i in range(1, 200)])
         res = truncate_output(multi_line_text, max_chars=100)
         self.assertIn("lines 1-", res)
-        self.assertIn("Use read(path=", res)
+        self.assertIn("Next: read(path=", res)
         self.assertIn("start_line=", res)
 
     def test_truncate_output_unique_log_per_tool(self):
@@ -36,8 +37,8 @@ class TestTruncateOutput(unittest.TestCase):
         res1 = truncate_output(text1, max_chars=100, tool_name="shell")
         res2 = truncate_output(text2, max_chars=100, tool_name="shell")
 
-        path1 = [word for word in res1.split() if ".log" in word][0].rstrip(".")
-        path2 = [word for word in res2.split() if ".log" in word][0].rstrip(".")
+        path1 = [word for word in res1.split() if ".log" in word][0].rstrip(".").rstrip("'")
+        path2 = [word for word in res2.split() if ".log" in word][0].rstrip(".").rstrip("'")
 
         # Same tool name, different snapshots -> distinct unique files.
         self.assertNotEqual(path1, path2)
@@ -54,7 +55,7 @@ class TestTruncateOutput(unittest.TestCase):
     def test_truncate_output_from_end(self):
         text = "HEAD_\n" + ("X\n" * 100) + "_TAIL"
         res = truncate_output(text, max_chars=50, from_end=True, save_log=False)
-        self.assertIn("showing last 50 chars", res)
+        self.assertIn("last 50 chars", res)
         self.assertIn("lines ", res)
         self.assertTrue(res.endswith("_TAIL"))
         self.assertNotIn("HEAD_", res)
@@ -67,10 +68,10 @@ class TestTruncateOutput(unittest.TestCase):
         self.assertNotIn("\n", single_line_json)
 
         res = truncate_output(single_line_json, max_chars=100, tool_name="mcp_test")
-        self.assertIn("Format: JSON.", res)
-        self.assertIn("inspect formatted JSON", res)
+        self.assertIn("Log:", res)
+        self.assertIn(".json", res)
 
-        log_path = [word for word in res.split() if ".json" in word][0].rstrip(".")
+        log_path = [word for word in res.split() if ".json" in word][0].rstrip(".").rstrip("'")
         with open(log_path, "r", encoding="utf-8") as f:
             log_content = f.read()
 
@@ -124,6 +125,6 @@ class TestTruncateOutput(unittest.TestCase):
         from tools.utils import format_line_pagination
 
         res = format_line_pagination(["single line content"], start_line=140, path="test.log")
-        self.assertIn("ERR: range 'read': start_line (140) exceeds total file line count (1)", res.display)
-        self.assertIn("File has only 1 total line", res.display)
+        self.assertIn("ERR: range 'read': start_line (140) exceeds line count (1)", res.display)
+        self.assertIn("File has 1 line", res.display)
         self.assertIn("content_offset", res.display)

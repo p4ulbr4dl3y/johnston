@@ -329,7 +329,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         ):
             wt, branch = SubagentWorktreeManager.append_worktree_diff_to_acc(self.repo_dir, wt_path, "subagent-x", acc)
         self.assertEqual((wt, branch), (None, None))
-        self.assertIn("[Worktree Branch 'subagent-x']", acc[0])
+        self.assertIn("branch 'subagent-x'", acc[0])
         self.assertIn("Some diff", acc[0])
         mock_cleanup.assert_called_once_with(self.repo_dir, wt_path, "subagent-x", keep_branch=True)
 

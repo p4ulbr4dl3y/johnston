@@ -266,16 +266,13 @@ def truncate_subagent_result(text: str, session_id: str = "") -> str:
     is saved on truncation and the path is returned in the hint.
     """
     text = (text or "").strip()
-    if len(text) <= MAX_SUBAGENT_RESULT_CHARS:
-        return text
+    from tools.base import truncate_output
 
-    log_path = _write_result_log(text, session_id=session_id or "subagent", ext=".md") or "output file"
-    truncated = text[:MAX_SUBAGENT_RESULT_CHARS]
-    shown_lines = truncated.count("\n") + (1 if truncated else 0)
-    next_line = shown_lines + 1
-    return (
-        truncated
-        + f"\n... [Subagent result truncated at {MAX_SUBAGENT_RESULT_CHARS} chars (lines 1-{shown_lines} shown). Full output saved to {log_path}. Use `read` tool (path='{log_path}', start_line={next_line}) to inspect remaining output.]"
+    return truncate_output(
+        text,
+        max_chars=MAX_SUBAGENT_RESULT_CHARS,
+        tool_name=session_id or "subagent",
+        ext=".md",
     )
 
 

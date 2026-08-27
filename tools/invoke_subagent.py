@@ -205,7 +205,11 @@ class InvokeSubagentTool(BaseTool):
         from tools.base import format_background_notification
 
         notification_hdr = format_background_notification(
-            "subagent", title, session_id, "{result_text}"
+            "subagent",
+            title,
+            session_id,
+            "{result_text}",
+            follow_up=f"manage_subagent(action='send_message', session_id='{session_id}', message='...')",
         )
 
         bg_task = asyncio.create_task(

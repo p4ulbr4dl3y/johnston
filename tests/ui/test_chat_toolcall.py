@@ -33,10 +33,9 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
 
     def test_clean_hints_and_markup(self):
         widget = ToolCallWidget("shell", "cmd")
-        self.assertEqual(widget._clean_hints_for_ui("text\n[Hint: do x]"), "text")
-        self.assertEqual(widget._clean_hints_for_ui("text [Hint: inline] rest"), "text")
+        self.assertEqual(widget._clean_hints_for_ui("text"), "text")
         self.assertEqual(widget._clean_hints_for_ui(""), "")
-        self.assertEqual(widget._clean_markup_text("[b]bold[/b]\n[Hint: nope]"), "[b]bold[/b]")
+        self.assertEqual(widget._clean_markup_text("[b]bold[/b]"), "[b]bold[/b]")
 
     def test_try_parse_json(self):
         widget = ToolCallWidget("shell", "cmd")
@@ -92,6 +91,13 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         # Truncated without log
         recent = "[Output truncated: showing recent output]\nsome output"
         self.assertEqual(_format_truncation_for_ui(recent), "[Output truncated: showing recent output]\nsome output")
+
+        # New unified pipe-separated format
+        pipe_footer = "file text\n... [Truncated: lines 1-100 of 500 | Log: /path/to/log.json | Next: read(path='/path/to/log.json', start_line=101)]"
+        self.assertEqual(
+            _format_truncation_for_ui(pipe_footer),
+            "file text\n... [Truncated: lines 1-100 of 500 | Log: /path/to/log.json]",
+        )
 
         # Double cleaning / idempotency
         double_cleaned = _format_truncation_for_ui(cleaned)
@@ -212,13 +218,11 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         text = (
             "real output\n"
             "... [Output truncated: showing last 4000 chars (lines 1-100 of 500). "
-            "Full log: /path/to.log. Use read to inspect.]\n"
-            "[Hint: foo]"
+            "Full log: /path/to.log. Use read to inspect.]"
         )
         cleaned = widget._clean_bash_output(text)
         self.assertIn("real output", cleaned)
         self.assertIn("Log: /path/to.log", cleaned)
-        self.assertNotIn("Hint:", cleaned)
         self.assertEqual(widget._clean_bash_output(""), "")
 
     def test_append_shell_output(self):

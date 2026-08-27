@@ -145,12 +145,8 @@ class TestToolExpansion(unittest.TestCase):
         widget.set_result(full_text, is_error=True)
         # result_text must keep <hint> for agent
         self.assertEqual(widget.result_text, full_text)
-        # Error results are not expandable, but building content directly still
-        # strips <hint> while keeping the ERR: line for the UI.
-        widget.render_content()
-        content = getattr(widget.content_widget, "_Static__content")
-        self.assertNotIn("<hint", content)
-        self.assertIn("ERR: target not found.", content)
+        # Error results for non-shell tools are not clickable/expandable in UI
+        self.assertFalse(widget.is_clickable_header())
 
     def test_create_tool_error_display(self):
         error_text = "ERR: '/some/dir' is a directory"
@@ -496,15 +492,15 @@ class TestToolExpansion(unittest.TestCase):
         # Task id still parsed for the completion repaint
         self.assertEqual(widget.background_task_id, "bg_1")
 
-    def test_shell_bg_banner_kept_when_no_live_output(self):
-        """Explicit background=true launch: banner is shown until chunks arrive."""
+    def test_shell_bg_banner_not_put_into_result_text_when_no_live_output(self):
+        """Explicit background=true launch: result_text stays clean without system banner."""
         widget = ToolCallWidget(
             tool_type="shell",
             target="server",
             args={"command": "server"},
         )
         widget.set_result("[Background Task ID: bg_2] 'server' moved to background.", status="running")
-        self.assertIn("moved to background", widget.result_text)
+        self.assertNotIn("moved to background", widget.result_text)
         self.assertEqual(widget.background_task_id, "bg_2")
         self.assertFalse(widget.is_expanded)
 

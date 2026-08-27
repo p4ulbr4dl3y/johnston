@@ -182,8 +182,8 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         # Clipped and annotated with a pointer to the full session log
         self.assertLess(len(result), len(long_text))
         self.assertTrue(result.startswith("x" * MAX_SUBAGENT_RESULT_CHARS))
-        self.assertIn("truncated", result)
-        self.assertIn("Use `read` tool", result)
+        self.assertIn("Truncated:", result)
+        self.assertIn("Next: read(path=", result)
 
 
 if __name__ == "__main__":
