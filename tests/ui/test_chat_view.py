@@ -2,6 +2,8 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
+import pytest
+
 from app import JohnstonApp
 from widgets.chat_toolcall import ToolCallWidget
 from widgets.presentation.widgets.chat_container import ChatView
@@ -430,6 +432,7 @@ class TestChatViewAutoFollow(unittest.IsolatedAsyncioTestCase):
         view.on_mouse_scroll_down(MagicMock())
         view.call_after_refresh.assert_called_once_with(view._resume_follow_if_at_bottom)
 
+    @pytest.mark.slow  # timing-sensitive (run_test + pilot.pause) — flaky under -n auto
     async def test_sending_message_resumes_auto_follow(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:
@@ -439,6 +442,7 @@ class TestChatViewAutoFollow(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertTrue(chat_view._auto_follow)
 
+    @pytest.mark.slow  # timing-sensitive (run_test + pilot.pause) — flaky under -n auto
     async def test_stream_growth_keeps_follow_when_pinned(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:
@@ -454,6 +458,7 @@ class TestChatViewAutoFollow(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.2)
             self.assertTrue(chat_view.is_at_bottom())
 
+    @pytest.mark.slow  # timing-sensitive (run_test + pilot.pause) — flaky under -n auto
     async def test_wheel_up_mid_stream_prevents_follow(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:
