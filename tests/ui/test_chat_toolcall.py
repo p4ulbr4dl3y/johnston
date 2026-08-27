@@ -10,6 +10,9 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
     def test_is_expandable_variants(self):
         self.assertFalse(ToolCallWidget("read", "f.py").is_expandable())
         self.assertFalse(ToolCallWidget("web_fetch", "http://x").is_expandable())
+        self.assertFalse(ToolCallWidget("invoke_subagent", "prompt").is_expandable())
+        self.assertFalse(ToolCallWidget("manage_shell", "list", args={"action": "list"}).is_expandable())
+        self.assertFalse(ToolCallWidget("manage_subagent", "list", args={"action": "list"}).is_expandable())
         self.assertTrue(ToolCallWidget("shell", "cmd").is_expandable())
         self.assertTrue(ToolCallWidget("create", "f.py").is_expandable())
         self.assertTrue(ToolCallWidget("custom_tool", "x").is_expandable())
@@ -359,7 +362,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         screen_cls.assert_called_once()
         event.stop.assert_called_once()
 
-    def test_on_click_invoke_subagent_finished_toggles_expanded(self):
+    def test_on_click_invoke_subagent_finished_pushes_screen(self):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"}, result_text="Done work")
         event = MagicMock()
         mock_store = MagicMock()
@@ -373,8 +376,8 @@ class TestToolCallWidgetRendering(unittest.TestCase):
             app.current_session_id = None
             app_prop.return_value = app
             widget.on_click(event)
-        screen_cls.assert_not_called()
-        self.assertTrue(widget.is_expanded)
+        screen_cls.assert_called_once()
+        self.assertFalse(widget.is_expanded)
         event.stop.assert_called_once()
 
     def test_on_click_invoke_subagent_session_not_found_notifies(self):
@@ -455,7 +458,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         app.push_screen.assert_called_once()
         event.stop.assert_called_once()
 
-    def test_on_click_manage_shell_list_without_active_tasks_toggles_expanded(self):
+    def test_on_click_manage_shell_list_without_active_tasks_notifies(self):
         widget = self._widget("manage_shell", "list", args={"action": "list"})
         self.assertTrue(widget.is_clickable_header())
         event = MagicMock()
@@ -469,7 +472,8 @@ class TestToolCallWidgetRendering(unittest.TestCase):
             app_prop.return_value = app
             widget.on_click(event)
         shell_screen_cls.assert_not_called()
-        self.assertTrue(widget.is_expanded)
+        self.assertFalse(widget.is_expanded)
+        app.notify.assert_called_once_with("No active background tasks", severity="information")
         event.stop.assert_called_once()
 
     def test_on_click_manage_subagent_list_with_active_opens_subagents_screen(self):
@@ -492,7 +496,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         app.push_screen.assert_called_once()
         event.stop.assert_called_once()
 
-    def test_on_click_manage_subagent_list_without_active_toggles_expanded(self):
+    def test_on_click_manage_subagent_list_without_active_notifies(self):
         widget = self._widget("manage_subagent", "list", args={"action": "list"})
         self.assertTrue(widget.is_clickable_header())
         event = MagicMock()
@@ -508,7 +512,8 @@ class TestToolCallWidgetRendering(unittest.TestCase):
             app_prop.return_value = app
             widget.on_click(event)
         subagents_screen_cls.assert_not_called()
-        self.assertTrue(widget.is_expanded)
+        self.assertFalse(widget.is_expanded)
+        app.notify.assert_called_once_with("No active subagents", severity="information")
         event.stop.assert_called_once()
 
     def test_on_click_manage_subagent_with_session_id_opens_subagent_view_screen(self):
@@ -584,6 +589,16 @@ class TestToolCallWidgetRendering(unittest.TestCase):
     def test_ask_user_not_expandable_without_answers(self):
         widget = self._widget("ask_user", "q", args={"questions": [{"question": "Q1", "options": ["A"]}]})
         self.assertFalse(widget.is_expandable())
+
+    def test_set_result_auto_expands_when_parent_auto_expand_all_is_true(self):
+        widget = self._widget("ask_user", "q", args={"questions": [{"question": "Q1", "options": ["A"]}]})
+        self.assertFalse(widget.is_expandable())
+        self.assertFalse(widget.is_expanded)
+        parent_mock = MagicMock(auto_expand_all=True)
+        widget._parent = parent_mock
+        widget.set_result("Question: Q1\nAnswer: A", status="done")
+        self.assertTrue(widget.is_expandable())
+        self.assertTrue(widget.is_expanded)
 
     def test_parse_ask_user_answers_multi_question(self):
         widget = self._widget(

@@ -427,19 +427,14 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if canonical == "ask_user":
             # Expandable inline when completed (has answers); minimized wizard is resumed via modal.
             return "Answer:" in (self.result_text or "")
-        if canonical == "manage_shell":
-            action = (self.args if isinstance(self.args, dict) else {}).get("action", "list")
-            return (action or "list").lower() == "list"
-        if canonical == "manage_subagent":
-            action = (self.args if isinstance(self.args, dict) else {}).get("action", "list")
-            return (action or "list").lower() == "list"
         if canonical in (
             "read",
             "web_fetch",
+            "invoke_subagent",
+            "manage_shell",
+            "manage_subagent",
         ):
             return False
-        if canonical == "invoke_subagent":
-            return True
         if canonical in self.EXPANDABLE_TOOLS:
             return True
         if hasattr(self, "SYSTEM_TOOLS") and self.tool_type not in self.SYSTEM_TOOLS:
@@ -451,9 +446,16 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return (
                 self.canonical_tool == "shell" and bool((self.result_text or "").strip())
             )
+        if self.canonical_tool == "manage_shell":
+            action = (self.args if isinstance(self.args, dict) else {}).get("action", "list")
+            return (action or "list").lower() == "list"
+        if self.canonical_tool == "manage_subagent":
+            args = self.args if isinstance(self.args, dict) else {}
+            action = (args.get("action") or "list").lower()
+            return bool(getattr(self, "subagent_session_id", None) or args.get("session_id") or action == "list")
         return (
             self.is_expandable()
-            or self.canonical_tool in ("invoke_subagent", "manage_subagent", "ask_user")
+            or self.canonical_tool in ("invoke_subagent", "ask_user")
         )
 
     def __init__(
@@ -652,6 +654,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.header_label.add_class(TOOL_HEADER_EXPANDABLE)
             self.header_label.remove_class(TOOL_HEADER)
+            parent = getattr(self, "parent", None)
+            if getattr(parent, "auto_expand_all", False) and self.is_expandable():
+                self.is_expanded = True
         self.render_header()
         if self.is_expanded:
             # Scroll the finished result into view only when the user is
@@ -761,20 +766,15 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     app.notify("Subagent session not found", severity="warning")
                 event.stop()
                 return
-            if getattr(session, "status", "") == "running":
-                try:
-                    from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+            event.stop()
+            try:
+                from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
-                    if app:
-                        app.push_screen(SubagentViewScreen(identifier))
-                    event.stop()
-                    return
-                except Exception:
-                    pass
-            if self.is_expandable():
-                self.toggle_expanded()
-                event.stop()
-                return
+                if app:
+                    app.push_screen(SubagentViewScreen(identifier))
+            except Exception:
+                pass
+            return
         if self.canonical_tool == "manage_subagent":
             args = self.args if isinstance(self.args, dict) else {}
             session_id = getattr(self, "subagent_session_id", None) or args.get("session_id")
@@ -795,20 +795,15 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         app.notify("Subagent session not found", severity="warning")
                     event.stop()
                     return
-                if getattr(session, "status", "") == "running":
-                    try:
-                        from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+                event.stop()
+                try:
+                    from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
-                        if app:
-                            app.push_screen(SubagentViewScreen(session_id))
-                        event.stop()
-                        return
-                    except Exception:
-                        pass
-                if self.is_expandable():
-                    self.toggle_expanded()
-                    event.stop()
-                    return
+                    if app:
+                        app.push_screen(SubagentViewScreen(session_id))
+                except Exception:
+                    pass
+                return
             else:
                 action = (args.get("action") or "list").lower()
                 if action == "list":
@@ -824,16 +819,19 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         else (store.list(kind="subagent") if store else [])
                     )
                     has_active = any(getattr(s, "status", "") == "running" for s in (subagents or []))
+                    event.stop()
                     if has_active:
                         try:
                             from widgets.presentation.screens.tasks import SubagentsScreen
 
                             if app:
                                 app.push_screen(SubagentsScreen())
-                            event.stop()
-                            return
                         except Exception:
                             pass
+                    else:
+                        if app and hasattr(app, "notify"):
+                            app.notify("No active subagents", severity="information")
+                    return
         if self.canonical_tool == "manage_shell":
             args = self.args if isinstance(self.args, dict) else {}
             action = (args.get("action") or "list").lower()
@@ -847,16 +845,19 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     and (getattr(t, "session_id", None) == curr_sid if curr_sid else True)
                     for t in (tasks or [])
                 )
+                event.stop()
                 if has_active:
                     try:
                         from widgets.presentation.screens.tasks import ShellTasksScreen
 
                         if app:
                             app.push_screen(ShellTasksScreen())
-                        event.stop()
-                        return
                     except Exception:
                         pass
+                else:
+                    if app and hasattr(app, "notify"):
+                        app.notify("No active background tasks", severity="information")
+                return
         if self.canonical_tool == "shell":
             tasks = getattr(app, "task_manager", []) if app else []
             curr_sid = getattr(app, "current_session_id", None) if app else None

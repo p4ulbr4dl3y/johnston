@@ -362,16 +362,26 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
 
             thinking = await chat_view.add_thinking_widget("Thinking text", animate=False)
             tool = await chat_view.add_tool_call("shell", "echo test", "result", animate=False)
+            ask_tool = await chat_view.add_tool_call(
+                "ask_user", "q", args={"questions": [{"question": "Q?", "options": []}]}, animate=False
+            )
             await pilot.pause()
 
             self.assertTrue(thinking.is_expanded)
             self.assertTrue(tool.is_expanded)
+            self.assertFalse(ask_tool.is_expanded)
+
+            # Completing ask_user auto-expands it when auto_expand_all is True
+            ask_tool.set_result("Question: Q?\nAnswer: Yes", status="done")
+            await pilot.pause()
+            self.assertTrue(ask_tool.is_expanded)
 
             # Toggle expand again -> collapses all and auto_expand_all becomes False
             chat_view.toggle_expand()
             self.assertFalse(chat_view.auto_expand_all)
             self.assertFalse(thinking.is_expanded)
             self.assertFalse(tool.is_expanded)
+            self.assertFalse(ask_tool.is_expanded)
 
             # New widgets added after collapsing are not expanded
             new_tool = await chat_view.add_tool_call("shell", "ls", "files", animate=False)
