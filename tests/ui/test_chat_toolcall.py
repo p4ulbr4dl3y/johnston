@@ -332,6 +332,13 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget.set_result("Command is running in the background", status="running")
         self.assertEqual(widget.status, "running")
 
+    def test_set_result_shell_background_banner_extracts_id_and_log(self):
+        widget = self._widget("shell", "cmd")
+        widget.set_result("[Background Task ID: task_123 | Full Log: /path/to/task.log]", status="running")
+        self.assertEqual(widget.background_task_id, "task_123")
+        self.assertEqual(widget.log_path, "/path/to/task.log")
+
+
     def test_set_result_error_and_nonexpandable(self):
         widget = self._widget("shell", "cmd")
         widget.is_expanded = True

@@ -487,6 +487,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.is_mcp = is_mcp
         self.is_expanded = False
         self.background_task_id = None
+        self.log_path: str | None = None
+        self.task_id: str | None = None
+        self.subagent_session_id: str | None = None
         self._shell_update_scheduled = False
         self._shell_update_handle: asyncio.TimerHandle | None = None
         if status is not None:
@@ -632,9 +635,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 bg_m = re.search(r"(?:Background Task ID:|id:)\s*([^\s\]\|]+)", cleaned)
                 if bg_m and not self.background_task_id:
                     self.background_task_id = bg_m.group(1)
-                log_m = re.search(r"(?:Full Log:|log:)\s*([^\s\(\)\|]+)", cleaned)
+                log_m = re.search(r"(?:Full Log:|log:)\s*([^\s\(\)\|\]]+)", cleaned)
                 if log_m and not self.log_path:
-                    self.log_path = log_m.group(1)
+                    self.log_path = log_m.group(1).rstrip(".]")
             # A background transition emits a transient RUNNING banner.
             # Never overwrite card content (live output or empty) with this system message.
             if cleaned and not (status == "running" and is_bg_banner):
@@ -1089,9 +1092,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 return "markup", self._clean_markup_text(clean_res)
             elif self.tool_type == "shell":
                 output_text = self._clean_bash_output(self.result_text)
-                log_match = re.search(r"Full Log:\s*([^\s\(\)]+)", self.result_text or "")
+                log_match = re.search(r"Full Log:\s*([^\s\(\)\]]+)", self.result_text or "")
                 if log_match:
-                    log_path = log_match.group(1)
+                    log_path = log_match.group(1).rstrip(".]")
                     if os.path.isfile(log_path):
                         try:
                             from widgets.utils.file_reader import read_file_content
