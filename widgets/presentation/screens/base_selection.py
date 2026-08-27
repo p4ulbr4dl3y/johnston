@@ -333,6 +333,11 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
                     except Exception:
                         pass
                 opt_list.highlighted = default_idx
+            if opt_list.highlighted is not None:
+                try:
+                    opt_list.scroll_to_highlight()
+                except Exception:
+                    pass
         except Exception:
             pass
 

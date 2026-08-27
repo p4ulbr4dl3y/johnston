@@ -676,12 +676,18 @@ ModalScreen {
     margin-bottom: 0;
 }
 
-#wizard-summary-scroll,
-#rewind-files {
+#wizard-summary-scroll {
     display: none;
     width: 100%;
     height: auto;
     margin-bottom: 0;
+}
+
+#rewind-files {
+    display: none;
+    width: 100%;
+    height: auto;
+    margin-bottom: 1;
 }
 
 #modal-dialog.wizard-dialog .tool-scroll-box {

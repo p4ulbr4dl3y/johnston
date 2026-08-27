@@ -155,6 +155,11 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
                 opt_list.highlighted = len(self.filtered_options) - 1
             else:
                 opt_list.highlighted = None
+            if opt_list.highlighted is not None:
+                try:
+                    opt_list.scroll_to_highlight()
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -202,6 +207,19 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             pass
         self._refresh_options()
         try:
+            opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
+            if self.filtered_options:
+                default_idx = len(self.filtered_options) - 1
+                if self.default_value in self.filtered_items:
+                    try:
+                        default_idx = self.filtered_items.index(self.default_value)
+                    except Exception:
+                        pass
+                opt_list.highlighted = default_idx
+                opt_list.scroll_to_highlight()
+        except Exception:
+            pass
+        try:
             self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         except Exception:
             try:
@@ -222,7 +240,9 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             if idx is not None and 0 <= idx < len(self.filtered_entries):
                 self.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option(""), idx))
             elif self.filtered_entries:
-                self.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option(""), 0))
+                self.on_option_list_option_selected(
+                    OptionList.OptionSelected(opt_list, Option(""), len(self.filtered_entries) - 1)
+                )
 
     def _on_key(self, event: events.Key) -> None:
         if self.step == 1:
@@ -337,6 +357,16 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             pass
 
         self._refresh_options()
+        try:
+            opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
+            if self.selected_step1_index is not None and 0 <= self.selected_step1_index < len(self.filtered_options):
+                opt_list.highlighted = self.selected_step1_index
+            elif self.filtered_options:
+                opt_list.highlighted = len(self.filtered_options) - 1
+            if opt_list.highlighted is not None:
+                opt_list.scroll_to_highlight()
+        except Exception:
+            pass
 
         try:
             hint = self.query_one(MODAL_HINT, Label)

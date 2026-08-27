@@ -6,7 +6,7 @@ from textual.widgets import OptionList
 from widgets.presentation.screens.fork import FORK_CURRENT_STATE, ForkScreen
 
 
-class TestForkScreen(unittest.TestCase):
+class TestForkScreen(unittest.IsolatedAsyncioTestCase):
     def test_fork_screen_formatting_and_fit(self):
         user_messages = [
             (0, "first message\nwith multiline"),
@@ -80,4 +80,20 @@ class TestForkScreen(unittest.TestCase):
 
         screen._filter_options("")
         self.assertEqual(len(screen.filtered_items), 3)
+
+    async def test_fork_screen_default_highlight(self):
+        from textual.app import App
+
+        class MockApp(App):
+            pass
+
+        app = MockApp()
+        async with app.run_test() as pilot:
+            screen = ForkScreen([(0, "msg 1"), (1, "msg 2")])
+            await app.push_screen(screen)
+            await pilot.pause()
+            opt_list = screen.query_one(OptionList)
+            self.assertEqual(opt_list.highlighted, 2)
+            self.assertEqual(screen.raw_items[opt_list.highlighted], FORK_CURRENT_STATE)
+
 

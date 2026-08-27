@@ -60,8 +60,8 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
             chat_view = app.query_one(ChatView)
             user_msgs = list(chat_view.query(UserMessage))
-            self.assertEqual(len(user_msgs), 0)
-            self.assertEqual(chat_input.text, "First message")
+            self.assertEqual(len(user_msgs), 2)
+            self.assertEqual(chat_input.text, "Third message")
 
             # 4. Test /resume
             sess = app.sm.create_main("session_test_resume")

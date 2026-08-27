@@ -7,7 +7,7 @@ from core.application.session.actions import RewindEntry
 from widgets.presentation.screens.rewind import RewindScreen
 
 
-class TestRewindScreen(unittest.TestCase):
+class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
     def test_rewind_multiline_formatting(self):
         user_messages = [
             RewindEntry(0, "@/Users/yegor/testing/interactive_test.sh\nне чита..."),
@@ -195,4 +195,25 @@ class TestRewindScreen(unittest.TestCase):
 
         screen._apply_filter("")
         self.assertEqual(len(screen.filtered_entries), 3)
+
+    async def test_rewind_screen_default_highlight(self):
+        from textual.app import App
+
+        class MockApp(App):
+            pass
+
+        app = MockApp()
+        async with app.run_test() as pilot:
+            user_messages = [
+                RewindEntry(0, "first message"),
+                RewindEntry(1, "second message"),
+                RewindEntry(2, "third message"),
+            ]
+            screen = RewindScreen(user_messages, checkpoints_enabled=False)
+            await app.push_screen(screen)
+            await pilot.pause()
+            opt_list = screen.query_one(OptionList)
+            self.assertEqual(opt_list.highlighted, 2)
+            self.assertEqual(screen.filtered_items[opt_list.highlighted], 2)
+
 
