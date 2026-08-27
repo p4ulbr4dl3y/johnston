@@ -94,12 +94,25 @@ class TestSubagentApplyRole(unittest.TestCase):
             registry.load_roles(project_dir=tmpdir)
             definition = registry.get_role("lead")
             self.assertEqual(definition.scope, "main")
-
             agent = _FakeAgent()
             agent.tools = []
             configure_subagent_agent(agent, "lead", app=None, project_dir=tmpdir)
             # The subagent must end up bound to the worker role, not lead.
             self.assertEqual(agent.role, "worker")
+
+    def test_configure_subagent_agent_with_worktree_branch(self):
+        from core.application.session.stream import configure_subagent_agent
+
+        class _FakeAgent:
+            pass
+
+        agent = _FakeAgent()
+        agent.tools = []
+        configure_subagent_agent(agent, "worker", app=None, worktree_branch="feat-branch")
+        self.assertEqual(agent.worktree_branch, "feat-branch")
+        self.assertIn("<worktree_guidelines>", agent.system_prompt)
+        self.assertIn("branch 'feat-branch'", agent.system_prompt)
+
 
 
 class TestSubagentApplyProvider(unittest.TestCase):

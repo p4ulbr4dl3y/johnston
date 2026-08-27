@@ -97,8 +97,8 @@ class InvokeSubagentTool(BaseTool):
                         "type": "string",
                         "description": (
                             "Git branch name for worktree isolation. MUST be used for parallel write/edit tasks "
-                            "to avoid file conflicts. Runs in an isolated worktree. On completion, changes stay on "
-                            "this branch for you to `git merge <branch>`. "
+                            "to avoid file conflicts. Runs in an isolated worktree. On completion, changes are "
+                            "auto-committed to this branch for you to `git merge <branch>`. "
                             "If omitted or same as current branch, runs directly in main workspace."
                         ),
                     },
@@ -176,6 +176,7 @@ class InvokeSubagentTool(BaseTool):
             if wt_path:
                 subagent.project_dir = wt_path
                 subagent.cwd = wt_path
+                subagent.worktree_branch = wt_branch
 
         # Apply role definition: system prompt, model, and tool filtering. Do this
         # BEFORE creating the session so session.role captures the canonically
@@ -184,7 +185,11 @@ class InvokeSubagentTool(BaseTool):
         from core.application.session.stream import configure_subagent_agent
 
         applied_role = configure_subagent_agent(
-            subagent, subagent_type, app=ctx.host, project_dir=project_dir
+            subagent,
+            subagent_type,
+            app=ctx.host,
+            project_dir=project_dir,
+            worktree_branch=wt_branch,
         )
         canonical_role = getattr(subagent, "role", None) or getattr(applied_role, "key", None) or "worker"
 

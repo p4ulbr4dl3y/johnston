@@ -1,6 +1,6 @@
 import tempfile
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.session_manager import AgentSession, SessionStore
 from tools.manage_subagent import ManageSubagentTool
@@ -404,6 +404,38 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"action": "send_message", "session_id": "sub-noreg", "message": "hi"}, ctx=app))
         self.assertIn("message sent to sub-noreg", res)
 
+    async def test_send_message_with_worktree_and_host(self):
+        sess = self.store.create_subagent(
+            parent_id="sess-main",
+            subagent_id="sub-wt",
+            role="worker",
+            description="Worktree task",
+            prompt="prompt",
+            status="completed",
+            project_dir="/tmp/worktree",
+            branch_name="feature-test",
+        )
+        app, spy = self._app_with_widget(sess)
+        app.project_dir = "/tmp/parent"
+        app.pm.get_active_provider_key.return_value = "openai"
+
+        class MockSubagent:
+            def __init__(self):
+                self.provider_key = "openai"
+
+            async def stream_steps(self, message):
+                yield ("bot_text", "report done")
+
+        subagent_inst = MockSubagent()
+        sess.agent = subagent_inst
+
+        with patch("core.infrastructure.runtime.subagent_worktree.SubagentWorktreeManager.ensure_worktree_available_async", new_callable=AsyncMock) as mock_wt:
+            mock_wt.return_value = "/tmp/worktree"
+            tool = ManageSubagentTool()
+            res = str(await tool.execute({"action": "send_message", "session_id": "sub-wt", "message": "give report"}, ctx=app))
+            self.assertIn("message sent to sub-wt", res)
+            mock_wt.assert_awaited_once_with(sess, parent_dir="/tmp/parent")
+
     async def test_manage_subagent_missing_session_id_self_healing(self):
         sess = self._mk_subagent("sub-1", role="worker")
         app, _ = self._app_with_widget(sess)
@@ -420,3 +452,4 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -92,6 +92,7 @@ async def build_prompt_context_async(agent: Any) -> Tuple[str, List[Dict[str, An
         is_subagent=is_subagent,
         subagent_schema=getattr(agent, "subagent_schema", None),
         sandbox_enabled=sandbox_val,
+        worktree_branch=getattr(agent, "worktree_branch", None),
     )
     sys_prompt = await builder.build_system_prompt_async()
     all_tools = builder.build_tools()

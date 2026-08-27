@@ -158,6 +158,21 @@ class TestPromptBuilder(unittest.TestCase):
         prompt = builder.build_system_prompt()
         self.assertNotIn('sandbox="active"', prompt)
 
+    def test_build_system_prompt_subagent_worktree_guidelines(self):
+        builder = PromptBuilder(
+            "Subagent prompt",
+            [],
+            role="worker",
+            is_subagent=True,
+            worktree_branch="feature-x",
+        )
+        prompt = builder.build_system_prompt()
+        self.assertIn("<worktree_guidelines>", prompt)
+        self.assertIn("branch 'feature-x'", prompt)
+        self.assertIn("NEVER modify files in parent repository paths", prompt)
+        self.assertIn("DO NOT switch branches", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()
+

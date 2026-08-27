@@ -7,13 +7,18 @@ from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.application.skills.manager import get_skill_manager
-from core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT, SUBAGENT_DEFAULT_SYSTEM_PROMPT
+from core.domain.defaults.prompts import (
+    DEFAULT_SYSTEM_PROMPT,
+    SUBAGENT_DEFAULT_SYSTEM_PROMPT,
+    SUBAGENT_WORKTREE_PROMPT,
+)
 
 INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
 
 __all__ = [
     "DEFAULT_SYSTEM_PROMPT",
     "SUBAGENT_DEFAULT_SYSTEM_PROMPT",
+    "SUBAGENT_WORKTREE_PROMPT",
     "PromptBuilder",
     "INSTRUCTION_FILES",
 ]
@@ -202,6 +207,7 @@ class PromptBuilder:
         is_subagent: bool = False,
         subagent_schema: Optional[Dict] = None,
         sandbox_enabled: Optional[bool] = None,
+        worktree_branch: Optional[str] = None,
     ):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
@@ -211,6 +217,7 @@ class PromptBuilder:
         self.cwd = os.path.realpath(cwd) if cwd else None
         self.is_subagent = is_subagent
         self.subagent_schema = subagent_schema
+        self.worktree_branch = worktree_branch
         if sandbox_enabled is not None:
             self.sandbox_enabled = bool(sandbox_enabled)
         elif self.role == "explorer":
@@ -355,6 +362,9 @@ class PromptBuilder:
                 else:
                     sys_prompt += f"\n\n{p_text}"
 
+        if self.is_subagent and self.worktree_branch and "<worktree_guidelines>" not in sys_prompt:
+            sys_prompt += f"\n\n{SUBAGENT_WORKTREE_PROMPT.format(branch_name=self.worktree_branch)}"
+
         # Cache key from the stable components. role_def is represented by its
         # content so the cache invalidates when the role definition changes even
         # if registry internals were refreshed in place.
@@ -370,6 +380,7 @@ class PromptBuilder:
             subagents_snippet,
             mcp_snippet,
             self.role,
+            self.worktree_branch,
             _ident(role_def),
         )
 

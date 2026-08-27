@@ -74,7 +74,13 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
         session.add_event({"type": "event_divider", "text": val1 or "Session Compacted"})
 
 
-def configure_subagent_agent(subagent: Any, role_key: str, app: Any = None, project_dir: Optional[str] = None) -> Any:
+def configure_subagent_agent(
+    subagent: Any,
+    role_key: str,
+    app: Any = None,
+    project_dir: Optional[str] = None,
+    worktree_branch: Optional[str] = None,
+) -> Any:
     """Configures a subagent agent: binds the app, marks it as a subagent, and
     applies its role (system prompt, model, tool filtering).
 
@@ -83,11 +89,14 @@ def configure_subagent_agent(subagent: Any, role_key: str, app: Any = None, proj
     """
     subagent.app = app
     subagent.is_subagent = True
+    if worktree_branch:
+        subagent.worktree_branch = worktree_branch
     if app and hasattr(app, "sandbox_enabled"):
         subagent.sandbox_enabled = app.sandbox_enabled
     from core.roles import apply_role
 
-    return apply_role(subagent, role_key, project_dir=project_dir)
+    return apply_role(subagent, role_key, project_dir=project_dir, worktree_branch=worktree_branch)
+
 
 
 def merge_subagent_metrics(subagent: Any, context: Any) -> None:
@@ -367,22 +376,31 @@ async def send_subagent_followup(
                     app=ctx.host,
                     project_dir=getattr(ctx, "project_dir", None) or session.project_dir,
                 )
-                session.agent = subagent
+        elif getattr(ctx, "host", None):
+            # Keep existing subagent provider credentials current with any host changes
+            from core.roles.provider import rebind_provider
+
+            pkey = getattr(subagent, "provider_key", "")
+            if not pkey and hasattr(ctx.host, "pm") and hasattr(ctx.host.pm, "get_active_provider_key"):
+                pkey = ctx.host.pm.get_active_provider_key()
+            if pkey and isinstance(pkey, str):
+                try:
+                    rebind_provider(subagent, pkey)
+                except Exception:
+                    pass
 
         # Restore the isolated worktree context for follow-up so the subagent
         # keeps working on its own branch/cwd instead of silently falling back
         # to the parent checkout (worktree is removed on completion).
         if subagent and session.project_dir and session.branch_name:
             from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
-            from core.roles.provider import rebind_provider
 
-            # Keep subagent provider credentials current with any host changes
-            rebind_provider(subagent, ctx.host)
             project_dir = await SubagentWorktreeManager.ensure_worktree_available_async(
                 session, parent_dir=ctx.project_dir
             )
             subagent.project_dir = project_dir
             subagent.cwd = project_dir
+            subagent.worktree_branch = session.branch_name
 
         if not subagent:
             return ToolResult.error("context", name=session.id, detail="no active agent")

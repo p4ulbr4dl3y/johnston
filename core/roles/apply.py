@@ -9,7 +9,12 @@ from core.roles.resolve import resolve_role
 from core.roles.tools import apply_role_tools
 
 
-def apply_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) -> AgentRole:
+def apply_role(
+    subagent: Any,
+    role_key: str,
+    project_dir: Optional[str] = None,
+    worktree_branch: Optional[str] = None,
+) -> AgentRole:
     """Apply a role definition to a subagent agent.
 
     Resolves the effective role (with main->worker fallback), switches provider
@@ -22,5 +27,6 @@ def apply_role(subagent: Any, role_key: str, project_dir: Optional[str] = None) 
     definition = resolve_role(registry, role_key, project_dir=project_dir)
     apply_provider(subagent, definition)
     apply_role_tools(subagent, definition)
-    apply_prompt(subagent, definition)
+    apply_prompt(subagent, definition, worktree_branch=worktree_branch)
     return definition
+

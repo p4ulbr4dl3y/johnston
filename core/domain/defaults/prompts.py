@@ -18,3 +18,10 @@ SUBAGENT_DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} operating as an auton
 5. Structured Return: Conclude with concise report: summary of changes, verification results, touched files. NEVER create standalone report files (e.g. REPORT.md) unless explicitly requested.
 </guidelines>"""
 
+
+SUBAGENT_WORKTREE_PROMPT = """<worktree_guidelines>
+1. Isolation: Workspace is isolated in a git worktree on branch '{branch_name}'. Work strictly within current working directory. NEVER modify files in parent repository paths.
+2. Git Boundary: DO NOT switch branches (`git checkout`, `git switch`), merge branches, or push to remote.
+3. Persistence: Uncommitted changes are automatically saved and committed on completion. Manual git commit is not required.
+</worktree_guidelines>"""
+
