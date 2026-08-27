@@ -16,6 +16,7 @@ async def test_theme_modal_full_workflow():
         # 1. Start in default Zinc
         assert app.theme == "zinc"
         assert theme_manager.current_theme.name == "zinc"
+        assert app.screen.styles.background.hex.upper() == "#09090B"
 
         # 2. Type /theme in chat input and submit
         input_widget = app.query_one("#message-input", ChatInput)
@@ -45,6 +46,7 @@ async def test_theme_modal_full_workflow():
         assert not isinstance(app.screen, ThemeScreen)
         assert app.theme == "dracula"
         assert theme_manager.current_theme.name == "dracula"
+        assert app.screen.styles.background.hex.upper() == "#282A36"
 
         # 8. Open via /themes alias
         input_widget.text = "/themes"
@@ -65,7 +67,9 @@ async def test_theme_modal_full_workflow():
         assert not isinstance(app.screen, ThemeScreen)
         assert app.theme == "tokyo-night"
         assert theme_manager.current_theme.name == "tokyo-night"
+        assert app.screen.styles.background.hex.upper() == "#1A1B26"
 
         # Restore zinc
         app.set_app_theme("zinc")
         assert app.theme == "zinc"
+        assert app.screen.styles.background.hex.upper() == "#09090B"

@@ -1,27 +1,3 @@
-/* Design Tokens (Defaults: Zinc Monochrome) */
-$bg-app: #09090b;
-$bg-surface: #18181b;
-$bg-elevated: #27272a;
-$bg-hover: #3f3f46;
-
-$border-subtle: #27272a;
-$border-strong: #3f3f46;
-
-$fg-primary: #ffffff;
-$fg-body: #f4f4f5;
-$fg-secondary: #e4e4e7;
-$fg-card: #d4d4d8;
-$fg-muted: #a1a1aa;
-$fg-dim: #71717a;
-$fg-faint: #52525b;
-
-$fg-inverted: #09090b;
-$bg-inverted: #ffffff;
-
-$toast-info: #61afef;
-$toast-warn: #e5c07b;
-$toast-error: #e06c75;
-
 /* Dynamic True Color Inversion Selection for all Screens, Input fields and TextAreas */
 .screen--selection,
 .text-area--selection,

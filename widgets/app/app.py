@@ -117,3 +117,8 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         if hasattr(self, 'refresh_status_footer'):
             self.refresh_status_footer()
 
+    def get_theme_variable_defaults(self) -> dict[str, str]:
+        """Return design token defaults for TCSS stylesheet compilation."""
+        from core.domain.defaults.themes import ZINC_DARK
+        return dict(ZINC_DARK.tcss_vars)
+
