@@ -18,7 +18,7 @@ STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
 
 
 def format_display_path(raw_path: str, max_length: int = 40) -> str:
-    """Format directory path for footer display with ~/ for $HOME and middle truncation if long."""
+    """Format directory path for footer display with worktree: prefix, ~/ for $HOME and middle truncation if long."""
     if not raw_path:
         return ""
     try:
@@ -27,25 +27,63 @@ def format_display_path(raw_path: str, max_length: int = 40) -> str:
         home_real = os.path.realpath(home)
         norm_real = os.path.realpath(norm_path)
 
-        if norm_path == home or norm_real == home_real:
-            display_path = "~"
-        elif norm_path.startswith(home + os.sep):
-            rel = os.path.relpath(norm_path, home)
-            display_path = f"~/{rel}"
-        elif norm_real.startswith(home_real + os.sep):
-            rel = os.path.relpath(norm_real, home_real)
-            display_path = f"~/{rel}"
-        else:
-            display_path = norm_path
+        # 1. Check if path is within worktrees directory
+        wt_candidates: list[str] = []
+        try:
+            from core.infrastructure.platform.paths import WORKTREES_DIR
+
+            if WORKTREES_DIR:
+                wt_candidates.append(os.path.abspath(os.path.expanduser(WORKTREES_DIR)))
+        except Exception:
+            pass
+        default_wt = os.path.abspath(os.path.expanduser("~/.johnston/worktrees"))
+        if default_wt not in wt_candidates:
+            wt_candidates.append(default_wt)
+
+        display_path = None
+        for wt in wt_candidates:
+            wt_real = os.path.realpath(wt)
+            if norm_path == wt or norm_real == wt_real:
+                display_path = "worktree"
+                break
+            if norm_path.startswith(wt + os.sep):
+                rel = os.path.relpath(norm_path, wt)
+                display_path = f"worktree:{rel}"
+                break
+            if norm_real.startswith(wt_real + os.sep):
+                rel = os.path.relpath(norm_real, wt_real)
+                display_path = f"worktree:{rel}"
+                break
+
+        if display_path is None:
+            if norm_path == home or norm_real == home_real:
+                display_path = "~"
+            elif norm_path.startswith(home + os.sep):
+                rel = os.path.relpath(norm_path, home)
+                display_path = f"~/{rel}"
+            elif norm_real.startswith(home_real + os.sep):
+                rel = os.path.relpath(norm_real, home_real)
+                display_path = f"~/{rel}"
+            else:
+                display_path = norm_path
 
         if len(display_path) > max_length:
-            parts = display_path.split(os.sep)
-            if len(parts) > 3:
-                display_path = f"{parts[0]}/{parts[1]}/.../{parts[-1]}"
+            if display_path.startswith("worktree:"):
+                wt_suffix = display_path[len("worktree:") :]
+                parts = wt_suffix.split(os.sep)
+                if len(parts) > 1:
+                    display_path = f"worktree:.../{parts[-1]}"
                 if len(display_path) > max_length:
+                    avail = max(6, max_length - len("worktree:"))
+                    display_path = f"worktree:{ellipsize(parts[-1], avail)}"
+            else:
+                parts = display_path.split(os.sep)
+                if len(parts) > 3:
+                    display_path = f"{parts[0]}/{parts[1]}/.../{parts[-1]}"
+                    if len(display_path) > max_length:
+                        display_path = f"{parts[0]}/.../{parts[-1]}"
+                elif len(parts) == 3:
                     display_path = f"{parts[0]}/.../{parts[-1]}"
-            elif len(parts) == 3:
-                display_path = f"{parts[0]}/.../{parts[-1]}"
         return display_path
     except Exception:
         return raw_path
