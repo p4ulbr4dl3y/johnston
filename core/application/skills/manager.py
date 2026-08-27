@@ -309,21 +309,24 @@ def _provision_skill_files(skill: BundledSkill) -> None:
 def get_skill_manager(project_dir: Optional[str] = None) -> SkillManager:
     """Return the shared SkillManager for ``project_dir`` (defaults to cwd).
 
-    Managers are cached by resolved project dir so repeated calls reuse one
-    scan cache/TTL window. The first call also creates the global skills dir
-    and provisions bundled default skills into it (once per process).
+    Managers are cached by (resolved project dir, global skills dir) so that a
+    change in configuration/global skills directory (e.g. per-test isolation)
+    yields a fresh manager instead of reusing one that scans a stale directory.
+    Bundled default skills are provisioned into the global skills dir whenever a
+    new manager is created; ``_provision_skill_files`` is idempotent per file, so
+    this is cheap and only ever happens once per configuration in production.
     """
-    global _bundled_provisioned
-    key = os.path.realpath(project_dir or os.getcwd())
+    key = (
+        os.path.realpath(project_dir or os.getcwd()),
+        os.path.realpath(GLOBAL_SKILLS_DIR),
+    )
     with _registry_lock:
         mgr = _SKILL_MANAGERS.get(key)
         if mgr is None:
-            if not _bundled_provisioned:
-                os.makedirs(GLOBAL_SKILLS_DIR, exist_ok=True)
-                for name in list_bundled_skills():
-                    _provision_skill_files(get_bundled_skill(name))
-                _bundled_provisioned = True
-            mgr = SkillManager(project_dir=key)
+            os.makedirs(GLOBAL_SKILLS_DIR, exist_ok=True)
+            for name in list_bundled_skills():
+                _provision_skill_files(get_bundled_skill(name))
+            mgr = SkillManager(project_dir=key[0])
             _SKILL_MANAGERS[key] = mgr
         return mgr
 
