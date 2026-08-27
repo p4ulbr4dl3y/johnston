@@ -135,9 +135,12 @@ class PermissionManager:
         fail-closed interpretation by check_permission.
         """
         stamp = _file_mtime(CONFIG_FILE)
+        # Key the cache by (path, mtime): on coarse-mtime filesystems (e.g.
+        # Windows 1s granularity) two different config files can share an mtime,
+        # so a path-only mtime comparison would hand back a stale snapshot.
         cached = self._effective_cache
-        if cached is not None and stamp is not None and cached[0] == stamp:
-            return cached[1]
+        if cached is not None and stamp is not None and cached[0] == CONFIG_FILE and cached[1] == stamp:
+            return cached[2]
 
         # 1. Base defaults
         merged: Dict[str, Any] = {
@@ -155,7 +158,7 @@ class PermissionManager:
 
         merge_perms(merged, global_perms)
 
-        self._effective_cache = (stamp, merged)
+        self._effective_cache = (CONFIG_FILE, stamp, merged)
         return merged
 
     def check_permission(self, tool_name: str, args: Optional[Dict[str, Any]] = None) -> PermissionDecision:
