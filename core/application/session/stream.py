@@ -401,7 +401,7 @@ async def send_subagent_followup(
         )
 
         notification_hdr = format_background_notification(
-            "Subagent follow-up",
+            "subagent",
             session.description,
             session.id,
             "{result_text}",

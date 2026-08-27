@@ -45,7 +45,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         tool = CreateTool()
         target = os.path.join(self.test_dir, ".johnston", "config.json")
         res = await tool.execute({"path": target, "content": '{"permissions": {}}'})
-        self.assertIn("--- /dev/null", res.content)
+        self.assertIn("OK: created", res.content)
         self.assertTrue(os.path.exists(target))
 
     async def test_edit_allows_johnston_config(self):
@@ -235,7 +235,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Test capitalized tool name "Create"
         res_create = await execute_tool("Create", {"path": file_path, "content": "Case Content"})
-        self.assertIn("--- /dev/null", res_create.content)
+        self.assertIn("OK: created", res_create.content)
         self.assertTrue(os.path.exists(file_path))
 
         # Aliases are no longer resolved: 'write' is unknown, only 'create' works.

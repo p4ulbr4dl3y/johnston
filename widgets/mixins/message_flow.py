@@ -241,13 +241,12 @@ class MessageFlowMixin:
             from tools.base import format_background_notification, truncate_output
 
             msg = format_background_notification(
-                "Background shell",
+                "shell",
                 command_str,
                 task_id,
                 truncate_output(
                     result,
                     max_chars=4000,
-                    hint="Pipe command to grep/head, or inspect full log if needed.",
                     tool_name="shell",
                     from_end=True,
                     save_log=False,

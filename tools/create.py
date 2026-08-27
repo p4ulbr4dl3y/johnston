@@ -65,30 +65,18 @@ class CreateTool(BaseTool):
 
         def _write_and_diff():
             write_file_text(path, content)
+            new_lines = content.splitlines()
+            cnt = len(new_lines) if content else 0
             if not file_existed:
-                new_lines = content.splitlines()
-                cnt = len(new_lines) or 1
-                diff_lines = [
-                    "--- /dev/null",
-                    f"+++ b/{path}",
-                    f"@@ -0,0 +1,{cnt} @@",
-                ] + [f"+{line}" for line in new_lines]
-                return "\n".join(diff_lines)
-            diff_text = make_git_diff(old_content, content, fromfile=f"a/{path}", tofile=f"b/{path}")
+                return f"OK: created '{path_arg}' ({cnt} lines)"
+            diff_text = make_git_diff(old_content, content, fromfile=f"a/{path_arg}", tofile=f"b/{path_arg}")
             if not diff_text:
-                new_lines = content.splitlines()
-                cnt = len(new_lines) or 1
-                diff_lines = [
-                    f"--- a/{path}",
-                    f"+++ b/{path}",
-                    f"@@ -1,{cnt} +1,{cnt} @@",
-                ] + [f" {line}" for line in new_lines]
-                diff_text = "\n".join(diff_lines)
+                return f"OK: file '{path_arg}' unchanged ({cnt} lines)"
             return diff_text
 
         try:
-            diff_text = await run_cancellable(_write_and_diff)
-            diff_text = diff_text.strip() if diff_text else ""
-            return ToolResult.done(content=diff_text, display=diff_text)
+            result_str = await run_cancellable(_write_and_diff)
+            result_str = result_str.strip() if result_str else ""
+            return ToolResult.done(content=result_str, display=result_str)
         except Exception as e:
-            return ToolResult.error("file", detail=str(e), name=path)
+            return ToolResult.error("file", detail=str(e), name=path_arg or path)
