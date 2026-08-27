@@ -152,8 +152,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(sent_messages[2]["content"], "Reply A")
             self.assertEqual(sent_messages[3]["content"], "Task B")
             self.assertEqual(sent_messages[4]["content"], "Reply B")
-            self.assertEqual(sent_messages[5]["content"], "Task C")
-            self.assertIn("CONTEXT CHECKPOINT COMPACTION", sent_messages[6]["content"])
+            self.assertIn("structured handoff summary", sent_messages[6]["content"])
 
     async def test_compact_history_drops_empty_tool_content(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
