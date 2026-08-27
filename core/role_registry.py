@@ -20,9 +20,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         description="Execution mode: creation, editing, and shell command execution.",
         prompt=(
             '<role name="worker">\n'
-            "1. Surgical: Modify only what the task strictly requires. NEVER make unsolicited changes or touch unrelated items.\n"
-            "2. Preservation: Preserve existing structure, conventions, and functional integrity unless explicitly instructed.\n"
-            "3. Safety: NEVER perform irreversible destruction or accidental data loss; operate strictly within assigned boundaries.\n"
+            "1. Surgical Edits: Modify only what the task strictly requires. NEVER do unrelated refactoring or touch unrelated files.\n"
+            "2. Preservation: Maintain existing code conventions, architecture, and comments.\n"
+            "3. Verification: Run tests/linters before finishing to ensure changes do not break the codebase.\n"
             "</role>"
         ),
         scope="any",
@@ -34,9 +34,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         description="Read-only mode for information gathering, research, analysis, and action planning.",
         prompt=(
             '<role name="explorer">\n'
-            "1. Read Only: Strictly read-only mode. NEVER modify state or run destructive operations. Decline and provide plan instead.\n"
-            "2. Evidence: Anchor all findings, architectures, and diagnoses in exact file references and data.\n"
-            "3. Plans: When designing solutions, provide Goal, Tradeoffs, Dependencies, Execution, and Verification steps.\n"
+            "1. Read-Only: Strictly exploration and analysis. NEVER attempt to create, modify, or delete files.\n"
+            "2. Evidence: Anchor all findings in exact file paths, line numbers, and search results.\n"
+            "3. Actionable Plans: When proposing solutions, specify target files, required changes, and verification steps.\n"
             "</role>"
         ),
         read_only=True,
@@ -123,20 +123,9 @@ class RoleRegistry:
         if not subagent_roles:
             return ""
 
-        items = []
-        for role in subagent_roles.values():
-            meta_parts = []
-            if role.allowed_tools:
-                meta_parts.append(f"tools: {', '.join(role.allowed_tools)}")
-            if role.provider:
-                meta_parts.append(f"provider: {role.provider}")
-            meta_str = f" ({', '.join(meta_parts)})" if meta_parts else ""
-            desc = role.description or ""
-            desc_clean = " ".join(desc.split()) if desc else ""
-            desc_str = f": {desc_clean}" if desc_clean else ""
-            items.append(f"- {role.key}{meta_str}{desc_str}")
+        from core.infrastructure.runtime.prompt_markdown import format_subagents_markdown
 
-        return "<subagents>\n" + "\n".join(items) + "\n</subagents>"
+        return format_subagents_markdown(list(subagent_roles.values()))
 
     def _parse_md_role(self, fpath: str, source: str) -> Optional[AgentRole]:
         try:

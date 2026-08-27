@@ -866,9 +866,6 @@ class MCPManager:
                 continue
             by_server.setdefault(server, []).append(name)
 
-        items = []
-        for server in sorted(by_server):
-            tools_str = ", ".join(sorted(by_server[server]))
-            items.append(f"- {server}: {tools_str}")
+        from core.infrastructure.runtime.prompt_markdown import format_mcp_servers_markdown
 
-        return "<mcp_servers>\n" + "\n".join(items) + "\n</mcp_servers>"
+        return format_mcp_servers_markdown(by_server)

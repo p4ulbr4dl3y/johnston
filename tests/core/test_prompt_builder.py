@@ -18,7 +18,7 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("System prompt test", [], role="explorer")
         sys_prompt = builder.build_system_prompt()
         self.assertIn('<role name="explorer"', sys_prompt)
-        self.assertIn("Read Only", sys_prompt)
+        self.assertIn("Read-Only", sys_prompt)
 
     def test_build_tools_explorer_mode_filters_create_edit(self):
         builder = PromptBuilder(
@@ -75,7 +75,7 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_includes_project_instructions(self):
         builder = PromptBuilder("System prompt test", [], role="worker")
         sys_prompt = builder.build_system_prompt()
-        self.assertIn("<project_instructions file=", sys_prompt)
+        self.assertIn('<rule id="project:AGENTS.md">', sys_prompt)
 
     def test_build_system_prompt_explorer_filters_write_tools(self):
         pb_exp = PromptBuilder(
@@ -106,7 +106,8 @@ class TestPromptBuilder(unittest.TestCase):
                 builder = PromptBuilder("Test", [], role="worker")
                 prompt = builder.build_system_prompt()
                 self.assertIn("<user_rules>", prompt)
-                self.assertIn("- custom_rule: Always use pytest", prompt)
+                self.assertIn('<rule id="project:custom_rule">', prompt)
+                self.assertIn("Always use pytest", prompt)
 
     def test_build_system_prompt_env_metadata_last(self):
         # Volatile env metadata must come AFTER the stable base + mode block so

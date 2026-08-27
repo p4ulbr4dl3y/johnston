@@ -25,9 +25,9 @@ _PROJECT_INSTR_CACHE_MAX = 64
 _STABLE_CORE_CACHE_MAX = 256
 _TOOLS_CACHE_MAX = 32
 
-# (realpath cwd) -> (mtime/size signature, snippet). Invalidates when any
+# (realpath cwd) -> (mtime/size signature, rules). Invalidates when any
 # instruction file appears/disappears or its mtime changes.
-_PROJECT_INSTRUCTION_CACHE: Dict[str, Tuple[tuple, str]] = {}
+_PROJECT_INSTRUCTION_CACHE: "OrderedDict[str, Tuple[tuple, List[Any]]]" = OrderedDict()
 
 # Semantic cache for the stable (non-volatile) prefix of the system prompt.
 # Keyed by the assembled stable parts so it only rebuilds when roles / rules /
@@ -124,8 +124,8 @@ def _project_instr_signature(cwd: str) -> tuple:
     return tuple(entries)
 
 
-def get_project_instructions_snippet(cwd: str = None) -> str:
-    """Reads INSTRUCTION_FILES from a working directory.
+def get_project_instruction_rules(cwd: str = None) -> List[Any]:
+    """Reads INSTRUCTION_FILES from a working directory as RuleDefinitions.
 
     Cached per-directory by an mtime/size signature; files are only re-read
     when they change, so the agent loop does not re-open disk files every turn.
@@ -136,7 +136,9 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
     if cached is not None and cached[0] == sig:
         return cached[1]
 
-    found_snippets = []
+    from core.application.rules.rules import RuleDefinition
+
+    found_rules = []
     for name in INSTRUCTION_FILES:
         filepath = os.path.join(cwd, name)
         if os.path.isfile(filepath):
@@ -144,49 +146,41 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
                 with open(filepath, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
                 if content:
-                    from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
                     if len(content) > 20000:
                         content = content[:20000] + "\n... [Project instructions truncated at 20000 chars]"
-                    escaped_name = escape_xml_attr(name)
-                    found_snippets.append(
-                        f'<project_instructions file="{escaped_name}">\n{content}\n</project_instructions>'
-                    )
+                    found_rules.append(RuleDefinition(name=name, content=content, source="project"))
             except Exception:
                 pass
 
-    result = "\n\n".join(found_snippets)
-    if len(_PROJECT_INSTRUCTION_CACHE) >= _PROJECT_INSTR_CACHE_MAX:
-        dict.popitem(_PROJECT_INSTRUCTION_CACHE, last=False)
-    _PROJECT_INSTRUCTION_CACHE[cwd] = (sig, result)
-    return result
+    _cache_set(_PROJECT_INSTRUCTION_CACHE, cwd, (sig, found_rules), _PROJECT_INSTR_CACHE_MAX)
+    return found_rules
+
+
+def get_project_instructions_snippet(cwd: str = None) -> str:
+    """Reads INSTRUCTION_FILES from a working directory and formats as rules block."""
+    from core.infrastructure.runtime.prompt_markdown import format_rules_markdown
+
+    rules = get_project_instruction_rules(cwd)
+    return format_rules_markdown(rules)
 
 
 async def get_project_instructions_snippet_async(cwd: str = None) -> str:
-    """Async variant: reads AGENTS.md/CLAUDE.md on a thread on cache miss.
-
-    Cache-hit calls return immediately without touching the thread pool.
-    """
-    cwd = os.path.realpath(cwd) if cwd else os.getcwd()
-    sig = _project_instr_signature(cwd)
-    cached = _PROJECT_INSTRUCTION_CACHE.get(cwd)
-    if cached is not None and cached[0] == sig:
-        return cached[1]
+    """Async variant: reads AGENTS.md/CLAUDE.md on a thread on cache miss."""
     return await asyncio.to_thread(get_project_instructions_snippet, cwd)
 
 
 def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
-    """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules using RulesManager.
+    """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules and project instruction files.
 
-    cwd selects the project rules directory so a subagent working in an isolated
-    worktree sees its own `.johnston/rules` instead of the parent checkout's.
+    cwd selects the project directory so a subagent working in an isolated
+    worktree sees its own rules and instructions instead of the parent checkout's.
     """
     from core.application.rules.rules import RulesManager
-
-    rules = RulesManager.get_instance().get_active_rules(project_dir=cwd)
     from core.infrastructure.runtime.prompt_markdown import format_rules_markdown
 
-    return format_rules_markdown(rules)
+    rules = list(RulesManager.get_instance().get_active_rules(project_dir=cwd))
+    instructions = get_project_instruction_rules(cwd)
+    return format_rules_markdown(rules + instructions)
 
 
 async def get_rules_snippet_async(role: str = "worker", cwd: str = None) -> str:
@@ -325,20 +319,19 @@ class PromptBuilder:
         """Assemble + cache the stable (non-volatile) system-prompt prefix.
 
         Only rebuilds when the parts it depends on change: base prompt, role
-        definition, project instructions, rules, skills, subagents or the MCP
+        definition, rules, skills, subagents or the MCP
         snippet. Volatile environment metadata (date/git) stays out of this
         build so it stays cacheable across turns.
         """
-        project_snippet = get_project_instructions_snippet(self.cwd)
         rules_snippet = get_rules_snippet(role=self.role, cwd=self.cwd)
         return self._assemble_stable_core(
-            project_snippet, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet
+            rules_snippet, mcp_snippet, skills_snippet, subagents_snippet
         )
 
-    def _assemble_stable_core(self, project_snippet, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet) -> str:
+    def _assemble_stable_core(self, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet) -> str:
         """Shared stable-prefix assembly for the sync and async builders.
 
-        Takes the already-fetched project/rules snippets so the sync and async
+        Takes the already-fetched rules snippet so the sync and async
         variants only differ in how those are read (direct vs worker thread).
         """
         from core.role_registry import RoleRegistry
@@ -372,7 +365,6 @@ class PromptBuilder:
 
         key = (
             sys_prompt,
-            project_snippet,
             rules_snippet,
             skills_snippet,
             subagents_snippet,
@@ -385,8 +377,6 @@ class PromptBuilder:
         if cached is not None:
             return cached
 
-        if project_snippet:
-            sys_prompt = f"{sys_prompt}\n\n{project_snippet}"
         if rules_snippet:
             sys_prompt = f"{sys_prompt}\n\n{rules_snippet}"
         if skills_snippet:
@@ -400,12 +390,11 @@ class PromptBuilder:
         return sys_prompt
 
     async def _build_stable_core_async(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
-        """Async variant: same stable-prefix assembly, but file reads (project
-        instructions, rules) happen on a worker thread on cache miss."""
-        project_snippet = await get_project_instructions_snippet_async(self.cwd)
+        """Async variant: same stable-prefix assembly, but file reads (rules)
+        happen on a worker thread on cache miss."""
         rules_snippet = await get_rules_snippet_async(role=self.role, cwd=self.cwd)
         return self._assemble_stable_core(
-            project_snippet, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet
+            rules_snippet, mcp_snippet, skills_snippet, subagents_snippet
         )
 
     def build_tools(self) -> List[Dict[str, Any]]:

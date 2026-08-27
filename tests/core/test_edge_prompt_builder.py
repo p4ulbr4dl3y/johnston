@@ -333,13 +333,38 @@ def test_project_snippet_cached_until_mtime_change(tmp_path):
 
     out1 = pb.get_project_instructions_snippet(str(tmp_path))
     out2 = pb.get_project_instructions_snippet(str(tmp_path))
-    assert out1 == out2 == '<project_instructions file="AGENTS.md">\nv1\n</project_instructions>'
+    assert '<rule id="project:AGENTS.md">\nv1\n</rule>' in out1
+    assert out1 == out2
 
     # Cache populated for this cwd after the reads.
     # Editing the file changes its mtime/size signature -> next read re-reads.
     (tmp_path / "AGENTS.md").write_text("v2-longer-content")
     out3 = pb.get_project_instructions_snippet(str(tmp_path))
     assert "v2-longer-content" in out3
+
+
+def test_project_instruction_cache_eviction(tmp_path, monkeypatch):
+    """Exceeding cache max size must evict oldest entries without raising error."""
+    import core.application.generation.prompt_builder as pb
+
+    monkeypatch.setattr(pb, "_PROJECT_INSTR_CACHE_MAX", 2)
+    pb._PROJECT_INSTRUCTION_CACHE.clear()
+
+    d1 = tmp_path / "d1"
+    d2 = tmp_path / "d2"
+    d3 = tmp_path / "d3"
+    for d in (d1, d2, d3):
+        d.mkdir()
+        (d / "AGENTS.md").write_text("hi")
+
+    pb.get_project_instruction_rules(str(d1))
+    pb.get_project_instruction_rules(str(d2))
+    assert len(pb._PROJECT_INSTRUCTION_CACHE) == 2
+    # Inserting 3rd must evict d1
+    pb.get_project_instruction_rules(str(d3))
+    assert len(pb._PROJECT_INSTRUCTION_CACHE) == 2
+    assert os.path.realpath(str(d1)) not in pb._PROJECT_INSTRUCTION_CACHE
+    assert os.path.realpath(str(d3)) in pb._PROJECT_INSTRUCTION_CACHE
 
 
 # ---------------------------------------------------------------------------
