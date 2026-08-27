@@ -613,3 +613,25 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
 
         hidden_msg = await chat_view.restore_message({"type": "user", "text": "hi", "show_in_ui": False})
         self.assertIsNone(hidden_msg)
+
+    async def test_load_all_older_messages_and_count(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            chat_view.PAGE_SIZE = 3
+            msgs = [{"type": "user", "text": f"turn_{i}"} for i in range(10)]
+            chat_view._unloaded_messages = msgs[:-3]
+            chat_view._is_loading_session = True
+            for m in msgs[-3:]:
+                await chat_view.restore_message(m)
+            chat_view._is_loading_session = False
+            await pilot.pause()
+
+            self.assertEqual(chat_view.get_total_user_message_count(), 10)
+            self.assertEqual(len(chat_view.get_user_messages()), 3)
+
+            await chat_view.load_all_older_messages()
+            await pilot.pause()
+
+            self.assertFalse(chat_view.has_older_messages())
+            self.assertEqual(len(chat_view.get_user_messages()), 10)

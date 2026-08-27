@@ -97,6 +97,7 @@ class GenCanvas:
     add_bot_message: Callable[[], Any] = field(default=None)
     add_event_divider: Callable[[str], Any] = field(default=None)
     get_user_messages: Callable[[], Any] = field(default=None)
+    get_user_messages_count: Optional[Callable[[], int]] = field(default=None)
     refresh_status_footer: Callable[[], Any] = field(default=None)
     notify: Callable[[str, str], Any] = field(default=None)
     save_session: Callable[..., Any] = field(default=None)
@@ -148,8 +149,12 @@ async def _create_git_checkpoint_async(
     try:
         await canvas.save_session()
         if session_id:
-            user_msgs = canvas.get_user_messages()
-            msg_idx = len(user_msgs) - 1
+            if getattr(canvas, "get_user_messages_count", None) is not None and callable(canvas.get_user_messages_count):
+                user_count = canvas.get_user_messages_count()
+            else:
+                user_msgs = canvas.get_user_messages() if canvas.get_user_messages else []
+                user_count = len(user_msgs)
+            msg_idx = user_count - 1
             if msg_idx >= 0:
                 await asyncio.to_thread(
                     GitCheckpointManager.create_checkpoint, session_id, msg_idx, project_path=project_path

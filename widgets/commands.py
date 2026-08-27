@@ -252,6 +252,10 @@ class RewindCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         chat_view = app.query_one(ChatView)
+        if hasattr(chat_view, "load_all_older_messages") and callable(chat_view.load_all_older_messages):
+            res = chat_view.load_all_older_messages()
+            if asyncio.iscoroutine(res):
+                await res
         user_msgs = chat_view.get_user_messages()
         if not user_msgs:
             app.notify("History is empty: no messages to rollback", severity="warning")
@@ -371,6 +375,10 @@ class ForkCommand(BaseCommand):
 
     async def execute(self, app) -> None:
         chat_view = app.query_one(ChatView)
+        if hasattr(chat_view, "load_all_older_messages") and callable(chat_view.load_all_older_messages):
+            res = chat_view.load_all_older_messages()
+            if asyncio.iscoroutine(res):
+                await res
         user_msgs = chat_view.get_user_messages()
         if not user_msgs:
             app.notify("History is empty: no messages to fork", severity="warning")

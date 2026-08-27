@@ -223,6 +223,21 @@ class ChatView(VerticalScroll):
         except RuntimeError:
             pass
 
+    async def load_all_older_messages(self) -> None:
+        """Load and mount all remaining older messages into view."""
+        while self.has_older_messages():
+            await self._load_older_messages_worker()
+
+    def get_total_user_message_count(self) -> int:
+        """Return total count of visible user turns (both unloaded and mounted)."""
+        unloaded_count = sum(
+            1
+            for m in self._unloaded_messages
+            if isinstance(m, dict) and m.get("type") == "user" and is_ui_visible_user_message(m)
+        )
+        mounted_count = sum(1 for c in self.children if isinstance(c, UserMessage))
+        return unloaded_count + mounted_count
+
     async def _load_older_messages_worker(self) -> None:
         if self._is_loading_older or not self._unloaded_messages:
             return

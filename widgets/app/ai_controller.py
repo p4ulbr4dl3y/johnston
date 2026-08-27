@@ -29,6 +29,7 @@ def build_gen_canvas(
         add_bot_message=chat_view.add_bot_message,
         add_event_divider=chat_view.add_event_divider,
         get_user_messages=chat_view.get_user_messages,
+        get_user_messages_count=getattr(chat_view, "get_total_user_message_count", None),
         refresh_status_footer=refresh_status_footer,
         notify=notify,
         save_session=save_session,
