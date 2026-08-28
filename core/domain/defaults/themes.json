@@ -1843,8 +1843,8 @@
       "border": "#27272a"
     },
     "markdown_styles": {
-      "markdown.paragraph": "#d4d4d8",
-      "markdown.text": "#d4d4d8",
+      "markdown.paragraph": "#f4f4f5",
+      "markdown.text": "#f4f4f5",
       "markdown.h1": "bold #f4f4f5",
       "markdown.h1.border": "none",
       "markdown.h2": "bold #f4f4f5",
@@ -1854,10 +1854,10 @@
       "markdown.h5": "bold #f4f4f5",
       "markdown.h6": "bold #f4f4f5",
       "markdown.code": "#f4f4f5 on #222225",
-      "markdown.code_block": "#d4d4d8 on #222225",
+      "markdown.code_block": "#f4f4f5 on #222225",
       "markdown.block_quote": "#a1a1aa on #1f1f22",
       "markdown.list": "#71717a",
-      "markdown.item": "#d4d4d8",
+      "markdown.item": "#f4f4f5",
       "markdown.item.bullet": "bold #71717a",
       "markdown.item.number": "bold #71717a",
       "markdown.table.border": "#27272a",
@@ -1865,7 +1865,7 @@
       "markdown.hr": "#27272a",
       "markdown.link": "underline #60a5fa",
       "markdown.link_url": "underline #60a5fa",
-      "markdown.em": "italic #d4d4d8",
+      "markdown.em": "italic #f4f4f5",
       "markdown.strong": "bold #ffffff",
       "markdown.s": "strike #71717a"
     },

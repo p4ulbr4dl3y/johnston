@@ -39,11 +39,16 @@ class ThemeManager(CoreThemeManager):
             from core.domain.defaults.themes import get_theme
 
             latte = get_theme("catppuccin-latte")
-            md_styles = latte.markdown_styles if latte else theme.markdown_styles
+            md_styles = dict(latte.markdown_styles) if latte else dict(theme.markdown_styles)
             syntax_tokens = latte.syntax_tokens if latte else theme.syntax_tokens
         else:
-            md_styles = theme.markdown_styles
+            md_styles = dict(theme.markdown_styles)
             syntax_tokens = theme.syntax_tokens
+
+        md_styles["markdown.paragraph"] = palette["fg_primary"]
+        md_styles["markdown.text"] = palette["fg_primary"]
+        md_styles["markdown.item"] = palette["fg_primary"]
+        md_styles["markdown.em"] = f"italic {palette['fg_primary']}"
 
         return Theme(
             name=theme.name,

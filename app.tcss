@@ -129,18 +129,18 @@ WelcomeWidget {
     background: $bg-surface;
 }
 
-/* Bot Message Container - Off-white Text */
+/* Bot Message Container - Primary Text */
 .bot-msg {
     width: 100%;
     height: auto;
     margin-top: 1;
-    color: $fg-secondary;
+    color: $fg-primary;
 }
 
 .bot-msg-stream {
     width: 100%;
     height: auto;
-    color: $fg-secondary;
+    color: $fg-primary;
 }
 
 /* Event Divider Styling - Full width centered zinc divider */
