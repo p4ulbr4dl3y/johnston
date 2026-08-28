@@ -1,381 +1,37 @@
+"""Chat tool call widget and presentation components."""
+from __future__ import annotations
+
 import asyncio
 import json
-import os
 import re
 from typing import Any
 
-from rich.console import Group
 from rich.markup import escape
-from rich.syntax import Syntax
-from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
 from widgets.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
-from widgets.presentation.widgets.chat_diff import format_edit_diff
+from widgets.presentation.tool_mixins import FormattingMixin, ParsingMixin
+from widgets.presentation.tool_renderers import (
+    build_synthetic_create_diff,
+    clean_truncation_marker,
+    compute_tool_call_content,
+    format_ask_user_display,
+    format_manage_shell_display,
+    format_manage_subagent_display,
+    format_plan_display,
+    format_truncation_for_ui,
+)
 from widgets.presentation.widgets.chat_markdown import (
-    CODE_THEME,
     TransparentSyntax,
     safe_update_markdown,
     to_snake_case,
 )
-from widgets.utils.lexer import guess_lexer_name
 
-_MISSING = object()
-
-
-def _clean_truncation_marker(match: re.Match) -> str:
-    prefix = match.group(1) or ""
-    tag_name = match.group(2) or "Truncated"
-    inner = match.group(3)
-    if "|" in inner:
-        parts = [p.strip() for p in inner.split("|") if p.strip()]
-        ui_parts = []
-        for p in parts:
-            if re.match(r"^Next:\s*", p, re.IGNORECASE):
-                continue
-            if re.match(r"^Use\s+.*to inspect", p, re.IGNORECASE):
-                continue
-            ui_parts.append(p)
-        if ui_parts:
-            return f"{prefix}[{tag_name}: {' | '.join(ui_parts)}]"
-    showing_match = re.search(
-        r"showing\s+(?:first|last|recent)\s+[^\s.(),|]+(?:\s+chars|\s+output)?",
-        inner,
-        re.IGNORECASE,
-    )
-    log_match = re.search(r"(?:Full\s+)?log:\s*([^\s\]|]+)", inner, re.IGNORECASE)
-
-    if showing_match or log_match:
-        showing = showing_match.group(0).strip() if showing_match else "showing truncated output"
-        if log_match:
-            log_path = log_match.group(1).rstrip(".]")
-            return f"{prefix}[Output truncated: {showing} | Log: {log_path}]"
-        return f"{prefix}[Output truncated: {showing}]"
-
-    return match.group(0)
-
-
-def _format_truncation_for_ui(text: str) -> str:
-    """Format truncation banners for UI display."""
-    if not text:
-        return ""
-    return re.sub(
-        r"(\.\.\.\s*)?\[(Output\s+truncated|Truncated):?\s*([^\]]*)\]",
-        _clean_truncation_marker,
-        text,
-        flags=re.IGNORECASE,
-    ).strip()
-
-
-def build_synthetic_create_diff(file_path: str, content: str) -> str:
-    """Build a synthetic ``--- a/… / +++ b/… / @@ -1,N +1,N @@`` diff for create/write tools."""
-    new_lines = content.splitlines() if content else []
-    cnt = len(new_lines) or 1
-    d_lines = [
-        f"--- a/{file_path or 'file'}",
-        f"+++ b/{file_path or 'file'}",
-        f"@@ -1,{cnt} +1,{cnt} @@",
-    ] + [f"+{line_str}" for line_str in new_lines]
-    return "\n".join(d_lines)
-
-
-def format_plan_display(plan_items: Any, explanation: str = "") -> Text:
-    """Format an update_plan checklist into a unified rich Text renderable."""
-    t = Text()
-    if explanation:
-        t.append(f"{explanation}\n\n", style="italic #a1a1aa")
-
-    if isinstance(plan_items, list):
-        plan_lines = []
-        for item in plan_items:
-            if not isinstance(item, dict):
-                continue
-            step = str(item.get("step") or "").strip()
-            status = str(item.get("status") or "pending").lower()
-
-            if status == "completed":
-                line = Text("[x] ", style="dim #71717a") + Text(step, style="strike dim #71717a")
-            elif status == "in_progress":
-                line = Text("[>] ", style="#ffffff") + Text(step, style="#ffffff")
-            else:
-                line = Text("[ ] ", style="dim #a1a1aa") + Text(step, style="dim #a1a1aa")
-            plan_lines.append(line)
-
-        for i, pl in enumerate(plan_lines):
-            t.append(pl)
-            if i < len(plan_lines) - 1:
-                t.append("\n")
-    elif isinstance(plan_items, str) and plan_items.strip():
-        t.append(plan_items.strip(), style="#e4e4e7")
-
-    return t
-
-
-def format_ask_user_display(questions: list[dict], answers: dict[int, dict] | dict[int, str] | None = None) -> Text:
-    """Format ask_user questions and answers into a unified rich Text renderable."""
-    answers = answers or {}
-    t = Text()
-    num_questions = len(questions)
-    for i, q in enumerate(questions):
-        if i > 0:
-            t.append("\n\n")
-        q_text = str(q.get("question") or "").strip()
-        prefix = f"{i + 1}. " if num_questions > 1 else ""
-        t.append(f"{prefix}{q_text}\n", style="#ffffff")
-        ans_info = answers.get(i, {})
-        ans = ans_info.get("answer", "") if isinstance(ans_info, dict) else str(ans_info or "")
-        if ans:
-            t.append(ans, style="#a1a1aa")
-        else:
-            t.append("(No response)", style="italic #71717a")
-    return t
-
-
-def format_manage_shell_display(result_text: str) -> Text:
-    """Format manage_shell list output into a monochrome rich Text renderable."""
-    raw = (result_text or "").strip()
-    if not raw or raw.lower() in ("no tasks active", "no active tasks", "(no active tasks)"):
-        return Text("(No active tasks)", style="#e4e4e7")
-
-    t = Text()
-    lines = raw.splitlines()
-    task_lines = []
-    for line in lines:
-        line_clean = line.strip()
-        if not line_clean or line_clean.lower().startswith("active background tasks:"):
-            continue
-        # Pattern: "- ID: {id} | Status: {status} | Command: {cmd}"
-        m = re.match(
-            r"^[-\*]?\s*ID:\s*([^\s|]+)\s*\|\s*Status:\s*([^\s|]+)\s*\|\s*Command:\s*(.*)$",
-            line_clean,
-            re.IGNORECASE,
-        )
-        if m:
-            t_id, status, cmd = m.group(1), m.group(2).upper(), m.group(3).strip()
-            if status == "RUNNING":
-                task_t = Text("[>] ", style="#ffffff") + Text(f"{t_id}  ", style="bold #ffffff") + Text(cmd, style="#a1a1aa")
-            else:
-                task_t = Text("[x] ", style="dim #71717a") + Text(f"{t_id}  ", style="dim #71717a") + Text(cmd, style="dim #71717a")
-            task_lines.append(task_t)
-        else:
-            task_lines.append(Text(line_clean, style="#e4e4e7"))
-
-    if not task_lines:
-        return Text("(No active tasks)", style="#e4e4e7")
-
-    for i, tl in enumerate(task_lines):
-        t.append(tl)
-        if i < len(task_lines) - 1:
-            t.append("\n")
-    return t
-
-
-def format_manage_subagent_display(result_text: str) -> Text:
-    """Format manage_subagent list output into a monochrome rich Text renderable."""
-    raw = (result_text or "").strip()
-    if not raw or "no subagent sessions found" in raw.lower() or raw.lower() in ("no tasks active", "(no active subagents)"):
-        return Text("(No active subagents)", style="#e4e4e7")
-
-    t = Text()
-    lines = raw.splitlines()
-    subagent_lines = []
-    for line in lines:
-        line_clean = line.strip()
-        if not line_clean or line_clean.lower().startswith("active/past subagent sessions:"):
-            continue
-        # Pattern: "• ID: {id} | Status: {status} | Type: {role} | Title: {title}"
-        m = re.match(
-            r"^[•\-\*]?\s*ID:\s*([^\s|]+)\s*\|\s*Status:\s*([^\s|]+)\s*\|\s*Type:\s*([^|]*?)\s*\|\s*Title:\s*(.*)$",
-            line_clean,
-            re.IGNORECASE,
-        )
-        if m:
-            s_id, status, role, title = (
-                m.group(1).strip(),
-                m.group(2).strip().upper(),
-                m.group(3).strip(),
-                m.group(4).strip(),
-            )
-            role_cap = role.capitalize() if role else "Worker"
-            desc = f"{role_cap}: {title}" if title else (role_cap or "(no description)")
-            if status == "RUNNING":
-                item_t = (
-                    Text("[>] ", style="#ffffff")
-                    + Text(f"{s_id}  ", style="bold #ffffff")
-                    + Text(desc, style="#a1a1aa")
-                )
-            else:
-                item_t = (
-                    Text("[x] ", style="dim #71717a")
-                    + Text(f"{s_id}  ", style="dim #71717a")
-                    + Text(desc, style="dim #71717a")
-                )
-            subagent_lines.append(item_t)
-        else:
-            subagent_lines.append(Text(line_clean, style="#e4e4e7"))
-
-    if not subagent_lines:
-        return Text("(No active subagents)", style="#e4e4e7")
-
-    for i, sl in enumerate(subagent_lines):
-        t.append(sl)
-        if i < len(subagent_lines) - 1:
-            t.append("\n")
-    return t
-
-
-class FormattingMixin:
-    """Read/Edit/Plan formatting helpers"""
-
-    _lexer_cache: dict[str, str] = {}
-
-    def _guess_lexer(self, path_str: str) -> str:
-        cache = self._lexer_cache
-        cached = cache.get(path_str)
-        if cached is not None:
-            return cached
-        name = guess_lexer_name(path_str)
-        if len(cache) >= 256:
-            cache.clear()
-        cache[path_str] = name
-        return name
-
-    def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
-        return format_plan_display(plan_items, explanation)
-
-    def _format_ask_user_display(self) -> Any:
-        questions = self._parse_ask_user_questions()
-        answers = self._parse_ask_user_answers(questions)
-        display = format_ask_user_display(questions, answers)
-        if not display:
-            display.append(self._clean_hints_for_ui(self.result_text or "(No answers)"))
-        return display
-
-    def _format_manage_shell_display(self) -> Any:
-        return format_manage_shell_display(self.result_text or "")
-
-    def _format_manage_subagent_display(self) -> Any:
-        return format_manage_subagent_display(self.result_text or "")
-
-    def _format_edit_diff(self, diff_text: str, file_path: str) -> Any:
-        diff_text = self._clean_hints_for_ui(diff_text)
-        return format_edit_diff(diff_text, file_path)
-
-    def _clean_bash_output(self, text: str) -> str:
-        return _format_truncation_for_ui(text)
-
-    def _format_code_with_line_numbers(self, code: str) -> str:
-        lines = code.splitlines()
-        if not lines:
-            return "[dim]1 │ [/dim]"
-        max_digits = max(len(str(len(lines))), 2)
-        formatted = []
-        for i, line in enumerate(lines, 1):
-            num_str = str(i).rjust(max_digits)
-            escaped_line = line.replace("[", "\\[")
-            formatted.append(f"[dim]{num_str} │ [/dim]{escaped_line}")
-        return "\n".join(formatted)
-
-
-class ParsingMixin:
-    """Status / JSON / MCP-args parsing helpers"""
-
-    _JSON_PARSE_CACHE_LIMIT = 64
-
-    def _try_parse_json(self, text: str) -> Any:
-        cache = getattr(self, "_json_parse_cache", None)
-        if cache is None:
-            cache = {}
-            self._json_parse_cache = cache
-        cached = cache.get(text, _MISSING)
-        if cached is not _MISSING:
-            return cached
-        parsed = self._parse_json(text)
-        if len(cache) >= self._JSON_PARSE_CACHE_LIMIT:
-            cache.clear()
-        cache[text] = parsed
-        return parsed
-
-    def _parse_json(self, text: str) -> Any:
-        try:
-            return json.loads(text)
-        except Exception:
-            pass
-        if not text or not (text.startswith("{") or text.startswith("[")):
-            return None
-        stack = []
-        in_string = False
-        escaped = False
-        for char in text:
-            if escaped:
-                escaped = False
-                continue
-            if char == "\\":
-                escaped = True
-                continue
-            if char == '"':
-                in_string = not in_string
-                continue
-            if in_string:
-                continue
-            if char in "[{":
-                stack.append(char)
-            elif char == "]" and stack and stack[-1] == "[":
-                stack.pop()
-            elif char == "}" and stack and stack[-1] == "{":
-                stack.pop()
-
-        repair = ""
-        if in_string:
-            repair += '"'
-        for opener in reversed(stack):
-            if opener == "[":
-                repair += "]"
-            elif opener == "{":
-                repair += "}"
-
-        try:
-            return json.loads(text + repair)
-        except Exception:
-            return None
-
-    def _format_json_result(self, raw_text: str) -> Syntax | Group | None:
-        if not raw_text or not raw_text.strip():
-            return None
-        text = raw_text.strip()
-        footer = ""
-        if "\n... [Output truncated" in text:
-            parts = text.split("\n... [Output truncated", 1)
-            text_to_parse = parts[0].strip()
-            footer = "... [Output truncated" + parts[1]
-        else:
-            text_to_parse = text
-
-        parsed = self._try_parse_json(text_to_parse)
-        if parsed is not None:
-            pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False)
-            syntax = TransparentSyntax(
-                pretty_json, "json", theme=CODE_THEME, word_wrap=True, background_color="default"
-            )
-            if footer:
-                return Group(syntax, Text("\n" + footer.strip()))
-            return syntax
-        return None
-
-    def _is_error(self, text: str) -> bool:
-        """True when the tool card is in error/cancelled state or returned non-zero exit code."""
-        return self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0)
-
-    def _get_status_color(self) -> str:
-        if self.status == "running":
-            return "#e5c07b"
-        elif self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0):
-            return "#e06c75"
-        else:
-            return "#98c379"
-
+# Re-exports for backwards compatibility and test imports
+_clean_truncation_marker = clean_truncation_marker
+_format_truncation_for_ui = format_truncation_for_ui
 
 DISPLAY_NAMES: dict[str, str] = {
     "read": "Read",
@@ -394,13 +50,13 @@ SYSTEM_TOOLS: frozenset[str] = frozenset(DISPLAY_NAMES.keys())
 
 
 class ToolScrollBox(Vertical):
-    """Horizontal scroll box for tool code/diff view"""
+    """Horizontal scroll box for tool code/diff view."""
 
     pass
 
 
 class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
-    """Tool call widget (Create, Read, Edit, Shell) with expansion support"""
+    """Tool call widget (Create, Read, Edit, Shell) with expansion support."""
 
     can_focus = False
     ALLOW_SELECT = False
@@ -412,51 +68,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         "update_plan",
     }
 
-    def is_expandable(self) -> bool:
-        from core.infrastructure.runtime.tool_name import normalize_tool_name
+    DISPLAY_NAMES = DISPLAY_NAMES
+    SYSTEM_TOOLS = SYSTEM_TOOLS
 
-        canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
-        # Shell output is always useful to the user (return code / stdout),
-        # regardless of the tool status, so shell stays expandable.
-        if canonical == "shell":
-            return True
-        # Error/cancelled results are feedback for the agent (they flow to the
-        # model), not content for the user to inspect — don't expand those.
-        if self.status in ("error", "cancelled"):
-            return False
-        if canonical == "ask_user":
-            # Expandable inline when completed (has answers); minimized wizard is resumed via modal.
-            return "Answer:" in (self.result_text or "")
-        if canonical in (
-            "read",
-            "web_fetch",
-            "invoke_subagent",
-            "manage_shell",
-            "manage_subagent",
-        ):
-            return False
-        if canonical in self.EXPANDABLE_TOOLS:
-            return True
-        if hasattr(self, "SYSTEM_TOOLS") and self.tool_type not in self.SYSTEM_TOOLS:
-            return True
-        return self.tool_type in self.EXPANDABLE_TOOLS
-
-    def is_clickable_header(self) -> bool:
-        if self.status in ("error", "cancelled"):
-            return (
-                self.canonical_tool == "shell" and bool((self.result_text or "").strip())
-            )
-        if self.canonical_tool == "manage_shell":
-            action = self.args.get("action", "list")
-            return (action or "list").lower() == "list"
-        if self.canonical_tool == "manage_subagent":
-            args = self.args
-            action = (args.get("action") or "list").lower()
-            return bool(getattr(self, "subagent_session_id", None) or args.get("session_id") or action == "list")
-        return (
-            self.is_expandable()
-            or self.canonical_tool in ("invoke_subagent", "ask_user")
-        )
+    _RAW_BASH_LIMIT = 200 * 1024  # 200 KB retained raw buffer
+    _RAW_BASH_TRUNC = "[…[truncated]]\n"
 
     def __init__(
         self,
@@ -495,9 +111,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if status is not None:
             self.status = status
         else:
-            # Status is a structured input (from the stream event or session
-            # reload), never derived from result text. Default to "running" when
-            # the tool has no result yet, "done" when it already has output.
             self.status = "running" if not result_text else "done"
 
         is_clickable = self.is_clickable_header()
@@ -507,8 +120,49 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.md_widget = Markdown("", classes="tool-content-md")
         self.scroll_box = ToolScrollBox(self.content_widget, self.md_widget, classes=TOOL_SCROLL_BOX)
 
+    def is_expandable(self) -> bool:
+        from core.infrastructure.runtime.tool_name import normalize_tool_name
+
+        canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
+        if canonical == "shell":
+            return True
+        if self.status in ("error", "cancelled"):
+            return False
+        if canonical == "ask_user":
+            return "Answer:" in (self.result_text or "")
+        if canonical in (
+            "read",
+            "web_fetch",
+            "invoke_subagent",
+            "manage_shell",
+            "manage_subagent",
+        ):
+            return False
+        if canonical in self.EXPANDABLE_TOOLS:
+            return True
+        if hasattr(self, "SYSTEM_TOOLS") and self.tool_type not in self.SYSTEM_TOOLS:
+            return True
+        return self.tool_type in self.EXPANDABLE_TOOLS
+
+    def is_clickable_header(self) -> bool:
+        if self.status in ("error", "cancelled"):
+            return (
+                self.canonical_tool == "shell" and bool((self.result_text or "").strip())
+            )
+        if self.canonical_tool == "manage_shell":
+            action = self.args.get("action", "list")
+            return (action or "list").lower() == "list"
+        if self.canonical_tool == "manage_subagent":
+            args = self.args
+            action = (args.get("action") or "list").lower()
+            return bool(getattr(self, "subagent_session_id", None) or args.get("session_id") or action == "list")
+        return (
+            self.is_expandable()
+            or self.canonical_tool in ("invoke_subagent", "ask_user")
+        )
+
     def _clean_hints_for_ui(self, text: str) -> str:
-        return _format_truncation_for_ui(text)
+        return format_truncation_for_ui(text)
 
     def _clean_markup_text(self, text: str) -> str:
         if not text:
@@ -602,14 +256,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         status: str = None,
         returncode: int = None,
     ) -> None:
-        """Apply a tool's terminal/streamed result to the card.
-
-        Status comes in structurally (``status``/``is_error`` from the stream
-        event); the widget never classifies result text to derive it. The text is
-        kept as-is for display. When neither flag is provided we fall back to
-        ``is_error`` (callers pass it directly) and finally to the existing card
-        state so a completion that omits status keeps its prior color.
-        """
+        """Apply a tool's terminal/streamed result to the card."""
         if not isinstance(result_text, str):
             result_text = json.dumps(result_text, ensure_ascii=False) if result_text is not None else ""
         cleaned = (result_text or "").strip()
@@ -638,8 +285,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 log_m = re.search(r"(?:Full Log:|log:)\s*([^\s\(\)\|\]]+)", cleaned)
                 if log_m and not self.log_path:
                     self.log_path = log_m.group(1).rstrip(".]")
-            # A background transition emits a transient RUNNING banner.
-            # Never overwrite card content (live output or empty) with this system message.
             if cleaned and not (status == "running" and is_bg_banner):
                 self.result_text = cleaned
         else:
@@ -662,18 +307,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self.is_expanded = True
         self.render_header()
         if self.is_expanded:
-            # Scroll the finished result into view only when the user is
-            # already at the bottom; never yank them away from history.
             self._should_scroll_on_render = self._is_parent_at_bottom()
             self.render_content()
 
     def mark_cancelled(self) -> None:
-        """Mark an interrupted tool call as cancelled (not error, not running).
-
-        Called from the message-flow cancel path when a tool was killed before
-        emitting a ``tool_result``. The tool stays in a distinct visual state so
-        the user can tell it was interrupted rather than still running or failed.
-        """
+        """Mark an interrupted tool call as cancelled."""
         if self.status != "running":
             return
         self.status = "cancelled"
@@ -693,13 +331,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.render_header()
 
     def mark_running(self, text: str = "") -> None:
-        """Mark the tool card as running (yellow) with optional status text.
-
-        Set by the tools layer when a subagent follow-up is dispatched so the
-        invoke_subagent card returns to a yellow "working" state instead of
-        staying green after a send_message. ``text`` is only applied for
-        invoke_subagent cards; other tool types just flip to running.
-        """
+        """Mark the tool card as running (yellow) with optional status text."""
         self.status = "running"
         if text:
             self.result_text = text.strip()
@@ -710,9 +342,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.header_label.add_class(TOOL_HEADER_EXPANDABLE)
             self.header_label.remove_class(TOOL_HEADER)
         self.render_header()
-
-    DISPLAY_NAMES = DISPLAY_NAMES
-    SYSTEM_TOOLS = SYSTEM_TOOLS
 
     def render_header(self) -> None:
         c = self._get_status_color()
@@ -732,7 +361,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             )
             self.header_label.update(f"[{c}]● [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
         else:
-            # MCP/custom tool: single format — ToolName({k: v, ...}).
             from widgets.presentation.tool_display import format_compact_dict
 
             compact = format_compact_dict(self.args)
@@ -918,8 +546,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         text = self.result_text or ""
         if "Answer:" not in text:
             return answers
-        # Answers come from the wizard summary as sequential "Question:" / "Answer:" lines.
-        # Parse line-by-line so answers containing "Question:" don't break pairing.
         q_pairs = re.findall(r"^Question:\s*(.*?)\nAnswer:\s*(.*)$", text, re.MULTILINE)
         if not q_pairs:
             return answers
@@ -963,9 +589,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.md_widget.display = False
         self._update_next_sibling_spacing()
 
-    _RAW_BASH_LIMIT = 200 * 1024  # 200 KB retained raw buffer
-    _RAW_BASH_TRUNC = "[…[truncated]]\n"
-
     def append_shell_output(self, text: str) -> None:
         if not hasattr(self, "_raw_bash_buffer"):
             self._raw_bash_buffer = ""
@@ -996,122 +619,22 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.render_content()
             self._scroll_if_needed()
 
-
-    def _compute_content(self) -> tuple:
-        """Pure content computation (safe to run in a thread); returns (kind, value).
-
-        ``kind`` is one of ``"raw"`` (rich renderable for ``content_widget``),
-        ``"markup"`` (plain/re-escaped string for ``content_widget``) or
-        ``"md"`` (markdown text for ``md_widget``). No widget mutation here — the
-        caller applies the result on the event loop.
-        """
-        try:
-            file_path = self.args.get("path") or self.target
-            if self.tool_type == "create":
-                raw_text = (self.result_text or "").strip()
-                if self._is_error(raw_text):
-                    return "markup", self._clean_markup_text(raw_text or "(Error)")
-                if raw_text and (
-                    "@@" in raw_text
-                    or "--- a/" in raw_text
-                    or "+++ b/" in raw_text
-                    or " updated " in raw_text
-                    or " updated (" in raw_text
-                ):
-                    diff_text = raw_text
-                    if "@@" not in diff_text and "--- a/" not in diff_text:
-                        content = self.args.get("content") or ""
-                        diff_text = build_synthetic_create_diff(file_path, content)
-                    formatted_diff = self._format_edit_diff(diff_text, file_path)
-                    return "raw", formatted_diff
-                content = self.args.get("content")
-                if content is None:
-                    from widgets.utils.file_reader import read_file_content
-
-                    content = read_file_content(file_path)
-                if content is None and raw_text:
-                    content = raw_text
-
-                if content is not None:
-                    content = content.rstrip("\r\n")
-                    lexer = self._guess_lexer(file_path)
-                    try:
-                        syntax = TransparentSyntax(
-                            content,
-                            lexer,
-                            theme=CODE_THEME,
-                            line_numbers=True,
-                            word_wrap=True,
-                            background_color="default",
-                        )
-                        return "raw", syntax
-                    except Exception:
-                        return "raw", self._format_code_with_line_numbers(content)
-                return "markup", self._clean_markup_text(self.result_text or "(No content)")
-            elif self.tool_type == "edit":
-                raw_text = (self.result_text or "").strip()
-                if self._is_error(raw_text):
-                    return "markup", self._clean_markup_text(raw_text or "(Error)")
-                diff_text = raw_text
-                if not diff_text or "@@" not in diff_text:
-                    from widgets.lexer_utils import build_edit_diff_text
-
-                    diff_text = build_edit_diff_text(self.args, file_path or "file")
-
-                if diff_text:
-                    return "raw", self._format_edit_diff(diff_text, file_path)
-                return "markup", self._clean_markup_text(self.result_text or "(No diff)")
-            elif self.tool_type == "update_plan":
-                raw_text = (self.result_text or "").strip()
-                if self._is_error(raw_text):
-                    return "markup", self._clean_markup_text(raw_text or "(Error)")
-                plan_items = self.args.get("plan") or []
-                explanation = self.args.get("explanation", "")
-                return "raw", self._format_plan_display(plan_items, explanation)
-            elif self.canonical_tool == "ask_user":
-                return "raw", self._format_ask_user_display()
-            elif self.canonical_tool == "manage_shell":
-                action = (self.args.get("action") or "list").lower()
-                if action == "list":
-                    return "raw", self._format_manage_shell_display()
-                clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
-                return "markup", self._clean_markup_text(clean_res)
-            elif self.canonical_tool == "manage_subagent":
-                action = (self.args.get("action") or "list").lower()
-                if action == "list":
-                    return "raw", self._format_manage_subagent_display()
-                clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
-            elif self.canonical_tool == "invoke_subagent":
-                clean_res = self._clean_hints_for_ui(self.result_text or "")
-                if not clean_res.strip():
-                    prompt = self.args.get("prompt", "")
-                    clean_res = prompt or "(Subagent task)"
-                return "markup", self._clean_markup_text(clean_res)
-            elif self.tool_type == "shell":
-                output_text = self._clean_bash_output(self.result_text)
-                log_match = re.search(r"Full Log:\s*([^\s\(\)\]]+)", self.result_text or "")
-                if log_match:
-                    log_path = log_match.group(1).rstrip(".]")
-                    if os.path.isfile(log_path):
-                        try:
-                            from widgets.utils.file_reader import read_file_content
-
-                            log_content = read_file_content(log_path)
-                            if log_content and log_content.strip():
-                                output_text = log_content.rstrip("\r\n")
-                        except Exception:
-                            pass
-                if not output_text.strip():
-                    output_text = "(No output)"
-                return "markup", self._clean_markup_text(output_text)
-            else:
-                clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
-                syntax = self._format_json_result(clean_res)
-                if syntax:
-                    return "raw", syntax
-                return "markup", self._clean_markup_text(clean_res)
-        except Exception:
-            return "markup", self._clean_markup_text(self.result_text or "")
+    def _compute_content(self) -> tuple[str, Any]:
+        """Pure content computation (safe to run in a thread); returns (kind, value)."""
+        return compute_tool_call_content(
+            tool_type=self.tool_type,
+            canonical_tool=self.canonical_tool,
+            args=self.args,
+            target=self.target,
+            result_text=self.result_text,
+            is_error=self._is_error(),
+            guess_lexer=self._guess_lexer,
+            clean_markup=self._clean_markup_text,
+            clean_hints=self._clean_hints_for_ui,
+            clean_bash_output=self._clean_bash_output,
+            format_ask_user_display_fn=self._format_ask_user_display,
+            format_json_result_fn=self._format_json_result,
+        )
 
     def _apply_content(self, kind: str, value: Any) -> None:
         """Apply a computed content payload to the widgets (event-loop only)."""
@@ -1132,14 +655,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             pass
 
     def render_content(self) -> None:
-        """Render the tool's terminal content into the widgets.
-
-        The heavy path (disk reads, pygments) is pushed to a worker thread when
-        a running event loop is available (real app on the UI thread). When no
-        loop is running (unit tests / sync callers), the content is computed and
-        applied synchronously so the widgets are populated before the call
-        returns.
-        """
+        """Render the tool's terminal content into the widgets."""
         try:
             try:
                 loop = asyncio.get_running_loop()
@@ -1151,9 +667,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 gate: asyncio.Task | None = self._render_gate if hasattr(self, "_render_gate") else None
                 if gate is not None and not gate.done():
                     gate.cancel()
-                # Invalidation counter: a superseded render (or an unmount that
-                # left a cancelled gate's worker thread still running) must not
-                # overwrite fresher content when its thread eventually returns.
                 self._render_version = getattr(self, "_render_version", 0) + 1
                 version = self._render_version
                 self._render_gate = loop.create_task(self._async_render_content(version))
@@ -1176,8 +689,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             kind, value = await asyncio.to_thread(self._compute_content)
         except Exception:
             kind, value = "markup", self._clean_markup_text(self.result_text or "")
-        # A newer render superseded this one (or the widget was unmounted): the
-        # stale result must never overwrite fresher content.
         if version != getattr(self, "_render_version", 0):
             return
         if not getattr(self, "is_mounted", True):
@@ -1191,3 +702,25 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 force = getattr(self, "_should_scroll_on_render", False)
                 self._should_scroll_on_render = False
                 self._scroll_if_needed(force=force)
+
+
+ChatToolCall = ToolCallWidget
+
+__all__ = [
+    "ChatToolCall",
+    "DISPLAY_NAMES",
+    "FormattingMixin",
+    "ParsingMixin",
+    "SYSTEM_TOOLS",
+    "ToolCallWidget",
+    "ToolScrollBox",
+    "TransparentSyntax",
+    "_clean_truncation_marker",
+    "_format_truncation_for_ui",
+    "build_synthetic_create_diff",
+    "format_ask_user_display",
+    "format_manage_shell_display",
+    "format_manage_subagent_display",
+    "format_plan_display",
+    "format_truncation_for_ui",
+]
