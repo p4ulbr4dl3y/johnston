@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from core.session_manager import SessionStore
+from core.infrastructure.storage.session_store import SessionStore
 from tools.context import ToolContext
 from tools.manage_subagent import ManageSubagentTool
 

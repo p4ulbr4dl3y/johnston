@@ -11,8 +11,8 @@ from unittest.mock import patch
 import pytest
 
 from core.domain.entities.session import AgentSession
+from core.infrastructure.storage.session_store import SessionStore
 from core.permission_manager import PermissionManager
-from core.session_manager import SessionStore
 
 # ---------------------------------------------------------------------------
 # fixtures / helpers
@@ -51,7 +51,7 @@ def store(tmp_path):
     projects_dir.mkdir(exist_ok=True)
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
-    with patch("core.session_manager.PROJECTS_DIR", str(projects_dir)):
+    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
         s = SessionStore(project_path=str(project))
         yield s
 

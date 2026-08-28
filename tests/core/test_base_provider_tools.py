@@ -118,7 +118,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_task_tool_foreground(self):
         import tempfile
 
-        from core.session_manager import SessionStore
+        from core.infrastructure.storage.session_store import SessionStore
 
         _tmp = tempfile.TemporaryDirectory()
         self.addCleanup(_tmp.cleanup)
@@ -151,7 +151,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_task_tool_background(self):
         import tempfile
 
-        from core.session_manager import SessionStore
+        from core.infrastructure.storage.session_store import SessionStore
 
         _tmp = tempfile.TemporaryDirectory()
         self.addCleanup(_tmp.cleanup)

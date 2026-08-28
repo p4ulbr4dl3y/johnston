@@ -25,7 +25,7 @@ from core.domain.policies.messages import (
     is_ui_visible_user_message,
     transcript_before_turn,
 )
-from core.session_manager import SessionStore
+from core.infrastructure.storage.session_store import SessionStore
 
 
 def _make_store(test_dir: str) -> SessionStore:

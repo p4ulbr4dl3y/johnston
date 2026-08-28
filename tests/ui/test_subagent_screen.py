@@ -6,7 +6,7 @@ from unittest.mock import patch
 from textual.app import App
 from textual.screen import Screen
 
-from core.session_manager import SessionStore
+from core.infrastructure.storage.session_store import SessionStore
 from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 from widgets.presentation.widgets.chat_container import ChatView
 

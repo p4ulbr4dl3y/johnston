@@ -138,7 +138,7 @@ class InvokeSubagentTool(BaseTool):
         parent_session_id = ctx.session_id
         if not isinstance(parent_session_id, str) or not parent_session_id:
             parent_session_id = getattr(getattr(ctx, "host", None), "current_session_id", None)
-        from core.session_manager import get_session_store
+        from core.infrastructure.storage.session_store import get_session_store
 
         store = get_session_store(ctx.host)
         store.list(kind="subagent")  # ensure subagent sessions for project are loaded

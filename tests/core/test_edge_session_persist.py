@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from core.session_manager import SessionStore
+from core.infrastructure.storage.session_store import SessionStore
 
 # ---------------------------------------------------------------------------
 # fixtures / helpers
@@ -27,7 +27,7 @@ def store(tmp_path):
     projects_dir.mkdir(exist_ok=True)
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
-    with patch("core.session_manager.PROJECTS_DIR", str(projects_dir)):
+    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
         s = SessionStore(project_path=str(project))
         yield s
 
@@ -77,7 +77,7 @@ def test_roundtrip_persistence_between_separate_instances(tmp_path):
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
 
-    with patch("core.session_manager.PROJECTS_DIR", str(projects_dir)):
+    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
         s1 = SessionStore(project_path=str(project))
         sess = s1.create_main("persistent")
         sess.messages = [{"type": "bot", "text": "across-instance"}]
@@ -453,7 +453,7 @@ def test_delete_reload_from_fresh_store(store):
     store.create_main("gone")
     store.delete("gone")
     projects_dir = os.path.dirname(store.project_dir)
-    with patch("core.session_manager.PROJECTS_DIR", projects_dir):
+    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", projects_dir):
         s2 = SessionStore(project_path=store.project_path)
     assert s2.get("gone") is None, "deleted session must not reappear on fresh load"
 

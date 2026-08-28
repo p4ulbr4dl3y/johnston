@@ -14,7 +14,7 @@ from core.domain.policies.messages import (
     drop_stale_system_notes,
     find_visible_user_cutoff,
 )
-from core.session_manager import SessionStore
+from core.infrastructure.storage.session_store import SessionStore
 
 logger = logging.getLogger(__name__)
 

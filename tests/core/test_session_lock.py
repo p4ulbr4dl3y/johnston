@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from core.infrastructure.platform.session_lock import SessionLock
-from core.session_manager import SessionStore
+from core.infrastructure.storage.session_store import SessionStore
 from tools.context import ToolContext
 
 

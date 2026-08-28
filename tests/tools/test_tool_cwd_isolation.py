@@ -182,7 +182,7 @@ class TestSubagentBranchContextPersistence(unittest.TestCase):
         import tempfile
 
         from core.domain.entities.session import AgentSession
-        from core.session_manager import SessionStore
+        from core.infrastructure.storage.session_store import SessionStore
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = SessionStore(project_path=tmpdir)

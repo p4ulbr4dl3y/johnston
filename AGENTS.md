@@ -24,7 +24,7 @@ Layered core (`core/`): DDD-style. High-level vs low-level — keep deps pointin
 - `core/infrastructure/` — implementation: `adapters/`, `mcp/`, `platform/`, `runtime/` (circuit_breaker, frontmatter, token_util, thinking_effort), `storage/`, `tasks/`.
 - `core/adapters/` — external LLM providers (anthropic, gemini, ollama, openai). `core/base_provider/` holds provider internals (agent, compaction, errors, tools).
 - `core/roles/` — assistant role apply/resolve/prompt/provider/tools.
-- `core/` root — managers/config hitting multiple layers (role_registry, provider_manager, session_manager, permission_manager, models_catalog).
+- `core/` root — managers/config hitting multiple layers (role_registry, provider_manager, permission_manager, models_catalog).
 
 Widgets layering (`widgets/`):
 

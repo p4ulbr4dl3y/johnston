@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
+from core.domain.ports.tool_registry import ToolRegistryPort, get_default_tool_registry
 from core.infrastructure.adapters.models_source import extract_context_length
 from core.infrastructure.config.settings import get_settings
 from core.infrastructure.platform.paths import CACHE_DIR, CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
@@ -211,9 +212,13 @@ def _file_mtime(path: str) -> float:
 
 
 class ProviderManager:
-    def __init__(self):
+    def __init__(self, tool_registry: Optional[ToolRegistryPort] = None):
+        self._tool_registry = tool_registry
         self.invalidate_cache()
         self.ensure_config_dir()
+
+    def set_tool_registry(self, registry: Optional[ToolRegistryPort]) -> None:
+        self._tool_registry = registry
 
     def invalidate_cache(self):
         self._providers_memo = {}
@@ -440,7 +445,9 @@ class ProviderManager:
 
         return ""
 
-    def create_agent_for_provider(self, provider_key: str):
+    def create_agent_for_provider(
+        self, provider_key: str, tool_registry: Optional[ToolRegistryPort] = None
+    ):
         pdef = self.load_provider_def(provider_key)
         if pdef is None:
             return None
@@ -454,9 +461,12 @@ class ProviderManager:
 
         from core.base_provider import BaseAgent
         from core.infrastructure.runtime.tool_name import normalize_tool_name
-        from tools.invoke_subagent import InvokeSubagentTool
-        from tools.read import process_image_file_sync
-        from tools.registry import execute_tool, get_default_tools
+
+        reg = tool_registry or self._tool_registry or get_default_tool_registry()
+        tool_executor = reg.execute_tool if reg is not None else None
+        default_tools_provider = reg.get_default_tools if reg is not None else None
+        image_processor = reg.process_image_file if reg is not None else None
+        subagent_schema = reg.get_subagent_schema() if reg is not None else None
 
         agent = BaseAgent(
             api_key=stored_key or pdef.api_key,
@@ -474,12 +484,13 @@ class ProviderManager:
             retry_delay=pdef.retry_delay,
             retry_backoff=pdef.retry_backoff,
             max_retry_delay=pdef.max_retry_delay,
-            tool_executor=execute_tool,
-            default_tools_provider=get_default_tools,
-            image_processor=process_image_file_sync,
+            tool_executor=tool_executor,
+            default_tools_provider=default_tools_provider,
+            image_processor=image_processor,
             tool_name_normalizer=normalize_tool_name,
         )
-        agent.subagent_schema = InvokeSubagentTool.schema
+        if subagent_schema is not None:
+            agent.subagent_schema = subagent_schema
         return agent
 
     def create_active_agent(self):

@@ -595,7 +595,7 @@ class SubagentsScreen(BaseTasksListScreen):
             return self._cached_tasks
 
         items = []
-        from core.session_manager import get_session_store
+        from core.infrastructure.storage.session_store import get_session_store
 
         store = get_session_store(self.app)
         curr_sid = getattr(self.app, "current_session_id", None) if (hasattr(self, "app") and self.app) else None

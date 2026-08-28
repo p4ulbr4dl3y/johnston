@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.domain.entities.session import AgentSession
-from core.session_manager import SessionStore
+from core.infrastructure.storage.session_store import SessionStore
 from tools.manage_subagent import ManageSubagentTool
 
 

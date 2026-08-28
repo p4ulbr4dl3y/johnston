@@ -2,8 +2,8 @@ import os
 import tempfile
 import unittest
 
+from core.infrastructure.storage.session_store import SessionStore
 from core.role_registry import RoleRegistry
-from core.session_manager import SessionStore
 
 
 class TestSubagentRoles(unittest.TestCase):

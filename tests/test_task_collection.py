@@ -45,7 +45,7 @@ def test_collect_null_app_falls_back_to_session_store():
     """app None -> no bg tasks, store resolved via SessionStore singleton."""
     store = MagicMock()
     store.list.return_value = []
-    with patch("core.session_manager.SessionStore.get_instance", return_value=store):
+    with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
         tasks = collect_current_tasks(None, "")
 
     assert tasks.shell_tasks == []
@@ -73,7 +73,7 @@ def test_collect_missing_store_falls_back_to_session_store(make_app_mock):
     app = make_app_mock(task_manager=[_shell_task("shell", "s1")], sm=None)
     store = MagicMock()
     store.children.return_value = []
-    with patch("core.session_manager.SessionStore.get_instance", return_value=store):
+    with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
         tasks = collect_current_tasks(app, "s1")
 
     assert tasks.shell_tasks == [_shell_task("shell", "s1")]

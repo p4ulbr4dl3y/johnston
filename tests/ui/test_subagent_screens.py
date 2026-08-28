@@ -206,14 +206,14 @@ class TestSubagentOnMount(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
-        from core.session_manager import SessionStore
+        from core.infrastructure.storage.session_store import SessionStore
 
         self.store = SessionStore(project_path=self.temp_dir.name)
         self._old_instance = SessionStore._instance
         SessionStore._instance = self.store
 
     def tearDown(self):
-        from core.session_manager import SessionStore
+        from core.infrastructure.storage.session_store import SessionStore
 
         SessionStore._instance = self._old_instance
 

@@ -14,8 +14,8 @@ import pytest
 
 from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.domain.entities.session import SessionStatus
+from core.infrastructure.storage.session_store import SessionStore
 from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS
-from core.session_manager import SessionStore
 from tools.context import ToolContext
 from tools.invoke_subagent import InvokeSubagentTool
 
@@ -446,7 +446,7 @@ async def test_session_create_returns_none_crashes(monkeypatch):
     try:
         app.sm = None  # force singleton lookup path below
         # Use singleton path but override create_subagent to return None
-        import core.session_manager as sm
+        import core.infrastructure.storage.session_store as sm
 
         real = sm.SessionStore.create_subagent
         sm.SessionStore.create_subagent = lambda *a, **k: None
@@ -530,7 +530,7 @@ async def test_ctx_app_none_falls_back_to_singleton_store():
     store, app, tool, tmp = _make_env(_agent_with_stream(_gen_ok))
     try:
         app.sm = None
-        with patch("core.session_manager.SessionStore.get_instance", return_value=store):
+        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
             res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
             assert "[subagent" in res or res.startswith("subagent ") or "subagent" in res
@@ -547,7 +547,7 @@ async def test_app_has_no_sm_uses_singleton():
     try:
         app.sm = None
         tool._ensure_context = lambda ctx=None: ToolContext(app=app)
-        with patch("core.session_manager.SessionStore.get_instance", return_value=store):
+        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
             res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
             assert "[subagent" in res or "subagent" in res

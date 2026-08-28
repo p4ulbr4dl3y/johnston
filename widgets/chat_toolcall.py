@@ -757,7 +757,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             identifier = session_id or args.get("title") or args.get("prompt") or self.target
             store = getattr(app, "sm", None) if app else None
             if store is None:
-                from core.session_manager import SessionStore
+                from core.infrastructure.storage.session_store import SessionStore
 
                 store = SessionStore.get_instance()
             curr_session_id = getattr(app, "current_session_id", None) if app else None
@@ -784,7 +784,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             if session_id:
                 store = getattr(app, "sm", None) if app else None
                 if store is None:
-                    from core.session_manager import SessionStore
+                    from core.infrastructure.storage.session_store import SessionStore
 
                     store = SessionStore.get_instance()
                 curr_session_id = getattr(app, "current_session_id", None) if app else None
@@ -812,7 +812,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 if action == "list":
                     store = getattr(app, "sm", None) if app else None
                     if store is None:
-                        from core.session_manager import SessionStore
+                        from core.infrastructure.storage.session_store import SessionStore
 
                         store = SessionStore.get_instance()
                     curr_session_id = getattr(app, "current_session_id", None) if app else None

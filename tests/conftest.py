@@ -71,7 +71,6 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     # 3. Module-level bound constants
     monkeypatch.setattr("core.infrastructure.secrets.CONFIG_DIR", cfg_dir_str)
     monkeypatch.setattr("core.infrastructure.secrets.SECRETS_FILE", secrets_file)
-    monkeypatch.setattr("core.session_manager.PROJECTS_DIR", projects_dir)
     monkeypatch.setattr("core.infrastructure.storage.session_store.PROJECTS_DIR", projects_dir)
     monkeypatch.setattr("core.permission_manager.CONFIG_FILE", config_file)
     monkeypatch.setattr("core.provider_manager.CONFIG_DIR", cfg_dir_str)
@@ -96,9 +95,9 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     from core.application.rules.rules import RulesManager
     from core.application.skills.manager import SkillManager
     from core.infrastructure.mcp.manager import MCPManager
+    from core.infrastructure.storage.session_store import SessionStore
     from core.permission_manager import PermissionManager
     from core.role_registry import RoleRegistry
-    from core.session_manager import SessionStore
 
     SessionStore._instance = None
     PermissionManager._instance = None

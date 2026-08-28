@@ -9,9 +9,9 @@ from typing import Any
 from textual.app import App
 
 from core.infrastructure.platform.logging_setup import adopt_task_exception
+from core.infrastructure.storage.session_store import SessionStore
 from core.infrastructure.tasks.manager import TaskManager
 from core.provider_manager import ProviderManager
-from core.session_manager import SessionStore
 from widgets.mixins.actions import ActionsMixin
 from widgets.mixins.lifecycle import LifecycleMixin
 from widgets.mixins.message_flow import MessageFlowMixin

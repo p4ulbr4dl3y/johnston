@@ -5,6 +5,7 @@ import time
 from typing import Any, Dict, Type
 
 from core.domain.defaults.errors import ToolResult, normalize_tool_result
+from core.domain.ports.tool_registry import set_default_tool_registry
 from core.infrastructure.runtime.tool_name import normalize_tool_name
 from tools.ask_user import AskUserTool
 from tools.base import BaseTool, _resolve_app
@@ -300,3 +301,28 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return ToolResult.error("mcp", detail=str(e), name=name)
 
     return ToolResult.error("unknown", name=name)
+
+
+class DefaultToolRegistry:
+    """Default implementation of ToolRegistryPort wrapping tools subsystem."""
+
+    def execute_tool(
+        self, name: str, args: dict | None = None, app: Any = None, context: Any = None
+    ) -> Any:
+        return execute_tool(name, args, app=app, context=context)
+
+    def get_default_tools(self) -> list[Dict[str, Any]]:
+        return get_default_tools()
+
+    def process_image_file(self, path: str) -> Any:
+        from tools.read import process_image_file_sync
+
+        return process_image_file_sync(path)
+
+    def get_subagent_schema(self) -> Dict[str, Any] | None:
+        return getattr(InvokeSubagentTool, "schema", None)
+
+
+set_default_tool_registry(DefaultToolRegistry())
+
+

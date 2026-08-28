@@ -2,8 +2,8 @@ import tempfile
 import unittest
 
 from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
+from core.infrastructure.storage.session_store import SessionStore
 from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS, truncate_subagent_result
-from core.session_manager import SessionStore
 from tools.invoke_subagent import InvokeSubagentTool
 
 

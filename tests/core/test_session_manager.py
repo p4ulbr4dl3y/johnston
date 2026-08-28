@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from core.domain.policies.messages import is_ui_visible_user_message
-from core.session_manager import SessionStore
+from core.infrastructure.storage.session_store import SessionStore
 
 
 def _make_store(test_dir: str, project_name: str = "my_project") -> SessionStore:
@@ -19,7 +19,7 @@ class TestSessionManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir, ignore_errors=True)
-        self.projects_dir_patcher = patch("core.session_manager.PROJECTS_DIR", self.test_dir)
+        self.projects_dir_patcher = patch("core.infrastructure.storage.session_store.PROJECTS_DIR", self.test_dir)
         self.projects_dir_patcher.start()
         self.addCleanup(self.projects_dir_patcher.stop)
         self.store = _make_store(self.test_dir)
@@ -121,7 +121,7 @@ class TestSessionManagerRegression(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir, ignore_errors=True)
-        self.projects_dir_patcher = patch("core.session_manager.PROJECTS_DIR", os.path.join(self.test_dir, "projects"))
+        self.projects_dir_patcher = patch("core.infrastructure.storage.session_store.PROJECTS_DIR", os.path.join(self.test_dir, "projects"))
         self.projects_dir_patcher.start()
         self.addCleanup(self.projects_dir_patcher.stop)
         self.store = _make_store(self.test_dir)
@@ -173,7 +173,7 @@ class TestSessionManagerPureReader(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
-        self.p1 = patch("core.session_manager.PROJECTS_DIR", self.test_dir)
+        self.p1 = patch("core.infrastructure.storage.session_store.PROJECTS_DIR", self.test_dir)
         self.p1.start()
         self.addCleanup(self.p1.stop)
         self.store = _make_store(self.test_dir)

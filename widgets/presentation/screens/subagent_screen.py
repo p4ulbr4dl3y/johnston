@@ -45,7 +45,7 @@ class SubagentViewScreen(ModalScreen[None]):
 
         store = getattr(self.app, "sm", None) if self.app else None
         if store is None:
-            from core.session_manager import SessionStore
+            from core.infrastructure.storage.session_store import SessionStore
 
             store = SessionStore.get_instance()
 

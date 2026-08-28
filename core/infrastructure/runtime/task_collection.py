@@ -34,7 +34,7 @@ def collect_current_tasks(app, current_session_id: str) -> TaskCollection:
 
     store = getattr(app, "sm", None) if app else None
     if store is None:
-        from core.session_manager import SessionStore
+        from core.infrastructure.storage.session_store import SessionStore
 
         store = SessionStore.get_instance()
 
