@@ -9,7 +9,7 @@ consumer of these formatters, so the resulting system prompt is unchanged.
 import re
 from typing import Any, Dict, List
 
-from core.infrastructure.runtime.xml_utils import escape_xml_attr
+from core.infrastructure.runtime.xml_utils import escape_xml_attr, wrap_cdata
 
 
 def format_skills_markdown(skills: List[Any]) -> str:
@@ -63,7 +63,7 @@ def format_rules_markdown(rules: List[Any]) -> str:
         if not r_content:
             continue
         rule_id = escape_xml_attr(f"{r_source}:{r_name}")
-        items.append(f'<rule id="{rule_id}">\n{r_content}\n</rule>')
+        items.append(f'<rule id="{rule_id}">\n{wrap_cdata(r_content)}\n</rule>')
 
     if not items:
         return ""

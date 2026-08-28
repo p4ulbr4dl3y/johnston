@@ -333,7 +333,7 @@ def test_project_snippet_cached_until_mtime_change(tmp_path):
 
     out1 = pb.get_project_instructions_snippet(str(tmp_path))
     out2 = pb.get_project_instructions_snippet(str(tmp_path))
-    assert '<rule id="project:AGENTS.md">\nv1\n</rule>' in out1
+    assert '<rule id="project:AGENTS.md">\n<![CDATA[\nv1\n]]>\n</rule>' in out1
     assert out1 == out2
 
     # Cache populated for this cwd after the reads.

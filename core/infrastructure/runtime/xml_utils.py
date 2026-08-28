@@ -43,3 +43,17 @@ def unescape_xml(s: Optional[str]) -> str:
         .replace("&apos;", "'")
         .replace("&amp;", "&")
     )
+
+
+def wrap_cdata(s: Optional[str]) -> str:
+    """Wrap content in an XML CDATA block, escaping nested closing markers.
+
+    Handles null/empty strings safely.
+    """
+    if not s:
+        return ""
+    if not isinstance(s, str):
+        s = str(s)
+    safe = s.replace("]]>", "]]]]><![CDATA[>")
+    return f"<![CDATA[\n{safe}\n]]>"
+
