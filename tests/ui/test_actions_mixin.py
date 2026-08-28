@@ -88,6 +88,32 @@ class TestActionsRole(unittest.IsolatedAsyncioTestCase):
             app.action_background_all()
             self.assertTrue(task.is_background)
 
+    async def test_action_background_all_scoped_to_session(self):
+        """ctrl+b must only background tasks of the current session (like manage_shell)."""
+        app = JohnstonApp()
+        async with app.run_test():
+            curr = MagicMock()
+            curr.session_id = app.current_session_id
+            curr.task_id = "curr_task"
+            curr.is_running = True
+            curr.is_background = False
+            curr.kind = "shell"
+            curr.move_to_background = MagicMock()
+
+            other = MagicMock()
+            other.session_id = "another-session"
+            other.task_id = "other_task"
+            other.is_running = True
+            other.is_background = False
+            other.kind = "shell"
+            other.move_to_background = MagicMock()
+
+            app.task_manager.register(curr)
+            app.task_manager.register(other)
+            app.action_background_all()
+            curr.move_to_background.assert_called_once()
+            other.move_to_background.assert_not_called()
+
 
 class TestActionsPointer(unittest.IsolatedAsyncioTestCase):
     async def test_on_click_focuses_input(self):

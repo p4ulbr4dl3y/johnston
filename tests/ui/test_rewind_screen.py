@@ -59,9 +59,9 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(screen.selected_entry, user_messages[0])
         self.assertIsNone(dismissed_val)
         self.assertEqual(len(screen.filtered_items), 3)
-        self.assertEqual(screen.filtered_items, ["both", "conversation", "diff"])
+        self.assertEqual(screen.filtered_items, ["conversation", "both", "diff"])
 
-        # Step 2: choose 'diff'
+        # Step 2: choose 'diff' (index 2)
         mock_app = MagicMock()
         screen.session_id = "test-session"
         screen._show_step_2(user_messages[0])
@@ -71,17 +71,17 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
             mock_app.push_screen.assert_called_once()
         self.assertIsNone(dismissed_val)  # diff does not dismiss rewind dialog
 
-        # Step 2: choose 'conversation'
+        # Step 2: choose 'conversation' (index 0)
         screen._show_step_2(user_messages[1])
-        mock_event.option_index = 1
+        mock_event.option_index = 0
         screen.on_option_list_option_selected(mock_event)
         self.assertIsNotNone(dismissed_val)
         self.assertEqual(dismissed_val.index, 1)
         self.assertFalse(dismissed_val.restore_code)
 
-        # Step 2: choose 'both'
+        # Step 2: choose 'both' (index 1)
         screen._show_step_2(user_messages[0])
-        mock_event.option_index = 0
+        mock_event.option_index = 1
         screen.on_option_list_option_selected(mock_event)
         self.assertIsNotNone(dismissed_val)
         self.assertEqual(dismissed_val.index, 0)

@@ -154,6 +154,37 @@ async def test_shell_task_on_completed_only_when_background():
     assert "background" in completed_calls[0][2]
 
 
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_shell_task_background_error_observes_terminal_status():
+    """Regression: the completion callback must see the final (ERROR) status.
+
+    Previously ``_mark_terminated`` ran AFTER ``on_completed``, so a background
+    task that exited non-zero was still reported as ``running`` inside the
+    callback and the tool card was repainted as done (never error).
+    """
+    observed = {}
+
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", "import sys; sys.exit(3)",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    task = ShellTask(task_id="bg_err", command="exit 3", process=proc)
+
+    def on_completed(tid, cmd, out):
+        observed["status"] = task.status.value
+        observed["exit_code"] = task.exit_code
+
+    task.is_background = True
+    task.start_reading(on_completed=on_completed)
+    await task.wait()
+
+    assert task.status == TaskStatus.ERROR
+    assert observed["status"] == "error"
+    assert observed["exit_code"] == 3
+
+
 @pytest.mark.asyncio
 async def test_shell_task_widget_streaming_appends_output():
     class DummyWidget:

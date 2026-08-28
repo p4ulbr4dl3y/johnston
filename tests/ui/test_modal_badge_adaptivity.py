@@ -99,14 +99,15 @@ class TestRewindScreenAdaptivity(unittest.TestCase):
         # Step 2 formats options with badge row
         screen2 = RewindScreen(self.messages, checkpoints_enabled=True)
         screen2.step = 2
-        screen2.filtered_items = ["both", "conversation", "diff"]
+        screen2.filtered_items = ["conversation", "both", "diff"]
         opt_list = MagicMock()
         opt_list.size.width = 50
         opt_list.highlighted = 0
         screen2.query_one = MagicMock(return_value=opt_list)
         screen2._refresh_options()
         self.assertEqual(len(screen2.filtered_options), 3)
-        self.assertIn("revert code", screen2.filtered_options[0])
+        self.assertIn("keep current code", screen2.filtered_options[0])
+        self.assertIn("revert code", screen2.filtered_options[1])
 
 
 class TestTasksScreenAdaptivity(unittest.TestCase):

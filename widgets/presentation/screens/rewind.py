@@ -123,8 +123,8 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
 
     def _format_step2_options(self, target_width: int) -> list[str]:
         return [
-            "Rollback conversation & files [dim #71717a](revert code)[/]",
             "Rollback conversation only [dim #71717a](keep current code)[/]",
+            "Rollback conversation & files [dim #71717a](revert code)[/]",
             "View changes diff [dim #71717a](inspect code changes)[/]",
         ]
 
@@ -289,7 +289,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
     def _show_step_2(self, entry: RewindEntry) -> None:
         self.step = 2
         self.selected_entry = entry
-        self.filtered_items = ["both", "conversation", "diff"]
+        self.filtered_items = ["conversation", "both", "diff"]
         try:
             self.query_one(MODAL_SEARCH_INPUT, Input).display = False
         except Exception:
