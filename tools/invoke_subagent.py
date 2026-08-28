@@ -4,7 +4,7 @@ import uuid
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
-from core.infrastructure.config.config_helpers import load_max_concurrent_subagents
+from core.infrastructure.config.settings import get_settings
 from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool
 
@@ -145,7 +145,7 @@ class InvokeSubagentTool(BaseTool):
 
         active_sessions = store.children(parent_session_id) if parent_session_id else store.list(kind="subagent")
         running_subagents = [s for s in active_sessions if s.status == "running"]
-        max_subagents = load_max_concurrent_subagents()
+        max_subagents = get_settings().subagents.max_concurrent
         if len(running_subagents) >= max_subagents:
             return ToolResult.error(
                 "limit", detail=f"{max_subagents} concurrent max; wait or manage_subagent(action='kill')"

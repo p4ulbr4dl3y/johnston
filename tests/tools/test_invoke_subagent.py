@@ -70,7 +70,8 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             )
 
         # With limit=2, spawning should fail with "2 concurrent max"
-        with patch("tools.invoke_subagent.load_max_concurrent_subagents", return_value=2):
+        with patch("tools.invoke_subagent.get_settings") as mock_st:
+            mock_st.return_value.subagents.max_concurrent = 2
             res = str(await tool.execute({"prompt": "another task", "title": "Over limit", "branch": "main"}))
             self.assertIn("ERR: limit: 2 concurrent max", res)
 

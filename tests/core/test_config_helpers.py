@@ -3,8 +3,6 @@ import os
 import tempfile
 import time
 
-import pytest
-
 from core.domain.defaults.config import (
     CONTEXT_COMPACTION_THRESHOLD_RATIO,
     DEFAULT_MAX_RETRIES,
@@ -13,10 +11,8 @@ from core.domain.defaults.config import (
 )
 from core.infrastructure.config.config_helpers import (
     ensure_json_config,
-    load_max_concurrent_subagents,
     load_sandbox_config,
     load_theme_config,
-    save_max_concurrent_subagents,
     save_sandbox_config,
     save_theme_config,
 )
@@ -59,40 +55,6 @@ def test_theme_config_load_and_save():
         assert load_theme_config(path) is None
         save_theme_config("dracula", path)
         assert load_theme_config(path) == "dracula"
-
-
-def test_max_concurrent_subagents_defaults():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(tmpdir, "config.json")
-        assert load_max_concurrent_subagents(path) == MAX_CONCURRENT_SUBAGENTS
-
-
-def test_max_concurrent_subagents_config_file():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(tmpdir, "config.json")
-        save_max_concurrent_subagents(12, path)
-        assert load_max_concurrent_subagents(path) == 12
-
-
-def test_max_concurrent_subagents_env_override(monkeypatch):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(tmpdir, "config.json")
-        save_max_concurrent_subagents(10, path)
-
-        monkeypatch.setenv("JOHNSTON_MAX_CONCURRENT_SUBAGENTS", "20")
-        assert load_max_concurrent_subagents(path) == 20
-
-        monkeypatch.setenv("JOHNSTON_MAX_CONCURRENT_SUBAGENTS", "invalid")
-        assert load_max_concurrent_subagents(path) == 10
-
-
-def test_save_max_concurrent_subagents_invalid_value():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(tmpdir, "config.json")
-        with pytest.raises(ValueError):
-            save_max_concurrent_subagents(0, path)
-        with pytest.raises(ValueError):
-            save_max_concurrent_subagents(-5, path)
 
 
 def test_load_settings_full_sections():
@@ -232,6 +194,7 @@ def test_settings_env_var_overrides(monkeypatch):
         monkeypatch.setenv("JOHNSTON_MAX_TOOL_OUTPUT_CHARS", "16000")
         monkeypatch.setenv("JOHNSTON_SANDBOX_ENABLED", "true")
         monkeypatch.setenv("JOHNSTON_MAX_RETRIES", "0")
+        monkeypatch.setenv("JOHNSTON_MAX_CONCURRENT_SUBAGENTS", "15")
 
         settings = load_settings(path)
         assert settings.llm.stream_timeout == 75.5
@@ -239,6 +202,7 @@ def test_settings_env_var_overrides(monkeypatch):
         assert settings.tools.max_tool_output_chars == 16000
         assert settings.sandbox_enabled is True
         assert settings.llm.max_retries == 0
+        assert settings.subagents.max_concurrent == 15
 
 
 def test_get_settings_caching_and_invalidation():
@@ -272,6 +236,3 @@ def test_config_helpers_custom_path_cache_reload():
 
         save_theme_config("nord", config_file=path)
         assert get_settings(path).theme == "nord"
-
-        save_max_concurrent_subagents(9, config_file=path)
-        assert get_settings(path).subagents.max_concurrent == 9

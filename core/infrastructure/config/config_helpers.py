@@ -54,28 +54,4 @@ def save_theme_config(theme_name: str, config_file: Optional[str] = None) -> Non
         pass
 
 
-def load_max_concurrent_subagents(config_file: Optional[str] = None) -> int:
-    """Load max_concurrent_subagents from env var or global config (~/.johnston/config.json)."""
-    from core.infrastructure.config.settings import load_settings
-    return load_settings(config_file).subagents.max_concurrent
-
-
-def save_max_concurrent_subagents(limit: int, config_file: Optional[str] = None) -> None:
-    """Save max_concurrent_subagents to global config (~/.johnston/config.json)."""
-    from core.infrastructure.config.settings import reload_settings
-    if not isinstance(limit, int) or limit <= 0:
-        raise ValueError("max_concurrent_subagents must be a positive integer")
-    config_file = config_file or paths.CONFIG_FILE
-    try:
-        data = read_json(config_file, default={})
-        if not isinstance(data, dict):
-            data = {}
-        data["max_concurrent_subagents"] = limit
-        if "subagents" in data and isinstance(data["subagents"], dict):
-            data["subagents"]["max_concurrent"] = limit
-        atomic_write_json(config_file, data, indent=2)
-        reload_settings(config_file)
-    except Exception:
-        pass
-
 
