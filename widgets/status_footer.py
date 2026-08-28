@@ -220,7 +220,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 row1_right = f"[{txt}]Run /connect[/]"
 
             # Row 1 (LLM): ⠋ Action • claude-3.7  <left> | <right> 45% ctx • $0.02
-            row1_left_parts = [f"[bold {txt}]{role_formatted}[/]"]
+            row1_left_parts = [f"[bold {t_primary}]{role_formatted}[/]"]
             if is_connected and clean_model and clean_model != "[Select model: /models]":
                 role_len = display_width(role_formatted) + 3
                 right_len = 16
@@ -261,7 +261,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             diff_text = self._git_diff_stats(cwd=directory)
 
             # Row 1 (LLM): ⠋ Action • OpenRouter › claude-3.7 (high)  <left> | <right> [████░░░░] 45% (58k/128k) • 12.3k tok • $0.02
-            row1_left_parts = [f"[bold {txt}]{role_formatted}[/]"]
+            row1_left_parts = [f"[bold {t_primary}]{role_formatted}[/]"]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 model_part = f"[{txt}]{provider_display}[/]{arrow_sep}[{txt}]{clean_model}[/]"
                 if thinking_effort and thinking_effort != "auto":
