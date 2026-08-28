@@ -290,7 +290,27 @@ class TestGitCheckpointManager(unittest.TestCase):
         self.assertTrue(any("file_1.txt" in f for f in results[0][1]))
         self.assertTrue(any("file_2.txt" in f for f in results[0][1]))
 
+    def test_checkpoint_port_resolution(self):
+        from core.domain.ports.checkpoint import (
+            CheckpointPort,
+            get_checkpoint_manager,
+            set_default_checkpoint_manager,
+        )
+
+        self.assertIsInstance(GitCheckpointManager, CheckpointPort)
+        self.assertIs(get_checkpoint_manager(), GitCheckpointManager)
+
+        # Custom manager injection
+        mock_mgr = mock.MagicMock(spec=CheckpointPort)
+        set_default_checkpoint_manager(mock_mgr)
+        self.assertIs(get_checkpoint_manager(), mock_mgr)
+
+        # Restore default
+        set_default_checkpoint_manager(GitCheckpointManager)
+        self.assertIs(get_checkpoint_manager(), GitCheckpointManager)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

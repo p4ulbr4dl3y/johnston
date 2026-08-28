@@ -67,11 +67,8 @@ def set_default_checkpoint_manager(manager: Optional[CheckpointPort]) -> None:
     _default_checkpoint_manager = manager
 
 
-def get_checkpoint_manager() -> CheckpointPort:
+def get_checkpoint_manager() -> Optional[CheckpointPort]:
     """Resolves the active checkpoint manager port implementation."""
     global _default_checkpoint_manager
-    if _default_checkpoint_manager is not None:
-        return _default_checkpoint_manager
-    from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+    return _default_checkpoint_manager
 
-    return GitCheckpointManager

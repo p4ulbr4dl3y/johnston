@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from typing import Generator, Optional
 
 from core.domain.defaults.git_excludes import DEFAULT_EXCLUDES
+from core.domain.ports.checkpoint import set_default_checkpoint_manager
 from core.infrastructure.platform.paths import SHADOW_REPOS_DIR
 from core.infrastructure.runtime.git_utils import is_git_repository, run_git
 
@@ -610,3 +611,7 @@ class GitCheckpointManager:
                     return []
 
                 return cls._split_git_diff(diff_res.stdout)
+
+
+set_default_checkpoint_manager(GitCheckpointManager)
+

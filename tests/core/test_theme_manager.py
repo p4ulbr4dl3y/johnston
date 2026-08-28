@@ -197,3 +197,32 @@ def test_theme_manager_singleton_and_reset():
     inst3 = ThemeManager.get_instance()
     assert inst3 is not inst1
 
+
+def test_themes_loader_module():
+    import core.domain.defaults.themes as themes_mod
+    from core.domain.defaults.themes import (
+        BUILTIN_THEMES,
+        EVERFOREST_DARK,
+        THEMES,
+        ZINC_DARK,
+        get_theme,
+        list_themes,
+        load_builtin_themes,
+    )
+
+    assert len(THEMES) == 25
+    assert len(BUILTIN_THEMES) == 25
+    assert get_theme("zinc") is not None
+    assert get_theme("zinc").name == "zinc"
+    assert get_theme("nonexistent") is None
+    assert len(list_themes()) == 25
+    assert len(load_builtin_themes()) == 25
+    assert ZINC_DARK.name == "zinc"
+    assert EVERFOREST_DARK.name == "everforest"
+    assert themes_mod.NORD.name == "nord"
+    assert "THEMES" in dir(themes_mod)
+
+    with pytest.raises(AttributeError):
+        _ = themes_mod.NON_EXISTENT_THEME_XYZ
+
+
