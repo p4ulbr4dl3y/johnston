@@ -231,3 +231,36 @@ def test_themes_loader_module():
         _ = themes_mod.NON_EXISTENT_THEME_XYZ
 
 
+def test_ui_theme_manager_adapted_theme(monkeypatch):
+    from widgets.app.theme_manager import ThemeManager as UIThemeManager
+
+    UIThemeManager.reset_instance()
+    mgr = UIThemeManager(default_theme="native")
+
+    # Mock terminal palette query to light terminal
+    monkeypatch.setattr(
+        "core.infrastructure.platform.terminal_theme.query_terminal_palette",
+        lambda: ("#ffffff", "#000000"),
+    )
+
+    adapted = mgr.get_adapted_theme("native")
+    assert adapted.dark is False
+    assert adapted.primary == "#000000"
+    assert adapted.tcss_vars["bg-app"] == "ansi_default"
+
+    textual_theme = mgr.get_textual_theme("native")
+    assert textual_theme.dark is False
+    assert textual_theme.ansi is True
+    assert textual_theme.foreground == "#000000"
+
+    # Now mock dark terminal
+    monkeypatch.setattr(
+        "core.infrastructure.platform.terminal_theme.query_terminal_palette",
+        lambda: ("#0d1117", "#c9d1d9"),
+    )
+    adapted_dark = mgr.get_adapted_theme("native")
+    assert adapted_dark.dark is True
+    assert adapted_dark.primary == "#c9d1d9"
+
+
+

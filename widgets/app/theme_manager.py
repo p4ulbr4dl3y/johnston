@@ -16,34 +16,80 @@ class ThemeManager(CoreThemeManager):
 
     _instance: Optional[ThemeManager] = None
 
-    def get_textual_theme(self, theme_or_name: str | Theme) -> TextualTheme:
-        """Convert Johnston Theme to TextualTheme instance."""
+    def get_adapted_theme(self, theme_or_name: str | Theme) -> Theme:
+        """Return theme adapted to runtime terminal environment if applicable."""
         theme = theme_or_name if isinstance(theme_or_name, Theme) else self._themes.get(theme_or_name, ZINC_DARK)
         tcss_vars = dict(theme.tcss_vars)
         bg_app = tcss_vars.get("bg-app", "#09090b")
-        is_ansi = bg_app in ("ansi_default", "transparent")
-        if is_ansi:
-            from core.infrastructure.platform.terminal_theme import (
-                compute_adaptive_border,
-                compute_adaptive_surface,
-                query_terminal_palette,
-            )
+        is_ansi = bg_app in ("ansi_default", "transparent") or theme.name == "native"
+        if not is_ansi:
+            return theme
 
-            detected_bg, _ = query_terminal_palette()
-            surface = compute_adaptive_surface(detected_bg)
-            border = compute_adaptive_border(detected_bg)
-            tcss_vars["bg-surface"] = surface
-            tcss_vars["border"] = border
-            if "ansi-background" not in tcss_vars:
-                tcss_vars["ansi-background"] = "ansi_default"
-        return TextualTheme(
+        from core.infrastructure.platform.terminal_theme import (
+            compute_adaptive_palette,
+            query_terminal_palette,
+        )
+
+        detected_bg, detected_fg = query_terminal_palette()
+        palette = compute_adaptive_palette(detected_bg, detected_fg)
+        adapted_tcss = dict(tcss_vars)
+        adapted_tcss.update(palette["tcss_vars"])
+
+        if not palette["dark"]:
+            from core.domain.defaults.themes import get_theme
+
+            latte = get_theme("catppuccin-latte")
+            md_styles = latte.markdown_styles if latte else theme.markdown_styles
+            syntax_tokens = latte.syntax_tokens if latte else theme.syntax_tokens
+        else:
+            md_styles = theme.markdown_styles
+            syntax_tokens = theme.syntax_tokens
+
+        return Theme(
             name=theme.name,
-            primary=theme.primary,
-            secondary=theme.secondary,
-            foreground=tcss_vars.get("fg-primary", "#ffffff" if theme.dark else "#18181b"),
+            label=theme.label,
+            dark=palette["dark"],
+            primary=palette["primary"],
+            secondary=palette["secondary"],
+            muted=palette["muted"],
+            subtle=palette["subtle"],
+            tcss_vars=adapted_tcss,
+            markdown_styles=md_styles,
+            syntax_tokens=syntax_tokens,
+        )
+
+    @property
+    def current_theme(self) -> Theme:
+        """Get the currently active theme (adapted if native)."""
+        if self._current_theme.name == "native":
+            return self.get_adapted_theme(self._current_theme)
+        return self._current_theme
+
+    def set_theme(self, name: str, persist: bool = True) -> Theme:
+        """Set active theme, clearing palette cache if native."""
+        if name == "native":
+            from core.infrastructure.platform.terminal_theme import clear_palette_cache
+
+            clear_palette_cache()
+        theme = super().set_theme(name, persist=persist)
+        if theme.name == "native":
+            return self.get_adapted_theme(theme)
+        return theme
+
+    def get_textual_theme(self, theme_or_name: str | Theme) -> TextualTheme:
+        """Convert Johnston Theme to TextualTheme instance."""
+        adapted = self.get_adapted_theme(theme_or_name)
+        tcss_vars = dict(adapted.tcss_vars)
+        bg_app = tcss_vars.get("bg-app", "#09090b")
+        is_ansi = bg_app in ("ansi_default", "transparent") or adapted.name == "native"
+        return TextualTheme(
+            name=adapted.name,
+            primary=adapted.primary,
+            secondary=adapted.secondary,
+            foreground=tcss_vars.get("fg-primary", "#ffffff" if adapted.dark else "#18181b"),
             background=bg_app,
             surface=tcss_vars.get("bg-surface", "#18181b"),
-            dark=theme.dark,
+            dark=adapted.dark,
             ansi=is_ansi,
             variables=tcss_vars,
         )
@@ -54,3 +100,4 @@ class ThemeManager(CoreThemeManager):
 
 
 theme_manager = ThemeManager.get_instance()
+

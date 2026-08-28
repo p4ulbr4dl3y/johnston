@@ -7,7 +7,7 @@ import os
 import re
 import sys
 import time
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 BASE_LIFT = 0.06
 LIFT_DAMPING = 3.0
@@ -115,6 +115,125 @@ def compute_adaptive_border(terminal_bg: str | None = None) -> str:
     return lifted_from_terminal_bg(terminal_bg, RULE_BASE_LIFT, 0.0, 0.0)
 
 
+def clear_palette_cache() -> None:
+    """Clear cached terminal colors to allow re-querying."""
+    global _CACHED_TERMINAL_COLORS
+    _CACHED_TERMINAL_COLORS = None
+
+
+def lerp_oklab(c1_hex: str, c2_hex: str, t: float) -> str:
+    """Perceptually blend two hex colors in OKLab color space (t from 0.0 to 1.0)."""
+    clean1 = normalize_hex(c1_hex) or "#000000"
+    clean2 = normalize_hex(c2_hex) or "#ffffff"
+    L1, a1, b1 = hex_to_oklab(clean1)
+    L2, a2, b2 = hex_to_oklab(clean2)
+    t_clamped = max(0.0, min(1.0, float(t)))
+    return oklab_to_hex(
+        L1 + (L2 - L1) * t_clamped,
+        a1 + (a2 - a1) * t_clamped,
+        b1 + (b2 - b1) * t_clamped,
+    )
+
+
+def detect_os_theme_dark() -> bool:
+    """Detect whether the operating system is currently using dark mode."""
+    if sys.platform == "darwin":
+        try:
+            import subprocess
+
+            res = subprocess.run(
+                ["defaults", "read", "-g", "AppleInterfaceStyle"],
+                capture_output=True,
+                text=True,
+                timeout=0.2,
+            )
+            return "dark" in res.stdout.strip().lower()
+        except Exception:
+            return True
+
+    if sys.platform == "win32":
+        try:
+            import winreg
+
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+            )
+            val, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+            return val == 0
+        except Exception:
+            return True
+
+    if sys.platform.startswith("linux"):
+        try:
+            import subprocess
+
+            res = subprocess.run(
+                ["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
+                capture_output=True,
+                text=True,
+                timeout=0.2,
+            )
+            return "dark" in res.stdout.strip().lower()
+        except Exception:
+            return True
+
+    return True
+
+
+def compute_adaptive_palette(
+    terminal_bg: str | None = None,
+    terminal_fg: str | None = None,
+    mode: str = "act",
+) -> dict[str, Any]:
+    """Compute fully dynamic semantic palette for native theme based on detected BG & FG."""
+    norm_bg = normalize_hex(terminal_bg)
+    norm_fg = normalize_hex(terminal_fg)
+
+    if norm_bg is None:
+        os_dark = detect_os_theme_dark()
+        norm_bg = "#09090b" if os_dark else "#ffffff"
+
+    is_dark = not is_light_theme(norm_bg)
+
+    if norm_fg is None:
+        norm_fg = "#f4f4f5" if is_dark else "#18181b"
+
+    surface = compute_adaptive_surface(norm_bg, mode=mode)
+    border = compute_adaptive_border(norm_bg)
+    fg_secondary = lerp_oklab(norm_fg, norm_bg, 0.20)
+    fg_muted = lerp_oklab(norm_fg, norm_bg, 0.48)
+    subtle = lerp_oklab(norm_fg, norm_bg, 0.30)
+
+    tcss_vars = {
+        "bg-app": "ansi_default",
+        "bg-surface": surface,
+        "bg-inverted": norm_fg,
+        "fg-primary": norm_fg,
+        "fg-secondary": fg_secondary,
+        "fg-muted": fg_muted,
+        "fg-inverted": norm_bg,
+        "border": border,
+        "ansi-background": "ansi_default",
+    }
+
+    return {
+        "dark": is_dark,
+        "primary": norm_fg,
+        "secondary": fg_secondary,
+        "muted": fg_muted,
+        "subtle": subtle,
+        "bg_surface": surface,
+        "border": border,
+        "fg_primary": norm_fg,
+        "fg_secondary": fg_secondary,
+        "fg_muted": fg_muted,
+        "fg_inverted": norm_bg,
+        "bg_inverted": norm_fg,
+        "tcss_vars": tcss_vars,
+    }
+
+
 def parse_osc_palette(resp: str | bytes) -> tuple[str | None, str | None]:
     """Parse OSC 11 (background) and OSC 10 (foreground) RGB responses."""
     resp_bytes = resp.encode("latin1", errors="ignore") if isinstance(resp, str) else resp
@@ -164,7 +283,14 @@ def _query_posix_palette(timeout: float) -> tuple[str | None, str | None]:
     old_attr = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
-        sys.stdout.write("\x1b]11;?\x1b\\\x1b]10;?\x1b\\")
+        is_tmux = bool(os.environ.get("TMUX"))
+        term = os.environ.get("TERM", "").lower()
+        is_screen = "screen" in term or "tmux" in term
+        if is_tmux or is_screen:
+            # Wrap in DCS pass-through sequence for tmux/screen
+            sys.stdout.write("\x1bPtmux;\x1b\x1b]11;?\x1b\\\x1b\\\x1bPtmux;\x1b\x1b]10;?\x1b\\\x1b\\")
+        else:
+            sys.stdout.write("\x1b]11;?\x1b\\\x1b]10;?\x1b\\")
         sys.stdout.flush()
 
         resp = b""
