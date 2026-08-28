@@ -379,5 +379,10 @@ class BaseTool:
         """Returns tool schema, optionally tailored for subagents."""
         return self.schema
 
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        """Whether this tool invocation is safe to run concurrently with other safe tools."""
+        return False
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> "ToolResult":
         raise NotImplementedError
+

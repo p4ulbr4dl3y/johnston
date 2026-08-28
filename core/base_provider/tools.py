@@ -59,6 +59,18 @@ class ToolMixin:
                     cache.pop(next(iter(cache)))
         return result
 
+    def _is_tool_concurrency_safe(self, tool_name: str, args: dict | None = None) -> bool:
+        from core.domain.ports.tool_registry import get_default_tool_registry
+
+        reg = get_default_tool_registry()
+        if reg is not None and hasattr(reg, "is_tool_concurrency_safe"):
+            try:
+                return bool(reg.is_tool_concurrency_safe(tool_name, args))
+            except Exception:
+                return False
+        return False
+
+
 
 async def build_prompt_context_async(agent: Any) -> Tuple[str, List[Dict[str, Any]], int]:
     """Builds system prompt + tool schema for an agent asynchronously and returns them with token count.

@@ -176,6 +176,20 @@ async def aclose_tools() -> None:
     _TOOL_INSTANCES.clear()
 
 
+def is_tool_concurrency_safe(name: str, args: dict | None = None) -> bool:
+    """Check if a tool call is safe to run concurrently with other safe tools."""
+    raw_name = (name or "").strip()
+    resolved_name = normalize_tool_name(raw_name)
+    tool_cls = REGISTRY.get(resolved_name)
+    if tool_cls:
+        try:
+            tool_inst = _get_tool_instance(tool_cls)
+            return bool(tool_inst.is_concurrency_safe(args))
+        except Exception:
+            return False
+    return False
+
+
 async def execute_tool(name: str, args: dict | None, app: Any = None, context: Any = None) -> ToolResult:
     raw_name = (name or "").strip()
     clean_name = raw_name.lower()
@@ -321,6 +335,10 @@ class DefaultToolRegistry:
 
     def get_subagent_schema(self) -> Dict[str, Any] | None:
         return getattr(InvokeSubagentTool, "schema", None)
+
+    def is_tool_concurrency_safe(self, name: str, args: dict | None = None) -> bool:
+        return is_tool_concurrency_safe(name, args)
+
 
 
 set_default_tool_registry(DefaultToolRegistry())

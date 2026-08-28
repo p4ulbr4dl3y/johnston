@@ -25,6 +25,10 @@ class ToolRegistryPort(Protocol):
         """Return the schema for invoke_subagent tool."""
         ...
 
+    def is_tool_concurrency_safe(self, name: str, args: Optional[Dict[str, Any]] = None) -> bool:
+        """Check if a tool call is safe to run concurrently with other safe tools."""
+        ...
+
 
 _default_tool_registry: Optional[ToolRegistryPort] = None
 

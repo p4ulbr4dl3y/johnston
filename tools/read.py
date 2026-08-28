@@ -21,6 +21,7 @@ _MARKITDOWN_CLS = None
 _MARKITDOWN_INSTANCE = None
 _LINE_COUNT_CACHE: "OrderedDict[Tuple[str, float, int], int]" = OrderedDict()
 MAX_LINE_COUNT_CACHE = 500
+_CACHE_LOCK = threading.Lock()
 
 
 def _get_markitdown():
@@ -36,9 +37,10 @@ def _get_markitdown():
 
 def _get_file_line_count(file_path: str, mtime: float, size: int) -> int:
     key = (file_path, mtime, size)
-    if key in _LINE_COUNT_CACHE:
-        _LINE_COUNT_CACHE.move_to_end(key)
-        return _LINE_COUNT_CACHE[key]
+    with _CACHE_LOCK:
+        if key in _LINE_COUNT_CACHE:
+            _LINE_COUNT_CACHE.move_to_end(key)
+            return _LINE_COUNT_CACHE[key]
 
     total = 0
     last_byte = b""
@@ -52,10 +54,11 @@ def _get_file_line_count(file_path: str, mtime: float, size: int) -> int:
     except Exception:
         return 0
 
-    _LINE_COUNT_CACHE[key] = total
-    _LINE_COUNT_CACHE.move_to_end(key)
-    while len(_LINE_COUNT_CACHE) > MAX_LINE_COUNT_CACHE:
-        _LINE_COUNT_CACHE.popitem(last=False)
+    with _CACHE_LOCK:
+        _LINE_COUNT_CACHE[key] = total
+        _LINE_COUNT_CACHE.move_to_end(key)
+        while len(_LINE_COUNT_CACHE) > MAX_LINE_COUNT_CACHE:
+            _LINE_COUNT_CACHE.popitem(last=False)
     return total
 
 
@@ -65,12 +68,13 @@ def get_cached_doc_markdown(path: str) -> str | None:
     except Exception:
         return None
 
-    if path in _DOC_CACHE:
-        cached_mtime, cached_ts, text = _DOC_CACHE[path]
-        if cached_mtime == mtime and (time.monotonic() - cached_ts < DOC_CACHE_TTL):
-            _DOC_CACHE.move_to_end(path)
-            return text
-        del _DOC_CACHE[path]
+    with _CACHE_LOCK:
+        if path in _DOC_CACHE:
+            cached_mtime, cached_ts, text = _DOC_CACHE[path]
+            if cached_mtime == mtime and (time.monotonic() - cached_ts < DOC_CACHE_TTL):
+                _DOC_CACHE.move_to_end(path)
+                return text
+            del _DOC_CACHE[path]
     return None
 
 
@@ -80,10 +84,12 @@ def set_cached_doc_markdown(path: str, text: str) -> None:
     except Exception:
         return
 
-    _DOC_CACHE[path] = (mtime, time.monotonic(), text)
-    _DOC_CACHE.move_to_end(path)
-    while len(_DOC_CACHE) > MAX_DOC_CACHE:
-        _DOC_CACHE.popitem(last=False)
+    with _CACHE_LOCK:
+        _DOC_CACHE[path] = (mtime, time.monotonic(), text)
+        _DOC_CACHE.move_to_end(path)
+        while len(_DOC_CACHE) > MAX_DOC_CACHE:
+            _DOC_CACHE.popitem(last=False)
+
 
 
 def convert_doc_to_markdown_sync(
@@ -308,6 +314,9 @@ class ReadTool(BaseTool):
             },
         },
     }
+
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return True
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}

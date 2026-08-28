@@ -289,6 +289,40 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             if not is_local and not is_free_model:
                 self.cost_usd += prompt_tokens_est * p_prompt + output_tokens_est * p_comp
 
+    async def _execute_single_tool(self, tc: dict, role_def: Any) -> tuple[str, Any, Any]:
+        """Execute a single tool call and return (tool_call_id, display_result, resolved_tool_result)."""
+        t_id = tc["id"]
+        t_name = tc["name"]
+        raw_args = tc.get("arguments", "{}")
+        _, args = parse_tool_call_args({"function": {"name": t_name, "arguments": raw_args}})
+
+        policy_err = self._tool_policy_error(t_name, role_def)
+        if policy_err:
+            tool_result: Any = policy_err
+        else:
+            tool_result = None
+
+        if tool_result is None:
+            if self.tool_executor:
+                try:
+                    tool_result = await self.tool_executor(t_name, args, self)
+                except Exception as e:
+                    tool_result = ToolResult.error("execute", detail=str(e), name=t_name)
+            else:
+                tool_result = ToolResult.error("error", "tool_executor not provided", t_name)
+
+        resolved = await self._normalize_tool_result(tool_result)
+
+        source_for_image = resolved.content if isinstance(tool_result, ToolResult) else tool_result
+        display_result = tool_result
+        parsed_img = extract_image_payload(source_for_image)
+        if parsed_img is not None and parsed_img.get("type") == "image":
+            display_result = parsed_img.get("summary", f"[Image file: {parsed_img.get('path')}]")
+        elif isinstance(tool_result, ToolResult):
+            display_result = resolved.display if resolved.display is not None else (resolved.content or "")
+
+        return t_id, display_result, resolved
+
     async def _process_attachment_image(
         self, att_path: str, error_prefix: str = "Error processing attachment image"
     ) -> Optional[Dict[str, Any]]:
@@ -644,62 +678,70 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 }
                 messages.append(assistant_tool_msg)
 
+                from core.role_registry import RoleRegistry
+
+                current_role = getattr(self, "role", "worker").lower()
+                role_def = RoleRegistry.get_instance().get_role(current_role)
+
+                # Partition tool calls into batches: consecutive concurrency-safe
+                # tools run in parallel via asyncio.gather; mutating/barrier tools
+                # execute sequentially.
+                batches: list[tuple[bool, list[tuple[dict, Any]]]] = []
                 for tc in ordered_calls:
-                    t_id = tc["id"]
-                    t_name = tc["name"]
-                    raw_args = tc["arguments"]
-
-                    # parse_tool_call_args (shared with adapters) parses the
-                    # arguments; malformed JSON is normalized to {} by design.
-                    _, args = parse_tool_call_args({"function": {"name": t_name, "arguments": raw_args}})
-
-                    target = (
-                        (args.get("path") or args.get("command") or args.get("url") or "")
-                        if isinstance(args, dict)
-                        else ""
-                    )
-                    yield ("tool", t_name, str(target), args)
-
-                    from core.role_registry import RoleRegistry
-
-                    current_role = getattr(self, "role", "worker").lower()
-                    role_def = RoleRegistry.get_instance().get_role(current_role)
-
-                    policy_err = self._tool_policy_error(t_name, role_def)
-                    if policy_err:
-                        tool_result: Any = policy_err
+                    raw_args = tc.get("arguments", "{}")
+                    _, parsed_args = parse_tool_call_args({"function": {"name": tc["name"], "arguments": raw_args}})
+                    is_safe = self._is_tool_concurrency_safe(tc["name"], parsed_args if isinstance(parsed_args, dict) else None)
+                    if batches and batches[-1][0] and is_safe:
+                        batches[-1][1].append((tc, parsed_args))
                     else:
-                        tool_result = None
+                        batches.append((is_safe, [(tc, parsed_args)]))
 
-                    if tool_result is None:
-                        if self.tool_executor:
-                            try:
-                                tool_result = await self.tool_executor(t_name, args, self)
-                            except Exception as e:
-                                tool_result = ToolResult.error("execute", detail=str(e), name=t_name)
-                        else:
-                            tool_result = ToolResult.error("error", "tool_executor not provided", t_name)
+                for is_safe, batch in batches:
+                    if is_safe and len(batch) > 1:
+                        # Concurrent batch: announce all tool cards first
+                        for tc, args in batch:
+                            t_name = tc["name"]
+                            target = (
+                                (args.get("path") or args.get("command") or args.get("url") or "")
+                                if isinstance(args, dict)
+                                else ""
+                            )
+                            yield ("tool", t_name, str(target), args)
 
-                    resolved = await self._normalize_tool_result(tool_result)
+                        # Execute concurrently and preserve original order
+                        batch_results = await asyncio.gather(*(self._execute_single_tool(tc, role_def) for tc, _ in batch))
+                        for t_id, display_result, resolved in batch_results:
+                            yield (
+                                "tool_result",
+                                display_result,
+                                "",
+                                resolved.is_error,
+                                resolved.status,
+                                resolved.returncode,
+                            )
+                            messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
+                    else:
+                        # Sequential execution (single tool or mutating barrier)
+                        for tc, args in batch:
+                            t_name = tc["name"]
+                            target = (
+                                (args.get("path") or args.get("command") or args.get("url") or "")
+                                if isinstance(args, dict)
+                                else ""
+                            )
+                            yield ("tool", t_name, str(target), args)
 
-                    source_for_image = resolved.content if isinstance(tool_result, ToolResult) else tool_result
-                    display_result = tool_result
-                    parsed_img = extract_image_payload(source_for_image)
-                    if parsed_img is not None and parsed_img.get("type") == "image":
-                        display_result = parsed_img.get("summary", f"[Image file: {parsed_img.get('path')}]")
-                    elif isinstance(tool_result, ToolResult):
-                        display_result = resolved.display if resolved.display is not None else (resolved.content or "")
+                            t_id, display_result, resolved = await self._execute_single_tool(tc, role_def)
+                            yield (
+                                "tool_result",
+                                display_result,
+                                "",
+                                resolved.is_error,
+                                resolved.status,
+                                resolved.returncode,
+                            )
+                            messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
 
-                    yield (
-                        "tool_result",
-                        display_result,
-                        "",
-                        resolved.is_error,
-                        resolved.status,
-                        resolved.returncode,
-                    )
-
-                    messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
 
                 # Per-step copy of the transcript for the next provider request.
                 # Recomputing the full ``messages[1:]`` slice on every tool_result

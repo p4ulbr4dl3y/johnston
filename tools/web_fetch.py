@@ -154,6 +154,9 @@ class WebFetchTool(BaseTool):
         },
     }
 
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return True
+
     def __init__(self) -> None:
         super().__init__()
         self._client: httpx.AsyncClient | None = None
