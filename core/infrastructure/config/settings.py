@@ -1,6 +1,7 @@
 """Central application settings with environment variable and JSON config support."""
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Optional, Tuple
@@ -41,7 +42,7 @@ from core.infrastructure.platform.platform_utils import atomic_write_json, read_
 
 
 def _safe_int(val: Any, default: int, min_val: Optional[int] = None) -> int:
-    if val is None:
+    if val is None or isinstance(val, bool):
         return default
     try:
         parsed = int(val)
@@ -53,10 +54,12 @@ def _safe_int(val: Any, default: int, min_val: Optional[int] = None) -> int:
 
 
 def _safe_float(val: Any, default: float, min_val: Optional[float] = None) -> float:
-    if val is None:
+    if val is None or isinstance(val, bool):
         return default
     try:
         parsed = float(val)
+        if math.isnan(parsed) or math.isinf(parsed):
+            return default
         if min_val is not None and parsed < min_val:
             return default
         return parsed
@@ -355,9 +358,9 @@ _cached_settings_map: Dict[str, Tuple[float, JohnstonSettings]] = {}
 
 def load_settings(config_file: Optional[str] = None) -> JohnstonSettings:
     """Load settings from JSON config file with environment variable overlays."""
-    config_file = config_file or paths.CONFIG_FILE
+    target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
     try:
-        raw = read_json(config_file, default={})
+        raw = read_json(target_file, default={})
         if isinstance(raw, dict):
             return JohnstonSettings.from_dict(raw)
     except Exception:
@@ -368,7 +371,7 @@ def load_settings(config_file: Optional[str] = None) -> JohnstonSettings:
 def get_settings(config_file: Optional[str] = None, force_reload: bool = False) -> JohnstonSettings:
     """Returns per-file cached JohnstonSettings, refreshing on file mtime change."""
     global _cached_settings_map
-    target_file = config_file or paths.CONFIG_FILE
+    target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
 
     try:
         mtime = os.path.getmtime(target_file) if os.path.exists(target_file) else 0.0
@@ -390,13 +393,15 @@ def reload_settings(config_file: Optional[str] = None) -> JohnstonSettings:
 
 def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None) -> None:
     """Saves structured settings back to config_file."""
-    config_file = config_file or paths.CONFIG_FILE
+    target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
     try:
-        data = read_json(config_file, default={})
+        data = read_json(target_file, default={})
         if not isinstance(data, dict):
             data = {}
         if settings.active_provider is not None:
             data["active_provider"] = settings.active_provider
+        elif "active_provider" in data:
+            data.pop("active_provider", None)
         if settings.theme is not None:
             data["theme"] = settings.theme
         elif "theme" in data:
@@ -407,7 +412,7 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
         data["tools"] = asdict(settings.tools)
         data["ui"] = asdict(settings.ui)
         data["storage"] = asdict(settings.storage)
-        atomic_write_json(config_file, data, indent=2)
-        reload_settings(config_file)
+        atomic_write_json(target_file, data, indent=2)
+        reload_settings(target_file)
     except Exception:
         pass

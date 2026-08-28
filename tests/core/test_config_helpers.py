@@ -161,14 +161,16 @@ def test_load_settings_handles_corrupt_or_null_values():
         "llm": {
             "compaction_threshold_ratio": None,
             "stream_timeout": "not_a_number",
-            "max_retries": None,
+            "max_retries": True,  # boolean rejected as numeric
+            "retry_delay": "nan",
+            "chunk_timeout": "inf",
         },
         "tools": "not_a_dict",
         "subagents": {
             "max_concurrent": -10,
         },
         "storage": {
-            "log_max_age_days": None,
+            "log_max_age_days": False,  # boolean rejected as numeric
         },
     }
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -180,8 +182,11 @@ def test_load_settings_handles_corrupt_or_null_values():
         assert settings.llm.compaction_threshold_ratio == CONTEXT_COMPACTION_THRESHOLD_RATIO
         assert settings.llm.stream_timeout == DEFAULT_STREAM_TIMEOUT
         assert settings.llm.max_retries == DEFAULT_MAX_RETRIES
+        assert settings.llm.retry_delay == 1.0
+        assert settings.llm.chunk_timeout == 30.0
         assert settings.subagents.max_concurrent == MAX_CONCURRENT_SUBAGENTS
         assert settings.tools.shell_default_timeout == 120.0
+        assert settings.storage.log_max_age_days == 7
 
 
 def test_save_and_reload_settings():
@@ -208,6 +213,15 @@ def test_save_and_reload_settings():
         assert loaded.subagents.max_concurrent == 7
         assert loaded.ui.chat_page_size == 75
         assert loaded.storage.log_max_age_days == 30
+
+        # Clearing active_provider removes it from JSON
+        settings.active_provider = None
+        settings.theme = None
+        save_settings(settings, path)
+        with open(path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+        assert "active_provider" not in raw
+        assert "theme" not in raw
 
 
 def test_settings_env_var_overrides(monkeypatch):
@@ -248,3 +262,16 @@ def test_get_settings_caching_and_invalidation():
         save_settings(JohnstonSettings(theme="theme1_updated"), path1)
         s1_updated = get_settings(path1)
         assert s1_updated.theme == "theme1_updated"
+
+
+def test_config_helpers_custom_path_cache_reload():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "config_custom.json")
+        save_sandbox_config(True, config_file=path)
+        assert get_settings(path).sandbox_enabled is True
+
+        save_theme_config("nord", config_file=path)
+        assert get_settings(path).theme == "nord"
+
+        save_max_concurrent_subagents(9, config_file=path)
+        assert get_settings(path).subagents.max_concurrent == 9

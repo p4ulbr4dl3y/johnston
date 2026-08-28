@@ -28,7 +28,7 @@ def save_sandbox_config(enabled: bool, config_file: Optional[str] = None) -> Non
             data = {}
         data["sandbox_enabled"] = bool(enabled)
         atomic_write_json(config_file, data, indent=2)
-        reload_settings()
+        reload_settings(config_file)
     except Exception:
         pass
 
@@ -49,7 +49,7 @@ def save_theme_config(theme_name: str, config_file: Optional[str] = None) -> Non
             data = {}
         data["theme"] = str(theme_name).strip()
         atomic_write_json(config_file, data, indent=2)
-        reload_settings()
+        reload_settings(config_file)
     except Exception:
         pass
 
@@ -74,7 +74,7 @@ def save_max_concurrent_subagents(limit: int, config_file: Optional[str] = None)
         if "subagents" in data and isinstance(data["subagents"], dict):
             data["subagents"]["max_concurrent"] = limit
         atomic_write_json(config_file, data, indent=2)
-        reload_settings()
+        reload_settings(config_file)
     except Exception:
         pass
 

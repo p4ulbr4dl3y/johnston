@@ -87,7 +87,10 @@ class SubagentWorktreeManager:
         if os.path.exists(wt_path):
             return wt_path
 
-        res = run_git(["worktree", "add", wt_path, branch_name], cwd=project_dir, timeout=15)
+        from core.infrastructure.config.settings import get_settings
+
+        wt_timeout = get_settings().subagents.worktree_timeout
+        res = run_git(["worktree", "add", wt_path, branch_name], cwd=project_dir, timeout=wt_timeout)
         if res.returncode == 0 and os.path.exists(wt_path):
             return wt_path
 
