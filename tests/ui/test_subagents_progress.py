@@ -209,7 +209,7 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         row = format_subagent_task_row("Research codebase structure", session=sess, is_running=True)
         self.assertIn("Research codebase structure", row)
         self.assertIn("reading file", row)
-        self.assertIn("[dim #71717a]", row)
+        self.assertIn("[dim]", row)
 
 
 class TestShellTaskProgressDisplay(unittest.TestCase):
@@ -259,7 +259,7 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         row = format_shell_task_row("uv run pytest -n auto", task=task, is_running=False)
         self.assertIn("uv run pytest -n auto", row)
         self.assertIn("exit 0 • 42s", row)
-        self.assertIn("[dim #71717a]", row)
+        self.assertIn("[dim]", row)
 
     def test_fake_streaming_full_lifecycle_and_followup(self):
         from core.domain.entities.session import AgentSession, SessionKind

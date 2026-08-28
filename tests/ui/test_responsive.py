@@ -320,7 +320,7 @@ class TestCommandSuggestionsViewportAwareness:
         cs._render_file_suggestions([long_path], "")
         assert cs.added, "expected one suggestion row"
         row = cs.added[0]
-        assert row.endswith("File[/dim #71717a]")
+        assert row.endswith("File[/dim]")
         assert "..." in row
 
     def test_short_paths_align_at_legacy_column_when_wide(self):

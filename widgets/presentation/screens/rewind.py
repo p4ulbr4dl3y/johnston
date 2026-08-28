@@ -41,19 +41,19 @@ def format_rewind_files(
     if not changed_files:
         return t
     stat_label = f" ({git_stats})" if git_stats else ""
-    t.append("Files to revert", style="#ffffff")
+    t.append("Files to revert", style="bold")
     if stat_label:
-        t.append(stat_label, style="#a1a1aa")
-    t.append(":\n", style="#ffffff")
+        t.append(stat_label, style="dim")
+    t.append(":\n", style="bold")
 
     lines: list[tuple[str, str]] = []
     for f in changed_files[:max_show]:
         display_f = ellipsize(f, max(15, max_width - 4)) if max_width > 0 else f
-        lines.append((f"  {display_f}", "#a1a1aa"))
+        lines.append((f"  {display_f}", ""))
 
     if len(changed_files) > max_show:
         rem = len(changed_files) - max_show
-        lines.append((f"  ... and {rem} more", "italic #71717a"))
+        lines.append((f"  ... and {rem} more", "italic dim"))
 
     for i, (line_text, line_style) in enumerate(lines):
         t.append(line_text, style=line_style)
@@ -123,9 +123,9 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
 
     def _format_step2_options(self, target_width: int) -> list[str]:
         return [
-            "Rollback conversation only [dim #71717a](keep current code)[/]",
-            "Rollback conversation & files [dim #71717a](revert code)[/]",
-            "View changes diff [dim #71717a](inspect code changes)[/]",
+            "Rollback conversation only [dim](keep current code)[/]",
+            "Rollback conversation & files [dim](revert code)[/]",
+            "View changes diff [dim](inspect code changes)[/]",
         ]
 
     def _apply_filter(self, query: str = "") -> None:

@@ -99,4 +99,4 @@ def format_badge_row(
     if display_width(clean) > max_title:
         clean = ellipsize(clean, max_title)
     pad = max(min_gap, target_width - display_width(prefix) - display_width(clean) - display_width(badge))
-    return f"{prefix}{escape(clean)}{' ' * pad}[dim #71717a]{badge}[/]"
+    return f"{prefix}{escape(clean)}{' ' * pad}[dim]{badge}[/]"

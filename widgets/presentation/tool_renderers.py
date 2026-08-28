@@ -74,7 +74,7 @@ def format_plan_display(plan_items: Any, explanation: str = "") -> Text:
     """Format an update_plan checklist into a unified rich Text renderable."""
     t = Text()
     if explanation:
-        t.append(f"{explanation}\n\n", style="italic #a1a1aa")
+        t.append(f"{explanation}\n\n", style="italic dim")
 
     if isinstance(plan_items, list):
         plan_lines = []
@@ -85,11 +85,11 @@ def format_plan_display(plan_items: Any, explanation: str = "") -> Text:
             status = str(item.get("status") or "pending").lower()
 
             if status == "completed":
-                line = Text("[x] ", style="dim #71717a") + Text(step, style="strike dim #71717a")
+                line = Text("[x] ", style="dim") + Text(step, style="strike dim")
             elif status == "in_progress":
-                line = Text("[>] ", style="#ffffff") + Text(step, style="#ffffff")
+                line = Text("[>] ", style="bold") + Text(step, style="bold")
             else:
-                line = Text("[ ] ", style="dim #a1a1aa") + Text(step, style="dim #a1a1aa")
+                line = Text("[ ] ", style="dim") + Text(step, style="dim")
             plan_lines.append(line)
 
         for i, pl in enumerate(plan_lines):
@@ -97,7 +97,7 @@ def format_plan_display(plan_items: Any, explanation: str = "") -> Text:
             if i < len(plan_lines) - 1:
                 t.append("\n")
     elif isinstance(plan_items, str) and plan_items.strip():
-        t.append(plan_items.strip(), style="#e4e4e7")
+        t.append(plan_items.strip())
 
     return t
 
@@ -112,13 +112,13 @@ def format_ask_user_display(questions: list[dict], answers: dict[int, dict] | di
             t.append("\n\n")
         q_text = str(q.get("question") or "").strip()
         prefix = f"{i + 1}. " if num_questions > 1 else ""
-        t.append(f"{prefix}{q_text}\n", style="#ffffff")
+        t.append(f"{prefix}{q_text}\n", style="bold")
         ans_info = answers.get(i, {})
         ans = ans_info.get("answer", "") if isinstance(ans_info, dict) else str(ans_info or "")
         if ans:
-            t.append(ans, style="#a1a1aa")
+            t.append(ans)
         else:
-            t.append("(No response)", style="italic #71717a")
+            t.append("(No response)", style="italic dim")
     return t
 
 
@@ -126,7 +126,7 @@ def format_manage_shell_display(result_text: str) -> Text:
     """Format manage_shell list output into a monochrome rich Text renderable."""
     raw = (result_text or "").strip()
     if not raw or raw.lower() in ("no tasks active", "no active tasks", "(no active tasks)"):
-        return Text("(No active tasks)", style="#e4e4e7")
+        return Text("(No active tasks)")
 
     t = Text()
     lines = raw.splitlines()
@@ -144,15 +144,15 @@ def format_manage_shell_display(result_text: str) -> Text:
         if m:
             t_id, status, cmd = m.group(1), m.group(2).upper(), m.group(3).strip()
             if status == "RUNNING":
-                task_t = Text("[>] ", style="#ffffff") + Text(f"{t_id}  ", style="bold #ffffff") + Text(cmd, style="#a1a1aa")
+                task_t = Text("[>] ", style="bold") + Text(f"{t_id}  ", style="bold") + Text(cmd)
             else:
-                task_t = Text("[x] ", style="dim #71717a") + Text(f"{t_id}  ", style="dim #71717a") + Text(cmd, style="dim #71717a")
+                task_t = Text("[x] ", style="dim") + Text(f"{t_id}  ", style="dim") + Text(cmd, style="dim")
             task_lines.append(task_t)
         else:
-            task_lines.append(Text(line_clean, style="#e4e4e7"))
+            task_lines.append(Text(line_clean))
 
     if not task_lines:
-        return Text("(No active tasks)", style="#e4e4e7")
+        return Text("(No active tasks)")
 
     for i, tl in enumerate(task_lines):
         t.append(tl)
@@ -165,7 +165,7 @@ def format_manage_subagent_display(result_text: str) -> Text:
     """Format manage_subagent list output into a monochrome rich Text renderable."""
     raw = (result_text or "").strip()
     if not raw or "no subagent sessions found" in raw.lower() or raw.lower() in ("no tasks active", "(no active subagents)"):
-        return Text("(No active subagents)", style="#e4e4e7")
+        return Text("(No active subagents)")
 
     t = Text()
     lines = raw.splitlines()
@@ -191,22 +191,22 @@ def format_manage_subagent_display(result_text: str) -> Text:
             desc = f"{role_cap}: {title}" if title else (role_cap or "(no description)")
             if status == "RUNNING":
                 item_t = (
-                    Text("[>] ", style="#ffffff")
-                    + Text(f"{s_id}  ", style="bold #ffffff")
-                    + Text(desc, style="#a1a1aa")
+                    Text("[>] ", style="bold")
+                    + Text(f"{s_id}  ", style="bold")
+                    + Text(desc)
                 )
             else:
                 item_t = (
-                    Text("[x] ", style="dim #71717a")
-                    + Text(f"{s_id}  ", style="dim #71717a")
-                    + Text(desc, style="dim #71717a")
+                    Text("[x] ", style="dim")
+                    + Text(f"{s_id}  ", style="dim")
+                    + Text(desc, style="dim")
                 )
             subagent_lines.append(item_t)
         else:
-            subagent_lines.append(Text(line_clean, style="#e4e4e7"))
+            subagent_lines.append(Text(line_clean))
 
     if not subagent_lines:
-        return Text("(No active subagents)", style="#e4e4e7")
+        return Text("(No active subagents)")
 
     for i, sl in enumerate(subagent_lines):
         t.append(sl)

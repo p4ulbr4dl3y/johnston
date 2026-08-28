@@ -29,7 +29,7 @@ class WelcomeWidget(Vertical):
         try:
             logo = self.query_one("#welcome-logo", Static)
             if is_compact_width(width, breakpoint=BREAKPOINT_BANNER):
-                logo.update("[bold #ffffff]johnston[/bold #ffffff]")
+                logo.update("[bold]johnston[/bold]")
             else:
                 logo.update(self.FULL_BANNER)
         except Exception:

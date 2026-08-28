@@ -16,8 +16,8 @@ class SessionConflictScreen(BaseSelectionScreen[str]):
         self.session_title = session_title
         items = ["readonly", "steal"]
         options = [
-            "Open read-only [dim #71717a](fork on edit)[/]",
-            "Steal session [dim #71717a](take over)[/]",
+            "Open read-only [dim](fork on edit)[/]",
+            "Steal session [dim](take over)[/]",
         ]
         title = "### **Session is Open in Another Terminal**"
         super().__init__(

@@ -58,7 +58,7 @@ class TestFormatBadgeRow(unittest.TestCase):
     def test_badge_flush_right_at_target_width(self):
         row = format_badge_row("Research codebase", "running • 12s", target_width=40)
         self.assertEqual(visible_len(row), 40)
-        self.assertIn("[dim #71717a]running • 12s[/]", row)
+        self.assertIn("[dim]running • 12s[/]", row)
 
     def test_min_gap_enforced_when_title_too_long(self):
         row = format_badge_row("x" * 100, "done", target_width=20)
@@ -81,7 +81,7 @@ class TestFormatBadgeRow(unittest.TestCase):
         self.assertTrue(row.startswith("● sess one"))
 
     def test_prefix_with_rich_markup_keeps_badge_aligned(self):
-        prefix = "[dim #71717a]└─ [/]"
+        prefix = "[dim]└─ [/]"
         row = format_badge_row("Forked session title", "14 steps", target_width=60, prefix=prefix)
         self.assertEqual(visible_len(row), 60)
         self.assertIn("14 steps", row)

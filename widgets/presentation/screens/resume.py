@@ -99,7 +99,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             else:
                 status_pfx = "  " if has_indicator else ""
 
-            branch_pfx = "[dim #71717a]└─ [/]" if is_fork else ""
+            branch_pfx = "[dim]└─ [/]" if is_fork else ""
             prefix = f"{status_pfx}{branch_pfx}"
             title = str(s.get("title", ""))
             count = s.get("message_count", 0)
@@ -112,8 +112,8 @@ class ResumeScreen(BaseSelectionScreen[str]):
 
     def _format_step2_options(self) -> list[str]:
         return [
-            "Open read-only [dim #71717a](fork on edit)[/]",
-            "Steal session [dim #71717a](take over)[/]",
+            "Open read-only [dim](fork on edit)[/]",
+            "Steal session [dim](take over)[/]",
         ]
 
     def _refresh_options(self) -> None:

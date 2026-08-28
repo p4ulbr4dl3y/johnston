@@ -116,7 +116,7 @@ class CommandSuggestions(HeaderWrapOptionList):
                 display_name = f if display_width(f) <= align_col else ellipsize(f, align_col)
                 pad = max(0, align_col - display_width(display_name))
                 padding_spaces = " " * pad
-                formatted_line = f"{escape(display_name)}{padding_spaces} [dim #71717a]{kind}[/dim #71717a]"
+                formatted_line = f"{escape(display_name)}{padding_spaces} [dim]{kind}[/dim]"
                 self.add_option(formatted_line)
                 if len(matched_files) >= 50:
                     break
@@ -185,7 +185,7 @@ class CommandSuggestions(HeaderWrapOptionList):
                         escaped_desc = escape(clean_desc)
                         pad = max(0, padding - display_width(cmd))
                         padding_spaces = " " * pad
-                        formatted_line = f"{escaped_cmd}{padding_spaces} [dim #71717a]{escaped_desc}[/dim #71717a]"
+                        formatted_line = f"{escaped_cmd}{padding_spaces} [dim]{escaped_desc}[/dim]"
                         self.add_option(formatted_line)
 
                     self.current_matched = matched_cmds

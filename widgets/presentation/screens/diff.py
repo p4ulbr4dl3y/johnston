@@ -49,24 +49,24 @@ class DiffHeader(ResizeDebounceMixin, Static):
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             if width < 52:
                 title_short = escape(ellipsize(self.title_text, 12))
-                left_text = f"[bold #ffffff]Diff[/]  [#71717a]•[/]  [#f4f4f5]{title_short}[/]"
+                left_text = f"[bold]Diff[/]  [dim]•[/]  {title_short}"
             else:
                 max_stat_len = max(8, width - 30)
                 stat = ellipsize(self.stats_summary, max_stat_len)
                 title_short = escape(ellipsize(self.title_text, max(10, width // 4)))
                 left_text = (
-                    f"[bold #ffffff]Diff[/]  [#71717a]•[/]  "
-                    f"[#f4f4f5]{title_short}[/]  "
-                    f"[#71717a]({escape(stat)})[/]"
+                    f"[bold]Diff[/]  [dim]•[/]  "
+                    f"{title_short}  "
+                    f"[dim]({escape(stat)})[/]"
                 )
-            right_text = "[#71717a]esc[/]"
+            right_text = "[dim]esc[/]"
         else:
             left_text = (
-                f"[bold #ffffff]Diff Viewer[/]  [#71717a]•[/]  "
-                f"[#f4f4f5]{escape(self.title_text)}[/]  [#71717a]•[/]  "
-                f"[#71717a]({escape(self.stats_summary)})[/]"
+                f"[bold]Diff Viewer[/]  [dim]•[/]  "
+                f"{escape(self.title_text)}  [dim]•[/]  "
+                f"[dim]({escape(self.stats_summary)})[/]"
             )
-            right_text = f"[#71717a]{esc_label}[/]"
+            right_text = f"[dim]{esc_label}[/]"
 
         table.add_row(left_text, right_text)
         self.update(table)
@@ -128,21 +128,21 @@ class DiffFooter(ResizeDebounceMixin, Static):
 
         if self.current_file:
             display_path = format_relative_path(self.current_file, max_length=max_path_len)
-            left_text = f"[bold #f4f4f5]{escape(display_path)}[/]  [#71717a]({escape(self.current_stats)})[/]"
+            left_text = f"[bold]{escape(display_path)}[/]  [dim]({escape(self.current_stats)})[/]"
         else:
-            left_text = "[dim #71717a]No file selected[/]"
+            left_text = "[dim]No file selected[/]"
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             if width < 52:
-                right_text = "[#71717a]esc: back[/]" if self.compact_view == "diff" else "[#71717a]enter • esc[/]"
+                right_text = "[dim]esc: back[/]" if self.compact_view == "diff" else "[dim]enter • esc[/]"
             elif self.compact_view == "diff":
-                right_text = "[#71717a]esc: files  •  pgup/dn[/]"
+                right_text = "[dim]esc: files  •  pgup/dn[/]"
             else:
-                right_text = "[#71717a]enter: view  •  esc: close[/]"
+                right_text = "[dim]enter: view  •  esc: close[/]"
         elif width >= BREAKPOINT_HINT:
-            right_text = "[#71717a]↑↓: files  •  tab: toggle sidebar  •  pgup/pgdn: scroll[/]"
+            right_text = "[dim]↑↓: files  •  tab: toggle sidebar  •  pgup/pgdn: scroll[/]"
         else:
-            right_text = "[#71717a]↑↓: files  •  tab: sidebar[/]"
+            right_text = "[dim]↑↓: files  •  tab: sidebar[/]"
 
         table.add_row(left_text, right_text)
         self.update(table)
@@ -210,7 +210,7 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
                     short_name = short_name[: max_name_len - 1] + "…"
 
             spaces = " " * max(1, target_width - display_width(short_name) - display_width(stat_plain))
-            stat_markup = f"[#22c55e]+{added}[/][dim #71717a]/[/][#ef4444]-{deleted}[/]"
+            stat_markup = f"[green]+{added}[/][dim]/[/][red]-{deleted}[/]"
             options.append(f"{escape(short_name)}{spaces}{stat_markup}")
         return options
 
@@ -288,7 +288,7 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
                 with Vertical(id="diff-content-container"):
                     if not self.diff_items:
                         with Vertical(id="diff-empty-container"):
-                            yield Static("[dim #71717a]No workspace changes found.[/]", id="diff-empty-label")
+                            yield Static("[dim]No workspace changes found.[/]", id="diff-empty-label")
                     else:
                         with ToolScrollBox(id="diff-scroll-box"):
                             yield Static(id="diff-content-view")
@@ -349,7 +349,7 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
     def _render_empty_search(self) -> None:
         try:
             content_view = self.query_one("#diff-content-view", Static)
-            content_view.update("[dim #71717a]No matching files found.[/]")
+            content_view.update("[dim]No matching files found.[/]")
             footer = self.query_one("#diff-footer", DiffFooter)
             footer.update_info("", "no matches")
         except Exception:

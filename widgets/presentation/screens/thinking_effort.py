@@ -16,7 +16,7 @@ class ThinkingEffortScreen(BaseSelectionScreen[str]):
         options = []
         for item, label, hint in items_with_hints:
             prefix = f"{status_tag('ACTIVE')} " if item == current else "  "
-            options.append(f"{prefix}{label} [dim #71717a]({hint})[/]")
+            options.append(f"{prefix}{label} [dim]({hint})[/]")
         super().__init__(
             "### **Select Thinking Effort**",
             options,

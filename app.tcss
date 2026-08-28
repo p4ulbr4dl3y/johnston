@@ -153,6 +153,7 @@ WelcomeWidget {
 
 .thinking-header-expandable:hover {
     color: $fg-primary;
+    background: $bg-hover;
 }
 
 .thinking-widget Markdown, .thinking-content {
@@ -190,6 +191,7 @@ WelcomeWidget {
 
 .tool-header-expandable:hover {
     color: $fg-primary;
+    background: $bg-hover;
 }
 
 .tool-content, .tool-content-md {

@@ -43,7 +43,7 @@ class ForkScreen(BaseSelectionScreen[int]):
             clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
             opt_text = clean or "(empty message)"
             options.append(escape(ellipsize(opt_text, max(10, target_width - 2))))
-        options.append("Current state [dim #71717a](keep full history)[/]")
+        options.append("Current state [dim](keep full history)[/]")
         return options
 
     def _refresh_options(self) -> None:
