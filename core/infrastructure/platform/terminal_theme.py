@@ -5,8 +5,8 @@ from __future__ import annotations
 import math
 import os
 import re
-import select
 import sys
+import time
 from typing import Optional, Tuple
 
 BASE_LIFT = 0.06
@@ -115,8 +115,73 @@ def compute_adaptive_border(terminal_bg: str | None = None) -> str:
     return lifted_from_terminal_bg(terminal_bg, RULE_BASE_LIFT, 0.0, 0.0)
 
 
+def parse_osc_palette(resp: str | bytes) -> tuple[str | None, str | None]:
+    """Parse OSC 11 (background) and OSC 10 (foreground) RGB responses."""
+    resp_bytes = resp.encode("latin1", errors="ignore") if isinstance(resp, str) else resp
+    bg = None
+    fg = None
+
+    bg_m = re.search(rb"11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)", resp_bytes)
+    if bg_m:
+        r, g, b = (x.decode(errors="ignore") for x in bg_m.groups())
+        bg = f"#{r[:2].lower()}{g[:2].lower()}{b[:2].lower()}"
+
+    fg_m = re.search(rb"10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)", resp_bytes)
+    if fg_m:
+        r, g, b = (x.decode(errors="ignore") for x in fg_m.groups())
+        fg = f"#{r[:2].lower()}{g[:2].lower()}{b[:2].lower()}"
+
+    return bg, fg
+
+
+def _query_windows_palette(timeout: float) -> tuple[str | None, str | None]:
+    """Query OSC 10/11 palette on Windows via msvcrt input polling."""
+    import msvcrt
+
+    sys.stdout.write("\x1b]11;?\x1b\\\x1b]10;?\x1b\\")
+    sys.stdout.flush()
+
+    resp = ""
+    start = time.monotonic()
+    while time.monotonic() - start < timeout:
+        if msvcrt.kbhit():
+            ch = msvcrt.getwch()
+            resp += ch
+            if resp.count("\x1b\\") >= 2 or resp.count("\x07") >= 2:
+                break
+        else:
+            time.sleep(0.005)
+    return parse_osc_palette(resp)
+
+
+def _query_posix_palette(timeout: float) -> tuple[str | None, str | None]:
+    """Query OSC 10/11 palette on POSIX systems via termios / select."""
+    import select
+    import termios
+    import tty
+
+    fd = sys.stdin.fileno()
+    old_attr = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        sys.stdout.write("\x1b]11;?\x1b\\\x1b]10;?\x1b\\")
+        sys.stdout.flush()
+
+        resp = b""
+        while select.select([fd], [], [], timeout)[0]:
+            chunk = os.read(fd, 128)
+            if not chunk:
+                break
+            resp += chunk
+            if resp.count(b"\x1b\\") >= 2 or resp.count(b"\x07") >= 2:
+                break
+        return parse_osc_palette(resp)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_attr)
+
+
 def query_terminal_palette(timeout: float = 0.04) -> tuple[str | None, str | None]:
-    """Query terminal for OSC 11 background and OSC 10 foreground colors safely."""
+    """Query terminal for OSC 11 background and OSC 10 foreground colors cross-platform."""
     global _CACHED_TERMINAL_COLORS
     if _CACHED_TERMINAL_COLORS is not None:
         return _CACHED_TERMINAL_COLORS
@@ -139,41 +204,10 @@ def query_terminal_palette(timeout: float = 0.04) -> tuple[str | None, str | Non
         return _CACHED_TERMINAL_COLORS
 
     try:
-        import termios
-        import tty
-
-        fd = sys.stdin.fileno()
-        old_attr = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            # Send OSC 11 query for background, OSC 10 for foreground
-            sys.stdout.write("\x1b]11;?\x1b\\\x1b]10;?\x1b\\")
-            sys.stdout.flush()
-
-            resp = b""
-            while select.select([fd], [], [], timeout)[0]:
-                chunk = os.read(fd, 128)
-                if not chunk:
-                    break
-                resp += chunk
-                if resp.count(b"\x1b\\") >= 2 or resp.count(b"\x07") >= 2:
-                    break
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_attr)
-
-        bg = None
-        fg = None
-        bg_m = re.search(rb"11;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)", resp)
-        if bg_m:
-            r, g, b = (x.decode() for x in bg_m.groups())
-            bg = f"#{r[:2].lower()}{g[:2].lower()}{b[:2].lower()}"
-
-        fg_m = re.search(rb"10;rgb:([0-9a-fA-F]+)/([0-9a-fA-F]+)/([0-9a-fA-F]+)", resp)
-        if fg_m:
-            r, g, b = (x.decode() for x in fg_m.groups())
-            fg = f"#{r[:2].lower()}{g[:2].lower()}{b[:2].lower()}"
-
-        _CACHED_TERMINAL_COLORS = (bg, fg)
+        if sys.platform == "win32":
+            _CACHED_TERMINAL_COLORS = _query_windows_palette(timeout)
+        else:
+            _CACHED_TERMINAL_COLORS = _query_posix_palette(timeout)
         return _CACHED_TERMINAL_COLORS
     except Exception:
         _CACHED_TERMINAL_COLORS = (None, None)
