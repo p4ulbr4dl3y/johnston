@@ -63,8 +63,9 @@ Credential resolution precedence:
     "cb_cooldown_seconds": 30.0
   },
   "tools": {
-    "shell_default_timeout": 120,
-    "shell_max_cap": 600,
+    "shell_default_timeout": 120.0,
+    "shell_max_cap": 600.0,
+    "shell_output_chars": 4000,
     "max_tool_output_chars": 8000,
     "max_tool_payload_bytes": 10485760,
     "mcp_call_timeout": 120.0,
@@ -88,6 +89,15 @@ Credential resolution precedence:
   }
 }
 ```
+
+## Environment Variable Overrides
+All section parameters can be overridden at runtime via environment variables:
+- `JOHNSTON_MAX_CONCURRENT_SUBAGENTS`: Concurrency cap for background subagents.
+- `JOHNSTON_STREAM_TIMEOUT` / `JOHNSTON_CHUNK_TIMEOUT`: HTTP streaming timeouts.
+- `JOHNSTON_MAX_RETRIES` / `JOHNSTON_RETRY_DELAY`: LLM provider retry policy.
+- `JOHNSTON_SHELL_TIMEOUT` / `JOHNSTON_SHELL_MAX_CAP`: Shell command timeouts.
+- `JOHNSTON_SHELL_OUTPUT_CHARS` / `JOHNSTON_MAX_TOOL_OUTPUT_CHARS`: Output truncation caps.
+- `JOHNSTON_SANDBOX_ENABLED`: Enable/disable OS-level process sandboxing (`true`/`false`).
 
 ## Security & Sandbox Policy
 - **Sandbox Mode**: When enabled, enforces strict filesystem and network boundaries, preventing unauthorized mutations and blocking access to sensitive config files (`secrets.json`, `config.json`).
