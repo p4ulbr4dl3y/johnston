@@ -15,7 +15,7 @@ class ThemeScreen(BaseSelectionScreen[str]):
         self.initial_theme = current
         self._preview_timer = None
         self._pending_theme = None
-        themes = theme_manager.list_themes()
+        themes = sorted(theme_manager.list_themes(), key=lambda t: not t.dark)
         items = [t.name for t in themes]
         options = []
         for t in themes:
