@@ -13,6 +13,7 @@ from core.domain.policies.messages import (
     count_history_user_turns,
     drop_stale_system_notes,
     find_visible_user_cutoff,
+    is_ui_visible_user_message,
 )
 from core.infrastructure.storage.session_store import SessionStore
 
@@ -116,9 +117,13 @@ async def new_session(
     new_id = sm.generate_session_id()
     sm.create_main(new_id)
 
-    agent.clear_history()
-    if hasattr(agent, "role"):
-        agent.role = "worker"
+    if agent is not None:
+        if hasattr(agent, "clear_history"):
+            agent.clear_history()
+        elif hasattr(agent, "history"):
+            agent.history = []
+        if hasattr(agent, "role"):
+            agent.role = "worker"
     return new_id
 
 
@@ -201,6 +206,7 @@ async def get_rewind_git_stats(
     user_msgs: list[tuple[int, str]],
     project_path: str | None,
     checkpoint_manager: Optional[Any] = None,
+    session: Optional[Any] = None,
 ) -> list[RewindEntry]:
     """Fetch git-checkpoint stats for each user message in the rewind list.
 
@@ -220,6 +226,19 @@ async def get_rewind_git_stats(
 
     if current_session_id and checkpoints_enabled:
         seq_indices = list(range(len(user_msgs)))
+        scoped_files_map: Optional[dict[int, list[str]]] = None
+
+        if session and getattr(session, "messages", None):
+            user_events = [m for m in session.messages if is_ui_visible_user_message(m)]
+            has_tracking = any("touched_files" in u for u in user_events)
+            if has_tracking:
+                scoped_files_map = {}
+                for seq_idx in seq_indices:
+                    f_set = set()
+                    for j in range(seq_idx, len(user_events)):
+                        f_set.update(user_events[j].get("touched_files") or [])
+                    scoped_files_map[seq_idx] = sorted(f_set)
+
         try:
             details_map = await asyncio.wait_for(
                 asyncio.to_thread(
@@ -227,6 +246,7 @@ async def get_rewind_git_stats(
                     current_session_id,
                     seq_indices,
                     project_path=project_path,
+                    scoped_files=scoped_files_map,
                 ),
                 timeout=3.0,
             )
@@ -252,6 +272,7 @@ async def get_session_diff(
     message_index: Optional[int] = None,
     project_path: str | None = None,
     checkpoint_manager: Optional[Any] = None,
+    scoped_files: Optional[list[str]] = None,
 ) -> list[tuple[str, str, int, int]]:
     """Fetch git-checkpoint full diff between checkpoint and current workspace.
 
@@ -279,6 +300,7 @@ async def get_session_diff(
                 current_session_id,
                 message_index,
                 project_path=project_path,
+                scoped_files=scoped_files,
             ),
             timeout=5.0,
         )
@@ -395,7 +417,7 @@ def rewind_session(
         # messages in history, so only the tail can be truncated by index.
         # A selection inside the compacted region cannot be restored from
         # history and is rolled back to a clean slate.
-        real_tail = count_history_user_turns(agent.history)
+        real_tail = count_history_user_turns(agent.history) if (agent and hasattr(agent, "history")) else 0
         tail_start = len(user_msgs) - real_tail
         if seq_idx >= tail_start:
             truncate_idx = max(0, seq_idx - tail_start)
@@ -409,6 +431,17 @@ def rewind_session(
             elif hasattr(agent, "history"):
                 agent.history = []
         _reset_token_counters(agent, reset_context=False)
+
+    # Collect touched files to restore before truncating transcript
+    files_to_restore: Optional[list[str]] = None
+    if session and getattr(session, "messages", None):
+        user_events = [m for m in session.messages if is_ui_visible_user_message(m)]
+        has_tracking = any("touched_files" in u for u in user_events)
+        if has_tracking:
+            f_set = set()
+            for j in range(seq_idx, len(user_events)):
+                f_set.update(user_events[j].get("touched_files") or [])
+            files_to_restore = sorted(f_set)
 
     # Store transcript: drop events from the selected turn onward so a later
     # /resume does not resurrect rolled-back turns.
@@ -438,7 +471,11 @@ def rewind_session(
                 cm = checkpoint_manager or get_checkpoint_manager()
                 if restore_git:
                     await asyncio.to_thread(
-                        cm.restore_checkpoint, curr_sid, seq_idx, project_path=project_path
+                        cm.restore_checkpoint,
+                        curr_sid,
+                        seq_idx,
+                        project_path=project_path,
+                        files_to_restore=files_to_restore,
                     )
                 await asyncio.to_thread(
                     cm.purge_checkpoints_after, curr_sid, seq_idx, project_path=project_path
@@ -449,7 +486,8 @@ def rewind_session(
         git_restore_task = asyncio.create_task(_restore_git_bg())
         # Kept on the agent so a follow-up rewind can chain onto it and app
         # shutdown can cancel/await it.
-        agent.rewind_git_restore_task = git_restore_task
+        if agent is not None:
+            agent.rewind_git_restore_task = git_restore_task
 
     refresh_footer_cb()
     save_session_cb()

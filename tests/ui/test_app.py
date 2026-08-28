@@ -26,6 +26,9 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.slow
     async def test_chat_app_flow(self):
         app = JohnstonApp()
+        from core.base_provider import BaseAgent
+
+        app.agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
         async with app.run_test() as pilot:
             chat_input = app.query_one("#message-input", ChatInput)
             chat_input.focus()
@@ -108,6 +111,8 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(isinstance(app.screen, SubagentsScreen))
 
             # 9. Test role toggle via Tab
+            chat_input.focus()
+            await pilot.pause(0.1)
             self.assertEqual(getattr(app.agent, "role", "worker"), "worker")
             await pilot.press("tab")
             await pilot.pause(0.2)

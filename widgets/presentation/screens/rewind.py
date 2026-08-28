@@ -316,9 +316,14 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         diff_items = []
         if self.session_id:
             try:
-                diff_items = get_checkpoint_manager().get_checkpoint_diff(
-                    self.session_id, seq_idx, project_path=self.project_path
-                )
+                cm = get_checkpoint_manager()
+                if cm:
+                    diff_items = cm.get_checkpoint_diff(
+                        self.session_id,
+                        seq_idx,
+                        project_path=self.project_path,
+                        scoped_files=entry.changed_files if entry.changed_files else None,
+                    )
             except Exception:
                 diff_items = []
 

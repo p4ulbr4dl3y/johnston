@@ -251,19 +251,28 @@ class MessageFlowMixin:
                 )
             task_log = getattr(task, "log_path", None)
 
-            msg = format_background_notification(
-                "shell",
-                command_str,
-                task_id,
-                truncate_output(
-                    result,
-                    max_chars=4000,
-                    tool_name="shell",
-                    from_end=True,
-                    save_log=False,
-                    log_path=task_log,
-                ),
+            body = truncate_output(
+                result,
+                max_chars=4000,
+                tool_name="shell",
+                from_end=True,
+                save_log=False,
+                log_path=task_log,
             )
+
+            # Surface the terminal state so the model can distinguish a failed or
+            # aborted background command from a successful one (the raw output
+            # alone is ambiguous — e.g. a command that exits 3 with clean stdout).
+            task_status = getattr(task, "status", None)
+            status_val = task_status.value if hasattr(task_status, "value") else ""
+            exit_code = getattr(task, "exit_code", None)
+            if status_val in ("error", "killed") or (exit_code not in (None, 0)):
+                state_hint = (
+                    f"[exit code: {exit_code}]" if exit_code is not None else f"[status: {status_val}]"
+                )
+                body = f"{state_hint}\n{body}"
+
+            msg = format_background_notification("shell", command_str, task_id, body)
             curr_sid = getattr(self, "current_session_id", None)
             if self.is_generating:
                 self.message_queue.append((msg, False, None, curr_sid))

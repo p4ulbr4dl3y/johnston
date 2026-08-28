@@ -187,18 +187,22 @@ class ShellTask(BaseTask):
                 self.exit_code = exit_code
                 self.completed_at = time.time()
 
+                # Mark the terminal status BEFORE notifying subscribers so the
+                # completion callback observes the real final status (error/killed)
+                # instead of a stale RUNNING state. Previously the callback could
+                # read status= running and repaint a failed task card as "done".
+                self._mark_terminated(
+                    TaskStatus.KILLED
+                    if self.was_killed
+                    else (TaskStatus.COMPLETED if exit_code == 0 else TaskStatus.ERROR)
+                )
+
                 # Background tasks: announce completion via modal notify / callback.
                 if self.is_background and on_completed is not None:
                     try:
                         on_completed(self.task_id, self.command, self.output.formatted())
                     except Exception:
                         pass
-
-                self._mark_terminated(
-                    TaskStatus.KILLED
-                    if self.was_killed
-                    else (TaskStatus.COMPLETED if exit_code == 0 else TaskStatus.ERROR)
-                )
 
         self.read_task = asyncio.create_task(_read())
         return self.read_task

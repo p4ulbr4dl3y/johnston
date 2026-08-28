@@ -169,10 +169,12 @@ class ShellTool(BaseTool):
         target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         if target_widget is not None:
             task.add_listener(target_widget.append_shell_output)
-        _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
         task.is_background = True
+        # Open the log BEFORE attaching so the widget/registry receive the real
+        # log path (task.log_path is only populated by open_log()).
         task.open_log()
+        _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path)
         ctx.add_background_task(task)
         task.start_reading(on_completed=callback)
 

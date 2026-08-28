@@ -282,11 +282,48 @@ class GitCheckpointManager:
                 return None
 
     @classmethod
+    def finalize_turn(
+        cls,
+        session_id: str,
+        message_index: int,
+        project_path: Optional[str] = None,
+    ) -> list[str]:
+        """Captures files modified during the turn compared to the start checkpoint."""
+        shadow_dir, cwd = cls._get_shadow_dir(project_path)
+        with cls._get_lock(cwd):
+            if not cls.is_git_repo(cwd):
+                return []
+
+            cls._ensure_shadow_exclude(shadow_dir)
+            ref_name = cls.get_ref_name(session_id, message_index)
+            rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=2.0)
+            if rev_res.returncode != 0:
+                return []
+            commit_sha = rev_res.stdout.strip()
+
+            with cls._shadow_index_env(shadow_dir, cwd) as env:
+                add_res = run_git(["add", "-A"], cwd=cwd, env=env, timeout=30.0)
+                if add_res.returncode != 0:
+                    return []
+
+                diff_res = run_git(
+                    ["-c", "core.quotepath=off", "diff", "--cached", "--name-only", commit_sha],
+                    cwd=cwd,
+                    env=env,
+                    timeout=5.0,
+                )
+                if diff_res.returncode != 0:
+                    return []
+
+                return [f.strip() for f in diff_res.stdout.splitlines() if f.strip()]
+
+    @classmethod
     def restore_checkpoint(
         cls,
         session_id: str,
         message_index: int,
         project_path: Optional[str] = None,
+        files_to_restore: Optional[list[str]] = None,
     ) -> bool:
         """Restores repository working tree state to saved checkpoint."""
         shadow_dir, cwd = cls._get_shadow_dir(project_path)
@@ -311,6 +348,54 @@ class GitCheckpointManager:
                     break
 
             env = cls._base_shadow_env(shadow_dir, cwd)
+
+            if files_to_restore is not None:
+                if not files_to_restore:
+                    return True
+                try:
+                    existing_in_cp = set()
+                    ls_res = run_git(
+                        ["-c", "core.quotepath=off", "ls-tree", "-r", "--name-only", commit_sha, "--", *files_to_restore],
+                        cwd=cwd,
+                        env=env,
+                        timeout=10.0,
+                    )
+                    if ls_res.returncode == 0:
+                        for f in ls_res.stdout.splitlines():
+                            f = f.strip()
+                            if f:
+                                existing_in_cp.add(f)
+
+                    to_checkout = [f for f in files_to_restore if f in existing_in_cp]
+                    to_remove = [f for f in files_to_restore if f not in existing_in_cp]
+
+                    if to_checkout:
+                        res_co = run_git(
+                            ["checkout", commit_sha, "--", *to_checkout],
+                            cwd=cwd,
+                            env=env,
+                            timeout=30.0,
+                        )
+                        if res_co.returncode != 0:
+                            return False
+
+                    for f in to_remove:
+                        abs_p = os.path.join(cwd, f)
+                        if os.path.exists(abs_p) or os.path.islink(abs_p):
+                            try:
+                                if os.path.isdir(abs_p) and not os.path.islink(abs_p):
+                                    import shutil
+                                    shutil.rmtree(abs_p, ignore_errors=True)
+                                else:
+                                    os.remove(abs_p)
+                            except Exception:
+                                pass
+
+                    with cls._shadow_index_env(shadow_dir, cwd) as tmp_env:
+                        run_git(["add", "-A"], cwd=cwd, env=tmp_env, timeout=30.0)
+                    return True
+                except Exception:
+                    return False
 
             try:
                 res1 = run_git(["read-tree", "--reset", "-u", commit_sha], cwd=cwd, env=env, timeout=60.0)
@@ -426,6 +511,7 @@ class GitCheckpointManager:
         session_id: str,
         message_indices: list[int],
         project_path: Optional[str] = None,
+        scoped_files: Optional[dict[int, list[str]]] = None,
     ) -> dict[int, Optional[tuple[str, list[str]]]]:
         """Calculates line changes and changed files between checkpoints and current workspace.
 
@@ -461,6 +547,13 @@ class GitCheckpointManager:
                             ref_map[parts[1]] = parts[0]
 
                 def _fetch_diff_for_idx(msg_idx: int) -> tuple[int, Optional[tuple[str, list[str]]]]:
+                    if scoped_files is not None:
+                        paths = scoped_files.get(msg_idx)
+                        if paths is not None and not paths:
+                            return msg_idx, ("no changes", [])
+                    else:
+                        paths = None
+
                     ref_name = cls.get_ref_name(session_id, msg_idx)
                     commit_sha = ref_map.get(ref_name)
                     if not commit_sha:
@@ -469,8 +562,12 @@ class GitCheckpointManager:
                             return msg_idx, None
                         commit_sha = rev_res.stdout.strip()
 
+                    cmd = ["-c", "core.quotepath=off", "diff", "--cached", "--numstat", commit_sha]
+                    if paths is not None:
+                        cmd.extend(["--", *paths])
+
                     diff_res = run_git(
-                        ["-c", "core.quotepath=off", "diff", "--cached", "--numstat", commit_sha],
+                        cmd,
                         cwd=cwd,
                         env=env,
                         timeout=5.0,
@@ -550,12 +647,16 @@ class GitCheckpointManager:
         session_id: str,
         message_index: Optional[int] = None,
         project_path: Optional[str] = None,
+        scoped_files: Optional[list[str]] = None,
     ) -> list[tuple[str, str, int, int]]:
         """Calculates full diff between a session checkpoint and the current workspace.
 
         If message_index is None, finds the earliest available checkpoint for the session.
         Returns a list of tuples: (file_path, diff_text, added_lines, deleted_lines).
         """
+        if scoped_files is not None and not scoped_files:
+            return []
+
         shadow_dir, cwd = cls._get_shadow_dir(project_path)
         with cls._get_lock(cwd):
             if not cls.is_git_repo(cwd):
@@ -601,8 +702,12 @@ class GitCheckpointManager:
                 if add_res.returncode != 0:
                     return []
 
+                cmd = ["-c", "core.quotepath=off", "diff", "--cached", target_commit]
+                if scoped_files is not None:
+                    cmd.extend(["--", *scoped_files])
+
                 diff_res = run_git(
-                    ["-c", "core.quotepath=off", "diff", "--cached", target_commit],
+                    cmd,
                     cwd=cwd,
                     env=env,
                     timeout=10.0,

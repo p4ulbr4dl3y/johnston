@@ -21,11 +21,21 @@ class CheckpointPort(Protocol):
         """Creates a shadow git commit containing tracked & untracked working tree state."""
         ...
 
+    def finalize_turn(
+        self,
+        session_id: str,
+        message_index: int,
+        project_path: Optional[str] = None,
+    ) -> list[str]:
+        """Captures files modified during the turn compared to the start checkpoint."""
+        ...
+
     def restore_checkpoint(
         self,
         session_id: str,
         message_index: int,
         project_path: Optional[str] = None,
+        files_to_restore: Optional[list[str]] = None,
     ) -> bool:
         """Restores repository working tree state to saved checkpoint."""
         ...
@@ -44,6 +54,7 @@ class CheckpointPort(Protocol):
         session_id: str,
         message_indices: list[int],
         project_path: Optional[str] = None,
+        scoped_files: Optional[dict[int, list[str]]] = None,
     ) -> dict[int, Optional[tuple[str, list[str]]]]:
         """Calculates line changes and changed files between checkpoints and current workspace."""
         ...
@@ -53,6 +64,7 @@ class CheckpointPort(Protocol):
         session_id: str,
         message_index: Optional[int] = None,
         project_path: Optional[str] = None,
+        scoped_files: Optional[list[str]] = None,
     ) -> list[tuple[str, str, int, int]]:
         """Calculates full diff between a session checkpoint and current workspace."""
         ...

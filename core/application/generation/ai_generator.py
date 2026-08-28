@@ -18,6 +18,7 @@ from typing import Any, Callable, Optional
 
 from core.application.session.stream import record_subagent_step
 from core.domain.defaults.errors import parse_tool_result_step
+from core.domain.ports.checkpoint import get_checkpoint_manager
 
 logger = logging.getLogger(__name__)
 
@@ -141,16 +142,14 @@ async def _await_pending_git_restore(agent: Any) -> None:
 async def _create_git_checkpoint_async(
     canvas: GenCanvas,
     session_id: Optional[str],
-    project_path: Optional[str],
+    project_path: Optional[str] = None,
     checkpoint_manager: Optional[Any] = None,
-) -> None:
-    """Persist the session and snapshot a shadow git checkpoint for the newest user message."""
-    from core.domain.ports.checkpoint import get_checkpoint_manager
-
+) -> int:
     cm = checkpoint_manager or get_checkpoint_manager()
+    msg_idx = -1
     try:
         await canvas.save_session()
-        if session_id:
+        if session_id and cm:
             if getattr(canvas, "get_user_messages_count", None) is not None and callable(canvas.get_user_messages_count):
                 user_count = canvas.get_user_messages_count()
             else:
@@ -163,6 +162,26 @@ async def _create_git_checkpoint_async(
                 )
     except Exception as e:  # noqa: BLE001 - checkpoint best-effort, never fatal
         logger.warning("Git checkpoint creation failed: %s", e)
+    return msg_idx
+
+
+async def _finalize_git_turn_async(
+    session_id: Optional[str],
+    msg_idx: int,
+    user_event: dict,
+    project_path: Optional[str] = None,
+    checkpoint_manager: Optional[Any] = None,
+) -> None:
+    if not session_id or msg_idx < 0:
+        return
+    cm = checkpoint_manager or get_checkpoint_manager()
+    if not cm or not hasattr(cm, "finalize_turn"):
+        return
+    try:
+        touched = await asyncio.to_thread(cm.finalize_turn, session_id, msg_idx, project_path=project_path)
+        user_event["touched_files"] = touched
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Git checkpoint turn finalization failed: %s", e)
 
 
 async def generate_ai_response(
@@ -198,10 +217,14 @@ async def generate_ai_response(
 
     await _await_pending_git_restore(agent)
     if checkpoint_manager is not None:
-        await _create_git_checkpoint_async(canvas, session_id, project_path, checkpoint_manager=checkpoint_manager)
+        active_msg_idx = await _create_git_checkpoint_async(
+            canvas, session_id, project_path, checkpoint_manager=checkpoint_manager
+        )
     else:
-        await _create_git_checkpoint_async(canvas, session_id, project_path)
+        active_msg_idx = await _create_git_checkpoint_async(canvas, session_id, project_path)
 
+    active_user_event = user_event
+    has_tool_calls = False
     thinking_handle: Any = None
     bot_handle: Any = None
     tool_handle: Any = None
@@ -220,6 +243,11 @@ async def generate_ai_response(
             val4 = step[4] if len(step) > 4 else None
 
             if event_type == "queued_user_message":
+                if has_tool_calls and session_id:
+                    await _finalize_git_turn_async(
+                        session_id, active_msg_idx, active_user_event, project_path, checkpoint_manager
+                    )
+                    has_tool_calls = False
                 # Queued prompts are recorded as user msgs, rendered to the UI
                 # and given their own git checkpoint.
                 q_msg = val1
@@ -233,12 +261,15 @@ async def generate_ai_response(
                     q_event["attachments_count"] = len(q_atts)
                 session.add_event(q_event)
                 transcript_acc[0] = ""
+                active_user_event = q_event
                 if q_show:
                     # Prefer the short display text (e.g. "/skill-name") over the full
                     # prompt so skills invoked mid-generation render the command in UI.
                     await canvas.add_user_message(q_display_text or q_msg, q_atts)
                     await _await_pending_git_restore(agent)
-                    await _create_git_checkpoint_async(canvas, session_id, project_path)
+                    active_msg_idx = await _create_git_checkpoint_async(
+                        canvas, session_id, project_path, checkpoint_manager=checkpoint_manager
+                    )
             else:
                 record_subagent_step(step, session, transcript_acc)
 
@@ -258,6 +289,7 @@ async def generate_ai_response(
                     thinking_handle.finish_thinking(duration, val2)
                 thinking_handle = None
             elif event_type == "tool":
+                has_tool_calls = True
                 if bot_handle:
                     bot_handle.flush_pending_stream()
                     content_str = getattr(bot_handle, "content", "")
@@ -371,6 +403,10 @@ async def generate_ai_response(
                 bot_handle.remove()
             except Exception:  # noqa: BLE001
                 pass
+        if has_tool_calls and session_id:
+            await _finalize_git_turn_async(
+                session_id, active_msg_idx, active_user_event, project_path, checkpoint_manager
+            )
         try:
             await save_db.flush()
         except Exception:  # noqa: BLE001

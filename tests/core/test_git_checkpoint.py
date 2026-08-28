@@ -309,6 +309,114 @@ class TestGitCheckpointManager(unittest.TestCase):
         set_default_checkpoint_manager(GitCheckpointManager)
         self.assertIs(get_checkpoint_manager(), GitCheckpointManager)
 
+    def test_finalize_turn_detects_changes(self):
+        repo_path = self._init_git_repo()
+        sid = "session_turn_finalize"
+
+        sha0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(sha0)
+
+        # No changes initially
+        no_changes = GitCheckpointManager.finalize_turn(sid, 0, project_path=repo_path)
+        self.assertEqual(no_changes, [])
+
+        # Modify a file and create a new file
+        with open(os.path.join(repo_path, "initial.txt"), "w") as f:
+            f.write("turn modified content\n")
+        with open(os.path.join(repo_path, "turn_new.txt"), "w") as f:
+            f.write("new file in turn\n")
+
+        touched = GitCheckpointManager.finalize_turn(sid, 0, project_path=repo_path)
+        self.assertIn("initial.txt", touched)
+        self.assertIn("turn_new.txt", touched)
+
+    def test_get_diff_details_batch_with_scoped_files(self):
+        repo_path = self._init_git_repo()
+        sid = "session_scoped_batch"
+
+        sha0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(sha0)
+
+        # Modify initial.txt and external.txt
+        with open(os.path.join(repo_path, "initial.txt"), "w") as f:
+            f.write("agent modified\n")
+        with open(os.path.join(repo_path, "external.txt"), "w") as f:
+            f.write("user modified\n")
+
+        # When scoped_files has empty list for index 0 -> reports 'no changes'
+        res_empty = GitCheckpointManager.get_diff_details_batch(
+            sid, [0], project_path=repo_path, scoped_files={0: []}
+        )
+        self.assertEqual(res_empty[0], ("no changes", []))
+
+        # When scoped_files specifies only initial.txt -> only initial.txt is reported
+        res_scoped = GitCheckpointManager.get_diff_details_batch(
+            sid, [0], project_path=repo_path, scoped_files={0: ["initial.txt"]}
+        )
+        self.assertIn("1 file", res_scoped[0][0])
+        self.assertEqual(res_scoped[0][1], ["initial.txt"])
+
+    def test_restore_checkpoint_selective_preserves_external_files(self):
+        repo_path = self._init_git_repo()
+        sid = "session_selective_restore"
+
+        sha0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(sha0)
+
+        # Agent edits code_file.txt and creates agent_new.txt
+        code_file = os.path.join(repo_path, "initial.txt")
+        with open(code_file, "w") as f:
+            f.write("agent edits\n")
+        agent_new = os.path.join(repo_path, "agent_new.txt")
+        with open(agent_new, "w") as f:
+            f.write("created by agent\n")
+
+        # User edits external_file.txt
+        ext_file = os.path.join(repo_path, "user_external.txt")
+        with open(ext_file, "w") as f:
+            f.write("user manual work\n")
+
+        # Selective restore targeting only agent files
+        restored = GitCheckpointManager.restore_checkpoint(
+            sid, 0, project_path=repo_path, files_to_restore=["initial.txt", "agent_new.txt"]
+        )
+        self.assertTrue(restored)
+
+        # initial.txt is reverted to checkpoint 0
+        with open(code_file, "r") as f:
+            self.assertEqual(f.read(), "initial content\n")
+
+        # agent_new.txt is deleted
+        self.assertFalse(os.path.exists(agent_new))
+
+        # user_external.txt is PRESERVED!
+        self.assertTrue(os.path.exists(ext_file))
+        with open(ext_file, "r") as f:
+            self.assertEqual(f.read(), "user manual work\n")
+
+    def test_get_checkpoint_diff_with_scoped_files(self):
+        repo_path = self._init_git_repo()
+        sid = "session_scoped_diff"
+
+        GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        with open(os.path.join(repo_path, "initial.txt"), "w") as f:
+            f.write("new content\n")
+        with open(os.path.join(repo_path, "other.txt"), "w") as f:
+            f.write("other content\n")
+
+        # Scoped to only initial.txt
+        diff_items = GitCheckpointManager.get_checkpoint_diff(
+            sid, 0, project_path=repo_path, scoped_files=["initial.txt"]
+        )
+        self.assertEqual(len(diff_items), 1)
+        self.assertEqual(diff_items[0][0], "initial.txt")
+
+        # Scoped to empty list
+        diff_empty = GitCheckpointManager.get_checkpoint_diff(
+            sid, 0, project_path=repo_path, scoped_files=[]
+        )
+        self.assertEqual(diff_empty, [])
+
 
 if __name__ == "__main__":
     unittest.main()

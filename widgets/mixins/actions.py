@@ -49,11 +49,16 @@ class ActionsMixin:
     def action_background_all(self) -> None:
         """Background all running foreground shell tasks.
 
-        Tool cards are left as-is: an open expansion keeps streaming live output
-        until the task completes and the completion callback repaints it.
+        Mirrors the session scoping used by manage_shell and the tasks screen:
+        when a session is active, only its own tasks are affected. Tool cards are
+        left as-is: an open expansion keeps streaming live output until the task
+        completes and the completion callback repaints it.
         """
+        from core.infrastructure.tasks.manage import filter_to_session
+
         count = 0
         shell_tasks = [t for t in self.task_manager if getattr(t, "kind", "") == "shell"]
+        shell_tasks = filter_to_session(shell_tasks, getattr(self, "current_session_id", None))
         for t in list(shell_tasks):
             if getattr(t, "is_running", False) and not getattr(t, "is_background", False):
                 if hasattr(t, "move_to_background"):

@@ -105,7 +105,15 @@ class SessionPersistenceMixin:
         self.run_worker(_restore_messages(saved_msgs))
 
         # Restore agent context
-        if hasattr(self.agent, "history"):
+        if self.agent is None and hasattr(self, "pm") and self.pm:
+            try:
+                self.agent = self.pm.create_active_agent(
+                    role=session.role if hasattr(session, "role") and session.role else "worker"
+                )
+            except Exception:
+                self.agent = None
+
+        if self.agent is not None and hasattr(self.agent, "history"):
             self.agent.history = session.agent_history
             self.agent.tokens_input = session.tokens_input
             self.agent.tokens_output = session.tokens_output
@@ -126,6 +134,8 @@ class SessionPersistenceMixin:
 
                 ctx = recompute_context_tokens(self.agent, session.last_context_tokens)
             self.agent.last_context_tokens = ctx
+        elif hasattr(session, "role") and session.role:
+            self.role = session.role
 
         self.refresh_status_footer()
 

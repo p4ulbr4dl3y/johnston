@@ -215,8 +215,10 @@ class RewindCommand(BaseCommand):
 
         curr_sid = getattr(app, "current_session_id", None)
         proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
+        sm = getattr(app, "sm", None)
+        session = sm.get(curr_sid, reload=False) if (sm and curr_sid) else None
         get_stats_fn = _get_cmd_attr("get_rewind_git_stats", get_rewind_git_stats)
-        msgs_with_stats = await get_stats_fn(curr_sid, user_msgs, proj_path)
+        msgs_with_stats = await get_stats_fn(curr_sid, user_msgs, proj_path, session=session)
         checkpoints_enabled = any(m.git_stats for m in msgs_with_stats)
 
         async def on_rewind_selected(selection: Any) -> None:

@@ -377,6 +377,90 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(agent.history, [])
 
+    async def test_get_rewind_git_stats_with_session(self):
+        from unittest.mock import MagicMock
+
+        from core.application.session.actions import get_rewind_git_stats
+
+        mock_cm = MagicMock()
+        mock_cm.is_valid_checkpoint_target.return_value = True
+        mock_cm.get_diff_details_batch.return_value = {
+            0: ("1 file, +2 / -1", ["file_a.py"]),
+            1: ("no changes", []),
+        }
+
+        class MockSession:
+            def __init__(self):
+                self.messages = [
+                    {"type": "user", "text": "turn 0", "show_in_ui": True, "touched_files": ["file_a.py"]},
+                    {"type": "bot", "text": "reply 0"},
+                    {"type": "user", "text": "turn 1", "show_in_ui": True, "touched_files": []},
+                    {"type": "bot", "text": "reply 1"},
+                ]
+
+        session = MockSession()
+        entries = await get_rewind_git_stats(
+            "sess-1",
+            [(0, "turn 0"), (1, "turn 1")],
+            "/tmp/project",
+            checkpoint_manager=mock_cm,
+            session=session,
+        )
+
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0].git_stats, "1 file, +2 / -1")
+        self.assertEqual(entries[0].changed_files, ["file_a.py"])
+        self.assertEqual(entries[1].git_stats, "no changes")
+
+        # Verify get_diff_details_batch was called with scoped_files
+        mock_cm.get_diff_details_batch.assert_called_once_with(
+            "sess-1",
+            [0, 1],
+            project_path="/tmp/project",
+            scoped_files={0: ["file_a.py"], 1: []},
+        )
+
+    async def test_rewind_session_passes_files_to_restore(self):
+        from unittest.mock import patch
+
+        from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+
+        agent = MockAgent()
+        agent.history = [{"role": "user", "content": "turn 0"}, {"role": "user", "content": "turn 1"}]
+
+        class MockSession:
+            def __init__(self):
+                self.messages = [
+                    {"type": "user", "text": "turn 0", "show_in_ui": True, "touched_files": ["a.txt"]},
+                    {"type": "user", "text": "turn 1", "show_in_ui": True, "touched_files": ["b.txt"]},
+                ]
+
+        session = MockSession()
+
+        with patch.object(GitCheckpointManager, "restore_checkpoint") as mock_restore:
+            with patch.object(GitCheckpointManager, "purge_checkpoints_after") as mock_purge:
+                rewind_session(
+                    agent,
+                    "sess-1",
+                    "/tmp/project",
+                    [(0, "turn 0"), (1, "turn 1")],
+                    0,
+                    restore_git=True,
+                    session=session,
+                    rollback_ui=lambda i: None,
+                    load_text_into_input=lambda t: None,
+                    save_session_cb=lambda: None,
+                    refresh_footer_cb=lambda: None,
+                )
+                task = getattr(agent, "rewind_git_restore_task", None)
+                if task:
+                    await asyncio.wait_for(asyncio.shield(task), timeout=5)
+
+                mock_restore.assert_called_once_with(
+                    "sess-1", 0, project_path="/tmp/project", files_to_restore=["a.txt", "b.txt"]
+                )
+                mock_purge.assert_called_once_with("sess-1", 0, project_path="/tmp/project")
+
 
 if __name__ == "__main__":
     unittest.main()

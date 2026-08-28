@@ -61,6 +61,7 @@ class TestActionsRole(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             task = MagicMock()
             task.task_id = "task_bg_1"
+            task.session_id = app.current_session_id
             task.is_running = True
             task.is_background = False
             task.kind = "shell"
@@ -78,6 +79,7 @@ class TestActionsRole(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             task = MagicMock()
+            task.session_id = app.current_session_id
             task.is_running = True
             task.is_background = False
             task.kind = "shell"
