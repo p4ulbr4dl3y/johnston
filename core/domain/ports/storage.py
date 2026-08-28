@@ -1,6 +1,6 @@
 """Storage port interfaces for session persistence and metadata."""
 
-from typing import Any, List, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -15,22 +15,88 @@ class SessionStorePort(Protocol):
         """Generates a unique subagent session identifier."""
         ...
 
-    def create_main(self, session_id: str, system_prompt: Optional[str] = None) -> Any:
+    def create_main(self, session_id: Optional[str] = None, role: str = "worker") -> Any:
         """Creates a new main session."""
         ...
 
-    def get_session(self, session_id: str) -> Optional[Any]:
+    def create_subagent(
+        self,
+        parent_id: str,
+        subagent_id: Optional[str] = None,
+        role: str = "worker",
+        description: str = "",
+        prompt: str = "",
+        status: str = "running",
+        project_dir: str = "",
+        branch_name: str = "",
+        background: bool = True,
+    ) -> Any:
+        """Creates a new subagent session."""
+        ...
+
+    def get(self, session_id: str, reload: bool = True) -> Optional[Any]:
         """Retrieves a session by identifier."""
         ...
 
-    def save_session(self, session: Any) -> None:
+    def list(self, kind: Optional[str] = None) -> List[Any]:
+        """Lists all sessions for current project."""
+        ...
+
+    def list_main_sessions(self) -> List[Dict[str, Any]]:
+        """Lists non-empty main sessions sorted by updated time."""
+        ...
+
+    def children(self, parent_id: str) -> List[Any]:
+        """Lists child subagent sessions for a parent session."""
+        ...
+
+    def save(self, session: Any) -> None:
         """Persists a session to storage."""
         ...
 
-    def delete_session(self, session_id: str) -> bool:
+    async def save_async(self, session: Any) -> None:
+        """Asynchronously persists a session to storage."""
+        ...
+
+    def delete(self, session_id: str) -> None:
         """Deletes a session from storage."""
         ...
 
-    def list_sessions(self) -> List[Any]:
-        """Lists all main sessions."""
+    def set_active_session_id(self, session_id: str) -> None:
+        """Sets active session ID for the project."""
+        ...
+
+    def find_session_by_description_or_id(
+        self, identifier: str, parent_id: Optional[str] = None
+    ) -> Optional[Any]:
+        """Finds session by ID or description search."""
+        ...
+
+    def is_session_locked(self, session_id: str) -> bool:
+        """Checks if session is locked."""
+        ...
+
+    def acquire_session_lock(self, session_id: str) -> bool:
+        """Acquires lock on session."""
+        ...
+
+    def release_session_lock(self, session_id: str) -> None:
+        """Releases session lock."""
+        ...
+
+    def release_all_locks(self) -> None:
+        """Releases all held session locks."""
+        ...
+
+    def steal_session_lock(self, session_id: str) -> bool:
+        """Steals session lock from another process."""
+        ...
+
+    def fork_session(
+        self,
+        session_id: str,
+        new_title: Optional[str] = None,
+        up_to_msg_index: Optional[int] = None,
+    ) -> Optional[Any]:
+        """Forks a session."""
         ...

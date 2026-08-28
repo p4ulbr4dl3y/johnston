@@ -2,14 +2,14 @@ import time
 import unittest
 from unittest.mock import MagicMock
 
-from core.infrastructure.presentation.tool_display import (
-    _format_active_tool_progress,
-    extract_subagent_progress,
-)
 from widgets.presentation.screens.tasks import (
     extract_shell_task_progress,
     format_shell_task_row,
     format_subagent_task_row,
+)
+from widgets.presentation.tool_display import (
+    _format_active_tool_progress,
+    extract_subagent_progress,
 )
 
 

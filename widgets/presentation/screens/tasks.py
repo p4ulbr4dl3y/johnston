@@ -7,10 +7,6 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList, RichLog
 from textual.widgets.option_list import Option
 
-from core.infrastructure.presentation.tool_display import (
-    extract_subagent_progress,
-    is_subagent_running,
-)
 from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
@@ -22,6 +18,10 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
+)
+from widgets.presentation.tool_display import (
+    extract_subagent_progress,
+    is_subagent_running,
 )
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, format_badge_row, option_list_row_width

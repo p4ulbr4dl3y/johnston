@@ -72,6 +72,7 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     monkeypatch.setattr("core.infrastructure.secrets.CONFIG_DIR", cfg_dir_str)
     monkeypatch.setattr("core.infrastructure.secrets.SECRETS_FILE", secrets_file)
     monkeypatch.setattr("core.session_manager.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr("core.infrastructure.storage.session_store.PROJECTS_DIR", projects_dir)
     monkeypatch.setattr("core.permission_manager.CONFIG_FILE", config_file)
     monkeypatch.setattr("core.provider_manager.CONFIG_DIR", cfg_dir_str)
     monkeypatch.setattr("core.provider_manager.CONFIG_FILE", config_file)

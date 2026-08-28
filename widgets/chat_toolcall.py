@@ -723,7 +723,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             "ask_user",
         ):
             display_name = self.DISPLAY_NAMES.get(self.canonical_tool, self.tool_type or "Tool")
-            from core.infrastructure.presentation.tool_display import extract_tool_display
+            from widgets.presentation.tool_display import extract_tool_display
 
             target_str = (
                 extract_tool_display(self.canonical_tool, self.args)
@@ -733,7 +733,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.header_label.update(f"[{c}]● [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
         else:
             # MCP/custom tool: single format — ToolName({k: v, ...}).
-            from core.infrastructure.presentation.tool_display import format_compact_dict
+            from widgets.presentation.tool_display import format_compact_dict
 
             compact = format_compact_dict(self.args if isinstance(self.args, dict) else {})
             is_mcp = (self.tool_type or "").startswith("mcp_") or self.is_mcp

@@ -3,7 +3,7 @@ import unittest
 
 import pytest
 
-from core.infrastructure.presentation.tool_display import extract_tool_display
+from widgets.presentation.tool_display import extract_tool_display
 
 
 class TestToolDisplay(unittest.TestCase):

@@ -8,7 +8,7 @@ from rich.cells import cell_len
 from rich.markup import escape
 from rich.text import Text
 
-from core.infrastructure.presentation.tool_display import is_subagent_running
+from widgets.presentation.tool_display import is_subagent_running
 from widgets.utils.row_format import (
     DIFF_SIDEBAR_ROW_WIDTH,
     MODAL_DEFAULT_ROW_WIDTH,

@@ -164,7 +164,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget.status, "error")
 
     def test_format_compact_dict(self):
-        from core.infrastructure.presentation.tool_display import format_compact_dict
+        from widgets.presentation.tool_display import format_compact_dict
 
         self.assertEqual(format_compact_dict({}), "")
         self.assertEqual(format_compact_dict("nope"), "")

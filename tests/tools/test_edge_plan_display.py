@@ -1,8 +1,8 @@
 """Edge-case tests for update_plan tool and tool_display rendering (bug hunting)."""
 import unittest
 
-from core.infrastructure.presentation.tool_display import extract_tool_display, truncate
 from tools.update_plan import UpdatePlanTool
+from widgets.presentation.tool_display import extract_tool_display, truncate
 
 
 class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):

@@ -1,4 +1,3 @@
-import asyncio
 import sys
 import unittest
 from unittest.mock import MagicMock, patch
@@ -164,40 +163,29 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(footer._last_status_args["thinking_effort"], "medium")
 
     async def test_refresh_footer_mcp_active_counting(self):
-        app = FooterTestApp()
-        async with app.run_test() as pilot:
-            footer = app.query_one(StatusFooter)
-            mgr = MagicMock()
-            mgr.load_servers.return_value = [
-                {"name": "url-only", "url": "http://x", "command": None},
-                {"name": "err-client", "command": "python"},
-                {"name": "good", "command": "python"},
-                {"name": "off", "command": "python", "enabled": False},
-            ]
-            mgr.clients = {
-                "err-client": MagicMock(last_error="boom"),
-                "good": MagicMock(last_error=None),
-            }
-            mgr.active_server_count.return_value = 1
-            footer._mcp_cache_time = 0  # force reload of cached servers
-            # Force a fresh background cache load with the mocked manager.
-            footer._st_cache_time = 0
-            footer._st_cached_mcp_servers = None
-            footer._st_cache_loading = False
-            footer._st_cached_providers = {}
-            with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
+        mgr = MagicMock()
+        mgr.load_servers.return_value = [
+            {"name": "url-only", "url": "http://x", "command": None},
+            {"name": "err-client", "command": "python"},
+            {"name": "good", "command": "python"},
+            {"name": "off", "command": "python", "enabled": False},
+        ]
+        mgr.clients = {
+            "err-client": MagicMock(last_error="boom"),
+            "good": MagicMock(last_error=None),
+        }
+        mgr.active_server_count.return_value = 1
+        from widgets.app.status_state import refresh_footer_cache
+
+        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
+            app = FooterTestApp()
+            async with app.run_test() as pilot:
+                footer = app.query_one(StatusFooter)
+                await refresh_footer_cache(app, footer)
                 footer.refresh_footer()
                 await pilot.pause()
-                # Cache loads happen off the event loop; wait until the fresh
-                # values are in place and the footer has re-rendered.
-                for _ in range(50):
-                    if footer._st_cached_mcp_servers:
-                        break
-                    await asyncio.sleep(0.01)
-                footer.refresh_footer()
-                await pilot.pause()
-            self.assertEqual(footer._last_status_args["mcp_active"], 1)
-            self.assertEqual(footer._last_status_args["mcp_total"], 3)
+                self.assertEqual(footer._last_status_args["mcp_active"], 1)
+                self.assertEqual(footer._last_status_args["mcp_total"], 3)
 
     async def test_update_status_fallback_branches(self):
         app = FooterTestApp()

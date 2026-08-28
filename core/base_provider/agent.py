@@ -21,7 +21,6 @@ from core.infrastructure.adapters.base import (
     new_tool_call_id,
     parse_tool_call_args,
 )
-from core.infrastructure.presentation.tool_display import extract_tool_display
 from core.infrastructure.runtime.thinking_effort import normalize_thinking_effort
 from core.infrastructure.runtime.token_util import estimate_tokens
 from core.models_catalog import catalog
@@ -672,8 +671,12 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     # arguments; malformed JSON is normalized to {} by design.
                     _, args = parse_tool_call_args({"function": {"name": t_name, "arguments": raw_args}})
 
-                    target = extract_tool_display(t_name, args)
-                    yield ("tool", t_name, target, args)
+                    target = (
+                        (args.get("path") or args.get("command") or args.get("url") or "")
+                        if isinstance(args, dict)
+                        else ""
+                    )
+                    yield ("tool", t_name, str(target), args)
 
                     from core.role_registry import RoleRegistry
 

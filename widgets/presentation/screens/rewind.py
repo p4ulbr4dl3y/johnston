@@ -304,7 +304,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             pass
 
     def _open_diff_viewer(self, entry: RewindEntry) -> None:
-        from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+        from core.domain.ports.checkpoint import get_checkpoint_manager
         from widgets.presentation.screens.diff import DiffScreen
 
         seq_idx = 0
@@ -316,7 +316,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         diff_items = []
         if self.session_id:
             try:
-                diff_items = GitCheckpointManager.get_checkpoint_diff(
+                diff_items = get_checkpoint_manager().get_checkpoint_diff(
                     self.session_id, seq_idx, project_path=self.project_path
                 )
             except Exception:
