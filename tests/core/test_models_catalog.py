@@ -903,3 +903,37 @@ async def test_refresh_parses_modalities():
         assert cat.has_vision("anthropic", "claude-3.5-sonnet") is True
         assert cat._modalities["openai/gpt-4o"] == ["text", "image"]
         assert cat._modalities["anthropic/claude-3.5-sonnet"] == ["text", "image"]
+
+
+def test_models_catalog_internal_caches_and_invalidation():
+    cat = ModelsCatalog()
+    cat._names = {"openai/gpt-4o": "GPT-4o"}
+    cat._modalities = {"openai/gpt-4o": ["text", "image"]}
+
+    name1 = cat.get_model_display_name("openai", "gpt-4o")
+    assert name1 == "GPT-4o"
+    assert ("openai", "gpt-4o", 1) in cat._display_name_cache
+
+    vis1 = cat.has_vision("openai", "gpt-4o")
+    assert vis1 is True
+    assert ("openai", "gpt-4o", 1) in cat._vision_cache
+
+    cat._clear_internal_caches()
+    assert len(cat._display_name_cache) == 0
+    assert len(cat._vision_cache) == 0
+    assert len(cat._match_cache) == 0
+
+
+def test_models_catalog_set_match_lru_bounding():
+    from collections import OrderedDict
+
+    from core.models_catalog import _MATCH_CACHE_MAX, _set_match
+
+    cache = OrderedDict()
+    for i in range(_MATCH_CACHE_MAX + 50):
+        _set_match(cache, f"key_{i}", f"val_{i}")
+
+    assert len(cache) == _MATCH_CACHE_MAX
+    assert "key_0" not in cache
+    assert f"key_{_MATCH_CACHE_MAX + 49}" in cache
+

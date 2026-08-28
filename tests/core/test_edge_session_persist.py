@@ -506,3 +506,31 @@ def test_search_rewind_big_line(store):
     assert found is not None and found.id == "target"
     no_match = store.find_session_by_description_or_id("z" * 1000)
     assert no_match is None
+
+
+def test_children_fast_path_cold_and_warm(store):
+    """SessionStore.children(parent_id) returns only subagents for the given parent."""
+    main1 = store.create_main("main1")
+    store.save(main1)
+    sub1 = store.create_subagent("main1", "sub1")
+    store.save(sub1)
+
+    main2 = store.create_main("main2")
+    store.save(main2)
+    sub2 = store.create_subagent("main2", "sub2")
+    store.save(sub2)
+
+    # Warm cache test
+    children1 = store.children("main1")
+    assert len(children1) == 1
+    assert children1[0].id == "sub1"
+
+    # Cold cache test (clear in-memory and disk cache)
+    store._disk_cache = None
+    store._disk_cache_signature = None
+    store._sessions.clear()
+
+    cold_children1 = store.children("main1")
+    assert len(cold_children1) == 1
+    assert cold_children1[0].id == "sub1"
+

@@ -264,6 +264,33 @@ class TestGitCheckpointManager(unittest.TestCase):
         for name in (".env", ".env.local", "server.pem", "id_rsa"):
             self.assertNotIn(name, paths)
 
+    def test_get_diff_details_batch_parallel(self):
+        repo_path = self._init_git_repo()
+        sid = "session_batch_diff"
+
+        # Create multiple checkpoints across message indices
+        indices = [0, 1, 2]
+        for idx in indices:
+            test_file = os.path.join(repo_path, f"file_{idx}.txt")
+            with open(test_file, "w") as f:
+                f.write(f"content {idx}\n")
+            sha = GitCheckpointManager.create_checkpoint(sid, idx, project_path=repo_path)
+            self.assertIsNotNone(sha)
+
+        # Query batch diff details
+        results = GitCheckpointManager.get_diff_details_batch(sid, indices, project_path=repo_path)
+        self.assertIsInstance(results, dict)
+        for idx in indices:
+            self.assertIn(idx, results)
+            summary_str, file_names = results[idx]
+            self.assertIsInstance(summary_str, str)
+            self.assertIsInstance(file_names, list)
+
+        # Diff vs checkpoint 0 contains subsequent added files
+        self.assertTrue(any("file_1.txt" in f for f in results[0][1]))
+        self.assertTrue(any("file_2.txt" in f for f in results[0][1]))
+
 
 if __name__ == "__main__":
     unittest.main()
+

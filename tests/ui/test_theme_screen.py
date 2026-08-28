@@ -35,3 +35,28 @@ async def test_theme_screen_composition_and_search():
         await pilot.press("escape")
         await pilot.pause()
         assert not app.is_screen_installed(screen)
+
+
+@pytest.mark.asyncio
+async def test_theme_screen_debounce_preview():
+    app = ThemeTestApp()
+    app.set_app_theme = lambda t, persist=False: None
+    async with app.run_test() as pilot:
+        screen = ThemeScreen("zinc")
+        await app.push_screen(screen)
+        await pilot.pause()
+
+        # Simulate option highlighted via mock event
+        from unittest.mock import MagicMock
+        event = MagicMock()
+        event.option_index = 1
+        screen.on_option_list_option_highlighted(event)
+
+        assert screen._pending_theme == screen.filtered_items[1]
+        assert screen._preview_timer is not None
+
+        # Cancel should stop timer and reset
+        screen.action_cancel()
+        assert not app.is_screen_installed(screen)
+
+
