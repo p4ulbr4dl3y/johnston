@@ -1,10 +1,16 @@
 import json
 import os
 import tempfile
+import time
 
 import pytest
 
-from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
+from core.domain.defaults.config import (
+    CONTEXT_COMPACTION_THRESHOLD_RATIO,
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_STREAM_TIMEOUT,
+    MAX_CONCURRENT_SUBAGENTS,
+)
 from core.infrastructure.config.config_helpers import (
     ensure_json_config,
     load_max_concurrent_subagents,
@@ -21,6 +27,7 @@ from core.infrastructure.config.settings import (
     SubagentsSettings,
     ToolsSettings,
     UISettings,
+    get_settings,
     load_settings,
     save_settings,
 )
@@ -100,8 +107,8 @@ def test_load_settings_full_sections():
             "max_retries": 5,
         },
         "tools": {
-            "shell_default_timeout": 180,
-            "shell_max_cap": 900,
+            "shell_default_timeout": 180.0,
+            "shell_max_cap": 900.0,
             "max_tool_output_chars": 12000,
             "mcp_call_timeout": 150.0,
         },
@@ -134,8 +141,8 @@ def test_load_settings_full_sections():
         assert settings.llm.stream_timeout == 90.0
         assert settings.llm.chunk_timeout == 45.0
         assert settings.llm.max_retries == 5
-        assert settings.tools.shell_default_timeout == 180
-        assert settings.tools.shell_max_cap == 900
+        assert settings.tools.shell_default_timeout == 180.0
+        assert settings.tools.shell_max_cap == 900.0
         assert settings.tools.max_tool_output_chars == 12000
         assert settings.tools.mcp_call_timeout == 150.0
         assert settings.subagents.max_concurrent == 8
@@ -149,14 +156,43 @@ def test_load_settings_full_sections():
         assert settings.storage.disk_cache_ttl == 5.0
 
 
+def test_load_settings_handles_corrupt_or_null_values():
+    raw_data = {
+        "llm": {
+            "compaction_threshold_ratio": None,
+            "stream_timeout": "not_a_number",
+            "max_retries": None,
+        },
+        "tools": "not_a_dict",
+        "subagents": {
+            "max_concurrent": -10,
+        },
+        "storage": {
+            "log_max_age_days": None,
+        },
+    }
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "config.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(raw_data, f)
+
+        settings = load_settings(path)
+        assert settings.llm.compaction_threshold_ratio == CONTEXT_COMPACTION_THRESHOLD_RATIO
+        assert settings.llm.stream_timeout == DEFAULT_STREAM_TIMEOUT
+        assert settings.llm.max_retries == DEFAULT_MAX_RETRIES
+        assert settings.subagents.max_concurrent == MAX_CONCURRENT_SUBAGENTS
+        assert settings.tools.shell_default_timeout == 120.0
+
+
 def test_save_and_reload_settings():
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "config.json")
         settings = JohnstonSettings(
+            active_provider="anthropic",
             theme="monokai",
             sandbox_enabled=True,
             llm=LLMSettings(stream_timeout=120.0),
-            tools=ToolsSettings(shell_default_timeout=300),
+            tools=ToolsSettings(shell_default_timeout=300.0),
             subagents=SubagentsSettings(max_concurrent=7),
             ui=UISettings(chat_page_size=75),
             storage=StorageSettings(log_max_age_days=30),
@@ -164,10 +200,11 @@ def test_save_and_reload_settings():
         save_settings(settings, path)
 
         loaded = load_settings(path)
+        assert loaded.active_provider == "anthropic"
         assert loaded.theme == "monokai"
         assert loaded.sandbox_enabled is True
         assert loaded.llm.stream_timeout == 120.0
-        assert loaded.tools.shell_default_timeout == 300
+        assert loaded.tools.shell_default_timeout == 300.0
         assert loaded.subagents.max_concurrent == 7
         assert loaded.ui.chat_page_size == 75
         assert loaded.storage.log_max_age_days == 30
@@ -180,9 +217,34 @@ def test_settings_env_var_overrides(monkeypatch):
         monkeypatch.setenv("JOHNSTON_SHELL_TIMEOUT", "240")
         monkeypatch.setenv("JOHNSTON_MAX_TOOL_OUTPUT_CHARS", "16000")
         monkeypatch.setenv("JOHNSTON_SANDBOX_ENABLED", "true")
+        monkeypatch.setenv("JOHNSTON_MAX_RETRIES", "0")
 
         settings = load_settings(path)
         assert settings.llm.stream_timeout == 75.5
-        assert settings.tools.shell_default_timeout == 240
+        assert settings.tools.shell_default_timeout == 240.0
         assert settings.tools.max_tool_output_chars == 16000
         assert settings.sandbox_enabled is True
+        assert settings.llm.max_retries == 0
+
+
+def test_get_settings_caching_and_invalidation():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path1 = os.path.join(tmpdir, "config1.json")
+        path2 = os.path.join(tmpdir, "config2.json")
+
+        save_settings(JohnstonSettings(theme="theme1"), path1)
+        save_settings(JohnstonSettings(theme="theme2"), path2)
+
+        s1 = get_settings(path1)
+        s2 = get_settings(path2)
+        assert s1.theme == "theme1"
+        assert s2.theme == "theme2"
+
+        # Cache returns same instance
+        assert get_settings(path1) is s1
+
+        # File modification invalidates cache
+        time.sleep(0.01)
+        save_settings(JohnstonSettings(theme="theme1_updated"), path1)
+        s1_updated = get_settings(path1)
+        assert s1_updated.theme == "theme1_updated"
