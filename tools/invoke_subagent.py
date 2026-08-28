@@ -66,7 +66,7 @@ def _mark_subagent_running(app: Any, session_id: str, text: str = "") -> None:
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
-        "Launch an autonomous subagent in the background for a bounded task. "
+        "Launch an autonomous subagent in the background for a bounded task (up to concurrent limit). "
         "Completion notifies automatically. Manage or follow up via 'manage_subagent'."
     )
     schema = {
@@ -95,9 +95,8 @@ class InvokeSubagentTool(BaseTool):
                     "branch": {
                         "type": "string",
                         "description": (
-                            "Git branch name for worktree isolation. MUST be used for parallel write/edit tasks "
-                            "to avoid file conflicts. Runs in an isolated worktree. On completion, changes are "
-                            "auto-committed to this branch for you to `git merge <branch>`. "
+                            "Git branch name for worktree isolation (for write/worker tasks only, omit for explorer). "
+                            "Auto-commits on finish for parent to inspect and `git merge <branch>`. "
                             "If omitted or same as current branch, runs directly in main workspace."
                         ),
                     },

@@ -15,7 +15,7 @@ SUBAGENT_DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} operating as an auton
 2. Grounding: Inspect actual files and context before acting or drawing conclusions.
 3. Verification: Verify all acceptance criteria before finishing. Clean up temporary files and background processes.
 4. Silent Execution: Emit ONLY tool calls until final response. Zero preamble or commentary between calls.
-5. Structured Return: Conclude with concise report: summary of changes, verification results, touched files. NEVER create standalone report files (e.g. REPORT.md) unless explicitly requested.
+5. Structured Return: Conclude with concise report: summary of changes, verification results, touched files. If blocked or unable to complete, clearly state root blocker and verified hypotheses. NEVER create standalone report files (e.g. REPORT.md) unless explicitly requested.
 </guidelines>"""
 
 
