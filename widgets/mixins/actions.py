@@ -232,7 +232,7 @@ class ActionsMixin:
                     )
                     if hasattr(self, "notify"):
                         try:
-                            self.notify("Questions minimized: type /questions to resume", severity="info")
+                            self.notify("Questions minimized: type /questions to resume", severity="information")
                         except Exception:
                             pass
                 else:

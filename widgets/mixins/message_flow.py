@@ -62,7 +62,7 @@ class MessageFlowMixin:
         self.message_queue.append(item)
         if show_in_ui:
             try:
-                self.notify("Message queued", severity="info")
+                self.notify("Message queued", severity="information")
             except Exception as e:
                 logger.warning("Notify failed: %s", e)
 

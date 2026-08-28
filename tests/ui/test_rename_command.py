@@ -43,7 +43,7 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         app.sm.create_main.assert_called_with("fresh_sess_id", role="worker")
         self.assertEqual(fresh_sess.description, "Startup Session Name")
         app.sm.save.assert_called_with(fresh_sess)
-        app.notify.assert_called_with("Session renamed", severity="info")
+        app.notify.assert_called_with("Session renamed", severity="information", timeout=1.5)
 
     async def test_rename_command_successful_rename(self):
         app = MagicMock()
@@ -62,7 +62,7 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_sess.description, "Updated Feature Title")
         app.sm.save.assert_called_with(mock_sess)
         app.refresh_status_footer.assert_called()
-        app.notify.assert_called_with("Session renamed", severity="info")
+        app.notify.assert_called_with("Session renamed", severity="information", timeout=1.5)
 
     async def test_rename_command_empty_welcome_session(self):
         app = MagicMock()
@@ -83,4 +83,4 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(empty_sess.description, "Planned Architecture Refactor")
         app.sm.save.assert_called_with(empty_sess)
-        app.notify.assert_called_with("Session renamed", severity="info")
+        app.notify.assert_called_with("Session renamed", severity="information", timeout=1.5)

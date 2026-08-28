@@ -461,7 +461,7 @@ class ForkCommand(BaseCommand):
             else:
                 chat_input.load_text("")
             chat_input.focus()
-            app.notify("Session forked", severity="info")
+            app.notify("Session forked", severity="information", timeout=1.5)
 
         result = app.push_screen(
             ForkScreen(user_msgs),
@@ -507,7 +507,7 @@ class RenameCommand(BaseCommand):
                     app.sm.save(sess)
                     if hasattr(app, "refresh_status_footer"):
                         app.refresh_status_footer()
-                    app.notify("Session renamed", severity="info")
+                    app.notify("Session renamed", severity="information", timeout=1.5)
             app.query_one(MESSAGE_INPUT).focus()
 
         result = app.push_screen(
@@ -742,8 +742,6 @@ class QuestionsCommand(BaseCommand):
         from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
         if hasattr(app, "screen") and isinstance(app.screen, AskUserWizardScreen):
-            if hasattr(app, "notify"):
-                app.notify("Question wizard is currently active", severity="info")
             return
 
         pending_func = getattr(app, "_pending_ask_user", None)
@@ -772,7 +770,7 @@ class DiffCommand(BaseCommand):
 
         diff_items = await get_session_diff(curr_sid, project_path=proj_path)
         if not diff_items:
-            app.notify("No workspace changes found since session start", severity="info")
+            app.notify("No workspace changes found since session start", severity="information")
             return
 
         app.push_screen(DiffScreen(diff_items, title="Session Changes"))
@@ -787,8 +785,6 @@ class SandboxCommand(BaseCommand):
         if not hasattr(app, "sandbox_enabled"):
             app.sandbox_enabled = False
         app.sandbox_enabled = not app.sandbox_enabled
-        msg = "Sandbox enabled" if app.sandbox_enabled else "Sandbox disabled"
-        severity = "info" if app.sandbox_enabled else "warning"
 
         from core.infrastructure.config.config_helpers import save_sandbox_config
 
@@ -799,9 +795,6 @@ class SandboxCommand(BaseCommand):
 
         if hasattr(app, "refresh_status_footer"):
             app.refresh_status_footer()
-
-        if hasattr(app, "notify"):
-            app.notify(msg, severity=severity)
 
 
 class CopyCommand(BaseCommand):
@@ -815,10 +808,14 @@ class CopyCommand(BaseCommand):
             text = chat_view.get_last_bot_message_text()
             if text:
                 app.copy_to_clipboard(text)
+                if hasattr(app, "notify"):
+                    app.notify("Copied to clipboard", severity="information", timeout=1.5)
             else:
-                app.notify("No assistant response to copy", severity="warning")
+                if hasattr(app, "notify"):
+                    app.notify("No assistant response to copy", severity="warning")
         except Exception:
-            app.notify("Failed to copy assistant response", severity="error")
+            if hasattr(app, "notify"):
+                app.notify("Failed to copy assistant response", severity="error")
 
 
 
@@ -850,8 +847,6 @@ class ThemeCommand(BaseCommand):
                         app.theme = theme.name
                         if hasattr(app, "refresh_css"):
                             app.refresh_css()
-                if hasattr(app, "notify"):
-                    app.notify(f"Theme switched to {theme.label}", severity="information")
 
             if hasattr(app, "query_one"):
                 try:

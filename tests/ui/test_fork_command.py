@@ -52,7 +52,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         app.load_session_ui.assert_called_with("forked_sid")
         chat_input.load_text.assert_called_with("prompt 0")
         chat_input.focus.assert_called()
-        app.notify.assert_called_with("Session forked", severity="info")
+        app.notify.assert_called_with("Session forked", severity="information", timeout=1.5)
 
     async def test_fork_command_successful_fork_turn_subsequent(self):
         app = MagicMock()
@@ -127,4 +127,4 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         app.load_session_ui.assert_called_with("forked_sid")
         chat_input.load_text.assert_called_with("")
         chat_input.focus.assert_called()
-        app.notify.assert_called_with("Session forked", severity="info")
+        app.notify.assert_called_with("Session forked", severity="information", timeout=1.5)

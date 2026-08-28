@@ -27,4 +27,3 @@ async def test_theme_command_pushes_screen():
     # Trigger callback
     callback("catppuccin-mocha")
     app.set_app_theme.assert_called_once_with("catppuccin-mocha", persist=True)
-    app.notify.assert_called_once()

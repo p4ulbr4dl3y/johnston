@@ -245,7 +245,7 @@ class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
         with patch("core.application.session.actions.get_session_diff", new_callable=AsyncMock) as mock_get_diff:
             mock_get_diff.return_value = []
             await cmd.execute(app)
-            app.notify.assert_called_once_with("No workspace changes found since session start", severity="info")
+            app.notify.assert_called_once_with("No workspace changes found since session start", severity="information")
 
     async def test_diff_command_with_changes(self):
         app = MagicMock()

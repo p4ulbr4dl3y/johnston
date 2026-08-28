@@ -995,7 +995,7 @@ class SimpleApp:
         self.refreshed = 0
         self.input = MockInput()
 
-    def notify(self, msg, severity="info"):
+    def notify(self, msg, severity="information"):
         self.notified.append((msg, severity))
 
     def refresh_status_footer(self):
@@ -1411,7 +1411,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.screen = MagicMock(spec=AskUserWizardScreen)
         app.notify = MagicMock()
         await QuestionsCommand().execute(app)
-        app.notify.assert_called_once_with("Question wizard is currently active", severity="info")
+        app.notify.assert_not_called()
 
     async def test_questions_pending_func(self):
         app = SimpleApp()
@@ -1431,7 +1431,6 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
         app = SimpleApp()
         app.sandbox_enabled = False
-        app.notify = MagicMock()
         app.refresh_status_footer = MagicMock()
 
         cmd = SandboxCommand()
@@ -1439,14 +1438,11 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             await cmd.execute(app)
             self.assertTrue(app.sandbox_enabled)
             app.refresh_status_footer.assert_called_once()
-            app.notify.assert_called_once_with("Sandbox enabled", severity="info")
             mock_save.assert_called_once_with(True)
 
             mock_save.reset_mock()
-            app.notify.reset_mock()
             await cmd.execute(app)
             self.assertFalse(app.sandbox_enabled)
-            app.notify.assert_called_once_with("Sandbox disabled", severity="warning")
             mock_save.assert_called_once_with(False)
 
     async def test_copy_command_success(self):
@@ -1454,6 +1450,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
         app = SimpleApp()
         app.copy_to_clipboard = MagicMock()
+        app.notify = MagicMock()
         mock_chat_view = MagicMock()
         mock_chat_view.get_last_bot_message_text.return_value = "Assistant response text"
         app.query_one = MagicMock(return_value=mock_chat_view)
@@ -1462,6 +1459,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         await cmd.execute(app)
         mock_chat_view.get_last_bot_message_text.assert_called_once()
         app.copy_to_clipboard.assert_called_once_with("Assistant response text")
+        app.notify.assert_called_once_with("Copied to clipboard", severity="information", timeout=1.5)
 
     async def test_copy_command_no_response(self):
         from widgets.commands import CopyCommand

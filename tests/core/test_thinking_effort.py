@@ -256,7 +256,7 @@ class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
             def refresh_status_footer(self):
                 self.refreshed = True
 
-            def notify(self, message, severity="info"):
+            def notify(self, message, severity="information"):
                 self.messages.append((message, severity))
 
         app = App()
