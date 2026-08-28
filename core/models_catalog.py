@@ -362,6 +362,16 @@ class ModelsCatalog:
                             if isinstance(val, int) and not isinstance(val, bool):
                                 return val
 
+        # Fall back to the user-configurable context limit so the compaction
+        # threshold and token-window scaling honor config.json/`JOHNSTON_CONTEXT_LIMIT`.
+        try:
+            from core.infrastructure.config.settings import get_settings
+
+            configured = get_settings().llm.context_limit
+            if isinstance(configured, int) and not isinstance(configured, bool) and configured > 0:
+                return configured
+        except Exception:
+            pass
         return DEFAULT_CONTEXT_LIMIT
 
     def update_model_names(self, names: Dict[str, str]) -> None:

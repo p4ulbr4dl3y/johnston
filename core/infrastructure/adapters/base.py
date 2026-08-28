@@ -86,8 +86,26 @@ class BaseApiAdapter:
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
         thinking_effort: Optional[str] = None,
+        stream_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         raise NotImplementedError
+
+
+def resolve_stream_timeout(stream_timeout: Optional[float] = None) -> float:
+    """Return the per-request stream timeout, falling back to config/default.
+
+    Explicitly-passed ``stream_timeout`` wins; otherwise ``llm.stream_timeout``
+    is read from settings so config.json takes effect, and finally the 60s
+    default is used when settings are unavailable.
+    """
+    if stream_timeout is not None:
+        return stream_timeout
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        return get_settings().llm.stream_timeout
+    except Exception:
+        return 60.0
 
 
 def sort_keys_recursive(obj: Any) -> Any:

@@ -10,7 +10,7 @@ from core.domain.defaults.errors import ToolResult
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
 from tools.cancel import run_cancellable
-from tools.utils import DEFAULT_LINE_WINDOW, MAX_TOOL_PAYLOAD_BYTES
+from tools.utils import DEFAULT_LINE_WINDOW, get_max_tool_payload_bytes
 
 DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub"}
 _DOC_CACHE: "OrderedDict[str, Tuple[float, float, str]]" = OrderedDict()  # key: path, val: (mtime, timestamp, md_text)
@@ -378,9 +378,10 @@ class ReadTool(BaseTool):
 
             try:
                 file_size = os.path.getsize(path)
-                if file_size > MAX_TOOL_PAYLOAD_BYTES:
+                limit = get_max_tool_payload_bytes()
+                if file_size > limit:
                     return ToolResult.error(
-                        "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=path
+                        "file", detail=f"exceeds {limit // (1024 * 1024)}MB", name=path
                     )
             except OSError as e:
                 return ToolResult.error("check", detail=str(e), name=path)

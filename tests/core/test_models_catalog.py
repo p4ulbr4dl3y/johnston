@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
+from core.infrastructure.config.settings import JohnstonSettings, LLMSettings
 from core.models_catalog import ModelsCatalog, format_context_tokens, get_context_window
 
 
@@ -39,6 +40,15 @@ class TestModelsCatalog(unittest.TestCase):
         # Default fallback
         limit = catalog.get_context_limit("unknown_provider", "non_existent_model")
         self.assertEqual(limit, 128000)
+
+    def test_get_context_limit_uses_configured_llm_limit(self):
+        # Regression: an unknown model must fall back to the user-configurable
+        # llm.context_limit (config.json) rather than a hardcoded constant.
+        catalog = ModelsCatalog()
+        cfg = JohnstonSettings(llm=LLMSettings(context_limit=90000))
+        with patch("core.infrastructure.config.settings.get_settings", return_value=cfg):
+            limit = catalog.get_context_limit("unknown_provider", "non_existent_model")
+        self.assertEqual(limit, 90000)
 
     def test_get_context_limit_reloads_when_empty(self):
         with tempfile.TemporaryDirectory() as tmpdir:

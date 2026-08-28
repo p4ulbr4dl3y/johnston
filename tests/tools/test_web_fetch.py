@@ -212,6 +212,42 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ERR: fetch 'https://example.com': connection refused", res)
 
     @patch("httpx.AsyncClient")
+    async def test_client_timeout_uses_configured_value(self, mock_client_cls):
+        # Regression: the web_fetch HTTP client must honor tools.web_fetch_timeout
+        # from config.json instead of a hardcoded 20s.
+        from core.infrastructure.config.settings import JohnstonSettings, ToolsSettings
+
+        cfg = JohnstonSettings(tools=ToolsSettings(web_fetch_timeout=7.0))
+        with patch("core.infrastructure.config.settings.get_settings", return_value=cfg):
+            tool = WebFetchTool()
+            tool._get_client()
+        kwargs = mock_client_cls.call_args.kwargs
+        self.assertEqual(kwargs["timeout"], 7.0)
+
+    @patch("httpx.AsyncClient")
+    async def test_payload_cap_honors_configured_value(self, mock_client_cls):
+        # Regression: the payload size cap must come from tools.max_tool_payload_bytes.
+        with patch("tools.web_fetch.get_max_tool_payload_bytes", return_value=100):
+            response = MagicMock()
+            response.status_code = 200
+            response.headers = {"content-type": "text/html", "content-length": "101"}
+            response.raise_for_status = MagicMock()
+
+            cm = MagicMock()
+            cm.__aenter__ = AsyncMock(return_value=response)
+            cm.__aexit__ = AsyncMock(return_value=False)
+
+            client = MagicMock()
+            client.stream = MagicMock(return_value=cm)
+            client.__aenter__ = AsyncMock(return_value=client)
+            client.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value = client
+
+            tool = WebFetchTool()
+            res = str(await tool.execute({"url": "https://example.com/big"}))
+        self.assertIn("exceeds", res)
+
+    @patch("httpx.AsyncClient")
     @patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
     async def test_fetch_pdf_conversion_fallback(self, mock_convert, mock_client_cls):
         body = b"%PDF-1.4 fake body"

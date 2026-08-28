@@ -7,7 +7,19 @@ from tools.base import try_int
 DEFAULT_LINE_WINDOW = 800
 
 # Unified cap for any single file/web response fetched by a tool (read, web_fetch).
+# The effective value reads tools.max_tool_payload_bytes from config; this
+# constant is the fallback for direct callers.
 MAX_TOOL_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def get_max_tool_payload_bytes() -> int:
+    """Return the configured tool payload cap (tools.max_tool_payload_bytes)."""
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        return get_settings().tools.max_tool_payload_bytes
+    except Exception:
+        return MAX_TOOL_PAYLOAD_BYTES
 
 
 def resolve_writable_path(ctx: Any, path_arg: Any) -> tuple[str, ToolResult | None]:
@@ -38,8 +50,9 @@ def validate_file_for_edit(path: str) -> ToolResult | None:
     if os.path.isdir(path):
         return ToolResult.error("file", name=path, detail="is a directory")
     try:
-        if os.path.getsize(path) > MAX_TOOL_PAYLOAD_BYTES:
-            max_mb = MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)
+        limit = get_max_tool_payload_bytes()
+        if os.path.getsize(path) > limit:
+            max_mb = limit // (1024 * 1024)
             return ToolResult.error("file", name=path, detail=f"file exceeds maximum allowed size ({max_mb}MB)")
     except OSError:
         pass

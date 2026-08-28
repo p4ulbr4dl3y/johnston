@@ -63,6 +63,7 @@ def test_load_settings_full_sections():
         "theme": "nord",
         "sandbox_enabled": True,
         "llm": {
+            "context_limit": 100000,
             "compaction_threshold_ratio": 0.8,
             "stream_timeout": 90.0,
             "chunk_timeout": 45.0,
@@ -72,6 +73,9 @@ def test_load_settings_full_sections():
             "shell_default_timeout": 180.0,
             "shell_max_cap": 900.0,
             "max_tool_output_chars": 12000,
+            "max_tool_payload_bytes": 2097152,
+            "max_snapshot_log_bytes": 3145728,
+            "web_fetch_timeout": 33.0,
             "mcp_call_timeout": 150.0,
         },
         "subagents": {
@@ -99,6 +103,7 @@ def test_load_settings_full_sections():
         assert settings.active_provider == "openai"
         assert settings.theme == "nord"
         assert settings.sandbox_enabled is True
+        assert settings.llm.context_limit == 100000
         assert settings.llm.compaction_threshold_ratio == 0.8
         assert settings.llm.stream_timeout == 90.0
         assert settings.llm.chunk_timeout == 45.0
@@ -106,6 +111,9 @@ def test_load_settings_full_sections():
         assert settings.tools.shell_default_timeout == 180.0
         assert settings.tools.shell_max_cap == 900.0
         assert settings.tools.max_tool_output_chars == 12000
+        assert settings.tools.max_tool_payload_bytes == 2097152
+        assert settings.tools.max_snapshot_log_bytes == 3145728
+        assert settings.tools.web_fetch_timeout == 33.0
         assert settings.tools.mcp_call_timeout == 150.0
         assert settings.subagents.max_concurrent == 8
         assert settings.subagents.result_max_chars == 20000
@@ -190,16 +198,24 @@ def test_settings_env_var_overrides(monkeypatch):
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "config.json")
         monkeypatch.setenv("JOHNSTON_STREAM_TIMEOUT", "75.5")
+        monkeypatch.setenv("JOHNSTON_CONTEXT_LIMIT", "90000")
         monkeypatch.setenv("JOHNSTON_SHELL_TIMEOUT", "240")
         monkeypatch.setenv("JOHNSTON_MAX_TOOL_OUTPUT_CHARS", "16000")
+        monkeypatch.setenv("JOHNSTON_MAX_TOOL_PAYLOAD_BYTES", "2097152")
+        monkeypatch.setenv("JOHNSTON_MAX_SNAPSHOT_LOG_BYTES", "3145728")
+        monkeypatch.setenv("JOHNSTON_WEB_FETCH_TIMEOUT", "33.0")
         monkeypatch.setenv("JOHNSTON_SANDBOX_ENABLED", "true")
         monkeypatch.setenv("JOHNSTON_MAX_RETRIES", "0")
         monkeypatch.setenv("JOHNSTON_MAX_CONCURRENT_SUBAGENTS", "15")
 
         settings = load_settings(path)
         assert settings.llm.stream_timeout == 75.5
+        assert settings.llm.context_limit == 90000
         assert settings.tools.shell_default_timeout == 240.0
         assert settings.tools.max_tool_output_chars == 16000
+        assert settings.tools.max_tool_payload_bytes == 2097152
+        assert settings.tools.max_snapshot_log_bytes == 3145728
+        assert settings.tools.web_fetch_timeout == 33.0
         assert settings.sandbox_enabled is True
         assert settings.llm.max_retries == 0
         assert settings.subagents.max_concurrent == 15

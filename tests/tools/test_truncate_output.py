@@ -90,12 +90,25 @@ class TestTruncateOutput(unittest.TestCase):
         with open(path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), text)
 
+    def test_truncate_output_default_uses_configured_cap(self):
+        import unittest.mock as mock
+
+        from core.infrastructure.config.settings import JohnstonSettings, ToolsSettings
+
+        # Regression: with no explicit max_chars, truncate_output must honor the
+        # configurable tools.max_tool_output_chars from config.json.
+        cfg = JohnstonSettings(tools=ToolsSettings(max_tool_output_chars=10))
+        with mock.patch("core.infrastructure.config.settings.get_settings", return_value=cfg):
+            res = truncate_output("X" * 100, tool_name="cap")
+        self.assertIn("Log:", res)
+
     def test_truncate_output_clips_log_at_max_size(self):
         import unittest.mock as mock
 
-        from tools import base as tools_base
+        from core.infrastructure.config.settings import JohnstonSettings, ToolsSettings
 
-        with mock.patch.object(tools_base, "MAX_SNAPSHOT_LOG_BYTES", 1000):
+        cfg = JohnstonSettings(tools=ToolsSettings(max_snapshot_log_bytes=1000))
+        with mock.patch("core.infrastructure.config.settings.get_settings", return_value=cfg):
             res = truncate_output("X" * 5000, max_chars=100, tool_name="clip")
         log_path = [word for word in res.split() if ".log" in word][0].rstrip(".")
 

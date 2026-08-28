@@ -124,15 +124,43 @@ def _schedule_background(coro: Any) -> None:
 
 
 # Hard cap on a single snapshot log so a runaway tool output cannot fill disk.
+# The effective value reads tools.max_snapshot_log_bytes from config (falling
+# back to this constant); kept as the module-level default for direct callers.
 MAX_SNAPSHOT_LOG_BYTES = 50 * 1024 * 1024
 
 # Shared default cap for tool output handed to the model (truncate_output and
-# the registry's post-MCall truncation must stay in sync).
+# the registry's post-MCall truncation must stay in sync). The effective value
+# reads tools.max_tool_output_chars from config; this constant is the fallback.
 MAX_TOOL_OUTPUT_CHARS = 8000
 
 
+def _max_tool_output_chars() -> int:
+    """Return the configured tool-output cap (tools.max_tool_output_chars)."""
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        return get_settings().tools.max_tool_output_chars
+    except Exception:
+        return MAX_TOOL_OUTPUT_CHARS
+
+
+def _max_snapshot_log_bytes() -> int:
+    """Return the configured snapshot-log cap (tools.max_snapshot_log_bytes)."""
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        return get_settings().tools.max_snapshot_log_bytes
+    except Exception:
+        return MAX_SNAPSHOT_LOG_BYTES
+
+
 def _write_output_log(
-    log_content: str, *, tool_name: str = "", ext: str = ".log", unique: bool = True
+    log_content: str,
+    *,
+    tool_name: str = "",
+    ext: str = ".log",
+    unique: bool = True,
+    max_bytes: Optional[int] = None,
 ) -> Optional[str]:
     """Writes full output to a unique snapshot file under LOGS_DIR and returns its path.
 
@@ -140,8 +168,8 @@ def _write_output_log(
     Runs the blocking ``os.makedirs``/``open().write()`` off the event loop via
     ``asyncio.to_thread`` when an async context is active so a large snapshot in
     an async ``execute`` never stalls the loop; falls back to a synchronous write
-    for sync callers (no running loop). Content beyond ``MAX_SNAPSHOT_LOG_BYTES``
-    is clipped with a marker.
+    for sync callers (no running loop). Content beyond ``max_bytes`` (default
+    ``tools.max_snapshot_log_bytes``) is clipped with a marker.
     """
     content = log_content or ""
     if not content.strip():
@@ -153,8 +181,10 @@ def _write_output_log(
     if not log_path:
         return None
 
-    if len(content) > MAX_SNAPSHOT_LOG_BYTES:
-        content = content[:MAX_SNAPSHOT_LOG_BYTES] + "\n... [snapshot clipped at max size]\n"
+    if max_bytes is None:
+        max_bytes = _max_snapshot_log_bytes()
+    if len(content) > max_bytes:
+        content = content[:max_bytes] + "\n... [snapshot clipped at max size]\n"
 
     def _write() -> None:
         os.makedirs(LOGS_DIR, exist_ok=True)
@@ -173,7 +203,7 @@ def _write_output_log(
 
 def truncate_output(
     text: str,
-    max_chars: int = MAX_TOOL_OUTPUT_CHARS,
+    max_chars: Optional[int] = None,
     hint: str = "",
     save_log: bool = True,
     tool_name: str = "",
@@ -182,7 +212,13 @@ def truncate_output(
     log_path: Optional[str] = None,
     unique: bool = True,
 ) -> str:
-    """Truncates text safely if it exceeds max_chars, saving full output to a unique file."""
+    """Truncates text safely if it exceeds max_chars, saving full output to a unique file.
+
+    When ``max_chars`` is None (the default), the configured
+    ``tools.max_tool_output_chars`` value is used so config.json takes effect.
+    """
+    if max_chars is None:
+        max_chars = _max_tool_output_chars()
     if len(text) <= max_chars:
         return text
 

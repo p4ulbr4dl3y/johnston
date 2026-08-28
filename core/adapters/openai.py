@@ -10,6 +10,7 @@ from core.infrastructure.adapters.base import (
     extract_image_details,
     image_url_block,
     new_tool_call_id,
+    resolve_stream_timeout,
 )
 from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs
 from core.infrastructure.runtime.token_util import parse_usage
@@ -125,6 +126,7 @@ class OpenAIAdapter(BaseApiAdapter):
         chunk_timeout: Optional[float] = 30.0,
         provider_key: Optional[str] = "openai",
         client: Optional[Any] = None,
+        stream_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         target_client = client or self._get_client(base_url, api_key, headers=headers)
         formatted_msgs = format_messages_for_openai(messages)
@@ -135,6 +137,7 @@ class OpenAIAdapter(BaseApiAdapter):
             create_kwargs["max_tokens"] = max_tokens
         if extra_body:
             create_kwargs["extra_body"] = dict(extra_body)
+        create_kwargs["timeout"] = resolve_stream_timeout(stream_timeout)
         create_kwargs.update(build_openai_thinking_kwargs(thinking_effort))
 
         try:
@@ -150,6 +153,9 @@ class OpenAIAdapter(BaseApiAdapter):
             ):
                 if "reasoning_effort" in c_err_str or isinstance(create_err, TypeError):
                     create_kwargs.pop("reasoning_effort", None)
+                # Drop timeout too: some compatible endpoints reject it, and the
+                # fallback should retry with the most minimal payload possible.
+                create_kwargs.pop("timeout", None)
                 response = await target_client.chat.completions.create(**create_kwargs)
             else:
                 raise create_err

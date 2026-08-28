@@ -294,7 +294,8 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         return perm_err
 
     try:
-        from tools.base import MAX_TOOL_OUTPUT_CHARS, execute_mcp_tool, truncate_output
+        from core.infrastructure.config.settings import get_settings
+        from tools.base import execute_mcp_tool, truncate_output
 
         # Execute against the exact server that owns the permission-checked
         # exposed name, so the permission decision and the executed tool can
@@ -303,10 +304,11 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         mcp_res = await execute_mcp_tool(mcp_mgr, name, args, target_server=target_server)
         if mcp_res is not None:
             tool_res = await normalize_tool_result(mcp_res)
-            if not tool_res.is_error and tool_res.content and len(tool_res.content) > MAX_TOOL_OUTPUT_CHARS:
+            max_chars = get_settings().tools.max_tool_output_chars
+            if not tool_res.is_error and tool_res.content and len(tool_res.content) > max_chars:
                 tool_res.content = truncate_output(
                     tool_res.content,
-                    max_chars=MAX_TOOL_OUTPUT_CHARS,
+                    max_chars=max_chars,
                     tool_name=name,
                 )
             return tool_res

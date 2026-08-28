@@ -80,7 +80,7 @@ async def test_huge_file_rejected(tmp_path, ctx, monkeypatch):
     """File larger than the payload cap must be rejected before reading."""
     from tools import read
 
-    monkeypatch.setattr(read, "MAX_TOOL_PAYLOAD_BYTES", 100)
+    monkeypatch.setattr(read, "get_max_tool_payload_bytes", lambda: 100)
     p = wb(tmp_path, "big.txt", b"x" * 1000)
     res = str(await ReadTool().execute({"path": p}, ctx=ctx))
     assert "ERR:" in res

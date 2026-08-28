@@ -13,6 +13,7 @@ from core.domain.defaults.config import (
     DEFAULT_CHAT_PAGE_SIZE,
     DEFAULT_CHUNK_TIMEOUT,
     DEFAULT_COMPACTION_USER_BUDGET,
+    DEFAULT_CONTEXT_LIMIT,
     DEFAULT_DISK_CACHE_TTL,
     DEFAULT_LOG_MAX_AGE_DAYS,
     DEFAULT_LOG_MAX_BYTES,
@@ -94,6 +95,7 @@ def _env_bool(key: str, default: bool) -> bool:
 
 @dataclass
 class LLMSettings:
+    context_limit: int = DEFAULT_CONTEXT_LIMIT
     compaction_threshold_ratio: float = CONTEXT_COMPACTION_THRESHOLD_RATIO
     compaction_user_budget: int = DEFAULT_COMPACTION_USER_BUDGET
     stream_timeout: float = DEFAULT_STREAM_TIMEOUT
@@ -110,6 +112,11 @@ class LLMSettings:
     def from_dict(cls, data: Dict[str, Any]) -> LLMSettings:
         sec = data.get("llm") if isinstance(data.get("llm"), dict) else {}
         return cls(
+            context_limit=_env_int(
+                "JOHNSTON_CONTEXT_LIMIT",
+                _safe_int(sec.get("context_limit"), DEFAULT_CONTEXT_LIMIT, min_val=1024),
+                min_val=1024,
+            ),
             compaction_threshold_ratio=_env_float(
                 "JOHNSTON_COMPACTION_RATIO",
                 _safe_float(sec.get("compaction_threshold_ratio"), CONTEXT_COMPACTION_THRESHOLD_RATIO, min_val=0.1),

@@ -36,7 +36,6 @@ DEFAULT_MAX_RETRIES = 3
 DEFAULT_RETRY_DELAY = 1.0
 DEFAULT_RETRY_BACKOFF = 2.0
 DEFAULT_MAX_RETRY_DELAY = 10.0
-DEFAULT_MAX_TOKENS = 8192
 
 # Model-list cache lifetimes: a successful fetch lives a full day, an empty
 # result only briefly so unreachable providers are retried instead of being
@@ -478,7 +477,7 @@ class ProviderManager:
             reasoning_effort=pdef.reasoning_effort,
             thinking_effort=thinking_effort,
             chunk_timeout=pdef.chunk_timeout,
-            max_tokens=pdef.max_tokens or DEFAULT_MAX_TOKENS,
+            max_tokens=pdef.max_tokens or get_settings().llm.default_max_tokens,
             max_retries=pdef.max_retries,
             retry_delay=pdef.retry_delay,
             retry_backoff=pdef.retry_backoff,

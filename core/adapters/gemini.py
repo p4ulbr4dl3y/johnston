@@ -12,6 +12,7 @@ from core.infrastructure.adapters.base import (
     normalize_tool_arguments_str,
     parse_sse_line,
     parse_tool_call_args,
+    resolve_stream_timeout,
 )
 from core.infrastructure.runtime.thinking_effort import build_gemini_thinking_config
 
@@ -118,6 +119,7 @@ class GeminiAdapter(BaseApiAdapter):
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
         thinking_effort: Optional[str] = None,
+        stream_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         system_instruction, contents = self._to_gemini(messages)
         base = (base_url or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
@@ -150,7 +152,9 @@ class GeminiAdapter(BaseApiAdapter):
             payload["tools"] = [{"functionDeclarations": function_declarations}]
 
         client = self._get_client(base_url, api_key)
-        async with client.stream("POST", endpoint, json=payload, timeout=60.0) as resp:
+        async with client.stream(
+            "POST", endpoint, json=payload, timeout=resolve_stream_timeout(stream_timeout)
+        ) as resp:
             await check_httpx_response_status(resp)
             async for line in resp.aiter_lines():
                 evt = parse_sse_line(line)

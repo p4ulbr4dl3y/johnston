@@ -13,7 +13,7 @@ import httpx
 from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool
 from tools.cancel import run_cancellable
-from tools.utils import MAX_TOOL_PAYLOAD_BYTES
+from tools.utils import get_max_tool_payload_bytes
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -163,8 +163,14 @@ class WebFetchTool(BaseTool):
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or getattr(self._client, "is_closed", False) is True:
+            from core.infrastructure.config.settings import get_settings
+
+            try:
+                timeout = get_settings().tools.web_fetch_timeout
+            except Exception:
+                timeout = 20.0
             self._client = httpx.AsyncClient(
-                follow_redirects=True, timeout=20.0, event_hooks={"request": [_guard_request]}
+                follow_redirects=True, timeout=timeout, event_hooks={"request": [_guard_request]}
             )
         return self._client
 
@@ -201,6 +207,7 @@ class WebFetchTool(BaseTool):
         }
 
         client = self._get_client()
+        payload_limit = get_max_tool_payload_bytes()
         try:
             async with client.stream("GET", url, headers=headers) as response:
                 response.raise_for_status()
@@ -209,9 +216,9 @@ class WebFetchTool(BaseTool):
                 cl = response.headers.get("content-length")
                 if cl:
                     try:
-                        if int(cl) > MAX_TOOL_PAYLOAD_BYTES:
+                        if int(cl) > payload_limit:
                             return ToolResult.error(
-                                "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=url
+                                "file", detail=f"exceeds {payload_limit // (1024 * 1024)}MB", name=url
                             )
                     except ValueError:
                         pass
@@ -221,9 +228,9 @@ class WebFetchTool(BaseTool):
                 chunks = []
                 async for chunk in response.aiter_bytes():
                     total += len(chunk)
-                    if total > MAX_TOOL_PAYLOAD_BYTES:
+                    if total > payload_limit:
                         return ToolResult.error(
-                            "file", detail=f"exceeds {MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)}MB", name=url
+                            "file", detail=f"exceeds {payload_limit // (1024 * 1024)}MB", name=url
                         )
                     chunks.append(chunk)
                 content_bytes = b"".join(chunks)
@@ -292,7 +299,7 @@ class WebFetchTool(BaseTool):
         header = f"[URL: {url} | status: 200 | type: {type_name}]"
         from tools.base import truncate_output
 
-        body = truncate_output(text_content, max_chars=8000, tool_name="web_fetch", ext=out_ext)
+        body = truncate_output(text_content, tool_name="web_fetch", ext=out_ext)
         plain_content = f"{header}\n\n{body}"
         return ToolResult.done(content=plain_content, display="")
 

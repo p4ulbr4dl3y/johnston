@@ -12,6 +12,7 @@ from core.infrastructure.adapters.base import (
     new_tool_call_id,
     parse_sse_line,
     parse_tool_call_args,
+    resolve_stream_timeout,
     sort_keys_recursive,
 )
 from core.infrastructure.runtime.thinking_effort import build_anthropic_thinking_payload
@@ -200,6 +201,7 @@ class AnthropicAdapter(BaseApiAdapter):
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
         thinking_effort: Optional[str] = None,
+        stream_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         system_prompt, anthropic_msgs = self._to_anthropic_messages(messages)
         endpoint_url = f"{(base_url or 'https://api.anthropic.com').rstrip('/')}/v1/messages"
@@ -254,7 +256,9 @@ class AnthropicAdapter(BaseApiAdapter):
         }
 
         client = self._get_client(base_url, api_key)
-        async with client.stream("POST", endpoint_url, headers=headers, json=payload, timeout=60.0) as resp:
+        async with client.stream(
+            "POST", endpoint_url, headers=headers, json=payload, timeout=resolve_stream_timeout(stream_timeout)
+        ) as resp:
             await check_httpx_response_status(resp)
             async for line in resp.aiter_lines():
                 evt = parse_sse_line(line)

@@ -18,6 +18,7 @@ class LLMAdapterPort(Protocol):
         thinking_effort: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         extra_body: Optional[Dict[str, Any]] = None,
+        stream_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         """Streams normalized LLM events from provider wire protocol."""
         ...
