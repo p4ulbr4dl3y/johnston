@@ -51,11 +51,11 @@ COLOR_STATUS_RUNNING = "#e5c07b"
 COLOR_STATUS_ERROR = "#e06c75"
 COLOR_STATUS_SUCCESS = "#98c379"
 
-# Diff Highlighting Colors
-COLOR_DIFF_ADD_FG = "#3fb950"
-COLOR_DIFF_ADD_BG = "on #12261e"
-COLOR_DIFF_REMOVE_FG = "#f85149"
-COLOR_DIFF_REMOVE_BG = "on #2a1215"
+# Diff Highlighting Colors (OKLab balanced luminosity)
+COLOR_DIFF_ADD_FG = "#46c05a"
+COLOR_DIFF_ADD_BG = "on #15281e"
+COLOR_DIFF_REMOVE_FG = "#f25555"
+COLOR_DIFF_REMOVE_BG = "on #241416"
 COLOR_DIFF_GUTTER = "#6e7681"
 
 # Permissions Defaults
