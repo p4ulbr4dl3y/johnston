@@ -89,7 +89,7 @@
     "primary": "#ffffff",
     "secondary": "#cccccc",
     "muted": "#858585",
-    "subtle": "#3794ff",
+    "subtle": "#cccccc",
     "tcss_vars": {
       "bg-app": "#1e1e1e",
       "bg-surface": "#181818",
