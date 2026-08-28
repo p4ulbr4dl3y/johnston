@@ -435,7 +435,7 @@ CommandSuggestions > .option-list--option-hover {
     padding: 0 1 1 1;
     border: none;
     background: $bg-surface;
-    color: $fg-secondary;
+    color: $fg-primary;
 }
 
 #message-input:focus {
