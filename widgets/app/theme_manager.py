@@ -132,13 +132,31 @@ class ThemeManager:
         """Convert Johnston Theme to TextualTheme instance."""
         theme = theme_or_name if isinstance(theme_or_name, Theme) else self._themes.get(theme_or_name, ZINC_DARK)
         tcss_vars = dict(theme.tcss_vars)
+        bg_app = tcss_vars.get("bg-app", "#09090b")
+        is_ansi = bg_app in ("ansi_default", "transparent")
+        if is_ansi:
+            from core.infrastructure.platform.terminal_theme import (
+                compute_adaptive_border,
+                compute_adaptive_surface,
+                query_terminal_palette,
+            )
+
+            detected_bg, _ = query_terminal_palette()
+            surface = compute_adaptive_surface(detected_bg)
+            border = compute_adaptive_border(detected_bg)
+            tcss_vars["bg-surface"] = surface
+            tcss_vars["border"] = border
+            if "ansi-background" not in tcss_vars:
+                tcss_vars["ansi-background"] = "ansi_default"
         return TextualTheme(
             name=theme.name,
             primary=theme.primary,
             secondary=theme.secondary,
-            background=tcss_vars.get("bg-app", "#09090b"),
+            foreground=tcss_vars.get("fg-primary", "#ffffff" if theme.dark else "#18181b"),
+            background=bg_app,
             surface=tcss_vars.get("bg-surface", "#18181b"),
             dark=theme.dark,
+            ansi=is_ansi,
             variables=tcss_vars,
         )
 

@@ -120,14 +120,16 @@ def _build_subagent_grid(
     grid.add_column(justify="right")
 
     t_primary, t_secondary, t_muted, t_subtle = get_theme_colors()
+    txt = t_secondary
     sep = f"  [{t_muted}]•[/]  "
     sep_compact = f" [{t_muted}]•[/] "
+    arrow_sep = f" [{t_muted}]›[/] "
 
     if is_compact:
         # Row 1 (Compact): Left [Model] | Right [pct% ctx • $0.02 / tok]
         row1_left_parts = []
         if is_connected and clean_model and clean_model != "[Select model: /models]":
-            row1_left_parts.append(f"[{t_secondary}]{clean_model}[/]")
+            row1_left_parts.append(f"[{txt}]{clean_model}[/]")
         row1_left = sep_compact.join(row1_left_parts)
 
         if is_connected and bool(model_name):
@@ -136,23 +138,23 @@ def _build_subagent_grid(
             pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
             cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
             right_val = cost_str if cost_usd > 0 else f"{format_context_tokens(total_tokens)}t"
-            row1_right = f"[{t_secondary}]{pct_str} ctx[/]{sep_compact}[{t_secondary}]{right_val}[/]"
+            row1_right = f"[{txt}]{pct_str} ctx[/]{sep_compact}[{txt}]{right_val}[/]"
         else:
-            row1_right = f"[{t_subtle}]Run /connect[/{t_subtle}]"
+            row1_right = f"[{txt}]Run /connect[/]"
 
         # Row 2 (Compact): Left [dir • branch (+N/-M) • sb:on • mode] | Right []
         dir_basename = os.path.basename(os.path.abspath(directory)) or directory
-        row2_left_parts = [f"[{t_secondary}]{dir_basename}[/]"]
+        row2_left_parts = [f"[{txt}]{dir_basename}[/]"]
         diff_text = git_diff_stats()
         if branch and diff_text:
-            row2_left_parts.append(f"[{t_primary}]{branch}[/] [{t_secondary}]({diff_text})[/]")
+            row2_left_parts.append(f"[{txt}]{branch} ({diff_text})[/]")
         elif branch:
-            row2_left_parts.append(f"[{t_primary}]{branch}[/]")
+            row2_left_parts.append(f"[{txt}]{branch}[/]")
         elif diff_text:
-            row2_left_parts.append(f"[{t_secondary}]({diff_text})[/]")
-        row2_left_parts.append(f"[{t_primary}]sb:on[/]" if sandbox_enabled else f"[{t_muted}]sb:off[/]")
+            row2_left_parts.append(f"[{txt}]({diff_text})[/]")
+        row2_left_parts.append(f"[{txt}]sb:on[/]" if sandbox_enabled else f"[{txt}]sb:off[/]")
         if execution_mode:
-            row2_left_parts.append(f"[{t_secondary}]{execution_mode}[/]")
+            row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
         row2_left = sep_compact.join(row2_left_parts)
         row2_right = ""
 
@@ -168,12 +170,12 @@ def _build_subagent_grid(
     # Row 1: Left [Provider › Model (effort)] | Right [Context bar • tokens • cost]
     row1_left_parts = []
     if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
-        model_part = f"{provider_display} › {clean_model}"
+        model_part = f"[{txt}]{provider_display}[/]{arrow_sep}[{txt}]{clean_model}[/]"
         if thinking_effort and thinking_effort != "auto":
-            model_part += f" ({thinking_effort})"
-        row1_left_parts.append(f"[{t_secondary}]{model_part}[/]")
+            model_part += f" [{txt}]({thinking_effort})[/]"
+        row1_left_parts.append(model_part)
     elif clean_model:
-        row1_left_parts.append(f"[{t_secondary}]{clean_model}[/]")
+        row1_left_parts.append(f"[{txt}]{clean_model}[/]")
     row1_left = sep.join(row1_left_parts)
 
     if is_connected and model_name:
@@ -185,28 +187,28 @@ def _build_subagent_grid(
         cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
         tok_str = format_context_tokens(total_tokens)
         row1_right_parts = [
-            f"[{t_subtle}][{bar_str}][/] [{t_secondary}]{pct:.0f}% ({format_context_tokens(context_used)}/{context_window})[/]",
-            f"[{t_secondary}]{tok_str} tok[/]",
-            f"[{t_secondary}]{cost_str}[/]",
+            f"[{t_subtle}][{bar_str}][/] [{txt}]{pct:.0f}% ({format_context_tokens(context_used)}/{context_window})[/]",
+            f"[{txt}]{tok_str} tok[/]",
+            f"[{txt}]{cost_str}[/]",
         ]
         row1_right = sep.join(row1_right_parts)
     else:
-        row1_right = f"[{t_subtle}]Run /connect to set up API key.[/{t_subtle}]"
+        row1_right = f"[{txt}]Run /connect to set up API key.[/]"
     grid.add_row(row1_left, row1_right)
 
     # Row 2: Left [directory • branch (+N/-M) • sandbox: on • mode] | Right []
     dir_text = format_display_path(directory)
-    row2_left_parts = [f"[{t_secondary}]{dir_text}[/]"]
+    row2_left_parts = [f"[{txt}]{dir_text}[/]"]
     diff_text = git_diff_stats()
     if branch and diff_text:
-        row2_left_parts.append(f"[{t_primary}]{branch}[/] [{t_secondary}]({diff_text})[/]")
+        row2_left_parts.append(f"[{txt}]{branch} ({diff_text})[/]")
     elif branch:
-        row2_left_parts.append(f"[{t_primary}]{branch}[/]")
+        row2_left_parts.append(f"[{txt}]{branch}[/]")
     elif diff_text:
-        row2_left_parts.append(f"[{t_secondary}]({diff_text})[/]")
-    row2_left_parts.append(f"[{t_primary}]sandbox: on[/]" if sandbox_enabled else f"[{t_muted}]sandbox: off[/]")
+        row2_left_parts.append(f"[{txt}]({diff_text})[/]")
+    row2_left_parts.append(f"[{txt}]sandbox: on[/]" if sandbox_enabled else f"[{txt}]sandbox: off[/]")
     if execution_mode:
-        row2_left_parts.append(f"[{t_secondary}]{execution_mode}[/]")
+        row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
     row2_left = sep.join(row2_left_parts)
 
     row2_right = ""

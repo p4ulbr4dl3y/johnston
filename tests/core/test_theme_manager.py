@@ -56,7 +56,8 @@ def test_builtin_themes_presence():
     assert "cyberdream" in names
     assert "vesper" in names
     assert "dracula" in names
-    assert len(BUILTIN_THEMES) == 25
+    assert "native" in names
+    assert len(BUILTIN_THEMES) == 26
 
 
 def test_theme_manager_registration_and_switching():
@@ -101,6 +102,7 @@ def test_theme_manager_textual_theme_conversion():
     assert tt.name == "zinc"
     assert tt.background is not None
     assert tt.surface is not None
+    assert tt.foreground is not None
     assert "bg-app" in tt.variables
 
     all_tt = tm.get_all_textual_themes()
@@ -210,15 +212,18 @@ def test_themes_loader_module():
         load_builtin_themes,
     )
 
-    assert len(THEMES) == 25
-    assert len(BUILTIN_THEMES) == 25
+    assert len(THEMES) == 26
+    assert len(BUILTIN_THEMES) == 26
     assert get_theme("zinc") is not None
     assert get_theme("zinc").name == "zinc"
+    assert get_theme("native") is not None
+    assert get_theme("native").name == "native"
     assert get_theme("nonexistent") is None
-    assert len(list_themes()) == 25
-    assert len(load_builtin_themes()) == 25
+    assert len(list_themes()) == 26
+    assert len(load_builtin_themes()) == 26
     assert ZINC_DARK.name == "zinc"
     assert EVERFOREST_DARK.name == "everforest"
+    assert themes_mod.NATIVE.name == "native"
     assert themes_mod.NORD.name == "nord"
     assert "THEMES" in dir(themes_mod)
 

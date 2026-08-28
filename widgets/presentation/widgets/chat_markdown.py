@@ -11,6 +11,7 @@ from rich.syntax import Syntax
 from textual.app import ComposeResult
 from textual.color import Color
 from textual.containers import Horizontal, Vertical
+from textual.content import Content
 from textual.highlight import HighlightTheme
 from textual.style import Style
 from textual.widgets import Button, Label, Markdown, Static
@@ -134,8 +135,8 @@ class CustomMarkdownFence(MarkdownFence):
 
     @classmethod
     def highlight(
-        cls, code: str, language: str | None = None, ansi: bool = False, dark: bool = False
-    ) -> Any:
+        cls, code: str, language: str | None = None, ansi: bool = False, dark: bool = True
+    ) -> Content:
         clean_lang = (language or "").strip().lower()
         if clean_lang in ("text", "txt", "plaintext", "none", "raw", "output", "code", "log", ""):
             target_lexer = "text"
@@ -147,7 +148,29 @@ class CustomMarkdownFence(MarkdownFence):
                 target_lexer = "text"
 
         code_str = code if isinstance(code, str) else str(code)
-        return MarkdownFence.highlight(code_str.rstrip("\r\n"), language=target_lexer, ansi=ansi, dark=dark)
+        clean_code = code_str.rstrip("\r\n")
+
+        from rich.console import Console
+        from rich.text import Text
+        from textual.content import Content
+
+        if target_lexer == "text":
+            return Content.from_rich_text(Text(clean_code))
+
+        theme = CODE_THEME if dark else "github-light"
+        try:
+            syntax = Syntax(clean_code, target_lexer, theme=theme, word_wrap=True)
+            console = Console(force_terminal=True, color_system="truecolor")
+            rich_text = Text()
+            for segment in syntax._get_syntax(console, console.options):
+                style = segment.style.copy() if segment.style else None
+                if style and style.bgcolor:
+                    style._bgcolor = None
+                rich_text.append(segment.text, style=style)
+            rich_text.rstrip()
+            return Content.from_rich_text(rich_text)
+        except Exception:
+            return MarkdownFence.highlight(clean_code, language=target_lexer, ansi=ansi, dark=dark)
 
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "text"
@@ -162,9 +185,26 @@ class CustomMarkdownFence(MarkdownFence):
             yield lang_label
             yield copy_btn
 
-        code_content = self.highlight(self.code, self.lexer)
+        app = getattr(self, "app", None)
+        is_ansi = getattr(app, "native_ansi_color", False) if app else True
+        is_dark = getattr(getattr(app, "current_theme", None), "dark", True) if app else True
+        code_content = self.highlight(self.code, self.lexer, ansi=is_ansi, dark=is_dark)
         with Vertical(classes="fence-scroll-box"):
             yield Label(code_content, id="code-content", expand=True)
+
+    def notify_style_update(self) -> None:
+        """Update highlight theme when App theme changes."""
+        app = getattr(self, "app", None)
+        is_ansi = getattr(app, "native_ansi_color", False) if app else True
+        is_dark = getattr(getattr(app, "current_theme", None), "dark", True) if app else True
+        self._highlighted_code = self.highlight(
+            self.code,
+            self.lexer,
+            ansi=is_ansi,
+            dark=is_dark,
+        )
+        self.set_content(self._highlighted_code)
+        return super().notify_style_update()
 
     def set_content(self, content: Any) -> None:
         self._content = content

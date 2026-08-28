@@ -4,6 +4,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Input
 
+from widgets.app.theme_manager import theme_manager
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.theme import ThemeScreen
 
@@ -21,9 +22,9 @@ async def test_theme_screen_composition_and_search():
         await app.push_screen(screen)
         await pilot.pause()
 
-        # Check options loaded (25 modern themes)
+        # Check options loaded
         opt_list = screen.query_one(f"#{screen.option_list_id}", HeaderWrapOptionList)
-        assert opt_list.option_count == 25
+        assert opt_list.option_count == len(theme_manager.list_themes())
 
         # Search for "charcoal"
         search_input = screen.query_one("#modal-search-input", Input)

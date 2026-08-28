@@ -16,8 +16,24 @@ Input > .selection,
     text-style: none !important;
 }
 
+/* Dynamic True Color Cursors for all Input fields and TextAreas */
+.input--cursor,
+.text-area--cursor,
+Input > .input--cursor,
+TextArea > .text-area--cursor,
+#message-input > .text-area--cursor,
+#write-in-input > .input--cursor,
+#modal-search-input > .input--cursor,
+#diff-search-input > .input--cursor,
+#api-key-input > .input--cursor {
+    background: $fg-primary !important;
+    color: $fg-inverted !important;
+    text-style: none !important;
+}
+
 Screen {
     background: $bg-app;
+    color: $fg-primary;
     padding: 0;
     margin: 0;
     layers: default overlay;
@@ -210,7 +226,8 @@ WelcomeWidget {
 }
 
 /* Strict Height Auto & Zero Margin for Markdown Elements */
-Markdown, MarkdownBlock, MarkdownParagraph {
+Markdown, MarkdownBlock, MarkdownParagraph, MarkdownBulletList, MarkdownOrderedList, MarkdownItem {
+    color: $fg-primary;
     link-color: $fg-primary;
     link-color-hover: $fg-primary;
     link-background-hover: $bg-surface;
@@ -488,7 +505,7 @@ Toast.-error {
 /* Modal Dialog Styles - Pure Dark Glassmorphism Effect */
 ModalScreen {
     align: center middle;
-    background: $bg-app 85%;
+    background: #000000 80%;
     overflow: hidden;
     scrollbar-size: 0 0 !important;
 }

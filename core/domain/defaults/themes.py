@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     THEMES: dict[str, Theme]
     BUILTIN_THEMES: list[Theme]
     ZINC_DARK: Theme
+    NATIVE: Theme
 
 THEMES_JSON_PATH = Path(__file__).with_name("themes.json")
 
@@ -20,6 +21,8 @@ _themes_cache: dict[str, Theme] | None = None
 _NAME_ALIASES: dict[str, str] = {
     "ZINC_DARK": "zinc",
     "EVERFOREST_DARK": "everforest",
+    "NATIVE": "native",
+    "NATIVE_DARK": "native",
 }
 
 
