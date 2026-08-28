@@ -353,11 +353,6 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         with patch("core.application.generation.prompt_builder.get_git_info", return_value="main"):
             self.assertEqual(footer._compute_branch_sync(cwd="/some/dir"), "main")
 
-    def test_compute_branch_sync_legacy_wrapped_branch(self):
-        footer = StatusFooter()
-        with patch("core.application.generation.prompt_builder.get_git_info", return_value="branch 'dev'"):
-            self.assertEqual(footer._compute_branch_sync(cwd="/some/dir"), "dev")
-
     def test_compute_branch_sync_detached_head(self):
         footer = StatusFooter()
         with patch("core.application.generation.prompt_builder.get_git_info", return_value="detached HEAD (abc1234)"):

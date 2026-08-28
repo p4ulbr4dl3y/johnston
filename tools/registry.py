@@ -98,7 +98,7 @@ def get_default_tools() -> list[Dict[str, Any]]:
         if getattr(cls, "schema", None):
             try:
                 inst = _get_tool_instance(cls)
-                tools.append(inst.get_schema() if hasattr(inst, "get_schema") else cls.schema)
+                tools.append(inst.get_schema())
             except Exception:
                 tools.append(cls.schema)
     return tools
@@ -205,10 +205,9 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     # server not yet warmed up).
     active_mcp_tools: list = []
     try:
-        if hasattr(mcp_mgr, "get_cached_tools"):
-            cached_tools = mcp_mgr.get_cached_tools() or []
-            if isinstance(cached_tools, list):
-                active_mcp_tools = cached_tools
+        cached_tools = mcp_mgr.get_cached_tools() if hasattr(mcp_mgr, "get_cached_tools") else []
+        if isinstance(cached_tools, list):
+            active_mcp_tools = cached_tools
     except Exception as e:
         logger.warning("MCP cached tools read failed: %s", e, exc_info=True)
         return ToolResult.error("mcp", detail=f"failed to read cached tools: {e}", name=name)
@@ -221,7 +220,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         # found among cached tools. Kept outside the listing try so its failure
         # is reported distinctly and not confused with transport listing errors.
         try:
-            if mcp_mgr.get_capabilities_for_exposed_tool(name):
+            if hasattr(mcp_mgr, "get_capabilities_for_exposed_tool") and mcp_mgr.get_capabilities_for_exposed_tool(name):
                 is_mcp = True
         except Exception as e:
             logger.warning("MCP capability resolution failed for '%s': %s", name, e, exc_info=True)
@@ -238,8 +237,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             if hasattr(mcp_mgr, "get_active_tools_async"):
                 res_or_coro = mcp_mgr.get_active_tools_async()
                 listed_tools = await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
-            else:
+            elif hasattr(mcp_mgr, "get_active_tools"):
                 listed_tools = mcp_mgr.get_active_tools() or []
+            else:
+                listed_tools = []
             if listed_tools:
                 active_mcp_tools = list(listed_tools)
             is_mcp = any((t.get("function", {}).get("name") or "").lower() == clean_name for t in active_mcp_tools)

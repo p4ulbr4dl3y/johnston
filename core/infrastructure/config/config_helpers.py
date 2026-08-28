@@ -21,8 +21,6 @@ def load_sandbox_config(config_file: Optional[str] = None) -> bool:
             val = data.get("sandbox_enabled", False)
             if isinstance(val, bool):
                 return val
-            if isinstance(val, (int, str)):
-                return str(val).lower() in ("true", "1", "yes", "on")
     except Exception:
         pass
     return False

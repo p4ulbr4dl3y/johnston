@@ -30,4 +30,6 @@ ADAPTERS: Dict[str, BaseApiAdapter] = {
 
 def get_adapter(api_type: str = "openai") -> BaseApiAdapter:
     key = (api_type or "openai").lower().strip()
-    return ADAPTERS.get(key, ADAPTERS["openai"])
+    if key not in ADAPTERS:
+        raise ValueError(f"Unknown API adapter type: {api_type!r}")
+    return ADAPTERS[key]

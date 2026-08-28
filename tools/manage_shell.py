@@ -4,7 +4,7 @@ from core.domain.defaults.errors import ToolResult
 from core.infrastructure.tasks.manage import (
     filter_to_session,
     find_any,
-    format_tasks_xml,
+    format_tasks_plain,
     list_lines,
     not_found_message,
 )
@@ -53,9 +53,9 @@ class ManageShellTool(BaseTool):
         tasks = filter_to_session(tasks, curr_sid)
 
         if action == "list":
-            content_xml = format_tasks_xml(tasks)
+            content_plain = format_tasks_plain(tasks)
             display_txt = list_lines(tasks)
-            return ToolResult.done(content=content_xml, display=display_txt)
+            return ToolResult.done(content=content_plain, display=display_txt)
 
         if action == "send_input":
             if not task_id:

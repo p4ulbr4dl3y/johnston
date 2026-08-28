@@ -65,10 +65,7 @@ class GitMetricsMixin:
             target_cwd = cwd or os.getcwd()
             info = (get_git_info(cwd=target_cwd) or "").strip()
             # format_git_branch_info returns a bare branch name (e.g. "main"),
-            # "detached HEAD (<sha>)", or "" when not a repo. Keep the legacy
-            # "branch '<name>'" branch for backward compat with stale caches.
-            if info.startswith("branch '"):
-                return info[len("branch '") : -1]
+            # "detached HEAD (<sha>)", or "" when not a repo.
             if info.startswith("detached HEAD"):
                 return info.replace("detached HEAD (", "detached (")
             return info

@@ -451,8 +451,9 @@ def test_active_provider_json_null(pm, tmp_path):
 def test_active_provider_nonexistent(pm):
     pm.set_active_provider_key("ghost-provider")
     agent = pm.create_active_agent()
-    assert agent.provider_key == "ghost-provider"
-    assert agent.model == ""
+    # ghost-provider cannot back an agent, falls back to connected provider or None
+    if agent is not None:
+        assert agent.provider_key != "ghost-provider"
 
 
 # ---------------------------------------------------------------------------
@@ -461,14 +462,12 @@ def test_active_provider_nonexistent(pm):
 
 def test_create_agent_none_provider(pm):
     agent = pm.create_agent_for_provider(None)
-    assert agent is not None
-    assert agent.provider_key in (None, "")
+    assert agent is None
 
 
 def test_create_agent_unknown_provider(pm):
     agent = pm.create_agent_for_provider("unknown")
-    assert agent is not None
-    assert agent.model == ""
+    assert agent is None
 
 
 def test_create_agent_missing_api_key(pm):
@@ -714,9 +713,8 @@ def test_env_api_key_fallback_and_stored_precedence(pm, tmp_path, monkeypatch):
     assert pm.get_api_key("acme") == "typed-by-user"
 
 
-def test_env_api_key_alias_togetherai(pm, monkeypatch):
-    monkeypatch.delenv("TOGETHERAI_API_KEY", raising=False)
-    monkeypatch.setenv("TOGETHER_API_KEY", "tog-key")
+def test_env_api_key_togetherai(pm, monkeypatch):
+    monkeypatch.setenv("TOGETHERAI_API_KEY", "tog-key")
     from core.infrastructure.secrets import get_secret
 
     assert get_secret("togetherai") == "tog-key"

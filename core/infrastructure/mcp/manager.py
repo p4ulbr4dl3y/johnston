@@ -749,10 +749,10 @@ class MCPManager:
             caps = caps_cfg.get(tool_name)
             if caps is None:
                 caps = caps_cfg.get(f"{server_name}__{tool_name}")
-            if isinstance(caps, str):
-                return [caps]
             if isinstance(caps, list):
                 return [str(c) for c in caps if str(c).strip()]
+            if isinstance(caps, str) and caps.strip():
+                return [caps.strip()]
             return []
         return []
 
@@ -772,13 +772,7 @@ class MCPManager:
     def _resolve_target_client_and_tool(
         self, tool_name: str, active_tools: List[Dict[str, Any]], target_server: Optional[str] = None
     ) -> Tuple[Optional[MCPProcessClient], Optional[str]]:
-        """Helper to match exposed/raw tool_name against active MCP clients.
-
-        Exact match on the exposed or raw name runs FIRST, so a tool whose real
-        name contains ``__`` (e.g. ``db__query``) still resolves; the
-        ``server__tool`` namespace split is only attempted for legacy names that
-        no exact match covered.
-        """
+        """Helper to match exposed or raw tool_name against active MCP clients."""
         for t in active_tools:
             s_name = t.get("_mcp_server")
             o_name = t.get("_mcp_tool_name")
@@ -801,15 +795,10 @@ class MCPManager:
         target_server: Optional[str] = None,
         timeout: Optional[float] = None,
     ) -> Optional[str]:
-        """
-        Executes an MCP tool call by name across active MCP clients.
-        Supports both direct tool_name, namespaced server_name__tool_name, or explicit target_server.
-        """
+        """Executes an MCP tool call by name across active MCP clients."""
         if target_server and target_server in self.clients:
             client = self.clients[target_server]
-            raw_name = tool_name
-            if "__" in tool_name and tool_name.startswith(f"{target_server}__"):
-                raw_name = tool_name.split("__", 1)[1]
+            raw_name = tool_name[len(target_server) + 2 :] if tool_name.startswith(f"{target_server}__") else tool_name
             return client.call_tool(
                 raw_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
             )
@@ -831,9 +820,7 @@ class MCPManager:
     ) -> Optional[str]:
         if target_server and target_server in self.clients:
             client = self.clients[target_server]
-            raw_name = tool_name
-            if "__" in tool_name and tool_name.startswith(f"{target_server}__"):
-                raw_name = tool_name.split("__", 1)[1]
+            raw_name = tool_name[len(target_server) + 2 :] if tool_name.startswith(f"{target_server}__") else tool_name
             return await client.call_tool_async(
                 raw_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
             )

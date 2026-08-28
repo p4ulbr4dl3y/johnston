@@ -447,10 +447,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self.canonical_tool == "shell" and bool((self.result_text or "").strip())
             )
         if self.canonical_tool == "manage_shell":
-            action = (self.args if isinstance(self.args, dict) else {}).get("action", "list")
+            action = self.args.get("action", "list")
             return (action or "list").lower() == "list"
         if self.canonical_tool == "manage_subagent":
-            args = self.args if isinstance(self.args, dict) else {}
+            args = self.args
             action = (args.get("action") or "list").lower()
             return bool(getattr(self, "subagent_session_id", None) or args.get("session_id") or action == "list")
         return (
@@ -482,7 +482,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             target = re.sub(r"\s+", " ", target.replace("\n", " ").replace("\r", " ")).strip()
         self.target = target
         self.result_text = result_text
-        self.args = args or {}
+        self.args = args if isinstance(args, dict) else {}
         self.returncode = returncode
         self.is_mcp = is_mcp
         self.is_expanded = False
@@ -735,7 +735,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             # MCP/custom tool: single format — ToolName({k: v, ...}).
             from widgets.presentation.tool_display import format_compact_dict
 
-            compact = format_compact_dict(self.args if isinstance(self.args, dict) else {})
+            compact = format_compact_dict(self.args)
             is_mcp = (self.tool_type or "").startswith("mcp_") or self.is_mcp
             tool_name_display = to_snake_case(self.tool_type) if is_mcp else (self.tool_type or "Tool")
             escaped_compact = escape(compact)
@@ -752,7 +752,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             pass
 
         if self.canonical_tool == "invoke_subagent":
-            args = self.args if isinstance(self.args, dict) else {}
+            args = self.args
             session_id = getattr(self, "subagent_session_id", None)
             identifier = session_id or args.get("title") or args.get("prompt") or self.target
             store = getattr(app, "sm", None) if app else None
@@ -779,7 +779,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 pass
             return
         if self.canonical_tool == "manage_subagent":
-            args = self.args if isinstance(self.args, dict) else {}
+            args = self.args
             session_id = getattr(self, "subagent_session_id", None) or args.get("session_id")
             if session_id:
                 store = getattr(app, "sm", None) if app else None
@@ -836,7 +836,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                             app.notify("No active subagents", severity="information")
                     return
         if self.canonical_tool == "manage_shell":
-            args = self.args if isinstance(self.args, dict) else {}
+            args = self.args
             action = (args.get("action") or "list").lower()
             if action == "list":
                 tasks = getattr(app, "task_manager", []) if app else []
@@ -900,7 +900,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             pending()
 
     def _parse_ask_user_questions(self) -> list[dict]:
-        args = self.args if isinstance(self.args, dict) else {}
+        args = self.args
         qs = args.get("questions")
         out = []
         if isinstance(qs, list):
@@ -1006,8 +1006,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         caller applies the result on the event loop.
         """
         try:
-            nargs = self.args if isinstance(self.args, dict) else {}
-            file_path = nargs.get("path") or self.target
+            file_path = self.args.get("path") or self.target
             if self.tool_type == "create":
                 raw_text = (self.result_text or "").strip()
                 if self._is_error(raw_text):
@@ -1072,22 +1071,20 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             elif self.canonical_tool == "ask_user":
                 return "raw", self._format_ask_user_display()
             elif self.canonical_tool == "manage_shell":
-                args = self.args if isinstance(self.args, dict) else {}
-                action = (args.get("action") or "list").lower()
+                action = (self.args.get("action") or "list").lower()
                 if action == "list":
                     return "raw", self._format_manage_shell_display()
                 clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
                 return "markup", self._clean_markup_text(clean_res)
             elif self.canonical_tool == "manage_subagent":
-                args = self.args if isinstance(self.args, dict) else {}
-                action = (args.get("action") or "list").lower()
+                action = (self.args.get("action") or "list").lower()
                 if action == "list":
                     return "raw", self._format_manage_subagent_display()
                 clean_res = self._clean_hints_for_ui(self.result_text or "(No result)")
             elif self.canonical_tool == "invoke_subagent":
                 clean_res = self._clean_hints_for_ui(self.result_text or "")
                 if not clean_res.strip():
-                    prompt = (self.args if isinstance(self.args, dict) else {}).get("prompt", "")
+                    prompt = self.args.get("prompt", "")
                     clean_res = prompt or "(Subagent task)"
                 return "markup", self._clean_markup_text(clean_res)
             elif self.tool_type == "shell":

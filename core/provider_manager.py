@@ -441,16 +441,15 @@ class ProviderManager:
 
     def create_agent_for_provider(self, provider_key: str):
         pdef = self.load_provider_def(provider_key)
-        # A disabled provider must never back an agent (enable/disable must be
-        # authoritative for actual usage, not just UI filtering). Unknown/None
-        # providers keep building a default agent for backward compatibility.
-        if pdef is not None and not pdef.enabled:
+        if pdef is None:
+            return None
+        if not pdef.enabled:
             logger.warning("Refusing to create agent for disabled provider: %s", provider_key)
             return None
-        pkey_str = pdef.key if pdef else (provider_key or "")
-        stored_key = self.get_api_key(pkey_str) if pkey_str else ""
-        model_val = self.get_provider_model(provider_key) if provider_key else ""
-        thinking_effort = self.get_provider_thinking_effort(provider_key, model_val) if provider_key else EFFORT_AUTO
+        pkey_str = pdef.key
+        stored_key = self.get_api_key(pkey_str)
+        model_val = self.get_provider_model(provider_key)
+        thinking_effort = self.get_provider_thinking_effort(provider_key, model_val)
 
         from core.base_provider import BaseAgent
         from core.infrastructure.runtime.tool_name import normalize_tool_name
@@ -459,21 +458,21 @@ class ProviderManager:
         from tools.registry import execute_tool, get_default_tools
 
         agent = BaseAgent(
-            api_key=stored_key or (pdef.api_key if pdef else ""),
+            api_key=stored_key or pdef.api_key,
             model=model_val,
-            base_url=pdef.base_url if pdef else "",
+            base_url=pdef.base_url,
             provider_key=pkey_str,
-            api_type=pdef.api_type if pdef else "openai",
-            headers=pdef.headers if pdef else None,
-            extra_body=pdef.extra_body if pdef else None,
-            reasoning_effort=pdef.reasoning_effort if pdef else None,
+            api_type=pdef.api_type,
+            headers=pdef.headers,
+            extra_body=pdef.extra_body,
+            reasoning_effort=pdef.reasoning_effort,
             thinking_effort=thinking_effort,
-            chunk_timeout=pdef.chunk_timeout if pdef else DEFAULT_CHUNK_TIMEOUT,
-            max_tokens=(pdef.max_tokens if pdef else None) or DEFAULT_MAX_TOKENS,
-            max_retries=pdef.max_retries if pdef else DEFAULT_MAX_RETRIES,
-            retry_delay=pdef.retry_delay if pdef else DEFAULT_RETRY_DELAY,
-            retry_backoff=pdef.retry_backoff if pdef else DEFAULT_RETRY_BACKOFF,
-            max_retry_delay=pdef.max_retry_delay if pdef else DEFAULT_MAX_RETRY_DELAY,
+            chunk_timeout=pdef.chunk_timeout,
+            max_tokens=pdef.max_tokens or DEFAULT_MAX_TOKENS,
+            max_retries=pdef.max_retries,
+            retry_delay=pdef.retry_delay,
+            retry_backoff=pdef.retry_backoff,
+            max_retry_delay=pdef.max_retry_delay,
             tool_executor=execute_tool,
             default_tools_provider=get_default_tools,
             image_processor=process_image_file_sync,

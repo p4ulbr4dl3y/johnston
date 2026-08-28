@@ -57,11 +57,7 @@ class SessionStore:
         path_hash = hashlib.md5(self.project_path.encode("utf-8")).hexdigest()[:8]
         folder_name = os.path.basename(self.project_path) or "root"
         self.project_key = f"{folder_name}_{path_hash}"
-
-        import sys
-
-        pdir = getattr(sys.modules.get("core.session_manager"), "PROJECTS_DIR", None) or PROJECTS_DIR
-        self.project_dir = os.path.join(pdir, self.project_key)
+        self.project_dir = os.path.join(PROJECTS_DIR, self.project_key)
         self.sessions_dir = os.path.join(self.project_dir, "sessions")
         self.config_file = os.path.join(self.project_dir, "config.json")
 

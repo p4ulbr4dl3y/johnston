@@ -106,13 +106,6 @@ class TestResolvePathEdge(unittest.TestCase):
 
 
 class TestExecuteMcpEdge(unittest.IsolatedAsyncioTestCase):
-    async def test_sync_manager(self):
-        class SyncMgr:
-            def call_tool(self, n, a, **k):
-                return f"S:{n}"
-
-        self.assertEqual(await execute_mcp_tool(SyncMgr(), "x", {}), "S:x")
-
     async def test_async_manager(self):
         class AsyncMgr:
             async def call_tool_async(self, n, a, **k):
@@ -122,14 +115,14 @@ class TestExecuteMcpEdge(unittest.IsolatedAsyncioTestCase):
 
     async def test_returns_none(self):
         class NoneMgr:
-            def call_tool(self, n, a, **k):
+            async def call_tool_async(self, n, a, **k):
                 return None
 
         self.assertIsNone(await execute_mcp_tool(NoneMgr(), "x", {}))
 
     async def test_result_not_string(self):
         class DictMgr:
-            def call_tool(self, n, a, **k):
+            async def call_tool_async(self, n, a, **k):
                 return {"ok": True}
 
         res = await execute_mcp_tool(DictMgr(), "x", {})

@@ -258,7 +258,7 @@ def main():
     if getattr(app, "current_session_id", None) and hasattr(app, "sm"):
         try:
             sess = app.sm.get(app.current_session_id)
-            if sess and (sess.messages or sess.agent_history):
+            if sess and (getattr(sess, "messages", None) or getattr(sess, "agent_history", None)):
                 print(f"\nTo resume this session, run:\n  johnston --resume {app.current_session_id}")
         except Exception:
             pass

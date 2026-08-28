@@ -15,11 +15,6 @@ from core.infrastructure.platform.platform_utils import atomic_write_json, read_
 _ENV_VAR_PATTERN = re.compile(r"\$\{([A-Za-z0-9_]+)\}|\$([A-Za-z0-9_]+)")
 
 
-_ENV_KEY_ALIASES = {
-    "togetherai": "TOGETHER_API_KEY",
-}
-
-
 def load_secrets() -> Dict[str, str]:
     """Load secrets dictionary from ~/.johnston/secrets.json."""
     if not os.path.exists(SECRETS_FILE):
@@ -41,7 +36,7 @@ def save_secret(key: str, value: str) -> None:
 def get_secret(key: str, default: str = "") -> str:
     """Resolve secret by key from secrets.json first (user file override), then os.environ.
 
-    Supports exact match, known aliases, upper_snake_case, and <KEY>_API_KEY variants.
+    Supports exact match, upper_snake_case, and <KEY>_API_KEY variants.
     """
     canonical = (key or "").strip()
     if not canonical:
@@ -57,15 +52,7 @@ def get_secret(key: str, default: str = "") -> str:
     if canonical in os.environ and os.environ[canonical].strip():
         return os.environ[canonical].strip()
 
-    # 3. Known aliases (e.g. togetherai -> TOGETHER_API_KEY)
-    alias = _ENV_KEY_ALIASES.get(canonical.lower())
-    if alias:
-        if alias in secrets and str(secrets[alias]).strip():
-            return str(secrets[alias]).strip()
-        if alias in os.environ and os.environ[alias].strip():
-            return os.environ[alias].strip()
-
-    # 4. Uppercase normalized variants (e.g. "openrouter" -> "OPENROUTER", "OPENROUTER_API_KEY")
+    # 3. Uppercase normalized variants (e.g. "openrouter" -> "OPENROUTER", "OPENROUTER_API_KEY")
     upper_key = canonical.upper().replace("-", "_")
     for variant in (f"{upper_key}_API_KEY", upper_key, f"{upper_key}_TOKEN"):
         if variant in secrets and str(secrets[variant]).strip():

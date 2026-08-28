@@ -18,7 +18,8 @@ class TestAdapters(unittest.TestCase):
         self.assertIsInstance(get_adapter("anthropic"), AnthropicAdapter)
         self.assertIsInstance(get_adapter("gemini"), GeminiAdapter)
         self.assertIsInstance(get_adapter("ollama"), OllamaAdapter)
-        self.assertIsInstance(get_adapter("unknown"), OpenAIAdapter)
+        with self.assertRaises(ValueError):
+            get_adapter("unknown")
 
     def test_sort_keys_recursive(self):
         unsorted = {"z": 1, "a": {"c": 2, "b": 3}, "m": [3, 2, {"y": 4, "x": 5}]}

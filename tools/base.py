@@ -348,13 +348,13 @@ async def confirm_permission(
 
 
 async def execute_mcp_tool(mcp_mgr: Any, tool_name: str, arguments: Dict[str, Any], target_server: Optional[str] = None):
-    """Invokes an MCP tool, preferring the async API when available."""
+    """Invokes an MCP tool asynchronously."""
     kwargs = {"target_server": target_server} if target_server is not None else {}
     if hasattr(mcp_mgr, "call_tool_async"):
-        res_or_coro = mcp_mgr.call_tool_async(tool_name, arguments, **kwargs)
+        res = mcp_mgr.call_tool_async(tool_name, arguments, **kwargs)
     else:
-        res_or_coro = mcp_mgr.call_tool(tool_name, arguments, **kwargs)
-    return await res_or_coro if inspect.isawaitable(res_or_coro) else res_or_coro
+        res = mcp_mgr.call_tool(tool_name, arguments, **kwargs)
+    return await res if inspect.isawaitable(res) else res
 
 
 class BaseTool:

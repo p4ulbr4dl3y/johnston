@@ -36,7 +36,7 @@ def format_tasks_plain(tasks: List[Any]) -> str:
 
     items = []
     for t in tasks:
-        tid = str(getattr(t, "task_id", getattr(t, "id", "")))
+        tid = str(getattr(t, "task_id", ""))
         is_running = getattr(t, "is_running", True)
         status = "running" if is_running else "finished"
         cmd = str(getattr(t, "command", ""))
@@ -45,9 +45,6 @@ def format_tasks_plain(tasks: List[Any]) -> str:
         items.append(f"- ID: {tid} | status: {status} | cmd: {cmd}{log_part}")
 
     return f"Active Background Tasks ({len(tasks)}):\n" + "\n".join(items)
-
-
-format_tasks_xml = format_tasks_plain
 
 
 def not_found_message(task_id: str, tasks: List[Any], manager_name: str) -> str:
@@ -64,6 +61,6 @@ def not_found_message(task_id: str, tasks: List[Any], manager_name: str) -> str:
 def find_any(tasks: List[Any], task_id: str) -> Any:
     """Return the first task matching ``task_id`` or None."""
     for t in tasks:
-        if getattr(t, "task_id", None) == task_id or getattr(t, "id", None) == task_id:
+        if getattr(t, "task_id", None) == task_id:
             return t
     return None
