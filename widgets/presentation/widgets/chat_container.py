@@ -222,8 +222,11 @@ class ChatView(VerticalScroll):
 
     async def load_all_older_messages(self) -> None:
         """Load and mount all remaining older messages into view."""
+        was_bottom = self.is_at_bottom()
         while self.has_older_messages():
             await self._load_older_messages_worker()
+        if was_bottom:
+            self.scroll_to_bottom()
 
     def get_total_user_message_count(self) -> int:
         """Return total count of visible user turns (both unloaded and mounted)."""

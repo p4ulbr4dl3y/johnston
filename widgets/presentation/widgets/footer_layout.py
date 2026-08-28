@@ -13,6 +13,16 @@ STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
 STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
 
 
+def get_theme_colors() -> tuple[str, str, str, str]:
+    """Get active theme colors (primary, secondary, muted, subtle)."""
+    try:
+        from widgets.app.theme_manager import theme_manager
+        t = theme_manager.current_theme
+        return t.primary, t.secondary, t.muted, t.subtle
+    except Exception:
+        return THEME_PRIMARY, THEME_SECONDARY, THEME_MUTED, THEME_SUBTLE
+
+
 def format_display_path(raw_path: str, max_length: int = 40) -> str:
     """Format directory path for footer display with worktree: prefix, ~/ for $HOME and middle truncation if long."""
     if not raw_path:
@@ -109,12 +119,16 @@ def _build_subagent_grid(
     grid.add_column(justify="left")
     grid.add_column(justify="right")
 
+    t_primary, t_secondary, t_muted, t_subtle = get_theme_colors()
+    sep = f"  [{t_muted}]•[/]  "
+    sep_compact = f" [{t_muted}]•[/] "
+
     if is_compact:
         # Row 1 (Compact): Left [Model] | Right [pct% ctx • $0.02 / tok]
         row1_left_parts = []
         if is_connected and clean_model and clean_model != "[Select model: /models]":
-            row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/]")
-        row1_left = STATUS_SEP_COMPACT.join(row1_left_parts)
+            row1_left_parts.append(f"[{t_secondary}]{clean_model}[/]")
+        row1_left = sep_compact.join(row1_left_parts)
 
         if is_connected and bool(model_name):
             pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
@@ -122,24 +136,24 @@ def _build_subagent_grid(
             pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
             cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
             right_val = cost_str if cost_usd > 0 else f"{format_context_tokens(total_tokens)}t"
-            row1_right = f"[{THEME_SECONDARY}]{pct_str} ctx[/]{STATUS_SEP_COMPACT}[{THEME_SECONDARY}]{right_val}[/]"
+            row1_right = f"[{t_secondary}]{pct_str} ctx[/]{sep_compact}[{t_secondary}]{right_val}[/]"
         else:
-            row1_right = f"[{THEME_SUBTLE}]Run /connect[/{THEME_SUBTLE}]"
+            row1_right = f"[{t_subtle}]Run /connect[/{t_subtle}]"
 
         # Row 2 (Compact): Left [dir • branch (+N/-M) • sb:on • mode] | Right []
         dir_basename = os.path.basename(os.path.abspath(directory)) or directory
-        row2_left_parts = [f"[{THEME_SECONDARY}]{dir_basename}[/]"]
+        row2_left_parts = [f"[{t_secondary}]{dir_basename}[/]"]
         diff_text = git_diff_stats()
         if branch and diff_text:
-            row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/] [{THEME_SECONDARY}]({diff_text})[/]")
+            row2_left_parts.append(f"[{t_primary}]{branch}[/] [{t_secondary}]({diff_text})[/]")
         elif branch:
-            row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+            row2_left_parts.append(f"[{t_primary}]{branch}[/]")
         elif diff_text:
-            row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
-        row2_left_parts.append(f"[{THEME_PRIMARY}]sb:on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sb:off[/]")
+            row2_left_parts.append(f"[{t_secondary}]({diff_text})[/]")
+        row2_left_parts.append(f"[{t_primary}]sb:on[/]" if sandbox_enabled else f"[{t_muted}]sb:off[/]")
         if execution_mode:
-            row2_left_parts.append(f"[{THEME_SECONDARY}]{execution_mode}[/]")
-        row2_left = STATUS_SEP_COMPACT.join(row2_left_parts)
+            row2_left_parts.append(f"[{t_secondary}]{execution_mode}[/]")
+        row2_left = sep_compact.join(row2_left_parts)
         row2_right = ""
 
         grid.add_row(row1_left, row1_right)
@@ -157,10 +171,10 @@ def _build_subagent_grid(
         model_part = f"{provider_display} › {clean_model}"
         if thinking_effort and thinking_effort != "auto":
             model_part += f" ({thinking_effort})"
-        row1_left_parts.append(f"[{THEME_SECONDARY}]{model_part}[/]")
+        row1_left_parts.append(f"[{t_secondary}]{model_part}[/]")
     elif clean_model:
-        row1_left_parts.append(f"[{THEME_SECONDARY}]{clean_model}[/]")
-    row1_left = STATUS_SEP.join(row1_left_parts)
+        row1_left_parts.append(f"[{t_secondary}]{clean_model}[/]")
+    row1_left = sep.join(row1_left_parts)
 
     if is_connected and model_name:
         pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
@@ -171,29 +185,29 @@ def _build_subagent_grid(
         cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
         tok_str = format_context_tokens(total_tokens)
         row1_right_parts = [
-            f"[{THEME_SUBTLE}][{bar_str}][/] [{THEME_SECONDARY}]{pct:.0f}% ({format_context_tokens(context_used)}/{context_window})[/]",
-            f"[{THEME_SECONDARY}]{tok_str} tok[/]",
-            f"[{THEME_SECONDARY}]{cost_str}[/]",
+            f"[{t_subtle}][{bar_str}][/] [{t_secondary}]{pct:.0f}% ({format_context_tokens(context_used)}/{context_window})[/]",
+            f"[{t_secondary}]{tok_str} tok[/]",
+            f"[{t_secondary}]{cost_str}[/]",
         ]
-        row1_right = STATUS_SEP.join(row1_right_parts)
+        row1_right = sep.join(row1_right_parts)
     else:
-        row1_right = f"[{THEME_SUBTLE}]Run /connect to set up API key.[/{THEME_SUBTLE}]"
+        row1_right = f"[{t_subtle}]Run /connect to set up API key.[/{t_subtle}]"
     grid.add_row(row1_left, row1_right)
 
     # Row 2: Left [directory • branch (+N/-M) • sandbox: on • mode] | Right []
     dir_text = format_display_path(directory)
-    row2_left_parts = [f"[{THEME_SECONDARY}]{dir_text}[/]"]
+    row2_left_parts = [f"[{t_secondary}]{dir_text}[/]"]
     diff_text = git_diff_stats()
     if branch and diff_text:
-        row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/] [{THEME_SECONDARY}]({diff_text})[/]")
+        row2_left_parts.append(f"[{t_primary}]{branch}[/] [{t_secondary}]({diff_text})[/]")
     elif branch:
-        row2_left_parts.append(f"[{THEME_PRIMARY}]{branch}[/]")
+        row2_left_parts.append(f"[{t_primary}]{branch}[/]")
     elif diff_text:
-        row2_left_parts.append(f"[{THEME_SECONDARY}]({diff_text})[/]")
-    row2_left_parts.append(f"[{THEME_PRIMARY}]sandbox: on[/]" if sandbox_enabled else f"[{THEME_MUTED}]sandbox: off[/]")
+        row2_left_parts.append(f"[{t_secondary}]({diff_text})[/]")
+    row2_left_parts.append(f"[{t_primary}]sandbox: on[/]" if sandbox_enabled else f"[{t_muted}]sandbox: off[/]")
     if execution_mode:
-        row2_left_parts.append(f"[{THEME_SECONDARY}]{execution_mode}[/]")
-    row2_left = STATUS_SEP.join(row2_left_parts)
+        row2_left_parts.append(f"[{t_secondary}]{execution_mode}[/]")
+    row2_left = sep.join(row2_left_parts)
 
     row2_right = ""
     grid.add_row(row2_left, row2_right)

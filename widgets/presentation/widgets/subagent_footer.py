@@ -6,13 +6,15 @@ import os
 from rich.table import Table
 from textual.widgets import Static
 
-from core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY
 from core.infrastructure.runtime.thinking_effort import display_thinking_effort
 from core.models_catalog import catalog, format_context_tokens
 from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
-from widgets.presentation.widgets.footer_layout import _build_subagent_grid
+from widgets.presentation.widgets.footer_layout import (
+    _build_subagent_grid,
+    get_theme_colors,
+)
 from widgets.utils.responsive import BREAKPOINT_COMPACT, is_compact_width, resolve_width
 from widgets.utils.row_format import ellipsize
 
@@ -240,10 +242,12 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
         grid.add_column(justify="left")
         grid.add_column(justify="right")
 
+        t_primary, t_secondary, t_muted, _ = get_theme_colors()
+
         if not self.session:
             esc_label = "esc: back" if getattr(self, "from_tasks", False) else "esc: close"
-            grid.add_row("", f"[{THEME_MUTED}]{esc_label}[/{THEME_MUTED}]")
-            self._last_grid_rows = [("", f"[{THEME_MUTED}]{esc_label}[/{THEME_MUTED}]")]
+            grid.add_row("", f"[{t_muted}]{esc_label}[/{t_muted}]")
+            self._last_grid_rows = [("", f"[{t_muted}]{esc_label}[/{t_muted}]")]
             self.update(grid)
             return
 
@@ -268,12 +272,12 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
             width = resolve_width(self)
             is_compact = is_compact_width(width, breakpoint=BREAKPOINT_COMPACT)
 
-            role_part = f"[bold {THEME_PRIMARY}]{role_formatted}[/]"
+            role_part = f"[bold {t_primary}]{role_formatted}[/]"
             description = (getattr(session, "description", "") or "").strip()
             if description:
                 max_desc = max(8, width - len(role_str) - (12 if is_compact else 22))
                 clean_desc = ellipsize(description, max_desc)
-                role_part += f": [{THEME_SECONDARY}]{clean_desc}[/]"
+                role_part += f": [{t_secondary}]{clean_desc}[/]"
 
             row_left = role_part
             esc_label = (
@@ -281,7 +285,7 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
                 if getattr(self, "from_tasks", False)
                 else ("esc" if is_compact else "esc: close")
             )
-            row_right = f"[{THEME_MUTED}]{esc_label}[/{THEME_MUTED}]"
+            row_right = f"[{t_muted}]{esc_label}[/{t_muted}]"
 
             grid.add_row(row_left, row_right)
             self._last_grid_rows = [(row_left, row_right)]

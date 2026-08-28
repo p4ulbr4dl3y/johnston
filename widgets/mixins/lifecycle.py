@@ -32,9 +32,13 @@ class LifecycleMixin:
         install_asyncio_exception_handler()
         from widgets.app.theme_manager import theme_manager
         if hasattr(self, 'register_theme'):
+            available = getattr(self, 'available_themes', {})
             for t in theme_manager.get_all_textual_themes():
-                self.register_theme(t)
+                if t.name not in available:
+                    self.register_theme(t)
             self.theme = theme_manager.current_theme.name
+        self._theme_listener = lambda _: self.refresh_status_footer() if hasattr(self, "refresh_status_footer") else None
+        theme_manager.add_listener(self._theme_listener)
         self.is_app_active = True
         self.query_one("#message-input", ChatInput).focus()
         if getattr(self, "resume_session_id", None):
@@ -89,6 +93,13 @@ class LifecycleMixin:
     def on_unmount(self) -> None:
         """Clean up all running MCP servers and background processes when closing application"""
         self.is_app_active = False
+
+        if hasattr(self, "_theme_listener"):
+            try:
+                from widgets.app.theme_manager import theme_manager
+                theme_manager.remove_listener(self._theme_listener)
+            except Exception:
+                pass
 
         # Cancel an in-flight rewind git-restore task (kept on the agent by
         # rewind_session) so shutdown does not leave the worktree half-restored.

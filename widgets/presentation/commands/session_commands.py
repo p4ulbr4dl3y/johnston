@@ -197,26 +197,45 @@ class CompactCommand(BaseCommand):
                     app.trigger_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
 
 
+def _extract_user_messages(app, session=None) -> list[tuple[int, str]]:
+    """Extract list of (idx, text) user messages from session transcript or chat view."""
+    user_msgs: list[tuple[int, str]] = []
+    if session and getattr(session, "messages", None):
+        from core.domain.policies.messages import USER_EVENT_TYPE, is_ui_visible_user_message
+
+        for i, m in enumerate(session.messages):
+            if isinstance(m, dict) and m.get("type") == USER_EVENT_TYPE and is_ui_visible_user_message(m):
+                text = m.get("display_text") or m.get("text", "")
+                user_msgs.append((i, text))
+        if user_msgs:
+            return user_msgs
+
+    # Fallback to chat_view if session transcript has no messages
+    if hasattr(app, "query_one"):
+        try:
+            chat_view = app.query_one(ChatView)
+            return chat_view.get_user_messages()
+        except Exception:
+            pass
+    return user_msgs
+
+
 class RewindCommand(BaseCommand):
     name = "/rewind"
     aliases = ["/undo", "/history"]
     description = "Rollback chat history to a message"
 
     async def execute(self, app) -> None:
-        chat_view = app.query_one(ChatView)
-        if hasattr(chat_view, "load_all_older_messages") and callable(chat_view.load_all_older_messages):
-            res = chat_view.load_all_older_messages()
-            if asyncio.iscoroutine(res):
-                await res
-        user_msgs = chat_view.get_user_messages()
-        if not user_msgs:
-            app.notify("History is empty: no messages to rollback", severity="warning")
-            return
-
         curr_sid = getattr(app, "current_session_id", None)
         proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
         sm = getattr(app, "sm", None)
         session = sm.get(curr_sid, reload=False) if (sm and curr_sid) else None
+
+        user_msgs = _extract_user_messages(app, session=session)
+        if not user_msgs:
+            app.notify("History is empty: no messages to rollback", severity="warning")
+            return
+
         get_stats_fn = _get_cmd_attr("get_rewind_git_stats", get_rewind_git_stats)
         msgs_with_stats = await get_stats_fn(curr_sid, user_msgs, proj_path, session=session)
         checkpoints_enabled = any(m.git_stats for m in msgs_with_stats)
@@ -248,7 +267,17 @@ class RewindCommand(BaseCommand):
                 reset_app_state(app, is_generating=False, clear_queue=True)
 
                 def rollback_ui(target_idx: int) -> None:
-                    chat_view.rollback_to(target_idx)
+                    try:
+                        cv = app.query_one(ChatView)
+                        if session and getattr(session, "messages", None) is not None:
+                            page_size = getattr(cv, "PAGE_SIZE", 50)
+                            if len(session.messages) > page_size:
+                                cv._unloaded_messages = session.messages[:-page_size]
+                            else:
+                                cv._unloaded_messages = []
+                        cv.rollback_to(target_idx)
+                    except Exception:
+                        pass
 
                 def load_text_into_input(text: str) -> None:
                     chat_input = app.query_one(MESSAGE_INPUT)
@@ -259,7 +288,7 @@ class RewindCommand(BaseCommand):
                 def save_cb() -> None:
                     if hasattr(app, "save_current_session_async"):
                         asyncio.create_task(app.save_current_session_async())
-                    else:
+                    elif hasattr(app, "save_current_session"):
                         app.save_current_session()
 
                 sm = getattr(app, "sm", None)
@@ -300,19 +329,15 @@ class ForkCommand(BaseCommand):
     description = "Fork session from a selected message"
 
     async def execute(self, app) -> None:
-        chat_view = app.query_one(ChatView)
-        if hasattr(chat_view, "load_all_older_messages") and callable(chat_view.load_all_older_messages):
-            res = chat_view.load_all_older_messages()
-            if asyncio.iscoroutine(res):
-                await res
-        user_msgs = chat_view.get_user_messages()
-        if not user_msgs:
-            app.notify("History is empty: no messages to fork", severity="warning")
-            return
-
         curr_sid = getattr(app, "current_session_id", None)
         if not curr_sid or not hasattr(app, "sm"):
             app.notify("No active session to fork", severity="warning")
+            return
+
+        session = app.sm.get(curr_sid, reload=False) if (hasattr(app, "sm") and app.sm and curr_sid) else None
+        user_msgs = _extract_user_messages(app, session=session)
+        if not user_msgs:
+            app.notify("History is empty: no messages to fork", severity="warning")
             return
 
         def on_fork_selected(selected_child_idx: int | None) -> None:

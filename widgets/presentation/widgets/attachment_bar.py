@@ -1,8 +1,6 @@
 from textual.containers import HorizontalScroll
 from textual.widgets import Static
 
-from core.domain.defaults.config import THEME_MUTED, THEME_SECONDARY
-
 
 class AttachmentChip(Static):
     """Clickable chip representing a single attachment."""
@@ -13,10 +11,17 @@ class AttachmentChip(Static):
     def __init__(self, attachment, index: int = 1, *args, **kwargs) -> None:
         self.attachment = attachment
         self.index = index
+        try:
+            from widgets.app.theme_manager import theme_manager
+            t = theme_manager.current_theme
+            muted, secondary = t.muted, t.secondary
+        except Exception:
+            from core.domain.defaults.config import THEME_MUTED, THEME_SECONDARY
+            muted, secondary = THEME_MUTED, THEME_SECONDARY
         text = (
-            f"[{THEME_MUTED}]\\[[/{THEME_MUTED}]"
-            f"[{THEME_SECONDARY}]Image #{index}[/{THEME_SECONDARY}]"
-            f"[{THEME_MUTED}]\u00a0×][/{THEME_MUTED}]"
+            f"[{muted}]\\[[/{muted}]"
+            f"[{secondary}]Image #{index}[/{secondary}]"
+            f"[{muted}]\u00a0×][/{muted}]"
         )
         super().__init__(text, *args, **kwargs)
 

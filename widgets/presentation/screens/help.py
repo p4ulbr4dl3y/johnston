@@ -74,8 +74,8 @@ def _format_help_key(key: str, is_compact: bool) -> str:
 
 def _build_help_table(items: list[tuple[str, str]], is_compact: bool = False) -> Table:
     table = Table.grid(expand=True, padding=(0, 2 if not is_compact else 1))
-    table.add_column(style="bold #f4f4f5", no_wrap=True)
-    table.add_column(style="#a1a1aa", ratio=1)
+    table.add_column(style="bold", no_wrap=True)
+    table.add_column(style="dim", ratio=1)
     for key, desc in items:
         table.add_row(_format_help_key(key, is_compact), desc)
     return table

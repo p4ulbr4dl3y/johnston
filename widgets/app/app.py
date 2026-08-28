@@ -40,6 +40,12 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         from core.infrastructure.runtime.tool_name import normalize_tool_name
         from core.permission_manager import PermissionManager
         from core.role_registry import RoleRegistry
+        from widgets.app.theme_manager import theme_manager
+
+        if hasattr(self, "register_theme"):
+            for t in theme_manager.get_all_textual_themes():
+                self.register_theme(t)
+            self.theme = theme_manager.current_theme.name
 
         PermissionManager.configure_instance(tool_name_normalizer=normalize_tool_name)
         RoleRegistry._instance = RoleRegistry(tool_name_normalizer=normalize_tool_name)

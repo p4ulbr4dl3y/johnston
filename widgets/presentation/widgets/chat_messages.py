@@ -32,12 +32,12 @@ class EventDivider(Static):
     def __init__(self, title: str = "Session Compacted"):
         cleaned = _clean_divider_title(title)
         self.divider_title = cleaned
-        super().__init__(Rule(cleaned, style="dim #71717a"), classes="event-divider")
+        super().__init__(Rule(cleaned, style="dim"), classes="event-divider")
 
     def update_title(self, title: str) -> None:
         cleaned = _clean_divider_title(title)
         self.divider_title = cleaned
-        self.update(Rule(cleaned, style="dim #71717a"))
+        self.update(Rule(cleaned, style="dim"))
 
 
 class UserMessageAttachment(Static):

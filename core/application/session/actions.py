@@ -396,13 +396,9 @@ def rewind_session(
             seq_idx = i
             found = True
             break
-
     if not found and user_msgs:
         logger.warning("Selected child index %s not in user messages", selected_child_idx)
         return
-
-    target_idx = selected_child_idx - 1
-    rollback_ui(target_idx)
 
     # Agent history: full clear or truncate
     if seq_idx == 0:
@@ -446,6 +442,9 @@ def rewind_session(
     # Store transcript: drop events from the selected turn onward so a later
     # /resume does not resurrect rolled-back turns.
     _truncate_transcript(session, seq_idx)
+
+    target_idx = selected_child_idx - 1
+    rollback_ui(target_idx)
 
     # Restore Git checkpoints in background
     if curr_sid:
