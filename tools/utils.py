@@ -1,3 +1,5 @@
+import os
+from typing import Any
 
 from core.domain.defaults.errors import ToolResult
 from tools.base import try_int
@@ -6,6 +8,50 @@ DEFAULT_LINE_WINDOW = 800
 
 # Unified cap for any single file/web response fetched by a tool (read, web_fetch).
 MAX_TOOL_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def resolve_writable_path(ctx: Any, path_arg: Any) -> tuple[str, ToolResult | None]:
+    """Resolves a path argument and rejects missing values or sandbox-blocked writes.
+
+    Shared by create/edit so the path validation and sandbox permission check
+    cannot drift between file-writing tools. Returns ``(resolved_path, None)`` on
+    success, or ``("", error)`` when the path is empty or writes are not permitted
+    by an active sandbox.
+    """
+    if not path_arg or not str(path_arg).strip():
+        return "", ToolResult.error("params", name="path", detail="missing or empty")
+    from tools.base import resolve_path
+
+    path = resolve_path(str(path_arg), cwd=ctx.cwd)
+    if getattr(ctx, "sandbox_enabled", False):
+        from core.infrastructure.platform.sandbox import is_path_writable_in_sandbox
+
+        if not is_path_writable_in_sandbox(path, cwd=ctx.cwd):
+            return "", ToolResult.error("permission", f"sandbox restriction: write not permitted to '{path}' outside workspace")
+    return path, None
+
+
+def validate_file_for_edit(path: str) -> ToolResult | None:
+    """Validate that a file exists, is not a directory, and does not exceed payload cap."""
+    if not path or not os.path.exists(path):
+        return ToolResult.error("file", name=path, detail="not found")
+    if os.path.isdir(path):
+        return ToolResult.error("file", name=path, detail="is a directory")
+    try:
+        if os.path.getsize(path) > MAX_TOOL_PAYLOAD_BYTES:
+            max_mb = MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)
+            return ToolResult.error("file", name=path, detail=f"file exceeds maximum allowed size ({max_mb}MB)")
+    except OSError:
+        pass
+    return None
+
+
+def format_file_diff(old_content: str, new_content: str, path: str) -> str:
+    """Generate git-style unified diff for file modifications."""
+    from core.infrastructure.runtime.git_utils import make_git_diff
+
+    return make_git_diff(old_content, new_content, fromfile=f"a/{path}", tofile=f"b/{path}")
+
 
 
 def truncate_leading(text: str, max_chars: int) -> tuple[str, int]:

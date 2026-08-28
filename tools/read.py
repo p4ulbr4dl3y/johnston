@@ -86,7 +86,12 @@ def set_cached_doc_markdown(path: str, text: str) -> None:
         _DOC_CACHE.popitem(last=False)
 
 
-def convert_doc_to_markdown_sync(path: str, cancel_event: threading.Event | None = None) -> str:
+def convert_doc_to_markdown_sync(
+    path: str,
+    cancel_event: threading.Event | None = None,
+    sandbox_enabled: bool = False,
+    cwd: str | None = None,
+) -> str:
     """Synchronous CPU worker to convert rich documents to markdown via markitdown."""
     cached = get_cached_doc_markdown(path)
     if cached is not None:
@@ -117,9 +122,20 @@ def convert_doc_to_markdown_sync(path: str, cancel_event: threading.Event | None
     if result_text is None and not _interrupted():
         cli_path = shutil.which("markitdown")
         if cli_path:
-            proc = subprocess.Popen(
-                [cli_path, path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-            )
+            if sandbox_enabled:
+                import shlex
+
+                from core.infrastructure.platform.sandbox import build_sandboxed_command
+
+                cmd_str = f"{shlex.quote(cli_path)} {shlex.quote(path)}"
+                exe, args, _ = build_sandboxed_command(cmd_str, cwd=cwd, allow_workspace_writes=False)
+                proc = subprocess.Popen(
+                    [exe] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+            else:
+                proc = subprocess.Popen(
+                    [cli_path, path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
             try:
                 # Poll communicate() in short slices so a cancellation that lands
                 # mid-conversion can kill the subprocess promptly instead of
@@ -131,6 +147,7 @@ def convert_doc_to_markdown_sync(path: str, cancel_event: threading.Event | None
                 if proc.poll() is None:
                     proc.kill()
                 raise
+
 
     if _interrupted():
         return ""
@@ -391,7 +408,13 @@ class ReadTool(BaseTool):
         # Handle document formats (PDF, DOCX, etc.) via MarkItDown
         if ext in DOC_EXTENSIONS:
             try:
-                md_text = await run_cancellable(convert_doc_to_markdown_sync, path)
+                sandbox_enabled = bool(getattr(ctx, "sandbox_enabled", False))
+                md_text = await run_cancellable(
+                    convert_doc_to_markdown_sync,
+                    path,
+                    sandbox_enabled=sandbox_enabled,
+                    cwd=ctx.cwd,
+                )
                 lines = [ln.rstrip("\r\n") for ln in md_text.splitlines(keepends=True)]
                 from tools.base import _write_output_log
 

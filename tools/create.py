@@ -2,9 +2,9 @@ import os
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
-from core.infrastructure.runtime.git_utils import make_git_diff
-from tools.base import BaseTool, read_file_text, resolve_writable_path, write_file_text
+from tools.base import BaseTool, read_file_text, write_file_text
 from tools.cancel import run_cancellable
+from tools.utils import format_file_diff, resolve_writable_path
 
 
 class CreateTool(BaseTool):
@@ -64,7 +64,7 @@ class CreateTool(BaseTool):
             cnt = len(new_lines) if content else 0
             if not file_existed:
                 return f"OK: created '{path_arg}' ({cnt} lines)"
-            diff_text = make_git_diff(old_content, content, fromfile=f"a/{path_arg}", tofile=f"b/{path_arg}")
+            diff_text = format_file_diff(old_content, content, str(path_arg))
             if not diff_text:
                 return f"OK: file '{path_arg}' unchanged ({cnt} lines)"
             return diff_text

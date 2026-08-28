@@ -1,15 +1,17 @@
 import difflib
-import os
 from typing import Any, Dict, Tuple
 
-from core.domain.defaults.errors import FormattedToolError, ToolResult, format_tool_error
-from core.infrastructure.runtime.git_utils import make_git_diff
+from core.domain.defaults.errors import ToolResult
 from tools.base import (
     BaseTool,
-    resolve_writable_path,
     write_file_text,
 )
 from tools.cancel import run_cancellable
+from tools.utils import (
+    format_file_diff,
+    resolve_writable_path,
+    validate_file_for_edit,
+)
 
 LEFT_SINGLE_CURLY_QUOTE = "‘"
 RIGHT_SINGLE_CURLY_QUOTE = "’"
@@ -107,30 +109,32 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
     return ""
 
 
-def apply_edit(content: str, old_str: str, new_str: str, replace_all: bool = False, path: str = "file") -> Tuple[str, str]:
+def apply_edit(
+    content: str, old_str: str, new_str: str, replace_all: bool = False, path: str = "file"
+) -> Tuple[str, str] | ToolResult:
     if old_str is None:
-        raise FormattedToolError(format_tool_error("params", "missing 'old_str'"))
+        return ToolResult.error("params", detail="missing 'old_str'")
     if old_str == "":
-        raise FormattedToolError(format_tool_error("params", "old_str cannot be empty"))
+        return ToolResult.error("params", detail="old_str cannot be empty")
     if new_str is None:
-        raise FormattedToolError(format_tool_error("params", "missing 'new_str'"))
+        return ToolResult.error("params", detail="missing 'new_str'")
     if old_str == new_str:
-        raise FormattedToolError(format_tool_error("params", "new_str must be different from old_str"))
+        return ToolResult.error("params", detail="new_str must be different from old_str")
 
     actual_target, actual_replacement = find_actual_target_and_replacement(content, old_str, new_str)
     count = content.count(actual_target)
 
     if count == 0:
         hint = _generate_fuzzy_match_hint(content, old_str, path)
-        raise FormattedToolError(format_tool_error("match", f"exact block not found in '{path}'.{hint}"))
+        return ToolResult.error("match", detail=f"exact block not found in '{path}'.{hint}")
 
     if count > 1 and not replace_all:
-        raise FormattedToolError(
-            format_tool_error(
-                "match",
+        return ToolResult.error(
+            "match",
+            detail=(
                 f"target matches {count} occurrences in '{path}'. "
-                f"Include 2-4 lines of surrounding context to make old_str unique, or set replace_all=true.",
-            )
+                f"Include 2-4 lines of surrounding context to make old_str unique, or set replace_all=true."
+            ),
         )
 
     if replace_all:
@@ -138,7 +142,7 @@ def apply_edit(content: str, old_str: str, new_str: str, replace_all: bool = Fal
     else:
         new_content = content.replace(actual_target, actual_replacement, 1)
 
-    diff_output = make_git_diff(content, new_content, fromfile=f"a/{path}", tofile=f"b/{path}")
+    diff_output = format_file_diff(content, new_content, path)
     return new_content, diff_output
 
 
@@ -197,19 +201,9 @@ class EditTool(BaseTool):
         replace_all = bool(args.get("replace_all", False))
 
         def _do_edit() -> ToolResult:
-            if not path or not os.path.exists(path):
-                return ToolResult.error("file", name=path, detail="not found")
-            if os.path.isdir(path):
-                return ToolResult.error("file", name=path, detail="is a directory")
-
-            from tools.utils import MAX_TOOL_PAYLOAD_BYTES
-
-            try:
-                if os.path.getsize(path) > MAX_TOOL_PAYLOAD_BYTES:
-                    max_mb = MAX_TOOL_PAYLOAD_BYTES // (1024 * 1024)
-                    return ToolResult.error("file", name=path, detail=f"file exceeds maximum allowed size ({max_mb}MB)")
-            except OSError:
-                pass
+            val_err = validate_file_for_edit(path)
+            if val_err is not None:
+                return val_err
 
             # Read with newline="" to keep \r\n line endings intact: the default
             # universal-newline mode would collapse CRLF -> LF and silently rewrite
@@ -217,7 +211,11 @@ class EditTool(BaseTool):
             with open(path, "r", encoding="utf-8", newline="") as f:
                 content = f.read()
 
-            new_content, diff = apply_edit(content, old_str, new_str, replace_all, path)
+            res = apply_edit(content, old_str, new_str, replace_all, path)
+            if isinstance(res, ToolResult):
+                return res
+
+            new_content, diff = res
             write_file_text(path, new_content)
             return ToolResult.done(content=diff, display=diff)
 
@@ -225,12 +223,9 @@ class EditTool(BaseTool):
             return await run_cancellable(_do_edit)
         except (UnicodeDecodeError, UnicodeEncodeError) as ue:
             return ToolResult.error("file", detail=str(ue), name=path)
-        except FormattedToolError as fte:
-            from core.domain.defaults.errors import ToolResultStatus
-
-            return ToolResult(content=str(fte), status=ToolResultStatus.ERROR)
         except ValueError as ve:
-            # Unexpected ValueError (not a formatted tool error): wrap as params.
+            # Unexpected ValueError: wrap as params.
             return ToolResult.error("params", detail=str(ve))
         except Exception as e:
             return ToolResult.error("file", detail=str(e), name=path)
+

@@ -2,7 +2,6 @@ import os
 import unittest
 from unittest import mock
 
-from core.domain.defaults.errors import FormattedToolError
 from tests.conftest import WindowsSafeTemporaryDirectory
 from tools.edit import EditTool, apply_edit
 
@@ -52,15 +51,15 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
 
     def test_empty_target_content_raises_error(self):
         content = "foo\nbar\n"
-        with self.assertRaises(ValueError) as ctx:
-            apply_edit(content, "", "baz", False, "dummy.py")
-        self.assertIn("cannot be empty", str(ctx.exception))
+        res = apply_edit(content, "", "baz", False, "dummy.py")
+        self.assertTrue(res.is_error)
+        self.assertIn("cannot be empty", res.content)
 
     def test_same_old_and_new_str_raises_error(self):
         content = "foo\nbar\n"
-        with self.assertRaises(ValueError) as ctx:
-            apply_edit(content, "foo", "foo", False, "dummy.py")
-        self.assertIn("new_str must be different", str(ctx.exception))
+        res = apply_edit(content, "foo", "foo", False, "dummy.py")
+        self.assertTrue(res.is_error)
+        self.assertIn("new_str must be different", res.content)
 
     def test_deletion_of_block(self):
         content = "line 1\nline 2\nline 3\n"
@@ -71,29 +70,27 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
 
     def test_multiple_occurrences_raises_error(self):
         content = "dup\ndup\ndup\n"
-        with self.assertRaises(ValueError) as ctx:
-            apply_edit(content, "dup", "unique", False, "dummy.py")
-        self.assertIn("matches 3 occurrences", str(ctx.exception))
+        res = apply_edit(content, "dup", "unique", False, "dummy.py")
+        self.assertTrue(res.is_error)
+        self.assertIn("matches 3 occurrences", res.content)
 
     def test_fuzzy_hint_on_missing_target(self):
         content = "def calculate_total_price(items):\n    return sum(items)\n"
-        with self.assertRaises(ValueError) as ctx:
-            apply_edit(
-                content,
-                "def calculate_total_price(item_list):",
-                "pass",
-                False,
-                "dummy.py",
-            )
-        self.assertIn("Closest match in 'dummy.py'", str(ctx.exception))
+        res = apply_edit(
+            content,
+            "def calculate_total_price(item_list):",
+            "pass",
+            False,
+            "dummy.py",
+        )
+        self.assertTrue(res.is_error)
+        self.assertIn("Closest match in 'dummy.py'", res.content)
 
-    def test_match_failure_raises_formatted_tool_error(self):
-        # Match errors must be FormattedToolError (pre-formatted ERR: text), not
-        # bare ValueError, so the executor can pass them through without
-        # string-sniffing the "ERR:" prefix.
-        with self.assertRaises(FormattedToolError) as ctx:
-            apply_edit("foo\n", "bar", "baz", False, "dummy.py")
-        self.assertTrue(str(ctx.exception).startswith("ERR: match"))
+    def test_match_failure_returns_error_tool_result(self):
+        res = apply_edit("foo\n", "bar", "baz", False, "dummy.py")
+        self.assertTrue(res.is_error)
+        self.assertTrue(res.content.startswith("ERR: match"))
+
 
     async def test_missing_new_str_key_means_delete(self):
         # Pinned behavior: an ABSENT new_str key deletes the target in one turn

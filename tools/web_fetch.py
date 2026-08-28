@@ -26,7 +26,14 @@ _FAKE_IP_NET = ipaddress.ip_network("198.18.0.0/15")
 _DNS_CACHE: dict[str, tuple[float, bool]] = {}
 _DNS_CACHE_TTL = 60.0
 _MAX_DNS_CACHE = 512
+_DNS_CACHE_LOCK: asyncio.Lock | None = None
 
+
+def _get_dns_cache_lock() -> asyncio.Lock:
+    global _DNS_CACHE_LOCK
+    if _DNS_CACHE_LOCK is None:
+        _DNS_CACHE_LOCK = asyncio.Lock()
+    return _DNS_CACHE_LOCK
 
 
 def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
@@ -56,12 +63,14 @@ async def _is_private_host(url: str) -> bool:
         pass
 
     now = time.monotonic()
-    cached = _DNS_CACHE.get(host)
-    if cached is not None:
-        cached_ts, cached_res = cached
-        if now - cached_ts < _DNS_CACHE_TTL:
-            return cached_res
-        _DNS_CACHE.pop(host, None)
+    lock = _get_dns_cache_lock()
+    async with lock:
+        cached = _DNS_CACHE.get(host)
+        if cached is not None:
+            cached_ts, cached_res = cached
+            if now - cached_ts < _DNS_CACHE_TTL:
+                return cached_res
+            _DNS_CACHE.pop(host, None)
 
     # Hostname: resolve; block any private/loopback result.
     try:
@@ -83,10 +92,12 @@ async def _is_private_host(url: str) -> bool:
             is_blocked = True
             break
 
-    if len(_DNS_CACHE) >= _MAX_DNS_CACHE:
-        _DNS_CACHE.clear()
-    _DNS_CACHE[host] = (now, is_blocked)
+    async with lock:
+        if len(_DNS_CACHE) >= _MAX_DNS_CACHE:
+            _DNS_CACHE.clear()
+        _DNS_CACHE[host] = (now, is_blocked)
     return is_blocked
+
 
 
 _SCRIPT_TAG_RE = re.compile(r"<\s*/?\s*script\b[^>]*>", re.IGNORECASE)
@@ -274,18 +285,11 @@ class WebFetchTool(BaseTool):
             else:
                 out_ext = ".md"
 
-        is_trunc = len(text_content) > 8000
-        trunc_part = " (truncated)" if is_trunc else ""
-        log_part = ""
-        if is_trunc:
-            from tools.base import _write_output_log
-
-            log_path = _write_output_log(text_content, tool_name="web_fetch", ext=out_ext)
-            if log_path:
-                log_part = f" | log: {log_path}"
-
-        body = text_content[:8000].strip() if is_trunc else text_content.strip()
         type_name = out_ext.lstrip(".")
-        header = f"[URL: {url} | status: 200 | type: {type_name}{trunc_part}{log_part}]"
+        header = f"[URL: {url} | status: 200 | type: {type_name}]"
+        from tools.base import truncate_output
+
+        body = truncate_output(text_content, max_chars=8000, tool_name="web_fetch", ext=out_ext)
         plain_content = f"{header}\n\n{body}"
         return ToolResult.done(content=plain_content, display="")
+

@@ -45,14 +45,14 @@ class _Base(unittest.IsolatedAsyncioTestCase):
 # ---------------------------------------------------------------------------
 class TestApplyChunks(_Base):
     def test_chunk_without_old_str_raises(self):
-        with self.assertRaises(ValueError) as ctx:
-            apply_edit("abc\n", None, "x", False, "dummy.txt")
-        self.assertIn("missing 'old_str'", str(ctx.exception))
+        res = apply_edit("abc\n", None, "x", False, "dummy.txt")
+        self.assertTrue(res.is_error)
+        self.assertIn("missing 'old_str'", res.content)
 
     def test_chunk_without_new_str_raises(self):
-        with self.assertRaises(ValueError) as ctx:
-            apply_edit("abc\n", "abc", None, False, "dummy.txt")
-        self.assertIn("missing 'new_str'", str(ctx.exception))
+        res = apply_edit("abc\n", "abc", None, False, "dummy.txt")
+        self.assertTrue(res.is_error)
+        self.assertIn("missing 'new_str'", res.content)
 
     def test_multiple_replace_all_replaces_all(self):
         new, _ = apply_edit(
@@ -61,8 +61,9 @@ class TestApplyChunks(_Base):
         self.assertEqual(new, "X\nX\nX\n")
 
     def test_multiple_false_fails(self):
-        with self.assertRaises(ValueError):
-            apply_edit("dup\ndup\n", "dup", "X", False, "d.txt")
+        res = apply_edit("dup\ndup\n", "dup", "X", False, "d.txt")
+        self.assertTrue(res.is_error)
+
 
     def test_multiline_unicode_target(self):
         content = "первая строка\nвторая строка\nтретья\n"
@@ -114,14 +115,16 @@ class TestApplyChunks(_Base):
         self.assertEqual(new, "line1\r\nline3\r\n")
 
     def test_whitespace_only_target_empty_hint(self):
+
         # target_lines strips to nothing -> fuzzy hint must be empty, error keeps
         # the bare "exact block not found" message (no "[Hint:" suffix).
-        with self.assertRaises(ValueError) as ctx:
-            apply_edit(
-                "abc\n", "   \n  \n", "x", False, "d.txt"
-            )
-        self.assertIn("exact block not found", str(ctx.exception))
-        self.assertNotIn("[Hint:", str(ctx.exception))
+        res = apply_edit(
+            "abc\n", "   \n  \n", "x", False, "d.txt"
+        )
+        self.assertTrue(res.is_error)
+        self.assertIn("exact block not found", res.content)
+        self.assertNotIn("[Hint:", res.content)
+
 
 
 # ---------------------------------------------------------------------------
