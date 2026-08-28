@@ -9,7 +9,7 @@ import logging
 import os
 import time
 from collections import OrderedDict
-from typing import Any, Dict, FrozenSet, Iterable, Optional, Set
+from typing import Any, Dict, FrozenSet, Optional, Set
 
 import httpx
 
@@ -96,8 +96,19 @@ class ModelsCatalog:
         self._modalities: Dict[str, list[str]] = {}
         self._providers: Dict[str, Dict[str, Any]] = {}
         self._match_cache: "OrderedDict" = OrderedDict()
+        self._display_name_cache: "OrderedDict" = OrderedDict()
+        self._vision_cache: "OrderedDict" = OrderedDict()
         self._updated_at: float = 0.0
         self._client: Optional[httpx.AsyncClient] = None
+
+    def _clear_internal_caches(self) -> None:
+        self._match_cache.clear()
+        self._display_name_cache.clear()
+        self._vision_cache.clear()
+        if hasattr(self, "_slug_maps"):
+            self._slug_maps.clear()
+        if hasattr(self, "_token_maps"):
+            self._token_maps.clear()
 
     def get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -137,6 +148,7 @@ class ModelsCatalog:
             self._modalities = data.get("model_modalities", {})
             self._providers = data.get("providers", {})
             self._updated_at = float(data.get("updated_at", 0.0))
+            self._clear_internal_caches()
             return True
         return False
 
@@ -293,11 +305,7 @@ class ModelsCatalog:
             self._modalities = model_modalities
             if provider_catalog:
                 self._providers = provider_catalog
-            self._match_cache.clear()
-            if hasattr(self, "_slug_maps"):
-                self._slug_maps.clear()
-            if hasattr(self, "_token_maps"):
-                self._token_maps.clear()
+            self._clear_internal_caches()
 
             await self.save_cache_async()
         except Exception as e:
@@ -325,13 +333,13 @@ class ModelsCatalog:
         )
 
     def _resolve_catalog_key(
-        self, provider_id: str, model_id: str, search_space: Iterable[str] = None, tag: str = ""
+        self, provider_id: str, model_id: str, search_space: Any = None, tag: str = ""
     ) -> str:
         if not model_id:
             return ""
 
-        space_keys = set(search_space) if search_space is not None else self._get_all_catalog_keys()
-        if not space_keys:
+        space_obj = search_space if search_space is not None else self._get_all_catalog_keys()
+        if not space_obj:
             return ""
 
         if tag:
@@ -353,22 +361,23 @@ class ModelsCatalog:
         ):
             space_tag = "modalities"
         else:
-            space_obj = getattr(search_space, "__self__", search_space)
-            space_tag = id(space_obj) if space_obj is not None else id(self._limits)
+            space_target = getattr(search_space, "__self__", search_space)
+            space_tag = id(space_target) if space_target is not None else id(self._limits)
 
-        cache_key = (provider_id, model_id, space_tag, len(space_keys))
+        space_len = len(space_obj)
+        cache_key = (provider_id, model_id, space_tag, space_len)
         cached = _get_match(self._match_cache, cache_key)
         if cached is not None:
             return cached
 
         # Stage 1: Exact match
-        if model_id in space_keys:
+        if model_id in space_obj:
             _set_match(self._match_cache, cache_key, model_id)
             return model_id
 
         # Stage 2: Scoped match
         scoped_id = f"{provider_id}/{model_id}" if provider_id else ""
-        if scoped_id and scoped_id in space_keys:
+        if scoped_id and scoped_id in space_obj:
             _set_match(self._match_cache, cache_key, scoped_id)
             return scoped_id
 
@@ -378,13 +387,13 @@ class ModelsCatalog:
             self._slug_maps = {}
 
         slug_key = space_tag
-        if slug_key not in self._slug_maps or self._slug_maps[slug_key][0] != len(space_keys):
+        if slug_key not in self._slug_maps or self._slug_maps[slug_key][0] != space_len:
             slug_map = {}
-            for k in space_keys:
+            for k in space_obj:
                 kb = k.split("/")[-1].split(":")[0].lower()
                 if kb not in slug_map:
                     slug_map[kb] = k
-            self._slug_maps[slug_key] = (len(space_keys), slug_map)
+            self._slug_maps[slug_key] = (space_len, slug_map)
 
         slug_map = self._slug_maps[slug_key][1]
         if m_base in slug_map:
@@ -402,14 +411,14 @@ class ModelsCatalog:
             if not hasattr(self, "_token_maps"):
                 self._token_maps = {}
 
-            if slug_key not in self._token_maps or self._token_maps[slug_key][0] != len(space_keys):
+            if slug_key not in self._token_maps or self._token_maps[slug_key][0] != space_len:
                 token_entries = []
-                for k in space_keys:
+                for k in space_obj:
                     k_base = k.split("/")[-1].split(":")[0].lower()
                     k_tokens = set(_RE_TOKEN_SPLIT.findall(k_base)) - _IGNORED_TOKENS
                     k_digits = {t for t in k_tokens if t.isdigit()}
                     token_entries.append((k, k_tokens, k_digits))
-                self._token_maps[slug_key] = (len(space_keys), token_entries)
+                self._token_maps[slug_key] = (space_len, token_entries)
 
             token_entries = self._token_maps[slug_key][1]
             best_match = ""
@@ -464,17 +473,18 @@ class ModelsCatalog:
         if not names:
             return
         self._names.update(names)
-        self._match_cache.clear()
-        if hasattr(self, "_slug_maps"):
-            self._slug_maps.clear()
-        if hasattr(self, "_token_maps"):
-            self._token_maps.clear()
+        self._clear_internal_caches()
 
     def get_model_display_name(self, provider_id: str, model_id: str) -> str:
         if not model_id:
             return ""
         if not self._names and not self._limits:
             self.load_cache()
+
+        cache_key = (provider_id, model_id, len(self._names))
+        cached = _get_match(self._display_name_cache, cache_key)
+        if cached is not None:
+            return cached
 
         suffix_tag = ""
         if ":" in model_id:
@@ -489,6 +499,7 @@ class ModelsCatalog:
                 name = name.split(": ", 1)[-1]
             if suffix_tag and f"({suffix_tag})" not in name and suffix_tag.lower() not in name.lower():
                 name += f" ({suffix_tag})"
+            _set_match(self._display_name_cache, cache_key, name)
             return name
 
         base_raw = model_id.split("/")[-1].split(":")[0]
@@ -509,6 +520,7 @@ class ModelsCatalog:
         res = " ".join(formatted)
         if suffix_tag and f"({suffix_tag})" not in res:
             res += f" ({suffix_tag})"
+        _set_match(self._display_name_cache, cache_key, res)
         return res
 
     def get_model_pricing(self, provider_id: str, model_id: str) -> Dict[str, float]:
@@ -569,11 +581,18 @@ class ModelsCatalog:
         if not self._modalities and not self._limits:
             self.load_cache()
 
+        cache_key = (provider_id, model_id, len(self._modalities))
+        cached = _get_match(self._vision_cache, cache_key)
+        if cached is not None:
+            return cached
+
         resolved = self._resolve_catalog_key(provider_id, model_id, self._modalities, tag="modalities")
         if resolved and resolved in self._modalities:
             mods = self._modalities[resolved]
             if isinstance(mods, (list, tuple, set)):
-                return "image" in mods or "vision" in mods
+                res = "image" in mods or "vision" in mods
+                _set_match(self._vision_cache, cache_key, res)
+                return res
 
         # Heuristic fallback for common multimodal model naming conventions
         m_low = model_id.lower()
@@ -591,7 +610,9 @@ class ModelsCatalog:
                 "claude-sonnet",
             )
         ):
+            _set_match(self._vision_cache, cache_key, True)
             return True
+        _set_match(self._vision_cache, cache_key, False)
         return False
 
     def get_model_modalities(self, provider_id: str, model_id: str) -> list[str]:

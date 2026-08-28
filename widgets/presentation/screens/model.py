@@ -33,6 +33,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
         self.models_data = models_data
         self.current_model = current_model
         self.current_provider = current_provider
+        self._last_built_width = self._row_width()
 
         options, items, default_val = self._build_data()
 
@@ -56,7 +57,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
 
     def on_mount(self) -> None:
         super().on_mount()
-        self.raw_options, self.raw_items, self.default_value = self._build_data()
+        curr_w = self._row_width()
         search_val = ""
         if self.show_search:
             try:
@@ -64,11 +65,14 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 search_val = search_input.value
             except Exception:
                 pass
-        self._filter_options(search_val)
+        if curr_w != self._last_built_width or search_val:
+            self._last_built_width = curr_w
+            self.raw_options, self.raw_items, self.default_value = self._build_data()
+            self._filter_options(search_val)
 
     def on_resize(self, event: events.Resize) -> None:
         super().on_resize(event)
-        self.raw_options, self.raw_items, self.default_value = self._build_data()
+        curr_w = self._row_width()
         search_val = ""
         if self.show_search:
             try:
@@ -76,7 +80,10 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
                 search_val = search_input.value
             except Exception:
                 pass
-        self._filter_options(search_val)
+        if curr_w != self._last_built_width or search_val:
+            self._last_built_width = curr_w
+            self.raw_options, self.raw_items, self.default_value = self._build_data()
+            self._filter_options(search_val)
 
     async def action_refresh_models(self) -> None:
         """Fetch fresh model catalog with force_refresh=True and re-render."""

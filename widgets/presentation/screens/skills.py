@@ -52,9 +52,12 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         self.skills = self.sm.list_skills(include_hidden=True)
         self.options = []
         for s in self.skills:
-            stat_t = status_tag("HIDDEN" if s.hidden else "VISIBLE")
-            self.options.append(f"{stat_t} {s.name}")
-        self.filtered_skills = [s.to_dict() for s in self.skills]
+            stat_t = status_tag("HIDDEN" if getattr(s, "hidden", False) else "VISIBLE")
+            self.options.append(f"{stat_t} {getattr(s, 'name', '')}")
+        self.filtered_skills = [
+            s.to_dict() if hasattr(s, "to_dict") else {"name": getattr(s, "name", ""), "hidden": getattr(s, "hidden", False)}
+            for s in self.skills
+        ]
         self.filtered_options = list(self.options)
 
     def compose(self) -> ComposeResult:
@@ -87,9 +90,13 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         for scope in ("global", "project"):
             group = []
             for s, opt in zip(self.skills, self.options):
-                if s.scope.value != scope:
+                s_scope = getattr(s, "scope", None)
+                s_scope_val = s_scope.value if hasattr(s_scope, "value") else str(s_scope or "global").lower()
+                if s_scope_val != scope:
                     continue
-                if not q or q in s.name.lower() or q in s.description.lower() or q in scope:
+                s_name = getattr(s, "name", "")
+                s_desc = getattr(s, "description", "")
+                if not q or q in s_name.lower() or q in s_desc.lower() or q in scope:
                     group.append((s, opt))
             if not group:
                 continue
@@ -100,9 +107,13 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             self.filtered_skills.append(None)
             self.filtered_options.append(Option(scope.capitalize(), disabled=True))
             for s, opt in group:
-                self.filtered_skills.append(s.to_dict())
+                s_dict = (
+                    s.to_dict()
+                    if hasattr(s, "to_dict")
+                    else {"name": getattr(s, "name", ""), "hidden": getattr(s, "hidden", False)}
+                )
+                self.filtered_skills.append(s_dict)
                 self.filtered_options.append(opt)
-
         try:
             opt_list = self.query_one("#skills-option-list", OptionList)
             opt_list.clear_options()

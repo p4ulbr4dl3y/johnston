@@ -4,6 +4,7 @@ import re
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import Generator, Optional
 
@@ -458,13 +459,13 @@ class GitCheckpointManager:
                         if len(parts) == 2:
                             ref_map[parts[1]] = parts[0]
 
-                for msg_idx in message_indices:
+                def _fetch_diff_for_idx(msg_idx: int) -> tuple[int, Optional[tuple[str, list[str]]]]:
                     ref_name = cls.get_ref_name(session_id, msg_idx)
                     commit_sha = ref_map.get(ref_name)
                     if not commit_sha:
                         rev_res = run_git(["rev-parse", "--verify", ref_name], cwd=shadow_dir, timeout=1.0)
                         if rev_res.returncode != 0:
-                            continue
+                            return msg_idx, None
                         commit_sha = rev_res.stdout.strip()
 
                     diff_res = run_git(
@@ -474,16 +475,27 @@ class GitCheckpointManager:
                         timeout=5.0,
                     )
                     if diff_res.returncode != 0:
-                        continue
+                        return msg_idx, None
 
                     added, deleted, files = cls._parse_numstat(diff_res.stdout)
 
                     if added == 0 and deleted == 0:
-                        results[msg_idx] = ("no changes", [])
+                        return msg_idx, ("no changes", [])
                     else:
                         file_count = len(files)
                         plural = "files" if file_count != 1 else "file"
-                        results[msg_idx] = (f"{file_count} {plural}, +{added} / -{deleted}", files)
+                        return msg_idx, (f"{file_count} {plural}, +{added} / -{deleted}", files)
+
+                if len(message_indices) > 1:
+                    max_w = min(12, len(message_indices))
+                    with ThreadPoolExecutor(max_workers=max_w) as executor:
+                        for msg_idx, res in executor.map(_fetch_diff_for_idx, message_indices):
+                            if res is not None:
+                                results[msg_idx] = res
+                elif message_indices:
+                    msg_idx, res = _fetch_diff_for_idx(message_indices[0])
+                    if res is not None:
+                        results[msg_idx] = res
 
             return results
 

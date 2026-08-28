@@ -276,7 +276,21 @@ class SessionStore:
         return sessions
 
     def children(self, parent_id: str) -> List[AgentSession]:
-        return [s for s in self.list() if s.parent_id == parent_id]
+        if not parent_id:
+            return []
+        if self._disk_cache is not None:
+            return [s for s in self.list() if s.parent_id == parent_id]
+
+        s_dir = self._subagent_dir(parent_id)
+        sessions: Dict[str, AgentSession] = {}
+        if os.path.isdir(s_dir):
+            for fname in sorted(os.listdir(s_dir)):
+                if fname.endswith(".jsonl"):
+                    self._load_file(sessions, os.path.join(s_dir, fname))
+        for sid, sess in self._sessions.items():
+            if sess.parent_id == parent_id and sess.project_key == self.project_key:
+                sessions[sid] = sess
+        return list(sessions.values())
 
     # -- save/delete -------------------------------------------------------
 
