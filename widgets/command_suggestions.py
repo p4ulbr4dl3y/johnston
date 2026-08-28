@@ -159,21 +159,34 @@ class CommandSuggestions(HeaderWrapOptionList):
                     max_cmd_len = max((len(c) for c, _ in all_cmds), default=14)
                     padding = max(16, max_cmd_len + 2)
                     row_budget = max(30, resolve_width(self) - 2)
+                    primary_matches = []
+                    alias_matches = []
                     for cmd, desc in all_cmds:
-                        if cmd.lower().startswith(query_lower):
-                            matched_cmds.append(cmd)
-                            clean_desc = " ".join(desc.split())
-                            # Description budget: from the tag column to the right
-                            # edge; capped at 60 on wide terminals, shrinking on
-                            # narrow ones instead of clipping the tail unseen.
-                            desc_start = max(display_width(cmd), padding) + 1
-                            clean_desc = ellipsize(clean_desc, min(60, max(10, row_budget - desc_start)))
-                            escaped_cmd = escape(cmd)
-                            escaped_desc = escape(clean_desc)
-                            pad = max(0, padding - display_width(cmd))
-                            padding_spaces = " " * pad
-                            formatted_line = f"{escaped_cmd}{padding_spaces} [dim #71717a]{escaped_desc}[/dim #71717a]"
-                            self.add_option(formatted_line)
+                        if not cmd.lower().startswith(query_lower):
+                            continue
+                        is_alias = desc.startswith("Alias for ")
+                        if query_lower == "/" and is_alias:
+                            continue
+                        if is_alias:
+                            alias_matches.append((cmd, desc))
+                        else:
+                            primary_matches.append((cmd, desc))
+
+                    combined = primary_matches + alias_matches
+                    for cmd, desc in combined:
+                        matched_cmds.append(cmd)
+                        clean_desc = " ".join(desc.split())
+                        # Description budget: from the tag column to the right
+                        # edge; capped at 60 on wide terminals, shrinking on
+                        # narrow ones instead of clipping the tail unseen.
+                        desc_start = max(display_width(cmd), padding) + 1
+                        clean_desc = ellipsize(clean_desc, min(60, max(10, row_budget - desc_start)))
+                        escaped_cmd = escape(cmd)
+                        escaped_desc = escape(clean_desc)
+                        pad = max(0, padding - display_width(cmd))
+                        padding_spaces = " " * pad
+                        formatted_line = f"{escaped_cmd}{padding_spaces} [dim #71717a]{escaped_desc}[/dim #71717a]"
+                        self.add_option(formatted_line)
 
                     self.current_matched = matched_cmds
                     if matched_cmds:

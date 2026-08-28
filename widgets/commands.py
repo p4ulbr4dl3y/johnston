@@ -98,8 +98,8 @@ class NewCommand(BaseCommand):
 
 class ProvidersCommand(BaseCommand):
     name = "/providers"
-    aliases = ["/connect", "/provider"]
-    description = "Manage AI providers (API keys, active status, enable/disable)"
+    aliases = ["/provider", "/connect"]
+    description = "Manage AI providers and API keys"
 
     async def execute(self, app) -> None:
         from widgets.presentation.screens.providers import ProvidersScreen
@@ -187,7 +187,7 @@ class ProvidersCommand(BaseCommand):
 class ModelsCommand(BaseCommand):
     name = "/models"
     aliases = ["/model"]
-    description = "Switch active LLM model across connected providers"
+    description = "Switch active LLM model"
 
     async def execute(self, app) -> None:
         if not getattr(app, "pm", None):
@@ -227,7 +227,7 @@ class ModelsCommand(BaseCommand):
 class ThinkingEffortCommand(BaseCommand):
     name = "/thinking"
     aliases = ["/effort", "/reasoning"]
-    description = "Set thinking effort for the active provider/model"
+    description = "Set model reasoning and thinking effort"
 
     async def execute(self, app) -> None:
         if not getattr(app, "pm", None):
@@ -249,7 +249,7 @@ class ThinkingEffortCommand(BaseCommand):
 
 class RewindCommand(BaseCommand):
     name = "/rewind"
-    aliases = ["/undo"]
+    aliases = ["/undo", "/history"]
     description = "Rollback chat history to a message"
 
     async def execute(self, app) -> None:
@@ -520,7 +520,7 @@ class RenameCommand(BaseCommand):
 
 class ResumeCommand(BaseCommand):
     name = "/resume"
-    aliases = ["/sessions", "/load"]
+    aliases = ["/sessions", "/continue", "/load"]
     description = "Resume a saved session"
 
     async def execute(self, app) -> None:
@@ -591,7 +591,7 @@ class SubagentsCommand(BaseCommand):
 
 class ShellTasksCommand(BaseCommand):
     name = "/shell"
-    aliases = ["/shelltasks"]
+    aliases = ["/tasks", "/shelltasks", "/ps"]
     description = "Manage background shell tasks"
 
     async def execute(self, app) -> None:
@@ -638,7 +638,7 @@ class SkillsCommand(BaseCommand):
 class MCPCommand(BaseCommand):
     name = "/mcp"
     aliases = ["/mcps"]
-    description = "Manage MCP servers (toggle enabled/disabled)"
+    description = "Manage MCP servers"
 
     async def execute(self, app) -> None:
         mm = get_mcp_manager()
@@ -654,8 +654,8 @@ class MCPCommand(BaseCommand):
 
 class CompactCommand(BaseCommand):
     name = "/compact"
-    aliases = ["/compress"]
-    description = "Compact session conversation history with AI summary"
+    aliases = ["/compress", "/summarize", "/smol"]
+    description = "Compact session conversation history"
 
     async def execute(self, app) -> None:
         if not hasattr(app, "agent") or not app.agent:
@@ -736,7 +736,7 @@ class CompactCommand(BaseCommand):
 class QuestionsCommand(BaseCommand):
     name = "/questions"
     aliases = ["/q", "/ask"]
-    description = "Resume pending user questions wizard"
+    description = "Resume pending user questions"
 
     async def execute(self, app) -> None:
         from widgets.presentation.screens.ask_user import AskUserWizardScreen
@@ -756,7 +756,7 @@ class QuestionsCommand(BaseCommand):
 
 class DiffCommand(BaseCommand):
     name = "/diff"
-    aliases = ["/changes", "/status", "/patch"]
+    aliases = ["/changes", "/patch"]
     description = "View workspace diff since session checkpoint"
 
     async def execute(self, app) -> None:
@@ -781,7 +781,7 @@ class DiffCommand(BaseCommand):
 class SandboxCommand(BaseCommand):
     name = "/sandbox"
     aliases = ["/sb"]
-    description = "Toggle shell command sandbox (ON/OFF)"
+    description = "Toggle shell command sandbox"
 
     async def execute(self, app) -> None:
         if not hasattr(app, "sandbox_enabled"):
@@ -807,7 +807,7 @@ class SandboxCommand(BaseCommand):
 class CopyCommand(BaseCommand):
     name = "/copy"
     aliases = ["/cp", "/yank"]
-    description = "Copy last assistant response to clipboard"
+    description = "Copy last assistant response"
 
     async def execute(self, app) -> None:
         try:
@@ -825,7 +825,7 @@ class CopyCommand(BaseCommand):
 class ThemeCommand(BaseCommand):
     name = "/theme"
     aliases = ["/themes", "/color", "/colors"]
-    description = "Switch color theme (Zinc, Dracula, Catppuccin, Nord...)"
+    description = "Switch UI color theme"
 
     async def execute(self, app) -> None:
         from widgets.app.theme_manager import theme_manager
@@ -862,25 +862,25 @@ class ThemeCommand(BaseCommand):
         app.push_screen(ThemeScreen(theme_manager.current_theme.name), callback=on_theme_selected)
 
 COMMAND_CLASSES = [
-    ThemeCommand,
-    HelpCommand,
-    NewCommand,
-    CopyCommand,
-    ProvidersCommand,
     ModelsCommand,
     ThinkingEffortCommand,
+    ProvidersCommand,
+    NewCommand,
+    ResumeCommand,
+    CompactCommand,
     RewindCommand,
     ForkCommand,
     RenameCommand,
-    ResumeCommand,
-    SubagentsCommand,
-    ShellTasksCommand,
     SkillsCommand,
     MCPCommand,
-    CompactCommand,
-    QuestionsCommand,
+    SubagentsCommand,
+    ShellTasksCommand,
     DiffCommand,
+    QuestionsCommand,
     SandboxCommand,
+    CopyCommand,
+    ThemeCommand,
+    HelpCommand,
 ]
 
 

@@ -54,6 +54,31 @@ class TestUpdateQueryCommand(unittest.IsolatedAsyncioTestCase):
         res = await self._sugg.update_query("first line\n/he second", "/he second", cursor_col=3)
         self.assertTrue(any(c.lower() == "/help" for c in res))
 
+    async def test_bare_slash_excludes_aliases_and_preserves_priority(self):
+        res = await self._sugg.update_query("/")
+        self.assertTrue(len(res) > 0)
+        # Primary commands must be present
+        self.assertIn("/models", res)
+        self.assertIn("/new", res)
+        # Top of list must start with high-priority primary command, not aliases or /theme
+        self.assertEqual(res[0], "/models")
+        # Aliases must NOT be present in bare "/" suggestions
+        self.assertNotIn("/model", res)
+        self.assertNotIn("/clear", res)
+        self.assertNotIn("/themes", res)
+        self.assertNotIn("/color", res)
+
+    async def test_prefix_query_includes_matching_aliases(self):
+        res = await self._sugg.update_query("/cle")
+        self.assertIn("/clear", res)
+
+    async def test_prefix_query_prioritizes_primary_over_alias(self):
+        res = await self._sugg.update_query("/res")
+        # /resume and /reset both start with /res; primary /resume must come first
+        self.assertIn("/resume", res)
+        self.assertIn("/reset", res)
+        self.assertLess(res.index("/resume"), res.index("/reset"))
+
 
 class TestUpdateQueryDedupFiles(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

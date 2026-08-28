@@ -738,7 +738,13 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(commands_dict["/h"], "Alias for /help")
         self.assertEqual(commands_dict["/clear"], "Alias for /new")
         self.assertEqual(commands_dict["/undo"], "Alias for /rewind")
+        self.assertEqual(commands_dict["/history"], "Alias for /rewind")
         self.assertEqual(commands_dict["/model"], "Alias for /models")
+        self.assertEqual(commands_dict["/tasks"], "Alias for /shell")
+        self.assertEqual(commands_dict["/ps"], "Alias for /shell")
+        self.assertEqual(commands_dict["/summarize"], "Alias for /compact")
+        self.assertEqual(commands_dict["/smol"], "Alias for /compact")
+        self.assertEqual(commands_dict["/continue"], "Alias for /resume")
         self.assertIn("Manage AI providers", commands_dict["/providers"])
 
     async def test_johnston_guide_skill_command(self):
