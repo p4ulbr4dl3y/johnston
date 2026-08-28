@@ -46,6 +46,34 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"prompt": "another task", "title": "Over limit", "branch": "main"}))
         self.assertIn("ERR: limit: 5 concurrent max", res)
 
+    async def test_custom_max_concurrent_subagents_limit(self):
+        from unittest.mock import MagicMock, patch
+
+        tool = InvokeSubagentTool()
+        mock_app = MagicMock()
+        mock_app.current_session_id = "sess-main"
+        mock_app.sm = self.store
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.background_tasks = []
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        # Populate store with 2 running sessions
+        for i in range(2):
+            self.store.create_subagent(
+                parent_id="sess-main",
+                subagent_id=f"task-custom-{i}",
+                role="worker",
+                description=f"Task {i}",
+                prompt="prompt",
+                status="running",
+            )
+
+        # With limit=2, spawning should fail with "2 concurrent max"
+        with patch("tools.invoke_subagent.load_max_concurrent_subagents", return_value=2):
+            res = str(await tool.execute({"prompt": "another task", "title": "Over limit", "branch": "main"}))
+            self.assertIn("ERR: limit: 2 concurrent max", res)
+
     async def test_explore_subagent_tool_filtering(self):
         from unittest.mock import MagicMock
 

@@ -51,7 +51,8 @@ Credential resolution precedence:
   },
   "sandbox": {
     "enabled": false
-  }
+  },
+  "max_concurrent_subagents": 5
 }
 ```
 

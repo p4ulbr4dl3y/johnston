@@ -3,8 +3,8 @@ import copy
 import uuid
 from typing import Any, Dict
 
-from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
+from core.infrastructure.config.config_helpers import load_max_concurrent_subagents
 from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool
 
@@ -66,8 +66,7 @@ def _mark_subagent_running(app: Any, session_id: str, text: str = "") -> None:
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
-        f"Launch an autonomous subagent in the background for a bounded task "
-        f"(max {MAX_CONCURRENT_SUBAGENTS} concurrent). "
+        "Launch an autonomous subagent in the background for a bounded task. "
         "Completion notifies automatically. Manage or follow up via 'manage_subagent'."
     )
     schema = {
@@ -146,9 +145,10 @@ class InvokeSubagentTool(BaseTool):
 
         active_sessions = store.children(parent_session_id) if parent_session_id else store.list(kind="subagent")
         running_subagents = [s for s in active_sessions if s.status == "running"]
-        if len(running_subagents) >= MAX_CONCURRENT_SUBAGENTS:
+        max_subagents = load_max_concurrent_subagents()
+        if len(running_subagents) >= max_subagents:
             return ToolResult.error(
-                "limit", detail=f"{MAX_CONCURRENT_SUBAGENTS} concurrent max; wait or manage_subagent(action='kill')"
+                "limit", detail=f"{max_subagents} concurrent max; wait or manage_subagent(action='kill')"
             )
 
         subagent = ctx.create_agent()
