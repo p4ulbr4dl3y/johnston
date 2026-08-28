@@ -1,6 +1,6 @@
 ---
 name: johnston-guide
-description: Master Johnston system manual and reference. Manages CLI flags, MCP servers, roles, rules, LLM providers, tools, and custom subagent definitions.
+description: Master Johnston system manual and reference. Manages CLI flags, MCP servers, roles, rules, skills, LLM providers, config, tools, and slash commands.
 ---
 
 # Johnston System Guide
@@ -23,11 +23,20 @@ When performing specific configuration tasks, inspect ONLY the relevant referenc
 4. **Rules & Project Guidelines**: [references/rules.md](references/rules.md)
    - Global rules (`~/.johnston/rules/`), project rules (`.johnston/rules/`), role filtering, and `AGENTS.md` integration (`johnston --rules`).
 
-5. **LLM Providers & Keys**: [references/providers.md](references/providers.md)
+5. **Skills (Modular Capabilities & References)**: [references/skills.md](references/skills.md)
+   - Global skills (`~/.johnston/skills/`), project skills (`.johnston/skills/`), `SKILL.md` format, and subfolder organization (`johnston --skills`, `/skills`).
+
+6. **LLM Providers & Keys**: [references/providers.md](references/providers.md)
    - Provider settings (`~/.johnston/providers.json`), API keys, base URLs, and model aliases (`johnston --models`).
 
-6. **Builtin Tools**: [references/tools.md](references/tools.md)
-   - Builtin tool execution, shell permissions, and per-tool permission config.
+7. **Configuration & Security**: [references/config.md](references/config.md)
+   - App settings (`~/.johnston/config.json`), centralized secrets (`~/.johnston/secrets.json`), permissions, and sandbox mode.
+
+8. **Builtin Tools**: [references/tools.md](references/tools.md)
+   - Builtin tool execution, subagent restrictions, shell permissions, and per-tool permission config.
+
+9. **Slash Commands & Keybindings**: [references/commands.md](references/commands.md)
+   - Interactive TUI slash commands (`/new`, `/resume`, `/compact`, `/fork`, `/rewind`, `/providers`, etc.) and keyboard shortcuts.
 
 ## Token Optimization & Execution Rules
 
