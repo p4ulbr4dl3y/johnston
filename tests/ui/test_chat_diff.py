@@ -215,3 +215,33 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertTrue(any("···" in item for item in lines))
         self.assertTrue(any("50 + qux" in item for item in lines))
 
+    def test_get_diff_colors_dark_and_light(self):
+        from unittest.mock import MagicMock
+
+        from widgets.presentation.widgets.chat_diff import get_diff_colors
+
+        # Dark theme mock
+        dark_theme = MagicMock()
+        dark_theme.dark = True
+        dark_theme.muted = "#71717a"
+        dark_theme.syntax_tokens = {}
+        add_fg, add_bg, rem_fg, rem_bg, gutter = get_diff_colors(dark_theme)
+        self.assertEqual(add_fg, "#3fb950")
+        self.assertEqual(add_bg, "on #12261e")
+        self.assertEqual(rem_fg, "#f85149")
+        self.assertEqual(rem_bg, "on #2a1215")
+        self.assertEqual(gutter, "#71717a")
+
+        # Light theme mock
+        light_theme = MagicMock()
+        light_theme.dark = False
+        light_theme.muted = "#8c8fa1"
+        light_theme.syntax_tokens = {}
+        l_add_fg, l_add_bg, l_rem_fg, l_rem_bg, l_gutter = get_diff_colors(light_theme)
+        self.assertEqual(l_add_fg, "#1a7f37")
+        self.assertEqual(l_add_bg, "on #dafbe1")
+        self.assertEqual(l_rem_fg, "#cf222e")
+        self.assertEqual(l_rem_bg, "on #ffebe9")
+        self.assertEqual(l_gutter, "#8c8fa1")
+
+

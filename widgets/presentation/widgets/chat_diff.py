@@ -110,6 +110,41 @@ GIT_HEADER_PREFIXES = (
 )
 
 
+def get_diff_colors(theme: Any = None) -> tuple[str, str, str, str, str]:
+    """Return (add_fg, add_bg, remove_fg, remove_bg, gutter) harmonized with active theme."""
+    if theme is None:
+        try:
+            from widgets.app.theme_manager import theme_manager
+
+            theme = theme_manager.current_theme
+        except Exception:
+            theme = None
+
+    is_dark = getattr(theme, "dark", True) if theme else True
+    gutter = getattr(theme, "muted", COLOR_DIFF_GUTTER) if theme else COLOR_DIFF_GUTTER
+
+    if is_dark:
+        add_fg = COLOR_DIFF_ADD_FG
+        add_bg = COLOR_DIFF_ADD_BG
+        remove_fg = COLOR_DIFF_REMOVE_FG
+        remove_bg = COLOR_DIFF_REMOVE_BG
+    else:
+        add_fg = "#1a7f37"
+        add_bg = "on #dafbe1"
+        remove_fg = "#cf222e"
+        remove_bg = "on #ffebe9"
+
+    if theme and getattr(theme, "syntax_tokens", None):
+        from pygments.token import Token
+
+        if Token.Generic.Inserted in theme.syntax_tokens:
+            add_fg = theme.syntax_tokens[Token.Generic.Inserted].split()[0]
+        if Token.Generic.Deleted in theme.syntax_tokens:
+            remove_fg = theme.syntax_tokens[Token.Generic.Deleted].split()[0]
+
+    return add_fg, add_bg, remove_fg, remove_bg, gutter
+
+
 def format_edit_diff(diff_text: str, file_path: str) -> Any:
     diff_text = re.sub(
         r"^(?:Success|OK):\s*file\s+'[^']+'\s*(?:updated|created|saved)[^\n]*\n?", "", diff_text, flags=re.MULTILINE
@@ -200,7 +235,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
                     lexer = get_lexer_by_name("javascript")
                 except Exception:
                     pass
-            elif has_css and not has_style_open and not has_script_open:
+            elif has_css and not has_style_open and not has_js:
                 try:
                     lexer = get_lexer_by_name("css")
                 except Exception:
@@ -209,18 +244,27 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
     old_texts = lex_block_to_line_texts(old_code_lines, lexer)
     new_texts = lex_block_to_line_texts(new_code_lines, lexer)
 
+    formatted_lines = []
     old_line = 0
     new_line = 0
     old_idx = 0
     new_idx = 0
 
-    def append_diff_line(num_str: str, symbol: str, code_text: Text, style_bg: str = None, style_fg: str = None):
+    diff_add_fg, diff_add_bg, diff_remove_fg, diff_remove_bg, diff_gutter = get_diff_colors()
+
+    def append_diff_line(
+        num_str: str,
+        symbol: str,
+        code_text: Text,
+        style_bg: str | None = None,
+        style_fg: str | None = None,
+    ) -> None:
         prefix = Text()
         if style_fg:
             prefix.append(f"{num_str} ", style=style_fg)
             prefix.append(f"{symbol} ", style=f"bold {style_fg}")
         else:
-            prefix.append(f"{num_str} ", style=COLOR_DIFF_GUTTER)
+            prefix.append(f"{num_str} ", style=diff_gutter)
             prefix.append("  ")
         formatted_lines.append(DiffLine(prefix, code_text, style_bg=style_bg))
 
@@ -235,7 +279,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             old_line = int(hunk_match.group(1))
             new_line = int(hunk_match.group(3))
             if hunk_count > 0 and formatted_lines:
-                sep_prefix = Text(f"{'···'.rjust(max_num_digits)}   ", style=f"dim {COLOR_DIFF_GUTTER}")
+                sep_prefix = Text(f"{'···'.rjust(max_num_digits)}   ", style=f"dim {diff_gutter}")
                 formatted_lines.append(DiffLine(sep_prefix, Text(""), style_bg=None))
             hunk_count += 1
             in_hunk = True
@@ -252,13 +296,13 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             num_str = str(old_line).rjust(max_num_digits)
             code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:].expandtabs(4))
             old_idx += 1
-            append_diff_line(num_str, "-", code_text, style_bg=COLOR_DIFF_REMOVE_BG, style_fg=COLOR_DIFF_REMOVE_FG)
+            append_diff_line(num_str, "-", code_text, style_bg=diff_remove_bg, style_fg=diff_remove_fg)
             old_line += 1
         elif line.startswith("+"):
             num_str = str(new_line).rjust(max_num_digits)
             code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:].expandtabs(4))
             new_idx += 1
-            append_diff_line(num_str, "+", code_text, style_bg=COLOR_DIFF_ADD_BG, style_fg=COLOR_DIFF_ADD_FG)
+            append_diff_line(num_str, "+", code_text, style_bg=diff_add_bg, style_fg=diff_add_fg)
             new_line += 1
         elif line.startswith("\\"):
             continue

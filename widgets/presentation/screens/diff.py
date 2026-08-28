@@ -13,7 +13,7 @@ from textual.widgets import Input, OptionList, Static
 from widgets.chat_toolcall import ToolScrollBox
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_selection import ModalSearchNavMixin
-from widgets.presentation.widgets.chat_diff import format_edit_diff
+from widgets.presentation.widgets.chat_diff import format_edit_diff, get_diff_colors
 from widgets.presentation.widgets.footer_layout import get_theme_colors
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import BREAKPOINT_COMPACT, BREAKPOINT_HINT, is_compact_width, resolve_width
@@ -201,6 +201,8 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
 
     def _format_sidebar_options(self, target_width: int = DIFF_SIDEBAR_ROW_WIDTH) -> list[str]:
         options = []
+        add_fg, _, remove_fg, _, _ = get_diff_colors()
+        _, _, t_muted, _ = get_theme_colors()
         for file_path, _, added, deleted in self.diff_items:
             short_name = os.path.basename(file_path) or file_path
             stat_plain = f"+{added}/-{deleted}"
@@ -215,7 +217,7 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
                     short_name = short_name[: max_name_len - 1] + "…"
 
             spaces = " " * max(1, target_width - display_width(short_name) - display_width(stat_plain))
-            stat_markup = f"[green]+{added}[/][dim]/[/][red]-{deleted}[/]"
+            stat_markup = f"[{add_fg}]+{added}[/][{t_muted}]/[/][{remove_fg}]-{deleted}[/]"
             options.append(f"{escape(short_name)}{spaces}{stat_markup}")
         return options
 
