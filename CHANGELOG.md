@@ -7,6 +7,23 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.27.1](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.27.0...johnston-v0.27.1) (2026-08-28)
+
+
+### Bug Fixes
+
+* **commands:** sync full history for rewind, fork and checkpoints ([f08381c](https://github.com/p4ulbr4dl3y/johnston/commit/f08381cad9a3c01a458efd54edfe28587839c79a))
+* **core:** remove pointer-based message key caching in agent ([54ecc5c](https://github.com/p4ulbr4dl3y/johnston/commit/54ecc5ca02df6872c859365327f10f6090e327d8))
+* **core:** resolve config helpers paths at call time ([7dd99d8](https://github.com/p4ulbr4dl3y/johnston/commit/7dd99d8ac9bb5dd977aab6b9dc86c74f6cda117e))
+* **ui:** fix autoscroll race and infinite pagination trigger on scroll ([fb9aa28](https://github.com/p4ulbr4dl3y/johnston/commit/fb9aa2811508ad91c9635eb674591821ef5fd0e8))
+* **ui:** use height compensation on scroll up instead of reactive watch ([3315caa](https://github.com/p4ulbr4dl3y/johnston/commit/3315caa56b336c5651d1c56417ab514a64731dfd))
+
+
+### Performance Improvements
+
+* **screens:** optimize modal load times, catalog lookups and git diffs ([76cfe5f](https://github.com/p4ulbr4dl3y/johnston/commit/76cfe5f30815478776652596e226ef3eccf0cd96))
+* **ui:** add lazy pagination and scroll autoloading to chat view ([aff6133](https://github.com/p4ulbr4dl3y/johnston/commit/aff6133221681416845c5bfdac454a62adf9c60a))
+
 ## [0.27.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.26.0...johnston-v0.27.0) (2026-08-27)
 
 
