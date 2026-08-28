@@ -12,15 +12,6 @@ from tests.core._base_provider_helpers import _MockStream, _text_chunk, _tool_ca
 
 
 class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        async def _fake_stream_chat(*args, **kwargs):
-            return
-            yield
-
-        self._stream_patcher = unittest.mock.patch("core.adapters.openai.OpenAIAdapter.stream_chat", side_effect=_fake_stream_chat)
-        self._stream_patcher.start()
-        self.addAsyncCleanup(self._stream_patcher.stop)
-
     def test_compact_command_registered(self):
         from widgets.app.dispatch import COMMAND_REGISTRY
 

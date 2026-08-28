@@ -142,10 +142,12 @@ async def _create_git_checkpoint_async(
     canvas: GenCanvas,
     session_id: Optional[str],
     project_path: Optional[str],
+    checkpoint_manager: Optional[Any] = None,
 ) -> None:
     """Persist the session and snapshot a shadow git checkpoint for the newest user message."""
-    from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+    from core.domain.ports.checkpoint import get_checkpoint_manager
 
+    cm = checkpoint_manager or get_checkpoint_manager()
     try:
         await canvas.save_session()
         if session_id:
@@ -157,7 +159,7 @@ async def _create_git_checkpoint_async(
             msg_idx = user_count - 1
             if msg_idx >= 0:
                 await asyncio.to_thread(
-                    GitCheckpointManager.create_checkpoint, session_id, msg_idx, project_path=project_path
+                    cm.create_checkpoint, session_id, msg_idx, project_path=project_path
                 )
     except Exception as e:  # noqa: BLE001 - checkpoint best-effort, never fatal
         logger.warning("Git checkpoint creation failed: %s", e)
@@ -174,6 +176,7 @@ async def generate_ai_response(
     attachments: Optional[list] = None,
     project_path: Optional[str] = None,
     display_text: Optional[str] = None,
+    checkpoint_manager: Optional[Any] = None,
 ) -> None:
     """Run the agent stream for a user prompt, recording transcript events and
     driving UI handles via ``canvas``.
@@ -194,7 +197,10 @@ async def generate_ai_response(
         await canvas.add_user_message(display_text or user_text, attachments)
 
     await _await_pending_git_restore(agent)
-    await _create_git_checkpoint_async(canvas, session_id, project_path)
+    if checkpoint_manager is not None:
+        await _create_git_checkpoint_async(canvas, session_id, project_path, checkpoint_manager=checkpoint_manager)
+    else:
+        await _create_git_checkpoint_async(canvas, session_id, project_path)
 
     thinking_handle: Any = None
     bot_handle: Any = None

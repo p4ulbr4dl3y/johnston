@@ -7,7 +7,7 @@ streaming is mocked; no real network calls.
 
 import re
 import unittest.mock
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -275,77 +275,17 @@ async def test_compact_history_client_fallback_dict_choice():
     agent._last_sys_tokens = 0
     agent.last_context_tokens = 0
 
-    class _EmptyAdapter:
+    class _StreamingAdapter:
         async def stream_chat(self, *a, **k):
-            if False:
-                yield  # pragma: no cover
+            yield ("adapter_text", _SUMMARY)
 
-    res = {"choices": [{"message": {"content": _SUMMARY}}]}
-    with patch("core.adapters.get_adapter", return_value=_EmptyAdapter()):
-        with patch.object(agent.client.chat.completions, "create", new_callable=AsyncMock, return_value=res):
-            success, _ = await agent.compact_history()
+    with patch("core.adapters.get_adapter", return_value=_StreamingAdapter()):
+        success, _ = await agent.compact_history()
     assert success
 
 
 @pytest.mark.asyncio
-async def test_compact_history_client_fallback_data_choice():
-    agent = _agent(
-        [
-            {"role": "user", "content": "r1"},
-            {"role": "assistant", "content": "a1"},
-            {"role": "user", "content": "r2"},
-            {"role": "assistant", "content": "a2"},
-            {"role": "user", "content": "r3"},
-        ]
-    )
-    agent._last_sys_tokens = 0
-    agent.last_context_tokens = 0
-
-    class _EmptyAdapter:
-        async def stream_chat(self, *a, **k):
-            if False:
-                yield  # pragma: no cover
-
-    res = {"data": {"choices": [{"message": {"content": _SUMMARY}}]}}
-    with patch("core.adapters.get_adapter", return_value=_EmptyAdapter()):
-        with patch.object(agent.client.chat.completions, "create", new_callable=AsyncMock, return_value=res):
-            success, _ = await agent.compact_history()
-    assert success
-
-
-@pytest.mark.asyncio
-async def test_compact_history_client_fallback_attr_choice():
-    agent = _agent(
-        [
-            {"role": "user", "content": "r1"},
-            {"role": "assistant", "content": "a1"},
-            {"role": "user", "content": "r2"},
-            {"role": "assistant", "content": "a2"},
-            {"role": "user", "content": "r3"},
-        ]
-    )
-    agent._last_sys_tokens = 0
-    agent.last_context_tokens = 0
-
-    class _EmptyAdapter:
-        async def stream_chat(self, *a, **k):
-            if False:
-                yield  # pragma: no cover
-
-    class _Msg:
-        content = _SUMMARY
-
-    class _Obj:
-        data = MagicMock(choices=[MagicMock(message=_Msg())])
-
-    with patch("core.adapters.get_adapter", return_value=_EmptyAdapter()):
-        with patch.object(agent.client.chat.completions, "create", new_callable=AsyncMock, return_value=_Obj()):
-            success, _ = await agent.compact_history()
-    assert success
-
-
-@pytest.mark.asyncio
-async def test_compact_history_fallback_error_returns_failure():
+async def test_compact_history_adapter_empty_returns_failure():
     agent = _agent(
         [
             {"role": "user", "content": "r1"},
@@ -364,12 +304,35 @@ async def test_compact_history_fallback_error_returns_failure():
                 yield  # pragma: no cover
 
     with patch("core.adapters.get_adapter", return_value=_EmptyAdapter()):
-        with patch.object(
-            agent.client.chat.completions, "create", new_callable=AsyncMock, side_effect=RuntimeError("boom")
-        ):
-            success, msg = await agent.compact_history()
+        success, msg = await agent.compact_history()
     assert success is False
     assert "Failed to generate summary" in msg
+
+
+@pytest.mark.asyncio
+async def test_compact_history_adapter_error_returns_failure():
+    agent = _agent(
+        [
+            {"role": "user", "content": "r1"},
+            {"role": "assistant", "content": "a1"},
+            {"role": "user", "content": "r2"},
+            {"role": "assistant", "content": "a2"},
+            {"role": "user", "content": "r3"},
+        ]
+    )
+    agent._last_sys_tokens = 0
+    agent.last_context_tokens = 0
+
+    class _ErrorAdapter:
+        async def stream_chat(self, *a, **k):
+            raise RuntimeError("boom")
+            yield  # pragma: no cover
+
+    with patch("core.adapters.get_adapter", return_value=_ErrorAdapter()):
+        success, msg = await agent.compact_history()
+    assert success is False
+    assert "Failed to generate summary" in msg
+    assert "boom" in msg
 
 
 @pytest.mark.asyncio

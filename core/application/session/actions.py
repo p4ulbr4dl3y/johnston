@@ -200,19 +200,21 @@ async def get_rewind_git_stats(
     current_session_id: str | None,
     user_msgs: list[tuple[int, str]],
     project_path: str | None,
+    checkpoint_manager: Optional[Any] = None,
 ) -> list[RewindEntry]:
     """Fetch git-checkpoint stats for each user message in the rewind list.
 
     Returns a list of :class:`RewindEntry` where ``git_stats`` is a formatted
     string like '+12 / -4', 'no changes', or ''.
     """
-    from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+    from core.domain.ports.checkpoint import get_checkpoint_manager
 
+    cm = checkpoint_manager or get_checkpoint_manager()
     msgs_with_stats: list[RewindEntry] = []
     checkpoints_enabled = False
 
     try:
-        checkpoints_enabled = await asyncio.to_thread(GitCheckpointManager.is_valid_checkpoint_target, project_path)
+        checkpoints_enabled = await asyncio.to_thread(cm.is_valid_checkpoint_target, project_path)
     except Exception:
         checkpoints_enabled = False
 
@@ -221,7 +223,7 @@ async def get_rewind_git_stats(
         try:
             details_map = await asyncio.wait_for(
                 asyncio.to_thread(
-                    GitCheckpointManager.get_diff_details_batch,
+                    cm.get_diff_details_batch,
                     current_session_id,
                     seq_indices,
                     project_path=project_path,
@@ -249,18 +251,21 @@ async def get_session_diff(
     current_session_id: str | None,
     message_index: Optional[int] = None,
     project_path: str | None = None,
+    checkpoint_manager: Optional[Any] = None,
 ) -> list[tuple[str, str, int, int]]:
     """Fetch git-checkpoint full diff between checkpoint and current workspace.
 
     Returns a list of tuples: (file_path, diff_text, added_lines, deleted_lines).
     """
-    from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+    from core.domain.ports.checkpoint import get_checkpoint_manager
 
     if not current_session_id:
         return []
 
+    cm = checkpoint_manager or get_checkpoint_manager()
+
     try:
-        checkpoints_enabled = await asyncio.to_thread(GitCheckpointManager.is_valid_checkpoint_target, project_path)
+        checkpoints_enabled = await asyncio.to_thread(cm.is_valid_checkpoint_target, project_path)
     except Exception:
         checkpoints_enabled = False
 
@@ -270,7 +275,7 @@ async def get_session_diff(
     try:
         return await asyncio.wait_for(
             asyncio.to_thread(
-                GitCheckpointManager.get_checkpoint_diff,
+                cm.get_checkpoint_diff,
                 current_session_id,
                 message_index,
                 project_path=project_path,
@@ -342,6 +347,7 @@ def rewind_session(
     load_text_into_input: Callable[[str], None],
     save_session_cb: Callable[[], None],
     refresh_footer_cb: Callable[[], None],
+    checkpoint_manager: Optional[Any] = None,
 ) -> None:
     """Execute a rewind/rollback for a selected user message.
 
@@ -427,13 +433,15 @@ def rewind_session(
                 except Exception as e:
                     logger.warning("Previous git checkpoint restore failed: %s", e)
             try:
-                from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+                from core.domain.ports.checkpoint import get_checkpoint_manager
+
+                cm = checkpoint_manager or get_checkpoint_manager()
                 if restore_git:
                     await asyncio.to_thread(
-                        GitCheckpointManager.restore_checkpoint, curr_sid, seq_idx, project_path=project_path
+                        cm.restore_checkpoint, curr_sid, seq_idx, project_path=project_path
                     )
                 await asyncio.to_thread(
-                    GitCheckpointManager.purge_checkpoints_after, curr_sid, seq_idx, project_path=project_path
+                    cm.purge_checkpoints_after, curr_sid, seq_idx, project_path=project_path
                 )
             except Exception as e:
                 logger.warning("Git checkpoint restore failed: %s", e)

@@ -5,7 +5,6 @@ import logging
 import os
 import random
 import time
-from asyncio import Queue
 from collections import OrderedDict
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
 
@@ -23,8 +22,8 @@ from core.infrastructure.adapters.base import (
     parse_tool_call_args,
 )
 from core.infrastructure.presentation.tool_display import extract_tool_display
-from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs, normalize_thinking_effort
-from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
+from core.infrastructure.runtime.thinking_effort import normalize_thinking_effort
+from core.infrastructure.runtime.token_util import estimate_tokens
 from core.models_catalog import catalog
 from core.provider_manager import is_local_provider
 
@@ -178,10 +177,12 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self.retry_backoff = retry_backoff
         self.max_retry_delay = max_retry_delay
 
-        client_kwargs = {"api_key": self.api_key or "sk-placeholder", "base_url": self.base_url}
-        if self.headers:
-            client_kwargs["default_headers"] = self.headers
-        self.client = AsyncOpenAI(**client_kwargs)
+        self._client: Optional[AsyncOpenAI] = None
+        if self.api_type == "openai":
+            client_kwargs = {"api_key": self.api_key or "sk-placeholder", "base_url": self.base_url}
+            if self.headers:
+                client_kwargs["default_headers"] = self.headers
+            self._client = AsyncOpenAI(**client_kwargs)
         self.history = []
         self.app = None
         self.tokens_input = 0
@@ -200,9 +201,22 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         # resolution + membership checks rerun for every tool_result.
         self._tool_policy_cache: Dict[tuple, Any] = {}
 
+    @property
+    def client(self) -> AsyncOpenAI:
+        if self._client is None:
+            client_kwargs = {"api_key": self.api_key or "sk-placeholder", "base_url": self.base_url}
+            if self.headers:
+                client_kwargs["default_headers"] = self.headers
+            self._client = AsyncOpenAI(**client_kwargs)
+        return self._client
+
+    @client.setter
+    def client(self, val: Any) -> None:
+        self._client = val
+
     async def close(self):
-        if hasattr(self, "client") and self.client:
-            await self.client.close()
+        if getattr(self, "_client", None) is not None:
+            await self._client.close()
 
     def clear_history(self):
         self.history.clear()
@@ -495,250 +509,64 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     active_thought_parts = []
                     step_usage = None
                     tool_calls_dict = {}
-                    tool_call_arg_parts: Dict[int, List[str]] = {}
                     thinking_started = False
                     thinking_t0 = time.time()
-                    last_finish_reason = None
-                    last_native_finish_reason = None
 
                     try:
-                        if getattr(self, "api_type", "openai") != "openai":
-                            from core.adapters import get_adapter
+                        from core.adapters import get_adapter
 
-                            adapter = get_adapter(self.api_type)
-                            async for tag, payload in adapter.stream_chat(
-                                self.base_url,
-                                self.api_key,
-                                self.model,
-                                messages,
-                                all_tools if all_tools else None,
-                                max_tokens=getattr(self, "max_tokens", 4096),
-                                thinking_effort=getattr(self, "thinking_effort", None),
-                            ):
-                                if tag == "adapter_text":
-                                    if thinking_started:
-                                        dt = time.time() - thinking_t0
-                                        yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
-                                        thinking_started = False
-                                    full_assistant_parts.append(payload)
-                                    yield ("bot_delta", payload, "")
-                                elif tag == "adapter_thought":
-                                    if not thinking_started:
-                                        yield ("thinking_start", "Thinking...", "")
-                                        thinking_started = True
-                                        thinking_t0 = time.time()
-                                    active_thought_parts.append(payload)
-                                    yield ("thinking_delta", payload, "")
-                                elif tag == "adapter_tool_call":
-                                    if thinking_started:
-                                        dt = time.time() - thinking_t0
-                                        yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
-                                        thinking_started = False
-                                    idx = len(tool_calls_dict)
-                                    tc_id = payload.get("id") or new_tool_call_id(idx)
-                                    tool_calls_dict[idx] = {
-                                        "id": tc_id,
-                                        "name": payload.get("name", ""),
-                                        "arguments": payload.get("arguments", "") or "",
-                                    }
-                                elif tag == "adapter_usage":
-                                    step_usage = payload
-                        else:
-                            from core.adapters import format_messages_for_openai
+                        adapter = get_adapter(self.api_type)
+                        stream_kwargs: Dict[str, Any] = {
+                            "base_url": self.base_url,
+                            "api_key": self.api_key,
+                            "model": self.model,
+                            "messages": messages,
+                            "tools": all_tools if all_tools else None,
+                            "max_tokens": getattr(self, "max_tokens", 4096),
+                            "thinking_effort": getattr(self, "thinking_effort", None),
+                        }
+                        if self.api_type == "openai":
+                            stream_kwargs["headers"] = getattr(self, "headers", None)
+                            stream_kwargs["extra_body"] = getattr(self, "extra_body", None)
+                            stream_kwargs["chunk_timeout"] = getattr(self, "chunk_timeout", 30.0)
+                            stream_kwargs["provider_key"] = getattr(self, "provider_key", "openai")
+                            if getattr(self, "_client", None) is not None:
+                                stream_kwargs["client"] = self._client
 
-                            formatted_messages = format_messages_for_openai(messages)
-                            create_kwargs = {
-                                "model": self.model,
-                                "messages": formatted_messages,
-                                "tools": all_tools if all_tools else None,
-                                "stream": True,
-                            }
-                            e_body = dict(getattr(self, "extra_body", {}) or {})
-                            if e_body:
-                                create_kwargs["extra_body"] = e_body
-                            create_kwargs.update(build_openai_thinking_kwargs(getattr(self, "thinking_effort", None)))
+                        async for tag, payload in adapter.stream_chat(**stream_kwargs):
+                            if tag == "adapter_text":
+                                if thinking_started:
+                                    dt = time.time() - thinking_t0
+                                    yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
+                                    thinking_started = False
+                                full_assistant_parts.append(payload)
+                                yield ("bot_delta", payload, "")
+                            elif tag == "adapter_thought":
+                                if not thinking_started:
+                                    yield ("thinking_start", "Thinking...", "")
+                                    thinking_started = True
+                                    thinking_t0 = time.time()
+                                active_thought_parts.append(payload)
+                                yield ("thinking_delta", payload, "")
+                            elif tag == "adapter_tool_call":
+                                if thinking_started:
+                                    dt = time.time() - thinking_t0
+                                    yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
+                                    thinking_started = False
+                                idx = len(tool_calls_dict)
+                                tc_id = payload.get("id") or new_tool_call_id(idx)
+                                tool_calls_dict[idx] = {
+                                    "id": tc_id,
+                                    "name": payload.get("name", ""),
+                                    "arguments": payload.get("arguments", "") or "",
+                                }
+                            elif tag == "adapter_usage":
+                                step_usage = payload
 
-                            try:
-                                response = await self.client.chat.completions.create(
-                                    **create_kwargs, stream_options={"include_usage": True}
-                                )
-                            except Exception as create_err:
-                                c_err_str = str(create_err).lower()
-                                if (
-                                    "stream_options" in c_err_str
-                                    or "extra" in c_err_str
-                                    or isinstance(create_err, TypeError)
-                                ):
-                                    if "reasoning_effort" in c_err_str or isinstance(create_err, TypeError):
-                                        create_kwargs.pop("reasoning_effort", None)
-                                    response = await self.client.chat.completions.create(**create_kwargs)
-                                else:
-                                    raise create_err
-
-                            stream_iter = response.__aiter__()
-                            chunk_to = getattr(self, "chunk_timeout", 30.0) or 30.0
-                            # Single producer task pulls chunks off the provider; the
-                            # consumer polls the queue with a watchdog deadline so we
-                            # keep per-chunk timeouts without creating a task per chunk.
-                            _chunk_queue: "Queue[Any]" = Queue(maxsize=64)
-                            _DONE = object()
-
-                            async def _produce_chunks():
-                                try:
-                                    async for chunk in stream_iter:
-                                        await _chunk_queue.put(chunk)
-                                except asyncio.CancelledError:
-                                    raise
-                                except Exception as exc:
-                                    await _chunk_queue.put(exc)
-                                finally:
-                                    await _chunk_queue.put(_DONE)
-
-                            producer_task = asyncio.ensure_future(_produce_chunks())
-                            try:
-                                while True:
-                                    try:
-                                        item = await asyncio.wait_for(
-                                            _chunk_queue.get(), timeout=chunk_to
-                                        )
-                                    except asyncio.TimeoutError:
-                                        producer_task.cancel()
-                                        raise RuntimeError(
-                                            f"Stream chunk timeout: No response received from provider '{self.provider_key}' for {chunk_to}s."
-                                        )
-                                    if item is _DONE:
-                                        break
-                                    if isinstance(item, Exception):
-                                        raise item
-                                    chunk = item
-
-                                    if getattr(chunk, "usage", None):
-                                        step_usage = parse_usage(chunk.usage)
-
-                                    chunk_is_dict = isinstance(chunk, dict)
-                                    chunk_error = (
-                                        chunk.get("error")
-                                        if chunk_is_dict
-                                        else getattr(chunk, "error", None)
-                                    )
-                                    if (
-                                        chunk_error is not None
-                                        and not callable(chunk_error)
-                                        and not hasattr(chunk_error, "_mock_name")
-                                        and (isinstance(chunk_error, (dict, str)) or getattr(chunk_error, "message", None))
-                                    ):
-                                        err_msg = (
-                                            chunk_error.get("message")
-                                            if isinstance(chunk_error, dict)
-                                            else getattr(chunk_error, "message", str(chunk_error))
-                                        )
-                                        raise RuntimeError(f"Provider stream error: {err_msg}")
-
-                                    choices = (
-                                        getattr(chunk, "choices", None)
-                                        if not chunk_is_dict
-                                        else chunk.get("choices")
-                                    )
-                                    if not choices and (
-                                        hasattr(chunk, "data") or (chunk_is_dict and "data" in chunk)
-                                    ):
-                                        d = (
-                                            getattr(chunk, "data", None)
-                                            if not chunk_is_dict
-                                            else chunk.get("data")
-                                        )
-                                        choices = (
-                                            d.get("choices") if isinstance(d, dict) else getattr(d, "choices", None)
-                                        )
-                                    if not choices:
-                                        continue
-                                    choice = choices[0]
-                                    choice_is_dict = isinstance(choice, dict)
-                                    f_reason = (
-                                        choice.get("finish_reason")
-                                        if choice_is_dict
-                                        else getattr(choice, "finish_reason", None)
-                                    )
-                                    native_reason = (
-                                        choice.get("native_finish_reason")
-                                        if choice_is_dict
-                                        else getattr(choice, "native_finish_reason", None)
-                                    )
-                                    if isinstance(f_reason, str):
-                                        last_finish_reason = f_reason
-                                    if isinstance(native_reason, str):
-                                        last_native_finish_reason = native_reason
-
-                                    delta = (
-                                        choice.get("delta")
-                                        if choice_is_dict
-                                        else getattr(choice, "delta", None)
-                                    )
-                                    if not delta:
-                                        continue
-
-                                    reasoning = (
-                                        getattr(delta, "reasoning_content", None)
-                                        or getattr(delta, "reasoning", None)
-                                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
-                                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
-                                    )
-                                    if reasoning:
-                                        if not thinking_started:
-                                            yield ("thinking_start", "Thinking...", "")
-                                            thinking_started = True
-                                            thinking_t0 = time.time()
-                                        active_thought_parts.append(str(reasoning))
-                                        yield ("thinking_delta", str(reasoning), "")
-
-                                    if delta.content:
-                                        if thinking_started:
-                                            dt = time.time() - thinking_t0
-                                            yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
-                                            thinking_started = False
-                                        full_assistant_parts.append(delta.content)
-                                        yield ("bot_delta", delta.content, "")
-
-                                    if delta.tool_calls:
-                                        if thinking_started:
-                                            dt = time.time() - thinking_t0
-                                            yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
-                                            thinking_started = False
-
-                                        for tc in delta.tool_calls:
-                                            idx = tc.index
-                                            if idx not in tool_calls_dict:
-                                                tool_calls_dict[idx] = {"id": tc.id, "name": "", "arguments": ""}
-                                            if tc.id:
-                                                tool_calls_dict[idx]["id"] = tc.id
-                                            if tc.function:
-                                                if tc.function.name:
-                                                    tool_calls_dict[idx]["name"] = tc.function.name
-                                                if tc.function.arguments:
-                                                    tool_call_arg_parts.setdefault(idx, []).append(
-                                                        tc.function.arguments
-                                                    )
-                            finally:
-                                if not producer_task.done():
-                                    producer_task.cancel()
-
-                            if (
-                                (last_native_finish_reason in ("network_error", "error") or last_finish_reason == "error")
-                                and not full_assistant_parts
-                                and not tool_calls_dict
-                            ):
-                                err_name = last_native_finish_reason or last_finish_reason
-                                raise RuntimeError(f"Provider stream interrupted: {err_name}")
-
-                            # Resolve streamed tool-call argument fragments once.
-                            for _idx, _parts in tool_call_arg_parts.items():
-                                tool_calls_dict[_idx]["arguments"] = "".join(_parts)
                         # Stream completed successfully
                         circuit_breaker.record_success(pkey)
                         break
                     except asyncio.CancelledError:
-                        for _idx, _parts in tool_call_arg_parts.items():
-                            tool_calls_dict[_idx]["arguments"] = "".join(_parts)
                         output_est = (
                             estimate_tokens("".join(full_assistant_parts))
                             + estimate_tokens("".join(active_thought_parts))

@@ -25,10 +25,10 @@ class BaseApiAdapter:
         # pools). Clients are cached per (base_url, api_key) pair so different
         # providers reached through the adapter branch each get their own
         # client.
-        self._clients: Dict[Tuple[str, str], Any] = {}
+        self._clients: Dict[Tuple[Any, ...], Any] = {}
         atexit.register(self.close)
 
-    def _create_client(self, base_url: str, api_key: str) -> Any:
+    def _create_client(self, base_url: str, api_key: str, headers: Optional[Dict[str, str]] = None) -> Any:
         """Create a fresh transport client for the given (base_url, api_key).
 
         Subclasses override to instantiate their own client type.
@@ -39,11 +39,15 @@ class BaseApiAdapter:
         """Whether a cached client is closed and should be recreated."""
         return bool(getattr(client, "is_closed", False))
 
-    def _get_client(self, base_url: str, api_key: str) -> Any:
-        key = (base_url or "", api_key or "")
+    def _get_client(self, base_url: str, api_key: str, headers: Optional[Dict[str, str]] = None) -> Any:
+        header_key = tuple(sorted(headers.items())) if headers else ()
+        key = (base_url or "", api_key or "", header_key)
         client = self._clients.get(key)
         if client is None or self._client_is_closed(client):
-            client = self._create_client(base_url, api_key)
+            try:
+                client = self._create_client(base_url, api_key, headers=headers)
+            except TypeError:
+                client = self._create_client(base_url, api_key)
             self._clients[key] = client
         return client
 

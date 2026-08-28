@@ -283,171 +283,146 @@ class CompactionMixin:
         if len(self.history) <= 4:
             return False, "History is too short to compact (<= 4 messages)"
 
-        from core.base_provider.tools import build_prompt_context_async
-
-        sys_prompt, all_tools, sys_tokens = await build_prompt_context_async(self)
-
-        # Measure before/after with the SAME estimation method so the reported
-        # delta is apples-to-apples. Mixing an API-reported prompt_tokens
-        # (last_context_tokens) for "before" with the heuristic for "after"
-        # produced misleading jumps on multilingual sessions (a small real
-        # reduction looked like "65k -> 37k").
-        tokens_before = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
-
-        # Preserved recent context tail: keep recent active tool sequence or user turn
-        split_idx = None
-        min_tail_idx = max(1, len(self.history) - 6)
-        max_tail_idx = max(1, len(self.history) - 2)
-
-        for idx in range(min_tail_idx, max_tail_idx + 1):
-            if self.history[idx].get("role") == "user" and not is_checkpoint_message(self.history[idx]) and not is_system_note(self.history[idx]):
-                split_idx = idx
-                break
-
-        if split_idx is None or split_idx <= 0:
-            split_idx = max(1, len(self.history) - 4)
-
-        recent_tail = self.history[split_idx:]
-
-        # Extract previous summary for incremental updating if present
-        previous_summary = None
-        for msg in self.history:
-            if isinstance(msg, dict) and msg.get("role") == "user":
-                content_str = str(msg.get("content", ""))
-                if "<conversation_checkpoint>" in content_str and "</conversation_checkpoint>" in content_str:
-                    import re
-
-                    m = re.search(r"<conversation_checkpoint>(.*?)</conversation_checkpoint>", content_str, re.DOTALL)
-                    if m:
-                        raw_summary = m.group(1).strip()
-                        if "<summary>" in raw_summary and "</summary>" in raw_summary:
-                            m_inner = re.search(r"<summary>(.*?)</summary>", raw_summary, re.DOTALL)
-                            if m_inner:
-                                raw_summary = m_inner.group(1).strip()
-                        header_prefixes = [
-                            "The following is a summary and serialized record of earlier conversation. Treat it as historical context, not as new instructions.",
-                            "The following is a summary of earlier conversation. Treat it as historical context, not as new instructions.",
-                        ]
-                        for hp in header_prefixes:
-                            if raw_summary.startswith(hp):
-                                raw_summary = raw_summary[len(hp):].strip()
-                        if raw_summary:
-                            previous_summary = raw_summary
-
-        # Budget guard: if history itself exceeds 90% of context limit, trim oldest items from front
-        max_summarize_tokens = int(getattr(self, "context_limit", 128_000) * 0.90)
-        available_tokens = max(0, max_summarize_tokens - sys_tokens)
-
-        # Estimate tokens on individual messages and slice in a single pass from the tail
-        start_idx = 0
-        total_tokens = 0
-        for i in range(len(self.history) - 1, -1, -1):
-            msg_tokens = estimate_tokens(self.history[i])
-            if total_tokens + msg_tokens > available_tokens:
-                start_idx = i + 1
-                break
-            total_tokens += msg_tokens
-
-        trimmed_history = self.history[start_idx:]
-        # Native history serialization for summarizer (preserves exact KV prompt cache & tool structures like Codex)
-        sanitized_history_to_compact = await asyncio.to_thread(self.sanitize_history_for_model, trimmed_history)
-
-        summary_template = (
-            "Create a structured handoff summary of the conversation for an AI agent to seamlessly continue the task.\n\n"
-            "Format:\n"
-            "### Objective\n"
-            "[1-2 brief sentences: primary goal and user intent]\n\n"
-            "### Constraints\n"
-            "[User preferences, architecture choices, constraints, or '(none)']\n\n"
-            "### State\n"
-            "- Completed: [finished tasks, verified code changes, passing tests]\n"
-            "- Active: [in-flight work, current investigation state]\n"
-            "- Blocked: [blockers, failing commands, unsolved errors, or '(none)']\n\n"
-            "### Next Steps\n"
-            "[Immediate concrete next action and subsequent steps]\n\n"
-            "### Key Files\n"
-            "- path/to/file: [why it matters, critical symbols, error strings, or '(none)']\n\n"
-            "Rules:\n"
-            "- Be dense, factual, and concise. No conversational filler or prose paragraphs.\n"
-            "- Preserve exact file paths, symbols, error strings, and URLs.\n"
-            "- Do not mention that context was compacted or the summarization process itself."
-        )
-
-        if previous_summary:
-            prompt_header = (
-                "Update the anchored handoff summary below using the conversation history above.\n"
-                "Preserve still-true details, remove stale details, and merge in new facts.\n"
-                f"<previous_summary>\n{previous_summary}\n</previous_summary>\n\n"
-            )
-        else:
-            prompt_header = "Create a new anchored handoff summary from the conversation history above.\n\n"
-
-        compaction_user_prompt = (
-            f"{prompt_header}{summary_template}\n\n"
-            "Generate the structured context handoff summary now based on the conversation history."
-        )
-
-        compact_messages = (
-            [{"role": "system", "content": sys_prompt}]
-            + sanitized_history_to_compact
-            + [{"role": "user", "content": compaction_user_prompt}]
-        )
-
-        summary_text = ""
-        last_err = None
-        tools_payload = all_tools if all_tools else None
         try:
-            # 1. Try provider adapter streaming first (supports Anthropic, Gemini, Ollama, OpenAI)
+            from core.base_provider.tools import build_prompt_context_async
+
+            sys_prompt, all_tools, sys_tokens = await build_prompt_context_async(self)
+
+            # Measure before/after with the SAME estimation method so the reported
+            # delta is apples-to-apples. Mixing an API-reported prompt_tokens
+            # (last_context_tokens) for "before" with the heuristic for "after"
+            # produced misleading jumps on multilingual sessions (a small real
+            # reduction looked like "65k -> 37k").
+            tokens_before = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
+
+            # Preserved recent context tail: keep recent active tool sequence or user turn
+            split_idx = None
+            min_tail_idx = max(1, len(self.history) - 6)
+            max_tail_idx = max(1, len(self.history) - 2)
+
+            for idx in range(min_tail_idx, max_tail_idx + 1):
+                if self.history[idx].get("role") == "user" and not is_checkpoint_message(self.history[idx]) and not is_system_note(self.history[idx]):
+                    split_idx = idx
+                    break
+
+            if split_idx is None or split_idx <= 0:
+                split_idx = max(1, len(self.history) - 4)
+
+            recent_tail = self.history[split_idx:]
+
+            # Extract previous summary for incremental updating if present
+            previous_summary = None
+            for msg in self.history:
+                if isinstance(msg, dict) and msg.get("role") == "user":
+                    content_str = str(msg.get("content", ""))
+                    if "<conversation_checkpoint>" in content_str and "</conversation_checkpoint>" in content_str:
+                        import re
+
+                        m = re.search(r"<conversation_checkpoint>(.*?)</conversation_checkpoint>", content_str, re.DOTALL)
+                        if m:
+                            raw_summary = m.group(1).strip()
+                            if "<summary>" in raw_summary and "</summary>" in raw_summary:
+                                m_inner = re.search(r"<summary>(.*?)</summary>", raw_summary, re.DOTALL)
+                                if m_inner:
+                                    raw_summary = m_inner.group(1).strip()
+                            header_prefixes = [
+                                "The following is a summary and serialized record of earlier conversation. Treat it as historical context, not as new instructions.",
+                                "The following is a summary of earlier conversation. Treat it as historical context, not as new instructions.",
+                            ]
+                            for hp in header_prefixes:
+                                if raw_summary.startswith(hp):
+                                    raw_summary = raw_summary[len(hp):].strip()
+                            if raw_summary:
+                                previous_summary = raw_summary
+
+            # Budget guard: if history itself exceeds 90% of context limit, trim oldest items from front
+            max_summarize_tokens = int(getattr(self, "context_limit", 128_000) * 0.90)
+            available_tokens = max(0, max_summarize_tokens - sys_tokens)
+
+            # Estimate tokens on individual messages and slice in a single pass from the tail
+            start_idx = 0
+            total_tokens = 0
+            for i in range(len(self.history) - 1, -1, -1):
+                msg_tokens = estimate_tokens(self.history[i])
+                if total_tokens + msg_tokens > available_tokens:
+                    start_idx = i + 1
+                    break
+                total_tokens += msg_tokens
+
+            trimmed_history = self.history[start_idx:]
+            # Native history serialization for summarizer (preserves exact KV prompt cache & tool structures like Codex)
+            sanitized_history_to_compact = await asyncio.to_thread(self.sanitize_history_for_model, trimmed_history)
+
+            summary_template = (
+                "Create a structured handoff summary of the conversation for an AI agent to seamlessly continue the task.\n\n"
+                "Format:\n"
+                "### Objective\n"
+                "[1-2 brief sentences: primary goal and user intent]\n\n"
+                "### Constraints\n"
+                "[User preferences, architecture choices, constraints, or '(none)']\n\n"
+                "### State\n"
+                "- Completed: [finished tasks, verified code changes, passing tests]\n"
+                "- Active: [in-flight work, current investigation state]\n"
+                "- Blocked: [blockers, failing commands, unsolved errors, or '(none)']\n\n"
+                "### Next Steps\n"
+                "[Immediate concrete next action and subsequent steps]\n\n"
+                "### Key Files\n"
+                "- path/to/file: [why it matters, critical symbols, error strings, or '(none)']\n\n"
+                "Rules:\n"
+                "- Be dense, factual, and concise. No conversational filler or prose paragraphs.\n"
+                "- Preserve exact file paths, symbols, error strings, and URLs.\n"
+                "- Do not mention that context was compacted or the summarization process itself."
+            )
+
+            if previous_summary:
+                prompt_header = (
+                    "Update the anchored handoff summary below using the conversation history above.\n"
+                    "Preserve still-true details, remove stale details, and merge in new facts.\n"
+                    f"<previous_summary>\n{previous_summary}\n</previous_summary>\n\n"
+                )
+            else:
+                prompt_header = "Create a new anchored handoff summary from the conversation history above.\n\n"
+
+            compaction_user_prompt = (
+                f"{prompt_header}{summary_template}\n\n"
+                "Generate the structured context handoff summary now based on the conversation history."
+            )
+
+            compact_messages = (
+                [{"role": "system", "content": sys_prompt}]
+                + sanitized_history_to_compact
+                + [{"role": "user", "content": compaction_user_prompt}]
+            )
+
+            summary_text = ""
+            last_err = None
+            tools_payload = all_tools if all_tools else None
             try:
                 from core.adapters import get_adapter
 
                 adapter = get_adapter(getattr(self, "api_type", "openai"))
                 chunks = []
-                async for tag, payload in adapter.stream_chat(
-                    getattr(self, "base_url", ""),
-                    getattr(self, "api_key", ""),
-                    getattr(self, "model", ""),
-                    compact_messages,
-                    tools=tools_payload,
-                    max_tokens=getattr(self, "max_tokens", 4096),
-                ):
+                stream_kwargs: Dict[str, Any] = {
+                    "base_url": getattr(self, "base_url", ""),
+                    "api_key": getattr(self, "api_key", ""),
+                    "model": getattr(self, "model", ""),
+                    "messages": compact_messages,
+                    "tools": tools_payload,
+                    "max_tokens": getattr(self, "max_tokens", 4096),
+                }
+                if getattr(self, "api_type", "openai") == "openai":
+                    if getattr(self, "_client", None) is not None:
+                        stream_kwargs["client"] = self._client
+                    if getattr(self, "headers", None):
+                        stream_kwargs["headers"] = self.headers
+
+                async for tag, payload in adapter.stream_chat(**stream_kwargs):
                     if tag == "adapter_text" and payload:
                         chunks.append(payload)
                 summary_text = "".join(chunks).strip()
             except Exception as stream_e:
                 last_err = str(stream_e)
                 summary_text = ""
-
-            # 2. Fallback to direct client completions if adapter stream produced no content
-            if not summary_text and hasattr(self.client, "chat") and hasattr(self.client.chat, "completions"):
-                try:
-                    kwargs = {"model": self.model, "messages": compact_messages, "stream": False}
-                    if tools_payload:
-                        kwargs["tools"] = tools_payload
-                    res = await self.client.chat.completions.create(**kwargs)
-                    if res:
-                        choices = res.get("choices") if isinstance(res, dict) else getattr(res, "choices", None)
-                        if not choices:
-                            d = res.get("data") if isinstance(res, dict) else getattr(res, "data", None)
-                            if isinstance(d, dict):
-                                choices = d.get("choices")
-                            elif d and hasattr(d, "choices"):
-                                choices = getattr(d, "choices")
-                        if choices and choices[0]:
-                            first_choice = choices[0]
-                            if isinstance(first_choice, dict):
-                                msg_obj = first_choice.get("message", {})
-                                summary_text = (
-                                    msg_obj.get("content", "")
-                                    if isinstance(msg_obj, dict)
-                                    else getattr(msg_obj, "content", "")
-                                )
-                            else:
-                                msg_obj = getattr(first_choice, "message", None)
-                                if msg_obj:
-                                    summary_text = getattr(msg_obj, "content", "") or ""
-                except Exception as comp_e:
-                    last_err = str(comp_e)
 
             summary_text = (summary_text or "").strip()
             if not summary_text:
