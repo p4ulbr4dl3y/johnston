@@ -264,7 +264,7 @@ class TestCLIAdvanced(unittest.TestCase):
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "scope": "global"}]
             mgr.get_active_tools.return_value = []
-            mgr.clients = {}
+            mgr.get_server_status.return_value = {"server": "srv", "tools": 0, "error": None, "running": False}
             mock_get.return_value = mgr
             with redirect_stdout(f):
                 print_mcp()
@@ -277,9 +277,12 @@ class TestCLIAdvanced(unittest.TestCase):
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.return_value = []
-            client = MagicMock()
-            client.last_error = "process failed"
-            mgr.clients = {"srv": client}
+            mgr.get_server_status.return_value = {
+                "server": "srv",
+                "tools": 0,
+                "error": "process failed",
+                "running": False,
+            }
             mock_get.return_value = mgr
             with redirect_stdout(f):
                 print_mcp()
@@ -291,7 +294,7 @@ class TestCLIAdvanced(unittest.TestCase):
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.return_value = []
-            mgr.clients = {}
+            mgr.get_server_status.return_value = {"server": "srv", "tools": 0, "error": None, "running": False}
             mock_get.return_value = mgr
             with redirect_stdout(f):
                 print_mcp()

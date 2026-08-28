@@ -127,8 +127,8 @@ def print_mcp():
         elif url and not cmd:
             print("    Error: HTTP/SSE URL transport not supported yet (only stdio commands supported)")
         else:
-            client = mgr.clients.get(name)
-            err = getattr(client, "last_error", None) if client else None
+            server_status = mgr.get_server_status(name) if hasattr(mgr, "get_server_status") else {}
+            err = server_status.get("error") if isinstance(server_status, dict) else None
             if err:
                 print(f"    Error: {err}")
             elif not cmd:
@@ -138,6 +138,29 @@ def print_mcp():
 
         if idx < len(servers) - 1:
             print()
+
+
+def _print_resume_hint(app) -> None:
+    """Print command to resume the session if it has active messages."""
+    get_hint = getattr(app, "get_resume_hint", None)
+    if callable(get_hint):
+        try:
+            hint = get_hint()
+            if isinstance(hint, str) and hint.strip():
+                print(f"\nTo resume this session, run:\n  {hint}")
+                return
+        except Exception:
+            pass
+
+    sid = getattr(app, "current_session_id", None)
+    sm = getattr(app, "sm", None)
+    if sid and sm is not None:
+        try:
+            sess = sm.get(sid)
+            if sess and (getattr(sess, "messages", None) or getattr(sess, "agent_history", None)):
+                print(f"\nTo resume this session, run:\n  johnston --resume {sid}")
+        except Exception:
+            pass
 
 
 def print_rules():
@@ -255,13 +278,7 @@ def main():
     except KeyboardInterrupt:
         pass
 
-    if getattr(app, "current_session_id", None) and hasattr(app, "sm"):
-        try:
-            sess = app.sm.get(app.current_session_id)
-            if sess and (getattr(sess, "messages", None) or getattr(sess, "agent_history", None)):
-                print(f"\nTo resume this session, run:\n  johnston --resume {app.current_session_id}")
-        except Exception:
-            pass
+    _print_resume_hint(app)
 
     sys.exit(0)
 

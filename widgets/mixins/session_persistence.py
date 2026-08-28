@@ -177,3 +177,17 @@ class SessionPersistenceMixin:
         if session_data is not None:
             await asyncio.to_thread(self._write_session_data, session_data)
             self.refresh_status_footer()
+
+    def get_resume_hint(self) -> Optional[str]:
+        """Return CLI command string to resume active session if it contains messages."""
+        sid = getattr(self, "current_session_id", None)
+        sm = getattr(self, "sm", None)
+        if not sid or sm is None:
+            return None
+        try:
+            sess = sm.get(sid)
+            if sess and (getattr(sess, "messages", None) or getattr(sess, "agent_history", None)):
+                return f"johnston --resume {sid}"
+        except Exception:
+            pass
+        return None

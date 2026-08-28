@@ -15,6 +15,7 @@ All network interaction is mocked; no real sockets are used.
 import asyncio
 import inspect as _inspect
 import socket
+import threading
 import time
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -386,7 +387,7 @@ class TestCancelEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_cancel_after_completion_is_noop(self):
         # Cancelling a task that already finished must not raise/leak.
         task = asyncio.create_task(run_cancellable(lambda: "done"))
-        await asyncio.sleep(0.01)
+        await task
         self.assertEqual(task.result(), "done")
         task.cancel()  # already finished -> cancelling is safe
         try:
@@ -398,16 +399,18 @@ class TestCancelEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_multiple_cancel_calls(self):
         # Repeated cancel() must be idempotent and still raise CancelledError once.
         calls = []
+        started = threading.Event()
 
         def worker(cancel_event=None):
+            started.set()
             while True:
                 calls.append(cancel_event.is_set())
                 if cancel_event.is_set():
                     return "bailed"
-                time.sleep(0.005)
+                time.sleep(0.001)
 
         task = asyncio.create_task(run_cancellable(worker))
-        await asyncio.sleep(0.02)
+        await asyncio.to_thread(started.wait)
         task.cancel()
         task.cancel()
         task.cancel()
@@ -416,12 +419,15 @@ class TestCancelEdgeCases(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancel_non_cooperative_returns_immediately(self):
         # A worker that ignores cancel_event still lets the caller return at once.
+        started = threading.Event()
+
         def stubborn():
+            started.set()
             time.sleep(5.0)
             return "late"
 
         task = asyncio.create_task(run_cancellable(stubborn))
-        await asyncio.sleep(0.02)
+        await asyncio.to_thread(started.wait)
         start = time.monotonic()
         task.cancel()
         with self.assertRaises(asyncio.CancelledError):
@@ -433,13 +439,16 @@ class TestCancelEdgeCases(unittest.IsolatedAsyncioTestCase):
     async def test_worker_raising_returns_via_cancel_event(self):
         # A cooperative worker that raises once it sees the cancel event still
         # surfaces CancelledError to the awaiting task (exception swallowed).
+        started = threading.Event()
+
         def worker(cancel_event=None):
+            started.set()
             while not cancel_event.is_set():
-                time.sleep(0.005)
+                time.sleep(0.001)
             raise RuntimeError("cancelled cooperatively")
 
         task = asyncio.create_task(run_cancellable(worker))
-        await asyncio.sleep(0.02)
+        await asyncio.to_thread(started.wait)
         task.cancel()
         with self.assertRaises(asyncio.CancelledError):
             await task

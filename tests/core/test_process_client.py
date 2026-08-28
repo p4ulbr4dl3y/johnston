@@ -48,9 +48,14 @@ class TestAsyncReadLoop(unittest.IsolatedAsyncioTestCase):
         notification = json.dumps({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})
         proc.stdout.readline = MagicMock(side_effect=[notification.encode("utf-8"), b""])
         client.process = proc
-        client.fetch_tools_async = AsyncMock()
+        fetch_called = asyncio.Event()
+
+        async def _fetch():
+            fetch_called.set()
+
+        client.fetch_tools_async = AsyncMock(side_effect=_fetch)
         await client._async_read_loop()
-        await asyncio.sleep(0.01)
+        await asyncio.wait_for(fetch_called.wait(), timeout=1.0)
         client.fetch_tools_async.assert_awaited_once()
 
     async def test_async_read_loop_notification_fetch_error_ignored(self):
@@ -59,9 +64,15 @@ class TestAsyncReadLoop(unittest.IsolatedAsyncioTestCase):
         notification = json.dumps({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"})
         proc.stdout.readline = MagicMock(side_effect=[notification.encode("utf-8"), b""])
         client.process = proc
-        client.fetch_tools_async = AsyncMock(side_effect=RuntimeError("boom"))
+        fetch_called = asyncio.Event()
+
+        async def _fetch():
+            fetch_called.set()
+            raise RuntimeError("boom")
+
+        client.fetch_tools_async = AsyncMock(side_effect=_fetch)
         await client._async_read_loop()  # must not raise
-        await asyncio.sleep(0.01)
+        await asyncio.wait_for(fetch_called.wait(), timeout=1.0)
         client.fetch_tools_async.assert_awaited_once()
 
     async def test_async_read_loop_fulfills_pending_future(self):
@@ -828,12 +839,11 @@ class TestProcessClientAsyncRegression(unittest.IsolatedAsyncioTestCase):
         fut = loop.create_future()
         client._pending_futures[99] = fut
 
-        await client._async_read_loop()
-        await asyncio.sleep(0.01)
-
-        self.assertTrue(fut.done())
+        read_task = asyncio.create_task(client._async_read_loop())
         with self.assertRaises(RuntimeError):
-            await fut
+            await asyncio.wait_for(fut, timeout=2.0)
+        self.assertTrue(fut.done())
+        await read_task
 
     async def test_call_tool_async_cleans_pending_futures_on_cancellation(self):
         client = MCPProcessClient("test_srv", "echo")
@@ -846,7 +856,8 @@ class TestProcessClientAsyncRegression(unittest.IsolatedAsyncioTestCase):
         # Force infinite wait on future to trigger cancellation
         with patch.object(client, "_start_async_reader"):
             task = asyncio.create_task(client.call_tool_async("tool1", {}, timeout=10.0))
-            await asyncio.sleep(0.01)
+            while not client._pending_futures:
+                await asyncio.sleep(0)
             self.assertEqual(len(client._pending_futures), 1)
             task.cancel()
             with self.assertRaises(asyncio.CancelledError):
