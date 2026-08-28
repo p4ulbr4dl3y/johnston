@@ -2,7 +2,8 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.session_manager import AgentSession, SessionStore
+from core.domain.entities.session import AgentSession
+from core.session_manager import SessionStore
 from tools.manage_subagent import ManageSubagentTool
 
 

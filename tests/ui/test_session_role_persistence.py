@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from core.session_manager import AgentSession
+from core.domain.entities.session import AgentSession
 from widgets.app.role_service import toggle_agent_role
 from widgets.app.session_state import collect_session_data
 from widgets.mixins.session_persistence import SessionPersistenceMixin

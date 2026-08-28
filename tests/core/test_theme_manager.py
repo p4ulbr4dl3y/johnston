@@ -5,7 +5,7 @@ from pygments.token import Token
 
 from core.domain.defaults.themes import BUILTIN_THEMES
 from core.domain.entities.theme import Theme
-from core.theme_manager import ThemeManager
+from widgets.app.theme_manager import ThemeManager
 
 
 def test_theme_entity_creation():

@@ -10,8 +10,9 @@ from unittest.mock import patch
 
 import pytest
 
+from core.domain.entities.session import AgentSession
 from core.permission_manager import PermissionManager
-from core.session_manager import AgentSession, SessionStore
+from core.session_manager import SessionStore
 
 # ---------------------------------------------------------------------------
 # fixtures / helpers

@@ -330,7 +330,9 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
                         if was_active and self.pm.get_active_provider_key() == pkey:
                             app = getattr(self, "app", None)
                             if app is not None:
-                                self.pm.recreate_active_agent(app)
+                                from widgets.app.role_service import reconcile_active_agent
+
+                                reconcile_active_agent(app)
                                 self.active_key = self.pm.get_active_provider_key()
 
                 options, items = self._build_options()

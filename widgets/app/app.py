@@ -106,7 +106,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
     def set_app_theme(self, theme_name: str, persist: bool = True) -> None:
         """Switch active theme across UI tokens, stylesheets and markdown renderers."""
-        from core.theme_manager import theme_manager
+        from widgets.app.theme_manager import theme_manager
         theme = theme_manager.set_theme(theme_name, persist=persist)
         if hasattr(self, 'register_theme'):
             if theme.name not in getattr(self, 'available_themes', {}):

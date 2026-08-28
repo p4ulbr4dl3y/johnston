@@ -24,11 +24,39 @@ def _refresh_models_background(pm: ProviderManager) -> None:
         spawn_background_task(pm.fetch_models_grouped())
 
 
+def _recreate_agent(pm: ProviderManager, on_recreate: Any = None, provider_key: str | None = None) -> None:
+    if provider_key and hasattr(pm, "set_active_provider_key"):
+        pm.set_active_provider_key(provider_key)
+    if callable(on_recreate):
+        try:
+            on_recreate(provider_key=provider_key)
+        except TypeError:
+            on_recreate()
+    elif on_recreate is not None and hasattr(on_recreate, "agent"):
+        if hasattr(pm, "recreate_active_agent"):
+            try:
+                agent = pm.recreate_active_agent(provider_key=provider_key)
+            except TypeError:
+                agent = pm.recreate_active_agent(on_recreate, provider_key=provider_key)
+        elif hasattr(pm, "create_active_agent"):
+            agent = pm.create_active_agent()
+        else:
+            agent = None
+        if agent is not None:
+            on_recreate.agent = agent
+            if hasattr(agent, "role") and hasattr(on_recreate, "role"):
+                agent.role = on_recreate.role
+        if hasattr(on_recreate, "refresh_status_footer"):
+            on_recreate.refresh_status_footer()
+    else:
+        pm.recreate_active_agent(provider_key=provider_key)
+
+
 def set_provider_credentials(
     pm: ProviderManager,
     provider_key: str,
     api_key: str,
-    app: Any,
+    app: Any = None,
 ) -> bool:
     """Persist a non-empty API key, enable the provider, recreate the agent.
 
@@ -42,7 +70,7 @@ def set_provider_credentials(
     if api_key:
         pm.set_provider_api_key(provider_key, api_key)
         pm.set_provider_disabled(provider_key, False)
-        pm.recreate_active_agent(app, provider_key=provider_key)
+        _recreate_agent(pm, app, provider_key=provider_key)
         _refresh_models_background(pm)
         return True
 
@@ -58,7 +86,7 @@ def set_provider_credentials(
     if not pdef.enabled:
         pm.set_provider_disabled(provider_key, False)
     if provider_key != pm.get_active_provider_key():
-        pm.recreate_active_agent(app, provider_key=provider_key)
+        _recreate_agent(pm, app, provider_key=provider_key)
     return False
 
 
@@ -94,7 +122,7 @@ def select_model(
     agent: Any,
     provider_key: str,
     model_name: str,
-    app: Any,
+    app: Any = None,
 ) -> None:
     """Persist the model selection on *agent* and in the provider config.
 
@@ -102,7 +130,7 @@ def select_model(
     for that provider so history/role are preserved before the model is set.
     """
     if provider_key != pm.get_active_provider_key():
-        pm.recreate_active_agent(app, provider_key=provider_key)
+        _recreate_agent(pm, app, provider_key=provider_key)
 
     if hasattr(agent, "model"):
         agent.model = model_name
@@ -133,9 +161,9 @@ def set_thinking_effort(
     provider_key: str,
     model_name: str,
     effort: str,
-    app: Any,
+    app: Any = None,
 ) -> None:
     """Persist the thinking effort and recreate the agent."""
     if hasattr(pm, "set_provider_thinking_effort"):
         pm.set_provider_thinking_effort(provider_key, model_name, effort)
-    pm.recreate_active_agent(app)
+    _recreate_agent(pm, app)

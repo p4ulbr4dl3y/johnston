@@ -24,8 +24,8 @@ from core.application.generation.ai_generator import (
 )
 from core.base_provider import BaseAgent
 from core.base_provider.compaction import collect_user_messages
+from core.domain.entities.session import AgentSession
 from core.domain.policies.messages import is_system_note, is_ui_visible_user_message
-from core.session_manager import AgentSession
 from widgets.chat_input import KEY_QUIT, ChatInput
 from widgets.chat_toolcall import ToolCallWidget
 

@@ -2,7 +2,7 @@
 
 from textual.widgets import OptionList
 
-from core.theme_manager import theme_manager
+from widgets.app.theme_manager import theme_manager
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 

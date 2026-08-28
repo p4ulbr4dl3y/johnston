@@ -262,7 +262,7 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         self.assertIn("[dim #71717a]", row)
 
     def test_fake_streaming_full_lifecycle_and_followup(self):
-        from core.session_manager import AgentSession, SessionKind
+        from core.domain.entities.session import AgentSession, SessionKind
 
         sess = AgentSession(
             "sub-sim-1",

@@ -9,8 +9,7 @@ import logging
 from typing import Any, Callable, Optional
 
 from core.domain.defaults.errors import ToolResult, parse_tool_result_step
-from core.domain.entities.session import SessionStatus
-from core.session_manager import AgentSession
+from core.domain.entities.session import AgentSession, SessionStatus
 
 
 def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: list) -> None:

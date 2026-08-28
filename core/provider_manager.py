@@ -502,22 +502,21 @@ class ProviderManager:
                 return agent
         return None
 
-    def recreate_active_agent(self, app: Any, provider_key: Optional[str] = None, history: Optional[List[Any]] = None):
-        """Recreates active agent on app preserving history, mode, and UI status."""
-        old_history = history if history is not None else list(getattr(getattr(app, "agent", None), "history", []))
-        current_role = getattr(app, "role", getattr(getattr(app, "agent", None), "role", "worker"))
+    def recreate_active_agent(
+        self,
+        provider_key: Optional[str] = None,
+        history: Optional[List[Any]] = None,
+        role: Optional[str] = None,
+    ) -> Any:
+        """Recreates active agent preserving history and role."""
         if provider_key:
             self.set_active_provider_key(provider_key)
         agent = self.create_active_agent()
-        if agent:
-            if old_history:
-                agent.history = old_history
-            agent.role = current_role
-            agent.app = app
-        app.agent = agent
-        app.role = current_role
-        if hasattr(app, "refresh_status_footer"):
-            app.refresh_status_footer()
+        if agent is not None:
+            if history is not None:
+                agent.history = list(history)
+            if role is not None:
+                agent.role = role
         return agent
 
     async def fetch_models_for_provider(self, provider_key: str, force_refresh: bool = False) -> List[str]:

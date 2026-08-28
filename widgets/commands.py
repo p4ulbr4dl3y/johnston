@@ -17,7 +17,6 @@ from core.application.session.actions import (
 )
 from core.application.skills.manager import get_skill_manager
 from core.infrastructure.mcp import get_mcp_manager
-from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
 from widgets.presentation.screens.constants import MESSAGE_INPUT
 from widgets.presentation.screens.fork import FORK_CURRENT_STATE, ForkScreen
@@ -188,10 +187,13 @@ class ProvidersCommand(BaseCommand):
 class ModelsCommand(BaseCommand):
     name = "/models"
     aliases = ["/model"]
-    description = "Switch model for providers"
+    description = "Switch active LLM model across connected providers"
 
     async def execute(self, app) -> None:
-        asyncio.create_task(catalog.refresh())
+        if not getattr(app, "pm", None):
+            app.notify("Provider manager not available", severity="warning")
+            return
+
         grouped_models, is_disconnected = await fetch_grouped_models(app.pm)
         if not grouped_models:
             if is_disconnected:
@@ -826,7 +828,7 @@ class ThemeCommand(BaseCommand):
     description = "Switch color theme (Zinc, Dracula, Catppuccin, Nord...)"
 
     async def execute(self, app) -> None:
-        from core.theme_manager import theme_manager
+        from widgets.app.theme_manager import theme_manager
         from widgets.presentation.screens.theme import ThemeScreen
 
         def on_theme_selected(selected: str | None) -> None:

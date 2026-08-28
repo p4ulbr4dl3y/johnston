@@ -3,8 +3,8 @@
 import pytest
 from textual.widgets import Input
 
-from core.theme_manager import theme_manager
 from widgets.app.app import JohnstonApp
+from widgets.app.theme_manager import theme_manager
 from widgets.chat_input import ChatInput
 from widgets.presentation.screens.theme import ThemeScreen
 

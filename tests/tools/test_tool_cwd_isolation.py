@@ -181,7 +181,8 @@ class TestSubagentBranchContextPersistence(unittest.TestCase):
     def test_session_persists_project_dir_and_branch(self):
         import tempfile
 
-        from core.session_manager import AgentSession, SessionStore
+        from core.domain.entities.session import AgentSession
+        from core.session_manager import SessionStore
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = SessionStore(project_path=tmpdir)
@@ -203,7 +204,7 @@ class TestSubagentBranchContextPersistence(unittest.TestCase):
             self.assertEqual(restored.branch_name, "subagent-sub-abc")
 
     def test_from_dict_defaults_empty(self):
-        from core.session_manager import AgentSession
+        from core.domain.entities.session import AgentSession
 
         restored = AgentSession.from_dict({"id": "x", "kind": "subagent"})
         self.assertEqual(restored.project_dir, "")

@@ -85,18 +85,28 @@ def test_set_provider_model_save_failure_logged(pm):
 
 
 def test_recreate_active_agent_preserves_state(pm):
+    from widgets.app.role_service import reconcile_active_agent
+
     manager, tmp_path = pm
     manager.set_active_provider_key("openai")
+    # Test core manager recreate (pure domain)
+    agent = manager.recreate_active_agent(provider_key="openai", history=[{"role": "user", "content": "x"}], role="custom")
+    assert agent is not None
+    assert agent.history == [{"role": "user", "content": "x"}]
+    assert agent.role == "custom"
+
+    # Test UI state reconciliation
     app = MagicMock()
+    app.pm = manager
     app.agent = MagicMock()
     app.agent.history = [{"role": "user", "content": "old"}]
     app.agent.role = "custom"
     del app.role
-    agent = manager.recreate_active_agent(app, provider_key="openai", history=[{"role": "user", "content": "x"}])
-    assert agent is not None
-    assert agent.history == [{"role": "user", "content": "x"}]
-    assert agent.role == "custom"
-    assert app.agent is agent
+    reconciled = reconcile_active_agent(app, provider_key="openai", history=[{"role": "user", "content": "x"}])
+    assert reconciled is not None
+    assert reconciled.history == [{"role": "user", "content": "x"}]
+    assert reconciled.role == "custom"
+    assert app.agent is reconciled
     assert app.role == "custom"
     app.refresh_status_footer.assert_called_once()
 
@@ -104,11 +114,7 @@ def test_recreate_active_agent_preserves_state(pm):
 def test_recreate_active_agent_no_provider_key(pm):
     manager, tmp_path = pm
     manager.set_active_provider_key("openai")
-    app = MagicMock()
-    app.role = "worker"
-    app.agent = MagicMock()
-    app.agent.history = [{"role": "user", "content": "old"}]
-    agent = manager.recreate_active_agent(app)
+    agent = manager.recreate_active_agent(role="worker")
     assert agent is not None
     assert agent.role == "worker"
 
