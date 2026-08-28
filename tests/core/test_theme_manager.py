@@ -52,7 +52,11 @@ def test_builtin_themes_presence():
     assert "nord" in names
     assert "one-dark" in names
     assert "zinc-light" in names
-    assert len(BUILTIN_THEMES) == 21
+    assert "gruvbox-material" in names
+    assert "cyberdream" in names
+    assert "vesper" in names
+    assert "dracula" in names
+    assert len(BUILTIN_THEMES) == 25
 
 
 def test_theme_manager_registration_and_switching():
@@ -116,3 +120,80 @@ def test_theme_persistence(tmp_path, monkeypatch):
 
     save_theme_config("nord", cfg_file)
     assert load_theme_config(cfg_file) == "nord"
+
+
+def test_theme_serialization_and_validation():
+    # Valid serialization & deserialization
+    data = {
+        "name": "synthwave",
+        "label": "Synthwave 84",
+        "dark": True,
+        "primary": "#ff7edb",
+        "secondary": "#36f9f6",
+        "muted": "#848bbd",
+        "subtle": "#fe4450",
+        "tcss_vars": {"bg-app": "#262335", "bg-surface": "#241b2f"},
+        "markdown_styles": {"markdown.paragraph": "#f92aad"},
+        "syntax_tokens": {"Token.Keyword": "#fe4450", "Name.Function": "#36f9f6"},
+    }
+    theme = Theme.from_dict(data)
+    assert theme.name == "synthwave"
+    assert theme.label == "Synthwave 84"
+    assert theme.syntax_tokens[Token.Keyword] == "#fe4450"
+    assert theme.syntax_tokens[Token.Name.Function] == "#36f9f6"
+
+    serialized = theme.to_dict()
+    assert serialized["name"] == "synthwave"
+    assert serialized["primary"] == "#ff7edb"
+
+    # Validation errors
+    with pytest.raises(ValueError, match="Theme data must be a dictionary"):
+        Theme.from_dict("invalid")  # type: ignore
+
+    with pytest.raises(ValueError, match="Theme 'name' is required"):
+        Theme.from_dict({"label": "No Name"})
+
+    with pytest.raises(ValueError, match="Theme name must be a non-empty string"):
+        Theme(name="", label="Empty")
+
+    with pytest.raises(ValueError, match="Theme label must be a non-empty string"):
+        Theme(name="theme", label="")
+
+
+def test_theme_manager_load_user_themes(tmp_path):
+    themes_dir = tmp_path / "themes"
+    themes_dir.mkdir()
+
+    custom_json = themes_dir / "custom-matrix.json"
+    custom_json.write_text(
+        '{\n'
+        '  "name": "matrix",\n'
+        '  "label": "Matrix Green",\n'
+        '  "dark": true,\n'
+        '  "primary": "#00ff00",\n'
+        '  "tcss_vars": {"bg-app": "#000000"}\n'
+        '}'
+    )
+
+    invalid_json = themes_dir / "invalid.json"
+    invalid_json.write_text('{"invalid": true}')
+
+    tm = ThemeManager(load_config=False, custom_themes_dir=themes_dir)
+    assert tm.get("matrix") is not None
+    assert tm.get("matrix").label == "Matrix Green"
+
+    # Check non-existent directory handled gracefully
+    tm_empty = ThemeManager(load_config=False, custom_themes_dir=tmp_path / "nonexistent")
+    assert len(tm_empty.list_themes()) == len(BUILTIN_THEMES)
+
+
+def test_theme_manager_singleton_and_reset():
+    ThemeManager.reset_instance()
+    inst1 = ThemeManager.get_instance()
+    inst2 = ThemeManager.get_instance()
+    assert inst1 is inst2
+
+    ThemeManager.reset_instance()
+    inst3 = ThemeManager.get_instance()
+    assert inst3 is not inst1
+

@@ -16,6 +16,7 @@ __all__ = [
     "WORKTREES_DIR",
     "SHADOW_REPOS_DIR",
     "PROMPT_HISTORY_FILE",
+    "THEMES_DIR",
 ]
 
 CONFIG_DIR = str(johnston_config_dir())
@@ -24,6 +25,7 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 SECRETS_FILE = os.path.join(CONFIG_DIR, "secrets.json")
 PROVIDERS_JSON_FILE = os.path.join(CONFIG_DIR, "providers.json")
 CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
+THEMES_DIR = os.path.join(CONFIG_DIR, "themes")
 
 LOGS_DIR = os.path.join(CONFIG_DIR, "logs")
 TEMP_IMAGES_DIR = os.path.join(CONFIG_DIR, "temp_images")

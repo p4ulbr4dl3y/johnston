@@ -1,7 +1,27 @@
 """Theme domain entity and type definitions."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Any
+
+from pygments.token import Token
+
+
+def _parse_token(tok_key: Any) -> Any:
+    """Resolve string or Token representation to Pygments Token."""
+    if isinstance(tok_key, str):
+        parts = tok_key.strip().split(".")
+        if parts and parts[0] == "Token":
+            parts = parts[1:]
+        current = Token
+        for p in parts:
+            if hasattr(current, p):
+                current = getattr(current, p)
+            else:
+                return Token
+        return current
+    return tok_key
 
 
 @dataclass(frozen=True)
@@ -18,3 +38,64 @@ class Theme:
     tcss_vars: dict[str, str] = field(default_factory=dict)
     markdown_styles: dict[str, str] = field(default_factory=dict)
     syntax_tokens: dict[Any, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.name or not isinstance(self.name, str):
+            raise ValueError("Theme name must be a non-empty string")
+        if not self.label or not isinstance(self.label, str):
+            raise ValueError("Theme label must be a non-empty string")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize Theme to a JSON-serializable dictionary."""
+        syntax = {str(k): str(v) for k, v in self.syntax_tokens.items()}
+        return {
+            "name": self.name,
+            "label": self.label,
+            "dark": self.dark,
+            "primary": self.primary,
+            "secondary": self.secondary,
+            "muted": self.muted,
+            "subtle": self.subtle,
+            "tcss_vars": dict(self.tcss_vars),
+            "markdown_styles": dict(self.markdown_styles),
+            "syntax_tokens": syntax,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Theme:
+        """Create and validate Theme from a dictionary."""
+        if not isinstance(data, dict):
+            raise ValueError("Theme data must be a dictionary")
+        name = data.get("name")
+        if not name or not isinstance(name, str) or not name.strip():
+            raise ValueError("Theme 'name' is required and must be a non-empty string")
+        name = name.strip()
+        label = str(data.get("label", name.replace("-", " ").title()))
+        dark = bool(data.get("dark", True))
+        primary = str(data.get("primary", "#ffffff"))
+        secondary = str(data.get("secondary", "#f4f4f5"))
+        muted = str(data.get("muted", "#71717a"))
+        subtle = str(data.get("subtle", "#e4e4e7"))
+
+        tcss_vars = {str(k): str(v) for k, v in data.get("tcss_vars", {}).items()}
+        markdown_styles = {str(k): str(v) for k, v in data.get("markdown_styles", {}).items()}
+
+        raw_syntax = data.get("syntax_tokens", {})
+        syntax_tokens = {}
+        if isinstance(raw_syntax, dict):
+            for k, v in raw_syntax.items():
+                syntax_tokens[_parse_token(k)] = str(v)
+
+        return cls(
+            name=name,
+            label=label,
+            dark=dark,
+            primary=primary,
+            secondary=secondary,
+            muted=muted,
+            subtle=subtle,
+            tcss_vars=tcss_vars,
+            markdown_styles=markdown_styles,
+            syntax_tokens=syntax_tokens,
+        )
+

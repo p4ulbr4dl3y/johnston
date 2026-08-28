@@ -21,9 +21,9 @@ async def test_theme_screen_composition_and_search():
         await app.push_screen(screen)
         await pilot.pause()
 
-        # Check options loaded (21 modern themes)
+        # Check options loaded (25 modern themes)
         opt_list = screen.query_one(f"#{screen.option_list_id}", HeaderWrapOptionList)
-        assert opt_list.option_count == 21
+        assert opt_list.option_count == 25
 
         # Search for "charcoal"
         search_input = screen.query_one("#modal-search-input", Input)
