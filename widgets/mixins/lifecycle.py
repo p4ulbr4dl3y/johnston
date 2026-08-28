@@ -57,13 +57,12 @@ class LifecycleMixin:
                 self.sm.acquire_session_lock(self.current_session_id)
         from core.infrastructure.mcp import get_mcp_manager
 
+        catalog.load_cache()
         self.refresh_status_footer()
         if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
-            self.create_tracked_task(catalog.refresh())
             self.create_tracked_task(get_mcp_manager().ensure_tools_ready_async())
             self.create_tracked_task(self._check_initial_setup())
         else:
-            asyncio.create_task(catalog.refresh())
             asyncio.create_task(get_mcp_manager().ensure_tools_ready_async())
             asyncio.create_task(self._check_initial_setup())
 
@@ -75,9 +74,8 @@ class LifecycleMixin:
             or not getattr(self, "is_app_active", True)
         ):
             return
-        providers = self.pm.load_providers()
-        connected = any(self.pm.is_provider_connected(k, v) for k, v in providers.items())
-        if not connected:
+        active_key = self.pm.get_active_provider_key()
+        if not active_key or not self.pm.is_provider_connected(active_key):
             if not getattr(self, "is_app_active", True):
                 return
             from widgets.commands import ProvidersCommand

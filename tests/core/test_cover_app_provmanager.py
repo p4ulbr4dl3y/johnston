@@ -248,7 +248,13 @@ async def test_fetch_models_recursion_when_no_cache_no_fallback(pm):
     mock_client.get = AsyncMock(return_value=mock_resp)
     mock_client.__aenter__.return_value = mock_client
     with patch("httpx.AsyncClient", return_value=mock_client):
-        result = await manager.fetch_models_for_provider("apik3")
+        # Non-forced returns empty list with zero network requests
+        res_fast = await manager.fetch_models_for_provider("apik3", force_refresh=False)
+        assert res_fast == []
+        mock_client.get.assert_not_called()
+
+        # Forced refresh makes HTTP request
+        result = await manager.fetch_models_for_provider("apik3", force_refresh=True)
     assert result == ["rec-model"]
 
 

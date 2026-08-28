@@ -70,6 +70,8 @@ class TestProviderManager(unittest.TestCase):
         self.assertEqual(self.pm.get_active_provider_key(), "custom_prov")
 
     def test_create_active_agent(self):
+        self.assertIsNone(self.pm.create_active_agent())
+        self.pm.set_active_provider_key("openai")
         agent = self.pm.create_active_agent()
         self.assertIsNotNone(agent)
         self.assertEqual(agent.model, "")

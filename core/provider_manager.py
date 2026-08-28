@@ -17,7 +17,6 @@ from core.infrastructure.platform.platform_utils import (
     invalidate_json_read_cache,
     read_json,
 )
-from core.infrastructure.runtime.background import spawn_background_task
 from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 from core.infrastructure.secrets import (
     get_secret,
@@ -495,23 +494,9 @@ class ProviderManager:
 
     def create_active_agent(self):
         active_key = self.get_active_provider_key()
-        agent = self.create_agent_for_provider(active_key)
-        if agent is not None:
-            return agent
-        # Fallback: if the active provider is disabled/unusable, pick the first
-        # *connected* (enabled + configured) provider that can build an agent so
-        # the app keeps a working agent instead of silently switching to another
-        # provider that would fail on the first call for lack of a credential.
-        for pkey, pdata in self.load_providers().items():
-            if pkey == active_key or not pdata.get("enabled", True):
-                continue
-            if not self.is_provider_connected(pkey, pdata):
-                continue
-            agent = self.create_agent_for_provider(pkey)
-            if agent is not None:
-                self.set_active_provider_key(pkey)
-                return agent
-        return None
+        if not active_key:
+            return None
+        return self.create_agent_for_provider(active_key)
 
     def recreate_active_agent(
         self,
@@ -573,18 +558,15 @@ class ProviderManager:
                 if cached_models and cache_age < MODELS_CACHE_TTL:
                     return cached_models
                 # Recently fetched empty list with nothing better to show:
-                # serve it instead of spawning a refetch on every call.
+                # serve it instead of spamming refetches.
                 if not cached_models and not fallback and cache_age < MODELS_CACHE_EMPTY_TTL:
                     return []
 
-            # If no usable cache and no static fallback list, fetch directly
-            if not cached_models and not fallback and (api_key or not needs_key):
-                return await self.fetch_models_for_provider(provider_key, force_refresh=True)
-
-            # Trigger background refresh without blocking UI.
-            spawn_background_task(self.fetch_models_for_provider(provider_key, force_refresh=True))
-
-            return cached_models or fallback
+            if cached_models:
+                return cached_models
+            if fallback:
+                return fallback
+            return []
 
         # 2. Request models via provider HTTP API
         models = []
@@ -616,7 +598,10 @@ class ProviderManager:
                             if ctx_len:
                                 model_limits[m_id] = ctx_len
             except Exception as e:
-                logger.warning("Error fetching models for %s: %s", provider_key, e)
+                if is_local_provider(provider_key, pdef.api_type, pdef.base_url, pdef.requires_key):
+                    logger.debug("Local provider %s not reachable: %s", provider_key, e)
+                else:
+                    logger.warning("Error fetching models for %s: %s", provider_key, e)
 
         if models:
             try:

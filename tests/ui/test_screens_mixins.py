@@ -240,7 +240,8 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
     async def test_check_initial_setup_no_providers(self):
         obj = _life_host()
         obj.pm = MagicMock()
-        obj.pm.load_providers.return_value = {}
+        obj.pm.get_active_provider_key.return_value = ""
+        obj.pm.is_provider_connected.return_value = False
 
         class FakeCmd:
             async def execute(self, owner):
@@ -256,7 +257,7 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
     async def test_check_initial_setup_no_model(self):
         obj = _life_host()
         obj.pm = MagicMock()
-        obj.pm.load_providers.return_value = {"openai": "key"}
+        obj.pm.get_active_provider_key.return_value = "openai"
         obj.pm.is_provider_connected.return_value = True
         obj.agent.model = ""
 

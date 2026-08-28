@@ -22,6 +22,8 @@ def _bare_mixin() -> ActionsMixin:
 class TestActionsRole(unittest.IsolatedAsyncioTestCase):
     async def test_action_toggle_role_cycles(self):
         app = JohnstonApp()
+        app.pm.set_active_provider_key("openai")
+        app.agent = app.pm.create_active_agent()
         async with app.run_test():
             self.assertEqual(app.agent.role, "worker")
             app.action_toggle_role()

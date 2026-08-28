@@ -135,22 +135,14 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
             pm.set_active_provider_key("openai")
             pm.set_provider_disabled("openai", True)
             agent = pm.create_active_agent()
-            self.assertIsNotNone(agent)
-            self.assertNotEqual(agent.provider_key, "openai")
-            self.assertNotEqual(pm.get_active_provider_key(), "openai")
+            self.assertIsNone(agent)
         finally:
             self._teardown_pm()
 
-    def test_create_active_agent_fallback_prefers_connected_only(self):
-        # Fallback must pick a *connected* (no-key) provider, not a key-required
-        # provider that has no credential and would fail on first call.
+    def test_create_active_agent_returns_none_when_unconfigured(self):
         pm = self._make_pm()
         try:
-            pm.set_active_provider_key("openai")
-            pm.set_provider_disabled("openai", True)
-            agent = pm.create_active_agent()
-            self.assertIsNotNone(agent)
-            self.assertEqual(agent.provider_key, "lmstudio")  # first connected (no-key) provider
+            self.assertIsNone(pm.create_active_agent())
         finally:
             self._teardown_pm()
 
