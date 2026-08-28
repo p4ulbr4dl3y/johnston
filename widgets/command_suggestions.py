@@ -177,10 +177,10 @@ class CommandSuggestions(HeaderWrapOptionList):
                         matched_cmds.append(cmd)
                         clean_desc = " ".join(desc.split())
                         # Description budget: from the tag column to the right
-                        # edge; capped at 60 on wide terminals, shrinking on
-                        # narrow ones instead of clipping the tail unseen.
+                        # edge; dynamically sizes to available row budget instead
+                        # of an arbitrary 60-char ceiling.
                         desc_start = max(display_width(cmd), padding) + 1
-                        clean_desc = ellipsize(clean_desc, min(60, max(10, row_budget - desc_start)))
+                        clean_desc = ellipsize(clean_desc, max(10, row_budget - desc_start))
                         escaped_cmd = escape(cmd)
                         escaped_desc = escape(clean_desc)
                         pad = max(0, padding - display_width(cmd))

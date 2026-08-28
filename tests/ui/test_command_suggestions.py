@@ -202,7 +202,20 @@ class TestCommandSuggestionsCoverage(unittest.IsolatedAsyncioTestCase):
             res = await sugg.update_query("/test", "/test", 5)
         self.assertEqual(res, ["/test"])
         opt_text = str(sugg.options[0].prompt)
-        self.assertLessEqual(len(opt_text.split("  ")[1]), 60)
+        self.assertIn("...", opt_text)
+
+    async def test_command_desc_expands_on_wide_viewport(self):
+        sugg = CommandSuggestions()
+        cmds = [("/test", "x" * 120)]
+        with (
+            patch("widgets.command_suggestions.get_all_command_suggestions", new=AsyncMock(return_value=cmds)),
+            patch("widgets.command_suggestions.resolve_width", return_value=160),
+        ):
+            await sugg.update_query("/test", "/test", 5)
+        opt_text = str(sugg.options[0].prompt)
+        # On 160 cols, 120 chars description should not be truncated
+        self.assertNotIn("...", opt_text)
+        self.assertIn("x" * 120, opt_text)
 
     async def test_option_selected_command_and_file_mount(self):
         from widgets.chat_input import ChatInput
