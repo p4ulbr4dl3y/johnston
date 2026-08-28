@@ -1,6 +1,6 @@
 import time
 from enum import Enum
-from typing import Dict
+from typing import Dict, Optional
 
 
 class CircuitState(str, Enum):
@@ -25,7 +25,17 @@ class CircuitBreakerOpenError(Exception):
 class CircuitBreaker:
     """Production-grade circuit breaker to prevent cascading failures to unresponsive AI providers."""
 
-    def __init__(self, failure_threshold: int = 3, cooldown_seconds: float = 30.0):
+    def __init__(
+        self,
+        failure_threshold: Optional[int] = None,
+        cooldown_seconds: Optional[float] = None,
+    ):
+        if failure_threshold is None or cooldown_seconds is None:
+            from core.infrastructure.config.settings import get_settings
+
+            st = get_settings().llm
+            failure_threshold = failure_threshold if failure_threshold is not None else st.cb_failure_threshold
+            cooldown_seconds = cooldown_seconds if cooldown_seconds is not None else st.cb_cooldown_seconds
         self.failure_threshold = failure_threshold
         self.cooldown_seconds = cooldown_seconds
         self._failures: Dict[str, int] = {}

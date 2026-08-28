@@ -14,6 +14,7 @@ import os
 import sys
 import time
 from logging.handlers import RotatingFileHandler
+from typing import Optional
 
 from core.infrastructure.platform.paths import LOGS_DIR
 
@@ -53,7 +54,7 @@ def in_crash_logger() -> logging.Logger:
     return logging.getLogger(_CRASH_LOGGER_NAME)
 
 
-def cleanup_logs(logs_dir: str = LOGS_DIR, max_age_days: int = MAX_LOG_AGE_DAYS) -> int:
+def cleanup_logs(logs_dir: str = LOGS_DIR, max_age_days: Optional[int] = None) -> int:
     """Remove stale per-tool/task snapshot files under ``logs_dir``.
 
     Deletes snapshot files whose mtime is older than ``max_age_days``. The app
@@ -62,6 +63,14 @@ def cleanup_logs(logs_dir: str = LOGS_DIR, max_age_days: int = MAX_LOG_AGE_DAYS)
     records (writes land in the unlinked inode). Returns the number of removed
     files. Never raises; individual failures are swallowed.
     """
+    if max_age_days is None:
+        try:
+            from core.infrastructure.config.settings import get_settings
+
+            max_age_days = get_settings().storage.log_max_age_days
+        except Exception:
+            max_age_days = MAX_LOG_AGE_DAYS
+
     if not os.path.isdir(logs_dir):
         return 0
     cutoff = time.time() - max_age_days * 24 * 3600
@@ -169,9 +178,16 @@ def setup_logging() -> None:
         return
     _configured = True
     os.makedirs(LOGS_DIR, exist_ok=True)
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        max_bytes = get_settings().storage.log_max_bytes
+    except Exception:
+        max_bytes = _MAX_BYTES
+
     handler = RotatingFileHandler(
         LOG_FILE,
-        maxBytes=_MAX_BYTES,
+        maxBytes=max_bytes,
         backupCount=_BACKUP_COUNT,
         encoding="utf-8",
     )

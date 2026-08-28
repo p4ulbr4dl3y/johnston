@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
 from core.infrastructure.adapters.models_source import extract_context_length
+from core.infrastructure.config.settings import get_settings
 from core.infrastructure.platform.paths import CACHE_DIR, CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
 from core.infrastructure.platform.platform_utils import (
     atomic_write_json,
@@ -162,12 +163,12 @@ class ProviderDef:
             headers=headers,
             extra_body=data.get("extra_body"),
             reasoning_effort=data.get("reasoning_effort"),
-            chunk_timeout=_field_float(data, "chunk_timeout", DEFAULT_CHUNK_TIMEOUT),
+            chunk_timeout=_field_float(data, "chunk_timeout", get_settings().llm.chunk_timeout),
             max_tokens=data.get("max_tokens"),
-            max_retries=_field_int(data, "max_retries", DEFAULT_MAX_RETRIES),
-            retry_delay=_field_float(data, "retry_delay", DEFAULT_RETRY_DELAY),
-            retry_backoff=_field_float(data, "retry_backoff", DEFAULT_RETRY_BACKOFF),
-            max_retry_delay=_field_float(data, "max_retry_delay", DEFAULT_MAX_RETRY_DELAY),
+            max_retries=_field_int(data, "max_retries", get_settings().llm.max_retries),
+            retry_delay=_field_float(data, "retry_delay", get_settings().llm.retry_delay),
+            retry_backoff=_field_float(data, "retry_backoff", get_settings().llm.retry_backoff),
+            max_retry_delay=_field_float(data, "max_retry_delay", get_settings().llm.max_retry_delay),
             enabled=enabled,
             api_key=resolved_key,
             requires_key=data.get("requires_key"),

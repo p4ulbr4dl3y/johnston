@@ -796,19 +796,23 @@ class MCPManager:
         timeout: Optional[float] = None,
     ) -> Optional[str]:
         """Executes an MCP tool call by name across active MCP clients."""
+        if timeout is None:
+            try:
+                from core.infrastructure.config.settings import get_settings
+
+                timeout = get_settings().tools.mcp_call_timeout
+            except Exception:
+                timeout = DEFAULT_MCP_CALL_TIMEOUT
+
         if target_server and target_server in self.clients:
             client = self.clients[target_server]
             raw_name = tool_name[len(target_server) + 2 :] if tool_name.startswith(f"{target_server}__") else tool_name
-            return client.call_tool(
-                raw_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
-            )
+            return client.call_tool(raw_name, arguments, timeout=timeout)
 
         active_tools = self.get_active_tools()
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:
-            return client.call_tool(
-                o_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
-            )
+            return client.call_tool(o_name, arguments, timeout=timeout)
         return None
 
     async def call_tool_async(
@@ -818,19 +822,23 @@ class MCPManager:
         target_server: Optional[str] = None,
         timeout: Optional[float] = None,
     ) -> Optional[str]:
+        if timeout is None:
+            try:
+                from core.infrastructure.config.settings import get_settings
+
+                timeout = get_settings().tools.mcp_call_timeout
+            except Exception:
+                timeout = DEFAULT_MCP_CALL_TIMEOUT
+
         if target_server and target_server in self.clients:
             client = self.clients[target_server]
             raw_name = tool_name[len(target_server) + 2 :] if tool_name.startswith(f"{target_server}__") else tool_name
-            return await client.call_tool_async(
-                raw_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
-            )
+            return await client.call_tool_async(raw_name, arguments, timeout=timeout)
 
         active_tools = await self.get_active_tools_async()
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:
-            return await client.call_tool_async(
-                o_name, arguments, timeout=timeout if timeout is not None else DEFAULT_MCP_CALL_TIMEOUT
-            )
+            return await client.call_tool_async(o_name, arguments, timeout=timeout)
         return None
 
     def get_system_prompt_snippet(self) -> str:

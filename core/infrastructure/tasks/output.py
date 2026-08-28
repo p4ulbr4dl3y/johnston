@@ -269,11 +269,12 @@ def truncate_subagent_result(text: str, session_id: str = "") -> str:
     is saved on truncation and the path is returned in the hint.
     """
     text = (text or "").strip()
+    from core.infrastructure.config.settings import get_settings
     from tools.base import truncate_output
 
     return truncate_output(
         text,
-        max_chars=MAX_SUBAGENT_RESULT_CHARS,
+        max_chars=get_settings().subagents.result_max_chars,
         tool_name=session_id or "subagent",
         ext=".md",
         unique=False if session_id else True,

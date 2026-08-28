@@ -352,10 +352,12 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         # Automatic context compaction when total context (system prompt + tools + history)
         # exceeds 75% of the context window, when switching to a smaller model (downshift),
         # or when system prompt/tool schemas changed significantly.
-        from core.domain.defaults.config import CONTEXT_COMPACTION_THRESHOLD_RATIO, DEFAULT_CONTEXT_LIMIT
+        from core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
+        from core.infrastructure.config.settings import get_settings
 
         cur_limit = getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT)
-        threshold = int(cur_limit * CONTEXT_COMPACTION_THRESHOLD_RATIO)
+        compaction_ratio = get_settings().llm.compaction_threshold_ratio
+        threshold = int(cur_limit * compaction_ratio)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
         if self.history and len(self.history) > 10:
             history_tokens = await asyncio.to_thread(estimate_tokens, self.history)

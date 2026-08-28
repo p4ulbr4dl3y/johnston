@@ -30,6 +30,8 @@ Credential resolution precedence:
 ```json
 {
   "active_provider": "openai",
+  "theme": "github-dark",
+  "sandbox_enabled": false,
   "provider_models": {
     "openai": "gpt-4o",
     "anthropic": "claude-3-7-sonnet-latest"
@@ -39,6 +41,7 @@ Credential resolution precedence:
   },
   "disabled_providers": [],
   "permissions": {
+    "mode": "review",
     "default": "allow",
     "tools": {
       "shell": "ask",
@@ -49,10 +52,40 @@ Credential resolution precedence:
       "rm -rf *": "deny"
     }
   },
-  "sandbox": {
-    "enabled": false
+  "llm": {
+    "compaction_threshold_ratio": 0.75,
+    "compaction_user_budget": 20000,
+    "stream_timeout": 60.0,
+    "chunk_timeout": 30.0,
+    "max_retries": 3,
+    "retry_delay": 1.0,
+    "cb_failure_threshold": 3,
+    "cb_cooldown_seconds": 30.0
   },
-  "max_concurrent_subagents": 5
+  "tools": {
+    "shell_default_timeout": 120,
+    "shell_max_cap": 600,
+    "max_tool_output_chars": 8000,
+    "max_tool_payload_bytes": 10485760,
+    "mcp_call_timeout": 120.0,
+    "mcp_init_timeout": 5.0,
+    "web_fetch_timeout": 20.0
+  },
+  "subagents": {
+    "max_concurrent": 5,
+    "result_max_chars": 15000,
+    "worktree_timeout": 15.0
+  },
+  "ui": {
+    "max_prompt_history": 500,
+    "stream_flush_interval": 0.05,
+    "chat_page_size": 50
+  },
+  "storage": {
+    "log_max_bytes": 5242880,
+    "log_max_age_days": 7,
+    "disk_cache_ttl": 2.0
+  }
 }
 ```
 

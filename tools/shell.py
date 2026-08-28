@@ -61,9 +61,11 @@ def _attach_shell_widget(host, task_id: str, widget, log_path: str = None) -> No
 
 
 def _truncate_output(res: str) -> str:
+    from core.infrastructure.config.settings import get_settings
+
     return truncate_output(
         res,
-        max_chars=4000,
+        max_chars=get_settings().tools.shell_output_chars,
         tool_name="shell",
         from_end=True,
     )
@@ -110,17 +112,22 @@ class ShellTool(BaseTool):
         return _rebuild_tool(self.schema)
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
+        from core.infrastructure.config.settings import get_settings
+
+        settings = get_settings()
         args = args or {}
         ctx = self._ensure_context(ctx)
         cmd = (args.get("command") or "").strip()
         if not cmd:
             return ToolResult.error("params", name="command", detail="missing or empty")
 
-        raw_timeout = args.get("timeout", 120)
+        default_timeout = settings.tools.shell_default_timeout
+        max_cap = settings.tools.shell_max_cap
+        raw_timeout = args.get("timeout", default_timeout)
         try:
-            timeout = max(1, min(int(raw_timeout), 600))
+            timeout = max(1, min(int(raw_timeout), max_cap))
         except (ValueError, TypeError):
-            timeout = 120
+            timeout = default_timeout
 
         env = shell_env()
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None

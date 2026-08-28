@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.domain.policies.messages import is_checkpoint_message, is_system_note
 from core.infrastructure.runtime.token_util import estimate_tokens
@@ -18,7 +18,7 @@ def should_compact(history_len: int, sys_overhead: int, history_tokens: int, thr
 
 def collect_user_messages(
     history: List[Dict[str, Any]],
-    max_tokens: int = 20_000,
+    max_tokens: Optional[int] = None,
     is_subagent: bool = False,
 ) -> List[Dict[str, Any]]:
     """Collects real user messages to preserve across compaction checkpoints.
@@ -27,6 +27,14 @@ def collect_user_messages(
     - If is_subagent=True, guarantees the root task prompt (1st real user message) is always preserved.
     - Preserves user messages up to `max_tokens` budget.
     """
+    if max_tokens is None:
+        try:
+            from core.infrastructure.config.settings import get_settings
+
+            max_tokens = get_settings().llm.compaction_user_budget
+        except Exception:
+            max_tokens = 20_000
+
     real_user_msgs = []
     for msg in history:
         if isinstance(msg, dict) and msg.get("role") == "user":
