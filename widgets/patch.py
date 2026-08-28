@@ -210,7 +210,13 @@ def apply_textual_patches() -> None:
 
     RichVisual.render_strips = _new_rich_visual_render_strips
 
-    from textual.app import App
+    from time import time
+
+    from rich.style import Style
+    from rich.text import Text
+    from textual.app import App, RenderResult
+    from textual.color import Color, Gradient
+    from textual.widgets import LoadingIndicator
 
     from core.domain.defaults.themes import ZINC_DARK
     from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
@@ -224,4 +230,56 @@ def apply_textual_patches() -> None:
 
     App.get_theme_variable_defaults = _patched_get_theme_variable_defaults
 
+    def _patched_loading_indicator_render(self: LoadingIndicator) -> RenderResult:
+        if self.app.animation_level == "none":
+            return Text("Loading...")
+
+        elapsed = time() - getattr(self, "_start_time", 0.0)
+        speed = 0.8
+        dot = "\u25cf"
+        _, _, background, color = self.colors
+
+        curr_theme = getattr(self.app, "current_theme", None)
+        is_dark = getattr(curr_theme, "dark", True) if curr_theme else True
+        is_ansi = (
+            background.a == 0
+            or getattr(background, "ansi", False)
+            or getattr(background, "is_ansi_default", False)
+            or getattr(curr_theme, "ansi", False)
+        )
+        if is_ansi:
+            from core.infrastructure.platform.terminal_theme import query_terminal_palette
+
+            detected_bg, _ = query_terminal_palette()
+            if detected_bg:
+                bg_color = Color.parse(detected_bg)
+                base_color = bg_color.blend(color, 0.35)
+            else:
+                base_color = Color.parse("#3f3f46" if is_dark else "#d4d4d8")
+        else:
+            base_color = background.blend(color, 0.25)
+
+        peak_color = color.lighten(0.25) if is_dark else color.darken(0.25)
+        gradient = Gradient(
+            (0.0, base_color),
+            (0.5, color),
+            (1.0, peak_color),
+        )
+
+        blends = [(elapsed * speed - dot_number / 8) % 1 for dot_number in range(5)]
+
+        dots = [
+            (
+                f"{dot} ",
+                Style.from_color(gradient.get_color((1 - blend) ** 2).rich_color),
+            )
+            for blend in blends
+        ]
+        indicator = Text.assemble(*dots)
+        indicator.rstrip()
+        return indicator
+
+    LoadingIndicator.render = _patched_loading_indicator_render
+
     _apply_chat_markdown_patches()
+
