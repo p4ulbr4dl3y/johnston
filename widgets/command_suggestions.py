@@ -101,7 +101,7 @@ class CommandSuggestions(HeaderWrapOptionList):
         # Viewport-aware layout: align the File/Dir tag at column 46 when the
         # terminal is wide enough, shrink the alignment column on narrow ones,
         # and ellipsize long paths so the kind tag always stays visible.
-        row_budget = max(24, resolve_width(self) - 2)
+        row_budget = max(24, resolve_width(self) - 6)
         name_budget = row_budget - len(" Dir") - 1
         align_col = min(46, max(12, name_budget))
         matched_files = []
@@ -158,7 +158,7 @@ class CommandSuggestions(HeaderWrapOptionList):
                     all_cmds = await get_all_command_suggestions()
                     max_cmd_len = max((len(c) for c, _ in all_cmds), default=14)
                     padding = max(16, max_cmd_len + 2)
-                    row_budget = max(30, resolve_width(self) - 2)
+                    row_budget = max(30, resolve_width(self) - 6)
                     primary_matches = []
                     alias_matches = []
                     for cmd, desc in all_cmds:

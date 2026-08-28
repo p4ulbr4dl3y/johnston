@@ -8,6 +8,11 @@ from rich.console import Group
 from rich.syntax import Syntax
 from rich.text import Text
 
+from core.domain.defaults.config import (
+    COLOR_STATUS_ERROR,
+    COLOR_STATUS_RUNNING,
+    COLOR_STATUS_SUCCESS,
+)
 from widgets.presentation.tool_renderers import (
     format_ask_user_display,
     format_code_with_line_numbers,
@@ -158,8 +163,8 @@ class ParsingMixin:
 
     def _get_status_color(self) -> str:
         if self.status == "running":
-            return "#e5c07b"
+            return COLOR_STATUS_RUNNING
         elif self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0):
-            return "#e06c75"
+            return COLOR_STATUS_ERROR
         else:
-            return "#98c379"
+            return COLOR_STATUS_SUCCESS

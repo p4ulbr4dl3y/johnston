@@ -4,6 +4,13 @@ from typing import Any
 from pygments.lexers import get_lexer_by_name
 from rich.text import Span, Text
 
+from core.domain.defaults.config import (
+    COLOR_DIFF_ADD_BG,
+    COLOR_DIFF_ADD_FG,
+    COLOR_DIFF_GUTTER,
+    COLOR_DIFF_REMOVE_BG,
+    COLOR_DIFF_REMOVE_FG,
+)
 from widgets.utils.lexer import HUNK_HEADER_RE, guess_lexer_name, lex_block_to_line_texts
 
 
@@ -213,7 +220,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             prefix.append(f"{num_str} ", style=style_fg)
             prefix.append(f"{symbol} ", style=f"bold {style_fg}")
         else:
-            prefix.append(f"{num_str} ", style="#6e7681")
+            prefix.append(f"{num_str} ", style=COLOR_DIFF_GUTTER)
             prefix.append("  ")
         formatted_lines.append(DiffLine(prefix, code_text, style_bg=style_bg))
 
@@ -228,7 +235,7 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             old_line = int(hunk_match.group(1))
             new_line = int(hunk_match.group(3))
             if hunk_count > 0 and formatted_lines:
-                sep_prefix = Text(f"{'···'.rjust(max_num_digits)}   ", style="dim #6e7681")
+                sep_prefix = Text(f"{'···'.rjust(max_num_digits)}   ", style=f"dim {COLOR_DIFF_GUTTER}")
                 formatted_lines.append(DiffLine(sep_prefix, Text(""), style_bg=None))
             hunk_count += 1
             in_hunk = True
@@ -245,13 +252,13 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             num_str = str(old_line).rjust(max_num_digits)
             code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:].expandtabs(4))
             old_idx += 1
-            append_diff_line(num_str, "-", code_text, style_bg="on #2a1215", style_fg="#f85149")
+            append_diff_line(num_str, "-", code_text, style_bg=COLOR_DIFF_REMOVE_BG, style_fg=COLOR_DIFF_REMOVE_FG)
             old_line += 1
         elif line.startswith("+"):
             num_str = str(new_line).rjust(max_num_digits)
             code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:].expandtabs(4))
             new_idx += 1
-            append_diff_line(num_str, "+", code_text, style_bg="on #12261e", style_fg="#3fb950")
+            append_diff_line(num_str, "+", code_text, style_bg=COLOR_DIFF_ADD_BG, style_fg=COLOR_DIFF_ADD_FG)
             new_line += 1
         elif line.startswith("\\"):
             continue

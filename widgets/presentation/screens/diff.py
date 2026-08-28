@@ -14,6 +14,7 @@ from widgets.chat_toolcall import ToolScrollBox
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_selection import ModalSearchNavMixin
 from widgets.presentation.widgets.chat_diff import format_edit_diff
+from widgets.presentation.widgets.footer_layout import get_theme_colors
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import BREAKPOINT_COMPACT, BREAKPOINT_HINT, is_compact_width, resolve_width
 from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width, ellipsize
@@ -45,28 +46,30 @@ class DiffHeader(ResizeDebounceMixin, Static):
 
         width = resolve_width(self)
         esc_label = "esc: back" if self.from_rewind else "esc: close"
+        t_primary, t_secondary, t_muted, _ = get_theme_colors()
+        sep = f" [{t_muted}]•[/] "
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             if width < 52:
                 title_short = escape(ellipsize(self.title_text, 12))
-                left_text = f"[bold]Diff[/]  [dim]•[/]  {title_short}"
+                left_text = f"[bold {t_primary}]Diff[/]{sep}[{t_secondary}]{title_short}[/]"
             else:
                 max_stat_len = max(8, width - 30)
                 stat = ellipsize(self.stats_summary, max_stat_len)
                 title_short = escape(ellipsize(self.title_text, max(10, width // 4)))
                 left_text = (
-                    f"[bold]Diff[/]  [dim]•[/]  "
-                    f"{title_short}  "
-                    f"[dim]({escape(stat)})[/]"
+                    f"[bold {t_primary}]Diff[/]{sep}"
+                    f"[{t_secondary}]{title_short}[/] "
+                    f"[{t_muted}]({escape(stat)})[/]"
                 )
-            right_text = "[dim]esc[/]"
+            right_text = f"[{t_muted}]esc[/]"
         else:
             left_text = (
-                f"[bold]Diff Viewer[/]  [dim]•[/]  "
-                f"{escape(self.title_text)}  [dim]•[/]  "
-                f"[dim]({escape(self.stats_summary)})[/]"
+                f"[bold {t_primary}]Diff Viewer[/]{sep}"
+                f"[{t_secondary}]{escape(self.title_text)}[/]{sep}"
+                f"[{t_muted}]({escape(self.stats_summary)})[/]"
             )
-            right_text = f"[dim]{esc_label}[/]"
+            right_text = f"[{t_muted}]{esc_label}[/]"
 
         table.add_row(left_text, right_text)
         self.update(table)
@@ -123,26 +126,28 @@ class DiffFooter(ResizeDebounceMixin, Static):
         table.add_column(justify="right")
 
         width = resolve_width(self)
+        t_primary, t_secondary, t_muted, _ = get_theme_colors()
+        sep = f" [{t_muted}]•[/] "
 
         max_path_len = min(45, max(18, width // 3))
 
         if self.current_file:
             display_path = format_relative_path(self.current_file, max_length=max_path_len)
-            left_text = f"[bold]{escape(display_path)}[/]  [dim]({escape(self.current_stats)})[/]"
+            left_text = f"[bold {t_primary}]{escape(display_path)}[/] [{t_muted}]({escape(self.current_stats)})[/]"
         else:
-            left_text = "[dim]No file selected[/]"
+            left_text = f"[{t_muted}]No file selected[/]"
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             if width < 52:
-                right_text = "[dim]esc: back[/]" if self.compact_view == "diff" else "[dim]enter • esc[/]"
+                right_text = f"[{t_muted}]esc: back[/]" if self.compact_view == "diff" else f"[{t_muted}]enter • esc[/]"
             elif self.compact_view == "diff":
-                right_text = "[dim]esc: files  •  pgup/dn[/]"
+                right_text = f"[{t_muted}]esc: files{sep}pgup/dn[/]"
             else:
-                right_text = "[dim]enter: view  •  esc: close[/]"
+                right_text = f"[{t_muted}]enter: view{sep}esc: close[/]"
         elif width >= BREAKPOINT_HINT:
-            right_text = "[dim]↑↓: files  •  tab: toggle sidebar  •  pgup/pgdn: scroll[/]"
+            right_text = f"[{t_muted}]↑↓: files{sep}tab: toggle sidebar{sep}pgup/pgdn: scroll[/]"
         else:
-            right_text = "[dim]↑↓: files  •  tab: sidebar[/]"
+            right_text = f"[{t_muted}]↑↓: files{sep}tab: sidebar[/]"
 
         table.add_row(left_text, right_text)
         self.update(table)

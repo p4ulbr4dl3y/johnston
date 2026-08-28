@@ -46,6 +46,18 @@ THEME_SECONDARY = "#f4f4f5"
 THEME_MUTED = "#71717a"
 THEME_SUBTLE = "#e4e4e7"
 
+# Status Dot Colors
+COLOR_STATUS_RUNNING = "#e5c07b"
+COLOR_STATUS_ERROR = "#e06c75"
+COLOR_STATUS_SUCCESS = "#98c379"
+
+# Diff Highlighting Colors
+COLOR_DIFF_ADD_FG = "#3fb950"
+COLOR_DIFF_ADD_BG = "on #12261e"
+COLOR_DIFF_REMOVE_FG = "#f85149"
+COLOR_DIFF_REMOVE_BG = "on #2a1215"
+COLOR_DIFF_GUTTER = "#6e7681"
+
 # Permissions Defaults
 DEFAULT_PERMISSIONS = {
     "mode": "review",

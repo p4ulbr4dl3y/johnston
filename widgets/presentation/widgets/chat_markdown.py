@@ -22,6 +22,8 @@ from textual.widgets._markdown import (
     MarkdownTableContent,
 )
 
+from core.domain.defaults.themes import ZINC_DARK
+
 
 class TransparentSyntax(Syntax):
     """Rich Syntax renderable with transparent token background to allow TCSS styling."""
@@ -241,33 +243,7 @@ def sync_theme_styles(theme_obj: Any = None) -> None:
         TOKEN_COLORS.update(t.syntax_tokens)
 
 
-JOHNSTON_RICH_MARKDOWN_STYLES = {
-    "markdown.paragraph": "#f4f4f5",
-    "markdown.text": "#f4f4f5",
-    "markdown.h1": "bold #ffffff",
-    "markdown.h1.border": "none",
-    "markdown.h2": "bold #ffffff",
-    "markdown.h2.border": "none",
-    "markdown.h3": "bold #ffffff",
-    "markdown.h4": "bold #ffffff",
-    "markdown.h5": "bold #ffffff",
-    "markdown.h6": "bold #ffffff",
-    "markdown.code": "#ffffff on #27272a",
-    "markdown.code_block": "#f4f4f5 on #27272a",
-    "markdown.block_quote": "#e4e4e7 on #18181b",
-    "markdown.list": "#a1a1aa",
-    "markdown.item": "#f4f4f5",
-    "markdown.item.bullet": "bold #a1a1aa",
-    "markdown.item.number": "bold #a1a1aa",
-    "markdown.table.border": "#27272a",
-    "markdown.table.header": "bold #ffffff",
-    "markdown.hr": "#27272a",
-    "markdown.link": "underline #60a5fa",
-    "markdown.link_url": "underline #60a5fa",
-    "markdown.em": "italic #f4f4f5",
-    "markdown.strong": "bold #ffffff",
-    "markdown.s": "strike #71717a",
-}
+JOHNSTON_RICH_MARKDOWN_STYLES = dict(ZINC_DARK.markdown_styles)
 
 
 def _apply_chat_markdown_patches() -> None:
@@ -287,8 +263,9 @@ def _apply_chat_markdown_patches() -> None:
 
     HighlightTheme.STYLES[Token.Name.Function] = "$text-warning"
     HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
-    HighlightTheme.STYLES[Token.Generic.Heading] = "bold #61afef"
-    HighlightTheme.STYLES[Token.Generic.Subheading] = "bold #61afef"
+    heading_fn_color = TOKEN_COLORS.get(Token.Name.Function, "$text-warning")
+    HighlightTheme.STYLES[Token.Generic.Heading] = f"bold {heading_fn_color}"
+    HighlightTheme.STYLES[Token.Generic.Subheading] = f"bold {heading_fn_color}"
 
     from rich.default_styles import DEFAULT_STYLES
     from rich.markdown import Heading
@@ -441,30 +418,4 @@ def safe_update_markdown(widget: Markdown, content: str, on_done: Any = None) ->
             on_done()
 
 
-TOKEN_COLORS = {
-    Token.Keyword: "#c678dd",
-    Token.Keyword.Namespace: "#c678dd",
-    Token.Keyword.Type: "#e5c07b",
-    Token.Keyword.Declaration: "#c678dd",
-    Token.Name.Function: "#61afef",
-    Token.Name.Class: "#e5c07b",
-    Token.Name.Tag: "#e06c75",
-    Token.Name.Attribute: "#d19a66",
-    Token.Name.Property: "#e06c75",
-    Token.Name.Variable: "#e06c75",
-    Token.Name.Constant: "#d19a66",
-    Token.Name.Builtin: "#e5c07b",
-    Token.Name.Label: "#61afef",
-    Token.Name.Entity: "#56b6c2",
-    Token.Name.Decorator: "#61afef",
-    Token.Name.Other: "#e06c75",
-    Token.Name: "#e06c75",
-    Token.String: "#98c379",
-    Token.String.Doc: "#98c379",
-    Token.Number: "#d19a66",
-    Token.Number.Hex: "#d19a66",
-    Token.Literal: "#d19a66",
-    Token.Operator: "#56b6c2",
-    Token.Punctuation: "#abb2bf",
-    Token.Comment: "#7f848e italic",
-}
+TOKEN_COLORS = dict(ZINC_DARK.syntax_tokens)
