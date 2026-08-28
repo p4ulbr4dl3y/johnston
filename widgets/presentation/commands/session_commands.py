@@ -434,10 +434,11 @@ class RenameCommand(BaseCommand):
 class DiffCommand(BaseCommand):
     name = "/diff"
     aliases = ["/changes", "/patch"]
-    description = "View workspace diff since session checkpoint"
+    description = "View workspace diff for files modified in this session"
 
     async def execute(self, app) -> None:
         from core.application.session.actions import get_session_diff
+        from core.domain.policies.messages import is_ui_visible_user_message
 
         curr_sid = getattr(app, "current_session_id", None)
         proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
@@ -446,9 +447,23 @@ class DiffCommand(BaseCommand):
             app.notify("No active session found", severity="warning")
             return
 
-        diff_items = await get_session_diff(curr_sid, project_path=proj_path)
+        scoped_files: list[str] | None = None
+        session = app.sm.get(curr_sid, reload=False) if (hasattr(app, "sm") and app.sm and curr_sid) else None
+        if session and getattr(session, "messages", None):
+            user_events = [m for m in session.messages if is_ui_visible_user_message(m)]
+            has_tracking = any("touched_files" in u for u in user_events)
+            if has_tracking:
+                f_set = set()
+                for u in user_events:
+                    f_set.update(u.get("touched_files") or [])
+                scoped_files = sorted(f_set)
+                if not scoped_files:
+                    app.notify("No files were modified during this session", severity="information")
+                    return
+
+        diff_items = await get_session_diff(curr_sid, project_path=proj_path, scoped_files=scoped_files)
         if not diff_items:
-            app.notify("No workspace changes found since session start", severity="information")
+            app.notify("No workspace changes found for session files", severity="information")
             return
 
         app.push_screen(DiffScreen(diff_items, title="Session Changes"))

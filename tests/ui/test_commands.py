@@ -1486,8 +1486,63 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_called_once_with("Failed to copy assistant response", severity="error")
 
 
+class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
+    async def test_diff_command_no_session(self):
+        from widgets.presentation.commands.session_commands import DiffCommand
+
+        app = SimpleApp()
+        app.current_session_id = None
+        app.notify = MagicMock()
+
+        cmd = DiffCommand()
+        await cmd.execute(app)
+        app.notify.assert_called_once_with("No active session found", severity="warning")
+
+    async def test_diff_command_no_touched_files(self):
+        from widgets.presentation.commands.session_commands import DiffCommand
+
+        app = SimpleApp()
+        app.current_session_id = "sess-1"
+        app.notify = MagicMock()
+        app.sm = MagicMock()
+        app.sm.project_path = "/tmp/proj"
+        mock_sess = MagicMock()
+        mock_sess.messages = [
+            {"type": "user", "text": "hi", "touched_files": []}
+        ]
+        app.sm.get.return_value = mock_sess
+
+        cmd = DiffCommand()
+        await cmd.execute(app)
+        app.notify.assert_called_once_with("No files were modified during this session", severity="information")
+
+    async def test_diff_command_scoped_files_pushed(self):
+        from widgets.presentation.commands.session_commands import DiffCommand
+
+        app = SimpleApp()
+        app.current_session_id = "sess-1"
+        app.notify = MagicMock()
+        app.push_screen = MagicMock()
+        app.sm = MagicMock()
+        app.sm.project_path = "/tmp/proj"
+        mock_sess = MagicMock()
+        mock_sess.messages = [
+            {"type": "user", "text": "edit file", "touched_files": ["foo.py"]}
+        ]
+        app.sm.get.return_value = mock_sess
+
+        with patch("core.application.session.actions.get_session_diff", new_callable=AsyncMock) as mock_diff:
+            mock_diff.return_value = [("foo.py", "+1 line", 1, 0)]
+            cmd = DiffCommand()
+            await cmd.execute(app)
+
+            mock_diff.assert_called_once_with("sess-1", project_path="/tmp/proj", scoped_files=["foo.py"])
+            app.push_screen.assert_called_once()
+            screen = app.push_screen.call_args[0][0]
+            self.assertEqual(screen.diff_items, [("foo.py", "+1 line", 1, 0)])
 
 
 # ---------------------------------------------------------------------------
 # widgets/app/status_state.py
 # ---------------------------------------------------------------------------
+
