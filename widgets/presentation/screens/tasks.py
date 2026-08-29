@@ -664,7 +664,13 @@ class SubagentsScreen(BaseTasksListScreen):
             st_str = (getattr(s, "status", "") or "unknown").upper()
             is_run = is_subagent_running(s)
             badge = extract_subagent_progress(s)
-            desc = getattr(s, "description", None) or getattr(s, "prompt", None) or getattr(s, "id", "")
+            title_text = (
+                getattr(s, "title", "")
+                or getattr(s, "prompt", "")
+                or getattr(s, "id", "")
+                or "(subagent task)"
+            ).strip()
+            clean_title = " ".join(title_text.split()) or "(subagent task)"
             agent = getattr(s, "agent", None)
             role = getattr(agent, "role", None) if agent else getattr(s, "role", None)
             if (
@@ -674,12 +680,12 @@ class SubagentsScreen(BaseTasksListScreen):
                 and role.strip().lower() not in ("worker", "subagent", "default")
             ):
                 role_clean = role.strip()
-                if not desc.lower().startswith(role_clean.lower()):
-                    display_cmd = f"{role_clean}: {desc}"
+                if not clean_title.lower().startswith(role_clean.lower()):
+                    display_cmd = f"{role_clean}: {clean_title}"
                 else:
-                    display_cmd = desc
+                    display_cmd = clean_title
             else:
-                display_cmd = desc
+                display_cmd = clean_title
 
             items.append(
                 {

@@ -434,8 +434,6 @@ class ProviderManager:
         cfg = self._get_config_data()
         llm_sec = cfg.get("llm", {})
         efforts = llm_sec.get("thinking_efforts", {}) if isinstance(llm_sec, dict) else {}
-        if not efforts and isinstance(cfg.get("provider_thinking_efforts"), dict):
-            efforts = cfg.get("provider_thinking_efforts", {})
         provider_efforts = efforts.get(provider_key, {}) if isinstance(efforts, dict) else {}
         if model_name in provider_efforts:
             norm = normalize_thinking_effort(provider_efforts[model_name])

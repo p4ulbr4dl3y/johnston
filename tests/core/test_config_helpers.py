@@ -1,13 +1,21 @@
 import json
+import logging
 import os
 import tempfile
 import time
 
 from core.domain.defaults.config import (
+    DEFAULT_CHAT_INPUT_MAX_LINES,
     DEFAULT_COMPACTION_THRESHOLD_RATIO,
+    DEFAULT_IMAGE_MAX_DIMENSION,
+    DEFAULT_LOG_MAX_AGE_DAYS,
+    DEFAULT_LOG_MAX_BYTES,
     DEFAULT_MAX_CONCURRENT_SUBAGENTS,
     DEFAULT_MAX_RETRIES,
+    DEFAULT_SHELL_OUTPUT_CHARS,
+    DEFAULT_SHELL_STREAM_BUFFER_BYTES,
     DEFAULT_STREAM_TIMEOUT,
+    DEFAULT_SUBAGENT_RESULT_MAX_CHARS,
 )
 from core.infrastructure.config.config_helpers import (
     ensure_json_config,
@@ -194,6 +202,81 @@ def test_load_settings_handles_corrupt_or_null_values():
         assert settings.subagents.max_concurrent == DEFAULT_MAX_CONCURRENT_SUBAGENTS
         assert settings.tools.shell_default_timeout == 120.0
         assert settings.storage.max_log_age_days == 7
+
+
+def test_legacy_key_aliases_are_ignored():
+    """Backward-compat shims were removed; old keys must not override canonical ones."""
+    raw_data = {
+        "model": "openai/gpt-4o",
+        "provider_thinking_efforts": {"openai": {"gpt-4o": "high"}},  # legacy top-level
+        "max_concurrent_subagents": 9,                                  # legacy top-level
+        "sandbox_enabled": True,                                        # legacy top-level
+        "tools": {
+            "shell_output_chars": 999,            # legacy alias
+            "image_max_dimension": 999,           # legacy alias
+            "shell_stream_buffer_bytes": 999,     # valid canonical key is honored below
+            "max_shell_output_chars": 4000,
+            "max_image_dimension": 1024,
+        },
+        "ui": {
+            "chat_input_max_lines": 99,           # legacy alias
+            "max_chat_input_lines": 8,
+        },
+        "subagents": {"result_max_chars": 999},   # legacy alias
+        "storage": {"log_max_bytes": 999, "log_max_age_days": 99},  # legacy aliases
+    }
+    settings = JohnstonSettings.from_dict(raw_data)
+    # Legacy top-level keys do not override canonical sections.
+    assert settings.llm.thinking_efforts == {}
+    assert settings.subagents.max_concurrent == DEFAULT_MAX_CONCURRENT_SUBAGENTS
+    assert settings.sandbox_enabled is False
+    # Legacy aliases do not override canonical keys (canonical present) nor defaults.
+    assert settings.tools.max_shell_output_chars == 4000
+    assert settings.tools.max_image_dimension == 1024
+    assert settings.ui.max_chat_input_lines == 8
+    assert settings.subagents.max_result_chars == DEFAULT_SUBAGENT_RESULT_MAX_CHARS
+    assert settings.storage.max_log_bytes == DEFAULT_LOG_MAX_BYTES
+    assert settings.storage.max_log_age_days == DEFAULT_LOG_MAX_AGE_DAYS
+
+
+def test_load_settings_legacy_aliases_fall_back_to_defaults():
+    """When only a legacy alias is present, the canonical default is used."""
+    raw_data = {
+        "tools": {
+            "shell_output_chars": 999,
+            "image_max_dimension": 999,
+        },
+        "ui": {"shell_stream_buffer_bytes": 999},  # legacy cross-section
+        "subagents": {"result_max_chars": 999},
+        "storage": {"log_max_bytes": 999, "log_max_age_days": 99},
+    }
+    settings = JohnstonSettings.from_dict(raw_data)
+    assert settings.tools.max_shell_output_chars == DEFAULT_SHELL_OUTPUT_CHARS
+    assert settings.tools.max_image_dimension == DEFAULT_IMAGE_MAX_DIMENSION
+    assert settings.tools.shell_stream_buffer_bytes == DEFAULT_SHELL_STREAM_BUFFER_BYTES
+    assert settings.subagents.max_result_chars == DEFAULT_SUBAGENT_RESULT_MAX_CHARS
+    assert settings.storage.max_log_bytes == DEFAULT_LOG_MAX_BYTES
+    assert settings.storage.max_log_age_days == DEFAULT_LOG_MAX_AGE_DAYS
+    assert settings.ui.max_chat_input_lines == DEFAULT_CHAT_INPUT_MAX_LINES
+
+
+def test_load_settings_missing_file_defaults_silent():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "config.json")
+        settings = load_settings(path)
+        assert settings.llm.stream_timeout == DEFAULT_STREAM_TIMEOUT
+        assert settings.model is None
+
+
+def test_load_settings_invalid_json_warns_and_defaults(caplog):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "config.json")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("{not valid json")
+        with caplog.at_level(logging.WARNING, logger="core.infrastructure.config.settings"):
+            settings = load_settings(path)
+        assert settings.model is None
+        assert any("unreadable" in r.message for r in caplog.records)
 
 
 def test_save_and_reload_settings():

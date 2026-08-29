@@ -1,6 +1,7 @@
 """Central application settings with environment variable and JSON config support."""
 from __future__ import annotations
 
+import logging
 import math
 import os
 from dataclasses import asdict, dataclass, field
@@ -57,6 +58,8 @@ from core.domain.defaults.config import (
 )
 from core.infrastructure.platform import paths
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_int(val: Any, default: int, min_val: Optional[int] = None) -> int:
@@ -144,8 +147,6 @@ class LLMSettings:
     def from_dict(cls, data: Dict[str, Any]) -> LLMSettings:
         sec = data.get("llm") if isinstance(data.get("llm"), dict) else {}
         efforts = sec.get("thinking_efforts") if isinstance(sec.get("thinking_efforts"), dict) else {}
-        if not efforts and isinstance(data.get("provider_thinking_efforts"), dict):
-            efforts = data.get("provider_thinking_efforts", {})
         return cls(
             context_limit=_env_int(
                 "JOHNSTON_CONTEXT_LIMIT",
@@ -265,17 +266,9 @@ class ToolsSettings:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ToolsSettings:
         sec = data.get("tools") if isinstance(data.get("tools"), dict) else {}
-        ui_sec = data.get("ui") if isinstance(data.get("ui"), dict) else {}
         ua_val = sec.get("web_user_agent") if isinstance(sec.get("web_user_agent"), str) and sec.get("web_user_agent").strip() else DEFAULT_WEB_USER_AGENT
-        shell_buf = sec.get("shell_stream_buffer_bytes")
-        if shell_buf is None:
-            shell_buf = ui_sec.get("shell_stream_buffer_bytes")
         raw_shell_chars = sec.get("max_shell_output_chars")
-        if raw_shell_chars is None:
-            raw_shell_chars = sec.get("shell_output_chars")
         raw_img_dim = sec.get("max_image_dimension")
-        if raw_img_dim is None:
-            raw_img_dim = sec.get("image_max_dimension")
         return cls(
             shell_default_timeout=_env_float(
                 "JOHNSTON_SHELL_TIMEOUT",
@@ -344,7 +337,7 @@ class ToolsSettings:
             ),
             shell_stream_buffer_bytes=_env_int(
                 "JOHNSTON_SHELL_STREAM_BUFFER_BYTES",
-                _safe_int(shell_buf, DEFAULT_SHELL_STREAM_BUFFER_BYTES, min_val=1024),
+                _safe_int(sec.get("shell_stream_buffer_bytes"), DEFAULT_SHELL_STREAM_BUFFER_BYTES, min_val=1024),
                 min_val=1024,
             ),
             web_user_agent=_env_str("JOHNSTON_WEB_USER_AGENT", ua_val),
@@ -360,11 +353,8 @@ class SubagentsSettings:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> SubagentsSettings:
         sec = data.get("subagents") if isinstance(data.get("subagents"), dict) else {}
-        raw_max = sec.get("max_concurrent") if sec.get("max_concurrent") is not None else data.get("max_concurrent_subagents")
-        max_sub = _safe_int(raw_max, DEFAULT_MAX_CONCURRENT_SUBAGENTS, min_val=1)
+        max_sub = _safe_int(sec.get("max_concurrent"), DEFAULT_MAX_CONCURRENT_SUBAGENTS, min_val=1)
         raw_chars = sec.get("max_result_chars")
-        if raw_chars is None:
-            raw_chars = sec.get("result_max_chars")
         return cls(
             max_concurrent=_env_int("JOHNSTON_MAX_CONCURRENT_SUBAGENTS", max_sub, min_val=1),
             max_result_chars=_env_int(
@@ -393,8 +383,6 @@ class UISettings:
     def from_dict(cls, data: Dict[str, Any]) -> UISettings:
         sec = data.get("ui") if isinstance(data.get("ui"), dict) else {}
         raw_input_lines = sec.get("max_chat_input_lines")
-        if raw_input_lines is None:
-            raw_input_lines = sec.get("chat_input_max_lines")
         return cls(
             max_prompt_history=_env_int(
                 "JOHNSTON_MAX_PROMPT_HISTORY",
@@ -439,11 +427,7 @@ class StorageSettings:
     def from_dict(cls, data: Dict[str, Any]) -> StorageSettings:
         sec = data.get("storage") if isinstance(data.get("storage"), dict) else {}
         raw_bytes = sec.get("max_log_bytes")
-        if raw_bytes is None:
-            raw_bytes = sec.get("log_max_bytes")
         raw_age = sec.get("max_log_age_days")
-        if raw_age is None:
-            raw_age = sec.get("log_max_age_days")
         return cls(
             max_log_bytes=_env_int(
                 "JOHNSTON_LOG_MAX_BYTES",
@@ -470,7 +454,7 @@ class SandboxSettings:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> SandboxSettings:
         sec = data.get("sandbox") if isinstance(data.get("sandbox"), dict) else {}
-        val = sec.get("enabled", data.get("sandbox_enabled", False))
+        val = sec.get("enabled", False)
         return cls(
             enabled=_env_bool("JOHNSTON_SANDBOX_ENABLED", bool(val)),
         )
@@ -544,15 +528,20 @@ _cached_settings_map: Dict[str, Tuple[float, JohnstonSettings]] = {}
 
 
 def load_settings(config_file: Optional[str] = None) -> JohnstonSettings:
-    """Load settings from JSON config file with environment variable overlays."""
+    """Load settings from JSON config file with environment variable overlays.
+
+    A missing file yields defaults. A file that exists but is unreadable or
+    contains invalid JSON is surfaced via a warning instead of silently
+    discarding the user's configuration.
+    """
     target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
-    try:
-        raw = read_json(target_file, default={})
-        if isinstance(raw, dict):
-            return JohnstonSettings.from_dict(raw)
-    except Exception:
-        pass
-    return JohnstonSettings()
+    if not os.path.exists(target_file):
+        return JohnstonSettings.from_dict({})
+    raw = read_json(target_file, default=None)
+    if isinstance(raw, dict):
+        return JohnstonSettings.from_dict(raw)
+    logger.warning("Config file %s is unreadable or contains invalid JSON; using defaults.", target_file)
+    return JohnstonSettings.from_dict({})
 
 
 def get_settings(config_file: Optional[str] = None, force_reload: bool = False) -> JohnstonSettings:
@@ -579,34 +568,34 @@ def reload_settings(config_file: Optional[str] = None) -> JohnstonSettings:
 
 
 def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None) -> None:
-    """Saves structured settings back to config_file."""
+    """Saves structured settings back to config_file.
+
+    Write failures propagate to the caller so a lost update is never silent.
+    """
     target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
-    try:
-        data = read_json(target_file, default={})
-        if not isinstance(data, dict):
-            data = {}
-        data.pop("provider_models", None)
-        if settings.model is not None:
-            data["model"] = settings.model
-        else:
-            data.pop("model", None)
-        if settings.theme is not None:
-            data["theme"] = settings.theme
-        elif "theme" in data:
-            data.pop("theme", None)
-        data["sandbox"] = asdict(settings.sandbox)
-        data.pop("sandbox_enabled", None)
-        data.pop("provider_thinking_efforts", None)
-        data["permissions"] = settings.permissions
-        data["subagents"] = asdict(settings.subagents)
-        data["llm"] = asdict(settings.llm)
-        data["tools"] = asdict(settings.tools)
-        data["ui"] = asdict(settings.ui)
-        data["storage"] = asdict(settings.storage)
-        atomic_write_json(target_file, data, indent=2)
-        reload_settings(target_file)
-    except Exception:
-        pass
+    data = read_json(target_file, default={})
+    if not isinstance(data, dict):
+        data = {}
+    data.pop("provider_models", None)
+    if settings.model is not None:
+        data["model"] = settings.model
+    else:
+        data.pop("model", None)
+    if settings.theme is not None:
+        data["theme"] = settings.theme
+    elif "theme" in data:
+        data.pop("theme", None)
+    data["sandbox"] = asdict(settings.sandbox)
+    data.pop("sandbox_enabled", None)
+    data.pop("provider_thinking_efforts", None)
+    data["permissions"] = settings.permissions
+    data["subagents"] = asdict(settings.subagents)
+    data["llm"] = asdict(settings.llm)
+    data["tools"] = asdict(settings.tools)
+    data["ui"] = asdict(settings.ui)
+    data["storage"] = asdict(settings.storage)
+    atomic_write_json(target_file, data, indent=2)
+    reload_settings(target_file)
 
 
 def patch_settings(config_file: Optional[str] = None, **kwargs: Any) -> JohnstonSettings:

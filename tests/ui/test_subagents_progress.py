@@ -374,7 +374,45 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         dur2 = format_duration(max(0.0, sess.updated_at - sess.created_at))
         self.assertEqual(extract_subagent_progress(sess), f"done • 5 steps • {dur2}")
 
+    def test_subagents_screen_title_hierarchy(self):
+        from widgets.presentation.screens.tasks import SubagentsScreen
+
+        screen = SubagentsScreen()
+        mock_app = MagicMock()
+        mock_store = MagicMock()
+        mock_app.current_session_id = "parent-123"
+
+        sess_with_title = MagicMock()
+        sess_with_title.id = "s-1"
+        sess_with_title.status = "running"
+        sess_with_title.title = "Custom Agent Title"
+        sess_with_title.prompt = "Long initial prompt"
+        sess_with_title.role = "researcher"
+        sess_with_title.agent = None
+
+        sess_with_prompt_only = MagicMock()
+        sess_with_prompt_only.id = "s-2"
+        sess_with_prompt_only.status = "completed"
+        sess_with_prompt_only.title = ""
+        sess_with_prompt_only.prompt = "Execute command"
+        sess_with_prompt_only.role = "worker"
+        sess_with_prompt_only.agent = None
+
+        mock_store.children.return_value = [sess_with_title, sess_with_prompt_only]
+
+        from unittest.mock import PropertyMock, patch
+        with patch.object(SubagentsScreen, "app", new_callable=PropertyMock, return_value=mock_app), \
+             patch("core.infrastructure.storage.session_store.get_session_store", return_value=mock_store):
+            tasks = screen._get_filtered_tasks()
+
+        self.assertEqual(len(tasks), 2)
+        self.assertEqual(tasks[0]["id"], "s-1")
+        self.assertIn("Custom Agent Title", tasks[0]["command"])
+        self.assertEqual(tasks[1]["id"], "s-2")
+        self.assertIn("Execute command", tasks[1]["command"])
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
