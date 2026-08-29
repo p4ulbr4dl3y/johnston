@@ -9,7 +9,7 @@ import sys
 import time
 from typing import Any, Optional, Tuple
 
-BASE_LIFT = 0.06
+BASE_LIFT = 0.09
 LIFT_DAMPING = 3.0
 CHROMA_NUDGE = 0.003
 LIGHT_THEME_THRESHOLD = 0.5
