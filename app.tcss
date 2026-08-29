@@ -226,13 +226,18 @@ WelcomeWidget {
 }
 
 /* Strict Height Auto & Zero Margin for Markdown Elements */
-Markdown, MarkdownBlock, MarkdownParagraph, MarkdownBulletList, MarkdownOrderedList, MarkdownItem {
+Markdown, MarkdownBlock, MarkdownParagraph, MarkdownBulletList, MarkdownOrderedList, MarkdownItem, MarkdownTable, MarkdownTableContent, MarkdownTableCellContents, MarkdownTableContent > .cell {
     color: $fg-primary;
     link-color: $fg-primary;
     link-color-hover: $fg-primary;
     link-background-hover: $bg-surface;
     link-style: underline;
     link-style-hover: bold;
+}
+
+MarkdownTableContent > .header {
+    color: $primary;
+    text-style: bold;
 }
 
 Markdown {
