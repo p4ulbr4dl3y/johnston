@@ -16,7 +16,11 @@
       "fg-muted": "#71717a",
       "fg-inverted": "#09090b",
       "border": "#27272a",
-      "bg-code": "#333338"
+      "bg-code": "#333338",
+      "accent-info": "#61afef",
+      "accent-warning": "#e5c07b",
+      "accent-error": "#e06c75",
+      "accent-success": "#98c379"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -1842,7 +1846,11 @@
       "fg-muted": "#71717a",
       "fg-inverted": "#09090b",
       "border": "#27272a",
-      "bg-code": "#333338"
+      "bg-code": "#333338",
+      "accent-info": "#61afef",
+      "accent-warning": "#e5c07b",
+      "accent-error": "#e06c75",
+      "accent-success": "#98c379"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
