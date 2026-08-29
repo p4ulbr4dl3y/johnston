@@ -148,11 +148,7 @@ def build_status_kwargs(app, widget=None) -> dict:
     # running client that discovered tools and has no error. Pending or
     # errored servers don't count, so while loading the footer flips to
     # the spinner.
-    mcp_total = 0
-    for s in mcp_servers:
-        if s.get("url") and not s.get("command"):
-            continue
-        mcp_total += 1
+    mcp_total = len(mcp_servers)
     try:
         count_fn = getattr(get_mcp_manager(), "active_server_count", None)
         mcp_active = 0

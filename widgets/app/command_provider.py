@@ -37,6 +37,28 @@ def _build_command_suggestions() -> list[tuple[str, str]]:
                 registered.add(s_cmd)
     except Exception:
         pass
+
+    try:
+        from core.infrastructure.mcp import get_mcp_manager
+
+        mm = get_mcp_manager()
+        for s_name, client in mm.clients.items():
+            for p in getattr(client, "prompts", []):
+                p_name = p.get("name")
+                if not p_name:
+                    continue
+                desc = p.get("description") or f"MCP Prompt ({s_name})"
+                p_cmd = f"/{p_name}"
+                p_namespaced = f"/{s_name}__{p_name}"
+                if p_cmd not in registered:
+                    suggestions.append((p_cmd, f"MCP Prompt [{s_name}]: {desc}"))
+                    registered.add(p_cmd)
+                elif p_namespaced not in registered:
+                    suggestions.append((p_namespaced, f"MCP Prompt [{s_name}]: {desc}"))
+                    registered.add(p_namespaced)
+    except Exception:
+        pass
+
     return suggestions
 
 

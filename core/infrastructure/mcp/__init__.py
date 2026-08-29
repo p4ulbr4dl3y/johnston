@@ -8,9 +8,11 @@ from core.infrastructure.mcp.manager import (
     get_mcp_manager,
 )
 from core.infrastructure.mcp.process_client import MCPProcessClient
+from core.infrastructure.mcp.sse_client import MCPSSEClient
 
 __all__ = [
     "MCPProcessClient",
+    "MCPSSEClient",
     "MCPManager",
     "get_mcp_manager",
     "GLOBAL_MCP_FILE",

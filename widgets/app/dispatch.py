@@ -128,4 +128,56 @@ async def handle_slash_command(app, command_text: str) -> bool:
         app.trigger_ai_response(prompt, show_in_ui=True, display_text=command_text)
         return True
 
+    # MCP prompt execution fallback (e.g. /simple-prompt or /args-prompt topic=Python)
+    if words and words[0].startswith("/"):
+        raw_mcp_name = words[0][1:]
+        clean_mcp_name = "".join(homoglyphs.get(c, c) for c in raw_mcp_name.lower())
+        try:
+            from core.infrastructure.mcp import get_mcp_manager
+
+            mm = get_mcp_manager()
+            args_dict: dict[str, str] = {}
+            extra_text = []
+            for w in words[1:]:
+                if "=" in w:
+                    k, v = w.split("=", 1)
+                    args_dict[k.strip()] = v.strip()
+                else:
+                    extra_text.append(w)
+
+            target_server = None
+            prompt_lookup_name = clean_mcp_name
+            if "__" in clean_mcp_name:
+                target_server, prompt_lookup_name = clean_mcp_name.split("__", 1)
+
+            prompt_data = await mm.get_prompt_async(
+                prompt_lookup_name, arguments=args_dict, server_name=target_server
+            )
+            if prompt_data:
+                messages = prompt_data.get("messages", [])
+                out_parts = []
+                for msg in messages:
+                    content = msg.get("content")
+                    if isinstance(content, dict):
+                        if content.get("type") == "text":
+                            out_parts.append(content.get("text", ""))
+                        else:
+                            out_parts.append(str(content))
+                    elif isinstance(content, str):
+                        out_parts.append(content)
+                    elif isinstance(content, list):
+                        for item in content:
+                            if isinstance(item, dict) and item.get("type") == "text":
+                                out_parts.append(item.get("text", ""))
+                            else:
+                                out_parts.append(str(item))
+                if extra_text:
+                    out_parts.append(" ".join(extra_text))
+                final_prompt = "\n\n".join(p for p in out_parts if p).strip()
+                if final_prompt:
+                    app.trigger_ai_response(final_prompt, show_in_ui=True, display_text=command_text)
+                    return True
+        except Exception:
+            pass
+
     return False

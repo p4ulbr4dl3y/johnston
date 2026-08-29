@@ -54,6 +54,9 @@ class MCPProcessClient:
         self.process: Optional[subprocess.Popen] = None
         self.req_id = 0
         self.tools: List[Dict[str, Any]] = []
+        self.resources: List[Dict[str, Any]] = []
+        self.prompts: List[Dict[str, Any]] = []
+        self.server_capabilities: Dict[str, Any] = {}
         self.last_error: Optional[str] = None
         self._stopped = False
         self._buffer = ""
@@ -79,6 +82,8 @@ class MCPProcessClient:
         self._tools_fetch_time = 0.0
         self._response_event = threading.Event()
         self.on_tools_changed: Optional[Any] = None
+        self.on_resources_changed: Optional[Any] = None
+        self.on_prompts_changed: Optional[Any] = None
 
     def _next_req_id(self) -> int:
         with self._lock:
@@ -239,6 +244,14 @@ class MCPProcessClient:
                     method = data.get("method", "")
                     if method in ("notifications/tools/list_changed", "tools/list_changed") or method.endswith("tools/list_changed"):
                         asyncio.create_task(self._handle_tools_list_changed_async())
+                    elif method in ("notifications/resources/list_changed", "resources/list_changed") or method.endswith("resources/list_changed"):
+                        asyncio.create_task(self._handle_resources_list_changed_async())
+                    elif method in ("notifications/prompts/list_changed", "prompts/list_changed") or method.endswith("prompts/list_changed"):
+                        asyncio.create_task(self._handle_prompts_list_changed_async())
+                    continue
+
+                if "method" in data and "id" in data:
+                    asyncio.create_task(self._handle_server_request_async(data))
                     continue
 
                 res_id = data.get("id")
@@ -255,6 +268,27 @@ class MCPProcessClient:
         finally:
             self._fail_pending_futures()
 
+    async def _handle_server_request_async(self, data: Dict[str, Any]) -> None:
+        req_id = data.get("id")
+        method = data.get("method", "")
+        if method == "roots/list":
+            roots = []
+            if self.cwd:
+                real_cwd = os.path.realpath(self.cwd)
+                roots.append({
+                    "uri": f"file://{real_cwd}",
+                    "name": os.path.basename(real_cwd) or "workspace",
+                })
+            await self._send_async({"jsonrpc": "2.0", "id": req_id, "result": {"roots": roots}})
+        elif method == "ping":
+            await self._send_async({"jsonrpc": "2.0", "id": req_id, "result": {}})
+        else:
+            await self._send_async({
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {"code": -32601, "message": f"Method {method!r} not found"},
+            })
+
     async def _handle_tools_list_changed_async(self) -> None:
         try:
             await self.fetch_tools_async()
@@ -266,6 +300,30 @@ class MCPProcessClient:
                     cb()
         except Exception:
             logger.debug("Failed to refresh tools on list_changed notification for '%s'", self.name, exc_info=True)
+
+    async def _handle_resources_list_changed_async(self) -> None:
+        try:
+            await self.fetch_resources_async()
+            if callable(self.on_resources_changed):
+                cb = self.on_resources_changed
+                if asyncio.iscoroutinefunction(cb):
+                    await cb()
+                else:
+                    cb()
+        except Exception:
+            logger.debug("Failed to refresh resources on list_changed notification for '%s'", self.name, exc_info=True)
+
+    async def _handle_prompts_list_changed_async(self) -> None:
+        try:
+            await self.fetch_prompts_async()
+            if callable(self.on_prompts_changed):
+                cb = self.on_prompts_changed
+                if asyncio.iscoroutinefunction(cb):
+                    await cb()
+                else:
+                    cb()
+        except Exception:
+            logger.debug("Failed to refresh prompts on list_changed notification for '%s'", self.name, exc_info=True)
 
     def _send_request_sync(
         self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
@@ -573,16 +631,30 @@ class MCPProcessClient:
                 if "method" in data and "id" not in data:
                     method = data.get("method", "")
                     if method in ("notifications/tools/list_changed", "tools/list_changed") or method.endswith("tools/list_changed"):
-                        # Reentrant by design: _lock is an RLock and fetch_tools
-                        # only mutates the same reader-critical sections guarded
-                        # here; the GIL keeps _pending_responses consistent
-                        # between sync and async read paths.
                         try:
                             self.fetch_tools()
                             if callable(self.on_tools_changed):
                                 self.on_tools_changed()
                         except Exception:
                             logger.debug("Failed to refresh tools on list_changed notification", exc_info=True)
+                    elif method in ("notifications/resources/list_changed", "resources/list_changed") or method.endswith("resources/list_changed"):
+                        try:
+                            self.fetch_resources()
+                            if callable(self.on_resources_changed):
+                                self.on_resources_changed()
+                        except Exception:
+                            logger.debug("Failed to refresh resources on list_changed notification", exc_info=True)
+                    elif method in ("notifications/prompts/list_changed", "prompts/list_changed") or method.endswith("prompts/list_changed"):
+                        try:
+                            self.fetch_prompts()
+                            if callable(self.on_prompts_changed):
+                                self.on_prompts_changed()
+                        except Exception:
+                            logger.debug("Failed to refresh prompts on list_changed notification", exc_info=True)
+                    continue
+
+                if "method" in data and "id" in data:
+                    self._handle_server_request_sync(data)
                     continue
 
                 res_id = data.get("id")
@@ -636,6 +708,27 @@ class MCPProcessClient:
 
         return None
 
+    def _handle_server_request_sync(self, data: Dict[str, Any]) -> None:
+        req_id = data.get("id")
+        method = data.get("method", "")
+        if method == "roots/list":
+            roots = []
+            if self.cwd:
+                real_cwd = os.path.realpath(self.cwd)
+                roots.append({
+                    "uri": f"file://{real_cwd}",
+                    "name": os.path.basename(real_cwd) or "workspace",
+                })
+            self._send({"jsonrpc": "2.0", "id": req_id, "result": {"roots": roots}})
+        elif method == "ping":
+            self._send({"jsonrpc": "2.0", "id": req_id, "result": {}})
+        else:
+            self._send({
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "error": {"code": -32601, "message": f"Method {method!r} not found"},
+            })
+
     def _initialize(self) -> bool:
         current_id = self._next_req_id()
         init_req = {
@@ -644,7 +737,9 @@ class MCPProcessClient:
             "method": "initialize",
             "params": {
                 "protocolVersion": MCP_PROTOCOL_VERSION,
-                "capabilities": {},
+                "capabilities": {
+                    "roots": {"listChanged": True},
+                },
                 "clientInfo": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
             },
         }
@@ -660,8 +755,13 @@ class MCPProcessClient:
             self.last_error = f"MCP init error: {err_msg}"
             return False
 
+        self.server_capabilities = res.get("result", {}).get("capabilities", {})
         self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
         self.fetch_tools()
+        if "resources" in self.server_capabilities:
+            self.fetch_resources()
+        if "prompts" in self.server_capabilities:
+            self.fetch_prompts()
         return True
 
     async def _initialize_async(self) -> bool:
@@ -669,7 +769,9 @@ class MCPProcessClient:
             "initialize",
             params={
                 "protocolVersion": MCP_PROTOCOL_VERSION,
-                "capabilities": {},
+                "capabilities": {
+                    "roots": {"listChanged": True},
+                },
                 "clientInfo": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
             },
             timeout=INIT_TIMEOUT,
@@ -684,8 +786,13 @@ class MCPProcessClient:
             self.last_error = f"MCP init error: {err_msg}"
             return False
 
+        self.server_capabilities = res.get("result", {}).get("capabilities", {})
         await self._send_async({"jsonrpc": "2.0", "method": "notifications/initialized"})
         await self.fetch_tools_async()
+        if "resources" in self.server_capabilities:
+            await self.fetch_resources_async()
+        if "prompts" in self.server_capabilities:
+            await self.fetch_prompts_async()
         return True
 
     def fetch_tools(self) -> List[Dict[str, Any]]:
@@ -705,6 +812,92 @@ class MCPProcessClient:
             self.tools = res["result"].get("tools", [])
             self._tools_fetch_time = time.monotonic()
         return self.tools
+
+    def fetch_resources(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            current_id = self._next_req_id()
+            req = {"jsonrpc": "2.0", "id": current_id, "method": "resources/list"}
+            self._send(req)
+            res = self._read_response(req_id=current_id, timeout=INIT_TIMEOUT)
+            if res and "result" in res:
+                self.resources = res["result"].get("resources", [])
+            return self.resources
+
+    async def fetch_resources_async(self) -> List[Dict[str, Any]]:
+        res = await self._send_request_async("resources/list", timeout=INIT_TIMEOUT)
+        if res and "result" in res:
+            self.resources = res["result"].get("resources", [])
+        return self.resources
+
+    def read_resource(self, uri: str, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            current_id = self._next_req_id()
+            req = {
+                "jsonrpc": "2.0",
+                "id": current_id,
+                "method": "resources/read",
+                "params": {"uri": uri},
+            }
+            self._send(req)
+            res = self._read_response(req_id=current_id, timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT)
+            if res and "result" in res:
+                return res["result"]
+            return None
+
+    async def read_resource_async(self, uri: str, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
+        res = await self._send_request_async(
+            "resources/read",
+            params={"uri": uri},
+            timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT,
+        )
+        if res and "result" in res:
+            return res["result"]
+        return None
+
+    def fetch_prompts(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            current_id = self._next_req_id()
+            req = {"jsonrpc": "2.0", "id": current_id, "method": "prompts/list"}
+            self._send(req)
+            res = self._read_response(req_id=current_id, timeout=INIT_TIMEOUT)
+            if res and "result" in res:
+                self.prompts = res["result"].get("prompts", [])
+            return self.prompts
+
+    async def fetch_prompts_async(self) -> List[Dict[str, Any]]:
+        res = await self._send_request_async("prompts/list", timeout=INIT_TIMEOUT)
+        if res and "result" in res:
+            self.prompts = res["result"].get("prompts", [])
+        return self.prompts
+
+    def get_prompt(
+        self, name: str, arguments: Optional[Dict[str, str]] = None, timeout: Optional[float] = None
+    ) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            current_id = self._next_req_id()
+            req = {
+                "jsonrpc": "2.0",
+                "id": current_id,
+                "method": "prompts/get",
+                "params": {"name": name, "arguments": arguments or {}},
+            }
+            self._send(req)
+            res = self._read_response(req_id=current_id, timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT)
+            if res and "result" in res:
+                return res["result"]
+            return None
+
+    async def get_prompt_async(
+        self, name: str, arguments: Optional[Dict[str, str]] = None, timeout: Optional[float] = None
+    ) -> Optional[Dict[str, Any]]:
+        res = await self._send_request_async(
+            "prompts/get",
+            params={"name": name, "arguments": arguments or {}},
+            timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT,
+        )
+        if res and "result" in res:
+            return res["result"]
+        return None
 
     def is_tools_stale(self, ttl: float = 300.0) -> bool:
         """True if the cached tools list is stale (based on last fetch time)."""

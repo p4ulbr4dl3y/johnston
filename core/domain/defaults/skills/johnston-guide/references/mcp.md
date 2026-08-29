@@ -24,9 +24,15 @@
 - `enabled` is optional. An enabled server simply omits it — only `"enabled": false` is stored for turned-off servers.
 - `command` (string or list) is required; `args`, `env`, `cwd` are optional.
 
-## Transport
-- **stdio** (via `command` + `args`) is the only executed transport.
-- An optional `url` field is preserved in config, but HTTP/SSE URL transport is NOT yet executed — such servers are skipped.
+## Transports
+- **stdio**: Local subprocess via `command` + `args`.
+- **sse / http**: Remote server via `url` (e.g. `https://example.com/mcp/sse`) + optional `headers`.
+
+## Capabilities
+- **Tools**: `tools/list` and `tools/call`.
+- **Resources**: `resources/list` and `resources/read` (read directly via `read` tool with resource URI).
+- **Prompts**: `prompts/list` and `prompts/get`.
+- **Roots**: `roots/list` (automatically responds with project workspace).
 
 ## Verification
 - Run `johnston --mcp` via shell tool to verify server registration and readiness.

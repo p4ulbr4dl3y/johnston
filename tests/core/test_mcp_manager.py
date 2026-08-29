@@ -269,16 +269,16 @@ class TestMCPManagerRegression(unittest.TestCase):
         self.assertEqual(by_name["bad-args"]["args"], [])
         self.assertIsNone(by_name["bad-env"]["env"])
 
-    def test_url_only_server_skipped_with_clear_warning(self):
-        # stdio-only client: an HTTP/SSE 'url' entry can never be served, so it
-        # is skipped with an explicit warning instead of "invalid command None".
+    def test_url_server_loaded_and_invalid_url_warns(self):
+        # HTTP/SSE 'url' entry is loaded as an SSE server, invalid url warns
         mm = MCPManager(project_dir=self.test_dir)
         mm.global_file = os.path.join(self.test_dir, "global_mcp.json")
         with open(mm.global_file, "w", encoding="utf-8") as f:
             json.dump(
                 {
                     "mcpServers": {
-                        "remote": {"url": "https://example.com/sse"},
+                        "remote": {"url": "https://example.com/sse", "headers": {"X-Key": "123"}},
+                        "invalid_url": {"url": "not-a-valid-url"},
                         "local": {"command": "python", "args": ["-m", "srv"]},
                     }
                 },
@@ -288,8 +288,14 @@ class TestMCPManagerRegression(unittest.TestCase):
         with self.assertLogs("core.infrastructure.mcp.manager", level="WARNING") as captured:
             servers = mm.load_servers()
 
-        self.assertEqual([s["name"] for s in servers], ["local"])
-        self.assertTrue(any("'url' transport" in message for message in captured.output))
+        server_names = [s["name"] for s in servers]
+        self.assertIn("remote", server_names)
+        self.assertIn("local", server_names)
+        self.assertNotIn("invalid_url", server_names)
+        remote_srv = next(s for s in servers if s["name"] == "remote")
+        self.assertEqual(remote_srv["type"], "sse")
+        self.assertEqual(remote_srv["headers"], {"X-Key": "123"})
+        self.assertTrue(any("invalid url" in message for message in captured.output))
 
     def test_constructor_does_not_write_real_global_config(self):
         # Regression: instantiating the manager must not scribble the default

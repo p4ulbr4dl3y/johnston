@@ -185,7 +185,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 footer.refresh_footer()
                 await pilot.pause()
                 self.assertEqual(footer._last_status_args["mcp_active"], 1)
-                self.assertEqual(footer._last_status_args["mcp_total"], 3)
+                self.assertEqual(footer._last_status_args["mcp_total"], 4)
 
     async def test_update_status_fallback_branches(self):
         app = FooterTestApp()

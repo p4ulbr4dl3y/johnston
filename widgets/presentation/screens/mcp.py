@@ -228,8 +228,6 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         if tool_cnt > 0:
             tool_info = f"{tool_cnt} tool" if tool_cnt == 1 else f"{tool_cnt} tools"
             opt_list.add_option(_row(status_tag("ON"), name, tool_info))
-        elif url and not cmd:
-            opt_list.add_option(_row(status_tag("ERR"), name, "URL unsupported"))
         else:
             try:
                 st = self.mm.get_server_status(name) if hasattr(self.mm, "get_server_status") else {}

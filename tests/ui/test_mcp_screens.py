@@ -419,7 +419,6 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
             joined = "\n".join(calls)
             self.assertIn("○", joined)
             self.assertIn("2 tools", joined)
-            self.assertIn("URL unsupported", joined)
             self.assertIn("Start failed", joined)
             self.assertIn("Timeout", joined)
             self.assertIn("●", joined)

@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import subprocess
@@ -11,6 +12,8 @@ from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
 from tools.cancel import run_cancellable
 from tools.utils import DEFAULT_LINE_WINDOW, get_max_tool_payload_bytes
+
+logger = logging.getLogger(__name__)
 
 DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub"}
 _DOC_CACHE: "OrderedDict[str, Tuple[float, float, str]]" = OrderedDict()  # key: path, val: (mtime, timestamp, md_text)
@@ -324,6 +327,34 @@ class ReadTool(BaseTool):
         raw_path = str(args.get("path") or "").strip()
         if not raw_path:
             return ToolResult.error("params", name="path", detail="missing or empty")
+
+        if "://" in raw_path and not os.path.exists(raw_path):
+            from core.infrastructure.mcp import get_mcp_manager
+
+            mcp_mgr = get_mcp_manager()
+            try:
+                res_data = await mcp_mgr.read_resource_async(raw_path)
+                if res_data:
+                    contents = res_data.get("contents", [])
+                    out_parts = []
+                    for c in contents:
+                        if isinstance(c, dict):
+                            text = c.get("text")
+                            if text is not None:
+                                out_parts.append(text)
+                            elif c.get("blob") is not None:
+                                out_parts.append(f"[Binary Blob: {c.get('mimeType', 'unknown')}]")
+                            else:
+                                out_parts.append(str(c))
+                        else:
+                            out_parts.append(str(c))
+                    return ToolResult.done(
+                        content="\n".join(out_parts).strip() or "[Empty Resource]",
+                        display=f"Resource {raw_path}",
+                    )
+            except Exception as e:
+                logger.debug("Failed to read MCP resource %s: %s", raw_path, e)
+
         path = resolve_path(raw_path, cwd=ctx.cwd)
         if getattr(ctx, "sandbox_enabled", False):
             from core.infrastructure.platform.sandbox import is_path_readable_in_sandbox

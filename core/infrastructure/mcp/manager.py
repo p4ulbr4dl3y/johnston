@@ -261,25 +261,29 @@ class MCPManager:
                 self._warn_broken_config(path, reason=f"server '{k}': entry must be an object")
                 continue
             v_copy = dict(v)
+            url = v_copy.get("url")
             cmd = v_copy.get("command")
-            if not cmd and v_copy.get("url"):
-                # The client is stdio-only: an HTTP/SSE url entry can never be
-                # served, so say so explicitly instead of a cryptic "invalid
-                # command None".
-                self._warn_once(
-                    (path, f"url-server:{k}"),
-                    f"MCP config {path}: server '{k}' uses 'url' transport, which is "
-                    "unsupported (stdio only); the server is skipped",
-                )
-                continue
-            if not self._command_parts_valid(cmd):
-                self._warn_broken_config(path, reason=f"server '{k}': invalid command {cmd!r}")
-                continue
-            args = v_copy.get("args")
-            if args is not None and not isinstance(args, list):
-                self._warn_broken_config(path, reason=f"server '{k}': 'args' must be an array")
-                args = None
-            v_copy["args"] = args or []
+            if url:
+                if not isinstance(url, str) or not (url.startswith("http://") or url.startswith("https://")):
+                    self._warn_broken_config(path, reason=f"server '{k}': invalid url {url!r}")
+                    continue
+                v_copy["type"] = "sse"
+                headers = v_copy.get("headers")
+                if headers is not None and not isinstance(headers, dict):
+                    self._warn_broken_config(path, reason=f"server '{k}': 'headers' must be an object")
+                    headers = None
+                v_copy["headers"] = headers or {}
+            else:
+                if not self._command_parts_valid(cmd):
+                    self._warn_broken_config(path, reason=f"server '{k}': invalid command {cmd!r}")
+                    continue
+                args = v_copy.get("args")
+                if args is not None and not isinstance(args, list):
+                    self._warn_broken_config(path, reason=f"server '{k}': 'args' must be an array")
+                    args = None
+                v_copy["args"] = args or []
+                v_copy["type"] = "stdio"
+
             env = v_copy.get("env")
             if env is not None and not isinstance(env, dict):
                 self._warn_broken_config(path, reason=f"server '{k}': 'env' must be an object")
@@ -427,6 +431,27 @@ class MCPManager:
         self._notify_listeners("server_updated")
         return new_enabled
 
+    def _create_client(self, server: Dict[str, Any]) -> Any:
+        name = server["name"]
+        url = server.get("url")
+        cwd = server.get("cwd") or self.project_dir
+        env = server.get("env")
+        if url:
+            from core.infrastructure.mcp.sse_client import MCPSSEClient
+
+            headers = server.get("headers")
+            client = MCPSSEClient(name, url, headers=headers, cwd=cwd, env=env)
+        else:
+            cmd = server.get("command")
+            args = server.get("args") or []
+            full_cmd = [cmd] + list(args) if isinstance(cmd, str) else list(cmd) + list(args)
+            client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
+
+        client.on_tools_changed = lambda: self._notify_listeners("tools_updated")
+        client.on_resources_changed = lambda: self._notify_listeners("resources_updated")
+        client.on_prompts_changed = lambda: self._notify_listeners("prompts_updated")
+        return client
+
     def get_active_tools(self) -> List[Dict[str, Any]]:
         """Connects to enabled MCP servers and returns their tools in OpenAI function format."""
         tools: List[Dict[str, Any]] = []
@@ -438,19 +463,14 @@ class MCPManager:
                 continue
 
             name = s["name"]
+            url = s.get("url")
             cmd = s.get("command")
-            if not cmd:
+            if not url and not cmd:
                 continue
-
-            args = s.get("args") or []
-            env = s.get("env")
-            cwd = s.get("cwd")
-            full_cmd = [cmd] + list(args) if isinstance(cmd, str) else list(cmd) + list(args)
 
             client = self.clients.get(name)
             if not client:
-                client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
-                client.on_tools_changed = lambda: self._notify_listeners("tools_updated")
+                client = self._create_client(s)
                 if client.start():
                     self.clients[name] = client
                     self._server_errors.pop(name, None)
@@ -466,7 +486,7 @@ class MCPManager:
                     except Exception:
                         logger.warning("Failed to fetch tools for MCP server %s", name, exc_info=True)
 
-            for t in client.tools:
+            for t in getattr(client, "tools", []):
                 formatted = self._format_tool_schema(t, name, seen_names)
                 if formatted:
                     tools.append(formatted)
@@ -486,14 +506,10 @@ class MCPManager:
         later, sequentially, so name-collision assignment stays deterministic.
         """
         name = server["name"]
+        url = server.get("url")
         cmd = server.get("command")
-        if not cmd:
+        if not url and not cmd:
             return []
-
-        args = server.get("args") or []
-        env = server.get("env")
-        cwd = server.get("cwd")
-        full_cmd = [cmd] + list(args) if isinstance(cmd, str) else list(cmd) + list(args)
 
         gen = self._generation
         lock = self._start_locks.get(name)
@@ -510,8 +526,7 @@ class MCPManager:
             client = self.clients.get(name)
             created = client is None
             if created:
-                client = MCPProcessClient(name, full_cmd, cwd=cwd, env=env)
-                client.on_tools_changed = lambda: self._notify_listeners("tools_updated")
+                client = self._create_client(server)
                 # Register before starting: a concurrent stop_all() iterates
                 # clients, so a half-started process must already be reachable.
                 self.clients[name] = client
@@ -556,7 +571,7 @@ class MCPManager:
                 logger.warning("MCP server %s failed to load tools", name, exc_info=True)
                 return []
 
-    async def _teardown_unready_client(self, name: str, client: MCPProcessClient) -> None:
+    async def _teardown_unready_client(self, name: str, client: Any) -> None:
         """Stop a client that must not stay alive and drop it from the cache.
 
         Remembering its fatal ``last_error`` keeps the UI showing an ERR badge
@@ -604,8 +619,9 @@ class MCPManager:
 
     async def get_active_tools_async(self) -> List[Dict[str, Any]]:
         servers = await self.load_servers_async()
-
-        eligible = [s for s in servers if self.server_enabled(s) and s.get("command")]
+        eligible = [
+            s for s in servers if self.server_enabled(s) and (s.get("command") or s.get("url"))
+        ]
         # Start every server concurrently with an isolated per-server deadline so
         # a slow/cold (npx/uvx) or broken server cannot stall the others. Tool
         # naming/formatting happens afterwards, sequentially in config order, so
@@ -670,7 +686,7 @@ class MCPManager:
         return {"server": server_name, "tools": len(tools), "error": err, "running": running}
 
     def active_server_count(self, servers: Optional[List[Dict[str, Any]]] = None) -> int:
-        """Count enabled stdio servers that finished loading tools without error.
+        """Count enabled servers that finished loading tools without error.
 
         Pending/errored servers don't count, so while loading the footer flips
         to the spinner until the first warmup delivers tools.
@@ -679,8 +695,6 @@ class MCPManager:
             servers = self.load_servers()
         count = 0
         for s in servers:
-            if s.get("url") and not s.get("command"):
-                continue
             if not self.server_enabled(s):
                 continue
             st = self.get_server_status(s.get("name", ""))
@@ -836,6 +850,98 @@ class MCPManager:
         client, o_name = self._resolve_target_client_and_tool(tool_name, active_tools, target_server=target_server)
         if client and o_name:
             return await client.call_tool_async(o_name, arguments, timeout=timeout)
+        return None
+
+    async def get_active_resources_async(self, timeout: float = 15.0) -> List[Dict[str, Any]]:
+        """Returns all resources discovered across enabled MCP servers."""
+        resources: List[Dict[str, Any]] = []
+        servers = await self.load_servers_async()
+        for s in servers:
+            if not self.server_enabled(s):
+                continue
+            name = s["name"]
+            await self._load_server_tools_async(s, timeout=timeout)
+            client = self.clients.get(name)
+            if client and hasattr(client, "resources"):
+                for r in client.resources:
+                    r_copy = dict(r)
+                    r_copy["_mcp_server"] = name
+                    resources.append(r_copy)
+        return resources
+
+    async def read_resource_async(
+        self, uri: str, server_name: Optional[str] = None, timeout: float = DEFAULT_MCP_CALL_TIMEOUT
+    ) -> Optional[Dict[str, Any]]:
+        """Reads an MCP resource by URI across enabled servers or from a target server."""
+        if server_name and server_name in self.clients:
+            client = self.clients[server_name]
+            if hasattr(client, "read_resource_async"):
+                return await client.read_resource_async(uri, timeout=timeout)
+
+        active_resources = await self.get_active_resources_async(timeout=timeout)
+        for r in active_resources:
+            if r.get("uri") == uri:
+                s_name = r.get("_mcp_server")
+                client = self.clients.get(s_name)
+                if client and hasattr(client, "read_resource_async"):
+                    return await client.read_resource_async(uri, timeout=timeout)
+
+        for client in self.clients.values():
+            if hasattr(client, "read_resource_async"):
+                try:
+                    res = await client.read_resource_async(uri, timeout=timeout)
+                    if res:
+                        return res
+                except Exception:
+                    pass
+        return None
+
+    async def get_active_prompts_async(self, timeout: float = 15.0) -> List[Dict[str, Any]]:
+        """Returns all prompts discovered across enabled MCP servers."""
+        prompts: List[Dict[str, Any]] = []
+        servers = await self.load_servers_async()
+        for s in servers:
+            if not self.server_enabled(s):
+                continue
+            name = s["name"]
+            await self._load_server_tools_async(s, timeout=timeout)
+            client = self.clients.get(name)
+            if client and hasattr(client, "prompts"):
+                for p in client.prompts:
+                    p_copy = dict(p)
+                    p_copy["_mcp_server"] = name
+                    prompts.append(p_copy)
+        return prompts
+
+    async def get_prompt_async(
+        self,
+        name: str,
+        arguments: Optional[Dict[str, str]] = None,
+        server_name: Optional[str] = None,
+        timeout: float = DEFAULT_MCP_CALL_TIMEOUT,
+    ) -> Optional[Dict[str, Any]]:
+        """Gets prompt messages by prompt name."""
+        if server_name and server_name in self.clients:
+            client = self.clients[server_name]
+            if hasattr(client, "get_prompt_async"):
+                return await client.get_prompt_async(name, arguments=arguments, timeout=timeout)
+
+        active_prompts = await self.get_active_prompts_async(timeout=timeout)
+        for p in active_prompts:
+            if p.get("name") == name:
+                s_name = p.get("_mcp_server")
+                client = self.clients.get(s_name)
+                if client and hasattr(client, "get_prompt_async"):
+                    return await client.get_prompt_async(name, arguments=arguments, timeout=timeout)
+
+        for client in self.clients.values():
+            if hasattr(client, "get_prompt_async"):
+                try:
+                    res = await client.get_prompt_async(name, arguments=arguments, timeout=timeout)
+                    if res:
+                        return res
+                except Exception:
+                    pass
         return None
 
     def get_system_prompt_snippet(self) -> str:
