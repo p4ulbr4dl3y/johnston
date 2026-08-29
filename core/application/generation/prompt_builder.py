@@ -14,7 +14,16 @@ from core.domain.defaults.prompts import (
     SUBAGENT_WORKTREE_PROMPT,
 )
 
-INSTRUCTION_FILES = ["AGENTS.md", "CLAUDE.md", ".cursorrules", ".windsurfrules", "CONVENTIONS.md"]
+INSTRUCTION_FILES = [
+    "AGENTS.md",
+    "AGENT.md",
+    "CLAUDE.md",
+    ".cursorrules",
+    ".windsurfrules",
+    ".clinerules",
+    "CONVENTIONS.md",
+    os.path.join(".github", "copilot-instructions.md"),
+]
 
 __all__ = [
     "DEFAULT_SYSTEM_PROMPT",
@@ -112,6 +121,23 @@ def _compute_git_info(cwd: str = None) -> str:
     return format_git_branch_info(cwd=cwd)
 
 
+def _scan_cursor_rules_files(cwd: str) -> List[Tuple[str, str]]:
+    """Scan .cursor/rules directory for .md and .mdc files; returns [(rel_path, abs_path), ...]"""
+    cursor_dir = os.path.join(cwd, ".cursor", "rules")
+    if not os.path.isdir(cursor_dir):
+        return []
+    rules = []
+    try:
+        for fname in sorted(os.listdir(cursor_dir)):
+            if fname.endswith((".md", ".mdc")) and not fname.startswith("."):
+                fpath = os.path.join(cursor_dir, fname)
+                if os.path.isfile(fpath):
+                    rules.append((os.path.join(".cursor", "rules", fname), fpath))
+    except Exception:
+        pass
+    return rules
+
+
 def _project_instr_signature(cwd: str) -> tuple:
     """Cheap (name, mtime_ns, size) signature for every instruction file present.
 
@@ -127,11 +153,19 @@ def _project_instr_signature(cwd: str) -> tuple:
             positions = {e[0] for e in entries}
             if name not in positions:
                 entries.append((name, 0, 0))
+
+    for rel_name, fpath in _scan_cursor_rules_files(cwd):
+        try:
+            st = os.stat(fpath)
+            entries.append((rel_name, st.st_mtime_ns, st.st_size))
+        except OSError:
+            pass
+
     return tuple(entries)
 
 
 def get_project_instruction_rules(cwd: str = None) -> List[Any]:
-    """Reads INSTRUCTION_FILES from a working directory as RuleDefinitions.
+    """Reads INSTRUCTION_FILES and .cursor/rules from a working directory as RuleDefinitions.
 
     Cached per-directory by an mtime/size signature; files are only re-read
     when they change, so the agent loop does not re-open disk files every turn.
@@ -143,6 +177,14 @@ def get_project_instruction_rules(cwd: str = None) -> List[Any]:
         return cached[1]
 
     from core.application.rules.rules import RuleDefinition
+    from core.infrastructure.runtime.frontmatter import parse_frontmatter
+
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        max_chars = get_settings().llm.agent_md_max_chars
+    except Exception:
+        max_chars = DEFAULT_AGENT_MD_MAX_CHARS
 
     found_rules = []
     for name in INSTRUCTION_FILES:
@@ -150,18 +192,30 @@ def get_project_instruction_rules(cwd: str = None) -> List[Any]:
         if os.path.isfile(filepath):
             try:
                 with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read().strip()
-                if content:
-                    try:
-                        from core.infrastructure.config.settings import get_settings
-                        max_chars = get_settings().llm.agent_md_max_chars
-                    except Exception:
-                        max_chars = DEFAULT_AGENT_MD_MAX_CHARS
-                    if len(content) > max_chars:
-                        content = content[:max_chars] + f"\n... [Project instructions truncated at {max_chars} chars]"
-                    found_rules.append(RuleDefinition(name=name, content=content, source="project"))
+                    raw = f.read().strip()
+                if raw:
+                    _, content = parse_frontmatter(raw)
+                    content = content.strip()
+                    if content:
+                        if len(content) > max_chars:
+                            content = content[:max_chars] + f"\n... [Project instructions truncated at {max_chars} chars]"
+                        found_rules.append(RuleDefinition(name=name, content=content, source="project"))
             except Exception:
                 pass
+
+    for rel_name, filepath in _scan_cursor_rules_files(cwd):
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                raw = f.read().strip()
+            if raw:
+                _, content = parse_frontmatter(raw)
+                content = content.strip()
+                if content:
+                    if len(content) > max_chars:
+                        content = content[:max_chars] + f"\n... [Project instructions truncated at {max_chars} chars]"
+                    found_rules.append(RuleDefinition(name=rel_name, content=content, source="project"))
+        except Exception:
+            pass
 
     _cache_set(_PROJECT_INSTRUCTION_CACHE, cwd, (sig, found_rules), _PROJECT_INSTR_CACHE_MAX)
     return found_rules

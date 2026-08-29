@@ -173,6 +173,39 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertIn("DO NOT switch branches", prompt)
 
 
+    def test_build_system_prompt_all_instruction_formats(self):
+        import os
+        import tempfile
+
+        from core.application.generation.prompt_builder import get_project_instruction_rules
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # 1. .clinerules
+            with open(os.path.join(tmp, ".clinerules"), "w", encoding="utf-8") as f:
+                f.write("Cline rule content")
+
+            # 2. .github/copilot-instructions.md
+            gh_dir = os.path.join(tmp, ".github")
+            os.makedirs(gh_dir, exist_ok=True)
+            with open(os.path.join(gh_dir, "copilot-instructions.md"), "w", encoding="utf-8") as f:
+                f.write("Copilot rule content")
+
+            # 3. .cursor/rules/*.mdc
+            cur_dir = os.path.join(tmp, ".cursor", "rules")
+            os.makedirs(cur_dir, exist_ok=True)
+            with open(os.path.join(cur_dir, "frontend.mdc"), "w", encoding="utf-8") as f:
+                f.write("---\ndescription: Frontend rules\nglobs: *.tsx\n---\nCursor MDC rule content")
+
+            rules = get_project_instruction_rules(cwd=tmp)
+            rule_names = [r.name for r in rules]
+            self.assertIn(".clinerules", rule_names)
+            self.assertIn(os.path.join(".github", "copilot-instructions.md"), rule_names)
+            self.assertIn(os.path.join(".cursor", "rules", "frontend.mdc"), rule_names)
+
+            mdc_rule = next(r for r in rules if "frontend.mdc" in r.name)
+            self.assertEqual(mdc_rule.content, "Cursor MDC rule content")
+
+
 if __name__ == "__main__":
     unittest.main()
 
