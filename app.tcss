@@ -510,7 +510,7 @@ Toast.-error {
 /* Modal Dialog Styles - Pure Dark Glassmorphism Effect */
 ModalScreen {
     align: center middle;
-    background: #000000 80%;
+    background: #000000 45%;
     overflow: hidden;
     scrollbar-size: 0 0 !important;
 }
