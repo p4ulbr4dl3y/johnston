@@ -526,6 +526,11 @@ ModalScreen {
     overflow: hidden;
 }
 
+#modal-dialog.modal-dialog-compact {
+    width: 90%;
+    max-width: 56;
+}
+
 #modal-dialog.modal-dialog-medium,
 #modal-dialog.wizard-dialog {
     width: 90%;

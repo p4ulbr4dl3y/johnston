@@ -21,6 +21,7 @@ from widgets.presentation.screens.constants import (
     TAB_KEYS,
 )
 from widgets.utils.responsive import (
+    MODAL_COMPACT_MAX_WIDTH,
     MODAL_MAX_WIDTH,
     MODAL_MEDIUM_MAX_WIDTH,
     MODAL_MIN_WIDTH,
@@ -219,6 +220,8 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
                     max_w = MODAL_WIDE_MAX_WIDTH
                 elif "modal-dialog-medium" in classes or "wizard-dialog" in classes:
                     max_w = MODAL_MEDIUM_MAX_WIDTH
+                elif "modal-dialog-compact" in classes:
+                    max_w = MODAL_COMPACT_MAX_WIDTH
                 else:
                     max_w = MODAL_MAX_WIDTH
             apply_modal_fit(
@@ -347,6 +350,18 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
         idx = opt_list.highlighted
+        if idx is None and self.filtered_items:
+            for i, it in enumerate(self.filtered_items):
+                if it is not None:
+                    idx = i
+                    break
+
+        if hasattr(self, "_handle_selection"):
+            self._handle_selection(idx)
+            event.stop()
+            event.prevent_default()
+            return
+
         if idx is not None and 0 <= idx < len(self.filtered_items):
             item = self.filtered_items[idx]
             if item is not None:

@@ -6,7 +6,7 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList, Static
+from textual.widgets import Input, Label, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from core.application.session.actions import RewindEntry
@@ -64,7 +64,7 @@ def format_rewind_files(
 
 
 class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection]]):
-    """Modal rollback screen (/rewind) with 2-step selection for code vs conversation."""
+    """Modal rollback screen (/rewind) with separate action selection modal."""
 
     search_nav_option_list_id: str = MODAL_OPTION_LIST_ID
     search_nav_filtered_attr: str = "filtered_options"
@@ -81,10 +81,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         self.checkpoints_enabled = checkpoints_enabled
         self.session_id = session_id
         self.project_path = project_path
-        self.step = 1
         self.search_query = ""
-        self.selected_entry: Optional[RewindEntry] = None
-        self.selected_step1_index: Optional[int] = None
         self.filtered_entries: list[RewindEntry] = list(user_messages)
 
         options = self._format_step1_options(MODAL_WIDE_ROW_WIDTH, self.filtered_entries)
@@ -102,48 +99,52 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
         except Exception:
-            opt_list = self
+            opt_list = None
         return option_list_row_width(opt_list, MODAL_WIDE_ROW_WIDTH)
 
-    def _format_step1_options(self, target_width: int, entries: Optional[list[RewindEntry]] = None) -> list[str]:
+    def _format_step1_options(self, target_width: int, entries: list[RewindEntry]) -> list[str]:
         options = []
-        msg_list = entries if entries is not None else self.user_messages
-        for msg in msg_list:
-            text = msg.text
-            diff_stat = msg.git_stats
-            clean = " ".join(text.replace("\n", " ").replace("\r", " ").split())
-            opt_text = clean or "(empty message)"
-            if self.checkpoints_enabled:
-                badge_plain = diff_stat or "no checkpoint"
-                opt = format_badge_row(opt_text, badge_plain, target_width=target_width)
+        for m in entries:
+            clean = " ".join(m.text.replace("\n", " ").replace("\r", " ").split())
+            if not clean:
+                clean = "(empty message)"
+            clean_preview = ellipsize(clean, 60)
+            clean_escaped = escape(clean_preview)
+            badge_plain = (m.git_stats or "no checkpoint") if self.checkpoints_enabled else ""
+            if self.checkpoints_enabled and badge_plain:
+                options.append(format_badge_row(clean_escaped, badge_plain, target_width=target_width))
             else:
-                opt = escape(ellipsize(opt_text, max(10, target_width - 5)))
-            options.append(opt)
+                options.append(clean_escaped)
         return options
 
-    def _format_step2_options(self, target_width: int) -> list[str]:
-        return [
-            "Rollback conversation only [dim](keep current code)[/]",
-            "Rollback conversation & files [dim](revert code)[/]",
-            "View changes diff [dim](inspect code changes)[/]",
-        ]
-
-    def _apply_filter(self, query: str = "") -> None:
-        q = (query or "").strip().lower()
-        target_w = self._row_width()
-        self.raw_options = self._format_step1_options(target_w, self.user_messages)
-        if not q:
+    def _apply_filter(self, query: str) -> None:
+        query_clean = query.strip().lower()
+        if not query_clean:
             self.filtered_entries = list(self.user_messages)
         else:
-            tokens = q.split()
+            tokens = query_clean.split()
             self.filtered_entries = [
-                msg
-                for msg in self.user_messages
-                if all(t in f"{msg.text} {msg.git_stats}".lower() for t in tokens)
+                m for m in self.user_messages if all(t in m.text.lower() for t in tokens)
             ]
+        target_w = self._row_width()
         self.filtered_options = self._format_step1_options(target_w, self.filtered_entries)
         self.filtered_items = [m.index for m in self.filtered_entries]
+        try:
+            opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
+            opt_list.clear_options()
+            opt_list.add_options(self.filtered_options)
+            if self.filtered_options:
+                opt_list.highlighted = len(self.filtered_options) - 1
+                opt_list.scroll_to_highlight()
+            else:
+                opt_list.highlighted = None
+        except Exception:
+            pass
 
+    def _refresh_options(self) -> None:
+        target_w = self._row_width()
+        self.raw_options = self._format_step1_options(target_w, self.user_messages)
+        self.filtered_options = self._format_step1_options(target_w, self.filtered_entries)
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
             saved_idx = opt_list.highlighted
@@ -153,41 +154,15 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
                 opt_list.highlighted = saved_idx
             elif self.filtered_options:
                 opt_list.highlighted = len(self.filtered_options) - 1
-            else:
-                opt_list.highlighted = None
-            if opt_list.highlighted is not None:
-                try:
-                    opt_list.scroll_to_highlight()
-                except Exception:
-                    pass
         except Exception:
             pass
-
-    def _refresh_options(self) -> None:
-        target_w = self._row_width()
-        if self.step == 1:
-            self._apply_filter(self.search_query)
-        else:
-            self.filtered_options = self._format_step2_options(target_w)
-            try:
-                opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
-                saved_idx = opt_list.highlighted
-                opt_list.clear_options()
-                opt_list.add_options(self.filtered_options)
-                if saved_idx is not None and 0 <= saved_idx < len(self.filtered_options):
-                    opt_list.highlighted = saved_idx
-            except Exception:
-                pass
 
         try:
             from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
 
             screen_w = resolve_screen_width(self)
             hint_lbl = self.query_one(MODAL_HINT, Label)
-            if self.step == 1:
-                h_text = "enter • ↑↓ • esc" if screen_w < BREAKPOINT_HINT else self.hint_text
-            else:
-                h_text = "enter • ↑↓ • esc: back" if screen_w < BREAKPOINT_HINT else "enter: select • ↑↓: nav • esc: back to messages"
+            h_text = "enter • ↑↓ • esc" if screen_w < BREAKPOINT_HINT else self.hint_text
             hint_lbl.update(h_text)
         except Exception:
             pass
@@ -196,15 +171,10 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
             yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
-            yield Static("", id="rewind-files", classes=MODAL_MARKDOWN, markup=False)
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             yield Label(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
-        try:
-            self.query_one("#rewind-files", Static).display = False
-        except Exception:
-            pass
         self._refresh_options()
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
@@ -229,155 +199,30 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
                 pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        if self.step == 1:
-            self.search_query = event.value
-            self._apply_filter(event.value)
+        self.search_query = event.value
+        self._apply_filter(event.value)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        if self.step == 1:
-            opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
-            idx = opt_list.highlighted
-            if idx is not None and 0 <= idx < len(self.filtered_entries):
-                self.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option(""), idx))
-            elif self.filtered_entries:
-                self.on_option_list_option_selected(
-                    OptionList.OptionSelected(opt_list, Option(""), len(self.filtered_entries) - 1)
-                )
+        opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
+        idx = opt_list.highlighted
+        if idx is not None and 0 <= idx < len(self.filtered_entries):
+            self.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option(""), idx))
+        elif self.filtered_entries:
+            self.on_option_list_option_selected(
+                OptionList.OptionSelected(opt_list, Option(""), len(self.filtered_entries) - 1)
+            )
 
     def _on_key(self, event: events.Key) -> None:
-        if self.step == 1:
-            if event.key in TAB_KEYS:
-                event.prevent_default()
-                event.stop()
-                return
-            if self._handle_search_navigation(event):
-                return
-
-    def _update_step2_display(self) -> None:
-        if self.step != 2 or not self.selected_entry:
+        if event.key in TAB_KEYS:
+            event.prevent_default()
+            event.stop()
             return
-        clean = " ".join(self.selected_entry.text.replace("\n", " ").replace("\r", " ").split())
-        target_w = self._row_width()
-        clean_preview = ellipsize(clean, max(12, target_w - 12)) if clean else "(empty message)"
-
-        try:
-            md = self.query_one(f".{MODAL_MARKDOWN}", Markdown)
-            md.update(f"### **Rollback: {clean_preview}**")
-        except Exception:
-            pass
-
-        try:
-            files_widget = self.query_one("#rewind-files", Static)
-            if self.selected_entry.changed_files:
-                files_widget.update(
-                    format_rewind_files(
-                        self.selected_entry.changed_files,
-                        self.selected_entry.git_stats,
-                        max_width=target_w,
-                    )
-                )
-                files_widget.display = True
-            else:
-                files_widget.display = False
-        except Exception:
-            pass
+        if self._handle_search_navigation(event):
+            return
+        super()._on_key(event)
 
     def on_resize(self, event: events.Resize) -> None:
         self._refresh_options()
-        self._update_step2_display()
-
-    def _show_step_2(self, entry: RewindEntry) -> None:
-        self.step = 2
-        self.selected_entry = entry
-        self.filtered_items = ["conversation", "both", "diff"]
-        try:
-            self.query_one(MODAL_SEARCH_INPUT, Input).display = False
-        except Exception:
-            pass
-        self._refresh_options()
-        self._update_step2_display()
-        try:
-            opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
-            opt_list.highlighted = 0
-            opt_list.focus()
-        except Exception:
-            pass
-
-    def _open_diff_viewer(self, entry: RewindEntry) -> None:
-        from core.domain.ports.checkpoint import get_checkpoint_manager
-        from widgets.presentation.screens.diff import DiffScreen
-
-        seq_idx = 0
-        for i, m in enumerate(self.user_messages):
-            if m.index == entry.index:
-                seq_idx = i
-                break
-
-        diff_items = []
-        if self.session_id:
-            try:
-                cm = get_checkpoint_manager()
-                if cm:
-                    diff_items = cm.get_checkpoint_diff(
-                        self.session_id,
-                        seq_idx,
-                        project_path=self.project_path,
-                        scoped_files=entry.changed_files if entry.changed_files else None,
-                    )
-            except Exception:
-                diff_items = []
-
-        clean = " ".join(entry.text.replace("\n", " ").replace("\r", " ").split())
-        clean_preview = ellipsize(clean, 60) if clean else "(empty message)"
-
-        try:
-            app = self.app
-        except Exception:
-            app = None
-
-        if app:
-            app.push_screen(DiffScreen(diff_items, title=f"Rollback: {clean_preview}", from_rewind=True))
-
-    def _show_step_1(self) -> None:
-        self.step = 1
-        self.selected_entry = None
-
-        try:
-            md = self.query_one(f".{MODAL_MARKDOWN}", Markdown)
-            md.update(self.title)
-        except Exception:
-            pass
-
-        try:
-            files_widget = self.query_one("#rewind-files", Static)
-            files_widget.display = False
-        except Exception:
-            pass
-
-        try:
-            search_inp = self.query_one(MODAL_SEARCH_INPUT, Input)
-            search_inp.display = True
-            search_inp.focus()
-        except Exception:
-            pass
-
-        self._refresh_options()
-        try:
-            opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
-            if self.selected_step1_index is not None and 0 <= self.selected_step1_index < len(self.filtered_options):
-                opt_list.highlighted = self.selected_step1_index
-            elif self.filtered_options:
-                opt_list.highlighted = len(self.filtered_options) - 1
-            if opt_list.highlighted is not None:
-                opt_list.scroll_to_highlight()
-        except Exception:
-            pass
-
-        try:
-            hint = self.query_one(MODAL_HINT, Label)
-            hint.update(self.hint_text)
-        except Exception:
-            pass
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         idx = event.option_index
@@ -385,34 +230,43 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             event.stop()
             return
 
-        if self.step == 1:
-            self.selected_step1_index = idx
-            if 0 <= idx < len(self.filtered_entries):
-                selected_entry = self.filtered_entries[idx]
-                has_changes = bool(
-                    self.checkpoints_enabled
-                    and selected_entry.git_stats
-                    and selected_entry.git_stats not in ("no changes", "no checkpoint")
+        if 0 <= idx < len(self.filtered_entries):
+            selected_entry = self.filtered_entries[idx]
+            has_changes = bool(
+                self.checkpoints_enabled
+                and selected_entry.git_stats
+                and selected_entry.git_stats not in ("no changes", "no checkpoint")
+            )
+            if not has_changes:
+                self.dismiss(RewindSelection(index=selected_entry.index, restore_code=False))
+                return
+
+            try:
+                app = self.app
+            except Exception:
+                app = getattr(self, "_app", None)
+            if app:
+                from widgets.presentation.screens.rewind_action import RewindActionScreen
+
+                def on_action_done(sel: RewindSelection | None) -> None:
+                    if sel is not None:
+                        self.dismiss(sel)
+                    else:
+                        try:
+                            self.query_one(MODAL_SEARCH_INPUT, Input).focus()
+                        except Exception:
+                            pass
+
+                app.push_screen(
+                    RewindActionScreen(
+                        selected_entry,
+                        session_id=self.session_id,
+                        project_path=self.project_path,
+                        user_messages=self.user_messages,
+                    ),
+                    callback=on_action_done,
                 )
-                if not has_changes:
-                    self.dismiss(RewindSelection(index=selected_entry.index, restore_code=False))
-                    return
-                self._show_step_2(selected_entry)
-            event.stop()
-            return
-        elif self.step == 2:
-            action = self.filtered_items[idx]
-            if action == "both" and self.selected_entry is not None:
-                self.dismiss(RewindSelection(index=self.selected_entry.index, restore_code=True))
-            elif action == "conversation" and self.selected_entry is not None:
-                self.dismiss(RewindSelection(index=self.selected_entry.index, restore_code=False))
-            elif action == "diff" and self.selected_entry is not None:
-                self._open_diff_viewer(self.selected_entry)
-            event.stop()
-            return
+        event.stop()
 
     def action_cancel(self) -> None:
-        if self.step == 2:
-            self._show_step_1()
-        else:
-            self.dismiss(None)
+        self.dismiss(None)

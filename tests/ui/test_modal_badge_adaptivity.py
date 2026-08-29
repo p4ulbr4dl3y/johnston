@@ -96,18 +96,19 @@ class TestRewindScreenAdaptivity(unittest.TestCase):
         screen.on_resize(MagicMock(spec=events.Resize))
         screen._refresh_options.assert_called_once()
 
-        # Step 2 formats options with badge row
-        screen2 = RewindScreen(self.messages, checkpoints_enabled=True)
-        screen2.step = 2
-        screen2.filtered_items = ["conversation", "both", "diff"]
-        opt_list = MagicMock()
-        opt_list.size.width = 50
-        opt_list.highlighted = 0
-        screen2.query_one = MagicMock(return_value=opt_list)
-        screen2._refresh_options()
-        self.assertEqual(len(screen2.filtered_options), 3)
-        self.assertIn("keep current code", screen2.filtered_options[0])
-        self.assertIn("revert code", screen2.filtered_options[1])
+        # RewindActionScreen formats options with badge row
+        from widgets.presentation.screens.rewind_action import RewindActionScreen
+
+        action_screen = RewindActionScreen(self.messages[0])
+        action_screen._apply_dialog_fit = MagicMock()
+        action_screen._update_files_display = MagicMock()
+
+        action_screen.on_resize(MagicMock(spec=events.Resize))
+        action_screen._apply_dialog_fit.assert_called_once()
+        action_screen._update_files_display.assert_called_once()
+        self.assertEqual(len(action_screen.options), 3)
+        self.assertIn("keep current code", action_screen.options[0])
+        self.assertIn("restore code", action_screen.options[1])
 
 
 class TestTasksScreenAdaptivity(unittest.TestCase):

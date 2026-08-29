@@ -419,63 +419,58 @@ class TestProvidersScreen(unittest.TestCase):
         event.stop.assert_called_once()
 
     def test_step_transitions_and_esc_back(self):
+        from widgets.presentation.screens.api_key import ApiKeyScreen
+
         providers = {"p1": {"key": "p1", "name": "P1"}}
         s = ProvidersScreen(providers=providers, active_key="", configured_keys={"p1": "secret-key"})
         dismissed = []
         s.dismiss = lambda val: dismissed.append(val)
 
-        # Mock widgets
-        mock_widgets = {
-            "#providers-markdown": MagicMock(),
-            "#modal-search-input": MagicMock(),
-            f"#{s.option_list_id}": MagicMock(),
-            "#providers-key-input": MagicMock(),
-            "#modal-hint": MagicMock(),
-        }
-        s.query_one = lambda selector, *args: mock_widgets.get(selector, MagicMock())
+        mock_app = MagicMock()
+        with patch.object(ProvidersScreen, "app", new=mock_app):
+            # Select AUTH option -> pushes ApiKeyScreen
+            mock_ev = MagicMock()
+            mock_ev.option_index = 0
+            s.on_option_list_option_selected(mock_ev)
+            mock_app.push_screen.assert_called_once()
 
-        # Select AUTH option in step 1 -> transitions to step 2
-        mock_ev = MagicMock()
-        mock_ev.option_index = 0
-        s.on_option_list_option_selected(mock_ev)
-        self.assertEqual(s.step, 2)
-        self.assertEqual(s.selected_key, "p1")
-        self.assertEqual(mock_widgets["#providers-key-input"].placeholder, "secr...-key")
-        self.assertEqual(mock_widgets["#providers-key-input"].value, "")
-        mock_widgets["#providers-key-input"].display = True
+            args, kwargs = mock_app.push_screen.call_args
+            key_screen = args[0]
+            cb = kwargs.get("callback")
+            self.assertIsInstance(key_screen, ApiKeyScreen)
+            self.assertEqual(key_screen.provider_name, "P1")
+            self.assertEqual(key_screen.current_key, "secret-key")
 
-        # Esc in step 2 -> returns to step 1
-        esc_ev = MagicMock(key="escape")
-        s._on_key(esc_ev)
-        self.assertEqual(s.step, 1)
-        # Action cancel on step 2 -> returns to step 1
-        s.step = 2
+            # Callback with key dismisses ProvidersScreen
+            cb("new-key")
+            self.assertEqual(dismissed, [("p1", "new-key")])
+
+        # Action cancel dismisses None
         s.action_cancel()
-        self.assertEqual(s.step, 1)
+        self.assertEqual(dismissed, [("p1", "new-key"), None])
 
-        # Action cancel on step 1 -> dismisses None
-        s.action_cancel()
-        self.assertEqual(dismissed, [None])
+    def test_api_key_screen_input_submission(self):
+        from widgets.presentation.screens.api_key import ApiKeyScreen
 
-    def test_input_submitted_step_2_dismisses_tuple(self):
-        providers = {"p1": {"key": "p1", "name": "P1"}}
-        s = ProvidersScreen(providers=providers, active_key="p1", configured_keys={"p1": "existing-key"})
+        s = ApiKeyScreen(provider_name="P1", current_key="existing-key", provider_key="p1")
         dismissed = []
         s.dismiss = lambda val: dismissed.append(val)
-        s._show_step_2("p1")
 
         submit_ev = MagicMock()
-        submit_ev.input.id = "providers-key-input"
         submit_ev.value = "my-new-key"
         s.on_input_submitted(submit_ev)
-
-        self.assertEqual(dismissed, [("p1", "my-new-key")])
+        self.assertEqual(dismissed, ["my-new-key"])
 
         # Test empty input keeps existing key
         dismissed.clear()
         submit_ev.value = ""
         s.on_input_submitted(submit_ev)
-        self.assertEqual(dismissed, [("p1", "existing-key")])
+        self.assertEqual(dismissed, ["existing-key"])
+
+        # Cancel dismisses None
+        dismissed.clear()
+        s.action_cancel()
+        self.assertEqual(dismissed, [None])
 
 
 class TestProvidersEdge(unittest.TestCase):

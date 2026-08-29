@@ -13,6 +13,7 @@ with Textual's default ``padding: 0 1``, so 2 columns are subtracted):
   - option padding 2x1 = 70.
 - diff sidebar: CSS width 34 - border-right 1 - option padding 2x1 = 31.
 """
+import time
 from typing import Any
 
 from rich.cells import cell_len
@@ -23,6 +24,35 @@ MODAL_WIDE_ROW_WIDTH = 96
 MODAL_MEDIUM_ROW_WIDTH = 78
 MODAL_DEFAULT_ROW_WIDTH = 70
 DIFF_SIDEBAR_ROW_WIDTH = 31
+
+
+def format_relative_time(ts: float | int | None, now: float | int | None = None) -> str:
+    """Format timestamp as concise relative time ('just now', '5m ago', '2h ago', '3d ago', etc.)."""
+    if ts is None:
+        return ""
+    try:
+        ts_float = float(ts)
+    except (ValueError, TypeError):
+        return ""
+    if ts_float <= 0:
+        return ""
+
+    cur = float(now) if now is not None else time.time()
+    diff = int(cur - ts_float)
+    if diff < 60:
+        return "just now"
+    if diff < 3600:
+        return f"{diff // 60}m ago"
+    if diff < 86400:
+        return f"{diff // 3600}h ago"
+    if diff < 604800:
+        return f"{diff // 86400}d ago"
+    if diff < 2592000:
+        return f"{diff // 604800}w ago"
+    if diff < 31536000:
+        return f"{diff // 2592000}mo ago"
+    return f"{diff // 31536000}y ago"
+
 
 
 def option_list_row_width(opt_list: Any, default: int) -> int:

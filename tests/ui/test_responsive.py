@@ -22,6 +22,7 @@ from widgets.utils.responsive import (
     BREAKPOINT_COMPACT,
     BREAKPOINT_HINT,
     DEFAULT_TERMINAL_WIDTH,
+    MODAL_COMPACT_MAX_WIDTH,
     MODAL_CONTENT_GUTTER,
     MODAL_MAX_WIDTH,
     MODAL_MIN_WIDTH,
@@ -434,8 +435,13 @@ class _ModalHostApp(App[None]):
         super().__init__()
         self.screen_to_test = screen_to_test
 
+    def get_theme_variable_defaults(self) -> dict[str, str]:
+        from core.domain.defaults.themes import ZINC_DARK
+        return dict(ZINC_DARK.tcss_vars)
+
     def on_mount(self) -> None:
         self.push_screen(self.screen_to_test)
+
 
 
 class TestModalFitPilot:
@@ -458,8 +464,15 @@ class TestModalFitPilot:
 
     async def test_session_conflict_hugs_content(self):
         width = await self._dialog_width(SessionConflictScreen("sess-1"), (120, 40))
-        assert width == 78
+        assert width == MODAL_MIN_WIDTH == 44
 
     async def test_session_conflict_respects_ratio_cap_on_narrow_terminal(self):
         width = await self._dialog_width(SessionConflictScreen("sess-1"), (46, 20))
         assert 0 < width <= int(46 * MODAL_WIDTH_RATIO)
+
+    async def test_confirm_screen_compact_width(self):
+        from widgets.presentation.screens.confirm import ConfirmScreen
+
+        width = await self._dialog_width(ConfirmScreen(title="Delete", message="Sure?"), (120, 40))
+        assert width == MODAL_COMPACT_MAX_WIDTH == 56
+

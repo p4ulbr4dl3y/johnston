@@ -1,5 +1,5 @@
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
-from widgets.utils.responsive import MODAL_WIDE_MAX_WIDTH
+from widgets.utils.responsive import MODAL_COMPACT_MAX_WIDTH, MODAL_MIN_WIDTH
 
 
 class SessionConflictScreen(BaseSelectionScreen[str]):
@@ -9,8 +9,8 @@ class SessionConflictScreen(BaseSelectionScreen[str]):
         self,
         session_id: str,
         session_title: str = "",
-        min_dialog_width: int = 78,
-        dialog_classes: str = "modal-dialog-wide",
+        min_dialog_width: int = MODAL_MIN_WIDTH,
+        dialog_classes: str = "modal-dialog-compact",
     ):
         self.session_id = session_id
         self.session_title = session_title
@@ -30,5 +30,5 @@ class SessionConflictScreen(BaseSelectionScreen[str]):
             dialog_classes=dialog_classes,
             fit_content=True,
             min_dialog_width=min_dialog_width,
-            max_dialog_width=MODAL_WIDE_MAX_WIDTH,
+            max_dialog_width=MODAL_COMPACT_MAX_WIDTH,
         )

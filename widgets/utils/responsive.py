@@ -39,6 +39,7 @@ DEFAULT_TERMINAL_WIDTH = 80
 # Modal dialog geometry: dialogs hug their content between a floor and a cap,
 # and never claim more than MODAL_WIDTH_RATIO of the terminal width.
 MODAL_MIN_WIDTH = 44
+MODAL_COMPACT_MAX_WIDTH = 56
 MODAL_MAX_WIDTH = 78
 MODAL_MEDIUM_MAX_WIDTH = 86
 MODAL_WIDE_MAX_WIDTH = 104

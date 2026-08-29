@@ -17,6 +17,7 @@ from widgets.utils.row_format import (
     display_width,
     ellipsize,
     format_badge_row,
+    format_relative_time,
     option_list_row_width,
 )
 
@@ -178,6 +179,51 @@ class TestOptionListRowWidth(unittest.TestCase):
         self.assertEqual(option_list_row_width(widget, default=50), 50)
 
 
+class TestFormatRelativeTime(unittest.TestCase):
+    def test_none_or_invalid(self):
+        self.assertEqual(format_relative_time(None), "")
+        self.assertEqual(format_relative_time(0), "")
+        self.assertEqual(format_relative_time(-100), "")
+        self.assertEqual(format_relative_time("invalid"), "")
+
+    def test_just_now(self):
+        now = 1000.0
+        self.assertEqual(format_relative_time(1000.0, now=now), "just now")
+        self.assertEqual(format_relative_time(950.0, now=now), "just now")
+        self.assertEqual(format_relative_time(1010.0, now=now), "just now")
+
+    def test_minutes(self):
+        now = 10000.0
+        self.assertEqual(format_relative_time(now - 60, now=now), "1m ago")
+        self.assertEqual(format_relative_time(now - 3599, now=now), "59m ago")
+
+    def test_hours(self):
+        now = 100000.0
+        self.assertEqual(format_relative_time(now - 3600, now=now), "1h ago")
+        self.assertEqual(format_relative_time(now - 86399, now=now), "23h ago")
+
+    def test_days(self):
+        now = 1000000.0
+        self.assertEqual(format_relative_time(now - 86400, now=now), "1d ago")
+        self.assertEqual(format_relative_time(now - 86400 * 6, now=now), "6d ago")
+
+    def test_weeks(self):
+        now = 10000000.0
+        self.assertEqual(format_relative_time(now - 86400 * 7, now=now), "1w ago")
+        self.assertEqual(format_relative_time(now - 86400 * 25, now=now), "3w ago")
+
+    def test_months(self):
+        now = 100000000.0
+        self.assertEqual(format_relative_time(now - 86400 * 30, now=now), "1mo ago")
+        self.assertEqual(format_relative_time(now - 86400 * 300, now=now), "10mo ago")
+
+    def test_years(self):
+        now = 1000000000.0
+        self.assertEqual(format_relative_time(now - 86400 * 365, now=now), "1y ago")
+        self.assertEqual(format_relative_time(now - 86400 * 365 * 3, now=now), "3y ago")
+
+
 if __name__ == "__main__":
     unittest.main()
+
 

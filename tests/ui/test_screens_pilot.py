@@ -80,14 +80,25 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_providers_screen_pilot(self):
+        from widgets.presentation.screens.api_key import ApiKeyScreen
+
         providers = {"opencode": {"key": "opencode", "name": "OpenCode"}, "openai": {"key": "openai", "name": "OpenAI"}}
         screen = ProvidersScreen(providers=providers, active_key="opencode", configured_keys={})
         app = DummyHostApp(screen)
 
         async with app.run_test() as pilot:
             await pilot.pause()
-            await pilot.press("escape")
+            # Press enter on search input / active item -> pushes ApiKeyScreen
+            await pilot.press("enter")
             await pilot.pause()
+
+            self.assertIsInstance(app.screen, ApiKeyScreen)
+            # Type API key in ApiKeyScreen
+            await pilot.press("s", "e", "c", "r", "e", "t")
+            await pilot.press("enter")
+            await pilot.pause()
+
+            self.assertEqual(app.dismiss_result, ("opencode", "secret"))
 
     async def test_subagents_screen_empty_pilot(self):
         screen = SubagentsScreen()

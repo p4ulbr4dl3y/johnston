@@ -2,20 +2,15 @@ import os
 from typing import Any
 
 from textual import events
-from textual.app import ComposeResult
-from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList
+from textual.widgets import Input, OptionList
 
 from core.infrastructure.platform.paths import CONFIG_DIR
 from core.infrastructure.platform.platform_utils import cached_json_read
 from core.models_catalog import catalog
+from widgets.presentation.screens.api_key import ApiKeyScreen
 from widgets.presentation.screens.base_modal import status_tag
-from widgets.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
+from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.constants import (
-    MODAL_DIALOG_ID,
-    MODAL_HINT_ID,
-    MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
     MODAL_OPTION_LIST,
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
@@ -25,7 +20,15 @@ from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, o
 
 
 class ProvidersScreen(BaseSelectionScreen[Any]):
-    """Modal provider selection screen for /providers command with in-place API key step."""
+    """Modal provider selection screen for /providers command with separate ApiKeyScreen modal."""
+
+    BINDINGS = expand_bindings([
+        ("escape", "cancel", "Cancel"),
+        ("tab", "toggle_disabled", "Toggle Disabled"),
+        ("ctrl+t", "toggle_disabled", "Toggle Disabled"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(
         self, providers: dict, active_key: str, configured_keys: dict, disabled_providers: list = None, pm=None
@@ -35,9 +38,6 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
         self.configured_keys = configured_keys
         self.disabled_set = set(disabled_providers or [])
         self.pm = pm
-        self.step = 1
-        self.selected_key: str | None = None
-        self.selected_step1_index: int | None = None
 
         options, items = self._build_options()
         super().__init__(
@@ -115,21 +115,8 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             items.append(key)
         return options, items
 
-    def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID, classes=self.dialog_classes or None):
-            yield Markdown(self.title, id="providers-markdown", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
-            if self.show_search:
-                yield Input(placeholder=self.search_placeholder, id=MODAL_SEARCH_INPUT_ID)
-            yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
-            yield Input(placeholder="API Key...", password=True, id="providers-key-input")
-            yield Label(self.hint_text, id=MODAL_HINT_ID)
-
     def on_mount(self) -> None:
         super().on_mount()
-        try:
-            self.query_one("#providers-key-input", Input).display = False
-        except Exception:
-            pass
         self.raw_options, self.raw_items = self._build_options()
         search_val = ""
         if self.show_search:
@@ -152,162 +139,44 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
                 pass
         self._filter_options(search_val)
 
-
-    BINDINGS = expand_bindings([
-        ("escape", "cancel", "Cancel"),
-        ("tab", "toggle_disabled", "Toggle Disabled"),
-        ("ctrl+t", "toggle_disabled", "Toggle Disabled"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
-    ])
-
-    def _show_step_2(self, pkey: str) -> None:
-        self.step = 2
-        self.selected_key = pkey
-        p_info = self.providers.get(pkey, {})
-        p_name = (p_info.get("name") or pkey) if isinstance(p_info, dict) else pkey
-        curr_key = self.configured_keys.get(pkey) or (self.pm.get_api_key(pkey) if self.pm else "")
-
-        try:
-            md = self.query_one("#providers-markdown", Markdown)
-            md.update(f"### **Connect {p_name}**")
-        except Exception:
-            pass
-
-        if self.show_search:
-            try:
-                self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input).display = False
-            except Exception:
-                pass
-
-        try:
-            self.query_one(f"#{self.option_list_id}", OptionList).display = False
-        except Exception:
-            pass
-
-        if curr_key:
-            if len(curr_key) > 8:
-                masked = f"{curr_key[:4]}...{curr_key[-4:]}"
-            else:
-                masked = curr_key
-            placeholder = masked
-        else:
-            placeholder = "API Key..."
-
-        try:
-            key_inp = self.query_one("#providers-key-input", Input)
-            key_inp.placeholder = placeholder
-            key_inp.value = ""
-            key_inp.display = True
-            key_inp.focus()
-            self.clear_selection()
-        except Exception:
-            pass
-
-        try:
-            hint_lbl = self.query_one(f"#{MODAL_HINT_ID}", Label)
-            hint_lbl.update("enter: save • esc: back")
-        except Exception:
-            pass
-
-    def _show_step_1(self) -> None:
-        self.step = 1
-        self.selected_key = None
-        try:
-            self.clear_selection()
-        except Exception:
-            pass
-
-        try:
-            md = self.query_one("#providers-markdown", Markdown)
-            md.update(self.title)
-        except Exception:
-            pass
-
-        if self.show_search:
-            try:
-                self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input).display = True
-            except Exception:
-                pass
-
-        try:
-            opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
-            opt_list.display = True
-        except Exception:
-            pass
-
-        try:
-            self.query_one("#providers-key-input", Input).display = False
-        except Exception:
-            pass
-
-        try:
-            hint_lbl = self.query_one(f"#{MODAL_HINT_ID}", Label)
-            hint_lbl.update(self.hint_text)
-        except Exception:
-            pass
-
-        try:
-            opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
-            if self.selected_step1_index is not None and 0 <= self.selected_step1_index < len(self.filtered_items):
-                opt_list.highlighted = self.selected_step1_index
-            if self.show_search:
-                s_inp = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
-                s_inp.focus()
-                try:
-                    from textual.widgets._input import Selection
-
-                    s_inp.selection = Selection(0, len(s_inp.value))
-                except Exception:
-                    pass
-            else:
-                opt_list.focus()
-        except Exception:
-            pass
-
     def _handle_selection(self, idx: int | None) -> None:
         if idx is None or idx < 0 or idx >= len(self.filtered_items):
             return
-        if self.step == 1:
-            item = self.filtered_items[idx]
-            if item is not None:
-                self.selected_step1_index = idx
-                self._show_step_2(item)
+        item = self.filtered_items[idx]
+        if item is None:
+            return
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "providers-key-input":
-            event.stop()
-            event.prevent_default()
-            key_val = event.value.strip()
-            curr_key = (
-                self.configured_keys.get(self.selected_key or "")
-                or (self.pm.get_api_key(self.selected_key) if self.pm and self.selected_key else "")
+        p_info = self.providers.get(item, {})
+        p_name = (p_info.get("name") or item) if isinstance(p_info, dict) else item
+        curr_key = self.configured_keys.get(item) or (self.pm.get_api_key(item) if self.pm else "")
+
+        try:
+            app = self.app
+        except Exception:
+            app = getattr(self, "_app", None)
+
+        if app:
+            def on_key_entered(entered_key: str | None) -> None:
+                if entered_key is not None:
+                    self.dismiss((item, entered_key))
+                else:
+                    try:
+                        if self.show_search:
+                            self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input).focus()
+                        else:
+                            self.query_one(f"#{self.option_list_id}", OptionList).focus()
+                    except Exception:
+                        pass
+
+            app.push_screen(
+                ApiKeyScreen(provider_name=p_name, current_key=curr_key, provider_key=item),
+                callback=on_key_entered,
             )
-            final_key = key_val if key_val else curr_key
-            self.dismiss((self.selected_key, final_key))
-            return
-
-        if self.step == 1 and event.input.id == MODAL_SEARCH_INPUT_ID:
-            event.stop()
-            event.prevent_default()
-            opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
-            idx = opt_list.highlighted
-            if idx is None and self.filtered_items:
-                idx = 0
-            self._handle_selection(idx)
-            return
-
-        super().on_input_submitted(event)
 
     def action_cancel(self) -> None:
-        if self.step == 2:
-            self._show_step_1()
-        else:
-            self.dismiss(None)
+        self.dismiss(None)
 
     def action_toggle_disabled(self) -> None:
-        if self.step != 1:
-            return
         opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
         idx = opt_list.highlighted
         if idx is None and self.filtered_items:
@@ -324,9 +193,6 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
                     self.disabled_set.add(pkey)
                     if self.pm:
                         self.pm.set_provider_disabled(pkey, True)
-                        # Disabling the active provider would otherwise leave the
-                        # current agent running on a provider that is now OFF.
-                        # Recreate it so the app falls back to an enabled provider.
                         if was_active and self.pm.get_active_provider_key() == pkey:
                             app = getattr(self, "app", None)
                             if app is not None:
@@ -349,19 +215,6 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
                         pass
 
     def _on_key(self, event: events.Key) -> None:
-        if self.step == 2:
-            if event.key == "escape":
-                self._show_step_1()
-                event.prevent_default()
-                event.stop()
-                return
-            if event.key in TAB_KEYS:
-                event.prevent_default()
-                event.stop()
-                return
-            super()._on_key(event)
-            return
-
         if event.key in KEY_TOGGLE_DISABLED or event.key in TAB_KEYS:
             self.action_toggle_disabled()
             event.prevent_default()
