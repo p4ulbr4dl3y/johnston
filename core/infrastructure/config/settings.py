@@ -10,6 +10,7 @@ from core.domain.defaults.config import (
     DEFAULT_AGENT_MD_MAX_CHARS,
     DEFAULT_AUTO_TITLE,
     DEFAULT_AUTO_TITLE_MAX_LEN,
+    DEFAULT_AUTO_TITLE_MODEL,
     DEFAULT_AUTO_TITLE_TIMEOUT,
     DEFAULT_AUTOCOMPLETE_MAX_FILES,
     DEFAULT_CATALOG_CACHE_TTL,
@@ -134,6 +135,7 @@ class LLMSettings:
     auto_title: bool = DEFAULT_AUTO_TITLE
     auto_title_timeout: float = DEFAULT_AUTO_TITLE_TIMEOUT
     auto_title_max_len: int = DEFAULT_AUTO_TITLE_MAX_LEN
+    auto_title_model: Optional[str] = DEFAULT_AUTO_TITLE_MODEL
     catalog_cache_ttl: float = DEFAULT_CATALOG_CACHE_TTL
     agent_md_max_chars: int = DEFAULT_AGENT_MD_MAX_CHARS
 
@@ -219,6 +221,10 @@ class LLMSettings:
                 "JOHNSTON_AUTO_TITLE_MAX_LEN",
                 _safe_int(sec.get("auto_title_max_len"), DEFAULT_AUTO_TITLE_MAX_LEN, min_val=10),
                 min_val=10,
+            ),
+            auto_title_model=_env_str(
+                "JOHNSTON_AUTO_TITLE_MODEL",
+                sec.get("auto_title_model") if isinstance(sec.get("auto_title_model"), str) else DEFAULT_AUTO_TITLE_MODEL,
             ),
             catalog_cache_ttl=_env_float(
                 "JOHNSTON_CATALOG_CACHE_TTL",
@@ -432,6 +438,7 @@ class StorageSettings:
 
 @dataclass
 class JohnstonSettings:
+    model: Optional[str] = None
     active_provider: Optional[str] = None
     theme: Optional[str] = None
     sandbox_enabled: bool = False
@@ -447,6 +454,9 @@ class JohnstonSettings:
         if not isinstance(data, dict):
             return cls()
 
+        model = data.get("model")
+        if not (isinstance(model, str) and model.strip()):
+            model = None
         theme = data.get("theme")
         if not (isinstance(theme, str) and theme.strip()):
             theme = None
@@ -462,8 +472,13 @@ class JohnstonSettings:
         if not isinstance(perms, dict):
             perms = dict(DEFAULT_PERMISSIONS)
 
+        act_prov = data.get("active_provider") if isinstance(data.get("active_provider"), str) else None
+        if not act_prov and model and "/" in model:
+            act_prov = model.split("/", 1)[0].strip().lower()
+
         return cls(
-            active_provider=data.get("active_provider") if isinstance(data.get("active_provider"), str) else None,
+            model=model.strip() if model else None,
+            active_provider=act_prov,
             theme=theme.strip() if theme else None,
             sandbox_enabled=_env_bool("JOHNSTON_SANDBOX_ENABLED", sandbox_val),
             permissions=perms,
@@ -520,10 +535,16 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
         data = read_json(target_file, default={})
         if not isinstance(data, dict):
             data = {}
-        if settings.active_provider is not None:
-            data["active_provider"] = settings.active_provider
-        elif "active_provider" in data:
+        data.pop("provider_models", None)
+        if settings.model is not None:
+            data["model"] = settings.model
             data.pop("active_provider", None)
+        else:
+            data.pop("model", None)
+            if settings.active_provider is not None:
+                data["active_provider"] = settings.active_provider
+            elif "active_provider" in data:
+                data.pop("active_provider", None)
         if settings.theme is not None:
             data["theme"] = settings.theme
         elif "theme" in data:

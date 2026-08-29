@@ -480,7 +480,7 @@ def test_create_agent_missing_api_key(pm):
 
 
 def test_create_agent_invalid_model(pm, tmp_path):
-    _write(tmp_path / "config.json", {"provider_models": {"openai": "not-a-real-model"}})
+    _write(tmp_path / "config.json", {"model": "openai/not-a-real-model"})
     agent = pm.create_agent_for_provider("openai")
     assert agent.model == "not-a-real-model"
 
@@ -779,7 +779,7 @@ def test_set_provider_model_single_source_of_truth(pm, tmp_path):
 
     # config.json holds the selection...
     data = _load_json(tmp_path / "config.json")
-    assert data["provider_models"]["custom"] == "new-model"
+    assert data["model"] == "custom/new-model"
     # ...and providers.json is no longer rewritten (no drift).
     assert _load_json(pfile)["custom"]["model"] == "orig"
 

@@ -60,7 +60,7 @@ def test_theme_config_load_and_save():
 
 def test_load_settings_full_sections():
     raw_data = {
-        "active_provider": "openai",
+        "model": "openai/gpt-4o",
         "theme": "nord",
         "sandbox_enabled": True,
         "llm": {
@@ -71,6 +71,7 @@ def test_load_settings_full_sections():
             "chunk_timeout": 45.0,
             "max_retries": 5,
             "auto_title_max_len": 60,
+            "auto_title_model": "anthropic/claude-3-5-haiku",
             "catalog_cache_ttl": 3600.0,
             "agent_md_max_chars": 15000,
         },
@@ -124,6 +125,7 @@ def test_load_settings_full_sections():
         assert settings.llm.chunk_timeout == 45.0
         assert settings.llm.max_retries == 5
         assert settings.llm.auto_title_max_len == 60
+        assert settings.llm.auto_title_model == "anthropic/claude-3-5-haiku"
         assert settings.llm.catalog_cache_ttl == 3600.0
         assert settings.llm.agent_md_max_chars == 15000
         assert settings.tools.shell_default_timeout == 180.0
@@ -192,7 +194,7 @@ def test_save_and_reload_settings():
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "config.json")
         settings = JohnstonSettings(
-            active_provider="anthropic",
+            model="anthropic/claude-3-7-sonnet",
             theme="monokai",
             sandbox_enabled=True,
             llm=LLMSettings(stream_timeout=120.0),
@@ -204,6 +206,7 @@ def test_save_and_reload_settings():
         save_settings(settings, path)
 
         loaded = load_settings(path)
+        assert loaded.model == "anthropic/claude-3-7-sonnet"
         assert loaded.active_provider == "anthropic"
         assert loaded.theme == "monokai"
         assert loaded.sandbox_enabled is True
@@ -213,12 +216,13 @@ def test_save_and_reload_settings():
         assert loaded.ui.chat_page_size == 75
         assert loaded.storage.log_max_age_days == 30
 
-        # Clearing active_provider removes it from JSON
-        settings.active_provider = None
+        # Clearing model and theme removes them from JSON
+        settings.model = None
         settings.theme = None
         save_settings(settings, path)
         with open(path, "r", encoding="utf-8") as f:
             raw = json.load(f)
+        assert "model" not in raw
         assert "active_provider" not in raw
         assert "theme" not in raw
 

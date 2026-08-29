@@ -51,8 +51,15 @@ class AgentRole:
         self.prompt = prompt or ""
         self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
         self.allowed_tools = [t.strip() for t in (allowed_tools or [])]
-        self.model = model
-        self.provider = (provider or "").strip().lower()
+        raw_model = (model or "").strip()
+        raw_provider = (provider or "").strip().lower()
+        if not raw_provider and "/" in raw_model:
+            p_part, m_part = raw_model.split("/", 1)
+            self.provider = p_part.strip().lower()
+            self.model = m_part.strip()
+        else:
+            self.provider = raw_provider
+            self.model = raw_model
         self.scope = normalize_role_scope(scope)
         self.source = source
         self.tool_name_normalizer = tool_name_normalizer

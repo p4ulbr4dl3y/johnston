@@ -364,11 +364,31 @@ class ProviderManager:
         return catalog.get_discovered_providers()
 
     def get_active_provider_key(self) -> str:
-        return self._get_config_data().get("active_provider", "")
+        cfg = self._get_config_data()
+        if "active_provider" in cfg:
+            return cfg["active_provider"]
+        cfg_model = cfg.get("model", "")
+        if isinstance(cfg_model, str) and cfg_model.strip():
+            raw = cfg_model.strip()
+            if "/" in raw:
+                return raw.split("/", 1)[0].strip().lower()
+            providers = self.load_providers()
+            if raw.lower() in providers:
+                return raw.lower()
+        return ""
 
     def set_active_provider_key(self, key: str):
         data = self._read_config()
-        data["active_provider"] = key
+        if key is None:
+            data["active_provider"] = None
+            data.pop("model", None)
+        else:
+            data["active_provider"] = key
+            cur_model = self.get_provider_model(key)
+            if cur_model:
+                data["model"] = f"{key}/{cur_model}"
+            else:
+                data["model"] = key
         self._save_config(data)
         self.invalidate_cache()
 
@@ -381,16 +401,11 @@ class ProviderManager:
         self.invalidate_cache()
 
     def set_provider_model(self, key: str, model_name: str):
-        """Saves selected model for provider to config.json.
-
-        Single source of truth: the selection is intentionally NOT mirrored
-        into providers.json — the old dual write drifted apart and silently
-        skipped catalog-only providers.
-        """
+        """Saves selected model to config.json as model: key/model_name."""
         data = self._read_config()
-        if "provider_models" not in data:
-            data["provider_models"] = {}
-        data["provider_models"][key] = model_name
+        data.pop("provider_models", None)
+        data["active_provider"] = key
+        data["model"] = f"{key}/{model_name}" if model_name else key
         self._save_config(data)
         self.invalidate_cache()
 
@@ -422,11 +437,9 @@ class ProviderManager:
 
     def get_provider_model(self, provider_key: str) -> str:
         """Returns active model for specified provider with priority:
-        1. Saved user choice in config.json (provider_models)
+        1. Saved user choice in config.json (model: provider/model or model)
         2. Explicit 'model' field in provider definition
-        3. Empty string when neither is configured — no model is guessed,
-           so a misconfigured provider fails loudly instead of silently
-           using an arbitrary first entry of its models list.
+        3. Empty string when neither is configured.
         """
         providers = self.load_providers()
         if provider_key not in providers:
@@ -434,9 +447,15 @@ class ProviderManager:
 
         target_provider = providers[provider_key]
 
-        p_models = self._get_config_data().get("provider_models", {})
-        if provider_key in p_models and p_models[provider_key]:
-            return p_models[provider_key]
+        cfg_model = self._get_config_data().get("model", "")
+        if isinstance(cfg_model, str) and cfg_model.strip():
+            raw = cfg_model.strip()
+            if "/" in raw:
+                p_key, m_name = raw.split("/", 1)
+                if p_key.strip().lower() == provider_key:
+                    return m_name.strip()
+            elif self.get_active_provider_key() == provider_key and raw.lower() != provider_key.lower():
+                return raw
 
         if target_provider.get("model"):
             return target_provider["model"]

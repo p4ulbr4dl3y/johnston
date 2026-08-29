@@ -40,6 +40,17 @@ class TestAutoTitleHelpers(unittest.TestCase):
         self.assertEqual(sanitize_title('  "Title: Fix JWT Expiration"  '), "Fix JWT Expiration")
         self.assertEqual(sanitize_title("### Topic: Database Connection Pooling."), "Database Connection Pooling")
         self.assertEqual(sanitize_title("`Refactor Auth Code`"), "Refactor Auth Code")
+        self.assertEqual(
+            sanitize_title("<think>Let's summarize this.</think>\nDocker Compose Setup"),
+            "Docker Compose Setup",
+        )
+
+    def test_extract_title_from_thought(self):
+        from core.application.session.auto_title import extract_title_from_thought
+
+        thought = 'User wants title for "docker container crash". Title should be: "Docker container crash investigation".'
+        self.assertEqual(extract_title_from_thought(thought), "Docker container crash investigation")
+        self.assertEqual(extract_title_from_thought(""), "")
 
     def test_extract_first_user_text_from_messages(self):
         sess = AgentSession("s1")
@@ -68,6 +79,17 @@ class TestAutoTitleHelpers(unittest.TestCase):
 
 
 class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.settings_patcher = patch("core.application.session.auto_title.get_settings")
+        self.mock_settings = self.settings_patcher.start()
+        self.mock_settings.return_value.llm.auto_title = True
+        self.mock_settings.return_value.llm.auto_title_timeout = 8.0
+        self.mock_settings.return_value.llm.auto_title_max_len = 45
+        self.mock_settings.return_value.llm.auto_title_model = None
+
+    def tearDown(self):
+        self.settings_patcher.stop()
+
     async def test_preserves_existing_title(self):
         sess = AgentSession("s1", title="Manual Custom Title")
         sess.messages = [{"type": "user", "text": "Some text"}]
@@ -114,6 +136,93 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sess._title, "Optimize SQL Query Indexes")
         self.assertEqual(sess.title, "Optimize SQL Query Indexes")
 
+    async def test_llm_auto_titling_reasoning_thought(self):
+        sess = AgentSession("s4_thought")
+        sess.messages = [{"type": "user", "text": "Help me configure redis cache in FastAPI"}]
+
+        mock_agent = MagicMock()
+        mock_agent.api_type = "openai"
+        mock_agent.model = "deepseek-r1"
+        mock_agent.base_url = "https://api.openai.com/v1"
+        mock_agent.api_key = "sk-test"
+        mock_agent._client = None
+        mock_agent.headers = {}
+
+        mock_adapter = MagicMock()
+
+        async def fake_stream(**kwargs):
+            yield ("adapter_thought", 'Thinking about user prompt... suggested title: "Redis cache in FastAPI"')
+
+        mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
+
+        with patch("core.adapters.get_adapter", return_value=mock_adapter):
+            res = await auto_title_session(mock_agent, sess)
+
+        self.assertEqual(res, "Redis cache in FastAPI")
+        self.assertEqual(sess._title, "Redis cache in FastAPI")
+
+    async def test_llm_auto_titling_with_custom_model(self):
+        sess = AgentSession("s4_model")
+        sess.messages = [{"type": "user", "text": "Setup pytest configuration"}]
+
+        mock_agent = MagicMock()
+        mock_agent.api_type = "openai"
+        mock_agent.model = "gpt-4o"
+        mock_agent.base_url = "https://api.openai.com/v1"
+        mock_agent.api_key = "sk-test"
+        mock_agent._client = None
+        mock_agent.headers = {}
+
+        self.mock_settings.return_value.llm.auto_title_model = "gpt-4o-mini"
+
+        mock_adapter = MagicMock()
+        captured_kwargs = {}
+
+        async def fake_stream(**kwargs):
+            captured_kwargs.update(kwargs)
+            yield ("adapter_text", "Pytest Configuration Setup")
+
+        mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
+
+        with patch("core.adapters.get_adapter", return_value=mock_adapter):
+            res = await auto_title_session(mock_agent, sess)
+
+        self.assertEqual(res, "Pytest Configuration Setup")
+        self.assertEqual(captured_kwargs.get("model"), "gpt-4o-mini")
+
+    async def test_llm_auto_titling_with_provider_slash_model(self):
+        sess = AgentSession("s4_p_model")
+        sess.messages = [{"type": "user", "text": "Configure Anthropic prompt caching"}]
+
+        active_agent = MagicMock()
+        active_agent.api_type = "openai"
+        active_agent.model = "gpt-4o"
+
+        self.mock_settings.return_value.llm.auto_title_model = "anthropic/claude-3-5-haiku"
+
+        provider_agent = MagicMock()
+        provider_agent.api_type = "anthropic"
+        provider_agent.model = "claude-3-5-sonnet"
+        provider_agent.base_url = "https://api.anthropic.com"
+        provider_agent.api_key = "ant-test"
+        provider_agent.headers = {}
+
+        mock_adapter = MagicMock()
+        captured_kwargs = {}
+
+        async def fake_stream(**kwargs):
+            captured_kwargs.update(kwargs)
+            yield ("adapter_text", "Anthropic Prompt Caching")
+
+        mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
+
+        with patch("core.provider_manager.ProviderManager.create_agent_for_provider", return_value=provider_agent), \
+             patch("core.adapters.get_adapter", return_value=mock_adapter):
+            res = await auto_title_session(active_agent, sess)
+
+        self.assertEqual(res, "Anthropic Prompt Caching")
+        self.assertEqual(captured_kwargs.get("model"), "claude-3-5-haiku")
+
     async def test_llm_auto_titling_fallback_on_error(self):
         sess = AgentSession("s5")
         sess.messages = [{"type": "user", "text": "Deploy to production Kubernetes cluster"}]
@@ -132,9 +241,8 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
         sess = AgentSession("s6")
         sess.messages = [{"type": "user", "text": "Hello world"}]
 
-        with patch("core.application.session.auto_title.get_settings") as mock_settings:
-            mock_settings.return_value.llm.auto_title = False
-            res = await auto_title_session(None, sess)
+        self.mock_settings.return_value.llm.auto_title = False
+        res = await auto_title_session(None, sess)
 
         self.assertIsNone(res)
         self.assertEqual(sess._title, "")
@@ -159,8 +267,14 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
         sess = AgentSession("s-test")
         sess.messages = [{"type": "user", "text": "Test auto titling integration"}]
 
-        app._schedule_auto_title(sess)
-        await asyncio.sleep(0.05)
+        with patch("core.application.session.auto_title.get_settings") as mock_settings:
+            mock_settings.return_value.llm.auto_title = True
+            mock_settings.return_value.llm.auto_title_timeout = 8.0
+            mock_settings.return_value.llm.auto_title_max_len = 45
+            mock_settings.return_value.llm.auto_title_model = None
+
+            app._schedule_auto_title(sess)
+            await asyncio.sleep(0.05)
 
         self.assertEqual(sess.title, "Test auto titling integration")
         app.sm.save.assert_called_with(sess)

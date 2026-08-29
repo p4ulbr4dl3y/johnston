@@ -36,8 +36,7 @@ class TestRoleRegistry(unittest.TestCase):
 name: Reviewer
 description: Code reviewer role
 allowed_tools: read, grep, glob
-model: deepseek-chat
-provider: clinepass
+model: clinepass/deepseek-chat
 scope: subagent
 read_only: true
 ---
@@ -230,6 +229,21 @@ class TestAgentRoleConstruction:
     def test_provider_stripped_lower(self):
         r = AgentRole(key="x", provider="  OpenAi  ")
         assert r.provider == "openai"
+
+    def test_model_with_provider_prefix_splits(self):
+        r = AgentRole(key="x", model="anthropic/claude-3-5-sonnet")
+        assert r.provider == "anthropic"
+        assert r.model == "claude-3-5-sonnet"
+
+    def test_model_without_provider_prefix_leaves_provider_empty(self):
+        r = AgentRole(key="x", model="gpt-4o")
+        assert r.provider == ""
+        assert r.model == "gpt-4o"
+
+    def test_explicit_provider_takes_precedence_over_model_slash(self):
+        r = AgentRole(key="x", provider="openrouter", model="meta-llama/llama-3")
+        assert r.provider == "openrouter"
+        assert r.model == "meta-llama/llama-3"
 
     def test_unicode_prompt_roundtrip(self):
         prompt = "Привет, мир! Роль: 🧠 测试 テスト"
@@ -427,10 +441,11 @@ class TestRoleFiles:
 
     def test_provider_empty_and_present(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            self._make_role(tmpdir, "p.md", "---\nname: p\nprovider: openai\n---\np")
+            self._make_role(tmpdir, "p.md", "---\nname: p\nmodel: openai/gpt-4o\n---\np")
             reg = RoleRegistry()
             roles = reg.load_roles(project_dir=tmpdir, include_global=False)
             assert roles["p"].provider == "openai"
+            assert roles["p"].model == "gpt-4o"
             assert roles["worker"].provider == ""
 
     def test_unicode_system_prompt_from_file(self):

@@ -142,7 +142,6 @@ class RoleRegistry:
             name = meta.get("name") or key.capitalize()
             desc = meta.get("description", "")
             model = meta.get("model", "")
-            provider = meta.get("provider", "")
             scope = meta.get("scope", "any")
 
             disallowed_tools = parse_csv_list(meta.get("disallowed_tools"))
@@ -161,7 +160,6 @@ class RoleRegistry:
                 disallowed_tools=disallowed_tools,
                 allowed_tools=allowed_tools,
                 model=model,
-                provider=provider,
                 scope=scope,
                 source=source,
                 tool_name_normalizer=self.tool_name_normalizer,

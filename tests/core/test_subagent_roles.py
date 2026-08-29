@@ -29,8 +29,7 @@ class TestSubagentRoles(unittest.TestCase):
 name: reviewer
 description: Code reviewer subagent
 allowed_tools: read, grep, glob
-model: deepseek-v4-flash
-provider: clinepass
+model: clinepass/deepseek-v4-flash
 ---
 You are a senior code reviewer subagent. Analyze diffs carefully.""")
 
@@ -55,19 +54,25 @@ You run tests and report coverage.""")
             reviewer_def = registry.get_role("reviewer")
             self.assertEqual(reviewer_def.description, "Code reviewer subagent")
             self.assertEqual(reviewer_def.allowed_tools, ["read", "grep", "glob"])
+            self.assertEqual(reviewer_def.provider, "clinepass")
             self.assertEqual(reviewer_def.model, "deepseek-v4-flash")
             self.assertIn("senior code reviewer", reviewer_def.prompt)
 
             tester_def = registry.get_role("tester")
             self.assertEqual(tester_def.description, "Automated testing subagent")
             self.assertEqual(tester_def.allowed_tools, ["shell"])
+            self.assertEqual(tester_def.provider, "")
             self.assertEqual(tester_def.model, "gpt-4o")
             self.assertIn("run tests and report coverage", tester_def.prompt)
 
             snippet = registry.get_system_prompt_snippet(project_dir=tmpdir)
             self.assertIn("- explorer: Read-only mode", snippet)
             self.assertIn(
-                "- reviewer (tools: read, grep, glob, provider: clinepass): Code reviewer subagent",
+                "- reviewer (tools: read, grep, glob, model: clinepass/deepseek-v4-flash): Code reviewer subagent",
+                snippet,
+            )
+            self.assertIn(
+                "- tester (tools: shell, model: gpt-4o): Automated testing subagent",
                 snippet,
             )
 

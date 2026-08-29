@@ -82,8 +82,12 @@ def format_subagents_markdown(roles: List[Any]) -> str:
         meta_parts = []
         if getattr(role, "allowed_tools", None):
             meta_parts.append(f"tools: {', '.join(role.allowed_tools)}")
-        if getattr(role, "provider", None):
+        if getattr(role, "provider", None) and getattr(role, "model", None):
+            meta_parts.append(f"model: {role.provider}/{role.model}")
+        elif getattr(role, "provider", None):
             meta_parts.append(f"provider: {role.provider}")
+        elif getattr(role, "model", None):
+            meta_parts.append(f"model: {role.model}")
         meta_str = f" ({', '.join(meta_parts)})" if meta_parts else ""
         desc = getattr(role, "description", "") or ""
         desc_clean = " ".join(desc.split()) if desc else ""

@@ -11,8 +11,7 @@ name: reviewer
 description: Code reviewer subagent
 scope: subagent
 allowed_tools: read, shell, web_fetch
-model: deepseek-chat
-provider: deepseek
+model: deepseek/deepseek-chat
 ---
 
 System prompt instructions for the role...
@@ -30,8 +29,7 @@ System prompt instructions for the role...
 - `read_only`: `true` to make role strictly read-only (blocks `create`/`edit` and enforces kernel-level read-only sandbox for `shell`).
 - `allowed_tools`: Comma-separated whitelist of permitted tool names.
 - `disallowed_tools`: Comma-separated list of blocked tool names.
-- `model`: Specific LLM model override (subagents).
-- `provider`: Specific provider override (subagents). Defaults to parent's active provider.
+- `model`: Specific model or `provider/model` override (subagents). If provider omitted, defaults to parent's active provider.
 
 ## Tool Isolation & Worktree Modes
 Subagents are invoked via `invoke_subagent` with an optional `branch='<name>'` parameter:

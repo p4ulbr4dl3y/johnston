@@ -30,12 +30,9 @@ Credential resolution precedence:
 ```json
 {
   "active_provider": "openai",
+  "model": "openai/gpt-4o",
   "theme": "github-dark",
   "sandbox_enabled": false,
-  "provider_models": {
-    "openai": "gpt-4o",
-    "anthropic": "claude-3-7-sonnet-latest"
-  },
   "provider_thinking_efforts": {
     "anthropic/claude-3-7-sonnet-latest": "medium"
   },

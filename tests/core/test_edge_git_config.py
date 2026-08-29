@@ -335,7 +335,7 @@ def test_provider_manager_nested_missing_key_no_keyerror(tmp_path):
     with patch("core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
         with patch("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
             cfg = tmp_path / "cfg.json"
-            cfg.write_text('{"provider_models": {}}', encoding="utf-8")
+            cfg.write_text('{"model": ""}', encoding="utf-8")
             pm = ProviderManager()
             assert pm.get_api_key("nope") == ""
 
