@@ -69,7 +69,7 @@
       "Token.Literal": "#d19a66",
       "Token.Operator": "#56b6c2",
       "Token.Punctuation": "#abb2bf",
-      "Token.Comment": "#7f848e italic"
+      "Token.Comment": "$fg-muted"
     }
   },
   {
