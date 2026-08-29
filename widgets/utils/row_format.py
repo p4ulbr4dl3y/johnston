@@ -54,6 +54,29 @@ def format_relative_time(ts: float | int | None, now: float | int | None = None)
     return f"{diff // 31536000}y ago"
 
 
+def format_duration(seconds: float | int | None) -> str:
+    """Format duration in seconds as concise string ('4.2s', '14s', '1m 20s', '2h 15m')."""
+    if seconds is None:
+        return ""
+    try:
+        sec = float(seconds)
+    except (ValueError, TypeError):
+        return ""
+    if sec < 0:
+        sec = 0.0
+    if sec < 60:
+        if sec < 10:
+            return f"{sec:.1f}s"
+        return f"{int(sec)}s"
+    if sec < 3600:
+        minutes = int(sec // 60)
+        secs = int(sec % 60)
+        return f"{minutes}m {secs:02d}s"
+    hours = int(sec // 3600)
+    mins = int((sec % 3600) // 60)
+    return f"{hours}h {mins:02d}m"
+
+
 
 def option_list_row_width(opt_list: Any, default: int) -> int:
     """Visible content width of a mounted OptionList for badge padding math.

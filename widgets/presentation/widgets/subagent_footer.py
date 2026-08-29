@@ -280,12 +280,16 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
                 role_part += f": [{t_primary}]{clean_desc}[/]"
 
             row_left = role_part
+            is_running = getattr(session, "status", "") == "running"
             esc_label = (
                 "esc: back"
                 if getattr(self, "from_tasks", False)
                 else ("esc" if is_compact else "esc: close")
             )
-            row_right = f"[{t_muted}]{esc_label}[/{t_muted}]"
+            if is_running and not is_compact:
+                row_right = f"[{t_muted}]{esc_label} • ctrl+k: kill[/{t_muted}]"
+            else:
+                row_right = f"[{t_muted}]{esc_label}[/{t_muted}]"
 
             grid.add_row(row_left, row_right)
             self._last_grid_rows = [(row_left, row_right)]

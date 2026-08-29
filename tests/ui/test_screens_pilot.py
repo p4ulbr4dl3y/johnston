@@ -260,16 +260,16 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             opt_list = screen.query_one("#shell-option-list", OptionList)
             # index 1 = task (Completed header@0, task@1)
             screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("norm task"), 1))
-            self.assertEqual(screen.step, 2)
-            self.assertEqual(screen.selected_task, task_normal)
-            log_widget = screen.query_one("#console-log", RichLog)
-            self.assertTrue(log_widget.display)
+            await pilot.pause()
 
-            # escape returns to step 1
+            self.assertIsInstance(app.screen, TaskConsoleScreen)
+            log_widget = app.screen.query_one("#console-log", RichLog)
+            self.assertIsNotNone(log_widget)
+
+            # escape returns to list
             await pilot.press("escape")
             await pilot.pause()
-            self.assertEqual(screen.step, 1)
-            self.assertIsNone(screen.selected_task)
+            self.assertIsInstance(app.screen, ShellTasksScreen)
 
             # second escape closes modal
             await pilot.press("escape")
@@ -343,30 +343,61 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
             opt_list = screen.query_one("#shell-option-list", OptionList)
             screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("read answer"), 1))
-            self.assertEqual(screen.step, 2)
-            stdin_inp = screen.query_one("#shell-stdin-input", Input)
+            await pilot.pause()
+
+            self.assertIsInstance(app.screen, TaskConsoleScreen)
+            console_screen = app.screen
+            stdin_inp = console_screen.query_one("#shell-stdin-input", Input)
             self.assertTrue(stdin_inp.display)
 
             # send input
             stdin_inp.value = "my-input"
-            screen.on_input_submitted(Input.Submitted(stdin_inp, "my-input"))
+            console_screen.on_input_submitted(Input.Submitted(stdin_inp, "my-input"))
             await pilot.pause()
             task_run.send_input.assert_called_once_with("my-input")
 
             # live output chunk
-            screen._on_console_output("output line\n")
+            console_screen._handle_live_chunk("output line\n")
             await pilot.pause()
 
-            # kill on step 2
-            await screen.action_kill_task()
+            # kill in console
+            await console_screen.action_kill_task()
             await pilot.pause()
             task_run.kill.assert_called_once()
             self.assertFalse(stdin_inp.display)
 
-            # escape back to step 1
+            # escape back to list
             await pilot.press("escape")
             await pilot.pause()
-            self.assertEqual(screen.step, 1)
+            self.assertIsInstance(app.screen, ShellTasksScreen)
+
+    async def test_subagent_view_screen_kill_pilot(self):
+        from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+
+        sub_session = MagicMock()
+        sub_session.id = "sub-k"
+        sub_session.status = "running"
+        sub_session.description = "subagent to kill"
+        sub_session.async_task = MagicMock()
+        sub_session.async_task.done.return_value = False
+        sub_session.messages = []
+        sub_session.finish = MagicMock(side_effect=lambda st, desc: setattr(sub_session, "status", st))
+
+        mock_store = MagicMock()
+        mock_store.find_session_by_description_or_id.return_value = sub_session
+
+        screen = SubagentViewScreen("sub-k")
+        app = DummyHostApp(screen)
+        app.sm = mock_store
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Press ctrl+k to kill subagent
+            await pilot.press("ctrl+k")
+            await pilot.pause()
+            sub_session.async_task.cancel.assert_called_once()
+            sub_session.finish.assert_called_once_with("cancelled", "Terminated from subagent view")
+            self.assertEqual(sub_session.status, "cancelled")
 
     async def test_help_screen_pilot(self):
         screen = HelpScreen()

@@ -16,6 +16,7 @@ class SubagentViewScreen(ModalScreen[None]):
     inherit_bindings = False
     BINDINGS = expand_bindings([
         ("escape", "close", "Close Screen"),
+        ("ctrl+k", "kill_subagent", "Kill Subagent"),
         ("ctrl+o", "toggle_expand", "Toggle Expand"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
@@ -273,6 +274,18 @@ class SubagentViewScreen(ModalScreen[None]):
 
     def action_close(self) -> None:
         self.dismiss()
+
+    def action_kill_subagent(self) -> None:
+        """Kill the current subagent if running."""
+        if self.session and getattr(self.session, "status", "") == "running":
+            if getattr(self.session, "async_task", None) and not self.session.async_task.done():
+                try:
+                    self.session.async_task.cancel()
+                except Exception:
+                    pass
+            if hasattr(self.session, "finish"):
+                self.session.finish("cancelled", "Terminated from subagent view")
+            self._refresh_chrome()
 
     def action_toggle_expand(self) -> None:
         """Toggle expand on all expandable widgets in subagent chat."""

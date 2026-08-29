@@ -10,6 +10,8 @@ import re
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
+from widgets.utils.row_format import format_duration
+
 # Textual markup-aware escaping: literal [ and ] would otherwise be swallowed as
 # style tags, so escape them (and backslashes) for the chat tool chip.
 _ESCAPE_RE = re.compile(r"([\[\]\\])")
@@ -353,6 +355,17 @@ def is_subagent_running(session: Any) -> bool:
     progress badge and kill availability. Sessions are created as ACTIVE and
     flip to RUNNING once their stream starts, so both count as running.
     """
+    if session is None:
+        return False
+    if isinstance(session, dict):
+        if "is_running" in session and isinstance(session["is_running"], bool):
+            return session["is_running"]
+        st = str(session.get("status") or "").lower()
+        return st in ("running", "active")
+    if hasattr(session, "is_running"):
+        val = getattr(session, "is_running")
+        if isinstance(val, bool):
+            return val
     st_str = (getattr(session, "status", "") or "").lower()
     return st_str in ("running", "active") or getattr(session, "is_running", None) is True
 
@@ -361,15 +374,15 @@ def _count_session_steps(session: Any) -> int:
     """Count agent loop iterations / steps for a session."""
     if session is None:
         return 0
-    step_cnt = getattr(session, "step_count", None)
+    step_cnt = session.get("step_count") if isinstance(session, dict) else getattr(session, "step_count", None)
     if isinstance(step_cnt, int) and step_cnt > 0:
         return step_cnt
-    history = getattr(session, "agent_history", None)
+    history = session.get("agent_history") if isinstance(session, dict) else getattr(session, "agent_history", None)
     if isinstance(history, list) and history:
         cnt = sum(1 for m in history if isinstance(m, dict) and m.get("role") == "assistant")
         if cnt > 0:
             return cnt
-    messages = getattr(session, "messages", None)
+    messages = session.get("messages") if isinstance(session, dict) else getattr(session, "messages", None)
     if isinstance(messages, list) and messages:
         cnt = sum(1 for m in messages if isinstance(m, dict) and m.get("type") in ("bot", "tool"))
         if cnt > 0:
@@ -385,19 +398,40 @@ def extract_subagent_progress(session: Any) -> str:
     if session is None:
         return ""
 
-    st_str = (getattr(session, "status", "") or "unknown").lower()
+    st_str = (
+        (session.get("status") if isinstance(session, dict) else getattr(session, "status", "")) or "unknown"
+    ).lower()
     if not is_subagent_running(session):
+        parts = []
         if st_str in ("completed", "done"):
-            steps = _count_session_steps(session)
-            if steps > 0:
-                step_str = "step" if steps == 1 else "steps"
-                return f"done • {steps} {step_str}"
-            return "done"
-        if st_str in ("cancelled", "canceled"):
-            return "cancelled"
-        if st_str in ("error", "failed"):
-            return "error"
-        return st_str or "done"
+            parts.append("done")
+        elif st_str in ("cancelled", "canceled"):
+            parts.append("cancelled")
+        elif st_str in ("error", "failed"):
+            parts.append("error")
+        else:
+            parts.append(st_str or "done")
+
+        steps = _count_session_steps(session)
+        if steps > 0:
+            step_str = "step" if steps == 1 else "steps"
+            parts.append(f"{steps} {step_str}")
+
+        created_at = session.get("created_at") if isinstance(session, dict) else getattr(session, "created_at", None)
+        updated_at = session.get("updated_at") if isinstance(session, dict) else getattr(session, "updated_at", None)
+        if (
+            created_at is not None
+            and updated_at is not None
+            and isinstance(created_at, (int, float))
+            and isinstance(updated_at, (int, float))
+            and created_at > 0
+            and updated_at >= created_at
+        ):
+            dur = format_duration(max(0.0, updated_at - created_at))
+            if dur:
+                parts.append(dur)
+
+        return " • ".join(parts)
 
     messages = getattr(session, "messages", [])
     if not isinstance(messages, (list, tuple)) or not messages:

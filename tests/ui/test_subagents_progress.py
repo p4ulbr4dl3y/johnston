@@ -11,6 +11,7 @@ from widgets.presentation.tool_display import (
     _format_active_tool_progress,
     extract_subagent_progress,
 )
+from widgets.utils.row_format import format_duration
 
 
 class TestSubagentProgressDisplay(unittest.TestCase):
@@ -35,6 +36,53 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         self.assertEqual(extract_subagent_progress(sess), "cancelled")
         sess.status = "error"
         self.assertEqual(extract_subagent_progress(sess), "error")
+
+    def test_extract_progress_with_duration_and_steps(self):
+        sess = MagicMock()
+        sess.is_running = False
+        sess.status = "completed"
+        sess.step_count = 3
+        sess.created_at = 100.0
+        sess.updated_at = 114.0
+        self.assertEqual(extract_subagent_progress(sess), "done • 3 steps • 14s")
+
+        # 1 step singular
+        sess.step_count = 1
+        sess.updated_at = 104.2
+        self.assertEqual(extract_subagent_progress(sess), "done • 1 step • 4.2s")
+
+        # error with steps and duration
+        sess.status = "error"
+        sess.step_count = 2
+        sess.updated_at = 105.0
+        self.assertEqual(extract_subagent_progress(sess), "error • 2 steps • 5.0s")
+
+        # error with 0 steps
+        sess.step_count = 0
+        sess.agent_history = []
+        sess.messages = []
+        sess.updated_at = 101.5
+        self.assertEqual(extract_subagent_progress(sess), "error • 1.5s")
+
+        # cancelled with steps and duration
+        sess.status = "cancelled"
+        sess.step_count = 1
+        sess.updated_at = 103.0
+        self.assertEqual(extract_subagent_progress(sess), "cancelled • 1 step • 3.0s")
+
+        # cancelled with 0 steps
+        sess.step_count = 0
+        self.assertEqual(extract_subagent_progress(sess), "cancelled • 3.0s")
+
+        # dict format
+        d = {
+            "status": "completed",
+            "step_count": 4,
+            "created_at": 200.0,
+            "updated_at": 275.0,
+            "is_running": False,
+        }
+        self.assertEqual(extract_subagent_progress(d), "done • 4 steps • 1m 15s")
 
     def test_extract_progress_running_starting(self):
         sess = MagicMock()
@@ -220,7 +268,7 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         task = MagicMock()
         task.is_running = True
         task.created_at = time.time() - 15.0
-        self.assertEqual(extract_shell_task_progress(task), "running • 15s")
+        self.assertEqual(extract_shell_task_progress(task), "15s")
         task.created_at = None
         self.assertEqual(extract_shell_task_progress(task), "running...")
 
@@ -309,7 +357,8 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
 
         # 10. Subagent finishes first turn
         sess.finish("completed")
-        self.assertEqual(extract_subagent_progress(sess), "done • 4 steps")
+        dur1 = format_duration(max(0.0, sess.updated_at - sess.created_at))
+        self.assertEqual(extract_subagent_progress(sess), f"done • 4 steps • {dur1}")
 
         # 11. Follow-up send_message
         sess.status = "running"
@@ -322,7 +371,8 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
 
         # 13. Follow-up finish
         sess.finish("completed")
-        self.assertEqual(extract_subagent_progress(sess), "done • 5 steps")
+        dur2 = format_duration(max(0.0, sess.updated_at - sess.created_at))
+        self.assertEqual(extract_subagent_progress(sess), f"done • 5 steps • {dur2}")
 
 
 if __name__ == "__main__":
