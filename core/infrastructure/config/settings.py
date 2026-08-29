@@ -9,6 +9,8 @@ from typing import Any, Dict, Optional, Tuple
 from core.domain.defaults.config import (
     COMPACTION_SUMMARIZE_RATIO,
     CONTEXT_COMPACTION_THRESHOLD_RATIO,
+    DEFAULT_AUTO_TITLE,
+    DEFAULT_AUTO_TITLE_TIMEOUT,
     DEFAULT_CB_COOLDOWN_SECONDS,
     DEFAULT_CB_FAILURE_THRESHOLD,
     DEFAULT_CHAT_PAGE_SIZE,
@@ -109,6 +111,8 @@ class LLMSettings:
     max_retry_delay: float = DEFAULT_MAX_RETRY_DELAY
     cb_failure_threshold: int = DEFAULT_CB_FAILURE_THRESHOLD
     cb_cooldown_seconds: float = DEFAULT_CB_COOLDOWN_SECONDS
+    auto_title: bool = DEFAULT_AUTO_TITLE
+    auto_title_timeout: float = DEFAULT_AUTO_TITLE_TIMEOUT
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> LLMSettings:
@@ -178,6 +182,15 @@ class LLMSettings:
                 "JOHNSTON_CB_COOLDOWN",
                 _safe_float(sec.get("cb_cooldown_seconds"), DEFAULT_CB_COOLDOWN_SECONDS, min_val=0.0),
                 min_val=0.0,
+            ),
+            auto_title=_env_bool(
+                "JOHNSTON_AUTO_TITLE",
+                sec.get("auto_title", DEFAULT_AUTO_TITLE) if isinstance(sec.get("auto_title"), bool) else DEFAULT_AUTO_TITLE,
+            ),
+            auto_title_timeout=_env_float(
+                "JOHNSTON_AUTO_TITLE_TIMEOUT",
+                _safe_float(sec.get("auto_title_timeout"), DEFAULT_AUTO_TITLE_TIMEOUT, min_val=0.1),
+                min_val=0.1,
             ),
         )
 

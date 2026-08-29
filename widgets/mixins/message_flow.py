@@ -201,6 +201,8 @@ class MessageFlowMixin:
             except Exception as e:
                 logger.warning("Session save failed: %s", e)
             self.is_generating = False
+            if getattr(self, "is_app_active", True) and session and not getattr(session, "description", None):
+                self._schedule_auto_title(session)
             if getattr(self, "is_app_active", True):
                 next_item = self._pop_queued_for_current_session()
                 if next_item is not None:
@@ -215,6 +217,28 @@ class MessageFlowMixin:
                             **kw,
                         )
                     )
+
+    def _schedule_auto_title(self, session: Any) -> None:
+        """Schedule background auto-titling for a session without blocking UI."""
+        if not session or getattr(session, "description", None):
+            return
+
+        async def _run() -> None:
+            try:
+                from core.application.session.auto_title import auto_title_session
+
+                agent = getattr(self, "agent", None)
+                title = await auto_title_session(agent, session)
+                if title:
+                    if hasattr(self, "sm"):
+                        self.sm.save(session)
+                    if getattr(self, "is_app_active", True) and getattr(self, "current_session_id", None) == getattr(session, "id", None):
+                        if hasattr(self, "refresh_status_footer"):
+                            self.refresh_status_footer()
+            except Exception as e:
+                logger.debug("Background auto-titling failed: %s", e)
+
+        asyncio.create_task(_run())
 
     def _pop_queued_for_current_session(self):
         """Pop the first queued message bound to the current session, or None."""
