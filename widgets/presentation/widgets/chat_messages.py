@@ -8,6 +8,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import Label, Markdown, Static
 
+from core.infrastructure.config.settings import get_settings
 from widgets.presentation.widgets.chat_markdown import (
     _handle_markdown_task_done,
     clean_markdown_for_rendering,
@@ -259,7 +260,7 @@ class BotMessage(Vertical):
             return
         self._stream_update_scheduled = True
         try:
-            self._stream_update_handle = asyncio.get_running_loop().call_later(0.05, self._flush_stream_update)
+            self._stream_update_handle = asyncio.get_running_loop().call_later(get_settings().ui.stream_flush_interval, self._flush_stream_update)
         except RuntimeError:
             self._flush_stream_update()
 
@@ -423,7 +424,7 @@ class ThinkingWidget(Vertical):
             return
         self._update_scheduled = True
         try:
-            self._update_handle = asyncio.get_running_loop().call_later(0.05, self._flush_content_update)
+            self._update_handle = asyncio.get_running_loop().call_later(get_settings().ui.stream_flush_interval, self._flush_content_update)
         except RuntimeError:
             self._flush_content_update()
 

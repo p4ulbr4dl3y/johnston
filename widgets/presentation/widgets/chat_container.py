@@ -6,6 +6,7 @@ from textual import events
 from textual.containers import VerticalScroll
 
 from core.domain.policies.messages import is_ui_visible_user_message
+from core.infrastructure.config.settings import get_settings
 from core.infrastructure.mcp import mcp_tool_is_known
 from widgets.chat_toolcall import ToolCallWidget
 from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
@@ -95,7 +96,17 @@ async def restore_message_item(
 class ChatView(VerticalScroll):
     """Scrollable chat stream with virtualized pagination / auto-loading"""
 
-    PAGE_SIZE: int = 50
+    @property
+    def PAGE_SIZE(self) -> int:
+        """Messages mounted per page when restoring older sessions (ui.chat_page_size)."""
+        if hasattr(self, "_page_size") and self._page_size is not None:
+            return self._page_size
+        return get_settings().ui.chat_page_size
+
+    @PAGE_SIZE.setter
+    def PAGE_SIZE(self, value: int) -> None:
+        self._page_size = value
+
     can_focus = False
 
     def __init__(self, *args, show_welcome: bool = True, **kwargs):

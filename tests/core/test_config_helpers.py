@@ -258,3 +258,15 @@ def test_config_helpers_custom_path_cache_reload():
 
         save_theme_config("nord", config_file=path)
         assert get_settings(path).theme == "nord"
+
+
+def test_session_store_disk_cache_ttl_respects_settings(monkeypatch):
+    from core.infrastructure.storage.session_store import SessionStore
+
+    settings = JohnstonSettings(storage=StorageSettings(disk_cache_ttl=9.0))
+    monkeypatch.setattr("core.infrastructure.storage.session_store.get_settings", lambda: settings)
+    store = SessionStore.__new__(SessionStore)
+    assert store.DISK_CACHE_TTL == 9.0
+    # per-instance override (existing tests assign this value) still wins
+    store.DISK_CACHE_TTL = 1.5
+    assert store.DISK_CACHE_TTL == 1.5

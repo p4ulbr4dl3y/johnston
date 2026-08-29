@@ -11,6 +11,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
+from core.infrastructure.config.settings import get_settings
 from widgets.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 from widgets.presentation.tool_mixins import FormattingMixin, ParsingMixin
 from widgets.presentation.tool_renderers import (
@@ -603,7 +604,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self._shell_update_scheduled = True
         try:
             loop = asyncio.get_running_loop()
-            self._shell_update_handle = loop.call_later(0.05, self._flush_shell_update)
+            self._shell_update_handle = loop.call_later(get_settings().ui.stream_flush_interval, self._flush_shell_update)
         except RuntimeError:
             self._flush_shell_update()
 

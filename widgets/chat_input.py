@@ -7,6 +7,7 @@ from textual import events
 from textual.message import Message
 from textual.widgets import TextArea
 
+from core.infrastructure.config.settings import get_settings
 from core.infrastructure.platform import paths as config
 from core.infrastructure.platform.paths import IMAGE_EXTENSIONS
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
@@ -51,7 +52,16 @@ class ChatInput(TextArea):
 
     PASTE_LINE_THRESHOLD = 10
 
-    MAX_PROMPT_HISTORY = 500
+    @property
+    def MAX_PROMPT_HISTORY(self) -> int:
+        """Max entries retained in prompt history (configurable via ui.max_prompt_history)."""
+        if hasattr(self, "_max_prompt_history") and self._max_prompt_history is not None:
+            return self._max_prompt_history
+        return get_settings().ui.max_prompt_history
+
+    @MAX_PROMPT_HISTORY.setter
+    def MAX_PROMPT_HISTORY(self, value: int) -> None:
+        self._max_prompt_history = value
 
     def __init__(self, **kwargs):
         kwargs.setdefault("soft_wrap", True)

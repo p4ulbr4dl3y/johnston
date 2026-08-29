@@ -15,6 +15,7 @@ from core.domain.policies.messages import (
     history_before_turn,
     transcript_before_turn,
 )
+from core.infrastructure.config.settings import get_settings
 from core.infrastructure.platform.paths import PROJECTS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json, atomic_write_jsonl, read_json
 from core.infrastructure.platform.session_lock import SessionLock
@@ -47,7 +48,17 @@ class SessionStore:
     """
 
     _instance: Optional["SessionStore"] = None
-    DISK_CACHE_TTL = 2.0  # seconds between filesystem rescans
+
+    @property
+    def DISK_CACHE_TTL(self) -> float:
+        """Seconds between filesystem rescans (storage.disk_cache_ttl)."""
+        if hasattr(self, "_disk_cache_ttl") and self._disk_cache_ttl is not None:
+            return self._disk_cache_ttl
+        return get_settings().storage.disk_cache_ttl
+
+    @DISK_CACHE_TTL.setter
+    def DISK_CACHE_TTL(self, value: float) -> None:
+        self._disk_cache_ttl = value
 
     def __init__(self, project_path: Optional[str] = None):
         if not project_path:
