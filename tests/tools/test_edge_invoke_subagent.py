@@ -12,7 +12,7 @@ from unittest.mock import MagicMock as MMock
 
 import pytest
 
-from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
+from core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
 from core.domain.entities.session import SessionStatus
 from core.infrastructure.storage.session_store import SessionStore
 from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS
@@ -504,7 +504,7 @@ async def test_no_parent_session_id_uses_global_running_scan():
     agent = _agent_with_stream(_gen_ok)
     store, app, tool, tmp = _make_env(agent)
     try:
-        for i in range(MAX_CONCURRENT_SUBAGENTS):
+        for i in range(DEFAULT_MAX_CONCURRENT_SUBAGENTS):
             store.create_subagent(
                 parent_id=f"other-parent-{i}", role="worker", title=f"foreign {i}", prompt="p", status="running"
             )

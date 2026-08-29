@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 
-from core.domain.defaults.config import MAX_CONCURRENT_SUBAGENTS
+from core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
 from core.infrastructure.storage.session_store import SessionStore
 from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS, truncate_subagent_result
 from tools.invoke_subagent import InvokeSubagentTool
@@ -31,8 +31,8 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         mock_ctx.background_tasks = []
         tool._ensure_context = lambda app=None: mock_ctx
 
-        # Populate store with MAX_CONCURRENT_SUBAGENTS running sessions
-        for i in range(MAX_CONCURRENT_SUBAGENTS):
+        # Populate store with DEFAULT_MAX_CONCURRENT_SUBAGENTS running sessions
+        for i in range(DEFAULT_MAX_CONCURRENT_SUBAGENTS):
             self.store.create_subagent(
                 parent_id="sess-main",
                 subagent_id=f"task-{i}",

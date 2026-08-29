@@ -7,8 +7,6 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
 from core.domain.defaults.config import (
-    COMPACTION_SUMMARIZE_RATIO,
-    CONTEXT_COMPACTION_THRESHOLD_RATIO,
     DEFAULT_AGENT_MD_MAX_CHARS,
     DEFAULT_AUTO_TITLE,
     DEFAULT_AUTO_TITLE_MAX_LEN,
@@ -20,6 +18,8 @@ from core.domain.defaults.config import (
     DEFAULT_CHAT_INPUT_MAX_LINES,
     DEFAULT_CHAT_PAGE_SIZE,
     DEFAULT_CHUNK_TIMEOUT,
+    DEFAULT_COMPACTION_SUMMARIZE_RATIO,
+    DEFAULT_COMPACTION_THRESHOLD_RATIO,
     DEFAULT_COMPACTION_USER_BUDGET,
     DEFAULT_CONTEXT_LIMIT,
     DEFAULT_DISK_CACHE_TTL,
@@ -27,6 +27,7 @@ from core.domain.defaults.config import (
     DEFAULT_IMAGE_MAX_DIMENSION,
     DEFAULT_LOG_MAX_AGE_DAYS,
     DEFAULT_LOG_MAX_BYTES,
+    DEFAULT_MAX_CONCURRENT_SUBAGENTS,
     DEFAULT_MAX_DIR_ENTRIES,
     DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_RETRY_DELAY,
@@ -52,7 +53,6 @@ from core.domain.defaults.config import (
     DEFAULT_TOOL_PAYLOAD_BYTES,
     DEFAULT_WEB_FETCH_TIMEOUT,
     DEFAULT_WEB_USER_AGENT,
-    MAX_CONCURRENT_SUBAGENTS,
 )
 from core.infrastructure.platform import paths
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
@@ -119,8 +119,8 @@ def _env_str(key: str, default: str) -> str:
 @dataclass
 class LLMSettings:
     context_limit: int = DEFAULT_CONTEXT_LIMIT
-    compaction_threshold_ratio: float = CONTEXT_COMPACTION_THRESHOLD_RATIO
-    compaction_summarize_ratio: float = COMPACTION_SUMMARIZE_RATIO
+    compaction_threshold_ratio: float = DEFAULT_COMPACTION_THRESHOLD_RATIO
+    compaction_summarize_ratio: float = DEFAULT_COMPACTION_SUMMARIZE_RATIO
     compaction_user_budget: int = DEFAULT_COMPACTION_USER_BUDGET
     stream_timeout: float = DEFAULT_STREAM_TIMEOUT
     chunk_timeout: float = DEFAULT_CHUNK_TIMEOUT
@@ -148,12 +148,12 @@ class LLMSettings:
             ),
             compaction_threshold_ratio=_env_float(
                 "JOHNSTON_COMPACTION_RATIO",
-                _safe_float(sec.get("compaction_threshold_ratio"), CONTEXT_COMPACTION_THRESHOLD_RATIO, min_val=0.1),
+                _safe_float(sec.get("compaction_threshold_ratio"), DEFAULT_COMPACTION_THRESHOLD_RATIO, min_val=0.1),
                 min_val=0.1,
             ),
             compaction_summarize_ratio=_env_float(
                 "JOHNSTON_COMPACTION_SUMMARIZE_RATIO",
-                _safe_float(sec.get("compaction_summarize_ratio"), COMPACTION_SUMMARIZE_RATIO, min_val=0.1),
+                _safe_float(sec.get("compaction_summarize_ratio"), DEFAULT_COMPACTION_SUMMARIZE_RATIO, min_val=0.1),
                 min_val=0.1,
             ),
             compaction_user_budget=_env_int(
@@ -326,7 +326,7 @@ class ToolsSettings:
 
 @dataclass
 class SubagentsSettings:
-    max_concurrent: int = MAX_CONCURRENT_SUBAGENTS
+    max_concurrent: int = DEFAULT_MAX_CONCURRENT_SUBAGENTS
     result_max_chars: int = DEFAULT_SUBAGENT_RESULT_MAX_CHARS
     worktree_timeout: float = DEFAULT_SUBAGENT_WORKTREE_TIMEOUT
 
@@ -334,7 +334,7 @@ class SubagentsSettings:
     def from_dict(cls, data: Dict[str, Any]) -> SubagentsSettings:
         sec = data.get("subagents") if isinstance(data.get("subagents"), dict) else {}
         raw_max = sec.get("max_concurrent") if sec.get("max_concurrent") is not None else data.get("max_concurrent_subagents")
-        max_sub = _safe_int(raw_max, MAX_CONCURRENT_SUBAGENTS, min_val=1)
+        max_sub = _safe_int(raw_max, DEFAULT_MAX_CONCURRENT_SUBAGENTS, min_val=1)
         return cls(
             max_concurrent=_env_int("JOHNSTON_MAX_CONCURRENT_SUBAGENTS", max_sub, min_val=1),
             result_max_chars=_env_int(

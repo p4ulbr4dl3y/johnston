@@ -4,10 +4,10 @@ import tempfile
 import time
 
 from core.domain.defaults.config import (
-    CONTEXT_COMPACTION_THRESHOLD_RATIO,
+    DEFAULT_COMPACTION_THRESHOLD_RATIO,
+    DEFAULT_MAX_CONCURRENT_SUBAGENTS,
     DEFAULT_MAX_RETRIES,
     DEFAULT_STREAM_TIMEOUT,
-    MAX_CONCURRENT_SUBAGENTS,
 )
 from core.infrastructure.config.config_helpers import (
     ensure_json_config,
@@ -177,13 +177,13 @@ def test_load_settings_handles_corrupt_or_null_values():
             json.dump(raw_data, f)
 
         settings = load_settings(path)
-        assert settings.llm.compaction_threshold_ratio == CONTEXT_COMPACTION_THRESHOLD_RATIO
+        assert settings.llm.compaction_threshold_ratio == DEFAULT_COMPACTION_THRESHOLD_RATIO
         assert settings.llm.compaction_summarize_ratio == 0.90
         assert settings.llm.stream_timeout == DEFAULT_STREAM_TIMEOUT
         assert settings.llm.max_retries == DEFAULT_MAX_RETRIES
         assert settings.llm.retry_delay == 1.0
         assert settings.llm.chunk_timeout == 30.0
-        assert settings.subagents.max_concurrent == MAX_CONCURRENT_SUBAGENTS
+        assert settings.subagents.max_concurrent == DEFAULT_MAX_CONCURRENT_SUBAGENTS
         assert settings.tools.shell_default_timeout == 120.0
         assert settings.storage.log_max_age_days == 7
 
