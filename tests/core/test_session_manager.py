@@ -93,7 +93,7 @@ class TestSessionManager(unittest.TestCase):
 
     def test_subagent_nested_layout(self):
         main = self.store.create_main()
-        sub = self.store.create_subagent(parent_id=main.id, subagent_id="sub-1", description="d", prompt="p")
+        sub = self.store.create_subagent(parent_id=main.id, subagent_id="sub-1", title="d", prompt="p")
         self.store.save(main)
         self.store.save(sub)
 
@@ -107,7 +107,7 @@ class TestSessionManager(unittest.TestCase):
 
     def test_delete_main_removes_subagents(self):
         main = self.store.create_main()
-        self.store.create_subagent(parent_id=main.id, subagent_id="sub-1", description="d", prompt="p")
+        self.store.create_subagent(parent_id=main.id, subagent_id="sub-1", title="d", prompt="p")
         self.store.save(main)
         self.store.save(self.store.get("sub-1"))
 

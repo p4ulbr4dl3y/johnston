@@ -65,10 +65,10 @@ class ManageSubagentTool(BaseTool):
                 s_id = str(sess.id)
                 s_status = str(sess.status)
                 s_role = str(sess.role or "worker")
-                s_desc = str(sess.description or "")
-                items.append(f"- ID: {s_id} | status: {s_status} | role: {s_role} | title: {s_desc}")
+                s_title = str(sess.title or "")
+                items.append(f"- ID: {s_id} | status: {s_status} | role: {s_role} | title: {s_title}")
                 disp_lines.append(
-                    f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {s_role.capitalize()} | Title: {sess.description}"
+                    f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {s_role.capitalize()} | Title: {sess.title}"
                 )
 
             content_txt = f"Active Subagent Sessions ({len(target_sessions)}):\n" + "\n".join(items)
@@ -82,7 +82,7 @@ class ManageSubagentTool(BaseTool):
                 detail=f"required for '{action}'. Run manage_subagent(action='list') to inspect active session IDs.",
             )
 
-        session = store.find_session_by_description_or_id(session_id, parent_id=curr_session_id)
+        session = store.find_session_by_title_or_id(session_id, parent_id=curr_session_id)
         if not session:
             return ToolResult.error("notfound", name=session_id)
 

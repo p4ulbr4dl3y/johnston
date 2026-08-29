@@ -92,13 +92,13 @@ async def auto_title_session(
     *,
     timeout: Optional[float] = None,
 ) -> Optional[str]:
-    """Generate and set a concise description / title for the session.
+    """Generate and set a concise title for the session.
 
-    If session.description is already set (e.g. manually renamed), it is kept untouched.
+    If session._title is already set (e.g. manually renamed), it is kept untouched.
     Tries fast LLM completion first; falls back to heuristic if LLM is unavailable or fails.
     """
-    if session.description:
-        return session.description
+    if getattr(session, "_title", None):
+        return session.title
 
     first_text = extract_first_user_text(session)
     if not first_text:
@@ -161,8 +161,8 @@ async def auto_title_session(
     if not generated_title:
         generated_title = clean_heuristic_title(first_text)
 
-    if generated_title and not session.description:
-        session.description = generated_title
+    if generated_title and not getattr(session, "_title", None):
+        session.title = generated_title
         return generated_title
 
-    return session.description or None
+    return session.title or None

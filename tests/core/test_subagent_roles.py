@@ -175,7 +175,7 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
             parent_id="sess-main",
             subagent_id=sid,
             role="worker",
-            description=desc,
+            title=desc,
             prompt=prompt,
             status="running",
         )
@@ -185,16 +185,16 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
         self._mk("task-2", "Other task", "p2")
 
         # A single letter that previously matched via substring must now return None.
-        self.assertIsNone(self.store.find_session_by_description_or_id("a"))
+        self.assertIsNone(self.store.find_session_by_title_or_id("a"))
         # A totally unknown id must return None, not the last session.
-        self.assertIsNone(self.store.find_session_by_description_or_id("nonexistent-xyz"))
+        self.assertIsNone(self.store.find_session_by_title_or_id("nonexistent-xyz"))
 
     async def test_exact_match_still_works(self):
         self._mk("task-1", "Important task", "p1")
-        res = self.store.find_session_by_description_or_id("task-1")
+        res = self.store.find_session_by_title_or_id("task-1")
         self.assertIsNotNone(res)
         self.assertEqual(res.id, "task-1")
-        res = self.store.find_session_by_description_or_id("Important task")
+        res = self.store.find_session_by_title_or_id("Important task")
         self.assertIsNotNone(res)
         self.assertEqual(res.id, "task-1")
 

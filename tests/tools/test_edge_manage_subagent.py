@@ -39,7 +39,7 @@ def _mk(sid=None, status="running", parent="parent-x", desc="desc", background=T
         parent_id=parent,
         subagent_id=sid,
         role="worker",
-        description=desc,
+        title=desc,
         prompt="p",
         status=status,
         background=background,

@@ -300,23 +300,23 @@ def test_recovery_json_dict_without_id(store):
 # METADATA edge types
 # ===========================================================================
 
-def test_metadata_description_none_and_huge(store):
+def test_metadata_title_none_and_huge(store):
     sess = store.create_main("meta")
-    sess.description = "x" * 1_000_000  # huge description
+    sess.title = "x" * 1_000_000  # huge title
     sess.messages = [{"type": "user", "text": "hi"}]
     store.save(sess)
     loaded = _reload(store, "meta")
     assert loaded is not None
-    assert loaded.description == "x" * 1_000_000
+    assert loaded.title == "x" * 1_000_000
 
 
-def test_metadata_description_none_presented_correctly(store):
-    """description absent/None in JSON must not crash and yield '' default."""
-    data = {"id": "m2", "kind": "main", "messages": [], "description": None}
+def test_metadata_title_none_presented_correctly(store):
+    """title absent/None in JSON must not crash and yield '' default."""
+    data = {"id": "m2", "kind": "main", "messages": [], "title": None}
     _write_session_json(store, "m2.jsonl", data)
     loaded = store.get("m2")
     if loaded is not None:
-        assert loaded.description == ""
+        assert loaded._title == ""
     # at minimum, must not raise
 
 
@@ -378,7 +378,7 @@ def test_list_mixed_main_subagent_and_sorting(store):
     m2.messages = [{"type": "user", "text": "m2"}]
     store.save(m2)
 
-    sub = store.create_subagent(parent_id="m1", subagent_id="sub1", description="s")
+    sub = store.create_subagent(parent_id="m1", subagent_id="sub1", title="s")
     store.save(sub)
 
     store._sessions.clear()
@@ -492,19 +492,19 @@ def test_title_from_messages_unicode_surrogate(store):
 
 
 def test_search_empty(store):
-    assert store.find_session_by_description_or_id("") is None
-    assert store.find_session_by_description_or_id("   ") is None
+    assert store.find_session_by_title_or_id("") is None
+    assert store.find_session_by_title_or_id("   ") is None
 
 
 def test_search_rewind_big_line(store):
     """Search with a very long identifier must not crash and match exact id."""
     sess = store.create_main("target")
-    sess.description = "d" * 5000
+    sess.title = "d" * 5000
     store.save(sess)
     long_ident = "target"
-    found = store.find_session_by_description_or_id(long_ident)
+    found = store.find_session_by_title_or_id(long_ident)
     assert found is not None and found.id == "target"
-    no_match = store.find_session_by_description_or_id("z" * 1000)
+    no_match = store.find_session_by_title_or_id("z" * 1000)
     assert no_match is None
 
 

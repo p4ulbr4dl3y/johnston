@@ -286,7 +286,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
                 except Exception:
                     sess = None
             if sess:
-                sess.description = new_title
+                sess.title = new_title
                 if (
                     hasattr(app, "agent")
                     and getattr(app.agent, "history", None)

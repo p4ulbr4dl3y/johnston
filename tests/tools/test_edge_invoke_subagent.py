@@ -506,7 +506,7 @@ async def test_no_parent_session_id_uses_global_running_scan():
     try:
         for i in range(MAX_CONCURRENT_SUBAGENTS):
             store.create_subagent(
-                parent_id=f"other-parent-{i}", role="worker", description=f"foreign {i}", prompt="p", status="running"
+                parent_id=f"other-parent-{i}", role="worker", title=f"foreign {i}", prompt="p", status="running"
             )
         res = str(await tool.execute({"prompt": "hi", "title": "t", "branch": "main"}))
         assert "ERR: limit" in res, (

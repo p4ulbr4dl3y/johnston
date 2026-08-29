@@ -234,7 +234,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         session.last_context_tokens = 0
         session.total_tokens = 200
         session.cost_usd = 0.0
-        session.description = "Test Subagent Task"
+        session.title = "Test Subagent Task"
 
         app = MagicMock()
         cm = MagicMock()
@@ -297,7 +297,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         session.last_context_tokens = 0
         session.total_tokens = 200
         session.cost_usd = 0.05
-        session.description = "Compact Task Name Very Long"
+        session.title = "Compact Task Name Very Long"
 
         app = MagicMock()
         app.size = MagicMock(width=60)
@@ -391,7 +391,7 @@ class TestSubagentHeaderCoverage(unittest.TestCase):
         session.status = "running"
         session.agent = None
         session.role = "explorer"
-        session.description = "Review feature"
+        session.title = "Review feature"
 
         header.update_session(session)
         self.assertIn("Review feature", header._last_grid_rows[0][0])
@@ -405,7 +405,7 @@ class TestSubagentHeaderCoverage(unittest.TestCase):
         session = MagicMock()
         session.agent = None
         session.role = "worker"
-        session.description = "A" * 100
+        session.title = "A" * 100
         header.session = session
         header._render_header()
         self.assertTrue("..." in header._last_grid_rows[0][0] or "…" in header._last_grid_rows[0][0])

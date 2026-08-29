@@ -390,9 +390,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
                 store = SessionStore.get_instance()
             curr_session_id = getattr(app, "current_session_id", None) if app else None
-            session = store.find_session_by_description_or_id(identifier, parent_id=curr_session_id) if store else None
+            session = store.find_session_by_title_or_id(identifier, parent_id=curr_session_id) if store else None
             if not session and store:
-                session = store.find_session_by_description_or_id(identifier)
+                session = store.find_session_by_title_or_id(identifier)
             if not session:
                 if app and hasattr(app, "notify"):
                     app.notify("Subagent session not found", severity="warning")
@@ -418,7 +418,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     store = SessionStore.get_instance()
                 curr_session_id = getattr(app, "current_session_id", None) if app else None
                 session = (
-                    store.find_session_by_description_or_id(session_id, parent_id=curr_session_id)
+                    store.find_session_by_title_or_id(session_id, parent_id=curr_session_id)
                     if store
                     else None
                 )

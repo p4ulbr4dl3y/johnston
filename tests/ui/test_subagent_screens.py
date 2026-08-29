@@ -226,7 +226,7 @@ class TestSubagentOnMount(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_mount_stops_old_footer(self):
         sess = self.store.create_subagent(
-            parent_id="sess-main", subagent_id="task-footer", role="worker", description="d", prompt="p", status="running"
+            parent_id="sess-main", subagent_id="task-footer", role="worker", title="d", prompt="p", status="running"
         )
         self.store.save(sess)
         screen = SubagentViewScreen("task-footer")
@@ -241,7 +241,7 @@ class TestSubagentOnMount(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_mount_footer_stop_raises(self):
         sess = self.store.create_subagent(
-            parent_id="sess-main", subagent_id="task-footer2", role="worker", description="d2", prompt="p", status="running"
+            parent_id="sess-main", subagent_id="task-footer2", role="worker", title="d2", prompt="p", status="running"
         )
         self.store.save(sess)
         screen = SubagentViewScreen("task-footer2")

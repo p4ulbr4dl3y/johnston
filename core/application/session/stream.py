@@ -299,7 +299,8 @@ async def run_subagent_stream_bg(
             msg = notification_template.format(
                 session_id=sid,
                 result_text=result_text,
-                description=session.description,
+                title=session.title,
+                description=session.title,
             )
             ctx.trigger_ai_response(msg)
 
@@ -419,7 +420,7 @@ async def send_subagent_followup(
 
         notification_hdr = format_background_notification(
             "subagent",
-            session.description,
+            session.title,
             session.id,
             "{result_text}",
         )

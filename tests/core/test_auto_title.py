@@ -68,12 +68,12 @@ class TestAutoTitleHelpers(unittest.TestCase):
 
 
 class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
-    async def test_preserves_existing_description(self):
-        sess = AgentSession("s1", description="Manual Custom Title")
+    async def test_preserves_existing_title(self):
+        sess = AgentSession("s1", title="Manual Custom Title")
         sess.messages = [{"type": "user", "text": "Some text"}]
         res = await auto_title_session(None, sess)
         self.assertEqual(res, "Manual Custom Title")
-        self.assertEqual(sess.description, "Manual Custom Title")
+        self.assertEqual(sess.title, "Manual Custom Title")
 
     async def test_empty_session_returns_none(self):
         sess = AgentSession("s2")
@@ -85,7 +85,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
         sess.messages = [{"type": "user", "text": "Fix broken database migrations"}]
         res = await auto_title_session(None, sess)
         self.assertEqual(res, "Fix broken database migrations")
-        self.assertEqual(sess.description, "Fix broken database migrations")
+        self.assertEqual(sess._title, "Fix broken database migrations")
         self.assertEqual(sess.title, "Fix broken database migrations")
 
     async def test_llm_auto_titling_success(self):
@@ -111,7 +111,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Optimize SQL Query Indexes")
-        self.assertEqual(sess.description, "Optimize SQL Query Indexes")
+        self.assertEqual(sess._title, "Optimize SQL Query Indexes")
         self.assertEqual(sess.title, "Optimize SQL Query Indexes")
 
     async def test_llm_auto_titling_fallback_on_error(self):
@@ -126,7 +126,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Deploy to production Kubernetes cluster")
-        self.assertEqual(sess.description, "Deploy to production Kubernetes cluster")
+        self.assertEqual(sess._title, "Deploy to production Kubernetes cluster")
 
     async def test_disabled_by_settings(self):
         sess = AgentSession("s6")
@@ -137,7 +137,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
             res = await auto_title_session(None, sess)
 
         self.assertIsNone(res)
-        self.assertEqual(sess.description, "")
+        self.assertEqual(sess._title, "")
 
 
 class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
@@ -162,6 +162,6 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
         app._schedule_auto_title(sess)
         await asyncio.sleep(0.05)
 
-        self.assertEqual(sess.description, "Test auto titling integration")
+        self.assertEqual(sess.title, "Test auto titling integration")
         app.sm.save.assert_called_with(sess)
         self.assertTrue(app.footer_refreshed)

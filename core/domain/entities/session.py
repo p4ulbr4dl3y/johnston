@@ -87,7 +87,7 @@ class AgentSession:
         role: str = "worker",
         status: str = SessionStatus.ACTIVE,
         project_key: str = "",
-        description: str = "",
+        title: str = "",
         prompt: str = "",
         created_at: Optional[float] = None,
         updated_at: Optional[float] = None,
@@ -98,7 +98,7 @@ class AgentSession:
         self.role = role
         self.status = status
         self.project_key = project_key
-        self.description = description
+        self._title = title
         self.prompt = prompt
         self.messages: List[Dict[str, Any]] = []
         self.agent_history: List[Dict[str, Any]] = []
@@ -208,7 +208,7 @@ class AgentSession:
             "role": self.role,
             "status": self.status,
             "project_key": self.project_key,
-            "description": self.description,
+            "title": self._title,
             "prompt": self.prompt,
             "messages": self.messages,
             "agent_history": history,
@@ -236,7 +236,7 @@ class AgentSession:
             "role": self.role,
             "status": self.status,
             "project_key": self.project_key,
-            "description": self.description,
+            "title": self._title,
             "prompt": self.prompt,
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,
@@ -270,7 +270,7 @@ class AgentSession:
             role=data.get("role", "worker"),
             status=data.get("status", SessionStatus.ACTIVE),
             project_key=data.get("project_key", ""),
-            description=data.get("description") or "",
+            title=data.get("title") or "",
             prompt=data.get("prompt") or "",
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
@@ -289,8 +289,8 @@ class AgentSession:
 
     @property
     def title(self) -> str:
-        if self.description:
-            clean = " ".join(str(self.description).split())
+        if self._title:
+            clean = " ".join(str(self._title).split())
             if clean:
                 return clean
         for m in self.messages:
@@ -300,6 +300,10 @@ class AgentSession:
                     clean = " ".join(text.split())
                     return clean
         return "Untitled"
+
+    @title.setter
+    def title(self, value: str) -> None:
+        self._title = str(value) if value is not None else ""
 
     @property
     def message_count(self) -> int:

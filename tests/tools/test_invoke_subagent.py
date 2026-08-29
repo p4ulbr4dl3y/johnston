@@ -37,7 +37,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
                 parent_id="sess-main",
                 subagent_id=f"task-{i}",
                 role="worker",
-                description=f"Task {i}",
+                title=f"Task {i}",
                 prompt="prompt",
                 status="running",
             )
@@ -64,7 +64,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
                 parent_id="sess-main",
                 subagent_id=f"task-custom-{i}",
                 role="worker",
-                description=f"Task {i}",
+                title=f"Task {i}",
                 prompt="prompt",
                 status="running",
             )

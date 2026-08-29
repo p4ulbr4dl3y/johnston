@@ -273,13 +273,13 @@ class SubagentHeader(ResizeDebounceMixin, Static):
             width = resolve_width(self)
             is_compact = is_compact_width(width, breakpoint=BREAKPOINT_COMPACT)
 
-            description = (
-                getattr(session, "description", "")
+            title_text = (
+                getattr(session, "title", "")
                 or getattr(session, "prompt", "")
                 or getattr(session, "id", "")
                 or "(subagent task)"
             ).strip()
-            clean_title = " ".join(description.split()) or "(subagent task)"
+            clean_title = " ".join(title_text.split()) or "(subagent task)"
             max_desc = max(8, width - (12 if is_compact else 22))
             title_part = ellipsize(clean_title, max_desc)
 

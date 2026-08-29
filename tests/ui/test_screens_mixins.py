@@ -78,7 +78,7 @@ def _session(**overrides):
     sess.total_tokens = 0
     sess.cost_usd = 0.0
     sess.last_context_tokens = 5
-    sess.description = ""
+    sess.title = ""
     sess.messages = []
     sess.__dict__.update(overrides)
     return sess

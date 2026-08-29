@@ -190,7 +190,7 @@ class TestSubagentBranchContextPersistence(unittest.TestCase):
                 parent_id="sess-main",
                 subagent_id="sub-abc",
                 role="worker",
-                description="desc",
+                title="desc",
                 prompt="prompt",
                 project_dir="/tmp/wt/sub-abc",
                 branch_name="subagent-sub-abc",

@@ -157,7 +157,7 @@ class TestResumeScreen(unittest.TestCase):
 
         mock_app = MagicMock()
         mock_sess = MagicMock()
-        mock_sess.description = "Old Title 1"
+        mock_sess.title = "Old Title 1"
         mock_app.sm.get.return_value = mock_sess
         mock_app.current_session_id = "s1"
 
@@ -179,7 +179,7 @@ class TestResumeScreen(unittest.TestCase):
 
             # Execute callback with new title
             cb("New Brand Title")
-            self.assertEqual(mock_sess.description, "New Brand Title")
+            self.assertEqual(mock_sess.title, "New Brand Title")
             mock_app.sm.save.assert_called_once_with(mock_sess)
             mock_app.refresh_status_footer.assert_called_once()
             mock_app.notify.assert_called_once_with("Session renamed", severity="information", timeout=1.5)
@@ -309,7 +309,7 @@ class TestResumeScreenPilot(unittest.IsolatedAsyncioTestCase):
         ]
         app = PilotApp(sessions)
         mock_sess = MagicMock()
-        mock_sess.description = "Original Title"
+        mock_sess.title = "Original Title"
         app.sm.get.return_value = mock_sess
 
         async with app.run_test() as pilot:
@@ -332,7 +332,7 @@ class TestResumeScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.screen, app.resume_screen)
             self.assertEqual(app.resume_screen.sessions[0]["title"], "Updated Renamed Session")
             self.assertIn("Updated Renamed Session", app.resume_screen.raw_options[0])
-            self.assertEqual(mock_sess.description, "Updated Renamed Session")
+            self.assertEqual(mock_sess.title, "Updated Renamed Session")
 
     async def test_resume_screen_delete_pilot(self):
         from unittest.mock import MagicMock

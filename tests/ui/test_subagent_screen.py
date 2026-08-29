@@ -52,7 +52,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
             parent_id="sess-main",
             subagent_id=sid,
             role=role,
-            description=desc,
+            title=desc,
             prompt=prompt,
             status="running",
         )
@@ -61,13 +61,13 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
     def test_tracker_create_and_find(self):
         sess = self._mk("task-123", "test subagent", "test prompt", role="worker")
         self.assertEqual(sess.id, "task-123")
-        self.assertEqual(sess.description, "test subagent")
+        self.assertEqual(sess.title, "test subagent")
         self.assertEqual(sess.status, "running")
 
-        found = self.store.find_session_by_description_or_id("task-123")
+        found = self.store.find_session_by_title_or_id("task-123")
         self.assertEqual(found, sess)
 
-        found_by_desc = self.store.find_session_by_description_or_id("test subagent")
+        found_by_desc = self.store.find_session_by_title_or_id("test subagent")
         self.assertEqual(found_by_desc, sess)
 
     def test_session_events(self):
@@ -182,7 +182,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         sess = self._mk("task-789", "my subagent", "do something")
         store = self.store
         screen = SubagentViewScreen("task-789")
-        screen.session = store.find_session_by_description_or_id("task-789")
+        screen.session = store.find_session_by_title_or_id("task-789")
         self.assertEqual(screen.session, sess)
         self.assertEqual(screen.session_id_or_desc, "task-789")
         self.assertIsInstance(screen, Screen)
@@ -196,17 +196,17 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.store._sessions.clear()
         reloaded = self.store.get("task-persist")
         self.assertIsNotNone(reloaded)
-        self.assertEqual(reloaded.description, "Persistent Agent")
+        self.assertEqual(reloaded.title, "Persistent Agent")
         self.assertTrue(any(m.get("text") == "persisted output" for m in reloaded.messages))
 
     def test_find_session_truncated_description(self):
         sess = self._mk("task-trunc", "Explore test setup and verify runner", "full prompt text", role="explorer")
-        found = self.store.find_session_by_description_or_id('"Explore test setup...runner"')
+        found = self.store.find_session_by_title_or_id('"Explore test setup...runner"')
         self.assertEqual(found, sess)
 
     def test_find_session_substring_description(self):
         sess = self._mk("task-sub", "Test subagent check env for py", "Test subagent check env for python environment")
-        found = self.store.find_session_by_description_or_id("Test subagent check env")
+        found = self.store.find_session_by_title_or_id("Test subagent check env")
         self.assertEqual(found, sess)
 
 
@@ -226,7 +226,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             parent_id="sess-main",
             subagent_id=sid,
             role=role,
-            description=desc,
+            title=desc,
             prompt=prompt,
             status="running",
         )

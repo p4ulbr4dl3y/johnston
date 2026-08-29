@@ -141,7 +141,7 @@ class TestSessionStoreLockingAndFork(unittest.TestCase):
 
     def test_store_fork_session(self):
         sess = self.store.create_main()
-        sess.description = "Initial task"
+        sess.title = "Initial task"
         sess.messages = [{"type": "user", "text": "hello"}]
         sess.tokens_input = 100
         self.store.save(sess)
@@ -152,7 +152,7 @@ class TestSessionStoreLockingAndFork(unittest.TestCase):
         self.assertEqual(len(forked.messages), 1)
         self.assertEqual(forked.messages[0]["text"], "hello")
         self.assertEqual(forked.tokens_input, 100)
-        self.assertIn("(fork)", forked.description)
+        self.assertIn("(fork)", forked.title)
         self.assertEqual(forked.parent_id, sess.id)
 
         # Forking invalid session returns None
@@ -160,7 +160,7 @@ class TestSessionStoreLockingAndFork(unittest.TestCase):
 
     def test_store_fork_session_with_slicing(self):
         sess = self.store.create_main()
-        sess.description = "Task multi"
+        sess.title = "Task multi"
         sess.messages = [
             {"type": "user", "text": "turn 0"},
             {"type": "bot", "text": "bot 0"},

@@ -52,9 +52,9 @@ class SubagentViewScreen(ModalScreen[None]):
             store = SessionStore.get_instance()
 
         curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
-        self.session = store.find_session_by_description_or_id(self.session_id_or_desc, parent_id=curr_session_id)
+        self.session = store.find_session_by_title_or_id(self.session_id_or_desc, parent_id=curr_session_id)
         if not self.session:
-            self.session = store.find_session_by_description_or_id(self.session_id_or_desc)
+            self.session = store.find_session_by_title_or_id(self.session_id_or_desc)
 
         if not self.session:
 

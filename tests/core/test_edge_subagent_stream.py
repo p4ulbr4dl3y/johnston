@@ -19,7 +19,7 @@ STATUS_ERROR = SessionStatus.ERROR
 
 
 def make_session(description="d", status="running"):
-    s = AgentSession(session_id="sub-1", kind="subagent", parent_id="main-1", description=description, status=status)
+    s = AgentSession(session_id="sub-1", kind="subagent", parent_id="main-1", title=description, status=status)
     return s
 
 

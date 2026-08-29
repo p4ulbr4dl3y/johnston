@@ -194,7 +194,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("role: worker", res.content)
         sessions = _store.list(kind="subagent")
         self.assertEqual(len(sessions), 1)
-        self.assertEqual(sessions[0].description, "bg job")
+        self.assertEqual(sessions[0].title, "bg job")
         self.assertEqual(sessions[0].status, "running")
 
     def test_truncate_output_helper(self):

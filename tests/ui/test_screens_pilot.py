@@ -119,7 +119,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         sub_session = MagicMock()
         sub_session.id = "sub-1"
         sub_session.status = "running"
-        sub_session.description = "sub task"
+        sub_session.title = "sub task"
 
         screen = SubagentsScreen()
         app = DummyHostApp(screen)
@@ -143,7 +143,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         sub_session = MagicMock()
         sub_session.id = "sub-1"
         sub_session.status = "running"
-        sub_session.description = "long " + "a" * 40
+        sub_session.title = "long " + "a" * 40
         sub_session.async_task = MagicMock()
         sub_session.async_task.done.return_value = False
         sub_session.finish = MagicMock()
@@ -377,14 +377,14 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         sub_session = MagicMock()
         sub_session.id = "sub-k"
         sub_session.status = "running"
-        sub_session.description = "subagent to kill"
+        sub_session.title = "subagent to kill"
         sub_session.async_task = MagicMock()
         sub_session.async_task.done.return_value = False
         sub_session.messages = []
         sub_session.finish = MagicMock(side_effect=lambda st, desc: setattr(sub_session, "status", st))
 
         mock_store = MagicMock()
-        mock_store.find_session_by_description_or_id.return_value = sub_session
+        mock_store.find_session_by_title_or_id.return_value = sub_session
 
         screen = SubagentViewScreen("sub-k")
         app = DummyHostApp(screen)

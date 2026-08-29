@@ -134,7 +134,7 @@ class TestForkRewindEquivalence(unittest.TestCase):
         self.store = _make_store(self.tmpdir)
         self.sid = "session_equiv"
         src = self.store.create_main(self.sid)
-        src.description = "equiv"
+        src.title = "equiv"
         src.messages = [dict(m) for m in TRANSCRIPT]
         src.agent_history = [dict(m) for m in HISTORY]
 

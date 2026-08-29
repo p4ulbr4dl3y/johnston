@@ -351,7 +351,7 @@ class ForkCommand(BaseCommand):
                 parent_sess = app.sm.get(curr_sid)
                 fork_title = None
                 if parent_sess:
-                    base = (parent_sess.description or parent_sess.title or "Session").removesuffix(" (fork)")
+                    base = (parent_sess.title or "Session").removesuffix(" (fork)")
                     fork_title = f"{base} (fork)"
             else:
                 found = False
@@ -431,7 +431,7 @@ class RenameCommand(BaseCommand):
             app.notify("Session not found", severity="error")
             return
 
-        current_title = sess.description or sess.title
+        current_title = sess.title
         if current_title == "Untitled":
             current_title = ""
 
@@ -439,7 +439,7 @@ class RenameCommand(BaseCommand):
             if new_title is not None:
                 new_title = new_title.strip()
                 if new_title:
-                    sess.description = new_title
+                    sess.title = new_title
                     if hasattr(app, "agent") and getattr(app.agent, "history", None):
                         sess.agent_history = list(app.agent.history)
                     app.sm.save(sess)

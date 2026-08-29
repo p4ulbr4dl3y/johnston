@@ -27,7 +27,6 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         app.role = "worker"
         app.sm.get.return_value = None
         fresh_sess = MagicMock()
-        fresh_sess.description = ""
         fresh_sess.title = ""
         fresh_sess.messages = []
         app.sm.create_main.return_value = fresh_sess
@@ -41,7 +40,7 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         await cmd.execute(app)
 
         app.sm.create_main.assert_called_with("fresh_sess_id", role="worker")
-        self.assertEqual(fresh_sess.description, "Startup Session Name")
+        self.assertEqual(fresh_sess.title, "Startup Session Name")
         app.sm.save.assert_called_with(fresh_sess)
         app.notify.assert_called_with("Session renamed", severity="information", timeout=1.5)
 
@@ -49,7 +48,7 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         app = MagicMock()
         app.current_session_id = "sess_1"
         mock_sess = MagicMock()
-        mock_sess.description = "Old Title"
+        mock_sess.title = "Old Title"
         app.sm.get.return_value = mock_sess
 
         def push_screen_mock(screen, callback):
@@ -59,7 +58,7 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         cmd = RenameCommand()
         await cmd.execute(app)
 
-        self.assertEqual(mock_sess.description, "Updated Feature Title")
+        self.assertEqual(mock_sess.title, "Updated Feature Title")
         app.sm.save.assert_called_with(mock_sess)
         app.refresh_status_footer.assert_called()
         app.notify.assert_called_with("Session renamed", severity="information", timeout=1.5)
@@ -68,7 +67,6 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         app = MagicMock()
         app.current_session_id = "empty_sess"
         empty_sess = MagicMock()
-        empty_sess.description = ""
         empty_sess.title = "Untitled"
         empty_sess.messages = []
         app.sm.get.return_value = empty_sess
@@ -81,6 +79,6 @@ class TestRenameCommand(unittest.IsolatedAsyncioTestCase):
         cmd = RenameCommand()
         await cmd.execute(app)
 
-        self.assertEqual(empty_sess.description, "Planned Architecture Refactor")
+        self.assertEqual(empty_sess.title, "Planned Architecture Refactor")
         app.sm.save.assert_called_with(empty_sess)
         app.notify.assert_called_with("Session renamed", severity="information", timeout=1.5)

@@ -316,7 +316,7 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
             "sub-sim-1",
             kind=SessionKind.SUBAGENT,
             role="worker",
-            description="Run refactoring and tests",
+            title="Run refactoring and tests",
             status="running",
         )
         # 1. Start turn

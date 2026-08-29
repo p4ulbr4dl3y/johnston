@@ -97,8 +97,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         app.current_session_id = "orig_sid"
 
         parent_sess = MagicMock()
-        parent_sess.description = "My Session"
-        parent_sess.title = "Fallback"
+        parent_sess.title = "My Session"
         app.sm.get.return_value = parent_sess
 
         forked_session = MagicMock()

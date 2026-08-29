@@ -26,7 +26,7 @@ class SessionStorePort(Protocol):
         parent_id: str,
         subagent_id: Optional[str] = None,
         role: str = "worker",
-        description: str = "",
+        title: str = "",
         prompt: str = "",
         status: str = "running",
         project_dir: str = "",
@@ -68,10 +68,10 @@ class SessionStorePort(Protocol):
         """Sets active session ID for the project."""
         ...
 
-    def find_session_by_description_or_id(
+    def find_session_by_title_or_id(
         self, identifier: str, parent_id: Optional[str] = None
     ) -> Optional[AgentSession]:
-        """Finds session by ID or description search."""
+        """Finds session by ID or title search."""
         ...
 
     def is_session_locked(self, session_id: str) -> bool:

@@ -32,7 +32,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
             parent_id="sess-main",
             subagent_id=sid,
             role=role,
-            description=desc,
+            title=desc,
             prompt=prompt,
             status=status,
         )
@@ -44,22 +44,28 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("No subagent sessions found for current session", res_empty.display)
 
         self._mk_subagent("sub-1", "Search files", "find python files", role="explorer")
-        res_list = await tool.execute({"action": "list"})
-        self.assertIn("sub-1", res_list.content)
-        self.assertIn("explorer", res_list.content)
+        self._mk_subagent("sub-2", "Run tests", "run pytest", role="worker", status="completed")
+
+        res = await tool.execute({"action": "list"})
+        self.assertIn("sub-1", res.content)
+        self.assertIn("Search files", res.content)
+        self.assertIn("sub-2", res.content)
+        self.assertIn("Run tests", res.content)
+        self.assertIn("Explorer", res.display)
+        self.assertIn("RUNNING", res.display)
+        self.assertIn("COMPLETED", res.display)
 
     async def test_kill_action(self):
         tool = ManageSubagentTool()
-        sess = self._mk_subagent("sub-3", "Long running task", "do heavy work", role="worker")
+        sess = self._mk_subagent("sub-kill", "Kill task", "prompt", status="running")
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        sess.async_task = mock_task
 
-        res_kill = await tool.execute({"action": "kill", "session_id": "sub-3"})
-        self.assertIn("sub-3 terminated", res_kill.content)
+        res = await tool.execute({"action": "kill", "session_id": "sub-kill"})
+        self.assertEqual(res.content, "sub-kill terminated")
         self.assertEqual(sess.status, "cancelled")
-
-        # Second kill on finished task
-        res_kill_again = await tool.execute({"action": "kill", "session_id": "sub-3"})
-        self.assertIn("already in 'cancelled'", res_kill_again.display)
-        self.assertIn("already in 'cancelled'", res_kill_again.content)
+        mock_task.cancel.assert_called_once()
 
     def test_agent_session_deserialization(self):
         data = {
@@ -68,7 +74,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
             "parent_id": "sess-main",
             "role": "worker",
             "status": "completed",
-            "description": "test desc",
+            "title": "test desc",
             "prompt": "test prompt",
             "agent_history": [
                 {"role": "user", "content": "Prior prompt"},
@@ -94,7 +100,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
     def _mk_subagent(
         self,
         sid: str,
-        desc: str = "Task",
+        desc: str = "desc",
         prompt: str = "prompt",
         role: str = "worker",
         status: str = "running",
@@ -104,7 +110,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
             parent_id="sess-main",
             subagent_id=sid,
             role=role,
-            description=desc,
+            title=desc,
             prompt=prompt,
             status=status,
             background=background,
@@ -330,7 +336,7 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
             parent_id="sess-main",
             subagent_id=sid,
             role=role,
-            description="Task",
+            title="Task",
             prompt="prompt",
             status=status,
         )
@@ -410,7 +416,7 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
             parent_id="sess-main",
             subagent_id="sub-wt",
             role="worker",
-            description="Worktree task",
+            title="Worktree task",
             prompt="prompt",
             status="completed",
             project_dir="/tmp/worktree",

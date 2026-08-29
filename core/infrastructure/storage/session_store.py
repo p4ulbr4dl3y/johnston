@@ -130,7 +130,7 @@ class SessionStore:
         parent_id: str,
         subagent_id: Optional[str] = None,
         role: str = "worker",
-        description: str = "",
+        title: str = "",
         prompt: str = "",
         status: str = SessionStatus.RUNNING,
         project_dir: str = "",
@@ -144,7 +144,7 @@ class SessionStore:
             role=role,
             status=status,
             project_key=self.project_key,
-            description=description,
+            title=title,
             prompt=prompt,
         )
         sess.project_dir = project_dir
@@ -355,7 +355,7 @@ class SessionStore:
 
     # -- search ---------------------------------------------------------------
 
-    def find_session_by_description_or_id(
+    def find_session_by_title_or_id(
         self, identifier: str, parent_id: Optional[str] = None
     ) -> Optional[AgentSession]:
         if not identifier:
@@ -378,8 +378,8 @@ class SessionStore:
         for sess in candidates:
             if sess.id == identifier or sess.id == clean_id:
                 return sess
-            clean_desc = sess.description.strip("\"' `")
-            if clean_desc == clean_id:
+            clean_title = (sess._title or sess.title).strip("\"' `")
+            if clean_title == clean_id:
                 return sess
             clean_prompt = sess.prompt.strip("\"' `")
             if clean_prompt == clean_id:
@@ -388,8 +388,8 @@ class SessionStore:
         if "..." in clean_id:
             parts = [p.strip() for p in clean_id.split("...") if p.strip()]
             for sess in candidates:
-                clean_desc = sess.description.strip("\"' `")
-                if parts and all(p in clean_desc for p in parts):
+                clean_title = (sess._title or sess.title).strip("\"' `")
+                if parts and all(p in clean_title for p in parts):
                     return sess
                 clean_prompt = sess.prompt.strip("\"' `")
                 if parts and all(p in clean_prompt for p in parts):
@@ -398,9 +398,9 @@ class SessionStore:
         clean_id_lower = clean_id.lower()
         if len(clean_id_lower) >= 3:
             for sess in candidates:
-                c_desc = sess.description.strip("\"' `").lower()
+                c_title = (sess._title or sess.title).strip("\"' `").lower()
                 c_prompt = sess.prompt.strip("\"' `").lower()
-                if c_desc and (clean_id_lower in c_desc or c_desc in clean_id_lower):
+                if c_title and (clean_id_lower in c_title or c_title in clean_id_lower):
                     return sess
                 if c_prompt and (clean_id_lower in c_prompt or c_prompt in clean_id_lower):
                     return sess
@@ -474,13 +474,10 @@ class SessionStore:
         new_id = self.generate_session_id()
         parent_id = source.id if source.kind == SessionKind.MAIN else source.parent_id
         if new_title:
-            fork_desc = new_title
-        elif source.description:
-            base = source.description.removesuffix(" (fork)")
-            fork_desc = f"{base} (fork)"
+            fork_title = new_title
         else:
             base = source.title.removesuffix(" (fork)")
-            fork_desc = f"{base} (fork)"
+            fork_title = f"{base} (fork)"
         new_sess = AgentSession(
             session_id=new_id,
             kind=source.kind,
@@ -488,7 +485,7 @@ class SessionStore:
             role=source.role,
             status=SessionStatus.ACTIVE,
             project_key=self.project_key,
-            description=fork_desc,
+            title=fork_title,
             prompt=source.prompt,
         )
         if up_to_msg_index is None:

@@ -196,7 +196,7 @@ class InvokeSubagentTool(BaseTool):
             parent_id=parent_session_id or "",
             subagent_id=session_id,
             role=canonical_role,
-            description=title,
+            title=title,
             prompt=prompt,
             status="running",
             project_dir=wt_path or "",

@@ -356,7 +356,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
         event = MagicMock()
         mock_store = MagicMock()
-        mock_store.find_session_by_description_or_id.return_value = MagicMock(status="running")
+        mock_store.find_session_by_title_or_id.return_value = MagicMock(status="running")
         with (
             patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
@@ -373,7 +373,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"}, result_text="Done work")
         event = MagicMock()
         mock_store = MagicMock()
-        mock_store.find_session_by_description_or_id.return_value = MagicMock(status="completed")
+        mock_store.find_session_by_title_or_id.return_value = MagicMock(status="completed")
         with (
             patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
@@ -391,7 +391,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "missing"})
         event = MagicMock()
         mock_store = MagicMock()
-        mock_store.find_session_by_description_or_id.return_value = None
+        mock_store.find_session_by_title_or_id.return_value = None
         with (
             patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
@@ -528,7 +528,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         self.assertTrue(widget.is_clickable_header())
         event = MagicMock()
         mock_store = MagicMock()
-        mock_store.find_session_by_description_or_id.return_value = MagicMock(status="running")
+        mock_store.find_session_by_title_or_id.return_value = MagicMock(status="running")
         with (
             patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as subagent_view_screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
@@ -547,7 +547,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         self.assertTrue(widget.is_clickable_header())
         event = MagicMock()
         mock_store = MagicMock()
-        mock_store.find_session_by_description_or_id.return_value = None
+        mock_store.find_session_by_title_or_id.return_value = None
         with (
             patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as subagent_view_screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
