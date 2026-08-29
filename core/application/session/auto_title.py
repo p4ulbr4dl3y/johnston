@@ -24,7 +24,7 @@ TITLE_PROMPT = """You are a title generator. You output ONLY a thread title. Not
 Generate a brief title that would help the user find this conversation later.
 Rules:
 - MUST use the same language as the user message you are summarizing
-- A single line, <=50 characters
+- A single line, concise (under 80 characters)
 - No explanations, no conversation, no quotes, no trailing punctuation
 - Keep exact: technical terms, numbers, filenames, HTTP codes
 - Never include tool names
@@ -61,10 +61,10 @@ def clean_heuristic_title(text: str, max_len: int = DEFAULT_AUTO_TITLE_MAX_LEN) 
     r_space = cut.rfind(" ")
     if r_space > 15:
         cut = cut[:r_space]
-    return cut.strip(".,:;!?- ") + "..."
+    return cut.strip(".,:;!?- ")
 
 
-def sanitize_title(title: str, max_len: int = 50) -> str:
+def sanitize_title(title: str, max_len: int = DEFAULT_AUTO_TITLE_MAX_LEN) -> str:
     """Sanitize LLM-generated title string."""
     if not title:
         return ""
@@ -89,11 +89,11 @@ def sanitize_title(title: str, max_len: int = 50) -> str:
         r_space = cut.rfind(" ")
         if r_space > 15:
             cut = cut[:r_space]
-        clean = cut.strip(".,:;!?- ") + "..."
+        clean = cut.strip(".,:;!?- ")
     return clean
 
 
-def extract_title_from_thought(thought_text: str, max_len: int = 50) -> str:
+def extract_title_from_thought(thought_text: str, max_len: int = DEFAULT_AUTO_TITLE_MAX_LEN) -> str:
     """Extract candidate title from reasoning thoughts when text output was empty."""
     if not thought_text:
         return ""
@@ -193,10 +193,12 @@ async def auto_title_session(
         settings = get_settings()
         auto_title_enabled = getattr(settings.llm, "auto_title", DEFAULT_AUTO_TITLE)
         configured_timeout = getattr(settings.llm, "auto_title_timeout", DEFAULT_AUTO_TITLE_TIMEOUT)
+        configured_max_len = getattr(settings.llm, "auto_title_max_len", DEFAULT_AUTO_TITLE_MAX_LEN)
         auto_title_model = getattr(settings.llm, "auto_title_model", None)
     except Exception:
         auto_title_enabled = DEFAULT_AUTO_TITLE
         configured_timeout = DEFAULT_AUTO_TITLE_TIMEOUT
+        configured_max_len = DEFAULT_AUTO_TITLE_MAX_LEN
         auto_title_model = None
 
     if not auto_title_enabled:
@@ -264,9 +266,9 @@ async def auto_title_session(
                 return "".join(text_chunks).strip(), "".join(thought_chunks).strip()
 
             raw_text, raw_thought = await asyncio.wait_for(_call_stream(), timeout=effective_timeout)
-            sanitized = sanitize_title(raw_text)
+            sanitized = sanitize_title(raw_text, max_len=configured_max_len)
             if not sanitized and raw_thought:
-                sanitized = extract_title_from_thought(raw_thought)
+                sanitized = extract_title_from_thought(raw_thought, max_len=configured_max_len)
             if sanitized:
                 generated_title = sanitized
         except Exception as e:
@@ -274,7 +276,7 @@ async def auto_title_session(
 
     # Fallback to heuristic if LLM did not produce a title
     if not generated_title:
-        generated_title = clean_heuristic_title(first_text)
+        generated_title = clean_heuristic_title(first_text, max_len=configured_max_len)
 
     if generated_title and not getattr(session, "_title", None):
         session.title = generated_title

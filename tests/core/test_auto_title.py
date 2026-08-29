@@ -31,9 +31,10 @@ class TestAutoTitleHelpers(unittest.TestCase):
     def test_clean_heuristic_title_truncation_word_boundary(self):
         long_prompt = "This is a very long user prompt that asks the agent to refactor the entire authentication subsystem"
         cleaned = clean_heuristic_title(long_prompt, max_len=40)
-        self.assertTrue(len(cleaned) <= 43)
-        self.assertTrue(cleaned.endswith("..."))
-        self.assertFalse(cleaned.endswith(" ..."))
+        self.assertTrue(len(cleaned) <= 40)
+        self.assertFalse(cleaned.endswith("..."))
+        self.assertFalse(cleaned.endswith(" "))
+        self.assertEqual(cleaned, "This is a very long user prompt that")
 
     def test_sanitize_title(self):
         self.assertEqual(sanitize_title(""), "")
