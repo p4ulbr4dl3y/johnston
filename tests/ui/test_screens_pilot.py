@@ -2,10 +2,10 @@ import os
 import shutil
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.app import App
-from textual.widgets import OptionList, RichLog
+from textual.widgets import Input, OptionList, RichLog
 from textual.widgets.option_list import Option
 
 from core.infrastructure.tasks.manager import TaskManager
@@ -247,12 +247,20 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             screen.update_tasks_list()
 
             opt_list = screen.query_one("#shell-option-list", OptionList)
-            with patch.object(app, "push_screen") as mock_push:
-                # index 1 = task (Completed header@0, task@1)
-                screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("norm task"), 1))
-                mock_push.assert_called_once()
-                self.assertIsInstance(mock_push.call_args[0][0], TaskConsoleScreen)
+            # index 1 = task (Completed header@0, task@1)
+            screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("norm task"), 1))
+            self.assertEqual(screen.step, 2)
+            self.assertEqual(screen.selected_task, task_normal)
+            log_widget = screen.query_one("#console-log", RichLog)
+            self.assertTrue(log_widget.display)
 
+            # escape returns to step 1
+            await pilot.press("escape")
+            await pilot.pause()
+            self.assertEqual(screen.step, 1)
+            self.assertIsNone(screen.selected_task)
+
+            # second escape closes modal
             await pilot.press("escape")
             await pilot.pause()
 
@@ -295,6 +303,59 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
             await pilot.press("escape")
             await pilot.pause()
+
+    async def test_shell_screen_step2_stdin_and_live_output(self):
+        task_run = MagicMock()
+        task_run.id = "task-stdin"
+        task_run.task_id = "task-stdin"
+        task_run.kind = "shell"
+        task_run.command = "read answer"
+        task_run.is_background = True
+        task_run.is_running = True
+        task_run.session_id = "main-1"
+        task_run.output.history = ["prompt: "]
+        task_run.send_input = AsyncMock()
+
+        async def mock_kill_async():
+            task_run.is_running = False
+
+        task_run.kill = MagicMock(side_effect=mock_kill_async)
+
+        screen = ShellTasksScreen()
+        app = DummyHostApp(screen)
+        app.task_manager.register(task_run)
+        app.current_session_id = "main-1"
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            screen.update_tasks_list()
+
+            opt_list = screen.query_one("#shell-option-list", OptionList)
+            screen.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option("read answer"), 1))
+            self.assertEqual(screen.step, 2)
+            stdin_inp = screen.query_one("#shell-stdin-input", Input)
+            self.assertTrue(stdin_inp.display)
+
+            # send input
+            stdin_inp.value = "my-input"
+            screen.on_input_submitted(Input.Submitted(stdin_inp, "my-input"))
+            await pilot.pause()
+            task_run.send_input.assert_called_once_with("my-input")
+
+            # live output chunk
+            screen._on_console_output("output line\n")
+            await pilot.pause()
+
+            # kill on step 2
+            await screen.action_kill_task()
+            await pilot.pause()
+            task_run.kill.assert_called_once()
+            self.assertFalse(stdin_inp.display)
+
+            # escape back to step 1
+            await pilot.press("escape")
+            await pilot.pause()
+            self.assertEqual(screen.step, 1)
 
     async def test_help_screen_pilot(self):
         screen = HelpScreen()

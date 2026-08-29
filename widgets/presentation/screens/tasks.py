@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Any, Optional
 
@@ -24,7 +25,7 @@ from widgets.presentation.tool_display import (
     is_subagent_running,
 )
 from widgets.utils.key_aliases import expand_bindings
-from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, format_badge_row, option_list_row_width
+from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, ellipsize, format_badge_row, option_list_row_width
 
 
 def _format_duration(seconds: float) -> str:
@@ -372,7 +373,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         self._last_signatures = new_signatures
 
         if not tasks:
-            if not self.search_query:
+            if not self.search_query and getattr(self, "step", 1) == 1:
                 self.filtered_tasks = []
                 self.dismiss()
                 return
@@ -442,7 +443,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
 
 class ShellTasksScreen(BaseTasksListScreen):
-    """Modal screen listing background shell tasks with console view and kill."""
+    """Modal screen listing background shell tasks with 2-step in-place console view, stdin and kill."""
 
     title_id = "shell-title"
     option_list_id = "shell-option-list"
@@ -451,19 +452,58 @@ class ShellTasksScreen(BaseTasksListScreen):
     def __init__(self):
         super().__init__()
         self._observed_tasks: set = set()
+        self.step = 1
+        self.selected_task: Optional[Any] = None
+        self.selected_step1_index: Optional[int] = None
+        self._pending_line = ""
 
     def _get_header_md(self) -> str:
         return "### **Shell Tasks**"
 
+    def compose(self) -> ComposeResult:
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
+            yield Markdown(
+                self._get_header_md(), id=self.title_id, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
+            )
+            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
+            yield HeaderWrapOptionList(id=self.option_list_id)
+            yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
+            yield Input(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input")
+            yield Label(f"{self.hint_action_name} • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
+
+    def on_mount(self) -> None:
+        super().on_mount()
+        try:
+            self.query_one("#console-log", RichLog).display = False
+            self.query_one("#shell-stdin-input", Input).display = False
+        except Exception:
+            pass
+
+    def _apply_dynamic_log_height(self) -> None:
+        try:
+            log_widget = self.query_one("#console-log", RichLog)
+            screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            log_widget.styles.max_height = max(5, min(18, screen_h - 8))
+        except Exception:
+            pass
+
     def _on_task_event(self, _text: str = "") -> None:
         if hasattr(self, "app") and self.app and self.is_mounted:
             try:
-                self.app.call_from_thread(self.update_tasks_list)
+                self.app.call_from_thread(self._handle_task_event_dispatch)
             except Exception:
                 try:
-                    self.update_tasks_list()
+                    self._handle_task_event_dispatch()
                 except Exception:
                     pass
+
+    def _handle_task_event_dispatch(self) -> None:
+        if not self.is_mounted:
+            return
+        if self.step == 1:
+            self.update_tasks_list()
+        elif self.step == 2 and self.selected_task:
+            self._update_step2_state()
 
     def _sync_task_listeners(self, tasks: list) -> None:
         for t in tasks:
@@ -475,6 +515,7 @@ class ShellTasksScreen(BaseTasksListScreen):
                     pass
 
     def on_unmount(self) -> None:
+        self._detach_step2_console()
         for t in list(self._observed_tasks):
             if hasattr(t, "remove_listener"):
                 try:
@@ -482,6 +523,13 @@ class ShellTasksScreen(BaseTasksListScreen):
                 except Exception:
                     pass
         self._observed_tasks.clear()
+
+    def _detach_step2_console(self) -> None:
+        if self.selected_task and hasattr(self.selected_task, "remove_listener"):
+            try:
+                self.selected_task.remove_listener(self._on_console_output)
+            except Exception:
+                pass
 
     def _get_filtered_tasks(self) -> list:
         all_tasks = []
@@ -523,7 +571,213 @@ class ShellTasksScreen(BaseTasksListScreen):
         )
 
     def _on_task_selected(self, item: dict) -> None:
-        self.app.push_screen(TaskConsoleScreen(item["raw_obj"]))
+        raw = item.get("raw_obj")
+        if raw is not None:
+            self._show_step_2(raw)
+
+    def _show_step_2(self, task: Any) -> None:
+        self.step = 2
+        self.selected_task = task
+        self._pending_line = ""
+
+        clean = " ".join(getattr(task, "command", "").replace("\n", " ").replace("\r", " ").split())
+        target_w = self._row_width()
+        clean_preview = ellipsize(clean, max(12, target_w - 14)) if clean else "(task)"
+
+        try:
+            title_md = self.query_one(f"#{self.title_id}", Markdown)
+            title_md.update(f"### **Shell Task: {clean_preview}**")
+        except Exception:
+            pass
+
+        try:
+            self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input).display = False
+            self.query_one(f"#{self.option_list_id}", OptionList).display = False
+        except Exception:
+            pass
+
+        log_widget = None
+        try:
+            log_widget = self.query_one("#console-log", RichLog)
+            log_widget.display = True
+            log_widget.clear()
+            self._apply_dynamic_log_height()
+        except Exception:
+            pass
+
+        has_history = False
+        for chunk in getattr(getattr(task, "output", None), "history", []):
+            if chunk.strip():
+                has_history = True
+            self._consume(strip_ansi(chunk))
+        if not has_history:
+            if getattr(task, "is_running", False):
+                if log_widget:
+                    log_widget.write("(Waiting for command output...)")
+            else:
+                if log_widget:
+                    log_widget.write("(No output produced)")
+        if log_widget:
+            log_widget.scroll_end(animate=False)
+
+        if hasattr(task, "add_listener"):
+            try:
+                task.add_listener(self._on_console_output)
+            except Exception:
+                pass
+
+        self._update_step2_state()
+
+    def _update_step2_state(self) -> None:
+        if self.step != 2 or not self.selected_task:
+            return
+        is_running = getattr(self.selected_task, "is_running", False)
+
+        try:
+            stdin_inp = self.query_one("#shell-stdin-input", Input)
+            if is_running:
+                stdin_inp.display = True
+                stdin_inp.focus()
+            else:
+                stdin_inp.display = False
+                try:
+                    log_widget = self.query_one("#console-log", RichLog)
+                    log_widget.focus()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        try:
+            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
+            if is_running:
+                hint.update("enter: send stdin • ctrl+k: kill • esc: back")
+            else:
+                hint.update("esc: back")
+        except Exception:
+            pass
+
+    def _show_step_1(self) -> None:
+        self._detach_step2_console()
+        self.step = 1
+        self.selected_task = None
+        self._pending_line = ""
+
+        try:
+            title_md = self.query_one(f"#{self.title_id}", Markdown)
+            title_md.update(self._get_header_md())
+        except Exception:
+            pass
+
+        try:
+            self.query_one("#console-log", RichLog).display = False
+            self.query_one("#shell-stdin-input", Input).display = False
+            self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input).display = True
+            self.query_one(f"#{self.option_list_id}", OptionList).display = True
+        except Exception:
+            pass
+
+        self._last_signatures = None
+        self.update_tasks_list()
+
+        try:
+            self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input).focus()
+        except Exception:
+            try:
+                self._get_option_list().focus()
+            except Exception:
+                pass
+
+    def _on_console_output(self, text: str) -> None:
+        if hasattr(self, "app") and self.app and self.is_mounted:
+            try:
+                self.app.call_from_thread(self._handle_live_chunk, text)
+            except Exception:
+                try:
+                    self._handle_live_chunk(text)
+                except Exception:
+                    pass
+
+    def _handle_live_chunk(self, text: str) -> None:
+        if self.step != 2:
+            return
+        if text:
+            self._consume(text)
+        else:
+            self._flush_pending()
+            self._update_step2_state()
+
+    def _is_at_bottom(self, threshold: int = 2) -> bool:
+        try:
+            log_widget = self.query_one("#console-log", RichLog)
+            return (log_widget.max_scroll_y - log_widget.scroll_y) <= threshold
+        except Exception:
+            return True
+
+    def _consume(self, text: str) -> None:
+        try:
+            log_widget = self.query_one("#console-log", RichLog)
+        except Exception:
+            return
+        combined = self._pending_line + text
+        parts = combined.split("\n")
+        self._pending_line = parts.pop()
+        at_bottom = self._is_at_bottom()
+        for line in parts:
+            log_widget.write(process_carriage_returns(line), scroll_end=at_bottom)
+
+    def _flush_pending(self) -> None:
+        if self._pending_line:
+            try:
+                log_widget = self.query_one("#console-log", RichLog)
+                at_bottom = self._is_at_bottom()
+                log_widget.write(process_carriage_returns(self._pending_line), scroll_end=at_bottom)
+            except Exception:
+                pass
+            self._pending_line = ""
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        if self.step == 2 and event.input.id == "shell-stdin-input":
+            val = event.value
+            event.input.value = ""
+            if self.selected_task and getattr(self.selected_task, "is_running", False):
+                if hasattr(self.selected_task, "send_input"):
+                    asyncio.create_task(self.selected_task.send_input(val))
+            return
+        super().on_input_submitted(event)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if self.step == 1:
+            super().on_input_changed(event)
+
+    def on_resize(self, event: events.Resize) -> None:
+        if self.step == 1:
+            super().on_resize(event)
+        elif self.step == 2:
+            self._apply_dynamic_log_height()
+
+    def _on_key(self, event: events.Key) -> None:
+        if self.step == 2:
+            if event.key == "escape":
+                self._show_step_1()
+                event.prevent_default()
+                event.stop()
+                return
+        super()._on_key(event)
+
+    def action_close(self) -> None:
+        if self.step == 2:
+            self._show_step_1()
+        else:
+            self.dismiss()
+
+    async def action_kill_task(self) -> None:
+        if self.step == 2:
+            if self.selected_task and getattr(self.selected_task, "is_running", False):
+                await self._kill_item({"raw_obj": self.selected_task})
+                self._update_step2_state()
+            return
+        await super().action_kill_task()
 
     async def _kill_item(self, item: dict) -> None:
         raw = item["raw_obj"]

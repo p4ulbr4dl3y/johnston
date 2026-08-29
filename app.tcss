@@ -1046,6 +1046,15 @@ ModalScreen OptionList > .option-list--option-hover {
     padding: 0 1;
 }
 
+#modal-dialog #shell-stdin-input,
+#modal-dialog #shell-stdin-input:focus,
+#shell-stdin-input,
+#shell-stdin-input:focus {
+    margin: 0;
+    border-left: solid $border;
+    padding: 0 1;
+}
+
 #modal-dialog Input > .input--placeholder,
 #modal-search-input > .input--placeholder,
 #write-in-input > .input--placeholder,
