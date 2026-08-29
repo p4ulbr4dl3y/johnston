@@ -37,7 +37,12 @@ class CommandSuggestions(HeaderWrapOptionList):
         home = os.path.realpath(os.path.expanduser("~"))
 
         is_home_or_root = real_cwd == home or os.path.dirname(real_cwd) == real_cwd
-        max_files = 300 if is_home_or_root else 1000
+        try:
+            from core.infrastructure.config.settings import get_settings
+            cfg_limit = get_settings().ui.autocomplete_max_files
+        except Exception:
+            cfg_limit = 1000
+        max_files = min(300, cfg_limit) if is_home_or_root else cfg_limit
 
         from core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
 

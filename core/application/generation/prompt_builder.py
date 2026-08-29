@@ -7,6 +7,7 @@ from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.application.skills.manager import get_skill_manager
+from core.domain.defaults.config import DEFAULT_AGENT_MD_MAX_CHARS
 from core.domain.defaults.prompts import (
     DEFAULT_SYSTEM_PROMPT,
     SUBAGENT_DEFAULT_SYSTEM_PROMPT,
@@ -151,8 +152,13 @@ def get_project_instruction_rules(cwd: str = None) -> List[Any]:
                 with open(filepath, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
                 if content:
-                    if len(content) > 20000:
-                        content = content[:20000] + "\n... [Project instructions truncated at 20000 chars]"
+                    try:
+                        from core.infrastructure.config.settings import get_settings
+                        max_chars = get_settings().llm.agent_md_max_chars
+                    except Exception:
+                        max_chars = DEFAULT_AGENT_MD_MAX_CHARS
+                    if len(content) > max_chars:
+                        content = content[:max_chars] + f"\n... [Project instructions truncated at {max_chars} chars]"
                     found_rules.append(RuleDefinition(name=name, content=content, source="project"))
             except Exception:
                 pass

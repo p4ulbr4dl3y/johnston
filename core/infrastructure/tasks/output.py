@@ -14,6 +14,7 @@ import threading
 import uuid
 from typing import List, Optional
 
+from core.domain.defaults.config import DEFAULT_SUBAGENT_RESULT_MAX_CHARS
 from core.infrastructure.platform.paths import LOGS_DIR
 
 __all__ = [
@@ -260,7 +261,7 @@ class OutputLog:
         self.close()
 
 
-MAX_SUBAGENT_RESULT_CHARS = 15000
+MAX_SUBAGENT_RESULT_CHARS = DEFAULT_SUBAGENT_RESULT_MAX_CHARS
 
 
 def truncate_subagent_result(text: str, session_id: str = "") -> str:

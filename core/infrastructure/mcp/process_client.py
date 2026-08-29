@@ -15,6 +15,7 @@ import threading
 import time
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
+from core.domain.defaults.config import DEFAULT_MCP_CALL_TIMEOUT, DEFAULT_MCP_INIT_TIMEOUT
 from core.domain.defaults.errors import format_tool_error
 
 logger = logging.getLogger(__name__)
@@ -26,8 +27,8 @@ CLIENT_VERSION = "1.0.0"
 # Default upper bound for a tools/call round-trip. A hanging server must never
 # hold an agent turn forever; both the manager and direct callers get this
 # default when no explicit timeout is passed.
-DEFAULT_TOOLS_CALL_TIMEOUT = 120.0
-INIT_TIMEOUT = 5.0
+DEFAULT_TOOLS_CALL_TIMEOUT = DEFAULT_MCP_CALL_TIMEOUT
+INIT_TIMEOUT = DEFAULT_MCP_INIT_TIMEOUT
 STDERR_TAIL_LINES = 200
 
 

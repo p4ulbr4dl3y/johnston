@@ -71,9 +71,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     DISPLAY_NAMES = DISPLAY_NAMES
     SYSTEM_TOOLS = SYSTEM_TOOLS
-
-    _RAW_BASH_LIMIT = 200 * 1024  # 200 KB retained raw buffer
     _RAW_BASH_TRUNC = "[…[truncated]]\n"
+
+    @property
+    def _RAW_BASH_LIMIT(self) -> int:
+        return get_settings().ui.shell_stream_buffer_bytes
 
     def __init__(
         self,

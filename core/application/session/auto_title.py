@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from core.domain.defaults.config import (
     DEFAULT_AUTO_TITLE,
+    DEFAULT_AUTO_TITLE_MAX_LEN,
     DEFAULT_AUTO_TITLE_MAX_TOKENS,
     DEFAULT_AUTO_TITLE_TIMEOUT,
 )
@@ -17,7 +18,7 @@ from core.infrastructure.config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
-def clean_heuristic_title(text: str, max_len: int = 45) -> str:
+def clean_heuristic_title(text: str, max_len: int = DEFAULT_AUTO_TITLE_MAX_LEN) -> str:
     """Generate a clean single-line fallback title from raw user input text."""
     if not text:
         return ""

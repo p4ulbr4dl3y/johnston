@@ -11,6 +11,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.domain.defaults.config import DEFAULT_MCP_CALL_TIMEOUT
 from core.infrastructure.mcp.process_client import MCPProcessClient
 from core.infrastructure.platform.paths import CONFIG_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json
@@ -19,10 +20,6 @@ logger = logging.getLogger(__name__)
 
 GLOBAL_MCP_FILE = os.path.join(CONFIG_DIR, "mcp.json")
 PROJECT_MCP_FILE = os.path.join(".johnston", "mcp.json")
-
-# Default upper bound for an MCP tools/call round-trip. A hanging server must
-# never hold an agent turn forever; callers without an explicit timeout get this.
-DEFAULT_MCP_CALL_TIMEOUT = 120.0
 
 _mcp_manager_instance: Optional["MCPManager"] = None
 _atexit_registered = False

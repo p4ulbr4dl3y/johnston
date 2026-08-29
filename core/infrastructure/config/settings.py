@@ -9,27 +9,39 @@ from typing import Any, Dict, Optional, Tuple
 from core.domain.defaults.config import (
     COMPACTION_SUMMARIZE_RATIO,
     CONTEXT_COMPACTION_THRESHOLD_RATIO,
+    DEFAULT_AGENT_MD_MAX_CHARS,
     DEFAULT_AUTO_TITLE,
+    DEFAULT_AUTO_TITLE_MAX_LEN,
     DEFAULT_AUTO_TITLE_TIMEOUT,
+    DEFAULT_AUTOCOMPLETE_MAX_FILES,
+    DEFAULT_CATALOG_CACHE_TTL,
     DEFAULT_CB_COOLDOWN_SECONDS,
     DEFAULT_CB_FAILURE_THRESHOLD,
+    DEFAULT_CHAT_INPUT_MAX_LINES,
     DEFAULT_CHAT_PAGE_SIZE,
     DEFAULT_CHUNK_TIMEOUT,
     DEFAULT_COMPACTION_USER_BUDGET,
     DEFAULT_CONTEXT_LIMIT,
     DEFAULT_DISK_CACHE_TTL,
+    DEFAULT_DOC_CONVERSION_TIMEOUT,
+    DEFAULT_IMAGE_MAX_DIMENSION,
     DEFAULT_LOG_MAX_AGE_DAYS,
     DEFAULT_LOG_MAX_BYTES,
+    DEFAULT_MAX_DIR_ENTRIES,
     DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_RETRY_DELAY,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MCP_CALL_TIMEOUT,
     DEFAULT_MCP_INIT_TIMEOUT,
+    DEFAULT_PASTE_LINE_THRESHOLD,
+    DEFAULT_PERMISSIONS,
     DEFAULT_PROMPT_HISTORY,
+    DEFAULT_READ_LINE_WINDOW,
     DEFAULT_RETRY_BACKOFF,
     DEFAULT_RETRY_DELAY,
     DEFAULT_SHELL_MAX_CAP,
     DEFAULT_SHELL_OUTPUT_CHARS,
+    DEFAULT_SHELL_STREAM_BUFFER_BYTES,
     DEFAULT_SHELL_TIMEOUT,
     DEFAULT_SNAPSHOT_LOG_BYTES,
     DEFAULT_STREAM_FLUSH_INTERVAL,
@@ -39,6 +51,7 @@ from core.domain.defaults.config import (
     DEFAULT_TOOL_OUTPUT_CHARS,
     DEFAULT_TOOL_PAYLOAD_BYTES,
     DEFAULT_WEB_FETCH_TIMEOUT,
+    DEFAULT_WEB_USER_AGENT,
     MAX_CONCURRENT_SUBAGENTS,
 )
 from core.infrastructure.platform import paths
@@ -96,6 +109,13 @@ def _env_bool(key: str, default: bool) -> bool:
     return default
 
 
+def _env_str(key: str, default: str) -> str:
+    val = os.getenv(key)
+    if val is not None and val.strip():
+        return val.strip()
+    return default
+
+
 @dataclass
 class LLMSettings:
     context_limit: int = DEFAULT_CONTEXT_LIMIT
@@ -113,6 +133,9 @@ class LLMSettings:
     cb_cooldown_seconds: float = DEFAULT_CB_COOLDOWN_SECONDS
     auto_title: bool = DEFAULT_AUTO_TITLE
     auto_title_timeout: float = DEFAULT_AUTO_TITLE_TIMEOUT
+    auto_title_max_len: int = DEFAULT_AUTO_TITLE_MAX_LEN
+    catalog_cache_ttl: float = DEFAULT_CATALOG_CACHE_TTL
+    agent_md_max_chars: int = DEFAULT_AGENT_MD_MAX_CHARS
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> LLMSettings:
@@ -192,6 +215,21 @@ class LLMSettings:
                 _safe_float(sec.get("auto_title_timeout"), DEFAULT_AUTO_TITLE_TIMEOUT, min_val=0.1),
                 min_val=0.1,
             ),
+            auto_title_max_len=_env_int(
+                "JOHNSTON_AUTO_TITLE_MAX_LEN",
+                _safe_int(sec.get("auto_title_max_len"), DEFAULT_AUTO_TITLE_MAX_LEN, min_val=10),
+                min_val=10,
+            ),
+            catalog_cache_ttl=_env_float(
+                "JOHNSTON_CATALOG_CACHE_TTL",
+                _safe_float(sec.get("catalog_cache_ttl"), DEFAULT_CATALOG_CACHE_TTL, min_val=0.0),
+                min_val=0.0,
+            ),
+            agent_md_max_chars=_env_int(
+                "JOHNSTON_AGENT_MD_MAX_CHARS",
+                _safe_int(sec.get("agent_md_max_chars"), DEFAULT_AGENT_MD_MAX_CHARS, min_val=1000),
+                min_val=1000,
+            ),
         )
 
 
@@ -206,10 +244,16 @@ class ToolsSettings:
     mcp_call_timeout: float = DEFAULT_MCP_CALL_TIMEOUT
     mcp_init_timeout: float = DEFAULT_MCP_INIT_TIMEOUT
     web_fetch_timeout: float = DEFAULT_WEB_FETCH_TIMEOUT
+    read_line_window: int = DEFAULT_READ_LINE_WINDOW
+    max_dir_entries: int = DEFAULT_MAX_DIR_ENTRIES
+    doc_conversion_timeout: float = DEFAULT_DOC_CONVERSION_TIMEOUT
+    image_max_dimension: int = DEFAULT_IMAGE_MAX_DIMENSION
+    web_user_agent: str = DEFAULT_WEB_USER_AGENT
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ToolsSettings:
         sec = data.get("tools") if isinstance(data.get("tools"), dict) else {}
+        ua_val = sec.get("web_user_agent") if isinstance(sec.get("web_user_agent"), str) and sec.get("web_user_agent").strip() else DEFAULT_WEB_USER_AGENT
         return cls(
             shell_default_timeout=_env_float(
                 "JOHNSTON_SHELL_TIMEOUT",
@@ -256,6 +300,27 @@ class ToolsSettings:
                 _safe_float(sec.get("web_fetch_timeout"), DEFAULT_WEB_FETCH_TIMEOUT, min_val=0.1),
                 min_val=0.1,
             ),
+            read_line_window=_env_int(
+                "JOHNSTON_READ_LINE_WINDOW",
+                _safe_int(sec.get("read_line_window"), DEFAULT_READ_LINE_WINDOW, min_val=10),
+                min_val=10,
+            ),
+            max_dir_entries=_env_int(
+                "JOHNSTON_MAX_DIR_ENTRIES",
+                _safe_int(sec.get("max_dir_entries"), DEFAULT_MAX_DIR_ENTRIES, min_val=5),
+                min_val=5,
+            ),
+            doc_conversion_timeout=_env_float(
+                "JOHNSTON_DOC_CONVERSION_TIMEOUT",
+                _safe_float(sec.get("doc_conversion_timeout"), DEFAULT_DOC_CONVERSION_TIMEOUT, min_val=0.5),
+                min_val=0.5,
+            ),
+            image_max_dimension=_env_int(
+                "JOHNSTON_IMAGE_MAX_DIMENSION",
+                _safe_int(sec.get("image_max_dimension"), DEFAULT_IMAGE_MAX_DIMENSION, min_val=128),
+                min_val=128,
+            ),
+            web_user_agent=_env_str("JOHNSTON_WEB_USER_AGENT", ua_val),
         )
 
 
@@ -290,6 +355,10 @@ class UISettings:
     max_prompt_history: int = DEFAULT_PROMPT_HISTORY
     stream_flush_interval: float = DEFAULT_STREAM_FLUSH_INTERVAL
     chat_page_size: int = DEFAULT_CHAT_PAGE_SIZE
+    paste_line_threshold: int = DEFAULT_PASTE_LINE_THRESHOLD
+    chat_input_max_lines: int = DEFAULT_CHAT_INPUT_MAX_LINES
+    autocomplete_max_files: int = DEFAULT_AUTOCOMPLETE_MAX_FILES
+    shell_stream_buffer_bytes: int = DEFAULT_SHELL_STREAM_BUFFER_BYTES
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> UISettings:
@@ -309,6 +378,26 @@ class UISettings:
                 "JOHNSTON_CHAT_PAGE_SIZE",
                 _safe_int(sec.get("chat_page_size"), DEFAULT_CHAT_PAGE_SIZE, min_val=1),
                 min_val=1,
+            ),
+            paste_line_threshold=_env_int(
+                "JOHNSTON_PASTE_LINE_THRESHOLD",
+                _safe_int(sec.get("paste_line_threshold"), DEFAULT_PASTE_LINE_THRESHOLD, min_val=1),
+                min_val=1,
+            ),
+            chat_input_max_lines=_env_int(
+                "JOHNSTON_CHAT_INPUT_MAX_LINES",
+                _safe_int(sec.get("chat_input_max_lines"), DEFAULT_CHAT_INPUT_MAX_LINES, min_val=2),
+                min_val=2,
+            ),
+            autocomplete_max_files=_env_int(
+                "JOHNSTON_AUTOCOMPLETE_MAX_FILES",
+                _safe_int(sec.get("autocomplete_max_files"), DEFAULT_AUTOCOMPLETE_MAX_FILES, min_val=10),
+                min_val=10,
+            ),
+            shell_stream_buffer_bytes=_env_int(
+                "JOHNSTON_SHELL_STREAM_BUFFER_BYTES",
+                _safe_int(sec.get("shell_stream_buffer_bytes"), DEFAULT_SHELL_STREAM_BUFFER_BYTES, min_val=1024),
+                min_val=1024,
             ),
         )
 
@@ -346,6 +435,7 @@ class JohnstonSettings:
     active_provider: Optional[str] = None
     theme: Optional[str] = None
     sandbox_enabled: bool = False
+    permissions: Dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_PERMISSIONS))
     llm: LLMSettings = field(default_factory=LLMSettings)
     tools: ToolsSettings = field(default_factory=ToolsSettings)
     subagents: SubagentsSettings = field(default_factory=SubagentsSettings)
@@ -368,10 +458,15 @@ class JohnstonSettings:
             else:
                 sandbox_val = False
 
+        perms = data.get("permissions")
+        if not isinstance(perms, dict):
+            perms = dict(DEFAULT_PERMISSIONS)
+
         return cls(
             active_provider=data.get("active_provider") if isinstance(data.get("active_provider"), str) else None,
             theme=theme.strip() if theme else None,
             sandbox_enabled=_env_bool("JOHNSTON_SANDBOX_ENABLED", sandbox_val),
+            permissions=perms,
             llm=LLMSettings.from_dict(data),
             tools=ToolsSettings.from_dict(data),
             subagents=SubagentsSettings.from_dict(data),
@@ -434,6 +529,7 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
         elif "theme" in data:
             data.pop("theme", None)
         data["sandbox_enabled"] = settings.sandbox_enabled
+        data["permissions"] = settings.permissions
         data["subagents"] = asdict(settings.subagents)
         data["llm"] = asdict(settings.llm)
         data["tools"] = asdict(settings.tools)
@@ -443,3 +539,15 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
         reload_settings(target_file)
     except Exception:
         pass
+
+
+def patch_settings(config_file: Optional[str] = None, **kwargs: Any) -> JohnstonSettings:
+    """Partially updates current settings, saves them to disk and returns reloaded instance."""
+    target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
+    current = load_settings(target_file)
+    for key, value in kwargs.items():
+        if hasattr(current, key):
+            setattr(current, key, value)
+    save_settings(current, target_file)
+    return get_settings(target_file, force_reload=True)
+

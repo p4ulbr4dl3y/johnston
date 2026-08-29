@@ -50,7 +50,9 @@ class ChatInput(TextArea):
             self.value = value
             self.attachments = list(attachments or [])
 
-    PASTE_LINE_THRESHOLD = 10
+    @property
+    def PASTE_LINE_THRESHOLD(self) -> int:
+        return get_settings().ui.paste_line_threshold
 
     @property
     def MAX_PROMPT_HISTORY(self) -> int:
@@ -127,7 +129,8 @@ class ChatInput(TextArea):
         raw_lines = len(self.text.split("\n"))
         wrapped_lines = getattr(self.wrapped_document, "height", 1) if hasattr(self, "wrapped_document") else 1
         lines = max(raw_lines, wrapped_lines)
-        target_height = max(2, min(lines + 1, 6))
+        max_lines = get_settings().ui.chat_input_max_lines
+        target_height = max(2, min(lines + 1, max_lines))
         h = self.styles.height
         if h is None or h.value != target_height or str(getattr(h, "unit", "")) != "Unit.CELLS":
             self.styles.height = target_height

@@ -13,7 +13,7 @@ from typing import Any, Dict, FrozenSet, Optional, Set
 
 import httpx
 
-from core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
+from core.domain.defaults.config import DEFAULT_CATALOG_CACHE_TTL, DEFAULT_CONTEXT_LIMIT
 from core.domain.entities.models import ModelPricing, ModelSpec
 from core.domain.policies.model_catalog_policy import (
     _RE_FUZZY_STRIP,
@@ -31,7 +31,7 @@ from core.infrastructure.platform.platform_utils import (
 logger = logging.getLogger(__name__)
 
 CACHE_FILE = os.path.join(CONFIG_DIR, "cache", "models_catalog_cache.json")
-CACHE_TTL = 86400  # 24 hours
+CACHE_TTL = DEFAULT_CATALOG_CACHE_TTL
 
 # Upper bound on the in-memory model-match cache to prevent unbounded growth.
 _MATCH_CACHE_MAX = 1000
