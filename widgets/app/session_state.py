@@ -23,22 +23,18 @@ def collect_session_data(app: Any) -> Optional[dict]:
         return None
 
     messages = list(session.messages)
-
-    title = ""
-    for msg in messages:
-        if isinstance(msg, dict) and msg.get("type") == "user" and is_ui_visible_user_message(msg):
-            first_msg = str(msg.get("display_text") or msg.get("text", "")).strip()
-            clean = " ".join(first_msg.split())
-            title = clean
-            break
-    if not title:
+    has_user_msg = any(
+        isinstance(msg, dict) and msg.get("type") == "user" and is_ui_visible_user_message(msg)
+        for msg in messages
+    )
+    if not has_user_msg:
         return None
 
     agent_history = getattr(app.agent, "history", [])
 
     return {
         "id": app.current_session_id,
-        "title": title,
+        "title": getattr(session, "_title", "") or "",
         "role": getattr(app.agent, "role", getattr(app, "role", "worker")),
         "messages": messages,
         "agent_history": agent_history,

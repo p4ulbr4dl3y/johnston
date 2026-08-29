@@ -161,7 +161,8 @@ class SessionPersistenceMixin:
             return
         with _global_session_write_lock:
             session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
-            session.title = session._title or session_data.get("title", "")
+            if session_data.get("title"):
+                session.title = session_data["title"]
             if "role" in session_data:
                 session.role = session_data["role"]
             session.messages = session_data.get("messages", [])

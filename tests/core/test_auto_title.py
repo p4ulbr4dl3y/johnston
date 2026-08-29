@@ -279,3 +279,38 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sess.title, "Test auto titling integration")
         app.sm.save.assert_called_with(sess)
         self.assertTrue(app.footer_refreshed)
+
+    def test_collect_session_data_preserves_empty_title(self):
+        from widgets.app.session_state import collect_session_data
+
+        app = MagicMock()
+        app.current_session_id = "s-new"
+        sess = AgentSession("s-new")
+        sess.messages = [{"type": "user", "text": "Very long user prompt that should not become _title"}]
+        app.sm.get.return_value = sess
+        app.agent.role = "worker"
+        app.agent.history = []
+
+        data = collect_session_data(app)
+        self.assertIsNotNone(data)
+        self.assertEqual(data["title"], "")
+        self.assertEqual(sess._title, "")
+
+    def test_write_session_data_preserves_existing_title(self):
+        from widgets.mixins.session_persistence import SessionPersistenceMixin
+
+        class PersistenceApp(SessionPersistenceMixin):
+            def __init__(self):
+                self.current_session_id = "s-pers"
+                self.sm = MagicMock()
+
+        app = PersistenceApp()
+        sess = AgentSession("s-pers", title="Existing Title")
+        app.sm.get.return_value = sess
+
+        app._write_session_data({"title": ""})
+        self.assertEqual(sess._title, "Existing Title")
+
+        app._write_session_data({"title": "New Explicit Title"})
+        self.assertEqual(sess._title, "New Explicit Title")
+
