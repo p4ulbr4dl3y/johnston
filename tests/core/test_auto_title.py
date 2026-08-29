@@ -45,6 +45,51 @@ class TestAutoTitleHelpers(unittest.TestCase):
             sanitize_title("<think>Let's summarize this.</think>\nDocker Compose Setup"),
             "Docker Compose Setup",
         )
+        self.assertEqual(
+            sanitize_title("Sure! Here is the title: Rate Limiting Implementation"),
+            "Rate Limiting Implementation",
+        )
+
+    def test_parse_session_title_multi_tier(self):
+        from core.application.session.auto_title import parse_session_title
+
+        # Tier 1: Strict JSON
+        self.assertEqual(
+            parse_session_title('{"title": "Fix login button on mobile"}'),
+            "Fix login button on mobile",
+        )
+
+        # Tier 2: Embedded JSON in markdown
+        self.assertEqual(
+            parse_session_title('```json\n{"title": "Setup OAuth2 flow"}\n```'),
+            "Setup OAuth2 flow",
+        )
+
+        # Tier 3: Quoted title in text
+        self.assertEqual(
+            parse_session_title('I suggest the title "Optimize Redis Cache" for this thread.'),
+            "Optimize Redis Cache",
+        )
+
+        # Tier 4: Plain line with conversational prose
+        self.assertEqual(
+            parse_session_title("Here is a title: Refactor User Service"),
+            "Refactor User Service",
+        )
+
+        # Empty / unusable
+        self.assertEqual(parse_session_title(""), "")
+        self.assertEqual(parse_session_title("   "), "")
+
+    def test_extract_first_json_object(self):
+        from core.application.session.auto_title import extract_first_json_object
+
+        self.assertEqual(extract_first_json_object('{"title": "test"}'), '{"title": "test"}')
+        self.assertEqual(
+            extract_first_json_object('Some preamble {"title": "nested {val}"} trailing'),
+            '{"title": "nested {val}"}',
+        )
+        self.assertIsNone(extract_first_json_object("No json object here"))
 
     def test_extract_title_from_thought(self):
         from core.application.session.auto_title import extract_title_from_thought
