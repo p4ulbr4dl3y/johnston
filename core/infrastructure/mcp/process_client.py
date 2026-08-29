@@ -32,6 +32,16 @@ INIT_TIMEOUT = DEFAULT_MCP_INIT_TIMEOUT
 STDERR_TAIL_LINES = 200
 
 
+def _config_init_timeout() -> float:
+    """Return the configured MCP init timeout (tools.mcp_init_timeout)."""
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        return get_settings().tools.mcp_init_timeout
+    except Exception:
+        return INIT_TIMEOUT
+
+
 class MCPProcessClient:
     """Stdio JSON-RPC 2.0 client for MCP servers with Async Multiplexing support."""
 
@@ -744,7 +754,7 @@ class MCPProcessClient:
             },
         }
         self._send(init_req)
-        res = self._read_response(req_id=current_id, timeout=INIT_TIMEOUT)
+        res = self._read_response(req_id=current_id, timeout=_config_init_timeout())
         if not res:
             self.last_error = "Server did not respond to initialize request (timeout)"
             return False
@@ -774,7 +784,7 @@ class MCPProcessClient:
                 },
                 "clientInfo": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
             },
-            timeout=INIT_TIMEOUT,
+            timeout=_config_init_timeout(),
         )
         if not res:
             self.last_error = "Server did not respond to initialize request (timeout)"
@@ -800,14 +810,14 @@ class MCPProcessClient:
             current_id = self._next_req_id()
             req = {"jsonrpc": "2.0", "id": current_id, "method": "tools/list"}
             self._send(req)
-            res = self._read_response(req_id=current_id, timeout=INIT_TIMEOUT)
+            res = self._read_response(req_id=current_id, timeout=_config_init_timeout())
             if res and "result" in res:
                 self.tools = res["result"].get("tools", [])
                 self._tools_fetch_time = time.monotonic()
             return self.tools
 
     async def fetch_tools_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("tools/list", timeout=INIT_TIMEOUT)
+        res = await self._send_request_async("tools/list", timeout=_config_init_timeout())
         if res and "result" in res:
             self.tools = res["result"].get("tools", [])
             self._tools_fetch_time = time.monotonic()
@@ -818,13 +828,13 @@ class MCPProcessClient:
             current_id = self._next_req_id()
             req = {"jsonrpc": "2.0", "id": current_id, "method": "resources/list"}
             self._send(req)
-            res = self._read_response(req_id=current_id, timeout=INIT_TIMEOUT)
+            res = self._read_response(req_id=current_id, timeout=_config_init_timeout())
             if res and "result" in res:
                 self.resources = res["result"].get("resources", [])
             return self.resources
 
     async def fetch_resources_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("resources/list", timeout=INIT_TIMEOUT)
+        res = await self._send_request_async("resources/list", timeout=_config_init_timeout())
         if res and "result" in res:
             self.resources = res["result"].get("resources", [])
         return self.resources
@@ -859,13 +869,13 @@ class MCPProcessClient:
             current_id = self._next_req_id()
             req = {"jsonrpc": "2.0", "id": current_id, "method": "prompts/list"}
             self._send(req)
-            res = self._read_response(req_id=current_id, timeout=INIT_TIMEOUT)
+            res = self._read_response(req_id=current_id, timeout=_config_init_timeout())
             if res and "result" in res:
                 self.prompts = res["result"].get("prompts", [])
             return self.prompts
 
     async def fetch_prompts_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("prompts/list", timeout=INIT_TIMEOUT)
+        res = await self._send_request_async("prompts/list", timeout=_config_init_timeout())
         if res and "result" in res:
             self.prompts = res["result"].get("prompts", [])
         return self.prompts

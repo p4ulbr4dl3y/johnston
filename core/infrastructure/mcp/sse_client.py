@@ -25,6 +25,16 @@ DEFAULT_TOOLS_CALL_TIMEOUT = DEFAULT_MCP_CALL_TIMEOUT
 INIT_TIMEOUT = DEFAULT_MCP_INIT_TIMEOUT
 
 
+def _config_init_timeout() -> float:
+    """Return the configured MCP init timeout (tools.mcp_init_timeout)."""
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        return get_settings().tools.mcp_init_timeout
+    except Exception:
+        return INIT_TIMEOUT
+
+
 class MCPSSEClient:
     """HTTP/SSE JSON-RPC 2.0 client for remote MCP servers."""
 
@@ -72,7 +82,9 @@ class MCPSSEClient:
             return True
         return (time.monotonic() - self._tools_fetch_time) >= ttl
 
-    async def start_async(self, timeout: float = INIT_TIMEOUT) -> bool:
+    async def start_async(self, timeout: float | None = None) -> bool:
+        if timeout is None:
+            timeout = _config_init_timeout()
         async with self._start_lock:
             if self.is_alive():
                 return True
@@ -111,7 +123,9 @@ class MCPSSEClient:
                 await self.stop_async()
                 return False
 
-    def start(self, timeout: float = INIT_TIMEOUT) -> bool:
+    def start(self, timeout: float | None = None) -> bool:
+        if timeout is None:
+            timeout = _config_init_timeout()
         try:
             asyncio.get_running_loop()
             import concurrent.futures
@@ -337,7 +351,7 @@ class MCPSSEClient:
                 },
                 "clientInfo": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
             },
-            timeout=INIT_TIMEOUT,
+            timeout=_config_init_timeout(),
         )
         if not res:
             self.last_error = "Server did not respond to initialize request (timeout)"
@@ -357,7 +371,7 @@ class MCPSSEClient:
         return True
 
     async def fetch_tools_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("tools/list", timeout=INIT_TIMEOUT)
+        res = await self._send_request_async("tools/list", timeout=_config_init_timeout())
         if res and "result" in res:
             self.tools = res["result"].get("tools", [])
             self._tools_fetch_time = time.monotonic()
@@ -385,7 +399,7 @@ class MCPSSEClient:
         return self._format_content(result)
 
     async def fetch_resources_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("resources/list", timeout=INIT_TIMEOUT)
+        res = await self._send_request_async("resources/list", timeout=_config_init_timeout())
         if res and "result" in res:
             self.resources = res["result"].get("resources", [])
         return self.resources
@@ -401,7 +415,7 @@ class MCPSSEClient:
         return None
 
     async def fetch_prompts_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("prompts/list", timeout=INIT_TIMEOUT)
+        res = await self._send_request_async("prompts/list", timeout=_config_init_timeout())
         if res and "result" in res:
             self.prompts = res["result"].get("prompts", [])
         return self.prompts

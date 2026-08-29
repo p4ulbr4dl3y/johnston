@@ -15,7 +15,8 @@
       "fg-secondary": "#d4d4d8",
       "fg-muted": "#71717a",
       "fg-inverted": "#09090b",
-      "border": "#27272a"
+      "border": "#27272a",
+      "bg-code": "#333338"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -28,8 +29,8 @@
       "markdown.h4": "bold $fg-primary",
       "markdown.h5": "bold $fg-primary",
       "markdown.h6": "bold $fg-primary",
-      "markdown.code": "$primary on $border",
-      "markdown.code_block": "$fg-secondary on #222225",
+      "markdown.code": "$fg-primary on $bg-code",
+      "markdown.code_block": "$fg-secondary on $bg-surface",
       "markdown.block_quote": "$fg-secondary on $bg-surface",
       "markdown.list": "$fg-muted",
       "markdown.item": "$fg-primary",
@@ -1840,7 +1841,8 @@
       "fg-secondary": "#d4d4d8",
       "fg-muted": "#71717a",
       "fg-inverted": "#09090b",
-      "border": "#27272a"
+      "border": "#27272a",
+      "bg-code": "#333338"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -1853,8 +1855,8 @@
       "markdown.h4": "bold $fg-primary",
       "markdown.h5": "bold $fg-primary",
       "markdown.h6": "bold $fg-primary",
-      "markdown.code": "$primary on $border",
-      "markdown.code_block": "$fg-secondary on #222225",
+      "markdown.code": "$fg-primary on $bg-code",
+      "markdown.code_block": "$fg-secondary on $bg-surface",
       "markdown.block_quote": "$fg-secondary on $bg-surface",
       "markdown.list": "$fg-muted",
       "markdown.item": "$fg-primary",

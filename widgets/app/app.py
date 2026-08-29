@@ -113,18 +113,35 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
     def set_app_theme(self, theme_name: str, persist: bool = True) -> None:
         """Switch active theme across UI tokens, stylesheets and markdown renderers."""
         from widgets.app.theme_manager import theme_manager
+
         theme = theme_manager.set_theme(theme_name, persist=persist)
-        if hasattr(self, 'register_theme'):
-            if theme.name not in getattr(self, 'available_themes', {}):
-                self.register_theme(theme_manager.get_textual_theme(theme))
+        if hasattr(self, "register_theme"):
+            textual_theme = theme_manager.get_textual_theme(theme)
+            self.register_theme(textual_theme)
             self.theme = theme.name
-        if hasattr(self, 'refresh_css'):
+            if hasattr(self, "_watch_theme"):
+                try:
+                    self._watch_theme(theme.name)
+                except Exception:
+                    pass
+            if hasattr(self, "_refresh_truecolor_filter") and hasattr(self, "ansi_theme"):
+                try:
+                    self._refresh_truecolor_filter(self.ansi_theme)
+                except Exception:
+                    pass
+            if hasattr(self, "_invalidate_css"):
+                try:
+                    self._invalidate_css()
+                except Exception:
+                    pass
+        if hasattr(self, "refresh_css"):
             self.refresh_css()
-        if hasattr(self, 'refresh_status_footer'):
+        if hasattr(self, "refresh_status_footer"):
             self.refresh_status_footer()
 
     def get_theme_variable_defaults(self) -> dict[str, str]:
         """Return design token defaults for TCSS stylesheet compilation."""
         from core.domain.defaults.themes import ZINC_DARK
+
         return dict(ZINC_DARK.tcss_vars)
 

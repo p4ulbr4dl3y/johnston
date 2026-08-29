@@ -239,13 +239,15 @@ def apply_textual_patches() -> None:
         dot = "\u25cf"
         _, _, background, color = self.colors
 
-        curr_theme = getattr(self.app, "current_theme", None)
+        from widgets.app.theme_manager import theme_manager
+
+        curr_theme = getattr(self.app, "current_theme", None) or theme_manager.current_theme
         is_dark = getattr(curr_theme, "dark", True) if curr_theme else True
         is_ansi = (
             background.a == 0
             or getattr(background, "ansi", False)
             or getattr(background, "is_ansi_default", False)
-            or getattr(curr_theme, "ansi", False)
+            or getattr(curr_theme, "name", "") == "native"
         )
         if is_ansi:
             from core.infrastructure.platform.terminal_theme import query_terminal_palette

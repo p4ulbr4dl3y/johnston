@@ -36,6 +36,27 @@ def _get_dns_cache_lock() -> asyncio.Lock:
     return _DNS_CACHE_LOCK
 
 
+def _dns_cache_policy() -> tuple[float, int]:
+    """Return the configured (ttl, max) for the SSRF DNS cache."""
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        tools = get_settings().tools
+        return tools.dns_cache_ttl, tools.dns_cache_max
+    except Exception:
+        return _DNS_CACHE_TTL, _MAX_DNS_CACHE
+
+
+def _web_user_agent() -> str:
+    """Return the configured User-Agent for HTTP fetches."""
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        return get_settings().tools.web_user_agent
+    except Exception:
+        return DEFAULT_USER_AGENT
+
+
 def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     # 198.18.0.0/15 is used by transparent proxies / VPNs (Clash, Surge, Sing-box) as Fake-IP pool
     # Normalize IPv4-mapped IPv6 (e.g. ::ffff:198.18.0.21) so the Fake-IP exemption
@@ -63,12 +84,13 @@ async def _is_private_host(url: str) -> bool:
         pass
 
     now = time.monotonic()
+    cache_ttl, cache_max = _dns_cache_policy()
     lock = _get_dns_cache_lock()
     async with lock:
         cached = _DNS_CACHE.get(host)
         if cached is not None:
             cached_ts, cached_res = cached
-            if now - cached_ts < _DNS_CACHE_TTL:
+            if now - cached_ts < cache_ttl:
                 return cached_res
             _DNS_CACHE.pop(host, None)
 
@@ -93,7 +115,7 @@ async def _is_private_host(url: str) -> bool:
             break
 
     async with lock:
-        if len(_DNS_CACHE) >= _MAX_DNS_CACHE:
+        if len(_DNS_CACHE) >= cache_max:
             _DNS_CACHE.clear()
         _DNS_CACHE[host] = (now, is_blocked)
     return is_blocked
@@ -201,7 +223,7 @@ class WebFetchTool(BaseTool):
         raw_mode = bool(args.get("raw", False))
 
         headers = {
-            "User-Agent": DEFAULT_USER_AGENT,
+            "User-Agent": _web_user_agent(),
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
         }

@@ -27,6 +27,16 @@ MAX_LINE_COUNT_CACHE = 500
 _CACHE_LOCK = threading.Lock()
 
 
+def _tools_settings():
+    """Return the tools config, falling back to module defaults on any failure."""
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        return get_settings().tools
+    except Exception:
+        return None
+
+
 def _get_markitdown():
     global _MARKITDOWN_CLS, _MARKITDOWN_INSTANCE
     import markitdown
@@ -57,10 +67,12 @@ def _get_file_line_count(file_path: str, mtime: float, size: int) -> int:
     except Exception:
         return 0
 
+    tools = _tools_settings()
+    line_cap = tools.line_count_cache_max if tools else MAX_LINE_COUNT_CACHE
     with _CACHE_LOCK:
         _LINE_COUNT_CACHE[key] = total
         _LINE_COUNT_CACHE.move_to_end(key)
-        while len(_LINE_COUNT_CACHE) > MAX_LINE_COUNT_CACHE:
+        while len(_LINE_COUNT_CACHE) > line_cap:
             _LINE_COUNT_CACHE.popitem(last=False)
     return total
 
@@ -71,10 +83,12 @@ def get_cached_doc_markdown(path: str) -> str | None:
     except Exception:
         return None
 
+    tools = _tools_settings()
+    doc_ttl = tools.doc_cache_ttl if tools else DOC_CACHE_TTL
     with _CACHE_LOCK:
         if path in _DOC_CACHE:
             cached_mtime, cached_ts, text = _DOC_CACHE[path]
-            if cached_mtime == mtime and (time.monotonic() - cached_ts < DOC_CACHE_TTL):
+            if cached_mtime == mtime and (time.monotonic() - cached_ts < doc_ttl):
                 _DOC_CACHE.move_to_end(path)
                 return text
             del _DOC_CACHE[path]
@@ -87,10 +101,12 @@ def set_cached_doc_markdown(path: str, text: str) -> None:
     except Exception:
         return
 
+    tools = _tools_settings()
+    doc_cap = tools.max_doc_cache if tools else MAX_DOC_CACHE
     with _CACHE_LOCK:
         _DOC_CACHE[path] = (mtime, time.monotonic(), text)
         _DOC_CACHE.move_to_end(path)
-        while len(_DOC_CACHE) > MAX_DOC_CACHE:
+        while len(_DOC_CACHE) > doc_cap:
             _DOC_CACHE.popitem(last=False)
 
 
@@ -148,8 +164,10 @@ def convert_doc_to_markdown_sync(
             try:
                 # Poll communicate() in short slices so a cancellation that lands
                 # mid-conversion can kill the subprocess promptly instead of
-                # leaving it to run up to the full 30s window.
-                stdout, _ = _communicate_cancellable(proc, _interrupted, timeout=30)
+                # leaving it to run up to the full timeout window.
+                tools = _tools_settings()
+                doc_timeout = tools.doc_conversion_timeout if tools else 30.0
+                stdout, _ = _communicate_cancellable(proc, _interrupted, timeout=doc_timeout)
                 if proc.returncode == 0 and stdout:
                     result_text = stdout
             except Exception:
@@ -216,17 +234,23 @@ def process_image_file_sync(path: str, detail: str | None = None, cancel_event: 
 
     from PIL import Image
 
+    tools = _tools_settings()
+    dim_low = tools.image_dimension_low if tools else 512
+    dim_high = tools.image_dimension_high if tools else 2048
+    dim_default = tools.max_image_dimension if tools else 1568
+    png_keep_bytes = tools.image_png_keep_bytes if tools else 1 * 1024 * 1024
+
     try:
         with Image.open(path) as img:
             img_format = (img.format or "JPEG").upper()
             w, h = img.size
 
             if detail == "low":
-                max_dim = 512
+                max_dim = dim_low
             elif detail in ("high", "original"):
-                max_dim = 2048
+                max_dim = dim_high
             else:
-                max_dim = 1568  # Ideal token-efficient resolution for vision LLMs
+                max_dim = dim_default  # Ideal token-efficient resolution for vision LLMs
 
             # Convert color modes
             if img.mode in ("RGBA", "LA", "P", "PA", "CMYK"):
@@ -239,7 +263,7 @@ def process_image_file_sync(path: str, detail: str | None = None, cancel_event: 
                     img = img.convert("RGB")
                 target_format = "JPEG"
                 media_type = "image/jpeg"
-            elif img_format == "PNG" and max(w, h) <= max_dim and os.path.getsize(path) < 1 * 1024 * 1024:
+            elif img_format == "PNG" and max(w, h) <= max_dim and os.path.getsize(path) < png_keep_bytes:
                 img = img.convert("RGB") if img.mode != "RGB" else img
                 target_format = "PNG"
                 media_type = "image/png"
@@ -380,7 +404,8 @@ class ReadTool(BaseTool):
                 try:
                     raw_entries = sorted(os.listdir(path))
                     total_count = len(raw_entries)
-                    MAX_DIR_ENTRIES = 60
+                    tools = _tools_settings()
+                    max_dir_entries = tools.max_dir_entries if tools else 60
 
                     dirs, files = [], []
                     for entry in raw_entries:
@@ -393,8 +418,8 @@ class ReadTool(BaseTool):
                     entries = dirs + files
                     if total_count == 0:
                         content_str = f"[dir: {path} (empty)]"
-                    elif len(entries) > MAX_DIR_ENTRIES:
-                        body = "\n".join(entries[:MAX_DIR_ENTRIES])
+                    elif len(entries) > max_dir_entries:
+                        body = "\n".join(entries[:max_dir_entries])
                         content_str = f"[dir: {path} | total {total_count} (truncated)]\n{body}"
                     else:
                         body = "\n".join(entries)
@@ -494,11 +519,13 @@ class ReadTool(BaseTool):
 
                             for _ in itertools.islice(f, s_line - 1):
                                 pass
+                        tools = _tools_settings()
+                        window = tools.read_line_window if tools else DEFAULT_LINE_WINDOW
                         if e_line is not None:
                             # Read only up to the requested end line.
                             remaining = max(1, e_line - max(1, s_line or 1) + 1)
                         else:
-                            remaining = DEFAULT_LINE_WINDOW
+                            remaining = window
                         raw_lines = []
                         for _ in range(remaining):
                             ln = f.readline()

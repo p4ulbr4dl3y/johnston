@@ -171,7 +171,14 @@ class ModelsCatalog:
         except Exception as e:
             logger.warning("Error saving models catalog cache: %s", e)
 
-    async def refresh(self, force: bool = False, max_age: float = CACHE_TTL) -> Dict[str, int]:
+    async def refresh(self, force: bool = False, max_age: float | None = None) -> Dict[str, int]:
+        if max_age is None:
+            try:
+                from core.infrastructure.config.settings import get_settings
+
+                max_age = get_settings().llm.catalog_cache_ttl
+            except Exception:
+                max_age = CACHE_TTL
         if not force and self._limits and (time.time() - getattr(self, "_updated_at", 0.0) < max_age):
             return self._limits
 

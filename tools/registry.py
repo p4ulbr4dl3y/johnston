@@ -63,19 +63,32 @@ _MCP_MISS_MAX = 512
 _mcp_name_misses: Dict[str, float] = {}
 
 
+def _mcp_miss_policy() -> tuple[float, int]:
+    """Return the configured (ttl, max) for the MCP negative-lookup cache."""
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        tools = get_settings().tools
+        return tools.mcp_miss_ttl, tools.mcp_miss_max
+    except Exception:
+        return _MCP_MISS_TTL, _MCP_MISS_MAX
+
+
 def _mcp_name_recently_missed(name: str) -> bool:
     """True if a full MCP listing recently failed to find ``name``."""
+    miss_ttl, _ = _mcp_miss_policy()
     ts = _mcp_name_misses.get(name)
     if ts is None:
         return False
-    if time.time() - ts > _MCP_MISS_TTL:
+    if time.time() - ts > miss_ttl:
         _mcp_name_misses.pop(name, None)
         return False
     return True
 
 
 def _remember_mcp_miss(name: str) -> None:
-    if len(_mcp_name_misses) >= _MCP_MISS_MAX:
+    _, miss_max = _mcp_miss_policy()
+    if len(_mcp_name_misses) >= miss_max:
         _mcp_name_misses.clear()
     _mcp_name_misses[name] = time.time()
 

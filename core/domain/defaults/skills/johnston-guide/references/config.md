@@ -71,7 +71,22 @@ Credential resolution precedence:
     "shell_stream_buffer_bytes": 204800,
     "mcp_call_timeout": 120.0,
     "mcp_init_timeout": 5.0,
-    "web_fetch_timeout": 20.0
+    "mcp_miss_ttl": 30.0,
+    "mcp_miss_max": 512,
+    "web_fetch_timeout": 20.0,
+    "web_user_agent": "Mozilla/5.0 ... Johnston/0.1",
+    "dns_cache_ttl": 60.0,
+    "dns_cache_max": 512,
+    "read_line_window": 800,
+    "max_dir_entries": 60,
+    "doc_conversion_timeout": 30.0,
+    "max_image_dimension": 1568,
+    "image_dimension_low": 512,
+    "image_dimension_high": 2048,
+    "image_png_keep_bytes": 1048576,
+    "max_doc_cache": 50,
+    "doc_cache_ttl": 600.0,
+    "line_count_cache_max": 500
   },
   "subagents": {
     "max_concurrent": 5,

@@ -25,17 +25,27 @@ from core.domain.defaults.config import (
     DEFAULT_COMPACTION_USER_BUDGET,
     DEFAULT_CONTEXT_LIMIT,
     DEFAULT_DISK_CACHE_TTL,
+    DEFAULT_DNS_CACHE_MAX,
+    DEFAULT_DNS_CACHE_TTL,
+    DEFAULT_DOC_CACHE_TTL,
     DEFAULT_DOC_CONVERSION_TIMEOUT,
+    DEFAULT_IMAGE_DIMENSION_HIGH,
+    DEFAULT_IMAGE_DIMENSION_LOW,
     DEFAULT_IMAGE_MAX_DIMENSION,
+    DEFAULT_IMAGE_PNG_KEEP_BYTES,
+    DEFAULT_LINE_COUNT_CACHE_MAX,
     DEFAULT_LOG_MAX_AGE_DAYS,
     DEFAULT_LOG_MAX_BYTES,
     DEFAULT_MAX_CONCURRENT_SUBAGENTS,
     DEFAULT_MAX_DIR_ENTRIES,
+    DEFAULT_MAX_DOC_CACHE,
     DEFAULT_MAX_RETRIES,
     DEFAULT_MAX_RETRY_DELAY,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MCP_CALL_TIMEOUT,
     DEFAULT_MCP_INIT_TIMEOUT,
+    DEFAULT_MCP_MISS_MAX,
+    DEFAULT_MCP_MISS_TTL,
     DEFAULT_PASTE_LINE_THRESHOLD,
     DEFAULT_PERMISSIONS,
     DEFAULT_PROMPT_HISTORY,
@@ -260,6 +270,16 @@ class ToolsSettings:
     max_dir_entries: int = DEFAULT_MAX_DIR_ENTRIES
     doc_conversion_timeout: float = DEFAULT_DOC_CONVERSION_TIMEOUT
     max_image_dimension: int = DEFAULT_IMAGE_MAX_DIMENSION
+    image_dimension_low: int = DEFAULT_IMAGE_DIMENSION_LOW
+    image_dimension_high: int = DEFAULT_IMAGE_DIMENSION_HIGH
+    image_png_keep_bytes: int = DEFAULT_IMAGE_PNG_KEEP_BYTES
+    max_doc_cache: int = DEFAULT_MAX_DOC_CACHE
+    doc_cache_ttl: float = DEFAULT_DOC_CACHE_TTL
+    line_count_cache_max: int = DEFAULT_LINE_COUNT_CACHE_MAX
+    dns_cache_ttl: float = DEFAULT_DNS_CACHE_TTL
+    dns_cache_max: int = DEFAULT_DNS_CACHE_MAX
+    mcp_miss_ttl: float = DEFAULT_MCP_MISS_TTL
+    mcp_miss_max: int = DEFAULT_MCP_MISS_MAX
     shell_stream_buffer_bytes: int = DEFAULT_SHELL_STREAM_BUFFER_BYTES
     web_user_agent: str = DEFAULT_WEB_USER_AGENT
 
@@ -334,6 +354,56 @@ class ToolsSettings:
                 "JOHNSTON_IMAGE_MAX_DIMENSION",
                 _safe_int(raw_img_dim, DEFAULT_IMAGE_MAX_DIMENSION, min_val=128),
                 min_val=128,
+            ),
+            image_dimension_low=_env_int(
+                "JOHNSTON_IMAGE_DIMENSION_LOW",
+                _safe_int(sec.get("image_dimension_low"), DEFAULT_IMAGE_DIMENSION_LOW, min_val=128),
+                min_val=128,
+            ),
+            image_dimension_high=_env_int(
+                "JOHNSTON_IMAGE_DIMENSION_HIGH",
+                _safe_int(sec.get("image_dimension_high"), DEFAULT_IMAGE_DIMENSION_HIGH, min_val=128),
+                min_val=128,
+            ),
+            image_png_keep_bytes=_env_int(
+                "JOHNSTON_IMAGE_PNG_KEEP_BYTES",
+                _safe_int(sec.get("image_png_keep_bytes"), DEFAULT_IMAGE_PNG_KEEP_BYTES, min_val=1024),
+                min_val=1024,
+            ),
+            max_doc_cache=_env_int(
+                "JOHNSTON_MAX_DOC_CACHE",
+                _safe_int(sec.get("max_doc_cache"), DEFAULT_MAX_DOC_CACHE, min_val=1),
+                min_val=1,
+            ),
+            doc_cache_ttl=_env_float(
+                "JOHNSTON_DOC_CACHE_TTL",
+                _safe_float(sec.get("doc_cache_ttl"), DEFAULT_DOC_CACHE_TTL, min_val=0.0),
+                min_val=0.0,
+            ),
+            line_count_cache_max=_env_int(
+                "JOHNSTON_LINE_COUNT_CACHE_MAX",
+                _safe_int(sec.get("line_count_cache_max"), DEFAULT_LINE_COUNT_CACHE_MAX, min_val=1),
+                min_val=1,
+            ),
+            dns_cache_ttl=_env_float(
+                "JOHNSTON_DNS_CACHE_TTL",
+                _safe_float(sec.get("dns_cache_ttl"), DEFAULT_DNS_CACHE_TTL, min_val=0.0),
+                min_val=0.0,
+            ),
+            dns_cache_max=_env_int(
+                "JOHNSTON_DNS_CACHE_MAX",
+                _safe_int(sec.get("dns_cache_max"), DEFAULT_DNS_CACHE_MAX, min_val=1),
+                min_val=1,
+            ),
+            mcp_miss_ttl=_env_float(
+                "JOHNSTON_MCP_MISS_TTL",
+                _safe_float(sec.get("mcp_miss_ttl"), DEFAULT_MCP_MISS_TTL, min_val=0.0),
+                min_val=0.0,
+            ),
+            mcp_miss_max=_env_int(
+                "JOHNSTON_MCP_MISS_MAX",
+                _safe_int(sec.get("mcp_miss_max"), DEFAULT_MCP_MISS_MAX, min_val=1),
+                min_val=1,
             ),
             shell_stream_buffer_bytes=_env_int(
                 "JOHNSTON_SHELL_STREAM_BUFFER_BYTES",

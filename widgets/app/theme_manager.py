@@ -71,15 +71,31 @@ class ThemeManager(CoreThemeManager):
         return self._current_theme
 
     def set_theme(self, name: str, persist: bool = True) -> Theme:
-        """Set active theme, clearing palette cache if native."""
-        if name == "native":
-            from core.infrastructure.platform.terminal_theme import clear_palette_cache
+        """Set active theme, adapting if native and notifying listeners with adapted theme."""
+        theme = self._themes.get(name)
+        if not theme:
+            raise ValueError(f"Unknown theme: {name}. Available: {list(self._themes.keys())}")
+        self._current_theme = theme
 
-            clear_palette_cache()
-        theme = super().set_theme(name, persist=persist)
-        if theme.name == "native":
-            return self.get_adapted_theme(theme)
-        return theme
+        if persist:
+            from core.infrastructure.config.config_helpers import save_theme_config
+
+            try:
+                save_theme_config(theme.name)
+            except Exception as e:
+                import logging
+
+                logging.getLogger(__name__).warning("Failed to persist theme config: %s", e)
+
+        active_theme = self.get_adapted_theme(theme) if theme.name == "native" else theme
+        for listener in list(self._listeners):
+            try:
+                listener(active_theme)
+            except Exception as e:
+                import logging
+
+                logging.getLogger(__name__).warning("Theme listener error: %s", e)
+        return active_theme
 
     def get_textual_theme(self, theme_or_name: str | Theme) -> TextualTheme:
         """Convert Johnston Theme to TextualTheme instance."""

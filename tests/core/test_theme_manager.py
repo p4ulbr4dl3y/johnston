@@ -294,5 +294,63 @@ def test_theme_variable_resolution():
     assert t.syntax_tokens[Token.Keyword] == "#ffffff"
 
 
+def test_ui_theme_manager_native_listener_receives_adapted(monkeypatch):
+    from widgets.app.theme_manager import ThemeManager as UIThemeManager
+
+    UIThemeManager.reset_instance()
+    mgr = UIThemeManager()
+
+    monkeypatch.setattr(
+        "core.infrastructure.platform.terminal_theme.query_terminal_palette",
+        lambda: ("#ffffff", "#000000"),
+    )
+
+    received = []
+    mgr.add_listener(lambda t: received.append(t))
+    mgr.set_theme("native", persist=False)
+
+    assert len(received) == 1
+    assert received[0].name == "native"
+    assert received[0].dark is False
+    assert received[0].primary == "#000000"
+
+
+def test_chat_markdown_theme_sync():
+    from textual.widgets._markdown import MarkdownTableCellContents
+
+    from widgets.presentation.widgets.chat_markdown import (
+        _apply_chat_markdown_patches,
+        _new_markdown_block_get_style,
+        sync_theme_styles,
+    )
+
+    _apply_chat_markdown_patches()
+
+    custom_theme = Theme(
+        name="custom-test",
+        label="Custom Test",
+        dark=True,
+        markdown_styles={"markdown.code": "#ff0000 on #00ff00"},
+        syntax_tokens={Token.Keyword: "#123456"},
+    )
+    sync_theme_styles(custom_theme)
+
+    class DummyBlock:
+        def _get_style(self, style):
+            return None
+
+    style = _new_markdown_block_get_style(DummyBlock(), ".code_inline")
+    assert style is not None
+    assert style.foreground.hex.lower() == "#ff0000"
+    assert style.background.hex.lower() == "#00ff00"
+
+    cell = MarkdownTableCellContents()
+    cell_style = cell._get_style(".code_inline")
+    assert cell_style is not None
+    assert cell_style.foreground.hex.lower() == "#ff0000"
+    assert cell_style.background.hex.lower() == "#00ff00"
+
+
+
 
 

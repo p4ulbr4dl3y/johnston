@@ -5,11 +5,12 @@ from typing import Any
 
 from markdown_it import MarkdownIt
 from pygments.lexers import get_lexer_by_name
+from pygments.style import Style as PygmentsStyle
+from pygments.styles import get_style_by_name
 from pygments.token import Token
 from rich.segment import Segment
-from rich.syntax import Syntax
+from rich.syntax import PygmentsSyntaxTheme, Syntax
 from textual.app import ComposeResult
-from textual.color import Color
 from textual.containers import Horizontal, Vertical
 from textual.content import Content
 from textual.highlight import HighlightTheme
@@ -40,6 +41,7 @@ class TransparentSyntax(Syntax):
 
 
 CODE_THEME = "one-dark"
+_CURRENT_SYNTAX_THEME: PygmentsSyntaxTheme | str | None = None
 
 _RE_ITALIC_COLON = re.compile(r"(?<!\*)\*([^*:]+):\*(?!\*)")
 _RE_DOUBLE_BULLET = re.compile(r"^(\s*)(?:[-*]|\d+\.)\s+[-*]\s+")
@@ -157,9 +159,9 @@ class CustomMarkdownFence(MarkdownFence):
         if target_lexer == "text":
             return Content.from_rich_text(Text(clean_code))
 
-        theme = CODE_THEME if dark else "github-light"
+        syntax_theme = _CURRENT_SYNTAX_THEME or (CODE_THEME if dark else "github-light")
         try:
-            syntax = Syntax(clean_code, target_lexer, theme=theme, word_wrap=True)
+            syntax = Syntax(clean_code, target_lexer, theme=syntax_theme, word_wrap=True)
             console = Console(force_terminal=True, color_system="truecolor")
             rich_text = Text()
             for segment in syntax._get_syntax(console, console.options):
@@ -185,18 +187,24 @@ class CustomMarkdownFence(MarkdownFence):
             yield lang_label
             yield copy_btn
 
+        from widgets.app.theme_manager import theme_manager
+
         app = getattr(self, "app", None)
         is_ansi = getattr(app, "native_ansi_color", False) if app else True
-        is_dark = getattr(getattr(app, "current_theme", None), "dark", True) if app else True
+        curr = getattr(app, "current_theme", None) or theme_manager.current_theme
+        is_dark = getattr(curr, "dark", True)
         code_content = self.highlight(self.code, self.lexer, ansi=is_ansi, dark=is_dark)
         with Vertical(classes="fence-scroll-box"):
             yield Label(code_content, id="code-content", expand=True)
 
     def notify_style_update(self) -> None:
         """Update highlight theme when App theme changes."""
+        from widgets.app.theme_manager import theme_manager
+
         app = getattr(self, "app", None)
         is_ansi = getattr(app, "native_ansi_color", False) if app else True
-        is_dark = getattr(getattr(app, "current_theme", None), "dark", True) if app else True
+        curr = getattr(app, "current_theme", None) or theme_manager.current_theme
+        is_dark = getattr(curr, "dark", True)
         self._highlighted_code = self.highlight(
             self.code,
             self.lexer,
@@ -236,10 +244,12 @@ _patched = False
 
 def _new_markdown_block_get_style(self, style):
     if style == ".code_inline":
-        return Style(
-            background=Color(39, 39, 42),
-            foreground=Color(255, 255, 255),
-        )
+        code_style = JOHNSTON_RICH_MARKDOWN_STYLES.get("markdown.code")
+        if code_style:
+            try:
+                return Style.parse(code_style)
+            except Exception:
+                pass
     return _old_markdown_block_get_style(self, style)
 
 
@@ -265,22 +275,48 @@ def _new_markdown_init(self, *args, **kwargs):
 _old_markdown_block_get_style = MarkdownBlock._get_style
 
 
+def _update_syntax_theme(theme_obj: Any) -> None:
+    """Build PygmentsSyntaxTheme from active Theme syntax_tokens."""
+    global _CURRENT_SYNTAX_THEME
+    is_dark = getattr(theme_obj, "dark", True)
+    base_name = "one-dark" if is_dark else "github-light"
+    try:
+        base_cls = get_style_by_name(base_name)
+        styles = dict(base_cls.styles)
+    except Exception:
+        styles = {}
+    syntax_tokens = getattr(theme_obj, "syntax_tokens", {})
+    if isinstance(syntax_tokens, dict):
+        for tok, color in syntax_tokens.items():
+            styles[tok] = color
+    theme_name = getattr(theme_obj, "name", "custom").replace("-", "_")
+    dyn_cls = type(f"{theme_name.title()}SyntaxStyle", (PygmentsStyle,), {"styles": styles, "background_color": None})
+    _CURRENT_SYNTAX_THEME = PygmentsSyntaxTheme(dyn_cls)
+
+
 def sync_theme_styles(theme_obj: Any = None) -> None:
     """Sync rich markdown and token styles with active Theme."""
     from widgets.app.theme_manager import theme_manager
+
     t = theme_obj or theme_manager.current_theme
-    if getattr(t, 'markdown_styles', None):
+    if getattr(t, "markdown_styles", None):
         JOHNSTON_RICH_MARKDOWN_STYLES.update(t.markdown_styles)
         try:
             from rich.default_styles import DEFAULT_STYLES
             from rich.style import Style as RichStyle
+
             for k, v in t.markdown_styles.items():
                 DEFAULT_STYLES[k] = RichStyle.parse(v)
         except Exception:
             pass
-    if getattr(t, 'syntax_tokens', None):
+    if getattr(t, "syntax_tokens", None):
         TOKEN_COLORS.clear()
         TOKEN_COLORS.update(t.syntax_tokens)
+    _update_syntax_theme(t)
+
+    heading_fn_color = TOKEN_COLORS.get(Token.Name.Function, "$text-warning")
+    HighlightTheme.STYLES[Token.Generic.Heading] = f"bold {heading_fn_color}"
+    HighlightTheme.STYLES[Token.Generic.Subheading] = f"bold {heading_fn_color}"
 
 
 JOHNSTON_RICH_MARKDOWN_STYLES = dict(ZINC_DARK.markdown_styles)
@@ -297,9 +333,9 @@ def _apply_chat_markdown_patches() -> None:
         return
     _patched = True
     from widgets.app.theme_manager import theme_manager
+
     theme_manager.add_listener(sync_theme_styles)
     sync_theme_styles(theme_manager.current_theme)
-
 
     HighlightTheme.STYLES[Token.Name.Function] = "$text-warning"
     HighlightTheme.STYLES[Token.Name.Function.Magic] = "$text-warning"
@@ -340,8 +376,8 @@ def _apply_chat_markdown_patches() -> None:
     Markdown.BLOCKS["table_open"] = CustomMarkdownTable
 
     Markdown.__init__ = _new_markdown_init
-
     MarkdownBlock._get_style = _new_markdown_block_get_style
+    MarkdownTableCellContents._get_style = _new_markdown_block_get_style
 
 
 def _handle_markdown_task_done(task: asyncio.Task) -> None:

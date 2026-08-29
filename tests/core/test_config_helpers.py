@@ -7,11 +7,21 @@ import time
 from core.domain.defaults.config import (
     DEFAULT_CHAT_INPUT_MAX_LINES,
     DEFAULT_COMPACTION_THRESHOLD_RATIO,
+    DEFAULT_DNS_CACHE_MAX,
+    DEFAULT_DNS_CACHE_TTL,
+    DEFAULT_DOC_CACHE_TTL,
+    DEFAULT_IMAGE_DIMENSION_HIGH,
+    DEFAULT_IMAGE_DIMENSION_LOW,
     DEFAULT_IMAGE_MAX_DIMENSION,
+    DEFAULT_IMAGE_PNG_KEEP_BYTES,
+    DEFAULT_LINE_COUNT_CACHE_MAX,
     DEFAULT_LOG_MAX_AGE_DAYS,
     DEFAULT_LOG_MAX_BYTES,
     DEFAULT_MAX_CONCURRENT_SUBAGENTS,
+    DEFAULT_MAX_DOC_CACHE,
     DEFAULT_MAX_RETRIES,
+    DEFAULT_MCP_MISS_MAX,
+    DEFAULT_MCP_MISS_TTL,
     DEFAULT_SHELL_OUTPUT_CHARS,
     DEFAULT_SHELL_STREAM_BUFFER_BYTES,
     DEFAULT_STREAM_TIMEOUT,
@@ -237,6 +247,81 @@ def test_legacy_key_aliases_are_ignored():
     assert settings.subagents.max_result_chars == DEFAULT_SUBAGENT_RESULT_MAX_CHARS
     assert settings.storage.max_log_bytes == DEFAULT_LOG_MAX_BYTES
     assert settings.storage.max_log_age_days == DEFAULT_LOG_MAX_AGE_DAYS
+
+
+def test_tools_new_fields_parsed():
+    """New tool/cache/image knobs are read from the config section."""
+    raw_data = {
+        "tools": {
+            "image_dimension_low": 256,
+            "image_dimension_high": 1024,
+            "image_png_keep_bytes": 2097152,
+            "max_doc_cache": 5,
+            "doc_cache_ttl": 60.0,
+            "line_count_cache_max": 20,
+            "dns_cache_ttl": 30.0,
+            "dns_cache_max": 64,
+            "mcp_miss_ttl": 10.0,
+            "mcp_miss_max": 32,
+        },
+    }
+    settings = JohnstonSettings.from_dict(raw_data)
+    tools = settings.tools
+    assert tools.image_dimension_low == 256
+    assert tools.image_dimension_high == 1024
+    assert tools.image_png_keep_bytes == 2097152
+    assert tools.max_doc_cache == 5
+    assert tools.doc_cache_ttl == 60.0
+    assert tools.line_count_cache_max == 20
+    assert tools.dns_cache_ttl == 30.0
+    assert tools.dns_cache_max == 64
+    assert tools.mcp_miss_ttl == 10.0
+    assert tools.mcp_miss_max == 32
+
+
+def test_tools_new_fields_defaults():
+    """New tool/cache/image knobs default to their documented constants."""
+    tools = ToolsSettings()
+    assert tools.image_dimension_low == DEFAULT_IMAGE_DIMENSION_LOW
+    assert tools.image_dimension_high == DEFAULT_IMAGE_DIMENSION_HIGH
+    assert tools.image_png_keep_bytes == DEFAULT_IMAGE_PNG_KEEP_BYTES
+    assert tools.max_doc_cache == DEFAULT_MAX_DOC_CACHE
+    assert tools.doc_cache_ttl == DEFAULT_DOC_CACHE_TTL
+    assert tools.line_count_cache_max == DEFAULT_LINE_COUNT_CACHE_MAX
+    assert tools.dns_cache_ttl == DEFAULT_DNS_CACHE_TTL
+    assert tools.dns_cache_max == DEFAULT_DNS_CACHE_MAX
+    assert tools.mcp_miss_ttl == DEFAULT_MCP_MISS_TTL
+    assert tools.mcp_miss_max == DEFAULT_MCP_MISS_MAX
+
+
+def test_tools_new_fields_env_overrides(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "config.json")
+        monkeypatch.setenv("JOHNSTON_IMAGE_DIMENSION_LOW", "300")
+        monkeypatch.setenv("JOHNSTON_DOC_CACHE_TTL", "45.0")
+        monkeypatch.setenv("JOHNSTON_MCP_MISS_MAX", "16")
+        settings = load_settings(path)
+        assert settings.tools.image_dimension_low == 300
+        assert settings.tools.doc_cache_ttl == 45.0
+        assert settings.tools.mcp_miss_max == 16
+
+
+def test_catalog_cache_ttl_wired_in_refresh(monkeypatch):
+    """models_catalog.refresh() resolves catalog_cache_ttl from settings."""
+    from core.models_catalog import ModelsCatalog
+
+    catalog = ModelsCatalog.__new__(ModelsCatalog)
+    # _updated_at ~ now so the freshness window (catalog_cache_ttl=999) is fresh
+    # and refresh() returns the cached limits without hitting the network.
+    catalog._limits = {"a": 1}
+    catalog._updated_at = time.time()
+    # make the freshness window large so the epoch delta is still < max_age
+    mock_settings = JohnstonSettings(llm=LLMSettings(catalog_cache_ttl=1_000_000_000_000.0))
+    monkeypatch.setattr("core.infrastructure.config.settings.get_settings", lambda: mock_settings)
+    import asyncio
+
+    result = asyncio.run(catalog.refresh(force=False))
+    assert result == {"a": 1}
 
 
 def test_load_settings_legacy_aliases_fall_back_to_defaults():
