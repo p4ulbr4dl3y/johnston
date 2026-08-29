@@ -12,6 +12,7 @@ import asyncio
 import logging
 import math
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Optional
@@ -227,7 +228,7 @@ async def generate_ai_response(
     has_tool_calls = False
     thinking_handle: Any = None
     bot_handle: Any = None
-    tool_handle: Any = None
+    tool_handles: deque[Any] = deque()
     start_time = time.time()
 
     try:
@@ -302,12 +303,14 @@ async def generate_ai_response(
                 bot_handle = None
                 targs = val3 if isinstance(val3, dict) else {}
                 tool_handle = await canvas.add_tool_call(val1, val2, targs)
+                tool_handles.append(tool_handle)
                 if canvas.register_tool_widget:
                     canvas.register_tool_widget(tool_handle)
             elif event_type == "tool_result":
-                if tool_handle:
+                if tool_handles:
+                    cur_tool_handle = tool_handles.popleft()
                     parsed_tool_result = parse_tool_result_step(step)
-                    tool_handle.set_result(
+                    cur_tool_handle.set_result(
                         val1,
                         is_error=parsed_tool_result.is_error,
                         status=parsed_tool_result.status.value
@@ -315,7 +318,6 @@ async def generate_ai_response(
                         else None,
                         returncode=parsed_tool_result.returncode,
                     )
-                    tool_handle = None
                 try:
                     save_db.schedule()
                 except Exception:  # noqa: BLE001
@@ -384,8 +386,8 @@ async def generate_ai_response(
             canvas,
             thinking_handle,
             bot_handle,
-            tool_handle,
-            start_time,
+            start_time=start_time,
+            tool_handles=tool_handles,
         )
         raise
     except Exception as e:  # noqa: BLE001
@@ -419,8 +421,9 @@ async def _handle_interruption(
     canvas: GenCanvas,
     thinking_handle: Any,
     bot_handle: Any,
-    tool_handle: Any,
-    start_time: float,
+    tool_handle: Any = None,
+    start_time: float = 0.0,
+    tool_handles: Any = None,
 ) -> None:
     """Clean up partial state after a cancellation/interruption: finish the
     thinking widget, append the partial reply + interruption note to history,
@@ -450,31 +453,27 @@ async def _handle_interruption(
             canvas.refresh_status_footer()
         except Exception:  # noqa: BLE001
             pass
-    if tool_handle is not None:
+    active_handles = tool_handles if tool_handles is not None else tool_handle
+    handles_to_cancel = (
+        list(active_handles) if isinstance(active_handles, (deque, list)) else ([active_handles] if active_handles else [])
+    )
+    for h in handles_to_cancel:
         try:
-            tool_handle.mark_cancelled()
+            h.mark_cancelled()
         except Exception:  # noqa: BLE001
             pass
     if session and hasattr(session, "add_event"):
-        if (
-            hasattr(session, "messages")
-            and session.messages
-            and session.messages[-1].get("type") == "tool"
-            and "result_text" not in session.messages[-1]
-        ):
-            try:
-                res_text = (
-                    getattr(tool_handle, "result_text", "")
-                    if tool_handle is not None
-                    else ""
-                ) or "[Tool call interrupted or cancelled]"
-                session.add_event({
-                    "type": "tool",
-                    "result_text": res_text,
-                    "status": "cancelled",
-                })
-            except Exception:  # noqa: BLE001
-                pass
+        if hasattr(session, "messages") and session.messages:
+            for msg in session.messages:
+                if isinstance(msg, dict) and msg.get("type") == "tool" and "result_text" not in msg:
+                    try:
+                        session.add_event({
+                            "type": "tool",
+                            "result_text": "[Tool call interrupted or cancelled]",
+                            "status": "cancelled",
+                        })
+                    except Exception:  # noqa: BLE001
+                        pass
         try:
             session.add_event({"type": "event_divider", "text": "Response Interrupted"})
         except Exception:  # noqa: BLE001

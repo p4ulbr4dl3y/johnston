@@ -144,17 +144,21 @@ class AgentSession:
             last["text"] = event.get("text", "")
             if event.get("duration") is not None:
                 last["duration"] = event["duration"]
-        elif (
-            etype == MessageType.TOOL
-            and "result_text" in event
-            and last
-            and last.get("type") == MessageType.TOOL
-            and "result_text" not in last
-        ):
-            last["result_text"] = event["result_text"]
-            for key in ("status", "is_error", "returncode"):
-                if key in event:
-                    last[key] = event[key]
+        elif etype == MessageType.TOOL and "result_text" in event:
+            target_msg = None
+            if self.messages:
+                for msg in self.messages:
+                    if isinstance(msg, dict) and msg.get("type") == MessageType.TOOL and "result_text" not in msg:
+                        target_msg = msg
+                        break
+            if target_msg is not None:
+                target_msg["result_text"] = event["result_text"]
+                for key in ("status", "is_error", "returncode"):
+                    if key in event:
+                        target_msg[key] = event[key]
+            else:
+                self.messages.append(event)
+                self.updated_at = _now()
         elif (
             etype == MessageType.EVENT_DIVIDER
             and last

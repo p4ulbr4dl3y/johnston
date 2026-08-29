@@ -28,6 +28,7 @@ class SubagentViewScreen(ModalScreen[None]):
         self.session = None
         self.thinking_widget = None
         self.current_tool_widget = None
+        self.pending_tool_widgets = []
         self.bot_msg = None
         self.event_queue = asyncio.Queue()
         self.queue_task = None
@@ -205,7 +206,15 @@ class SubagentViewScreen(ModalScreen[None]):
                 self.thinking_widget = None
         elif etype == "tool":
             if "result_text" in evt and not evt.get("tool_type"):
-                if self.current_tool_widget:
+                if getattr(self, "pending_tool_widgets", None):
+                    w = self.pending_tool_widgets.pop(0)
+                    w.set_result(
+                        evt.get("result_text", ""),
+                        is_error=bool(evt.get("is_error", False)),
+                        status=evt.get("status"),
+                        returncode=evt.get("returncode"),
+                    )
+                elif self.current_tool_widget:
                     self.current_tool_widget.set_result(
                         evt.get("result_text", ""),
                         is_error=bool(evt.get("is_error", False)),
@@ -223,7 +232,7 @@ class SubagentViewScreen(ModalScreen[None]):
                         self.bot_msg.flush_pending_stream()
                         await self.bot_msg.finalize_stream()
                     self.bot_msg = None
-                self.current_tool_widget = await chat_view.add_tool_call(
+                widget = await chat_view.add_tool_call(
                     evt.get("tool_type", ""),
                     evt.get("target", ""),
                     result_text=evt.get("result_text", ""),
@@ -232,6 +241,11 @@ class SubagentViewScreen(ModalScreen[None]):
                     returncode=evt.get("returncode"),
                     animate=animate,
                 )
+                self.current_tool_widget = widget
+                if not evt.get("result_text"):
+                    if not hasattr(self, "pending_tool_widgets") or self.pending_tool_widgets is None:
+                        self.pending_tool_widgets = []
+                    self.pending_tool_widgets.append(widget)
         elif etype == "bot":
             txt = evt.get("text", "")
             if not animate and not txt.strip():

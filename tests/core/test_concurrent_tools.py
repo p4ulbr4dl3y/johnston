@@ -208,3 +208,132 @@ class TestConcurrentToolExecutionInAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tool_messages[0]["tool_call_id"], "c1")
         self.assertEqual(tool_messages[1]["tool_call_id"], "c2")
         self.assertEqual(tool_messages[2]["tool_call_id"], "c3")
+
+
+class TestConcurrentToolsGeneratorAndSession(unittest.IsolatedAsyncioTestCase):
+    async def test_ai_generator_concurrent_tool_ui_handles(self):
+        from core.application.generation.ai_generator import GenCanvas, generate_ai_response
+        from core.domain.entities.session import AgentSession
+
+        w1, w2, w3 = unittest.mock.MagicMock(), unittest.mock.MagicMock(), unittest.mock.MagicMock()
+        widgets = [w1, w2, w3]
+
+        async def fake_add_tool_call(name, target, args=None):
+            return widgets.pop(0)
+
+        canvas = GenCanvas(
+            add_user_message=unittest.mock.AsyncMock(),
+            add_thinking_widget=unittest.mock.AsyncMock(return_value=unittest.mock.MagicMock()),
+            add_tool_call=unittest.mock.AsyncMock(side_effect=fake_add_tool_call),
+            add_bot_message=unittest.mock.AsyncMock(
+                return_value=unittest.mock.MagicMock(
+                    content="",
+                    finalize_stream=unittest.mock.AsyncMock(),
+                    reset_stream=unittest.mock.AsyncMock(),
+                    flush_pending_stream=unittest.mock.MagicMock(),
+                )
+            ),
+            add_event_divider=unittest.mock.AsyncMock(),
+            get_user_messages=unittest.mock.MagicMock(return_value=[("0", "hi")]),
+            refresh_status_footer=unittest.mock.MagicMock(),
+            notify=unittest.mock.MagicMock(),
+            save_session=unittest.mock.AsyncMock(),
+        )
+
+        class FakeAgent:
+            def __init__(self):
+                self.history = []
+                self._last_sys_tokens = 0
+                self.last_context_tokens = 0
+                self.model = "gpt-4o"
+
+            async def stream_steps(self, prompt, attachments=None):
+                yield ("tool", "read", "f1.txt", {"path": "f1.txt"})
+                yield ("tool", "read", "f2.txt", {"path": "f2.txt"})
+                yield ("tool", "read", "f3.txt", {"path": "f3.txt"})
+                yield ("tool_result", "res1", "", False, None, None)
+                yield ("tool_result", "res2", "", False, None, None)
+                yield ("tool_result", "res3", "", False, None, None)
+                yield ("bot_text", "done")
+
+        session = AgentSession("test_sess", prompt="test prompt")
+        agent = FakeAgent()
+        await generate_ai_response(agent, session, canvas, session_id="test_sess", user_text="Read files")
+
+        w1.set_result.assert_called_once()
+        self.assertEqual(w1.set_result.call_args[0][0], "res1")
+        w2.set_result.assert_called_once()
+        self.assertEqual(w2.set_result.call_args[0][0], "res2")
+        w3.set_result.assert_called_once()
+        self.assertEqual(w3.set_result.call_args[0][0], "res3")
+
+    async def test_ai_generator_concurrent_tool_interruption(self):
+        from core.application.generation.ai_generator import GenCanvas, generate_ai_response
+        from core.domain.entities.session import AgentSession
+
+        w1, w2 = unittest.mock.MagicMock(), unittest.mock.MagicMock()
+        widgets = [w1, w2]
+
+        async def fake_add_tool_call(name, target, args=None):
+            return widgets.pop(0)
+
+        canvas = GenCanvas(
+            add_user_message=unittest.mock.AsyncMock(),
+            add_thinking_widget=unittest.mock.AsyncMock(return_value=unittest.mock.MagicMock()),
+            add_tool_call=unittest.mock.AsyncMock(side_effect=fake_add_tool_call),
+            add_bot_message=unittest.mock.AsyncMock(
+                return_value=unittest.mock.MagicMock(
+                    content="",
+                    finalize_stream=unittest.mock.AsyncMock(),
+                    reset_stream=unittest.mock.AsyncMock(),
+                    flush_pending_stream=unittest.mock.MagicMock(),
+                )
+            ),
+            add_event_divider=unittest.mock.AsyncMock(),
+            get_user_messages=unittest.mock.MagicMock(return_value=[("0", "hi")]),
+            refresh_status_footer=unittest.mock.MagicMock(),
+            notify=unittest.mock.MagicMock(),
+            save_session=unittest.mock.AsyncMock(),
+        )
+
+        class FakeAgent:
+            def __init__(self):
+                self.history = []
+                self._last_sys_tokens = 0
+                self.last_context_tokens = 0
+                self.model = "gpt-4o"
+
+            async def stream_steps(self, prompt, attachments=None):
+                yield ("tool", "read", "f1.txt", {"path": "f1.txt"})
+                yield ("tool", "read", "f2.txt", {"path": "f2.txt"})
+                raise asyncio.CancelledError
+
+        session = AgentSession("test_sess", prompt="test prompt")
+        agent = FakeAgent()
+        with self.assertRaises(asyncio.CancelledError):
+            await generate_ai_response(agent, session, canvas, session_id="test_sess", user_text="Read files")
+
+        w1.mark_cancelled.assert_called_once()
+        w2.mark_cancelled.assert_called_once()
+
+    def test_session_add_event_concurrent_batch_tools(self):
+        from core.domain.entities.session import AgentSession
+
+        sess = AgentSession("s_batch", prompt="test")
+        sess.add_event({"type": "tool", "tool_type": "read", "target": "1.py", "args": {"path": "1.py"}})
+        sess.add_event({"type": "tool", "tool_type": "read", "target": "2.py", "args": {"path": "2.py"}})
+        sess.add_event({"type": "tool", "tool_type": "read", "target": "3.py", "args": {"path": "3.py"}})
+
+        sess.add_event({"type": "tool", "result_text": "content_1", "status": "done"})
+        sess.add_event({"type": "tool", "result_text": "content_2", "status": "done"})
+        sess.add_event({"type": "tool", "result_text": "content_3", "status": "done"})
+
+        tool_msgs = [m for m in sess.messages if m.get("type") == "tool"]
+        self.assertEqual(len(tool_msgs), 3)
+        self.assertEqual(tool_msgs[0]["target"], "1.py")
+        self.assertEqual(tool_msgs[0]["result_text"], "content_1")
+        self.assertEqual(tool_msgs[1]["target"], "2.py")
+        self.assertEqual(tool_msgs[1]["result_text"], "content_2")
+        self.assertEqual(tool_msgs[2]["target"], "3.py")
+        self.assertEqual(tool_msgs[2]["result_text"], "content_3")
+
