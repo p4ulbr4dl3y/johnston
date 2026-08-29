@@ -42,6 +42,13 @@ def linear_to_srgb(c: float) -> float:
     return max(0.0, min(1.0, v))
 
 
+def _cbrt(x: float) -> float:
+    """Cube root helper compatible with Python 3.10+."""
+    if hasattr(math, "cbrt"):
+        return math.cbrt(x)
+    return math.copysign(abs(x) ** (1.0 / 3.0), x)
+
+
 def hex_to_oklab(hex_str: str) -> tuple[float, float, float]:
     """Convert a hex color string to OKLab (L, a, b) space."""
     clean_hex = (normalize_hex(hex_str) or "#000000").lstrip("#")
@@ -49,9 +56,9 @@ def hex_to_oklab(hex_str: str) -> tuple[float, float, float]:
     g = srgb_to_linear(int(clean_hex[2:4], 16) / 255.0)
     b = srgb_to_linear(int(clean_hex[4:6], 16) / 255.0)
 
-    l_ = math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
-    m_ = math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
-    s_ = math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+    l_ = _cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+    m_ = _cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+    s_ = _cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
 
     return (
         0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,

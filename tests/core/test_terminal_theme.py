@@ -1,7 +1,9 @@
-"""Unit tests for terminal_theme and OKLab perceptual color math."""
+import sys
 
+import pytest
 
 from core.infrastructure.platform.terminal_theme import (
+    _cbrt,
     compute_adaptive_border,
     compute_adaptive_surface,
     hex_to_oklab,
@@ -12,6 +14,19 @@ from core.infrastructure.platform.terminal_theme import (
     parse_osc_palette,
     query_terminal_palette,
 )
+
+
+def test_cbrt_fallback(monkeypatch):
+    import core.infrastructure.platform.terminal_theme as tt
+
+    # Direct test
+    assert round(_cbrt(8.0), 4) == 2.0
+    assert round(_cbrt(0.0), 4) == 0.0
+
+    # Test without math.cbrt attribute (simulating Python 3.10)
+    monkeypatch.delattr(tt.math, "cbrt", raising=False)
+    assert round(tt._cbrt(27.0), 4) == 3.0
+    assert round(tt._cbrt(0.0), 4) == 0.0
 
 
 def test_normalize_hex():
@@ -167,6 +182,7 @@ def test_compute_adaptive_palette_dark_and_light():
     assert light_pal["tcss_vars"]["bg-app"] == "ansi_default"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX termios palette query")
 def test_query_posix_palette_tmux_wrapper(monkeypatch):
     import core.infrastructure.platform.terminal_theme as tt
 
