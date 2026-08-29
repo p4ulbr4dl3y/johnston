@@ -65,7 +65,7 @@ def _truncate_output(res: str) -> str:
 
     return truncate_output(
         res,
-        max_chars=get_settings().tools.shell_output_chars,
+        max_chars=get_settings().tools.max_shell_output_chars,
         tool_name="shell",
         from_end=True,
     )

@@ -129,7 +129,7 @@ class ChatInput(TextArea):
         raw_lines = len(self.text.split("\n"))
         wrapped_lines = getattr(self.wrapped_document, "height", 1) if hasattr(self, "wrapped_document") else 1
         lines = max(raw_lines, wrapped_lines)
-        max_lines = get_settings().ui.chat_input_max_lines
+        max_lines = get_settings().ui.max_chat_input_lines
         target_height = max(2, min(lines + 1, max_lines))
         h = self.styles.height
         if h is None or h.value != target_height or str(getattr(h, "unit", "")) != "Unit.CELLS":

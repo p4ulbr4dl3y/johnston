@@ -138,10 +138,14 @@ class LLMSettings:
     auto_title_model: Optional[str] = DEFAULT_AUTO_TITLE_MODEL
     catalog_cache_ttl: float = DEFAULT_CATALOG_CACHE_TTL
     agent_md_max_chars: int = DEFAULT_AGENT_MD_MAX_CHARS
+    thinking_efforts: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> LLMSettings:
         sec = data.get("llm") if isinstance(data.get("llm"), dict) else {}
+        efforts = sec.get("thinking_efforts") if isinstance(sec.get("thinking_efforts"), dict) else {}
+        if not efforts and isinstance(data.get("provider_thinking_efforts"), dict):
+            efforts = data.get("provider_thinking_efforts", {})
         return cls(
             context_limit=_env_int(
                 "JOHNSTON_CONTEXT_LIMIT",
@@ -236,6 +240,7 @@ class LLMSettings:
                 _safe_int(sec.get("agent_md_max_chars"), DEFAULT_AGENT_MD_MAX_CHARS, min_val=1000),
                 min_val=1000,
             ),
+            thinking_efforts=efforts,
         )
 
 
@@ -243,7 +248,7 @@ class LLMSettings:
 class ToolsSettings:
     shell_default_timeout: float = DEFAULT_SHELL_TIMEOUT
     shell_max_cap: float = DEFAULT_SHELL_MAX_CAP
-    shell_output_chars: int = DEFAULT_SHELL_OUTPUT_CHARS
+    max_shell_output_chars: int = DEFAULT_SHELL_OUTPUT_CHARS
     max_tool_output_chars: int = DEFAULT_TOOL_OUTPUT_CHARS
     max_tool_payload_bytes: int = DEFAULT_TOOL_PAYLOAD_BYTES
     max_snapshot_log_bytes: int = DEFAULT_SNAPSHOT_LOG_BYTES
@@ -253,13 +258,24 @@ class ToolsSettings:
     read_line_window: int = DEFAULT_READ_LINE_WINDOW
     max_dir_entries: int = DEFAULT_MAX_DIR_ENTRIES
     doc_conversion_timeout: float = DEFAULT_DOC_CONVERSION_TIMEOUT
-    image_max_dimension: int = DEFAULT_IMAGE_MAX_DIMENSION
+    max_image_dimension: int = DEFAULT_IMAGE_MAX_DIMENSION
+    shell_stream_buffer_bytes: int = DEFAULT_SHELL_STREAM_BUFFER_BYTES
     web_user_agent: str = DEFAULT_WEB_USER_AGENT
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ToolsSettings:
         sec = data.get("tools") if isinstance(data.get("tools"), dict) else {}
+        ui_sec = data.get("ui") if isinstance(data.get("ui"), dict) else {}
         ua_val = sec.get("web_user_agent") if isinstance(sec.get("web_user_agent"), str) and sec.get("web_user_agent").strip() else DEFAULT_WEB_USER_AGENT
+        shell_buf = sec.get("shell_stream_buffer_bytes")
+        if shell_buf is None:
+            shell_buf = ui_sec.get("shell_stream_buffer_bytes")
+        raw_shell_chars = sec.get("max_shell_output_chars")
+        if raw_shell_chars is None:
+            raw_shell_chars = sec.get("shell_output_chars")
+        raw_img_dim = sec.get("max_image_dimension")
+        if raw_img_dim is None:
+            raw_img_dim = sec.get("image_max_dimension")
         return cls(
             shell_default_timeout=_env_float(
                 "JOHNSTON_SHELL_TIMEOUT",
@@ -271,9 +287,9 @@ class ToolsSettings:
                 _safe_float(sec.get("shell_max_cap"), DEFAULT_SHELL_MAX_CAP, min_val=0.1),
                 min_val=0.1,
             ),
-            shell_output_chars=_env_int(
+            max_shell_output_chars=_env_int(
                 "JOHNSTON_SHELL_OUTPUT_CHARS",
-                _safe_int(sec.get("shell_output_chars"), DEFAULT_SHELL_OUTPUT_CHARS, min_val=100),
+                _safe_int(raw_shell_chars, DEFAULT_SHELL_OUTPUT_CHARS, min_val=100),
                 min_val=100,
             ),
             max_tool_output_chars=_env_int(
@@ -321,10 +337,15 @@ class ToolsSettings:
                 _safe_float(sec.get("doc_conversion_timeout"), DEFAULT_DOC_CONVERSION_TIMEOUT, min_val=0.5),
                 min_val=0.5,
             ),
-            image_max_dimension=_env_int(
+            max_image_dimension=_env_int(
                 "JOHNSTON_IMAGE_MAX_DIMENSION",
-                _safe_int(sec.get("image_max_dimension"), DEFAULT_IMAGE_MAX_DIMENSION, min_val=128),
+                _safe_int(raw_img_dim, DEFAULT_IMAGE_MAX_DIMENSION, min_val=128),
                 min_val=128,
+            ),
+            shell_stream_buffer_bytes=_env_int(
+                "JOHNSTON_SHELL_STREAM_BUFFER_BYTES",
+                _safe_int(shell_buf, DEFAULT_SHELL_STREAM_BUFFER_BYTES, min_val=1024),
+                min_val=1024,
             ),
             web_user_agent=_env_str("JOHNSTON_WEB_USER_AGENT", ua_val),
         )
@@ -333,7 +354,7 @@ class ToolsSettings:
 @dataclass
 class SubagentsSettings:
     max_concurrent: int = DEFAULT_MAX_CONCURRENT_SUBAGENTS
-    result_max_chars: int = DEFAULT_SUBAGENT_RESULT_MAX_CHARS
+    max_result_chars: int = DEFAULT_SUBAGENT_RESULT_MAX_CHARS
     worktree_timeout: float = DEFAULT_SUBAGENT_WORKTREE_TIMEOUT
 
     @classmethod
@@ -341,11 +362,14 @@ class SubagentsSettings:
         sec = data.get("subagents") if isinstance(data.get("subagents"), dict) else {}
         raw_max = sec.get("max_concurrent") if sec.get("max_concurrent") is not None else data.get("max_concurrent_subagents")
         max_sub = _safe_int(raw_max, DEFAULT_MAX_CONCURRENT_SUBAGENTS, min_val=1)
+        raw_chars = sec.get("max_result_chars")
+        if raw_chars is None:
+            raw_chars = sec.get("result_max_chars")
         return cls(
             max_concurrent=_env_int("JOHNSTON_MAX_CONCURRENT_SUBAGENTS", max_sub, min_val=1),
-            result_max_chars=_env_int(
+            max_result_chars=_env_int(
                 "JOHNSTON_SUBAGENT_RESULT_MAX_CHARS",
-                _safe_int(sec.get("result_max_chars"), DEFAULT_SUBAGENT_RESULT_MAX_CHARS, min_val=100),
+                _safe_int(raw_chars, DEFAULT_SUBAGENT_RESULT_MAX_CHARS, min_val=100),
                 min_val=100,
             ),
             worktree_timeout=_env_float(
@@ -359,21 +383,28 @@ class SubagentsSettings:
 @dataclass
 class UISettings:
     max_prompt_history: int = DEFAULT_PROMPT_HISTORY
+    max_chat_input_lines: int = DEFAULT_CHAT_INPUT_MAX_LINES
     stream_flush_interval: float = DEFAULT_STREAM_FLUSH_INTERVAL
     chat_page_size: int = DEFAULT_CHAT_PAGE_SIZE
     paste_line_threshold: int = DEFAULT_PASTE_LINE_THRESHOLD
-    chat_input_max_lines: int = DEFAULT_CHAT_INPUT_MAX_LINES
     autocomplete_max_files: int = DEFAULT_AUTOCOMPLETE_MAX_FILES
-    shell_stream_buffer_bytes: int = DEFAULT_SHELL_STREAM_BUFFER_BYTES
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> UISettings:
         sec = data.get("ui") if isinstance(data.get("ui"), dict) else {}
+        raw_input_lines = sec.get("max_chat_input_lines")
+        if raw_input_lines is None:
+            raw_input_lines = sec.get("chat_input_max_lines")
         return cls(
             max_prompt_history=_env_int(
                 "JOHNSTON_MAX_PROMPT_HISTORY",
                 _safe_int(sec.get("max_prompt_history"), DEFAULT_PROMPT_HISTORY, min_val=1),
                 min_val=1,
+            ),
+            max_chat_input_lines=_env_int(
+                "JOHNSTON_CHAT_INPUT_MAX_LINES",
+                _safe_int(raw_input_lines, DEFAULT_CHAT_INPUT_MAX_LINES, min_val=2),
+                min_val=2,
             ),
             stream_flush_interval=_env_float(
                 "JOHNSTON_STREAM_FLUSH_INTERVAL",
@@ -390,42 +421,38 @@ class UISettings:
                 _safe_int(sec.get("paste_line_threshold"), DEFAULT_PASTE_LINE_THRESHOLD, min_val=1),
                 min_val=1,
             ),
-            chat_input_max_lines=_env_int(
-                "JOHNSTON_CHAT_INPUT_MAX_LINES",
-                _safe_int(sec.get("chat_input_max_lines"), DEFAULT_CHAT_INPUT_MAX_LINES, min_val=2),
-                min_val=2,
-            ),
             autocomplete_max_files=_env_int(
                 "JOHNSTON_AUTOCOMPLETE_MAX_FILES",
                 _safe_int(sec.get("autocomplete_max_files"), DEFAULT_AUTOCOMPLETE_MAX_FILES, min_val=10),
                 min_val=10,
-            ),
-            shell_stream_buffer_bytes=_env_int(
-                "JOHNSTON_SHELL_STREAM_BUFFER_BYTES",
-                _safe_int(sec.get("shell_stream_buffer_bytes"), DEFAULT_SHELL_STREAM_BUFFER_BYTES, min_val=1024),
-                min_val=1024,
             ),
         )
 
 
 @dataclass
 class StorageSettings:
-    log_max_bytes: int = DEFAULT_LOG_MAX_BYTES
-    log_max_age_days: int = DEFAULT_LOG_MAX_AGE_DAYS
+    max_log_bytes: int = DEFAULT_LOG_MAX_BYTES
+    max_log_age_days: int = DEFAULT_LOG_MAX_AGE_DAYS
     disk_cache_ttl: float = DEFAULT_DISK_CACHE_TTL
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> StorageSettings:
         sec = data.get("storage") if isinstance(data.get("storage"), dict) else {}
+        raw_bytes = sec.get("max_log_bytes")
+        if raw_bytes is None:
+            raw_bytes = sec.get("log_max_bytes")
+        raw_age = sec.get("max_log_age_days")
+        if raw_age is None:
+            raw_age = sec.get("log_max_age_days")
         return cls(
-            log_max_bytes=_env_int(
+            max_log_bytes=_env_int(
                 "JOHNSTON_LOG_MAX_BYTES",
-                _safe_int(sec.get("log_max_bytes"), DEFAULT_LOG_MAX_BYTES, min_val=1024),
+                _safe_int(raw_bytes, DEFAULT_LOG_MAX_BYTES, min_val=1024),
                 min_val=1024,
             ),
-            log_max_age_days=_env_int(
+            max_log_age_days=_env_int(
                 "JOHNSTON_LOG_MAX_AGE_DAYS",
-                _safe_int(sec.get("log_max_age_days"), DEFAULT_LOG_MAX_AGE_DAYS, min_val=0),
+                _safe_int(raw_age, DEFAULT_LOG_MAX_AGE_DAYS, min_val=0),
                 min_val=0,
             ),
             disk_cache_ttl=_env_float(
@@ -437,17 +464,38 @@ class StorageSettings:
 
 
 @dataclass
+class SandboxSettings:
+    enabled: bool = False
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> SandboxSettings:
+        sec = data.get("sandbox") if isinstance(data.get("sandbox"), dict) else {}
+        val = sec.get("enabled", data.get("sandbox_enabled", False))
+        return cls(
+            enabled=_env_bool("JOHNSTON_SANDBOX_ENABLED", bool(val)),
+        )
+
+
+@dataclass
 class JohnstonSettings:
     model: Optional[str] = None
     active_provider: Optional[str] = None
     theme: Optional[str] = None
-    sandbox_enabled: bool = False
+    sandbox: SandboxSettings = field(default_factory=SandboxSettings)
     permissions: Dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_PERMISSIONS))
     llm: LLMSettings = field(default_factory=LLMSettings)
     tools: ToolsSettings = field(default_factory=ToolsSettings)
     subagents: SubagentsSettings = field(default_factory=SubagentsSettings)
     ui: UISettings = field(default_factory=UISettings)
     storage: StorageSettings = field(default_factory=StorageSettings)
+
+    @property
+    def sandbox_enabled(self) -> bool:
+        return self.sandbox.enabled
+
+    @sandbox_enabled.setter
+    def sandbox_enabled(self, val: bool) -> None:
+        self.sandbox.enabled = bool(val)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> JohnstonSettings:
@@ -460,13 +508,6 @@ class JohnstonSettings:
         theme = data.get("theme")
         if not (isinstance(theme, str) and theme.strip()):
             theme = None
-        sandbox_val = data.get("sandbox_enabled")
-        if not isinstance(sandbox_val, bool):
-            sandbox_sec = data.get("sandbox")
-            if isinstance(sandbox_sec, dict):
-                sandbox_val = bool(sandbox_sec.get("enabled", False))
-            else:
-                sandbox_val = False
 
         perms = data.get("permissions")
         if not isinstance(perms, dict):
@@ -480,7 +521,7 @@ class JohnstonSettings:
             model=model.strip() if model else None,
             active_provider=act_prov,
             theme=theme.strip() if theme else None,
-            sandbox_enabled=_env_bool("JOHNSTON_SANDBOX_ENABLED", sandbox_val),
+            sandbox=SandboxSettings.from_dict(data),
             permissions=perms,
             llm=LLMSettings.from_dict(data),
             tools=ToolsSettings.from_dict(data),
@@ -549,7 +590,9 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
             data["theme"] = settings.theme
         elif "theme" in data:
             data.pop("theme", None)
-        data["sandbox_enabled"] = settings.sandbox_enabled
+        data["sandbox"] = asdict(settings.sandbox)
+        data.pop("sandbox_enabled", None)
+        data.pop("provider_thinking_efforts", None)
         data["permissions"] = settings.permissions
         data["subagents"] = asdict(settings.subagents)
         data["llm"] = asdict(settings.llm)
@@ -567,7 +610,9 @@ def patch_settings(config_file: Optional[str] = None, **kwargs: Any) -> Johnston
     target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
     current = load_settings(target_file)
     for key, value in kwargs.items():
-        if hasattr(current, key):
+        if key == "sandbox_enabled":
+            current.sandbox.enabled = bool(value)
+        elif hasattr(current, key):
             setattr(current, key, value)
     save_settings(current, target_file)
     return get_settings(target_file, force_reload=True)

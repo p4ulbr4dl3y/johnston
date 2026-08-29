@@ -67,7 +67,7 @@ def cleanup_logs(logs_dir: str = LOGS_DIR, max_age_days: Optional[int] = None) -
         try:
             from core.infrastructure.config.settings import get_settings
 
-            max_age_days = get_settings().storage.log_max_age_days
+            max_age_days = get_settings().storage.max_log_age_days
         except Exception:
             max_age_days = MAX_LOG_AGE_DAYS
 
@@ -89,7 +89,7 @@ def cleanup_temp_images(temp_images_dir: str = TEMP_IMAGES_DIR, max_age_days: Op
         try:
             from core.infrastructure.config.settings import get_settings
 
-            max_age_days = get_settings().storage.log_max_age_days
+            max_age_days = get_settings().storage.max_log_age_days
         except Exception:
             max_age_days = MAX_LOG_AGE_DAYS
 
@@ -193,7 +193,7 @@ def setup_logging() -> None:
     try:
         from core.infrastructure.config.settings import get_settings
 
-        max_bytes = get_settings().storage.log_max_bytes
+        max_bytes = get_settings().storage.max_log_bytes
     except Exception:
         max_bytes = _MAX_BYTES
 

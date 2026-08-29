@@ -275,7 +275,7 @@ def truncate_subagent_result(text: str, session_id: str = "") -> str:
 
     return truncate_output(
         text,
-        max_chars=get_settings().subagents.result_max_chars,
+        max_chars=get_settings().subagents.max_result_chars,
         tool_name=session_id or "subagent",
         ext=".md",
         unique=False if session_id else True,

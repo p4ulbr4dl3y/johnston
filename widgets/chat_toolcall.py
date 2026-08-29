@@ -75,7 +75,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     @property
     def _RAW_BASH_LIMIT(self) -> int:
-        return get_settings().ui.shell_stream_buffer_bytes
+        return get_settings().tools.shell_stream_buffer_bytes
 
     def __init__(
         self,

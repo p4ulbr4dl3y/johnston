@@ -32,9 +32,8 @@ Credential resolution precedence:
   "active_provider": "openai",
   "model": "openai/gpt-4o",
   "theme": "github-dark",
-  "sandbox_enabled": false,
-  "provider_thinking_efforts": {
-    "anthropic/claude-3-7-sonnet-latest": "medium"
+  "sandbox": {
+    "enabled": false
   },
   "permissions": {
     "mode": "review",
@@ -49,6 +48,11 @@ Credential resolution precedence:
     }
   },
   "llm": {
+    "thinking_efforts": {
+      "anthropic": {
+        "claude-3-7-sonnet-latest": "medium"
+      }
+    },
     "compaction_threshold_ratio": 0.75,
     "compaction_user_budget": 20000,
     "stream_timeout": 60.0,
@@ -61,26 +65,28 @@ Credential resolution precedence:
   "tools": {
     "shell_default_timeout": 120.0,
     "shell_max_cap": 600.0,
-    "shell_output_chars": 4000,
+    "max_shell_output_chars": 4000,
     "max_tool_output_chars": 8000,
     "max_tool_payload_bytes": 10485760,
+    "shell_stream_buffer_bytes": 204800,
     "mcp_call_timeout": 120.0,
     "mcp_init_timeout": 5.0,
     "web_fetch_timeout": 20.0
   },
   "subagents": {
     "max_concurrent": 5,
-    "result_max_chars": 15000,
+    "max_result_chars": 15000,
     "worktree_timeout": 15.0
   },
   "ui": {
     "max_prompt_history": 500,
     "stream_flush_interval": 0.05,
-    "chat_page_size": 50
+    "chat_page_size": 50,
+    "max_chat_input_lines": 6
   },
   "storage": {
-    "log_max_bytes": 5242880,
-    "log_max_age_days": 7,
+    "max_log_bytes": 5242880,
+    "max_log_age_days": 7,
     "disk_cache_ttl": 2.0
   }
 }

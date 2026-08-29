@@ -410,8 +410,15 @@ class ProviderManager:
 
     def set_provider_thinking_effort(self, provider_key: str, model_name: str, effort: str):
         data = self._read_config()
+        llm_sec = data.setdefault("llm", {})
+        if not isinstance(llm_sec, dict):
+            llm_sec = {}
+            data["llm"] = llm_sec
+        efforts = llm_sec.setdefault("thinking_efforts", {})
+        if not isinstance(efforts, dict):
+            efforts = {}
+            llm_sec["thinking_efforts"] = efforts
 
-        efforts = data.setdefault("provider_thinking_efforts", {})
         provider_efforts = efforts.setdefault(provider_key, {})
         normalized = normalize_thinking_effort(effort)
         if normalized:
@@ -425,8 +432,12 @@ class ProviderManager:
         self.invalidate_cache()
 
     def get_provider_thinking_effort(self, provider_key: str, model_name: str = "") -> str:
-        efforts = self._get_config_data().get("provider_thinking_efforts", {})
-        provider_efforts = efforts.get(provider_key, {})
+        cfg = self._get_config_data()
+        llm_sec = cfg.get("llm", {})
+        efforts = llm_sec.get("thinking_efforts", {}) if isinstance(llm_sec, dict) else {}
+        if not efforts and isinstance(cfg.get("provider_thinking_efforts"), dict):
+            efforts = cfg.get("provider_thinking_efforts", {})
+        provider_efforts = efforts.get(provider_key, {}) if isinstance(efforts, dict) else {}
         if model_name in provider_efforts:
             norm = normalize_thinking_effort(provider_efforts[model_name])
             if norm:

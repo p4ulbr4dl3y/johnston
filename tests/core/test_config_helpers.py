@@ -19,6 +19,7 @@ from core.infrastructure.config.config_helpers import (
 from core.infrastructure.config.settings import (
     JohnstonSettings,
     LLMSettings,
+    SandboxSettings,
     StorageSettings,
     SubagentsSettings,
     ToolsSettings,
@@ -62,7 +63,7 @@ def test_load_settings_full_sections():
     raw_data = {
         "model": "openai/gpt-4o",
         "theme": "nord",
-        "sandbox_enabled": True,
+        "sandbox": {"enabled": True},
         "llm": {
             "context_limit": 100000,
             "compaction_threshold_ratio": 0.8,
@@ -74,10 +75,12 @@ def test_load_settings_full_sections():
             "auto_title_model": "anthropic/claude-3-5-haiku",
             "catalog_cache_ttl": 3600.0,
             "agent_md_max_chars": 15000,
+            "thinking_efforts": {"openai": {"gpt-4o": "high"}},
         },
         "tools": {
             "shell_default_timeout": 180.0,
             "shell_max_cap": 900.0,
+            "max_shell_output_chars": 5000,
             "max_tool_output_chars": 12000,
             "max_tool_payload_bytes": 2097152,
             "max_snapshot_log_bytes": 3145728,
@@ -86,12 +89,13 @@ def test_load_settings_full_sections():
             "read_line_window": 500,
             "max_dir_entries": 40,
             "doc_conversion_timeout": 45.0,
-            "image_max_dimension": 1024,
+            "max_image_dimension": 1024,
+            "shell_stream_buffer_bytes": 102400,
             "web_user_agent": "CustomAgent/1.0",
         },
         "subagents": {
             "max_concurrent": 8,
-            "result_max_chars": 20000,
+            "max_result_chars": 20000,
             "worktree_timeout": 25.0,
         },
         "ui": {
@@ -99,13 +103,12 @@ def test_load_settings_full_sections():
             "stream_flush_interval": 0.02,
             "chat_page_size": 100,
             "paste_line_threshold": 15,
-            "chat_input_max_lines": 8,
+            "max_chat_input_lines": 8,
             "autocomplete_max_files": 500,
-            "shell_stream_buffer_bytes": 102400,
         },
         "storage": {
-            "log_max_bytes": 10485760,
-            "log_max_age_days": 14,
+            "max_log_bytes": 10485760,
+            "max_log_age_days": 14,
             "disk_cache_ttl": 5.0,
         },
     }
@@ -118,6 +121,7 @@ def test_load_settings_full_sections():
         assert settings.active_provider == "openai"
         assert settings.theme == "nord"
         assert settings.sandbox_enabled is True
+        assert settings.sandbox.enabled is True
         assert settings.llm.context_limit == 100000
         assert settings.llm.compaction_threshold_ratio == 0.8
         assert settings.llm.compaction_summarize_ratio == 0.85
@@ -128,8 +132,10 @@ def test_load_settings_full_sections():
         assert settings.llm.auto_title_model == "anthropic/claude-3-5-haiku"
         assert settings.llm.catalog_cache_ttl == 3600.0
         assert settings.llm.agent_md_max_chars == 15000
+        assert settings.llm.thinking_efforts == {"openai": {"gpt-4o": "high"}}
         assert settings.tools.shell_default_timeout == 180.0
         assert settings.tools.shell_max_cap == 900.0
+        assert settings.tools.max_shell_output_chars == 5000
         assert settings.tools.max_tool_output_chars == 12000
         assert settings.tools.max_tool_payload_bytes == 2097152
         assert settings.tools.max_snapshot_log_bytes == 3145728
@@ -138,20 +144,20 @@ def test_load_settings_full_sections():
         assert settings.tools.read_line_window == 500
         assert settings.tools.max_dir_entries == 40
         assert settings.tools.doc_conversion_timeout == 45.0
-        assert settings.tools.image_max_dimension == 1024
+        assert settings.tools.max_image_dimension == 1024
+        assert settings.tools.shell_stream_buffer_bytes == 102400
         assert settings.tools.web_user_agent == "CustomAgent/1.0"
         assert settings.subagents.max_concurrent == 8
-        assert settings.subagents.result_max_chars == 20000
+        assert settings.subagents.max_result_chars == 20000
         assert settings.subagents.worktree_timeout == 25.0
         assert settings.ui.max_prompt_history == 1000
         assert settings.ui.stream_flush_interval == 0.02
         assert settings.ui.chat_page_size == 100
         assert settings.ui.paste_line_threshold == 15
-        assert settings.ui.chat_input_max_lines == 8
+        assert settings.ui.max_chat_input_lines == 8
         assert settings.ui.autocomplete_max_files == 500
-        assert settings.ui.shell_stream_buffer_bytes == 102400
-        assert settings.storage.log_max_bytes == 10485760
-        assert settings.storage.log_max_age_days == 14
+        assert settings.storage.max_log_bytes == 10485760
+        assert settings.storage.max_log_age_days == 14
         assert settings.storage.disk_cache_ttl == 5.0
 
 
@@ -170,7 +176,7 @@ def test_load_settings_handles_corrupt_or_null_values():
             "max_concurrent": -10,
         },
         "storage": {
-            "log_max_age_days": False,  # boolean rejected as numeric
+            "max_log_age_days": False,  # boolean rejected as numeric
         },
     }
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -187,7 +193,7 @@ def test_load_settings_handles_corrupt_or_null_values():
         assert settings.llm.chunk_timeout == 30.0
         assert settings.subagents.max_concurrent == DEFAULT_MAX_CONCURRENT_SUBAGENTS
         assert settings.tools.shell_default_timeout == 120.0
-        assert settings.storage.log_max_age_days == 7
+        assert settings.storage.max_log_age_days == 7
 
 
 def test_save_and_reload_settings():
@@ -196,12 +202,12 @@ def test_save_and_reload_settings():
         settings = JohnstonSettings(
             model="anthropic/claude-3-7-sonnet",
             theme="monokai",
-            sandbox_enabled=True,
+            sandbox=SandboxSettings(enabled=True),
             llm=LLMSettings(stream_timeout=120.0),
             tools=ToolsSettings(shell_default_timeout=300.0),
             subagents=SubagentsSettings(max_concurrent=7),
             ui=UISettings(chat_page_size=75),
-            storage=StorageSettings(log_max_age_days=30),
+            storage=StorageSettings(max_log_age_days=30),
         )
         save_settings(settings, path)
 
@@ -210,11 +216,12 @@ def test_save_and_reload_settings():
         assert loaded.active_provider == "anthropic"
         assert loaded.theme == "monokai"
         assert loaded.sandbox_enabled is True
+        assert loaded.sandbox.enabled is True
         assert loaded.llm.stream_timeout == 120.0
         assert loaded.tools.shell_default_timeout == 300.0
         assert loaded.subagents.max_concurrent == 7
         assert loaded.ui.chat_page_size == 75
-        assert loaded.storage.log_max_age_days == 30
+        assert loaded.storage.max_log_age_days == 30
 
         # Clearing model and theme removes them from JSON
         settings.model = None
@@ -312,15 +319,17 @@ def test_session_store_disk_cache_ttl_respects_settings(monkeypatch):
 def test_patch_settings():
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "config.json")
-        save_settings(JohnstonSettings(theme="monokai", sandbox_enabled=False), path)
+        save_settings(JohnstonSettings(theme="monokai", sandbox=SandboxSettings(enabled=False)), path)
 
         patched = patch_settings(path, theme="dracula", sandbox_enabled=True)
         assert patched.theme == "dracula"
         assert patched.sandbox_enabled is True
+        assert patched.sandbox.enabled is True
 
         reloaded = get_settings(path)
         assert reloaded.theme == "dracula"
         assert reloaded.sandbox_enabled is True
+        assert reloaded.sandbox.enabled is True
 
 
 def test_permissions_settings_roundtrip():
