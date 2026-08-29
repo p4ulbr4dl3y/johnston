@@ -1,4 +1,5 @@
 """Pure role policy: AgentRole model and tool-permission checks. No IO."""
+import fnmatch
 from enum import Enum
 from typing import Any, Callable, List, Optional, Tuple
 
@@ -66,6 +67,13 @@ class AgentRole:
         self.read_only = bool(read_only)
 
 
+def _matches_tool_pattern(name: str, resolved: str, pattern: str) -> bool:
+    pat = (pattern or "").strip().lower()
+    if not pat:
+        return False
+    return fnmatch.fnmatchcase(name, pat) or fnmatch.fnmatchcase(resolved, pat)
+
+
 # Single source of truth for role tool-policy checks. Used by
 # role_tool_error, roles/tools, and application.generation.prompt_builder so
 # disallowed, allowed_tools, and subagent exclusions are honored in one place.
@@ -98,12 +106,12 @@ def _tool_policy_result(
         if clean in ("create", "edit") or resolved in ("create", "edit"):
             return False, format_tool_error(f"tool '{clean}' disabled in read-only {name} role")
 
-    disallowed = [t.lower() for t in (getattr(role_def, "disallowed_tools", []) or [])]
-    if clean in disallowed or resolved in disallowed:
+    disallowed = [str(t).lower() for t in (getattr(role_def, "disallowed_tools", []) or [])]
+    if any(_matches_tool_pattern(clean, resolved, pat) for pat in disallowed):
         return False, format_tool_error(f"tool '{clean}' disabled in {name} role")
 
-    allowed = [t.lower() for t in (getattr(role_def, "allowed_tools", []) or [])]
-    if allowed and clean not in allowed and resolved not in allowed:
+    allowed = [str(t).lower() for t in (getattr(role_def, "allowed_tools", []) or [])]
+    if allowed and not any(_matches_tool_pattern(clean, resolved, pat) for pat in allowed):
         return False, format_tool_error(f"tool '{clean}' not in allowed tools list for {name} role")
 
     return True, None

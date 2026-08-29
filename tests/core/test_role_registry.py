@@ -589,3 +589,30 @@ class TestDefaultRoles:
 
     def test_explorer_scope_any(self):
         assert BUILTIN_ROLES["explorer"].scope in ("any", "subagent")
+
+
+class TestRoleToolWildcards:
+    def test_allowed_tools_wildcard(self):
+        role = AgentRole(key="mcp_only", allowed_tools=["mcp__*", "read"])
+        assert role_tool_error(role, "read") is None
+        assert role_tool_error(role, "mcp__github__create_issue") is None
+        assert role_tool_error(role, "mcp__slack__post") is None
+        assert role_tool_error(role, "shell") is not None
+        assert role_tool_error(role, "edit") is not None
+
+    def test_disallowed_tools_wildcard(self):
+        role = AgentRole(key="no_mcp", disallowed_tools=["mcp__*", "*delete*"])
+        assert role_tool_error(role, "read") is None
+        assert role_tool_error(role, "shell") is None
+        assert role_tool_error(role, "mcp__github__create_issue") is not None
+        assert role_tool_error(role, "delete_file") is not None
+        assert role_tool_error(role, "safe_delete") is not None
+
+    def test_wildcard_with_normalizer(self):
+        def normalizer(name: str) -> str:
+            return f"mcp__{name}" if name.startswith("ext_") else name
+
+        role = AgentRole(key="ext", allowed_tools=["mcp__*"], tool_name_normalizer=normalizer)
+        assert role_tool_error(role, "ext_tool") is None
+        assert role_tool_error(role, "other_tool") is not None
+

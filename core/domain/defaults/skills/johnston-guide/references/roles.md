@@ -27,8 +27,8 @@ System prompt instructions for the role...
 - `description`: Summary of purpose.
 - `scope`: `any`, `subagent`, or `main`.
 - `read_only`: `true` to make role strictly read-only (blocks `create`/`edit` and enforces kernel-level read-only sandbox for `shell`).
-- `allowed_tools`: Comma-separated whitelist of permitted tool names.
-- `disallowed_tools`: Comma-separated list of blocked tool names.
+- `allowed_tools`: Comma-separated whitelist of permitted tool names or glob patterns (e.g. `read, shell, mcp__*`).
+- `disallowed_tools`: Comma-separated list of blocked tool names or glob patterns (e.g. `create, edit, mcp__*`).
 - `model`: Specific model or `provider/model` override (subagents). If provider omitted, defaults to parent's active provider.
 
 ## Tool Isolation & Worktree Modes
