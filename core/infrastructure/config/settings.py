@@ -479,7 +479,6 @@ class SandboxSettings:
 @dataclass
 class JohnstonSettings:
     model: Optional[str] = None
-    active_provider: Optional[str] = None
     theme: Optional[str] = None
     sandbox: SandboxSettings = field(default_factory=SandboxSettings)
     permissions: Dict[str, Any] = field(default_factory=lambda: dict(DEFAULT_PERMISSIONS))
@@ -497,6 +496,21 @@ class JohnstonSettings:
     def sandbox_enabled(self, val: bool) -> None:
         self.sandbox.enabled = bool(val)
 
+    @property
+    def active_provider(self) -> Optional[str]:
+        """Provider derived solely from ``model``.
+
+        ``model`` is the single source of truth (``provider/model`` or a bare
+        ``provider`` key); the provider is extracted from its ``/``-prefix.
+        Returns ``None`` when no model is set or the model is a bare name that
+        cannot be decoded to a provider here (no catalog context).
+        """
+        if not self.model:
+            return None
+        if "/" in self.model:
+            return self.model.split("/", 1)[0].strip().lower()
+        return None
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> JohnstonSettings:
         if not isinstance(data, dict):
@@ -513,13 +527,8 @@ class JohnstonSettings:
         if not isinstance(perms, dict):
             perms = dict(DEFAULT_PERMISSIONS)
 
-        act_prov = data.get("active_provider") if isinstance(data.get("active_provider"), str) else None
-        if not act_prov and model and "/" in model:
-            act_prov = model.split("/", 1)[0].strip().lower()
-
         return cls(
             model=model.strip() if model else None,
-            active_provider=act_prov,
             theme=theme.strip() if theme else None,
             sandbox=SandboxSettings.from_dict(data),
             permissions=perms,
@@ -579,13 +588,8 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
         data.pop("provider_models", None)
         if settings.model is not None:
             data["model"] = settings.model
-            data.pop("active_provider", None)
         else:
             data.pop("model", None)
-            if settings.active_provider is not None:
-                data["active_provider"] = settings.active_provider
-            elif "active_provider" in data:
-                data.pop("active_provider", None)
         if settings.theme is not None:
             data["theme"] = settings.theme
         elif "theme" in data:

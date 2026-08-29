@@ -363,26 +363,26 @@ class ProviderManager:
         return catalog.get_discovered_providers()
 
     def get_active_provider_key(self) -> str:
-        cfg = self._get_config_data()
-        if "active_provider" in cfg:
-            return cfg["active_provider"]
-        cfg_model = cfg.get("model", "")
+        """Active provider derived solely from ``model``.
+
+        ``model`` is the single source of truth and always encodes the provider
+        either as ``provider/model`` or as a bare ``provider`` key.  The provider
+        is extracted directly; the legacy ``active_provider`` field is never read
+        or written.
+        """
+        cfg_model = self._get_config_data().get("model", "")
         if isinstance(cfg_model, str) and cfg_model.strip():
             raw = cfg_model.strip()
             if "/" in raw:
                 return raw.split("/", 1)[0].strip().lower()
-            providers = self.load_providers()
-            if raw.lower() in providers:
-                return raw.lower()
+            return raw.strip().lower()
         return ""
 
     def set_active_provider_key(self, key: str):
         data = self._read_config()
         if key is None:
-            data["active_provider"] = None
             data.pop("model", None)
         else:
-            data["active_provider"] = key
             cur_model = self.get_provider_model(key)
             if cur_model:
                 data["model"] = f"{key}/{cur_model}"
@@ -400,10 +400,9 @@ class ProviderManager:
         self.invalidate_cache()
 
     def set_provider_model(self, key: str, model_name: str):
-        """Saves selected model to config.json as model: key/model_name."""
+        """Saves selected model to config.json as ``model: key/model_name``."""
         data = self._read_config()
         data.pop("provider_models", None)
-        data["active_provider"] = key
         data["model"] = f"{key}/{model_name}" if model_name else key
         self._save_config(data)
         self.invalidate_cache()
@@ -447,8 +446,9 @@ class ProviderManager:
 
     def get_provider_model(self, provider_key: str) -> str:
         """Returns active model for specified provider with priority:
-        1. Saved user choice in config.json (model: provider/model or model)
-        2. Explicit 'model' field in provider definition
+        1. Saved user choice in config.json (model: provider/model)
+        2. Explicit 'model' field in the provider definition (used when the config
+           model is the bare provider key, i.e. no specific model selected yet)
         3. Empty string when neither is configured.
         """
         providers = self.load_providers()
@@ -462,10 +462,13 @@ class ProviderManager:
             raw = cfg_model.strip()
             if "/" in raw:
                 p_key, m_name = raw.split("/", 1)
-                if p_key.strip().lower() == provider_key:
+                if p_key.strip().lower() == provider_key.strip().lower():
                     return m_name.strip()
-            elif self.get_active_provider_key() == provider_key and raw.lower() != provider_key.lower():
-                return raw
+            elif raw.strip().lower() == provider_key.strip().lower():
+                # ``model`` is the bare provider key: fall back to its default model.
+                if target_provider.get("model"):
+                    return target_provider["model"]
+                return ""
 
         if target_provider.get("model"):
             return target_provider["model"]

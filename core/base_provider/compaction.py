@@ -296,12 +296,14 @@ class CompactionMixin:
 
             sys_prompt, all_tools, sys_tokens = await build_prompt_context_async(self)
 
-            # Measure before/after with the SAME estimation method so the reported
-            # delta is apples-to-apples. Mixing an API-reported prompt_tokens
-            # (last_context_tokens) for "before" with the heuristic for "after"
-            # produced misleading jumps on multilingual sessions (a small real
-            # reduction looked like "65k -> 37k").
-            tokens_before = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
+            raw_tokens_before = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
+            api_context = getattr(self, "last_context_tokens", 0)
+            if api_context > 0 and raw_tokens_before > 0:
+                tokens_before = api_context
+                scale_factor = api_context / raw_tokens_before
+            else:
+                tokens_before = raw_tokens_before
+                scale_factor = 1.0
 
             # Preserved recent context tail: keep recent active tool sequence or user turn
             split_idx = None
@@ -469,7 +471,8 @@ class CompactionMixin:
 
             new_history = preserved_prefix + [checkpoint_item] + recent_tail
             self.history = await asyncio.to_thread(self.sanitize_history_for_model, new_history)
-            tokens_after = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
+            raw_tokens_after = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
+            tokens_after = max(1, round(raw_tokens_after * scale_factor))
             self.last_context_tokens = tokens_after
 
             from core.models_catalog import format_context_tokens

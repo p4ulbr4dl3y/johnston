@@ -92,6 +92,11 @@ def _estimate_message_tokens(msg: Any) -> int:
         return _estimate_text_tokens(msg)
     if not isinstance(msg, dict):
         return estimate_tokens(msg)
+    # Exclude reasoning_content from context token estimation: providers (DeepSeek, OpenAI)
+    # discount/cache or do not bill CoT as standard input tokens, preventing false compaction triggers.
+    if "reasoning_content" in msg:
+        clean_msg = {k: v for k, v in msg.items() if k != "reasoning_content"}
+        return _estimate_message_tokens(clean_msg)
     key = _structural_key(msg)
     if key[0] != "big":
         cached = _msg_tokens_cache.get(key)
@@ -124,6 +129,8 @@ def _structural_key(val: Any, depth: int = 0) -> tuple:
             return ("big", "dict")
         items = []
         for k, v in val.items():
+            if k == "reasoning_content":
+                continue
             k_str = str(k)
             if isinstance(v, str):
                 if len(v) > _CACHE_STR_KEY_MAX:

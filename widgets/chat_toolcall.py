@@ -152,9 +152,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return (
                 self.canonical_tool == "shell" and bool((self.result_text or "").strip())
             )
-        if self.canonical_tool == "manage_shell":
-            action = self.args.get("action", "list")
-            return (action or "list").lower() == "list"
         if self.canonical_tool == "manage_subagent":
             args = self.args
             action = (args.get("action") or "list").lower()
@@ -466,54 +463,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                         if app and hasattr(app, "notify"):
                             app.notify("No active subagents", severity="information")
                     return
-        if self.canonical_tool == "manage_shell":
-            args = self.args
-            action = (args.get("action") or "list").lower()
-            if action == "list":
-                tasks = getattr(app, "task_manager", []) if app else []
-                curr_sid = getattr(app, "current_session_id", None) if app else None
-                has_active = any(
-                    getattr(t, "kind", "") == "shell"
-                    and getattr(t, "is_background", False)
-                    and getattr(t, "is_running", False)
-                    and (getattr(t, "session_id", None) == curr_sid if curr_sid else True)
-                    for t in (tasks or [])
-                )
-                event.stop()
-                if has_active:
-                    try:
-                        from widgets.presentation.screens.tasks import ShellTasksScreen
 
-                        if app:
-                            app.push_screen(ShellTasksScreen())
-                    except Exception:
-                        pass
-                else:
-                    if app and hasattr(app, "notify"):
-                        app.notify("No active background tasks", severity="information")
-                return
-        if self.canonical_tool == "shell":
-            tasks = getattr(app, "task_manager", []) if app else []
-            curr_sid = getattr(app, "current_session_id", None) if app else None
-            task_id = getattr(self, "task_id", None)
-            is_bg_running = any(
-                getattr(t, "kind", "") == "shell"
-                and getattr(t, "is_background", False)
-                and getattr(t, "is_running", False)
-                and (t.task_id == task_id if task_id else True)
-                and (getattr(t, "session_id", None) == curr_sid if curr_sid else True)
-                for t in (tasks or [])
-            ) if (self.status == "running" or getattr(self, "is_background", False)) else False
-            if is_bg_running:
-                try:
-                    from widgets.presentation.screens.tasks import ShellTasksScreen
 
-                    if app:
-                        app.push_screen(ShellTasksScreen())
-                    event.stop()
-                    return
-                except Exception:
-                    pass
         if self.canonical_tool == "ask_user":
             if getattr(app, "_pending_ask_user", None) is not None:
                 self._resume_ask_user_wizard()

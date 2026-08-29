@@ -445,10 +445,14 @@ def test_active_provider_none(pm):
     assert pm.get_active_provider_key() == "openai"
 
 
-def test_active_provider_json_null(pm, tmp_path):
-    _write(tmp_path / "config.json", {"active_provider": None})
-    # get_active_provider_key returns None for json null (not "")
-    assert pm.get_active_provider_key() is None
+def test_active_provider_field_is_ignored(pm, tmp_path):
+    # ``model`` is the single source of truth; a stale legacy ``active_provider``
+    # field is never read, so an active_provider-only config yields no provider.
+    _write(tmp_path / "config.json", {"active_provider": "openai"})
+    assert pm.get_active_provider_key() == ""
+
+    _write(tmp_path / "config.json", {"model": "openai/gpt-4o", "active_provider": "anthropic"})
+    assert pm.get_active_provider_key() == "openai"
 
 
 def test_active_provider_nonexistent(pm):
@@ -542,7 +546,8 @@ def test_save_atomic_no_partial_file(pm, tmp_path):
 
 def test_save_none_value(pm, tmp_path):
     pm.set_active_provider_key(None)
-    assert pm.get_active_provider_key() is None
+    # Clearing clears the model; no provider is left behind.
+    assert pm.get_active_provider_key() == ""
 
 
 def test_save_secret_not_in_caplog(pm, caplog):
@@ -641,11 +646,11 @@ def test_cache_invalidated_after_set(pm, tmp_path):
 
 def test_cache_reload_after_external_file_change(pm, tmp_path):
     config = tmp_path / "config.json"
-    _write(config, {"active_provider": "one"})
+    _write(config, {"model": "one/model-a"})
     assert pm.get_active_provider_key() == "one"
     # external modification with a later mtime
     time.sleep(0.01)
-    _write(config, {"active_provider": "two"})
+    _write(config, {"model": "two/model-b"})
     assert pm.get_active_provider_key() == "two"
 
 
@@ -783,6 +788,49 @@ def test_set_provider_model_single_source_of_truth(pm, tmp_path):
     assert data["model"] == "custom/new-model"
     # ...and providers.json is no longer rewritten (no drift).
     assert _load_json(pfile)["custom"]["model"] == "orig"
+
+
+def test_select_model_switching_provider_sets_live_agent_model(pm, tmp_path):
+    """Regression: switching provider via select_model must apply the chosen model
+    to the *recreated* agent (not a stale pre-recreation reference), and persist
+    it via the ``model`` field alone (no dedicated ``active_provider`` field)."""
+    from core.application.provider.actions import select_model
+
+    _write(
+        tmp_path / "providers.json",
+        {
+            "prov_a": {"key": "prov_a", "name": "A", "model": "model-a-default"},
+            "prov_b": {"key": "prov_b", "name": "B", "model": "model-b-default"},
+        },
+    )
+    _write(tmp_path / "config.json", {"model": "prov_a/model-a-default"})
+    pm.invalidate_cache()
+
+    agent = pm.create_active_agent()
+    assert agent.model == "model-a-default"
+
+    class _App:
+        def __init__(self, a):
+            self.agent = a
+            self.role = a.role
+
+        def refresh_status_footer(self):
+            pass
+
+    app = _App(agent)
+    select_model(pm, agent, "prov_b", "model-b2", app)
+
+    # The live agent (recreated for prov_b) must carry the selected model.
+    assert app.agent.provider_key == "prov_b"
+    assert app.agent.model == "model-b2"
+    assert pm.get_active_provider_key() == "prov_b"
+
+    # model is the single source of truth; no active_provider field is stored.
+    data = _load_json(tmp_path / "config.json")
+    assert data["model"] == "prov_b/model-b2"
+    assert "active_provider" not in data
+    # Re-reading the persisted selection gives back the selected model.
+    assert pm.get_provider_model("prov_b") == "model-b2"
 
 
 def test_is_local_provider():

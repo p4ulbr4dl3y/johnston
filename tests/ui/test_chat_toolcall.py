@@ -435,21 +435,25 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         screen_cls.assert_not_called()
         event.stop.assert_not_called()
 
-    def test_on_click_manage_shell_non_list_not_clickable(self):
-        widget = self._widget("manage_shell", "t", args={"action": "kill", "task_id": "1"})
-        self.assertFalse(widget.is_clickable_header())
-        event = MagicMock()
-        with (
-            patch("widgets.presentation.screens.tasks.ShellTasksScreen"),
-            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
-        ):
-            app_prop.return_value = MagicMock()
-            widget.on_click(event)
-        event.stop.assert_not_called()
+    def test_manage_shell_not_clickable_and_not_expandable(self):
+        for action in ("list", "kill", "send_input", "status"):
+            widget = self._widget("manage_shell", action, args={"action": action})
+            self.assertFalse(widget.is_clickable_header())
+            self.assertFalse(widget.is_expandable())
+            event = MagicMock()
+            with patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop:
+                app = MagicMock()
+                app_prop.return_value = app
+                widget.on_click(event)
+            event.stop.assert_not_called()
+            app.push_screen.assert_not_called()
+            app.notify.assert_not_called()
+            self.assertFalse(widget.is_expanded)
 
-    def test_on_click_manage_shell_list_with_active_tasks_opens_shell_tasks_screen(self):
-        widget = self._widget("manage_shell", "list", args={"action": "list"})
+    def test_on_click_shell_toggles_expansion(self):
+        widget = self._widget("shell", "execute", args={"command": "ls -la"}, result_text="file.txt")
         self.assertTrue(widget.is_clickable_header())
+        self.assertFalse(widget.is_expanded)
         event = MagicMock()
         dummy_task = MagicMock(kind="shell", is_background=True, is_running=True, session_id=None)
         with (
@@ -461,26 +465,8 @@ class TestToolCallWidgetRendering(unittest.TestCase):
             app.current_session_id = None
             app_prop.return_value = app
             widget.on_click(event)
-        shell_screen_cls.assert_called_once()
-        app.push_screen.assert_called_once()
-        event.stop.assert_called_once()
-
-    def test_on_click_manage_shell_list_without_active_tasks_notifies(self):
-        widget = self._widget("manage_shell", "list", args={"action": "list"})
-        self.assertTrue(widget.is_clickable_header())
-        event = MagicMock()
-        with (
-            patch("widgets.presentation.screens.tasks.ShellTasksScreen") as shell_screen_cls,
-            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
-        ):
-            app = MagicMock()
-            app.task_manager = []
-            app.current_session_id = None
-            app_prop.return_value = app
-            widget.on_click(event)
         shell_screen_cls.assert_not_called()
-        self.assertFalse(widget.is_expanded)
-        app.notify.assert_called_once_with("No active background tasks", severity="information")
+        self.assertTrue(widget.is_expanded)
         event.stop.assert_called_once()
 
     def test_on_click_manage_subagent_list_with_active_opens_subagents_screen(self):

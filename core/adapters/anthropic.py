@@ -268,9 +268,12 @@ class AnthropicAdapter(BaseApiAdapter):
                 etype = evt.get("type")
                 if etype == "message_start":
                     u = (evt.get("message") or {}).get("usage") or {}
-                    pending_usage["prompt_tokens"] = u.get("input_tokens", 0) or 0
-                    pending_usage["cache_read_tokens"] = u.get("cache_read_input_tokens", 0) or 0
-                    pending_usage["cache_write_tokens"] = u.get("cache_creation_input_tokens", 0) or 0
+                    uncached_in = u.get("input_tokens", 0) or 0
+                    cache_read = u.get("cache_read_input_tokens", 0) or 0
+                    cache_write = u.get("cache_creation_input_tokens", 0) or 0
+                    pending_usage["prompt_tokens"] = uncached_in + cache_read + cache_write
+                    pending_usage["cache_read_tokens"] = cache_read
+                    pending_usage["cache_write_tokens"] = cache_write
                 elif etype == "content_block_start":
                     idx = evt.get("index")
                     cb = evt.get("content_block") or {}

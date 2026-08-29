@@ -24,7 +24,14 @@ def _refresh_models_background(pm: ProviderManager) -> None:
         spawn_background_task(pm.fetch_models_grouped())
 
 
-def _recreate_agent(pm: ProviderManager, on_recreate: Any = None, provider_key: str | None = None) -> None:
+def _recreate_agent(pm: ProviderManager, on_recreate: Any = None, provider_key: str | None = None) -> Any:
+    """Recreate the active agent for *provider_key*, returning the new agent.
+
+    Returns the resulting agent object (or ``None`` when neither the manager nor
+    the widget was able to produce one).  Callers that need to mutate the newly
+    created agent (e.g. swap in a freshly selected model) must use the return
+    value — the ``on_recreate`` widget may hold a pre-recreation stale reference.
+    """
     if provider_key and hasattr(pm, "set_active_provider_key"):
         pm.set_active_provider_key(provider_key)
     if callable(on_recreate):
@@ -32,6 +39,7 @@ def _recreate_agent(pm: ProviderManager, on_recreate: Any = None, provider_key: 
             on_recreate(provider_key=provider_key)
         except TypeError:
             on_recreate()
+        return getattr(on_recreate, "agent", None)
     elif on_recreate is not None and hasattr(on_recreate, "agent"):
         if hasattr(pm, "recreate_active_agent"):
             try:
@@ -48,8 +56,9 @@ def _recreate_agent(pm: ProviderManager, on_recreate: Any = None, provider_key: 
                 agent.role = on_recreate.role
         if hasattr(on_recreate, "refresh_status_footer"):
             on_recreate.refresh_status_footer()
+        return agent
     else:
-        pm.recreate_active_agent(provider_key=provider_key)
+        return pm.recreate_active_agent(provider_key=provider_key)
 
 
 def set_provider_credentials(
@@ -128,13 +137,23 @@ def select_model(
 
     When switching to a different active provider the agent is re-created
     for that provider so history/role are preserved before the model is set.
+    The selection is persisted in config *before* recreation so the recreated
+    agent is built with the chosen model (correct context window, thinking
+    effort and pricing), and the model is then applied to the recreated agent
+    rather than the pre-recreation (now stale) reference.
     """
-    if provider_key != pm.get_active_provider_key():
-        _recreate_agent(pm, app, provider_key=provider_key)
-
+    switching = provider_key != pm.get_active_provider_key()
+    # Persist the choice first: ``create_agent_for_provider`` derives the model
+    # from config, so the recreated agent must see the new model at build time.
+    pm.set_provider_model(provider_key, model_name)
+    if switching:
+        recreated = _recreate_agent(pm, app, provider_key=provider_key)
+        if recreated is not None:
+            agent = recreated
+    # Keep the live agent in sync (harmless for the recreated one - it already
+    # carries the model - but required for the same-provider path).
     if hasattr(agent, "model"):
         agent.model = model_name
-    pm.set_provider_model(provider_key, model_name)
 
 
 # ── Thinking effort ─────────────────────────────────────────────────────

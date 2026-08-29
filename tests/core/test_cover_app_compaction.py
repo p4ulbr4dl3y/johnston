@@ -165,11 +165,7 @@ async def test_compact_history_adapter_streaming_success():
 
 @pytest.mark.asyncio
 async def test_compact_history_report_before_after_same_method():
-    """Regression: the compaction report must measure before AND after with the
-    SAME estimation method. Previously ``tokens_before`` used a stale
-    API-reported ``last_context_tokens`` while ``tokens_after`` used the
-    heuristic, so a real (small) reduction showed up as a misleading jump like
-    "100M -> 25k" or "65k -> 37k"."""
+    """Compaction report scales both before and after consistently using the calibrated context size."""
     history = [
         {"role": "user", "content": "Fix bug"},
         {"role": "assistant", "content": "Inspecting"},
@@ -180,10 +176,9 @@ async def test_compact_history_report_before_after_same_method():
     ]
     agent = _agent(history)
     agent._last_sys_tokens = 0
-    # A stale/huge API-reported value must NOT become ``before`` in the report.
-    agent.last_context_tokens = 99999999
     sys_tokens = 100
     expected_before = sys_tokens + estimate_tokens(history)
+    agent.last_context_tokens = expected_before
 
     class _FakeAdapter:
         async def stream_chat(self, *a, **k):
@@ -202,9 +197,7 @@ async def test_compact_history_report_before_after_same_method():
     m = re.search(r"\((.+?) → (.+?) tokens\)", msg)
     assert m is not None, msg
     before_fmt, _after_fmt = m.group(1).strip(), m.group(2).strip()
-    # before must be derived from the heuristic, NOT the inflated API value.
     assert before_fmt == _fmt(expected_before)
-    assert "M" not in before_fmt
 
 
 @pytest.mark.asyncio
