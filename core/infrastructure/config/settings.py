@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
 from core.domain.defaults.config import (
+    COMPACTION_SUMMARIZE_RATIO,
     CONTEXT_COMPACTION_THRESHOLD_RATIO,
     DEFAULT_CB_COOLDOWN_SECONDS,
     DEFAULT_CB_FAILURE_THRESHOLD,
@@ -97,6 +98,7 @@ def _env_bool(key: str, default: bool) -> bool:
 class LLMSettings:
     context_limit: int = DEFAULT_CONTEXT_LIMIT
     compaction_threshold_ratio: float = CONTEXT_COMPACTION_THRESHOLD_RATIO
+    compaction_summarize_ratio: float = COMPACTION_SUMMARIZE_RATIO
     compaction_user_budget: int = DEFAULT_COMPACTION_USER_BUDGET
     stream_timeout: float = DEFAULT_STREAM_TIMEOUT
     chunk_timeout: float = DEFAULT_CHUNK_TIMEOUT
@@ -120,6 +122,11 @@ class LLMSettings:
             compaction_threshold_ratio=_env_float(
                 "JOHNSTON_COMPACTION_RATIO",
                 _safe_float(sec.get("compaction_threshold_ratio"), CONTEXT_COMPACTION_THRESHOLD_RATIO, min_val=0.1),
+                min_val=0.1,
+            ),
+            compaction_summarize_ratio=_env_float(
+                "JOHNSTON_COMPACTION_SUMMARIZE_RATIO",
+                _safe_float(sec.get("compaction_summarize_ratio"), COMPACTION_SUMMARIZE_RATIO, min_val=0.1),
                 min_val=0.1,
             ),
             compaction_user_budget=_env_int(

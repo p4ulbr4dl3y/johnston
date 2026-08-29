@@ -65,6 +65,7 @@ def test_load_settings_full_sections():
         "llm": {
             "context_limit": 100000,
             "compaction_threshold_ratio": 0.8,
+            "compaction_summarize_ratio": 0.85,
             "stream_timeout": 90.0,
             "chunk_timeout": 45.0,
             "max_retries": 5,
@@ -105,6 +106,7 @@ def test_load_settings_full_sections():
         assert settings.sandbox_enabled is True
         assert settings.llm.context_limit == 100000
         assert settings.llm.compaction_threshold_ratio == 0.8
+        assert settings.llm.compaction_summarize_ratio == 0.85
         assert settings.llm.stream_timeout == 90.0
         assert settings.llm.chunk_timeout == 45.0
         assert settings.llm.max_retries == 5
@@ -130,6 +132,7 @@ def test_load_settings_handles_corrupt_or_null_values():
     raw_data = {
         "llm": {
             "compaction_threshold_ratio": None,
+            "compaction_summarize_ratio": "bad",
             "stream_timeout": "not_a_number",
             "max_retries": True,  # boolean rejected as numeric
             "retry_delay": "nan",
@@ -150,6 +153,7 @@ def test_load_settings_handles_corrupt_or_null_values():
 
         settings = load_settings(path)
         assert settings.llm.compaction_threshold_ratio == CONTEXT_COMPACTION_THRESHOLD_RATIO
+        assert settings.llm.compaction_summarize_ratio == 0.90
         assert settings.llm.stream_timeout == DEFAULT_STREAM_TIMEOUT
         assert settings.llm.max_retries == DEFAULT_MAX_RETRIES
         assert settings.llm.retry_delay == 1.0
@@ -199,6 +203,7 @@ def test_settings_env_var_overrides(monkeypatch):
         path = os.path.join(tmpdir, "config.json")
         monkeypatch.setenv("JOHNSTON_STREAM_TIMEOUT", "75.5")
         monkeypatch.setenv("JOHNSTON_CONTEXT_LIMIT", "90000")
+        monkeypatch.setenv("JOHNSTON_COMPACTION_SUMMARIZE_RATIO", "0.65")
         monkeypatch.setenv("JOHNSTON_SHELL_TIMEOUT", "240")
         monkeypatch.setenv("JOHNSTON_MAX_TOOL_OUTPUT_CHARS", "16000")
         monkeypatch.setenv("JOHNSTON_MAX_TOOL_PAYLOAD_BYTES", "2097152")
@@ -211,6 +216,7 @@ def test_settings_env_var_overrides(monkeypatch):
         settings = load_settings(path)
         assert settings.llm.stream_timeout == 75.5
         assert settings.llm.context_limit == 90000
+        assert settings.llm.compaction_summarize_ratio == 0.65
         assert settings.tools.shell_default_timeout == 240.0
         assert settings.tools.max_tool_output_chars == 16000
         assert settings.tools.max_tool_payload_bytes == 2097152

@@ -343,8 +343,16 @@ class CompactionMixin:
                             if raw_summary:
                                 previous_summary = raw_summary
 
-            # Budget guard: if history itself exceeds 90% of context limit, trim oldest items from front
-            max_summarize_tokens = int(getattr(self, "context_limit", 128_000) * 0.90)
+            # Budget guard: if history itself exceeds the configurable
+            # llm.compaction_summarize_ratio of the context limit, trim the
+            # oldest items from the front.
+            try:
+                from core.infrastructure.config.settings import get_settings
+
+                summarize_ratio = get_settings().llm.compaction_summarize_ratio
+            except Exception:
+                summarize_ratio = 0.90
+            max_summarize_tokens = int(getattr(self, "context_limit", 128_000) * summarize_ratio)
             available_tokens = max(0, max_summarize_tokens - sys_tokens)
 
             # Estimate tokens on individual messages and slice in a single pass from the tail
