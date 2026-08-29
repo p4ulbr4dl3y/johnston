@@ -19,7 +19,7 @@ from widgets.utils.responsive import BREAKPOINT_COMPACT, is_compact_width, resol
 from widgets.utils.row_format import ellipsize
 
 
-class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
+class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Static):
     """Dedicated status footer for subagent screen, isolated from main app footer."""
 
     can_focus = False
@@ -28,6 +28,9 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__("", *args, **kwargs)
         self.session = None
+        self.is_generating: bool = False
+        self._spinner_idx: int = 0
+        self._spinner_timer = None
         self._diff_text: str = ""
         self._diff_time: float = 0.0
         self._diff_loading: bool = False
@@ -37,12 +40,47 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
         self._render_footer()
 
     def on_unmount(self) -> None:
+        if self._spinner_timer:
+            try:
+                self._spinner_timer.stop()
+            except Exception:
+                pass
+            self._spinner_timer = None
         self.cancel_resize_timer()
 
     def update_session(self, session) -> None:
         """Update with a subagent session record (AgentSession) and refresh render."""
         self.session = session
+        if not session:
+            self._render_footer()
+            return
+
+        is_running = getattr(session, "status", "") == "running"
+        if is_running and not self.is_generating:
+            self.is_generating = True
+            if not self._spinner_timer:
+                try:
+                    self._spinner_timer = self.set_interval(0.2, self._spin)
+                except Exception:
+                    self._spinner_timer = None
+        elif not is_running and self.is_generating:
+            self.is_generating = False
+            if self._spinner_timer:
+                try:
+                    self._spinner_timer.stop()
+                except Exception:
+                    pass
+                self._spinner_timer = None
+            self._spinner_idx = 0
+
         self._render_footer()
+
+    def _spin(self) -> None:
+        self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
+        if getattr(self, "_last_grid_rows", None):
+            self._render_stream_frame()
+        else:
+            self._render_footer()
 
     def _render_footer(self) -> None:
         grid = Table.grid(expand=True)
@@ -147,6 +185,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
             pm_inst = PermissionManager.get_instance()
             execution_mode = pm_inst.execution_mode.value if pm_inst else "review"
 
+            agent_role = getattr(agent, "role", None) or getattr(session, "role", "worker")
             branch = getattr(session, "branch_name", "") or self._git_branch(cwd=directory)
             grid, rows = _build_subagent_grid(
                 provider_display=provider_display,
@@ -159,6 +198,9 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
                 context_window=context_window,
                 cost_usd=cost_usd,
                 thinking_effort=thinking_effort,
+                agent_role=agent_role,
+                is_generating=self.is_generating,
+                spinner_idx=self._spinner_idx,
                 directory=directory,
                 branch=branch,
                 git_diff_stats=lambda: self._git_diff_stats(cwd=directory),
@@ -179,8 +221,8 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, Static):
         self._render_footer()
 
 
-class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
-    """Single-line top header for subagent screen displaying role, description and esc hint."""
+class SubagentHeader(ResizeDebounceMixin, Static):
+    """Single-line top header for subagent screen displaying title and esc hint."""
 
     can_focus = False
     ALLOW_SELECT = False
@@ -189,50 +231,18 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
         super().__init__("", *args, **kwargs)
         self.session = None
         self.from_tasks = from_tasks
-        self.is_generating: bool = False
-        self._spinner_idx: int = 0
-        self._spinner_timer = None
         self._last_grid_rows: list[tuple[str, str]] | None = None
 
     def on_mount(self) -> None:
         self._render_header()
 
     def on_unmount(self) -> None:
-        if self._spinner_timer:
-            try:
-                self._spinner_timer.stop()
-            except Exception:
-                pass
-            self._spinner_timer = None
         self.cancel_resize_timer()
 
     def update_session(self, session) -> None:
         """Update with a subagent session record and refresh header render."""
         self.session = session
-        if not session:
-            self._render_header()
-            return
-
-        is_running = getattr(session, "status", "") == "running"
-        if is_running and not self.is_generating:
-            self.is_generating = True
-            if not self._spinner_timer:
-                self._spinner_timer = self.set_interval(0.2, self._spin)
-        elif not is_running and self.is_generating:
-            self.is_generating = False
-            if self._spinner_timer:
-                self._spinner_timer.stop()
-                self._spinner_timer = None
-            self._spinner_idx = 0
-
         self._render_header()
-
-    def _spin(self) -> None:
-        self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
-        if getattr(self, "_last_grid_rows", None):
-            self._render_stream_frame()
-        else:
-            self._render_header()
 
     def render_for_size(self) -> None:
         self._render_header()
@@ -260,26 +270,21 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
                 except Exception:
                     cur_app = None
 
-            agent = getattr(session, "agent", None)
-            role = getattr(agent, "role", "worker") if agent else getattr(session, "role", "worker")
-            role_str = role.capitalize()
-            if self.is_generating:
-                frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
-                role_formatted = f"{frame} {role_str}"
-            else:
-                role_formatted = role_str
-
             width = resolve_width(self)
             is_compact = is_compact_width(width, breakpoint=BREAKPOINT_COMPACT)
 
-            role_part = f"[bold {t_primary}]{role_formatted}[/]"
-            description = (getattr(session, "description", "") or "").strip()
-            if description:
-                max_desc = max(8, width - len(role_str) - (12 if is_compact else 22))
-                clean_desc = ellipsize(description, max_desc)
-                role_part += f": [{t_primary}]{clean_desc}[/]"
+            description = (
+                getattr(session, "description", "")
+                or getattr(session, "prompt", "")
+                or getattr(session, "id", "")
+                or "(subagent task)"
+            ).strip()
+            clean_title = " ".join(description.split()) or "(subagent task)"
+            max_desc = max(8, width - (12 if is_compact else 22))
+            title_part = ellipsize(clean_title, max_desc)
 
-            row_left = role_part
+            row_left = f"[bold {t_primary}]{title_part}[/]"
+
             is_running = getattr(session, "status", "") == "running"
             esc_label = (
                 "esc: back"

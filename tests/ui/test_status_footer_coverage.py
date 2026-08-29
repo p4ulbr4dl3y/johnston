@@ -176,8 +176,10 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         footer = SubagentStatusFooter()
         timer = MagicMock()
         timer.stop.side_effect = Exception("boom")
+        footer._spinner_timer = timer
         footer._resize_timer = timer
         footer.on_unmount()
+        self.assertIsNone(footer._spinner_timer)
         self.assertIsNone(footer._resize_timer)
 
     def test_update_session_none_renders(self):
@@ -187,7 +189,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
             footer.update_session(None)
         upd.assert_called_once()
 
-    def test_update_session_renders_footer(self):
+    def test_update_session_running_and_completed(self):
         footer = SubagentStatusFooter()
         session = MagicMock()
         session.status = "running"
@@ -195,10 +197,30 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         session.role = "explorer"
         session.project_dir = "/tmp"
         session.branch_name = ""
+        footer.set_interval = MagicMock(return_value=MagicMock())
+
+        footer.update_session(session)
+        self.assertTrue(footer.is_generating)
+        self.assertIsNotNone(footer._spinner_timer)
+
+        session.status = "completed"
+        footer.update_session(session)
+        self.assertFalse(footer.is_generating)
+        self.assertIsNone(footer._spinner_timer)
+
+    def test_spin_no_rows_renders(self):
+        footer = SubagentStatusFooter()
+        footer._last_grid_rows = None
         with patch.object(footer, "_render_footer") as rf:
-            footer.update_session(session)
-        self.assertEqual(footer.session, session)
+            footer._spin()
         rf.assert_called_once()
+
+    def test_spin_with_cached_rows(self):
+        footer = SubagentStatusFooter()
+        footer._last_grid_rows = [("left", "right")]
+        with patch.object(footer, "_render_stream_frame") as rsf:
+            footer._spin()
+        rsf.assert_called_once()
 
     def test_render_footer_provider_active_and_pricing(self):
         footer = SubagentStatusFooter()
@@ -227,6 +249,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         ), patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
+        self.assertIn("Worker", footer._last_grid_rows[0][0])
         self.assertIn("[Select model: /models]", footer._last_grid_rows[0][0])
         self.assertIn("sandboxed", footer._last_grid_rows[1][0])
         self.assertIn("review", footer._last_grid_rows[1][0])
@@ -346,16 +369,6 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
 
 
 class TestSubagentHeaderCoverage(unittest.TestCase):
-    def test_on_unmount_timer_stop_raises(self):
-        header = SubagentHeader()
-        timer = MagicMock()
-        timer.stop.side_effect = Exception("boom")
-        header._spinner_timer = timer
-        header._resize_timer = timer
-        header.on_unmount()
-        self.assertIsNone(header._spinner_timer)
-        self.assertIsNone(header._resize_timer)
-
     def test_update_session_none_renders(self):
         header = SubagentHeader(from_tasks=True)
         header._harness_app = MagicMock()
@@ -371,37 +384,18 @@ class TestSubagentHeaderCoverage(unittest.TestCase):
         upd.assert_called_once()
         self.assertIn("esc: close", header_close._last_grid_rows[0][1])
 
-    def test_update_session_running_and_completed(self):
+    def test_update_session_renders_title_only(self):
         header = SubagentHeader()
+        header._harness_app = MagicMock()
         session = MagicMock()
         session.status = "running"
         session.agent = None
         session.role = "explorer"
         session.description = "Review feature"
-        header.set_interval = MagicMock(return_value=MagicMock())
 
         header.update_session(session)
-        self.assertTrue(header.is_generating)
-        self.assertIsNotNone(header._spinner_timer)
-
-        session.status = "completed"
-        header.update_session(session)
-        self.assertFalse(header.is_generating)
-        self.assertIsNone(header._spinner_timer)
-
-    def test_spin_no_rows_renders(self):
-        header = SubagentHeader()
-        header._last_grid_rows = None
-        with patch.object(header, "_render_header") as rh:
-            header._spin()
-        rh.assert_called_once()
-
-    def test_spin_with_cached_rows(self):
-        header = SubagentHeader()
-        header._last_grid_rows = [("left", "right")]
-        with patch.object(header, "_render_stream_frame") as rsf:
-            header._spin()
-        rsf.assert_called_once()
+        self.assertIn("Review feature", header._last_grid_rows[0][0])
+        self.assertNotIn("Explorer:", header._last_grid_rows[0][0])
 
     def test_render_header_long_description_truncation(self):
         header = SubagentHeader(from_tasks=True)

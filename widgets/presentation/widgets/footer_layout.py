@@ -7,6 +7,7 @@ from rich.table import Table
 
 from core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import format_context_tokens
+from widgets.mixins.stream_frame import SPINNER_FRAMES
 from widgets.utils.row_format import ellipsize
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
@@ -107,6 +108,9 @@ def _build_subagent_grid(
     context_window: str,
     cost_usd: float,
     thinking_effort: str,
+    agent_role: str = "worker",
+    is_generating: bool = False,
+    spinner_idx: int = 0,
     directory: str = "",
     branch: str = "",
     git_diff_stats,
@@ -125,9 +129,16 @@ def _build_subagent_grid(
     sep_compact = f" [{t_muted}]•[/] "
     arrow_sep = f" [{t_muted}]›[/] "
 
+    role_str = (agent_role or "worker").capitalize()
+    if is_generating:
+        frame = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
+        role_formatted = f"{frame} {role_str}"
+    else:
+        role_formatted = role_str
+
     if is_compact:
-        # Row 1 (Compact): Left [Model] | Right [pct% ctx • $0.02 / tok]
-        row1_left_parts = []
+        # Row 1 (Compact): Left [Role • Model] | Right [pct% ctx • $0.02 / tok]
+        row1_left_parts = [f"[bold {txt}]{role_formatted}[/]"]
         if is_connected and clean_model and clean_model != "[Select model: /models]":
             row1_left_parts.append(f"[{txt}]{clean_model}[/]")
         row1_left = sep_compact.join(row1_left_parts)
@@ -168,8 +179,8 @@ def _build_subagent_grid(
         return grid, rows
 
     # Full mode
-    # Row 1: Left [Provider › Model (effort)] | Right [Context bar • tokens • cost]
-    row1_left_parts = []
+    # Row 1: Left [Role • Provider › Model (effort)] | Right [Context bar • tokens • cost]
+    row1_left_parts = [f"[bold {txt}]{role_formatted}[/]"]
     if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
         model_part = f"[{txt}]{provider_display}[/]{arrow_sep}[{txt}]{clean_model}[/]"
         if thinking_effort and thinking_effort != "auto":
