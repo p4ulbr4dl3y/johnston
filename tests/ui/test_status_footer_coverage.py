@@ -228,7 +228,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
         self.assertIn("[Select model: /models]", footer._last_grid_rows[0][0])
-        self.assertIn("sandbox: on", footer._last_grid_rows[1][0])
+        self.assertIn("sandboxed", footer._last_grid_rows[1][0])
         self.assertIn("review", footer._last_grid_rows[1][0])
         self.assertEqual(footer._last_grid_rows[1][1], "")
 
@@ -258,7 +258,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
                 "widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
             ), patch.object(footer, "_git_diff_stats", return_value=""):
                 footer._render_footer()
-            self.assertIn("sandbox: off", footer._last_grid_rows[1][0])
+            self.assertNotIn("sandboxed", footer._last_grid_rows[1][0])
             self.assertIn("yolo", footer._last_grid_rows[1][0])
         finally:
             pm.set_session_mode(orig_mode)
@@ -293,7 +293,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         self.assertIn("gpt-4o", footer._last_grid_rows[0][0])
         self.assertIn("ctx", footer._last_grid_rows[0][1])
         self.assertIn("my_repo", footer._last_grid_rows[1][0])
-        self.assertIn("sb:on", footer._last_grid_rows[1][0])
+        self.assertIn("sandboxed", footer._last_grid_rows[1][0])
         self.assertEqual(footer._last_grid_rows[1][1], "")
 
     def test_render_footer_sandbox_disabled(self):
@@ -326,9 +326,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         with patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
-        self.assertTrue(
-            "sandbox: off" in footer._last_grid_rows[1][0] or "sb:off" in footer._last_grid_rows[1][0]
-        )
+        self.assertNotIn("sandboxed", footer._last_grid_rows[1][0])
 
     def test_render_footer_exception(self):
         footer = SubagentStatusFooter()

@@ -277,7 +277,7 @@ class SubagentHeader(ResizeDebounceMixin, StreamFrameMixin, Static):
             if description:
                 max_desc = max(8, width - len(role_str) - (12 if is_compact else 22))
                 clean_desc = ellipsize(description, max_desc)
-                role_part += f": [{t_secondary}]{clean_desc}[/]"
+                role_part += f": [{t_primary}]{clean_desc}[/]"
 
             row_left = role_part
             esc_label = (

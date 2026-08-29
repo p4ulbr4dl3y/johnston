@@ -28,7 +28,7 @@
       "markdown.h4": "bold #f4f4f5",
       "markdown.h5": "bold #f4f4f5",
       "markdown.h6": "bold #f4f4f5",
-      "markdown.code": "#f4f4f5 on #222225",
+      "markdown.code": "#ffffff on #2e2e33",
       "markdown.code_block": "#d4d4d8 on #222225",
       "markdown.block_quote": "#a1a1aa on #1f1f22",
       "markdown.list": "#71717a",

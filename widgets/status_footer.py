@@ -200,7 +200,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
         width = resolve_width(self)
         is_compact = is_compact_width(width)
         t_primary, t_secondary, t_muted, t_subtle = get_theme_colors()
-        txt = t_secondary
+        txt = t_primary
         sep = f"  [{t_muted}]•[/]  "
         sep_compact = f" [{t_muted}]•[/] "
         arrow_sep = f" [{t_muted}]›[/] "
@@ -241,7 +241,8 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             elif diff_text:
                 row2_left_parts.append(f"[{txt}]({diff_text})[/]")
             if width >= 50:
-                row2_left_parts.append(f"[{txt}]sb:on[/]" if sandbox_enabled else f"[{txt}]sb:off[/]")
+                if sandbox_enabled:
+                    row2_left_parts.append(f"[{txt}]sandboxed[/]")
                 if execution_mode:
                     row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
             row2_left = sep_compact.join(row2_left_parts)
@@ -275,12 +276,13 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 pct = min(100.0, max(0.0, pct))
                 bar_len = 8
                 filled = int(round((pct / 100) * bar_len))
-                bar_str = "█" * filled + "░" * (bar_len - filled)
+                empty = bar_len - filled
+                bar_str = f"[{t_primary}]{'█' * filled}[/][{t_muted}]{'░' * empty}[/]"
                 used_formatted = format_context_tokens(ctx_val)
                 cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
                 tok_str = format_context_tokens(total_tokens)
                 row1_right_parts = [
-                    f"[{t_subtle}][{bar_str}][/] [{txt}]{pct:.0f}% ({used_formatted}/{context_window})[/]",
+                    f"[{t_muted}][[/]{bar_str}[{t_muted}]][/] [{txt}]{pct:.0f}% ({used_formatted}/{context_window})[/]",
                     f"[{txt}]{tok_str} tok[/]",
                     f"[{txt}]{cost_str}[/]",
                 ]
@@ -298,7 +300,8 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 row2_left_parts.append(f"[{txt}]{branch}[/]")
             elif diff_text:
                 row2_left_parts.append(f"[{txt}]({diff_text})[/]")
-            row2_left_parts.append(f"[{txt}]sandbox: on[/]" if sandbox_enabled else f"[{txt}]sandbox: off[/]")
+            if sandbox_enabled:
+                row2_left_parts.append(f"[{txt}]sandboxed[/]")
             if execution_mode:
                 row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
             row2_left = sep.join(row2_left_parts)
