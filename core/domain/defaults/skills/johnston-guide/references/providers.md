@@ -20,5 +20,4 @@ Resolution order: `os.environ` ➔ `~/.johnston/secrets.json` ➔ `<PROVIDER>_AP
 - `active_provider`: currently selected provider key.
 - `model`: selected model override (`provider/model` or `model`).
 - `provider_thinking_efforts`: per-provider/per-model reasoning effort overrides.
-- `disabled_providers`: list of disabled provider keys.
 - `permissions`: global tool and pattern execution permissions.

@@ -335,7 +335,8 @@ def test_config_not_a_dict(pm, tmp_path):
     _write(tmp_path / "config.json", ["openai", "groq"])
     # _read_config must coerce to {}
     assert pm._read_config() == {}
-    # get_disabled_providers must not blow up on list config
+    _write(tmp_path / "providers.json", ["openai", "groq"])
+    # get_disabled_providers must not blow up on list providers config
     assert pm.get_disabled_providers() == []
 
 
@@ -412,7 +413,7 @@ def test_connected_disabled_provider(pm, tmp_path):
     from core.infrastructure.secrets import save_secret
 
     save_secret("openai", "sk-abc")
-    _write(tmp_path / "config.json", {"disabled_providers": ["openai"]})
+    _write(tmp_path / "providers.json", {"openai": {"enabled": False}})
     assert pm.is_provider_connected("openai") is False
 
 

@@ -50,8 +50,8 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
 
     def test_provider_disabling(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = os.path.join(tmpdir, "config.json")
-            with patch("core.provider_manager.CONFIG_FILE", config_file):
+            prov_file = os.path.join(tmpdir, "providers.json")
+            with patch("core.provider_manager.PROVIDERS_JSON_FILE", prov_file):
                 with patch("core.provider_manager.CONFIG_DIR", tmpdir):
                     pm = ProviderManager()
                     self.assertEqual(pm.get_disabled_providers(), [])
@@ -69,8 +69,8 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
 
     async def test_fetch_models_grouped_excludes_disabled(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_file = os.path.join(tmpdir, "config.json")
-            with patch("core.provider_manager.CONFIG_FILE", config_file):
+            prov_file = os.path.join(tmpdir, "providers.json")
+            with patch("core.provider_manager.PROVIDERS_JSON_FILE", prov_file):
                 with patch("core.provider_manager.CONFIG_DIR", tmpdir):
                     pm = ProviderManager()
                     pm.set_provider_disabled("openai", True)

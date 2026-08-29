@@ -36,7 +36,6 @@ Credential resolution precedence:
   "provider_thinking_efforts": {
     "anthropic/claude-3-7-sonnet-latest": "medium"
   },
-  "disabled_providers": [],
   "permissions": {
     "mode": "review",
     "default": "allow",

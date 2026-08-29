@@ -143,7 +143,7 @@ class ProviderDef:
     requires_key: Optional[bool] = None
 
     @classmethod
-    def from_dict(cls, key: str, data: Dict[str, Any], *, enabled: bool = True) -> "ProviderDef":
+    def from_dict(cls, key: str, data: Dict[str, Any], *, enabled: Optional[bool] = None) -> "ProviderDef":
         """Build a ProviderDef from a raw provider JSON dict, applying defaults and secrets interpolation."""
         raw_key = data.get("api_key") or ""
         resolved_key = interpolate_secrets(raw_key) if raw_key else ""
@@ -151,6 +151,7 @@ class ProviderDef:
         resolved_base_url = interpolate_secrets(raw_base_url)
         headers = interpolate_secrets_in_obj(data.get("headers")) if data.get("headers") else None
 
+        is_enabled = bool(data.get("enabled", True)) if enabled is None else enabled
         return cls(
             key=key,
             name=data.get("name") or key,
@@ -168,7 +169,7 @@ class ProviderDef:
             retry_delay=_field_float(data, "retry_delay", get_settings().llm.retry_delay),
             retry_backoff=_field_float(data, "retry_backoff", get_settings().llm.retry_backoff),
             max_retry_delay=_field_float(data, "max_retry_delay", get_settings().llm.max_retry_delay),
-            enabled=enabled,
+            enabled=is_enabled,
             api_key=resolved_key,
             requires_key=data.get("requires_key"),
         )
@@ -286,29 +287,29 @@ class ProviderManager:
                 logger.warning("Failed to merge JSON providers", exc_info=True)
         return providers
 
+    def _read_providers_json(self) -> dict:
+        """Reads PROVIDERS_JSON_FILE directly, falling back to {} on missing/corrupt file."""
+        data = read_json(PROVIDERS_JSON_FILE, {})
+        return data if isinstance(data, dict) else {}
+
     def get_disabled_providers(self) -> List[str]:
-        return self._get_config_data().get("disabled_providers", [])
+        json_providers = self._load_json_providers()
+        return [k for k, v in json_providers.items() if not v.get("enabled", True)]
 
     def set_provider_disabled(self, key: str, disabled: bool):
-        data = self._read_config()
-        disabled_set = set(data.get("disabled_providers", []))
-        if disabled:
-            disabled_set.add(key)
-        else:
-            disabled_set.discard(key)
-        data["disabled_providers"] = list(disabled_set)
-        self._save_config(data)
+        data = self._read_providers_json()
+        prov_data = data.get(key)
+        if not isinstance(prov_data, dict):
+            prov_data = {}
+        prov_data["enabled"] = not disabled
+        data[key] = prov_data
+        self._save_providers_json(data)
         self.invalidate_cache()
 
     def load_providers(self, include_disabled: bool = True) -> Dict[str, Any]:
         """Loads providers from JSON definitions (memoized until source files change)."""
-        disabled_set = set(self.get_disabled_providers())
-        # Memo-key: include_disabled + source-file mtimes + disabled set. The
-        # result is reused across the many per-turn / footer-render calls and
-        # invalidated after any set_* mutation or external config change.
-        cfg_mtime = _file_mtime(CONFIG_FILE)
         providers_mtime = _file_mtime(PROVIDERS_JSON_FILE)
-        cache_key = (include_disabled, cfg_mtime, providers_mtime, tuple(sorted(disabled_set)))
+        cache_key = (include_disabled, providers_mtime)
         cached = self._providers_memo.get(cache_key)
         if cached is not None:
             return cached
@@ -316,12 +317,13 @@ class ProviderManager:
         json_providers = self._load_json_providers()
         providers = {}
         for pkey, pdata in json_providers.items():
-            if not include_disabled and pkey in disabled_set:
+            is_enabled = bool(pdata.get("enabled", True))
+            if not include_disabled and not is_enabled:
                 continue
             # One malformed user entry must never take down provider loading:
             # skip it with a warning (mirrors MCP config validation).
             try:
-                providers[pkey] = ProviderDef.from_dict(pkey, pdata, enabled=pkey not in disabled_set).to_dict()
+                providers[pkey] = ProviderDef.from_dict(pkey, pdata, enabled=is_enabled).to_dict()
             except Exception as exc:
                 logger.warning("Skipping malformed provider definition %r: %s", pkey, exc)
         if len(self._providers_memo) >= 16:
@@ -337,23 +339,20 @@ class ProviderManager:
         Reads the raw JSON definition directly (not the ``load_providers``
         ``to_dict`` shape) so provider fields that ``to_dict`` intentionally
         drops (``requires_key``, ``api_key``, ``fetch_models``, ...) are kept.
-        ``enabled`` is derived from the disabled set for both JSON and catalog
-        providers. A definition with garbage-typed fields yields None plus a
-        warning instead of raising, mirroring ``load_providers`` robustness.
+        A definition with garbage-typed fields yields None plus a warning
+        instead of raising, mirroring ``load_providers`` robustness.
         """
-        disabled_set = set(self.get_disabled_providers())
-        enabled = provider_key not in disabled_set
         json_providers = self._load_json_providers()
         if provider_key in json_providers:
             try:
-                return ProviderDef.from_dict(provider_key, json_providers[provider_key], enabled=enabled)
+                return ProviderDef.from_dict(provider_key, json_providers[provider_key])
             except Exception as exc:
                 logger.warning("Malformed provider definition %r: %s", provider_key, exc)
                 return None
         cat_pdata = catalog.get_catalog_provider(provider_key)
         if cat_pdata is not None:
             try:
-                return ProviderDef.from_dict(provider_key, cat_pdata, enabled=enabled)
+                return ProviderDef.from_dict(provider_key, cat_pdata, enabled=True)
             except Exception as exc:
                 logger.warning("Malformed catalog provider definition %r: %s", provider_key, exc)
                 return None
@@ -650,7 +649,7 @@ class ProviderManager:
         if pdata is None:
             providers = self.load_providers(include_disabled=True)
             pdata = providers.get(provider_key, {})
-        if not pdata or not pdata.get("enabled", True) or provider_key in self.get_disabled_providers():
+        if not pdata or not pdata.get("enabled", True):
             return False
         api_type = str(pdata.get("api_type", "openai")).lower()
         base_url = str(pdata.get("base_url", ""))
