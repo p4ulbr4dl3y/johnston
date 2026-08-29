@@ -263,4 +263,36 @@ def test_ui_theme_manager_adapted_theme(monkeypatch):
     assert adapted_dark.primary == "#c9d1d9"
 
 
+def test_theme_variable_resolution():
+    raw_data = {
+        "name": "test-vars",
+        "label": "Test Vars",
+        "primary": "#ffffff",
+        "secondary": "#f4f4f5",
+        "muted": "#71717a",
+        "subtle": "#e4e4e7",
+        "tcss_vars": {
+            "bg-surface": "#18181b",
+            "border": "#27272a",
+            "fg-primary": "#f4f4f5",
+        },
+        "markdown_styles": {
+            "markdown.paragraph": "$fg-primary",
+            "markdown.h1": "bold $primary",
+            "markdown.block_quote": "$secondary on $bg-surface",
+            "markdown.table.border": "$border",
+        },
+        "syntax_tokens": {
+            "Token.Keyword": "$primary",
+        },
+    }
+    t = Theme.from_dict(raw_data)
+    assert t.markdown_styles["markdown.paragraph"] == "#f4f4f5"
+    assert t.markdown_styles["markdown.h1"] == "bold #ffffff"
+    assert t.markdown_styles["markdown.block_quote"] == "#f4f4f5 on #18181b"
+    assert t.markdown_styles["markdown.table.border"] == "#27272a"
+    assert t.syntax_tokens[Token.Keyword] == "#ffffff"
+
+
+
 

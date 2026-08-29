@@ -2,10 +2,23 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 from pygments.token import Token
+
+
+def _resolve_style_vars(style_str: str, var_map: dict[str, str]) -> str:
+    """Replace $var or $var-name references with their mapped hex values."""
+    if not isinstance(style_str, str) or "$" not in style_str:
+        return style_str
+
+    def replacer(match: re.Match) -> str:
+        var_name = match.group(1)
+        return var_map.get(var_name, match.group(0))
+
+    return re.sub(r"\$([a-zA-Z0-9_-]+)", replacer, style_str)
 
 
 def _parse_token(tok_key: Any) -> Any:
@@ -78,13 +91,27 @@ class Theme:
         subtle = str(data.get("subtle", "#e4e4e7"))
 
         tcss_vars = {str(k): str(v) for k, v in data.get("tcss_vars", {}).items()}
-        markdown_styles = {str(k): str(v) for k, v in data.get("markdown_styles", {}).items()}
+
+        var_map: dict[str, str] = {
+            "primary": primary,
+            "secondary": secondary,
+            "muted": muted,
+            "subtle": subtle,
+        }
+        for k, v in tcss_vars.items():
+            var_map[k] = str(v)
+            var_map[k.replace("-", "_")] = str(v)
+
+        markdown_styles = {
+            str(k): _resolve_style_vars(str(v), var_map)
+            for k, v in data.get("markdown_styles", {}).items()
+        }
 
         raw_syntax = data.get("syntax_tokens", {})
         syntax_tokens = {}
         if isinstance(raw_syntax, dict):
             for k, v in raw_syntax.items():
-                syntax_tokens[_parse_token(k)] = str(v)
+                syntax_tokens[_parse_token(k)] = _resolve_style_vars(str(v), var_map)
 
         return cls(
             name=name,
