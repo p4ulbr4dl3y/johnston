@@ -13,6 +13,7 @@ from core.infrastructure.platform.logging_setup import (
     _uncaught_exception_hook,
     adopt_task_exception,
     cleanup_logs,
+    cleanup_temp_images,
     install_asyncio_exception_handler,
     install_excepthook,
 )
@@ -175,3 +176,36 @@ def test_log_task_done_skips_successful_task():
         _log_task_done(task)
     finally:
         loop.close()
+
+
+def test_cleanup_temp_images_removes_stale_images_and_tmp(tmp_path):
+    stale_png = str(tmp_path / "pasted_image_old.png")
+    stale_jpg = str(tmp_path / "clip_old.jpg")
+    stale_tmp = str(tmp_path / "raw_clip_123.tmp")
+    fresh_png = str(tmp_path / "pasted_image_new.png")
+    non_image = str(tmp_path / "keep_me.txt")
+
+    touch(stale_png, age_days=10)
+    touch(stale_jpg, age_days=10)
+    touch(stale_tmp, age_days=10)
+    touch(fresh_png, age_days=0)
+    touch(non_image, age_days=10)
+
+    removed = cleanup_temp_images(str(tmp_path), max_age_days=7)
+
+    assert removed == 3
+    assert not os.path.exists(stale_png)
+    assert not os.path.exists(stale_jpg)
+    assert not os.path.exists(stale_tmp)
+    assert os.path.exists(fresh_png)
+    assert os.path.exists(non_image)
+
+
+def test_cleanup_temp_images_default_settings(tmp_path, monkeypatch):
+    stale_png = str(tmp_path / "pasted.png")
+    touch(stale_png, age_days=10)
+
+    removed = cleanup_temp_images(str(tmp_path), max_age_days=None)
+    assert removed == 1
+    assert not os.path.exists(stale_png)
+

@@ -12,11 +12,11 @@ import asyncio
 import logging
 import os
 import sys
-import time
 from logging.handlers import RotatingFileHandler
 from typing import Optional
 
-from core.infrastructure.platform.paths import LOGS_DIR
+from core.infrastructure.platform.paths import LOGS_DIR, TEMP_IMAGES_DIR
+from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS, cleanup_dir_by_age
 
 LOG_FILE = os.path.join(LOGS_DIR, "johnston.log")
 _MAX_BYTES = 5 * 1024 * 1024
@@ -71,21 +71,33 @@ def cleanup_logs(logs_dir: str = LOGS_DIR, max_age_days: Optional[int] = None) -
         except Exception:
             max_age_days = MAX_LOG_AGE_DAYS
 
-    if not os.path.isdir(logs_dir):
-        return 0
-    cutoff = time.time() - max_age_days * 24 * 3600
-    removed = 0
-    for name in os.listdir(logs_dir):
-        if not name.endswith(SNAPSHOT_EXTENSIONS) or name.startswith("johnston.log"):
-            continue
-        path = os.path.join(logs_dir, name)
+    return cleanup_dir_by_age(
+        logs_dir,
+        max_age_days=max_age_days,
+        extensions=SNAPSHOT_EXTENSIONS,
+        exclude_prefixes=("johnston.log",),
+    )
+
+
+def cleanup_temp_images(temp_images_dir: str = TEMP_IMAGES_DIR, max_age_days: Optional[int] = None) -> int:
+    """Remove stale temporary/pasted image files under ``temp_images_dir``.
+
+    Deletes image files whose mtime is older than ``max_age_days``. Returns the
+    number of removed files. Never raises; individual failures are swallowed.
+    """
+    if max_age_days is None:
         try:
-            if os.path.getmtime(path) < cutoff:
-                os.remove(path)
-                removed += 1
-        except OSError:
-            continue
-    return removed
+            from core.infrastructure.config.settings import get_settings
+
+            max_age_days = get_settings().storage.log_max_age_days
+        except Exception:
+            max_age_days = MAX_LOG_AGE_DAYS
+
+    return cleanup_dir_by_age(
+        temp_images_dir,
+        max_age_days=max_age_days,
+        extensions=tuple(IMAGE_EXTENSIONS) + (".tmp",),
+    )
 
 
 def _quiet_noisy_loggers() -> None:
@@ -196,5 +208,6 @@ def setup_logging() -> None:
     root.addHandler(handler)
     root.setLevel(logging.INFO)
     cleanup_logs()
+    cleanup_temp_images()
     _quiet_noisy_loggers()
     install_excepthook()

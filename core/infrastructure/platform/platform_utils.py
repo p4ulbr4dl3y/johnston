@@ -5,8 +5,9 @@ import shutil
 import signal
 import subprocess
 import threading
+import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Sequence, Set, Union
 
 _FSYNC_EXECUTOR = None
 _FSYNC_EXECUTOR_LOCK = threading.Lock()
@@ -250,6 +251,36 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico", ".
 def is_image_file(path_str: str) -> bool:
     ext = os.path.splitext(path_str)[1].lower()
     return ext in IMAGE_EXTENSIONS
+
+
+def cleanup_dir_by_age(
+    dir_path: str,
+    max_age_days: float = 7.0,
+    extensions: Optional[Union[Sequence[str], Set[str]]] = None,
+    exclude_prefixes: Sequence[str] = (),
+) -> int:
+    """Remove files under ``dir_path`` whose mtime is older than ``max_age_days``.
+
+    Returns the number of removed files. Never raises; individual failures are swallowed.
+    """
+    if not dir_path or not os.path.isdir(dir_path):
+        return 0
+    cutoff = time.time() - max_age_days * 24 * 3600
+    removed = 0
+    ext_tuple = tuple(extensions) if extensions is not None else None
+    for name in os.listdir(dir_path):
+        if exclude_prefixes and any(name.startswith(p) for p in exclude_prefixes):
+            continue
+        if ext_tuple is not None and not name.endswith(ext_tuple):
+            continue
+        path = os.path.join(dir_path, name)
+        try:
+            if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                os.remove(path)
+                removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 def get_clipboard_image_or_file() -> tuple[str | None, Any | None]:
