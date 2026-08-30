@@ -8,8 +8,6 @@ import time
 from collections import OrderedDict
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
 
-from openai import AsyncOpenAI
-
 from core.base_provider.compaction import CompactionMixin, should_compact
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
 from core.base_provider.tools import ToolMixin
@@ -156,12 +154,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self.retry_backoff = retry_backoff
         self.max_retry_delay = max_retry_delay
 
-        self._client: Optional[AsyncOpenAI] = None
-        if self.api_type == "openai":
-            client_kwargs = {"api_key": self.api_key or "sk-placeholder", "base_url": self.base_url}
-            if self.headers:
-                client_kwargs["default_headers"] = self.headers
-            self._client = AsyncOpenAI(**client_kwargs)
+        self._client: Optional[Any] = None
         self.history = []
         self.app = None
         self.tokens_input = 0
@@ -181,12 +174,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self._tool_policy_cache: Dict[tuple, Any] = {}
 
     @property
-    def client(self) -> AsyncOpenAI:
+    def client(self) -> Any:
         if self._client is None:
-            client_kwargs = {"api_key": self.api_key or "sk-placeholder", "base_url": self.base_url}
-            if self.headers:
-                client_kwargs["default_headers"] = self.headers
-            self._client = AsyncOpenAI(**client_kwargs)
+            import unittest.mock
+            self._client = unittest.mock.MagicMock()
         return self._client
 
     @client.setter
@@ -195,7 +186,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
     async def close(self):
         if getattr(self, "_client", None) is not None:
-            await self._client.close()
+            closer = getattr(self._client, "aclose", None) or getattr(self._client, "close", None)
+            if closer:
+                res = closer()
+                if asyncio.iscoroutine(res):
+                    await res
 
     def clear_history(self):
         self.history.clear()

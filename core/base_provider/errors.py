@@ -146,33 +146,16 @@ class ErrorHandlingMixin:
         if any(term in err_str for term in non_retryable_terms):
             return False
 
-        # 3. Known non-retryable OpenAI exception types
-        try:
-            import openai
-
-            if isinstance(
-                err,
-                (
-                    openai.AuthenticationError,
-                    openai.PermissionDeniedError,
-                    openai.BadRequestError,
-                    openai.NotFoundError,
-                ),
-            ):
-                return False
-        except ImportError:
-            pass
-
-        # 4. Explicit retryable HTTP status codes (e.g. 429, 5xx, 529 overloaded)
+        # 3. Explicit retryable HTTP status codes (e.g. 429, 5xx, 529 overloaded)
         if status_code in (408, 429, 500, 502, 503, 504, 524, 529):
             return True
 
-        # 5. Asyncio / Runtime timeout errors
+        # 4. Asyncio / Runtime timeout errors
         if isinstance(err, (asyncio.TimeoutError, RuntimeError)):
             if "timeout" in err_str or isinstance(err, asyncio.TimeoutError):
                 return True
 
-        # 6. HTTPX exception types
+        # 5. HTTPX exception types
         try:
             import httpx
 
@@ -185,19 +168,7 @@ class ErrorHandlingMixin:
         except ImportError:
             pass
 
-        # 7. OpenAI retryable exception types
-        try:
-            import openai
-
-            if isinstance(
-                err,
-                (openai.APIConnectionError, openai.APITimeoutError, openai.InternalServerError, openai.RateLimitError),
-            ):
-                return True
-        except ImportError:
-            pass
-
-        # 8. Fallback retryable terms
+        # 6. Fallback retryable terms
         retryable_terms = [
             "timeout",
             "timed out",

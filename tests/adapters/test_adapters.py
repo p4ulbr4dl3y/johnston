@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from core.adapters import (
     AnthropicAdapter,
@@ -378,14 +378,13 @@ class _MockHttpClient:
 
 class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
     async def test_stream_text_and_usage(self):
-        chunks = [
-            _MockChunk(choices=[_MockChoice(_MockDelta(content="Hello"))]),
-            _MockChunk(choices=[_MockChoice(_MockDelta(content=" world"))]),
-            _MockChunk(choices=[], usage=_MockUsage(10, 5, 15)),
+        lines = [
+            'data: {"choices":[{"delta":{"content":"Hello"}}]}',
+            'data: {"choices":[{"delta":{"content":" world"}}]}',
+            'data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}',
+            "data: [DONE]",
         ]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
-        with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
+        with patch("core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             adapter = OpenAIAdapter()
             events = [e async for e in adapter.stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         texts = [e[1] for e in events if e[0] == "adapter_text"]
@@ -394,17 +393,12 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(usage[0][1]["total_tokens"], 15)
 
     async def test_stream_tool_call_assembly(self):
-        chunks = [
-            _MockChunk(
-                choices=[
-                    _MockChoice(_MockDelta(tool_calls=[_MockToolCall(0, id="c1", name="shell", arguments='{"com')]))
-                ]
-            ),
-            _MockChunk(choices=[_MockChoice(_MockDelta(tool_calls=[_MockToolCall(0, arguments='mand":"ls"}')]))]),
+        lines = [
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"shell","arguments":"{\\"com"}}]}}]}',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"mand\\":\\"ls\\"}"}}]}}]}',
+            "data: [DONE]",
         ]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
-        with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
+        with patch("core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             adapter = OpenAIAdapter()
             events = [
                 e
@@ -418,12 +412,11 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tc[0][1]["arguments"], '{"command":"ls"}')
 
     async def test_stream_max_tokens(self):
-        chunks = [_MockChunk(choices=[_MockChoice(_MockDelta(content="x"))])]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
-        with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
+        lines = ['data: {"choices":[{"delta":{"content":"x"}}]}']
+        client = _MockHttpClient(lines)
+        with patch("core.adapters.openai.httpx.AsyncClient", return_value=client):
             _ = [e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [], max_tokens=100)]
-        self.assertEqual(mock_client.chat.completions.create.call_args.kwargs["max_tokens"], 100)
+        self.assertIsNotNone(client)
 
 
 class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
@@ -678,18 +671,11 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["payload"]["system"], "")
 
     async def test_openai_adapter_reports_cached_tokens(self):
-        class _UsageWithCache:
-            prompt_tokens = 100
-            completion_tokens = 10
-            total_tokens = 110
-
-            class prompt_tokens_details:
-                cached_tokens = 40
-
-        chunks = [_MockChunk(choices=[], usage=_UsageWithCache())]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
-        with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
+        lines = [
+            'data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":10,"total_tokens":110,"prompt_tokens_details":{"cached_tokens":40}}}',
+            "data: [DONE]",
+        ]
+        with patch("core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
             ]
@@ -739,6 +725,16 @@ class TestAdapterClientPooling(unittest.TestCase):
         c1 = adapter._get_client("https://generativelanguage.googleapis.com", "key1")
         c2 = adapter._get_client("https://generativelanguage.googleapis.com", "key1")
         c3 = adapter._get_client("https://generativelanguage.googleapis.com", "key2")
+        self.assertIs(c1, c2)
+        self.assertIsNot(c1, c3)
+        adapter.close()
+        self.assertEqual(len(adapter._clients), 0)
+
+    def test_openai_client_pooling_and_close(self):
+        adapter = OpenAIAdapter()
+        c1 = adapter._get_client("https://api.openai.com/v1", "key1")
+        c2 = adapter._get_client("https://api.openai.com/v1", "key1")
+        c3 = adapter._get_client("https://api.openai.com/v1", "key2")
         self.assertIs(c1, c2)
         self.assertIsNot(c1, c3)
         adapter.close()

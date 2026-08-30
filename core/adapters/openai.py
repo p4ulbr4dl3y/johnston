@@ -2,14 +2,16 @@ import asyncio
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
-from openai import AsyncOpenAI
+import httpx
 
+from core.adapters.base import check_httpx_response_status
 from core.infrastructure.adapters.base import (
     BaseApiAdapter,
     build_adapter_usage_event,
     extract_image_details,
     image_url_block,
     new_tool_call_id,
+    parse_sse_line,
     resolve_stream_timeout,
 )
 from core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs
@@ -96,84 +98,22 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
 
 
 class OpenAIAdapter(BaseApiAdapter):
-    """Adapter for OpenAI and OpenAI-compatible Chat Completions APIs."""
+    """Adapter for OpenAI and OpenAI-compatible Chat Completions APIs using httpx."""
 
     def _create_client(
         self, base_url: str, api_key: str, headers: Optional[Dict[str, str]] = None
-    ) -> AsyncOpenAI:
-        kwargs: Dict[str, Any] = {
-            "api_key": api_key or "sk-placeholder",
-            "base_url": base_url or "https://api.openai.com/v1",
-        }
-        if headers:
-            kwargs["default_headers"] = headers
-        return AsyncOpenAI(**kwargs)
+    ) -> httpx.AsyncClient:
+        return httpx.AsyncClient()
 
-    def _client_is_closed(self, client: AsyncOpenAI) -> bool:
-        return False
+    def _client_is_closed(self, client: Any) -> bool:
+        return bool(getattr(client, "is_closed", False))
 
-    async def stream_chat(
+    async def _consume_chunks(
         self,
-        base_url: str,
-        api_key: str,
-        model: str,
-        messages: List[Dict[str, Any]],
-        tools: Optional[List[Dict[str, Any]]] = None,
-        max_tokens: int = 4096,
-        thinking_effort: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
-        extra_body: Optional[Dict[str, Any]] = None,
+        stream_iter: Any,
         chunk_timeout: Optional[float] = 30.0,
         provider_key: Optional[str] = "openai",
-        client: Optional[Any] = None,
-        stream_timeout: Optional[float] = None,
-        **kwargs: Any,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
-        target_client = client or self._get_client(base_url, api_key, headers=headers)
-        formatted_msgs = format_messages_for_openai(messages)
-        create_kwargs: Dict[str, Any] = {"model": model, "messages": formatted_msgs, "stream": True}
-        if tools:
-            create_kwargs["tools"] = tools
-        if max_tokens and max_tokens > 0:
-            create_kwargs["max_tokens"] = max_tokens
-        if extra_body:
-            create_kwargs["extra_body"] = dict(extra_body)
-        create_kwargs["timeout"] = resolve_stream_timeout(stream_timeout)
-        create_kwargs.update(build_openai_thinking_kwargs(thinking_effort))
-
-        try:
-            response = await target_client.chat.completions.create(
-                **create_kwargs, stream_options={"include_usage": True}
-            )
-        except Exception as create_err:
-            c_err_str = str(create_err).lower()
-            if (
-                "stream_options" in c_err_str
-                or "extra" in c_err_str
-                or isinstance(create_err, TypeError)
-            ):
-                if "reasoning_effort" in c_err_str or isinstance(create_err, TypeError):
-                    create_kwargs.pop("reasoning_effort", None)
-                # Drop timeout too: some compatible endpoints reject it, and the
-                # fallback should retry with the most minimal payload possible.
-                create_kwargs.pop("timeout", None)
-                response = await target_client.chat.completions.create(**create_kwargs)
-            else:
-                raise create_err
-
-        choices_attr = (
-            getattr(response, "choices", None) if not isinstance(response, dict) else response.get("choices")
-        )
-        if choices_attr and len(choices_attr) > 0:
-            first_c = choices_attr[0]
-            if hasattr(first_c, "message") or (isinstance(first_c, dict) and "message" in first_c):
-                msg_obj = first_c.get("message") if isinstance(first_c, dict) else getattr(first_c, "message", None)
-                content = msg_obj.get("content") if isinstance(msg_obj, dict) else getattr(msg_obj, "content", "")
-                if content:
-                    yield ("adapter_text", content)
-                return
-
-        stream_iter = response.__aiter__()
         chunk_to = chunk_timeout or 30.0
         _chunk_queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=64)
         _DONE = object()
@@ -212,16 +152,33 @@ class OpenAIAdapter(BaseApiAdapter):
                     raise item
                 chunk = item
 
-                if getattr(chunk, "usage", None):
-                    pu = parse_usage(chunk.usage)
-                    yield build_adapter_usage_event(
-                        prompt_tokens=pu["prompt_tokens"],
-                        completion_tokens=pu["completion_tokens"],
-                        total_tokens=pu["total_tokens"],
-                        cache_read_tokens=pu["cache_read_tokens"],
-                        cache_write_tokens=pu["cache_write_tokens"],
-                        cost=pu.get("cost"),
-                    )
+                usage = chunk.get("usage") if isinstance(chunk, dict) else getattr(chunk, "usage", None)
+                if usage:
+                    if isinstance(usage, dict):
+                        p_tok = usage.get("prompt_tokens", 0)
+                        c_tok = usage.get("completion_tokens", 0)
+                        t_tok = usage.get("total_tokens") or (p_tok + c_tok)
+                        ptd = usage.get("prompt_tokens_details") or {}
+                        cr_tok = ptd.get("cached_tokens", 0) if isinstance(ptd, dict) else getattr(ptd, "cached_tokens", 0)
+                        cw_tok = ptd.get("cache_write_tokens", 0) if isinstance(ptd, dict) else getattr(ptd, "cache_write_tokens", 0)
+                        yield build_adapter_usage_event(
+                            prompt_tokens=p_tok,
+                            completion_tokens=c_tok,
+                            total_tokens=t_tok,
+                            cache_read_tokens=cr_tok,
+                            cache_write_tokens=cw_tok,
+                            cost=usage.get("cost") or usage.get("cost_usd"),
+                        )
+                    else:
+                        pu = parse_usage(usage)
+                        yield build_adapter_usage_event(
+                            prompt_tokens=pu["prompt_tokens"],
+                            completion_tokens=pu["completion_tokens"],
+                            total_tokens=pu["total_tokens"],
+                            cache_read_tokens=pu["cache_read_tokens"],
+                            cache_write_tokens=pu["cache_write_tokens"],
+                            cost=pu.get("cost"),
+                        )
 
                 chunk_is_dict = isinstance(chunk, dict)
                 chunk_error = chunk.get("error") if chunk_is_dict else getattr(chunk, "error", None)
@@ -258,34 +215,43 @@ class OpenAIAdapter(BaseApiAdapter):
                 if not delta:
                     continue
 
+                delta_is_dict = isinstance(delta, dict)
                 reasoning = (
-                    getattr(delta, "reasoning_content", None)
-                    or getattr(delta, "reasoning", None)
-                    or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
-                    or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
+                    (delta.get("reasoning_content") or delta.get("reasoning"))
+                    if delta_is_dict
+                    else (
+                        getattr(delta, "reasoning_content", None)
+                        or getattr(delta, "reasoning", None)
+                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning_content")
+                        or (getattr(delta, "model_extra", {}) or {}).get("reasoning")
+                    )
                 )
                 if reasoning:
                     had_content = True
                     yield ("adapter_thought", str(reasoning))
 
-                if getattr(delta, "content", None):
+                content = delta.get("content") if delta_is_dict else getattr(delta, "content", None)
+                if content:
                     had_content = True
-                    yield ("adapter_text", delta.content)
+                    yield ("adapter_text", content)
 
-                if getattr(delta, "tool_calls", None):
-                    for tc in delta.tool_calls:
-                        idx = getattr(tc, "index", 0) if not isinstance(tc, dict) else tc.get("index", 0)
+                tool_calls_raw = delta.get("tool_calls") if delta_is_dict else getattr(delta, "tool_calls", None)
+                if tool_calls_raw:
+                    for tc in tool_calls_raw:
+                        tc_is_dict = isinstance(tc, dict)
+                        idx = tc.get("index", 0) if tc_is_dict else getattr(tc, "index", 0)
                         if idx not in tool_calls:
                             tool_calls[idx] = {"id": "", "name": ""}
-                        tc_id = getattr(tc, "id", "") if not isinstance(tc, dict) else tc.get("id", "")
+                        tc_id = tc.get("id", "") if tc_is_dict else getattr(tc, "id", "")
                         if tc_id:
                             tool_calls[idx]["id"] = tc_id
-                        tc_fn = getattr(tc, "function", None) if not isinstance(tc, dict) else tc.get("function")
+                        tc_fn = tc.get("function") if tc_is_dict else getattr(tc, "function", None)
                         if tc_fn:
-                            fn_name = getattr(tc_fn, "name", "") if not isinstance(tc_fn, dict) else tc_fn.get("name", "")
+                            fn_is_dict = isinstance(tc_fn, dict)
+                            fn_name = tc_fn.get("name", "") if fn_is_dict else getattr(tc_fn, "name", "")
                             if fn_name:
                                 tool_calls[idx]["name"] = fn_name
-                            fn_args = getattr(tc_fn, "arguments", "") if not isinstance(tc_fn, dict) else tc_fn.get("arguments", "")
+                            fn_args = tc_fn.get("arguments", "") if fn_is_dict else getattr(tc_fn, "arguments", "")
                             if fn_args:
                                 tool_call_arg_parts.setdefault(idx, []).append(fn_args)
         finally:
@@ -313,3 +279,123 @@ class OpenAIAdapter(BaseApiAdapter):
                         "arguments": args_str,
                     },
                 )
+
+    async def stream_chat(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        max_tokens: int = 4096,
+        thinking_effort: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
+        chunk_timeout: Optional[float] = 30.0,
+        provider_key: Optional[str] = "openai",
+        client: Optional[Any] = None,
+        stream_timeout: Optional[float] = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[Tuple[str, Any], None]:
+        target_client = client or self._get_client(base_url, api_key, headers=headers)
+        formatted_msgs = format_messages_for_openai(messages)
+        create_kwargs: Dict[str, Any] = {"model": model, "messages": formatted_msgs, "stream": True}
+        if tools:
+            create_kwargs["tools"] = tools
+        if max_tokens and max_tokens > 0:
+            create_kwargs["max_tokens"] = max_tokens
+        if extra_body:
+            create_kwargs["extra_body"] = dict(extra_body)
+        create_kwargs.update(build_openai_thinking_kwargs(thinking_effort))
+
+        if hasattr(target_client, "chat") and hasattr(target_client.chat, "completions"):
+            timeout = resolve_stream_timeout(stream_timeout)
+            create_kwargs["timeout"] = timeout
+            try:
+                response = await target_client.chat.completions.create(
+                    **create_kwargs, stream_options={"include_usage": True}
+                )
+            except Exception as create_err:
+                c_err_str = str(create_err).lower()
+                if (
+                    "stream_options" in c_err_str
+                    or "extra" in c_err_str
+                    or isinstance(create_err, TypeError)
+                ):
+                    if "reasoning_effort" in c_err_str or isinstance(create_err, TypeError):
+                        create_kwargs.pop("reasoning_effort", None)
+                    create_kwargs.pop("timeout", None)
+                    response = await target_client.chat.completions.create(**create_kwargs)
+                else:
+                    raise create_err
+
+            choices_attr = (
+                getattr(response, "choices", None) if not isinstance(response, dict) else response.get("choices")
+            )
+            if choices_attr and len(choices_attr) > 0:
+                first_c = choices_attr[0]
+                if hasattr(first_c, "message") or (isinstance(first_c, dict) and "message" in first_c):
+                    msg_obj = first_c.get("message") if isinstance(first_c, dict) else getattr(first_c, "message", None)
+                    content = msg_obj.get("content") if isinstance(msg_obj, dict) else getattr(msg_obj, "content", "")
+                    if content:
+                        yield ("adapter_text", content)
+                    return
+
+            async for item in self._consume_chunks(response.__aiter__(), chunk_timeout, provider_key):
+                yield item
+            return
+
+        base = (base_url or "https://api.openai.com/v1").rstrip("/")
+        endpoint = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
+        req_headers = {"Content-Type": "application/json"}
+        if api_key:
+            req_headers["Authorization"] = f"Bearer {api_key}"
+        if headers:
+            req_headers.update(headers)
+
+        timeout = resolve_stream_timeout(stream_timeout)
+        payload = dict(create_kwargs)
+        if "extra_body" in payload:
+            eb = payload.pop("extra_body")
+            if isinstance(eb, dict):
+                payload.update(eb)
+        payload["stream_options"] = {"include_usage": True}
+
+        async def _lines_to_chunks(resp_obj):
+            async for line in resp_obj.aiter_lines():
+                if not line or not line.strip():
+                    continue
+                chunk = parse_sse_line(line)
+                if chunk is None and line.strip().startswith("{") and line.strip().endswith("}"):
+                    try:
+                        chunk = json.loads(line.strip())
+                    except Exception:
+                        chunk = None
+                if chunk is not None:
+                    yield chunk
+
+        async with target_client.stream(
+            "POST", endpoint, headers=req_headers, json=payload, timeout=timeout
+        ) as resp:
+            if getattr(resp, "status_code", 200) >= 400:
+                err_bytes = await resp.aread()
+                err_text = err_bytes.decode("utf-8", errors="replace").lower()
+                if resp.status_code == 400 and (
+                    "stream_options" in err_text
+                    or "reasoning_effort" in err_text
+                    or "extra" in err_text
+                ):
+                    payload.pop("stream_options", None)
+                    payload.pop("reasoning_effort", None)
+                    async with target_client.stream(
+                        "POST", endpoint, headers=req_headers, json=payload, timeout=timeout
+                    ) as retry_resp:
+                        if getattr(retry_resp, "status_code", 200) >= 400:
+                            await check_httpx_response_status(retry_resp)
+                        async for item in self._consume_chunks(_lines_to_chunks(retry_resp), chunk_timeout, provider_key):
+                            yield item
+                    return
+                await check_httpx_response_status(resp)
+
+            async for item in self._consume_chunks(_lines_to_chunks(resp), chunk_timeout, provider_key):
+                yield item

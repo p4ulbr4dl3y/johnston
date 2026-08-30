@@ -216,19 +216,16 @@ async def test_openai_close_all_error_swallowed():
 
 @pytest.mark.asyncio
 async def test_openai_stream_data_choices_and_empty_delta():
-    mock_client = MagicMock()
-
-    class _DataChunk:
-        choices = []
-        usage = None
-        data = {"choices": [_MockChoice(_MockDelta(content="hello"))]}
-
-    usage_chunk = _MockChunk(choices=[], usage=_MockUsage(5, 2, 7))
-    empty_delta_chunk = _MockChunk(choices=[_MockChoice(delta=None)])
-    chunks = [usage_chunk, _DataChunk(), empty_delta_chunk]
-    mock_client.chat.completions.create = AsyncMock(return_value=_MockStreamResponse(chunks))
-    with patch("core.adapters.openai.AsyncOpenAI", return_value=mock_client):
+    lines = [
+        'data: {"choices":[{"delta":{"content":"hello"}}]}',
+        'data: {"choices":[{"delta":null}]}',
+        'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}',
+        "data: [DONE]",
+    ]
+    with patch("core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
         events = [e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
     texts = "".join(e[1] for e in events if e[0] == "adapter_text")
     assert texts == "hello"
+    usage = [e for e in events if e[0] == "adapter_usage"]
+    assert usage and usage[0][1]["total_tokens"] == 7
 
