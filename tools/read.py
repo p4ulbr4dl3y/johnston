@@ -1,11 +1,9 @@
 import logging
 import os
-import shutil
-import subprocess
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Dict, Tuple
 
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
@@ -101,8 +99,7 @@ def set_cached_doc_markdown(path: str, text: str) -> None:
 def convert_doc_to_markdown_sync(
     path: str,
     cancel_event: threading.Event | None = None,
-    sandbox_enabled: bool = False,
-    cwd: str | None = None,
+    **_kwargs: Any,
 ) -> str:
     """Synchronous CPU worker to convert rich documents to markdown."""
     cached = get_cached_doc_markdown(path)
@@ -117,7 +114,6 @@ def convert_doc_to_markdown_sync(
 
     result_text = None
 
-    # 1. Try Johnston's built-in document converter
     try:
         from core.infrastructure.converter import convert_file
 
@@ -125,42 +121,9 @@ def convert_doc_to_markdown_sync(
     except Exception as exc:
         logger.debug("Built-in document converter error for %s: %s", path, exc)
 
-    # 2. Try CLI fallback if available — also when the built-in converter
-    # returned empty output (e.g. a scanned PDF or a sparse document), since
-    # an empty string still means "nothing converted".
-    if (result_text is None or not result_text.strip()) and not _interrupted():
-        cli_path = shutil.which("markitdown")
-        if cli_path:
-            if sandbox_enabled:
-                import shlex
-
-                from core.infrastructure.platform.sandbox import build_sandboxed_command
-
-                cmd_str = f"{shlex.quote(cli_path)} {shlex.quote(path)}"
-                exe, args, _ = build_sandboxed_command(cmd_str, cwd=cwd, allow_workspace_writes=False)
-                proc = subprocess.Popen(
-                    [exe] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-                )
-            else:
-                proc = subprocess.Popen(
-                    [cli_path, path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-                )
-            try:
-                tools = _tools_settings()
-                doc_timeout = tools.doc_conversion_timeout if tools else 30.0
-                stdout, _ = _communicate_cancellable(proc, _interrupted, timeout=doc_timeout)
-                if proc.returncode == 0 and stdout:
-                    result_text = stdout
-            except Exception:
-                if proc.poll() is None:
-                    proc.kill()
-                raise
-
     if _interrupted():
         return ""
     if result_text is not None:
-        # Don't cache empty conversions — retry them (and the CLI fallback)
-        # on the next read instead of pinning "" for the whole cache TTL.
         if result_text.strip():
             set_cached_doc_markdown(path, result_text)
         return result_text
@@ -168,35 +131,6 @@ def convert_doc_to_markdown_sync(
     raise RuntimeError(
         f"Unable to convert '{path}' to markdown."
     )
-
-
-def _communicate_cancellable(
-    proc: subprocess.Popen, interrupted: "Callable[[], bool]", timeout: float
-) -> "tuple[str, str]":
-    """Run ``proc.communicate`` in slices, killing the process if ``interrupted``.
-
-    ``subprocess.Popen.communicate`` is blocking and cannot be interrupted by a
-    plain ``threading.Event``. By slicing the wait into small increments we can
-    reap the process as soon as cancellation is signalled, closing the pipe it
-    holds instead of letting it linger.
-    """
-    import time as _time
-
-    deadline = _time.monotonic() + timeout
-    while True:
-        if interrupted():
-            if proc.poll() is None:
-                proc.kill()
-            return proc.communicate()
-        remain = deadline - _time.monotonic()
-        if remain <= 0:
-            if proc.poll() is None:
-                proc.kill()
-            return proc.communicate()
-        try:
-            return proc.communicate(timeout=min(0.25, remain))
-        except subprocess.TimeoutExpired:
-            continue
 
 
 def process_image_file_sync(path: str, detail: str | None = None, cancel_event: threading.Event | None = None) -> str:
@@ -525,15 +459,12 @@ class ReadTool(BaseTool):
                 return ToolResult.error("image", detail=str(e), name=path)
 
         converted_path = None
-        # Handle document formats (PDF, DOCX, etc.) via MarkItDown
+        # Handle document formats (PDF, DOCX, etc.) via built-in converter
         if ext in DOC_EXTENSIONS:
             try:
-                sandbox_enabled = bool(getattr(ctx, "sandbox_enabled", False))
                 md_text = await run_cancellable(
                     convert_doc_to_markdown_sync,
                     path,
-                    sandbox_enabled=sandbox_enabled,
-                    cwd=ctx.cwd,
                 )
                 lines = [ln.rstrip("\r\n") for ln in md_text.splitlines(keepends=True)]
                 from tools.base import _write_output_log

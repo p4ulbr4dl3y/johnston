@@ -117,14 +117,14 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             if os.path.exists(ext_path):
                 os.remove(ext_path)
 
-        # Plain text HTML file (read as raw text without markitdown)
+        # Plain text HTML file (read as raw text)
         html_path = os.path.join(self.test_dir, "doc.html")
         with open(html_path, "w", encoding="utf-8") as f:
             f.write("<h1>Test HTML</h1>")
         res_html = str(await tool.execute({"path": html_path}))
         self.assertIn("<h1>Test HTML</h1>", res_html)
 
-        # PDF document format via markitdown conversion
+        # PDF document format via document conversion
         pdf_path = os.path.join(self.test_dir, "doc.pdf")
         with open(pdf_path, "wb") as f:
             f.write(b"%PDF-1.7 mock content")

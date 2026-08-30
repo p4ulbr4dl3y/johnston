@@ -1,9 +1,8 @@
 import os
-import subprocess
 import tempfile
 import time
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -11,7 +10,6 @@ from tools.read import (
     _DOC_CACHE,
     MAX_DOC_CACHE,
     ReadTool,
-    _communicate_cancellable,
     convert_doc_to_markdown_sync,
     get_cached_doc_markdown,
     process_image_file_sync,
@@ -78,50 +76,24 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             res = convert_doc_to_markdown_sync(fake_path)
             self.assertEqual(res, "# Cached Doc")
 
-    def test_convert_doc_to_markdown_sync_cli_fallback(self):
-        fake_path = "/tmp/cli_doc.docx"
+    def test_convert_doc_to_markdown_sync_success(self):
+        fake_path = "/tmp/doc.docx"
         with (
             patch("tools.read.get_cached_doc_markdown", return_value=None),
-            patch("core.infrastructure.converter.convert_file", side_effect=RuntimeError("fail")),
-            patch("shutil.which", return_value="/usr/local/bin/markitdown"),
-            patch("subprocess.Popen") as mock_popen,
+            patch("core.infrastructure.converter.convert_file", return_value="# Doc Output"),
         ):
-            proc = MagicMock()
-            proc.communicate.return_value = ("# CLI Output", "")
-            proc.returncode = 0
-            proc.poll.return_value = 0
-            mock_popen.return_value = proc
             res = convert_doc_to_markdown_sync(fake_path)
-            self.assertEqual(res, "# CLI Output")
+            self.assertEqual(res, "# Doc Output")
 
     def test_convert_doc_to_markdown_sync_failure_raises(self):
         fake_path = "/tmp/failed.docx"
         with (
             patch("tools.read.get_cached_doc_markdown", return_value=None),
             patch("core.infrastructure.converter.convert_file", side_effect=RuntimeError("fail")),
-            patch("shutil.which", return_value=None),
         ):
             with self.assertRaises(RuntimeError) as ctx:
                 convert_doc_to_markdown_sync(fake_path)
             self.assertIn("Unable to convert", str(ctx.exception))
-
-    def test_convert_doc_to_markdown_sync_empty_result_falls_back_to_cli(self):
-        # An empty built-in conversion (e.g. a scanned PDF) must still try the
-        # CLI fallback instead of returning "" right away.
-        fake_path = "/tmp/empty_result.pdf"
-        with (
-            patch("tools.read.get_cached_doc_markdown", return_value=None),
-            patch("core.infrastructure.converter.convert_file", return_value=""),
-            patch("shutil.which", return_value="/usr/local/bin/markitdown"),
-            patch("subprocess.Popen") as mock_popen,
-        ):
-            proc = MagicMock()
-            proc.communicate.return_value = ("# CLI Output", "")
-            proc.returncode = 0
-            proc.poll.return_value = 0
-            mock_popen.return_value = proc
-            res = convert_doc_to_markdown_sync(fake_path)
-            self.assertEqual(res, "# CLI Output")
 
     def test_empty_conversion_result_not_cached(self):
         fake_path = "/tmp/empty_not_cached.pdf"
@@ -130,7 +102,6 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             with (
                 patch("tools.read.get_cached_doc_markdown", return_value=None),
                 patch("core.infrastructure.converter.convert_file", return_value=""),
-                patch("shutil.which", return_value=None),
             ):
                 res = convert_doc_to_markdown_sync(fake_path)
                 self.assertEqual(res, "")
@@ -139,8 +110,6 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             _DOC_CACHE.pop(fake_path, None)
 
     def test_convert_doc_to_markdown_sync_cooperative_cancel(self):
-        # A pre-set cancel_event makes the worker skip the CLI fallback and
-        # skip caching, returning without launching the subprocess.
         import threading
 
         cancel_event = threading.Event()
@@ -149,39 +118,9 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with (
             patch("tools.read.get_cached_doc_markdown", return_value=None),
             patch("core.infrastructure.converter.convert_file", side_effect=RuntimeError("fail")),
-            patch("shutil.which", return_value="/usr/local/bin/markitdown"),
-            patch("subprocess.Popen") as mock_popen,
         ):
-            # Post-cancel the worker skips the CLI fallback, so no subprocess is
-            # launched and no result is produced -> returns empty instead of
-            # leaking an unreachable exception.
             res = convert_doc_to_markdown_sync(fake_path, cancel_event=cancel_event)
             self.assertEqual(res, "")
-            mock_popen.assert_not_called()
-
-    def test_communicate_cancellable_kills_on_cancel(self):
-        import threading
-
-        cancel_fired = threading.Event()
-
-        def fake_communicate(timeout=None):
-            # First poll raises so the loop can re-check cancellation; once the
-            # cancel event is set, communicate returns (reaps the killed proc).
-            if not cancel_fired.is_set():
-                cancel_fired.set()
-                raise subprocess.TimeoutExpired("cmd", timeout or 0.25)
-            return ("out", "")
-
-        proc = MagicMock()
-        proc.poll.return_value = None  # Process still running
-        proc.communicate.side_effect = fake_communicate
-
-        def _interrupted() -> bool:
-            return cancel_fired.is_set()
-
-        _communicate_cancellable(proc, _interrupted, timeout=30)
-        proc.kill.assert_called_once()
-        self.assertEqual(proc.communicate.call_count, 2)
 
     def test_process_image_file_sync_cooperative_cancel(self):
         import threading
