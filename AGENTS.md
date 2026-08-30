@@ -22,7 +22,7 @@ Layered core (`core/`): DDD-style. High-level vs low-level — keep deps pointin
 - `core/domain/` — business rules: `entities/` (session), `policies/` (catalog, permission, role), `defaults/` (config, prompts, providers, linters, skills).
 - `core/application/` — use-cases: `generation/`, `provider/`, `session/`, `rules/`, `skills/`, `linters/`.
 - `core/infrastructure/` — implementation: `adapters/`, `mcp/`, `platform/`, `runtime/` (circuit_breaker, frontmatter, token_util, thinking_effort), `storage/`, `tasks/`.
-- `core/adapters/` — external LLM providers (anthropic, gemini, ollama, openai). `core/base_provider/` holds provider internals (agent, compaction, errors, tools).
+- `core/adapters/` — external LLM providers (anthropic, gemini, openai). `core/base_provider/` holds provider internals (agent, compaction, errors, tools).
 - `core/roles/` — assistant role apply/resolve/prompt/provider/tools.
 - `core/` root — managers/config hitting multiple layers (role_registry, provider_manager, permission_manager, models_catalog).
 

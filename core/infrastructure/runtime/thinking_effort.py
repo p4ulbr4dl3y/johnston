@@ -54,8 +54,3 @@ def build_gemini_thinking_config(model: str, effort: str | None) -> dict[str, ob
     if is_gemini_3_model(model):
         return {"thinkingLevel": normalized}
     return None
-
-
-def build_ollama_thinking_payload(effort: str | None) -> dict[str, object]:
-    normalized = normalize_thinking_effort(effort)
-    return {"think": normalized} if normalized else {}

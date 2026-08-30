@@ -183,19 +183,6 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
             {"thinkingBudget": 24576, "includeThoughts": True},
         )
 
-    async def test_ollama_payload_effort(self):
-        from core.adapters import OllamaAdapter
-
-        class Client(_FakeHttpClient):
-            lines = ['{"done": true, "prompt_eval_count": 1, "eval_count": 1}']
-
-        with unittest.mock.patch("core.adapters.ollama.httpx.AsyncClient", Client):
-            async for _ in OllamaAdapter().stream_chat(
-                "", "", "qwen3", [{"role": "user", "content": "hi"}], thinking_effort="low"
-            ):
-                pass
-        self.assertEqual(_FakeHttpClient.captured_payload["think"], "low")
-
 
 class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
     async def test_command_saves_effort_and_preserves_role(self):

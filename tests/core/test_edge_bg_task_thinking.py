@@ -11,7 +11,6 @@ from core.infrastructure.runtime.thinking_effort import (
     SUPPORTED_THINKING_EFFORTS,
     build_anthropic_thinking_payload,
     build_gemini_thinking_config,
-    build_ollama_thinking_payload,
     build_openai_thinking_kwargs,
     display_thinking_effort,
     normalize_thinking_effort,
@@ -249,7 +248,6 @@ class TestThinkingEffortBuilders(unittest.TestCase):
             self.assertEqual(
                 build_anthropic_thinking_payload(e), {"output_config": {"effort": e}}
             )
-            self.assertEqual(build_ollama_thinking_payload(e), {"think": e})
             g25 = build_gemini_thinking_config("gemini-2.5-flash", e)
             self.assertEqual(g25["thinkingBudget"], GEMINI_25_THINKING_BUDGET_BY_EFFORT[e])
             self.assertIn("includeThoughts", g25)
@@ -269,7 +267,6 @@ class TestThinkingEffortBuilders(unittest.TestCase):
     def test_invalid_effort_builds_empty(self):
         self.assertEqual(build_openai_thinking_kwargs("bogus"), {})
         self.assertEqual(build_anthropic_thinking_payload("bogus"), {})
-        self.assertEqual(build_ollama_thinking_payload("bogus"), {})
         self.assertIsNone(build_gemini_thinking_config("gemini-2.5-flash", "bogus"))
 
     def test_negative_and_huge_no_crash(self):

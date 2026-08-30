@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from core.adapters import (
     AnthropicAdapter,
     GeminiAdapter,
-    OllamaAdapter,
     OpenAIAdapter,
     apply_anthropic_rolling_cache,
     get_adapter,
@@ -17,7 +16,6 @@ class TestAdapters(unittest.TestCase):
         self.assertIsInstance(get_adapter("openai"), OpenAIAdapter)
         self.assertIsInstance(get_adapter("anthropic"), AnthropicAdapter)
         self.assertIsInstance(get_adapter("gemini"), GeminiAdapter)
-        self.assertIsInstance(get_adapter("ollama"), OllamaAdapter)
         with self.assertRaises(ValueError):
             get_adapter("unknown")
 
@@ -138,14 +136,6 @@ class TestAdapterMessageNormalization(unittest.TestCase):
         self.assertEqual(resp_turn["role"], "user")
         fr = next(p for p in resp_turn["parts"] if "functionResponse" in p)
         self.assertEqual(fr["functionResponse"]["name"], "shell")
-
-    def test_ollama_normalizes_assistant_tool_call_arguments(self):
-        msgs = OllamaAdapter._to_ollama_messages(self._sample_messages())
-        assistant = next(m for m in msgs if m["role"] == "assistant" and m.get("tool_calls"))
-        tc = assistant["tool_calls"][0]
-        self.assertEqual(tc["function"]["name"], "shell")
-        # arguments converted from JSON string to object
-        self.assertEqual(tc["function"]["arguments"], {"command": "ls"})
 
     def test_anthropic_image_tool_result(self):
         import json
@@ -571,51 +561,6 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertIn("deep", thoughts[0])
 
 
-class TestOllamaAdapterStreaming(unittest.IsolatedAsyncioTestCase):
-    async def test_stream_text_and_usage(self):
-        lines = [
-            '{"message":{"content":"Hello"},"done":false}',
-            '{"message":{"content":" world"},"done":false}',
-            '{"done":true,"prompt_eval_count":10,"eval_count":5}',
-        ]
-        with patch("core.adapters.ollama.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-            events = [
-                e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
-            ]
-        texts = [e[1] for e in events if e[0] == "adapter_text"]
-        self.assertEqual("".join(texts), "Hello world")
-        usage = [e for e in events if e[0] == "adapter_usage"]
-        self.assertEqual(usage[0][1]["total_tokens"], 15)
-
-    async def test_stream_tool_call(self):
-        lines = [
-            '{"message":{"content":"","tool_calls":[{"function":{"name":"shell","arguments":{"command":"ls"}}}]},"done":false}',
-            '{"done":true,"prompt_eval_count":5,"eval_count":0}',
-        ]
-        with patch("core.adapters.ollama.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-            events = [
-                e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
-            ]
-        tc = [e for e in events if e[0] == "adapter_tool_call"]
-        self.assertEqual(len(tc), 1)
-        self.assertEqual(tc[0][1]["name"], "shell")
-
-    async def test_stream_thinking_content(self):
-        lines = [
-            '{"message":{"content":"secret thoughts","thinking":true},"done":false}',
-            '{"message":{"content":"Hello"},"done":false}',
-            '{"done":true,"prompt_eval_count":5,"eval_count":0}',
-        ]
-        with patch("core.adapters.ollama.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-            events = [
-                e async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
-            ]
-        thoughts = "".join(e[1] for e in events if e[0] == "adapter_thought")
-        self.assertEqual(thoughts, "secret thoughts")
-        texts = "".join(e[1] for e in events if e[0] == "adapter_text")
-        self.assertEqual(texts, "Hello")
-
-
 class TestAdapterMessageEdgeCases(unittest.TestCase):
     def test_anthropic_empty_messages(self):
         sys_p, msgs = AnthropicAdapter._to_anthropic_messages([])
@@ -647,30 +592,6 @@ class TestAdapterMessageEdgeCases(unittest.TestCase):
         _, contents = GeminiAdapter()._to_gemini([{"role": "tool", "name": "shell", "content": 12345}])
         fr = [p for c in contents for p in c["parts"] if "functionResponse" in p]
         self.assertEqual(len(fr), 1)
-
-    def test_ollama_system_role(self):
-        msgs = OllamaAdapter._to_ollama_messages(
-            [{"role": "system", "content": "Be nice"}, {"role": "user", "content": "hi"}]
-        )
-        self.assertEqual(msgs[0]["role"], "system")
-
-    def test_ollama_assistant_list_content(self):
-        msgs = OllamaAdapter._to_ollama_messages(
-            [{"role": "assistant", "content": [{"type": "text", "text": "hello"}]}]
-        )
-        # Ollama passes content through as-is (truthy values preserved)
-        self.assertEqual(msgs[0]["role"], "assistant")
-        self.assertEqual(msgs[0]["content"], [{"type": "text", "text": "hello"}])
-
-    def test_ollama_tool_role(self):
-        msgs = OllamaAdapter._to_ollama_messages(
-            [
-                {"role": "user", "content": "do it"},
-                {"role": "tool", "tool_call_id": "c1", "content": "result text"},
-            ]
-        )
-        tool_msg = next(m for m in msgs if m["role"] == "tool")
-        self.assertEqual(tool_msg["content"], "result text")
 
 
 class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
@@ -801,23 +722,6 @@ class TestAdapterNormalizationRegression(unittest.TestCase):
         self.assertEqual(messages[0]["content"][0]["tool_use_id"], "call_1")
         self.assertEqual(messages[0]["content"][0]["content"], "file contents")
 
-    def test_ollama_preserves_assistant_multimodal_content(self):
-        messages = OllamaAdapter._to_ollama_messages(
-            [
-                {
-                    "role": "assistant",
-                    "content": [
-                        {"type": "text", "text": "caption"},
-                        {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
-                    ],
-                }
-            ]
-        )
-
-        self.assertEqual(messages[0]["role"], "assistant")
-        self.assertEqual(messages[0]["content"][0]["text"], "caption")
-        self.assertEqual(messages[0]["content"][1]["image_url"]["url"], "data:image/png;base64,abc")
-
 
 class TestAdapterClientPooling(unittest.TestCase):
     def test_anthropic_client_pooling_and_close(self):
@@ -835,16 +739,6 @@ class TestAdapterClientPooling(unittest.TestCase):
         c1 = adapter._get_client("https://generativelanguage.googleapis.com", "key1")
         c2 = adapter._get_client("https://generativelanguage.googleapis.com", "key1")
         c3 = adapter._get_client("https://generativelanguage.googleapis.com", "key2")
-        self.assertIs(c1, c2)
-        self.assertIsNot(c1, c3)
-        adapter.close()
-        self.assertEqual(len(adapter._clients), 0)
-
-    def test_ollama_client_pooling_and_close(self):
-        adapter = OllamaAdapter()
-        c1 = adapter._get_client("http://localhost:11434", "")
-        c2 = adapter._get_client("http://localhost:11434", "")
-        c3 = adapter._get_client("http://remote:11434", "")
         self.assertIs(c1, c2)
         self.assertIsNot(c1, c3)
         adapter.close()

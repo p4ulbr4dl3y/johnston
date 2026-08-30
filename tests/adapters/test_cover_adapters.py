@@ -1,4 +1,4 @@
-"""Coverage-focused unit tests for the Gemini / OpenAI / Ollama adapters.
+"""Coverage-focused unit tests for the Gemini / OpenAI adapters.
 
 Covers client-pool close() edge paths, message/content normalisation branches
 and streaming error/skip lines that tests/adapters/test_adapters.py misses.
@@ -11,7 +11,6 @@ import pytest
 
 from core.adapters import (
     GeminiAdapter,
-    OllamaAdapter,
     OpenAIAdapter,
     format_messages_for_openai,
 )
@@ -233,49 +232,3 @@ async def test_openai_stream_data_choices_and_empty_delta():
     texts = "".join(e[1] for e in events if e[0] == "adapter_text")
     assert texts == "hello"
 
-
-# --- Ollama -----------------------------------------------------------------
-
-
-def test_ollama_close_no_clients():
-    adapter = OllamaAdapter()
-    adapter._clients = {}
-    adapter.close()
-    assert adapter._clients == {}
-
-
-@pytest.mark.asyncio
-async def test_ollama_close_with_running_loop_swallowed():
-    adapter = OllamaAdapter()
-    adapter._clients = {("u", "k"): MagicMock()}
-    adapter.close()
-    assert adapter._clients == {}
-
-
-@pytest.mark.asyncio
-async def test_ollama_close_all_aclose_error():
-    client = MagicMock()
-    client.aclose = AsyncMock(side_effect=RuntimeError("close fail"))
-    await OllamaAdapter._close_all({"k": client})  # must not raise
-
-
-@pytest.mark.asyncio
-async def test_ollama_stream_lines_and_tool_payload():
-    lines = [
-        "",
-        "not-json-line",
-        '{"message":{"content":"plain text"},"done":false}',
-        '{"message":{"tool_calls":["not-a-dict"]},"done":false}',
-        '{"message":{"tool_calls":[{"function":"not-a-dict-fn"}]},"done":false}',
-        '{"done":true,"prompt_eval_count":3,"eval_count":4}',
-    ]
-    tools = [{"type": "function", "function": {"name": "shell"}}]
-    with patch("core.adapters.ollama.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-        events = [
-            e
-            async for e in OllamaAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}], tools=tools)
-        ]
-    texts = "".join(e[1] for e in events if e[0] == "adapter_text")
-    assert texts == "plain text"
-    usage = [e for e in events if e[0] == "adapter_usage"]
-    assert usage and usage[0][1]["total_tokens"] == 7
