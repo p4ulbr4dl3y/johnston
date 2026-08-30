@@ -41,4 +41,14 @@ def set_default_tool_registry(registry: Optional[ToolRegistryPort]) -> None:
 
 def get_default_tool_registry() -> Optional[ToolRegistryPort]:
     """Resolves the active tool registry port implementation."""
+    global _default_tool_registry
+    if _default_tool_registry is None:
+        try:
+            import importlib
+
+            mod = importlib.import_module("tools.registry")
+            if _default_tool_registry is None and hasattr(mod, "DefaultToolRegistry"):
+                _default_tool_registry = mod.DefaultToolRegistry()
+        except Exception:
+            pass
     return _default_tool_registry
