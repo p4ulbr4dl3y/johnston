@@ -10,11 +10,11 @@ from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optiona
 
 from openai import AsyncOpenAI
 
-from core.application.generation.prompt_builder import DEFAULT_SYSTEM_PROMPT
 from core.base_provider.compaction import CompactionMixin, should_compact
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
 from core.base_provider.tools import ToolMixin
 from core.domain.defaults.errors import ToolResult
+from core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT
 from core.infrastructure.adapters.base import (
     extract_image_payload,
     image_url_block,

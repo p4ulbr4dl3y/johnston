@@ -86,7 +86,10 @@ class BaseApiAdapter:
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
         thinking_effort: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
         stream_timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         raise NotImplementedError
 

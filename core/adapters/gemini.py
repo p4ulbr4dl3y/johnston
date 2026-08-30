@@ -119,7 +119,10 @@ class GeminiAdapter(BaseApiAdapter):
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
         thinking_effort: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
         stream_timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         system_instruction, contents = self._to_gemini(messages)
         base = (base_url or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
@@ -150,10 +153,12 @@ class GeminiAdapter(BaseApiAdapter):
                     }
                 )
             payload["tools"] = [{"functionDeclarations": function_declarations}]
+        if extra_body:
+            payload.update(extra_body)
 
-        client = self._get_client(base_url, api_key)
+        client = self._get_client(base_url, api_key, headers=headers)
         async with client.stream(
-            "POST", endpoint, json=payload, timeout=resolve_stream_timeout(stream_timeout)
+            "POST", endpoint, headers=headers, json=payload, timeout=resolve_stream_timeout(stream_timeout)
         ) as resp:
             await check_httpx_response_status(resp)
             async for line in resp.aiter_lines():

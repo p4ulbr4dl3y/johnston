@@ -9,12 +9,11 @@ import logging
 import os
 import threading
 import time
-from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
 from core.domain.defaults.skills.loader import BundledSkill, get_bundled_skill, list_bundled_skills
+from core.domain.entities.skills import Skill, SkillScope
 from core.infrastructure.platform.paths import CONFIG_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_text
 from core.infrastructure.runtime.frontmatter import parse_frontmatter
@@ -33,36 +32,6 @@ __all__ = [
     "SkillScope",
     "get_skill_manager",
 ]
-
-
-class SkillScope(Enum):
-    """Domain scope of a discovered skill."""
-
-    GLOBAL = "global"
-    PROJECT = "project"
-
-
-@dataclass
-class Skill:
-    """Structured representation of a discovered skill."""
-
-    name: str
-    description: str
-    location: str
-    content: str
-    scope: SkillScope
-    hidden: bool
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize to the dict shape previously emitted for UI/JSON consumers."""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "location": self.location,
-            "content": self.content,
-            "scope": self.scope.value,
-            "hidden": self.hidden,
-        }
 
 
 class SkillManager:

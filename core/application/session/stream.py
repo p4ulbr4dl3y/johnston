@@ -355,7 +355,7 @@ async def send_subagent_followup(
         if not hasattr(session, "pending_messages"):
             session.pending_messages = []
         session.pending_messages.append(message)
-        from tools.invoke_subagent import _mark_subagent_running
+        from core.infrastructure.runtime.subagent_tracker import _mark_subagent_running
 
         _mark_subagent_running(ctx.host, session.id, text=f"follow-up queued for {session.id}")
         return ToolResult.done(f"queued for {session.id}")
@@ -411,8 +411,9 @@ async def send_subagent_followup(
         session.add_event({"type": "user", "text": message})
         session.add_event({"type": "status_change", "status": SessionStatus.RUNNING})
 
+        from core.domain.policies.messages import format_background_notification
+        from core.infrastructure.runtime.subagent_tracker import _mark_subagent_running
         from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
-        from tools.base import format_background_notification
 
         cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
             ctx.project_dir, session.project_dir, session.branch_name, is_followup=True
@@ -443,8 +444,6 @@ async def send_subagent_followup(
             )
         )
         session.async_task = bg_task
-
-        from tools.invoke_subagent import _mark_subagent_running
 
         _mark_subagent_running(ctx.host, session.id, text=f"follow-up sent to {session.id}")
         return ToolResult.done(f"message sent to {session.id}")

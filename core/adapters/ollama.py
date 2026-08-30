@@ -53,7 +53,10 @@ class OllamaAdapter(BaseApiAdapter):
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
         thinking_effort: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
         stream_timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         endpoint = f"{(base_url or 'http://localhost:11434').rstrip('/')}/api/chat"
         payload: Dict[str, Any] = {
@@ -66,10 +69,12 @@ class OllamaAdapter(BaseApiAdapter):
             payload["tools"] = tools
         if max_tokens and max_tokens > 0:
             payload["options"] = {"num_predict": max_tokens}
+        if extra_body:
+            payload.update(extra_body)
 
-        client = self._get_client(base_url, api_key)
+        client = self._get_client(base_url, api_key, headers=headers)
         async with client.stream(
-            "POST", endpoint, json=payload, timeout=resolve_stream_timeout(stream_timeout)
+            "POST", endpoint, headers=headers, json=payload, timeout=resolve_stream_timeout(stream_timeout)
         ) as resp:
             await check_httpx_response_status(resp)
             async for line in resp.aiter_lines():

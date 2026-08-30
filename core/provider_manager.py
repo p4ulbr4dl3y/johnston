@@ -3,10 +3,10 @@ import logging
 import os
 import re
 import time
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
+from core.domain.entities.provider import ProviderDef
 from core.domain.ports.tool_registry import ToolRegistryPort, get_default_tool_registry
 from core.infrastructure.adapters.models_source import extract_context_length
 from core.infrastructure.config.settings import get_settings
@@ -117,89 +117,41 @@ def _field_int(data: Dict[str, Any], key: str, default: int) -> int:
     raw = data.get(key)
     return default if raw is None else int(raw)
 
+def _provider_def_from_dict(
+    cls, key: str, data: Dict[str, Any], *, enabled: Optional[bool] = None
+) -> ProviderDef:
+    """Build a ProviderDef from a raw provider JSON dict, applying defaults and secrets interpolation."""
+    raw_key = data.get("api_key") or ""
+    resolved_key = interpolate_secrets(raw_key) if raw_key else ""
+    raw_base_url = resolve_base_url_placeholders(data.get("base_url") or "", key, data)
+    resolved_base_url = interpolate_secrets(raw_base_url)
+    headers = interpolate_secrets_in_obj(data.get("headers")) if data.get("headers") else None
 
-@dataclass
-class ProviderDef:
-    """Resolved provider definition used across the application."""
+    is_enabled = bool(data.get("enabled", True)) if enabled is None else enabled
+    return cls(
+        key=key,
+        name=data.get("name") or key,
+        base_url=resolved_base_url,
+        model=data.get("model") or "",
+        models=list(data.get("models") or []),
+        fetch_models=bool(data.get("fetch_models", True)),
+        api_type=data.get("api_type") or "openai",
+        headers=headers,
+        extra_body=data.get("extra_body"),
+        reasoning_effort=data.get("reasoning_effort"),
+        chunk_timeout=_field_float(data, "chunk_timeout", get_settings().llm.chunk_timeout),
+        max_tokens=data.get("max_tokens"),
+        max_retries=_field_int(data, "max_retries", get_settings().llm.max_retries),
+        retry_delay=_field_float(data, "retry_delay", get_settings().llm.retry_delay),
+        retry_backoff=_field_float(data, "retry_backoff", get_settings().llm.retry_backoff),
+        max_retry_delay=_field_float(data, "max_retry_delay", get_settings().llm.max_retry_delay),
+        enabled=is_enabled,
+        api_key=resolved_key,
+        requires_key=data.get("requires_key"),
+    )
 
-    key: str
-    name: str = ""
-    base_url: str = ""
-    model: str = ""
-    models: List[str] = field(default_factory=list)
-    fetch_models: bool = True
-    api_type: str = "openai"
-    headers: Optional[Dict[str, str]] = None
-    extra_body: Optional[Dict[str, Any]] = None
-    reasoning_effort: Optional[str] = None
-    chunk_timeout: float = DEFAULT_CHUNK_TIMEOUT
-    max_tokens: Optional[int] = None
-    max_retries: int = DEFAULT_MAX_RETRIES
-    retry_delay: float = DEFAULT_RETRY_DELAY
-    retry_backoff: float = DEFAULT_RETRY_BACKOFF
-    max_retry_delay: float = DEFAULT_MAX_RETRY_DELAY
-    enabled: bool = True
-    api_key: str = ""
-    requires_key: Optional[bool] = None
 
-    @classmethod
-    def from_dict(cls, key: str, data: Dict[str, Any], *, enabled: Optional[bool] = None) -> "ProviderDef":
-        """Build a ProviderDef from a raw provider JSON dict, applying defaults and secrets interpolation."""
-        raw_key = data.get("api_key") or ""
-        resolved_key = interpolate_secrets(raw_key) if raw_key else ""
-        raw_base_url = resolve_base_url_placeholders(data.get("base_url") or "", key, data)
-        resolved_base_url = interpolate_secrets(raw_base_url)
-        headers = interpolate_secrets_in_obj(data.get("headers")) if data.get("headers") else None
-
-        is_enabled = bool(data.get("enabled", True)) if enabled is None else enabled
-        return cls(
-            key=key,
-            name=data.get("name") or key,
-            base_url=resolved_base_url,
-            model=data.get("model") or "",
-            models=list(data.get("models") or []),
-            fetch_models=bool(data.get("fetch_models", True)),
-            api_type=data.get("api_type") or "openai",
-            headers=headers,
-            extra_body=data.get("extra_body"),
-            reasoning_effort=data.get("reasoning_effort"),
-            chunk_timeout=_field_float(data, "chunk_timeout", get_settings().llm.chunk_timeout),
-            max_tokens=data.get("max_tokens"),
-            max_retries=_field_int(data, "max_retries", get_settings().llm.max_retries),
-            retry_delay=_field_float(data, "retry_delay", get_settings().llm.retry_delay),
-            retry_backoff=_field_float(data, "retry_backoff", get_settings().llm.retry_backoff),
-            max_retry_delay=_field_float(data, "max_retry_delay", get_settings().llm.max_retry_delay),
-            enabled=is_enabled,
-            api_key=resolved_key,
-            requires_key=data.get("requires_key"),
-        )
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize to the dict shape previously returned by load_providers."""
-        return {
-            "key": self.key,
-            "name": self.name,
-            "base_url": self.base_url,
-            "model": self.model,
-            "models": list(self.models),
-            "fetch_models": self.fetch_models,
-            "api_type": self.api_type,
-            "headers": self.headers,
-            "extra_body": self.extra_body,
-            "reasoning_effort": self.reasoning_effort,
-            "chunk_timeout": self.chunk_timeout,
-            "max_tokens": self.max_tokens,
-            "max_retries": self.max_retries,
-            "retry_delay": self.retry_delay,
-            "retry_backoff": self.retry_backoff,
-            "max_retry_delay": self.max_retry_delay,
-            "enabled": self.enabled,
-            "requires_key": self.requires_key,
-        }
-
-    def models_fallback(self) -> List[str]:
-        """Resolve the fallback model list (explicit models, else default model)."""
-        return list(self.models) if self.models else ([self.model] if self.model else [])
+ProviderDef.from_dict = classmethod(_provider_def_from_dict)
 
 
 def _file_mtime(path: str) -> float:

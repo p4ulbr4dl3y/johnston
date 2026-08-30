@@ -362,12 +362,11 @@ async def auto_title_session(
                 "max_tokens": SESSION_TITLE_MAX_TOKENS,
                 "thinking_effort": "none",
             }
-            if getattr(target_agent, "api_type", "") == "openai":
-                client = getattr(target_agent, "_client", None) or getattr(target_agent, "client", None)
-                if client is not None:
-                    stream_kwargs["client"] = client
-                if getattr(target_agent, "headers", None):
-                    stream_kwargs["headers"] = target_agent.headers
+            client = getattr(target_agent, "_client", None) or getattr(target_agent, "client", None)
+            if client is not None:
+                stream_kwargs["client"] = client
+            if getattr(target_agent, "headers", None):
+                stream_kwargs["headers"] = target_agent.headers
 
             async def _call_stream() -> tuple[str, str]:
                 text_chunks = []

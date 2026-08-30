@@ -11,8 +11,7 @@ def apply_prompt(
     worktree_branch: Optional[str] = None,
 ) -> None:
     """Set the subagent's role-aware system prompt and pinned model (if any)."""
-    from core.application.generation.prompt_builder import SUBAGENT_DEFAULT_SYSTEM_PROMPT
-    from core.domain.defaults.prompts import SUBAGENT_WORKTREE_PROMPT
+    from core.domain.defaults.prompts import SUBAGENT_DEFAULT_SYSTEM_PROMPT, SUBAGENT_WORKTREE_PROMPT
 
     subagent.role = definition.key
     wt_branch = worktree_branch or getattr(subagent, "worktree_branch", None)

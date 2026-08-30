@@ -15,7 +15,7 @@ from core.domain.policies.messages import (
     find_visible_user_cutoff,
     is_ui_visible_user_message,
 )
-from core.infrastructure.storage.session_store import SessionStore
+from core.domain.ports.storage import SessionStorePort
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ def _parse_compaction_tokens(msg: str) -> CompactionTokens:
 # ---------------------------------------------------------------------------
 
 async def new_session(
-    sm: SessionStore,
+    sm: SessionStorePort,
     agent: Any,
     *,
     cancel_workers: Callable[[], None],

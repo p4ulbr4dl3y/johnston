@@ -157,3 +157,24 @@ def history_before_turn(history: List[Any], seq_idx: int) -> List[Any]:
     if cutoff is None:
         return list(history)
     return history[:cutoff]
+
+
+def format_background_notification(
+    type_: str,
+    title: str,
+    task_id: str,
+    result: str,
+) -> str:
+    """Unified template for background-task completion notifications.
+
+    Emitted as a synthetic user message when a background shell/subagent finishes:
+    `<notification type="..." id="..." title="...">\n...\n</notification>`
+    """
+    t_clean = (type_ or "").replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+    title_clean = (title or "").replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+    id_clean = (task_id or "").replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+    return (
+        f'<notification type="{t_clean}" id="{id_clean}" title="{title_clean}">\n'
+        f"{result}\n"
+        f"</notification>"
+    )

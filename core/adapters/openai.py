@@ -127,6 +127,7 @@ class OpenAIAdapter(BaseApiAdapter):
         provider_key: Optional[str] = "openai",
         client: Optional[Any] = None,
         stream_timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         target_client = client or self._get_client(base_url, api_key, headers=headers)
         formatted_msgs = format_messages_for_openai(messages)

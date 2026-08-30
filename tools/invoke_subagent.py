@@ -5,62 +5,11 @@ from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from core.infrastructure.config.settings import get_settings
+from core.infrastructure.runtime.subagent_tracker import (
+    _record_subagent_session,
+)
 from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 from tools.base import BaseTool
-
-
-def _record_subagent_session(app: Any, session_id: str) -> None:
-    """Associate a spawned subagent's session id with the host's current tool widget.
-
-    The subagent_screen/chat_toolcall widgets (UI zone, outside the tools layer)
-    read ``session_id`` from the current tool widget to launch the subagent view on
-    click. This helper is the single tools-side touchpoint for that coupling; the
-    widget access itself cannot be fully isolated without touching the UI zone.
-
-    Also registers the widget in the host's subagent-tool registry so the
-    background completion callback can repaint the card (yellow -> green/red).
-    """
-    if app is None:
-        return
-    widget = getattr(app, "current_tool_widget", None)
-    if widget is None:
-        return
-    if isinstance(getattr(widget, "args", None), dict):
-        widget.args["session_id"] = session_id
-    try:
-        setattr(widget, "subagent_session_id", session_id)
-    except Exception:
-        pass
-    reg = getattr(app, "_subagent_tools", None)
-    if not isinstance(reg, dict):
-        reg = {}
-        app._subagent_tools = reg
-    reg[session_id] = widget
-
-
-def _mark_subagent_running(app: Any, session_id: str, text: str = "") -> None:
-    """Flip the host's invoke_subagent widget for ``session_id`` back to running (yellow).
-
-    Used when a follow-up (``manage_subagent send_message``) is dispatched: the
-    subagent is now working again, so its card should leave the green "done"
-    state until the background completion callback repaints it to a final color.
-    Safe no-op in headless environments (no app / no widget / widget without a
-    ``mark_running`` hook).
-    """
-    if app is None:
-        return
-    reg = getattr(app, "_subagent_tools", None)
-    if not isinstance(reg, dict):
-        return
-    widget = reg.get(session_id)
-    if widget is None:
-        return
-    mark = getattr(widget, "mark_running", None)
-    if callable(mark):
-        try:
-            mark(text=text)
-        except Exception:
-            pass
 
 
 class InvokeSubagentTool(BaseTool):

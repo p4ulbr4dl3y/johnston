@@ -1,19 +1,8 @@
 import os
 from typing import List, Optional
 
+from core.domain.entities.rules import RuleDefinition
 from core.infrastructure.runtime.markdown_scanner import MarkdownScannerCache
-
-
-class RuleDefinition:
-    def __init__(
-        self,
-        name: str,
-        content: str,
-        source: str = "global",
-    ):
-        self.name = name
-        self.content = content
-        self.source = source
 
 
 class RulesManager:

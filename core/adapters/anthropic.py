@@ -201,22 +201,29 @@ class AnthropicAdapter(BaseApiAdapter):
         tools: Optional[List[Dict[str, Any]]] = None,
         max_tokens: int = 4096,
         thinking_effort: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
         stream_timeout: Optional[float] = None,
+        **kwargs: Any,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         system_prompt, anthropic_msgs = self._to_anthropic_messages(messages)
         endpoint_url = f"{(base_url or 'https://api.anthropic.com').rstrip('/')}/v1/messages"
-        headers = {
+        req_headers = {
             "x-api-key": api_key or "",
             "anthropic-version": "2023-06-01",
             "content-type": "application/json",
             "anthropic-beta": "prompt-caching-2024-07-31",
         }
+        if headers:
+            req_headers.update(headers)
         payload: Dict[str, Any] = {
             "model": model,
             "messages": anthropic_msgs,
             "max_tokens": max_tokens or 4096,
             "stream": True,
         }
+        if extra_body:
+            payload.update(extra_body)
         payload.update(build_anthropic_thinking_payload(thinking_effort))
 
         if system_prompt:
@@ -257,7 +264,7 @@ class AnthropicAdapter(BaseApiAdapter):
 
         client = self._get_client(base_url, api_key)
         async with client.stream(
-            "POST", endpoint_url, headers=headers, json=payload, timeout=resolve_stream_timeout(stream_timeout)
+            "POST", endpoint_url, headers=req_headers, json=payload, timeout=resolve_stream_timeout(stream_timeout)
         ) as resp:
             await check_httpx_response_status(resp)
             async for line in resp.aiter_lines():

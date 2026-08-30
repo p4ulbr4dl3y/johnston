@@ -5,6 +5,7 @@ import os
 from typing import Any, Dict, Optional, Set
 
 from core.domain.defaults.errors import ToolResult
+from core.domain.policies.messages import format_background_notification
 from core.infrastructure.platform.paths import LOGS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_text
 from tools.context import ToolContext
@@ -78,29 +79,6 @@ def get_fuzzy_matches(word: str, possibilities: list[str], n: int = 3, cutoff: f
     if not word or not possibilities:
         return []
     return difflib.get_close_matches(word, possibilities, n=n, cutoff=cutoff)
-
-
-def format_background_notification(
-    type_: str,
-    title: str,
-    task_id: str,
-    result: str,
-) -> str:
-    """Unified template for background-task completion notifications.
-
-    Emitted as a synthetic user message when a background shell/subagent finishes:
-    `<notification type="..." id="..." title="...">\n...\n</notification>`
-    """
-    from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-    escaped_type = escape_xml_attr(type_)
-    escaped_title = escape_xml_attr(title)
-    escaped_id = escape_xml_attr(task_id)
-    return (
-        f'<notification type="{escaped_type}" id="{escaped_id}" title="{escaped_title}">\n'
-        f"{result}\n"
-        f"</notification>"
-    )
 
 
 def _get_running_loop() -> Any:
