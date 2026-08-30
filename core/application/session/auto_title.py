@@ -362,7 +362,7 @@ async def auto_title_session(
                 "max_tokens": SESSION_TITLE_MAX_TOKENS,
                 "thinking_effort": "none",
             }
-            client = getattr(target_agent, "_client", None) or getattr(target_agent, "client", None)
+            client = getattr(target_agent, "_client", None)
             if client is not None:
                 stream_kwargs["client"] = client
             if getattr(target_agent, "headers", None):
