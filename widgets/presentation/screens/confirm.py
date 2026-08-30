@@ -11,6 +11,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     TAB_KEYS,
 )
+from widgets.utils.key_aliases import normalize_key_to_latin
 from widgets.utils.responsive import (
     MODAL_COMPACT_MAX_WIDTH,
     MODAL_MIN_WIDTH,
@@ -61,12 +62,13 @@ class ConfirmScreen(BaseModalScreen[bool]):
         self._apply_dialog_fit()
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("enter", "y", "Y"):
+        norm_key = normalize_key_to_latin(event.key)
+        if norm_key in ("enter", "y"):
             self.dismiss(True)
             event.prevent_default()
             event.stop()
             return
-        if event.key in ("escape", "n", "N"):
+        if norm_key in ("escape", "n"):
             self.dismiss(False)
             event.prevent_default()
             event.stop()

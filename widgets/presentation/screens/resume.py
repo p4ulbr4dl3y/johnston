@@ -9,6 +9,7 @@ from widgets.presentation.screens.constants import (
 )
 from widgets.presentation.screens.rename_session import RenameSessionScreen
 from widgets.presentation.screens.session_conflict import SessionConflictScreen
+from widgets.utils.key_aliases import normalize_key_to_latin
 from widgets.utils.row_format import (
     MODAL_WIDE_ROW_WIDTH,
     format_badge_row,
@@ -172,12 +173,13 @@ class ResumeScreen(BaseSelectionScreen[str]):
         self._refresh_options()
 
     def _on_key(self, event: events.Key) -> None:
-        if event.key in ("ctrl+r", "f2"):
+        norm_key = normalize_key_to_latin(event.key)
+        if norm_key in ("ctrl+r", "f2"):
             self._start_rename_selected()
             event.prevent_default()
             event.stop()
             return
-        if event.key in ("ctrl+d", "delete"):
+        if norm_key in ("ctrl+d", "delete"):
             self._start_delete_selected()
             event.prevent_default()
             event.stop()

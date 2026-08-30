@@ -20,7 +20,7 @@ from widgets.presentation.screens.constants import (
     WRITE_IN_INPUT,
     WRITE_IN_INPUT_ID,
 )
-from widgets.utils.key_aliases import expand_bindings
+from widgets.utils.key_aliases import expand_bindings, normalize_key_to_latin
 
 WRITE_IN_LABEL = "Other (custom answer)"
 
@@ -529,21 +529,22 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             self.submit_current_step()
 
     def _on_key(self, event: events.Key) -> None:
+        norm_key = normalize_key_to_latin(event.key)
         if self.q_idx >= len(self.questions):
-            if event.key in ("up", "down", "pageup", "pagedown", "home", "end", "j", "k"):
+            if norm_key in ("up", "down", "pageup", "pagedown", "home", "end", "j", "k"):
                 try:
                     scroll_box = self.query_one("#wizard-summary-scroll", ToolScrollBox)
-                    if event.key in ("up", "k"):
+                    if norm_key in ("up", "k"):
                         scroll_box.scroll_up(animate=False)
-                    elif event.key in ("down", "j"):
+                    elif norm_key in ("down", "j"):
                         scroll_box.scroll_down(animate=False)
-                    elif event.key == "pageup":
+                    elif norm_key == "pageup":
                         scroll_box.scroll_page_up(animate=False)
-                    elif event.key == "pagedown":
+                    elif norm_key == "pagedown":
                         scroll_box.scroll_page_down(animate=False)
-                    elif event.key == "home":
+                    elif norm_key == "home":
                         scroll_box.scroll_home(animate=False)
-                    elif event.key == "end":
+                    elif norm_key == "end":
                         scroll_box.scroll_end(animate=False)
                     event.prevent_default()
                     event.stop()
