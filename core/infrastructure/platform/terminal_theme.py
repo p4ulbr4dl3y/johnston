@@ -223,9 +223,9 @@ def compute_adaptive_palette(
         "border": border,
         "bg-code": surface,
         "accent-info": "#61afef",
-        "accent-warning": "#e5c07b",
-        "accent-error": "#e06c75",
-        "accent-success": "#98c379",
+        "accent-warning": "#d4a259",
+        "accent-error": "#d15858",
+        "accent-success": "#5ea876",
         "ansi-background": "ansi_default",
     }
 

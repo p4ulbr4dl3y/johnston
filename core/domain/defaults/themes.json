@@ -18,9 +18,9 @@
       "border": "#27272a",
       "bg-code": "#27272a",
       "accent-info": "#61afef",
-      "accent-warning": "#e5c07b",
-      "accent-error": "#e06c75",
-      "accent-success": "#98c379"
+      "accent-warning": "#d4a259",
+      "accent-error": "#d15858",
+      "accent-success": "#5ea876"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -1848,9 +1848,9 @@
       "border": "#27272a",
       "bg-code": "#27272a",
       "accent-info": "#61afef",
-      "accent-warning": "#e5c07b",
-      "accent-error": "#e06c75",
-      "accent-success": "#98c379"
+      "accent-warning": "#d4a259",
+      "accent-error": "#d15858",
+      "accent-success": "#5ea876"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",

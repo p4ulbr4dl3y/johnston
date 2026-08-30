@@ -132,13 +132,13 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
     def test_get_status_color(self):
         widget = ToolCallWidget("shell", "cmd")
         widget.status = "running"
-        self.assertEqual(widget._get_status_color(), "#e5c07b")
+        self.assertEqual(widget._get_status_color(), "#d4a259")
         widget.status = "error"
-        self.assertEqual(widget._get_status_color(), "#e06c75")
+        self.assertEqual(widget._get_status_color(), "#d15858")
         widget.status = "cancelled"
-        self.assertEqual(widget._get_status_color(), "#e06c75")
+        self.assertEqual(widget._get_status_color(), "#d15858")
         widget.status = "done"
-        self.assertEqual(widget._get_status_color(), "#98c379")
+        self.assertEqual(widget._get_status_color(), "#5ea876")
 
     def test_mark_cancelled_only_running(self):
         widget = ToolCallWidget("shell", "cmd")
