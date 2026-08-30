@@ -85,11 +85,11 @@ def format_plan_display(plan_items: Any, explanation: str = "") -> Text:
             status = str(item.get("status") or "pending").lower()
 
             if status == "completed":
-                line = Text("[x] ", style="dim") + Text(step, style="strike dim")
+                line = Text("[x] ") + Text(step, style="strike")
             elif status == "in_progress":
                 line = Text("[>] ", style="bold") + Text(step, style="bold")
             else:
-                line = Text("[ ] ", style="dim") + Text(step, style="dim")
+                line = Text("[ ] ") + Text(step)
             plan_lines.append(line)
 
         for i, pl in enumerate(plan_lines):

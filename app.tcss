@@ -215,14 +215,14 @@ WelcomeWidget {
     margin: 1 0 0 0;
     padding: 0 1;
     background: $bg-surface;
-    color: $fg-muted;
+    color: $fg-secondary;
     border-left: solid $border;
     text-wrap: wrap;
 }
 
 .tool-call Markdown {
     margin-top: 1;
-    color: $fg-muted;
+    color: $fg-secondary;
 }
 
 /* Strict Height Auto & Zero Margin for Markdown Elements */
@@ -578,7 +578,7 @@ ModalScreen {
 
 #wizard-title MarkdownParagraph {
     text-align: left;
-    color: $fg-secondary;
+    color: $fg-primary;
     margin: 0;
 }
 
@@ -636,6 +636,7 @@ ModalScreen {
 }
 
 #help-body {
+    color: $fg-primary;
     margin-top: 0;
     margin-bottom: 0;
     padding: 0 1;
@@ -717,11 +718,16 @@ ModalScreen {
     margin-bottom: 0;
 }
 
+#wizard-summary {
+    color: $fg-primary;
+}
+
 #rewind-files {
     display: none;
     width: 100%;
     height: auto;
     margin-bottom: 1;
+    color: $fg-primary;
 }
 
 #modal-dialog.wizard-dialog .tool-scroll-box {
@@ -806,7 +812,7 @@ DiffScreen {
     padding: 0 1;
     border: none;
     background: transparent !important;
-    color: $fg-secondary;
+    color: $fg-primary;
 }
 
 #diff-search-input > .input--placeholder {
@@ -1037,7 +1043,7 @@ ModalScreen OptionList > .option-list--option-hover {
     padding: 0 1;
     border: none;
     background: transparent !important;
-    color: $fg-secondary;
+    color: $fg-primary;
 }
 
 #modal-dialog #write-in-input,
