@@ -212,7 +212,7 @@ WelcomeWidget {
 .tool-content, .tool-content-md {
     width: 100%;
     height: auto;
-    margin: 1 1 0 0;
+    margin: 1 0 0 0;
     padding: 0 1;
     background: $bg-surface;
     color: $fg-secondary;
@@ -314,7 +314,7 @@ MarkdownFence .fence-header {
 CustomMarkdownFence .fence-lang,
 MarkdownFence .fence-lang {
     color: $fg-muted;
-    text-style: bold;
+    text-style: none;
     height: 1;
     width: 1fr;
     text-overflow: ellipsis;
@@ -339,7 +339,7 @@ MarkdownFence .fence-copy-btn:hover,
 CustomMarkdownFence .fence-copy-btn:focus,
 MarkdownFence .fence-copy-btn:focus {
     background: transparent;
-    color: $fg-primary;
+    color: $fg-secondary;
     text-style: none;
 }
 
