@@ -1,5 +1,7 @@
 import io
+import posixpath
 import re
+import urllib.parse
 import xml.etree.ElementTree as ET
 import zipfile
 from typing import BinaryIO, Dict, List, Union
@@ -66,7 +68,8 @@ def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
             item_id = elem.attrib.get("id")
             href = elem.attrib.get("href")
             if item_id and href:
-                full_href = f"{opf_dir}/{href}" if opf_dir else href
+                raw_href = f"{opf_dir}/{href}" if opf_dir else href
+                full_href = posixpath.normpath(urllib.parse.unquote(raw_href))
                 manifest[item_id] = full_href
         elif tag == "itemref":
             idref = elem.attrib.get("idref")

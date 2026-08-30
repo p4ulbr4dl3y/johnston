@@ -36,7 +36,10 @@ SUPPORTED_EXTENSIONS: Set[str] = {
 
 def is_convertible(path_or_ext: Union[str, Path]) -> bool:
     """Check if a file or extension is supported by the document converter."""
-    ext = os.path.splitext(str(path_or_ext))[1].lower()
+    s = str(path_or_ext).strip()
+    ext = os.path.splitext(s)[1].lower()
+    if not ext and s:
+        ext = s.lower() if s.startswith(".") else f".{s.lower()}"
     return ext in SUPPORTED_EXTENSIONS
 
 
@@ -48,8 +51,8 @@ def convert_bytes(
     Converts raw document bytes to Markdown based on extension or filename.
     """
     ext = os.path.splitext(extension_or_filename)[1].lower()
-    if not ext and extension_or_filename.startswith("."):
-        ext = extension_or_filename.lower()
+    if not ext and extension_or_filename:
+        ext = extension_or_filename.lower() if extension_or_filename.startswith(".") else f".{extension_or_filename.lower()}"
 
     if ext in (".html", ".htm", ".xhtml"):
         return html_to_markdown(data)
@@ -136,20 +139,29 @@ def convert_file(file_path: Union[str, Path]) -> str:
             return f.read()
 
 
-def _convert_zip(source: Union[str, BinaryIO, io.BytesIO]) -> str:
+def _convert_zip(source: Union[str, BinaryIO, io.BytesIO], depth: int = 0) -> str:
     """Recursively convert files inside a ZIP archive to Markdown."""
-    zf = zipfile.ZipFile(source)
+    if depth > 2:
+        return ""
+    try:
+        zf = zipfile.ZipFile(source)
+    except Exception:
+        return ""
     output: List[str] = []
 
     for name in sorted(zf.namelist()):
-        if name.endswith("/") or name.startswith("__MACOSX"):
+        basename = os.path.basename(name)
+        if name.endswith("/") or "__MACOSX" in name or basename.startswith(".") or basename == "Thumbs.db":
             continue
         ext = os.path.splitext(name)[1].lower()
         if not ext:
             continue
         try:
             file_data = zf.read(name)
-            md_content = convert_bytes(file_data, ext)
+            if ext == ".zip":
+                md_content = _convert_zip(io.BytesIO(file_data), depth=depth + 1)
+            else:
+                md_content = convert_bytes(file_data, ext)
             if md_content.strip():
                 output.append(f"## File: {name}\n\n{md_content}")
         except Exception:

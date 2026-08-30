@@ -48,9 +48,11 @@ def docx_to_markdown(docx_input: Union[str, bytes, BinaryIO]) -> str:
         return ""
 
     doc_tree = ET.fromstring(zf.read("word/document.xml"))
-    body = doc_tree.find(f".//{W_NS}body")
-    if body is None:
-        body = doc_tree.find(".//body")
+    body = None
+    for elem in doc_tree.iter():
+        if _local_tag(elem) == "body":
+            body = elem
+            break
     if body is None:
         return ""
 
@@ -91,18 +93,12 @@ def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
                         val = v
                         break
                 val_lower = val.lower()
-                if "heading1" in val_lower or "heading 1" in val_lower or val_lower == "title":
+                for level in range(1, 7):
+                    if f"heading{level}" in val_lower or f"heading {level}" in val_lower:
+                        heading_prefix = "#" * level + " "
+                        break
+                if not heading_prefix and val_lower == "title":
                     heading_prefix = "# "
-                elif "heading2" in val_lower or "heading 2" in val_lower:
-                    heading_prefix = "## "
-                elif "heading3" in val_lower or "heading 3" in val_lower:
-                    heading_prefix = "### "
-                elif "heading4" in val_lower or "heading 4" in val_lower:
-                    heading_prefix = "#### "
-                elif "heading5" in val_lower or "heading 5" in val_lower:
-                    heading_prefix = "##### "
-                elif "heading6" in val_lower or "heading 6" in val_lower:
-                    heading_prefix = "###### "
             elif tag == "numPr":
                 is_list = True
                 for num_child in pr_child:
@@ -140,19 +136,36 @@ def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
     return content
 
 
+def _is_prop_active(elem: ET.Element | None) -> bool:
+    if elem is None:
+        return False
+    for k, v in elem.attrib.items():
+        if k.endswith("val") or k == "val":
+            if v and v.lower() in ("0", "false", "off", "none"):
+                return False
+    return True
+
+
 def _parse_run(r_elem: ET.Element) -> str:
-    r_pr = r_elem.find(f"{W_NS}rPr") or r_elem.find("rPr")
+    r_pr = None
+    for child in r_elem:
+        if _local_tag(child) == "rPr":
+            r_pr = child
+            break
+
     is_bold = False
     is_italic = False
     is_strike = False
 
     if r_pr is not None:
-        if r_pr.find(f"{W_NS}b") is not None or r_pr.find("b") is not None:
-            is_bold = True
-        if r_pr.find(f"{W_NS}i") is not None or r_pr.find("i") is not None:
-            is_italic = True
-        if r_pr.find(f"{W_NS}strike") is not None or r_pr.find("strike") is not None:
-            is_strike = True
+        for prop in r_pr:
+            ptag = _local_tag(prop)
+            if ptag == "b" and _is_prop_active(prop):
+                is_bold = True
+            elif ptag == "i" and _is_prop_active(prop):
+                is_italic = True
+            elif ptag == "strike" and _is_prop_active(prop):
+                is_strike = True
 
     text_parts: List[str] = []
     for elem in r_elem:

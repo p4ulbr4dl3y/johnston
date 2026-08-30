@@ -8,15 +8,22 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
     Converts a Jupyter Notebook (.ipynb) to Markdown using Python stdlib json.
     Formats markdown cells and wraps code cells with python syntax fences.
     """
-    if isinstance(ipynb_input, bytes):
-        raw_text = ipynb_input.decode("utf-8", errors="replace")
-        data = json.loads(raw_text)
-    elif isinstance(ipynb_input, str):
-        data = json.loads(ipynb_input)
-    else:
-        data = ipynb_input
+    try:
+        if isinstance(ipynb_input, bytes):
+            raw_text = ipynb_input.decode("utf-8", errors="replace")
+            data = json.loads(raw_text)
+        elif isinstance(ipynb_input, str):
+            data = json.loads(ipynb_input)
+        else:
+            data = ipynb_input
+        if not isinstance(data, dict):
+            return ""
+    except Exception:
+        return ""
 
     cells = data.get("cells", [])
+    if not isinstance(cells, list):
+        return ""
     output: List[str] = []
 
     for cell in cells:
@@ -46,6 +53,13 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
                         text = "".join(data_dict["text/plain"])
                         if text.strip():
                             out_texts.append(f"```output\n{text.strip()}\n```")
+                elif out_type == "error":
+                    tb = out.get("traceback", [])
+                    clean_tb = re.sub(r"\x1b\[[0-9;]*[mGKF]", "", "\n".join(tb))
+                    if clean_tb.strip():
+                        out_texts.append(f"```output\n{clean_tb.strip()}\n```")
+                    elif out.get("evalue"):
+                        out_texts.append(f"```output\n{out.get('ename')}: {out.get('evalue')}\n```")
             if out_texts:
                 output.append(code_block + "\n\n" + "\n\n".join(out_texts))
             else:

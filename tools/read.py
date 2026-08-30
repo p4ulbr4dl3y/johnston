@@ -309,11 +309,6 @@ class ReadTool(BaseTool):
                             "Seeks directly to byte position."
                         ),
                     },
-                    "detail": {
-                        "type": "string",
-                        "enum": ["low", "high", "original"],
-                        "description": "Image quality mode for vision models ('low', 'high', 'original'). Defaults to 'high'.",
-                    },
                 },
                 "required": ["path"],
             },

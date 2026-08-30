@@ -16,13 +16,27 @@ class HTMLToMarkdownParser(HTMLParser):
         "svg",
         "canvas",
         "head",
-        "meta",
-        "link",
         "nav",
         "footer",
-        "header",
         "aside",
         "iframe",
+    }
+
+    VOID_TAGS = {
+        "meta",
+        "link",
+        "img",
+        "br",
+        "hr",
+        "input",
+        "area",
+        "base",
+        "col",
+        "embed",
+        "param",
+        "source",
+        "track",
+        "wbr",
     }
 
     BLOCK_TAGS = {
@@ -30,6 +44,7 @@ class HTMLToMarkdownParser(HTMLParser):
         "div",
         "article",
         "section",
+        "header",
         "main",
         "blockquote",
         "h1",
@@ -63,9 +78,21 @@ class HTMLToMarkdownParser(HTMLParser):
         self._title: Optional[str] = None
         self._in_title = False
 
+    def _append_token(self, token: str) -> None:
+        if self._current_link is not None:
+            self._current_link[2].append(token)
+        elif self._current_cell is not None:
+            self._current_cell.append(token)
+        else:
+            self._output.append(token)
+
     def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
         tag_lower = tag.lower()
         attr_dict = {k.lower(): (v or "") for k, v in attrs}
+
+        if tag_lower in self.VOID_TAGS:
+            if tag_lower in ("meta", "link", "base", "input", "param", "track", "wbr"):
+                return
 
         if tag_lower in self.IGNORE_TAGS:
             self._ignore_stack_depth += 1
@@ -87,19 +114,19 @@ class HTMLToMarkdownParser(HTMLParser):
         if tag_lower == "code":
             if not self._in_pre:
                 self._in_code = True
-                self._output.append("`")
+                self._append_token("`")
             return
 
         if tag_lower in ("b", "strong"):
-            self._output.append("**")
+            self._append_token("**")
             return
 
         if tag_lower in ("i", "em"):
-            self._output.append("*")
+            self._append_token("*")
             return
 
         if tag_lower in ("s", "strike", "del"):
-            self._output.append("~~")
+            self._append_token("~~")
             return
 
         if tag_lower == "blockquote":
@@ -194,12 +221,15 @@ class HTMLToMarkdownParser(HTMLParser):
                 self._output.append(f"![{alt}]({src}{title_suffix})")
             return
 
-        if tag_lower in ("p", "div", "article", "section"):
+        if tag_lower in ("p", "div", "article", "section", "header"):
             self._ensure_newline(2 if tag_lower == "p" else 1)
             return
 
     def handle_endtag(self, tag: str) -> None:
         tag_lower = tag.lower()
+
+        if tag_lower in self.VOID_TAGS:
+            return
 
         if tag_lower in self.IGNORE_TAGS:
             if self._ignore_stack_depth > 0:
@@ -222,19 +252,19 @@ class HTMLToMarkdownParser(HTMLParser):
         if tag_lower == "code":
             if not self._in_pre:
                 self._in_code = False
-                self._output.append("`")
+                self._append_token("`")
             return
 
         if tag_lower in ("b", "strong"):
-            self._output.append("**")
+            self._append_token("**")
             return
 
         if tag_lower in ("i", "em"):
-            self._output.append("*")
+            self._append_token("*")
             return
 
         if tag_lower in ("s", "strike", "del"):
-            self._output.append("~~")
+            self._append_token("~~")
             return
 
         if tag_lower in ("h1", "h2", "h3", "h4", "h5", "h6"):

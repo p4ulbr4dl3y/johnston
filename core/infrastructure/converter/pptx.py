@@ -33,10 +33,10 @@ def pptx_to_markdown(pptx_input: Union[str, bytes, BinaryIO]) -> str:
             rel_tree = ET.fromstring(zf.read("ppt/_rels/presentation.xml.rels"))
             for elem in rel_tree:
                 r_id = elem.attrib.get("Id")
-                target = elem.attrib.get("Target", "")
+                target = elem.attrib.get("Target", "").lstrip("/")
                 if r_id and target:
                     if not target.startswith("ppt/"):
-                        target = "ppt/" + target.lstrip("/")
+                        target = f"ppt/{target}"
                     pres_rels[r_id] = target
         except Exception:
             pass
@@ -132,7 +132,7 @@ def _parse_shape(sp_elem: ET.Element) -> Tuple[str, bool]:
             runs = []
             for r in p:
                 rtag = r.tag.split("}", 1)[-1] if "}" in r.tag else r.tag
-                if rtag == "r":
+                if rtag in ("r", "fld"):
                     for t in r:
                         ttag = t.tag.split("}", 1)[-1] if "}" in t.tag else t.tag
                         if ttag == "t" and t.text:
@@ -157,12 +157,29 @@ def _parse_pptx_table(tbl_elem: ET.Element) -> str:
             ctag = tc.tag.split("}", 1)[-1] if "}" in tc.tag else tc.tag
             if ctag != "tc":
                 continue
-            cell_texts = []
-            for t in tc.iter():
-                ttag = t.tag.split("}", 1)[-1] if "}" in t.tag else t.tag
-                if ttag == "t" and t.text:
-                    cell_texts.append(t.text)
-            clean_cell = "".join(cell_texts).strip().replace("\n", " ").replace("|", "\\|")
+            cell_paras: List[str] = []
+            for p in tc:
+                ptag = p.tag.split("}", 1)[-1] if "}" in p.tag else p.tag
+                if ptag == "p":
+                    p_runs = []
+                    for child in p:
+                        crtag = child.tag.split("}", 1)[-1] if "}" in child.tag else child.tag
+                        if crtag in ("r", "fld"):
+                            for t in child:
+                                ttag = t.tag.split("}", 1)[-1] if "}" in t.tag else t.tag
+                                if ttag == "t" and t.text:
+                                    p_runs.append(t.text)
+                        elif crtag == "br":
+                            p_runs.append(" ")
+                    p_text = "".join(p_runs).strip()
+                    if p_text:
+                        cell_paras.append(p_text)
+            if not cell_paras:
+                # Fallback: any t in tc
+                all_t = [t.text for t in tc.iter() if (t.tag.split("}", 1)[-1] if "}" in t.tag else t.tag) == "t" and t.text]
+                if all_t:
+                    cell_paras.append(" ".join(all_t))
+            clean_cell = " ".join(cell_paras).strip().replace("\n", " ").replace("|", "\\|")
             row_cells.append(clean_cell)
         if row_cells:
             rows.append(row_cells)

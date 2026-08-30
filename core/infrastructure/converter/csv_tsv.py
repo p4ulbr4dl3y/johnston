@@ -25,6 +25,7 @@ def csv_to_markdown(csv_input: Union[str, bytes, BinaryIO], delimiter: str | Non
         else:
             text = raw
 
+    text = text.replace("\x00", "")
     if not text.strip():
         return ""
 

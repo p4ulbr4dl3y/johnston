@@ -49,10 +49,15 @@ def xlsx_to_markdown(xlsx_input: Union[str, bytes, BinaryIO]) -> str:
             ss_tree = ET.fromstring(zf.read("xl/sharedStrings.xml"))
             for si in ss_tree:
                 text_parts = []
-                for t in si.iter():
-                    tag = t.tag.split("}", 1)[-1] if "}" in t.tag else t.tag
-                    if tag == "t" and t.text:
-                        text_parts.append(t.text)
+                for child in si:
+                    tag = child.tag.split("}", 1)[-1] if "}" in child.tag else child.tag
+                    if tag == "t" and child.text:
+                        text_parts.append(child.text)
+                    elif tag == "r":
+                        for r_child in child:
+                            rtag = r_child.tag.split("}", 1)[-1] if "}" in r_child.tag else r_child.tag
+                            if rtag == "t" and r_child.text:
+                                text_parts.append(r_child.text)
                 shared_strings.append("".join(text_parts))
         except Exception:
             pass
@@ -66,10 +71,10 @@ def xlsx_to_markdown(xlsx_input: Union[str, bytes, BinaryIO]) -> str:
             wb_rels = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
             for rel in wb_rels:
                 r_id = rel.attrib.get("Id")
-                target = rel.attrib.get("Target", "")
+                target = rel.attrib.get("Target", "").lstrip("/")
                 if r_id and target:
                     if not target.startswith("xl/"):
-                        target = "xl/" + target.lstrip("/")
+                        target = f"xl/{target}"
                     rels_map[r_id] = target
         except Exception:
             pass
@@ -81,11 +86,12 @@ def xlsx_to_markdown(xlsx_input: Union[str, bytes, BinaryIO]) -> str:
                 tag = sheet_elem.tag.split("}", 1)[-1] if "}" in sheet_elem.tag else sheet_elem.tag
                 if tag == "sheet":
                     name = sheet_elem.attrib.get("name", "Sheet")
-                    r_id = (
-                        sheet_elem.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
-                        or sheet_elem.attrib.get("id")
-                    )
-                    sheet_path = rels_map.get(r_id, "")
+                    r_id = None
+                    for k, v in sheet_elem.attrib.items():
+                        if k.endswith("}id") or k.endswith(":id") or k.lower() == "id":
+                            r_id = v
+                            break
+                    sheet_path = rels_map.get(r_id, "") if r_id else ""
                     if not sheet_path:
                         sheet_id = sheet_elem.attrib.get("sheetId", "1")
                         sheet_path = f"xl/worksheets/sheet{sheet_id}.xml"
@@ -129,6 +135,7 @@ def _parse_sheet_to_table(sheet_tree: ET.Element, shared_strings: List[str]) -> 
         row_idx = int(r_attr) - 1 if r_attr and r_attr.isdigit() else len(rows_dict)
 
         col_dict: Dict[int, str] = {}
+        last_col_idx = -1
         for c in row_elem:
             c_tag = c.tag.split("}", 1)[-1] if "}" in c.tag else c.tag
             if c_tag != "c":
@@ -138,7 +145,8 @@ def _parse_sheet_to_table(sheet_tree: ET.Element, shared_strings: List[str]) -> 
             if ref:
                 c_idx, _ = _split_cell_ref(ref)
             else:
-                c_idx = len(col_dict)
+                c_idx = last_col_idx + 1
+            last_col_idx = c_idx
 
             cell_type = c.attrib.get("t", "")
             val_text = ""
