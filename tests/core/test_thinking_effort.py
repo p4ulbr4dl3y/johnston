@@ -199,7 +199,7 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
 
 class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
     async def test_command_saves_effort_and_preserves_role(self):
-        from widgets.commands import ThinkingEffortCommand
+        from widgets.presentation.commands import ThinkingEffortCommand
 
         class Agent:
             def __init__(self):

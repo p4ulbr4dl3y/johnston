@@ -97,9 +97,6 @@ def sanitize_title_candidate(candidate: Any, max_len: int = DEFAULT_AUTO_TITLE_M
     return clean
 
 
-# Backward compatibility alias
-sanitize_title = sanitize_title_candidate
-
 
 def extract_first_json_object(text: str) -> str | None:
     """Extract the first balanced JSON object substring from text."""

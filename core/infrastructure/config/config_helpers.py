@@ -14,13 +14,13 @@ def ensure_json_config(file_path: str, default_data: Dict[str, Any]) -> None:
 def load_sandbox_config(config_file: Optional[str] = None) -> bool:
     """Load sandbox_enabled boolean from global config (~/.johnston/config.json)."""
     from core.infrastructure.config.settings import get_settings
-    return get_settings(config_file).sandbox_enabled
+    return get_settings(config_file).sandbox.enabled
 
 
 def save_sandbox_config(enabled: bool, config_file: Optional[str] = None) -> None:
     """Save sandbox_enabled boolean to global config (~/.johnston/config.json)."""
-    from core.infrastructure.config.settings import patch_settings
-    patch_settings(config_file=config_file, sandbox_enabled=bool(enabled))
+    from core.infrastructure.config.settings import SandboxSettings, patch_settings
+    patch_settings(config_file=config_file, sandbox=SandboxSettings(enabled=bool(enabled)))
 
 
 def load_theme_config(config_file: Optional[str] = None) -> Optional[str]:

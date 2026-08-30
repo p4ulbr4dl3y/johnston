@@ -138,7 +138,6 @@ def test_load_settings_full_sections():
         settings = load_settings(path)
         assert settings.active_provider == "openai"
         assert settings.theme == "nord"
-        assert settings.sandbox_enabled is True
         assert settings.sandbox.enabled is True
         assert settings.llm.context_limit == 100000
         assert settings.llm.compaction_threshold_ratio == 0.8
@@ -239,7 +238,7 @@ def test_legacy_key_aliases_are_ignored():
     # Legacy top-level keys do not override canonical sections.
     assert settings.llm.thinking_efforts == {}
     assert settings.subagents.max_concurrent == DEFAULT_MAX_CONCURRENT_SUBAGENTS
-    assert settings.sandbox_enabled is False
+    assert settings.sandbox.enabled is False
     # Legacy aliases do not override canonical keys (canonical present) nor defaults.
     assert settings.tools.max_shell_output_chars == 4000
     assert settings.tools.max_image_dimension == 1024
@@ -383,7 +382,6 @@ def test_save_and_reload_settings():
         assert loaded.model == "anthropic/claude-3-7-sonnet"
         assert loaded.active_provider == "anthropic"
         assert loaded.theme == "monokai"
-        assert loaded.sandbox_enabled is True
         assert loaded.sandbox.enabled is True
         assert loaded.llm.stream_timeout == 120.0
         assert loaded.tools.shell_default_timeout == 300.0
@@ -434,7 +432,7 @@ def test_settings_env_var_overrides(monkeypatch):
         assert settings.tools.max_dir_entries == 35
         assert settings.tools.web_user_agent == "CustomBot/2.0"
         assert settings.ui.paste_line_threshold == 20
-        assert settings.sandbox_enabled is True
+        assert settings.sandbox.enabled is True
         assert settings.llm.max_retries == 0
         assert settings.subagents.max_concurrent == 15
 
@@ -466,7 +464,7 @@ def test_config_helpers_custom_path_cache_reload():
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "config_custom.json")
         save_sandbox_config(True, config_file=path)
-        assert get_settings(path).sandbox_enabled is True
+        assert get_settings(path).sandbox.enabled is True
 
         save_theme_config("nord", config_file=path)
         assert get_settings(path).theme == "nord"
@@ -489,14 +487,12 @@ def test_patch_settings():
         path = os.path.join(tmpdir, "config.json")
         save_settings(JohnstonSettings(theme="monokai", sandbox=SandboxSettings(enabled=False)), path)
 
-        patched = patch_settings(path, theme="dracula", sandbox_enabled=True)
+        patched = patch_settings(path, theme="dracula", sandbox=SandboxSettings(enabled=True))
         assert patched.theme == "dracula"
-        assert patched.sandbox_enabled is True
         assert patched.sandbox.enabled is True
 
         reloaded = get_settings(path)
         assert reloaded.theme == "dracula"
-        assert reloaded.sandbox_enabled is True
         assert reloaded.sandbox.enabled is True
 
 

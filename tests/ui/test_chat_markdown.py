@@ -281,7 +281,7 @@ class TestMarkdownHelpers(unittest.TestCase):
         from widgets.presentation.widgets.chat_markdown import _new_markdown_block_get_style
 
         style = _new_markdown_block_get_style(object(), ".code_inline")
-        self.assertEqual(style.background.rgb, (39, 39, 42))
+        self.assertEqual(style.background.rgb, (51, 51, 56))
         other = _new_markdown_block_get_style(MagicMock(), "bold")
         self.assertIsNotNone(other)
 

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from widgets.commands import ThemeCommand
+from widgets.presentation.commands import ThemeCommand
 from widgets.presentation.screens.theme import ThemeScreen
 
 

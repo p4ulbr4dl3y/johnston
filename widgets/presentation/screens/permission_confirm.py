@@ -9,9 +9,10 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList, Static
 
 from core.domain.policies.permission_policy import suggest_pattern
-from widgets.chat_toolcall import ToolScrollBox, build_synthetic_create_diff
+from widgets.chat_toolcall import ToolScrollBox
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
+from widgets.presentation.tool_renderers import build_synthetic_create_diff
 from widgets.presentation.widgets.chat_diff import format_edit_diff
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import (

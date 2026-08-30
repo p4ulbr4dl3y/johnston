@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from textual.app import App, ComposeResult
 
 from widgets.chat_input import ChatInput
-from widgets.commands import ResumeCommand
+from widgets.presentation.commands import NewCommand, ResumeCommand
 from widgets.presentation.screens.resume import ResumeScreen
 from widgets.presentation.screens.session_conflict import SessionConflictScreen
 
@@ -64,8 +64,6 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         app.load_session_ui.assert_called_with("s_normal")
 
     async def test_new_command_resets_read_only_and_manages_locks(self):
-        from widgets.commands import NewCommand
-
         app = MagicMock()
         app.sm = MagicMock()
         app.current_session_id = "old_sess"
@@ -75,7 +73,7 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         chat_view.remove_children = AsyncMock()
         app.query_one.return_value = chat_view
 
-        with patch("widgets.commands.new_session", return_value="new_sess"):
+        with patch("widgets.presentation.commands.session_commands.new_session", return_value="new_sess"):
             cmd = NewCommand()
             await cmd.execute(app)
 

@@ -250,7 +250,7 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
         fake = FakeCmd()
         with patch.dict(os.environ, {}):
             os.environ.pop("PYTEST_CURRENT_TEST", None)
-            with patch("widgets.commands.ProvidersCommand", return_value=fake):
+            with patch("widgets.presentation.commands.ProvidersCommand", return_value=fake):
                 await obj._check_initial_setup()
         self.assertIs(fake.owner, obj)
 
@@ -268,7 +268,7 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
         fake = FakeCmd()
         with patch.dict(os.environ, {}):
             os.environ.pop("PYTEST_CURRENT_TEST", None)
-            with patch("widgets.commands.ModelsCommand", return_value=fake):
+            with patch("widgets.presentation.commands.ModelsCommand", return_value=fake):
                 await obj._check_initial_setup()
         self.assertIs(fake.owner, obj)
 

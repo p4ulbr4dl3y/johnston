@@ -6,7 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from widgets.status_footer import StatusFooter, SubagentHeader, SubagentStatusFooter, format_display_path
+from widgets.presentation.widgets.footer_layout import format_display_path
+from widgets.presentation.widgets.subagent_footer import SubagentHeader, SubagentStatusFooter
+from widgets.status_footer import StatusFooter
 
 
 class FooterHarness(StatusFooter):

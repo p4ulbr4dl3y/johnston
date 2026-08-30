@@ -54,11 +54,11 @@ def _load_skill_blocks(loaded_skills) -> list[str]:
 
 
 def build_command_registry() -> dict:
-    """Build the name->class registry from the command classes in widgets.commands."""
-    from widgets import commands as _commands
+    """Build the name->class registry from the command classes in widgets.presentation.commands."""
+    from widgets.presentation.commands import COMMAND_CLASSES
 
     registry = {}
-    for cls in _commands.COMMAND_CLASSES:
+    for cls in COMMAND_CLASSES:
         registry[cls.name] = cls
         for alias in getattr(cls, "aliases", []):
             registry[alias] = cls

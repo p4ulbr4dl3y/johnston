@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Callable, Optional
 
-from core.domain.defaults.themes import BUILTIN_THEMES, ZINC_DARK
+from core.domain.defaults.themes import ZINC_DARK, list_themes
 from core.domain.entities.theme import Theme
 from core.infrastructure.config.config_helpers import load_theme_config, save_theme_config
 from core.infrastructure.platform.paths import THEMES_DIR
@@ -30,7 +30,7 @@ class ThemeManager:
         self._themes: dict[str, Theme] = {}
         self._listeners: list[Callable[[Theme], None]] = []
 
-        for theme in BUILTIN_THEMES:
+        for theme in list_themes():
             self.register(theme)
 
         if load_custom_themes:

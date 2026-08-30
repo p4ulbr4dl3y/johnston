@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from widgets.commands import ForkCommand
+from widgets.presentation.commands import ForkCommand
 
 
 class TestForkCommand(unittest.IsolatedAsyncioTestCase):

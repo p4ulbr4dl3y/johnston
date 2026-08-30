@@ -14,25 +14,12 @@ from textual.widgets import Label, Markdown, Static
 from core.infrastructure.config.settings import get_settings
 from widgets.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 from widgets.presentation.tool_mixins import FormattingMixin, ParsingMixin
-from widgets.presentation.tool_renderers import (
-    build_synthetic_create_diff,
-    clean_truncation_marker,
-    compute_tool_call_content,
-    format_ask_user_display,
-    format_manage_shell_display,
-    format_manage_subagent_display,
-    format_plan_display,
-    format_truncation_for_ui,
-)
+from widgets.presentation.tool_renderers import compute_tool_call_content, format_truncation_for_ui
 from widgets.presentation.widgets.chat_markdown import (
     TransparentSyntax,
     safe_update_markdown,
     to_snake_case,
 )
-
-# Re-exports for backwards compatibility and test imports
-_clean_truncation_marker = clean_truncation_marker
-_format_truncation_for_ui = format_truncation_for_ui
 
 DISPLAY_NAMES: dict[str, str] = {
     "read": "Read",
@@ -658,10 +645,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self._scroll_if_needed(force=force)
 
 
-ChatToolCall = ToolCallWidget
-
 __all__ = [
-    "ChatToolCall",
     "DISPLAY_NAMES",
     "FormattingMixin",
     "ParsingMixin",
@@ -669,12 +653,4 @@ __all__ = [
     "ToolCallWidget",
     "ToolScrollBox",
     "TransparentSyntax",
-    "_clean_truncation_marker",
-    "_format_truncation_for_ui",
-    "build_synthetic_create_diff",
-    "format_ask_user_display",
-    "format_manage_shell_display",
-    "format_manage_subagent_display",
-    "format_plan_display",
-    "format_truncation_for_ui",
 ]

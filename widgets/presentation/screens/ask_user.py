@@ -274,7 +274,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 input_field.value = prev_answer
                 input_field.focus()
         else:
-            from widgets.chat_toolcall import format_ask_user_display
+            from widgets.presentation.tool_renderers import format_ask_user_display
 
             title_md.add_class("confirm-summary")
             title_md.update("### **Confirm Your Answers**")

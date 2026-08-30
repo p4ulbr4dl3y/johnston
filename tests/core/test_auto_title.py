@@ -9,7 +9,7 @@ from core.application.session.auto_title import (
     auto_title_session,
     clean_heuristic_title,
     extract_first_user_text,
-    sanitize_title,
+    sanitize_title_candidate,
 )
 from core.domain.entities.session import AgentSession
 
@@ -37,16 +37,16 @@ class TestAutoTitleHelpers(unittest.TestCase):
         self.assertEqual(cleaned, "This is a very long user prompt that")
 
     def test_sanitize_title(self):
-        self.assertEqual(sanitize_title(""), "")
-        self.assertEqual(sanitize_title('  "Title: Fix JWT Expiration"  '), "Fix JWT Expiration")
-        self.assertEqual(sanitize_title("### Topic: Database Connection Pooling."), "Database Connection Pooling")
-        self.assertEqual(sanitize_title("`Refactor Auth Code`"), "Refactor Auth Code")
+        self.assertEqual(sanitize_title_candidate(""), "")
+        self.assertEqual(sanitize_title_candidate('  "Title: Fix JWT Expiration"  '), "Fix JWT Expiration")
+        self.assertEqual(sanitize_title_candidate("### Topic: Database Connection Pooling."), "Database Connection Pooling")
+        self.assertEqual(sanitize_title_candidate("`Refactor Auth Code`"), "Refactor Auth Code")
         self.assertEqual(
-            sanitize_title("<think>Let's summarize this.</think>\nDocker Compose Setup"),
+            sanitize_title_candidate("<think>Let's summarize this.</think>\nDocker Compose Setup"),
             "Docker Compose Setup",
         )
         self.assertEqual(
-            sanitize_title("Sure! Here is the title: Rate Limiting Implementation"),
+            sanitize_title_candidate("Sure! Here is the title: Rate Limiting Implementation"),
             "Rate Limiting Implementation",
         )
 

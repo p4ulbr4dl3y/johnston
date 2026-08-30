@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.infrastructure.tasks.manager import TaskManager
 from widgets.app.dispatch import COMMAND_REGISTRY, handle_slash_command
-from widgets.commands import (
+from widgets.presentation.commands import (
     BaseCommand,
     CompactCommand,
     ModelsCommand,
@@ -18,6 +18,7 @@ from widgets.commands import (
     SubagentsCommand,
     ThinkingEffortCommand,
 )
+from widgets.presentation.screens.rewind import RewindSelection
 from widgets.presentation.widgets.chat_container import ChatView
 
 
@@ -133,7 +134,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(app.agent.compact_called)
 
     async def test_rewind_command_selected_idx_zero(self):
-        from widgets.commands import RewindCommand
+        from widgets.presentation.commands import RewindCommand
 
         app = MockApp()
         app.agent.history = [{"role": "user", "content": "First message"}]
@@ -163,7 +164,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         # Simulate selecting user message at index 0 in on_rewind_selected
         async def simulate_on_rewind_selected(screen, callback):
-            await callback(0)
+            await callback(RewindSelection(index=0, restore_code=True))
 
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
@@ -181,7 +182,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(getattr(app, "is_generating", False))
 
     async def test_rewind_command_clears_queue_and_resets_generating(self):
-        from widgets.commands import RewindCommand
+        from widgets.presentation.commands import RewindCommand
 
         app = MockApp()
         app.is_generating = True
@@ -205,7 +206,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         cmd = RewindCommand()
 
         async def simulate_on_rewind_selected(screen, callback):
-            await callback(0)
+            await callback(RewindSelection(index=0, restore_code=True))
 
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
@@ -214,7 +215,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.message_queue, [])
 
     async def test_rewind_command_partial_history_preserved(self):
-        from widgets.commands import RewindCommand
+        from widgets.presentation.commands import RewindCommand
 
         app = MockApp()
         app.agent.history = [
@@ -247,7 +248,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         cmd = RewindCommand()
 
         async def simulate_on_rewind_selected(screen, callback):
-            await callback(2)  # child_idx of Msg 1 (seq_idx = 1)
+            await callback(RewindSelection(index=2, restore_code=True))  # child_idx of Msg 1 (seq_idx = 1)
 
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
@@ -260,7 +261,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_rewind_command_truncates_store_transcript(self):
         from unittest.mock import MagicMock
 
-        from widgets.commands import RewindCommand
+        from widgets.presentation.commands import RewindCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -301,7 +302,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         cmd = RewindCommand()
 
         async def simulate_on_rewind_selected(screen, callback):
-            await callback(3)  # rewind to "Second" (seq_idx = 1)
+            await callback(RewindSelection(index=3, restore_code=True))  # rewind to "Second" (seq_idx = 1)
 
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
@@ -321,7 +322,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import MagicMock
 
         from core.infrastructure.tasks.shell_task import ShellTask
-        from widgets.commands import RewindCommand
+        from widgets.presentation.commands import RewindCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -364,7 +365,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         cmd = RewindCommand()
 
         async def simulate_on_rewind_selected(screen, callback):
-            await callback(0)
+            await callback(RewindSelection(index=0, restore_code=True))
 
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
@@ -374,7 +375,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         subagent.finish.assert_called_once()
 
     async def test_rewind_awaits_generation_worker_before_rollback(self):
-        from widgets.commands import RewindCommand
+        from widgets.presentation.commands import RewindCommand
 
         class FakeWorker:
             """Minimal Textual-Worker stand-in: cleanup runs inside wait()."""
@@ -417,7 +418,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         cmd = RewindCommand()
 
         async def simulate_on_rewind_selected(screen, callback):
-            await callback(0)
+            await callback(RewindSelection(index=0, restore_code=True))
 
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
@@ -429,7 +430,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_rewind_compacted_region_clears_history(self):
         from unittest.mock import MagicMock
 
-        from widgets.commands import RewindCommand
+        from widgets.presentation.commands import RewindCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -470,7 +471,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         async def simulate_on_rewind_selected(screen, callback):
             # Select "B" — a turn inside the compacted region.
-            await callback(1)
+            await callback(RewindSelection(index=1, restore_code=True))
 
         app.push_screen = simulate_on_rewind_selected
         await cmd.execute(app)
@@ -578,7 +579,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("analyze project", prompt)
 
     async def test_models_command_non_vision_warning(self):
-        from widgets.commands import ModelsCommand
+        from widgets.presentation.commands import ModelsCommand
 
         test_model_name = f"test-text-only-{int(time.time() * 1000)}"
 
@@ -616,7 +617,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(pushed_screens), 1)
 
     async def test_models_command_preserves_mode_when_switching_provider(self):
-        from widgets.commands import ModelsCommand
+        from widgets.presentation.commands import ModelsCommand
 
         class MockPM:
             def __init__(self):
@@ -661,7 +662,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.pm.saved, [("new", "new-model")])
 
     async def test_providers_command_preserves_role_when_connecting_provider(self):
-        from widgets.commands import ProvidersCommand
+        from widgets.presentation.commands import ProvidersCommand
 
         class MockPM:
             def __init__(self):
@@ -758,7 +759,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import AsyncMock, MagicMock
 
         from core.infrastructure.tasks.shell_task import ShellTask
-        from widgets.commands import NewCommand
+        from widgets.presentation.commands import NewCommand
 
         app = MockApp()
         app.message_queue = MagicMock()
@@ -776,7 +777,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_new_command_resets_role(self):
         from unittest.mock import AsyncMock, MagicMock
 
-        from widgets.commands import NewCommand
+        from widgets.presentation.commands import NewCommand
 
         app = MockApp()
         app.message_queue = MagicMock()
@@ -797,7 +798,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_subagents_command_no_subagents(self):
         from unittest.mock import MagicMock
 
-        from widgets.commands import SubagentsCommand
+        from widgets.presentation.commands import SubagentsCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -816,7 +817,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_subagents_command_with_subagents(self):
         from unittest.mock import MagicMock
 
-        from widgets.commands import SubagentsCommand
+        from widgets.presentation.commands import SubagentsCommand
 
         app = MockApp()
         app.notify = MagicMock()
@@ -832,7 +833,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_shell_command_no_tasks(self):
         from unittest.mock import MagicMock
 
-        from widgets.commands import ShellTasksCommand
+        from widgets.presentation.commands import ShellTasksCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -848,7 +849,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import MagicMock
 
         from core.infrastructure.tasks.shell_task import ShellTask
-        from widgets.commands import ShellTasksCommand
+        from widgets.presentation.commands import ShellTasksCommand
 
         app = MockApp()
         app.notify = MagicMock()
@@ -865,7 +866,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_resume_command_clears_queue_and_resets_generating(self):
         from unittest.mock import MagicMock
 
-        from widgets.commands import ResumeCommand
+        from widgets.presentation.commands import ResumeCommand
 
         app = MockApp()
         app.is_generating = True
@@ -887,7 +888,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_mcp_command_pushes_screen(self):
         from unittest.mock import MagicMock, patch
 
-        from widgets.commands import MCPCommand
+        from widgets.presentation.commands import MCPCommand
 
         app = MockApp()
         app.push_screen = MagicMock()
@@ -901,7 +902,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_mcp_command_no_servers(self):
         from unittest.mock import MagicMock, patch
 
-        from widgets.commands import MCPCommand
+        from widgets.presentation.commands import MCPCommand
 
         app = MockApp()
         app.push_screen = MagicMock()
@@ -1016,7 +1017,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             await BaseCommand().execute(None)
 
     async def test_new_command_cancels_running_worker(self):
-        from widgets.commands import NewCommand
+        from widgets.presentation.commands import NewCommand
 
         cancel_called = []
 
@@ -1043,7 +1044,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         chat.check_welcome = MagicMock()
         app.query_one = lambda target, default=None: chat
         with patch(
-            "widgets.commands.new_session", new=fake_new_session
+            "widgets.presentation.commands.session_commands.new_session", new=fake_new_session
         ), patch("core.application.session.stream.cancel_running_subagents"):
             await NewCommand().execute(app)
         self.assertEqual(len(cancel_called), 1)
@@ -1095,7 +1096,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
                 callback(("p", "secret"))
 
         app.push_screen = push_screen
-        with patch("widgets.commands.set_provider_credentials", return_value=""):
+        with patch("widgets.presentation.commands.provider_commands.set_provider_credentials", return_value=""):
             await ProvidersCommand().execute(app)
 
         # Flush the asyncio.create_task(_open_with_key) scheduled on failure path.
@@ -1144,7 +1145,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_models_command_disconnected_opens_providers(self):
         app = SimpleApp()
         app.pm = MagicMock()
-        with patch("widgets.commands.fetch_grouped_models", return_value=([], True)), patch.object(
+        with patch("widgets.presentation.commands.provider_commands.fetch_grouped_models", return_value=({}, True)), patch.object(
             ProvidersCommand, "execute", new=AsyncMock()
         ) as m_exec, patch.object(app, "push_screen") as ps:
             await ModelsCommand().execute(app)
@@ -1154,7 +1155,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_models_command_no_models_notify(self):
         app = SimpleApp()
         app.pm = MagicMock()
-        with patch("widgets.commands.fetch_grouped_models", return_value=([], False)), patch.object(
+        with patch("widgets.presentation.commands.provider_commands.fetch_grouped_models", return_value=({}, False)), patch.object(
             app, "push_screen"
         ) as ps:
             await ModelsCommand().execute(app)
@@ -1175,12 +1176,12 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
         def push_screen(screen, callback=None):
             if callback:
-                callback("gpt-x")  # scalar selection -> use curr_provider
+                callback(("p", "gpt-x"))
 
         app.push_screen = push_screen
         with patch(
-            "widgets.commands.fetch_grouped_models", return_value=({"p": {"name": "P"}}, False)
-        ), patch("widgets.commands.select_model", side_effect=lambda *a, **k: selected.append(a)):
+            "widgets.presentation.commands.provider_commands.fetch_grouped_models", return_value=({"p": {"name": "P"}}, False)
+        ), patch("widgets.presentation.commands.provider_commands.select_model", side_effect=lambda *a, **k: selected.append(a)):
             await ModelsCommand().execute(app)
         self.assertTrue(selected)
 
@@ -1200,7 +1201,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
                 callback(None)  # empty effort
 
         app.push_screen = push_screen
-        with patch("widgets.commands.get_current_thinking_effort", return_value=("p", "m", "auto")):
+        with patch("widgets.presentation.commands.provider_commands.get_current_thinking_effort", return_value=("p", "m", "auto")):
             await ThinkingEffortCommand().execute(app)
         self.assertIsNotNone(getattr(app.input, "focused", None))
 
@@ -1260,7 +1261,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
         async def push_screen(screen, callback=None):
             if callback:
-                await callback(0)
+                await callback(RewindSelection(index=0, restore_code=True))
                 return
             return None
 
@@ -1373,7 +1374,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             cb["on_begin"]()
             return outcome
 
-        with patch("widgets.commands.compact_session", new=fake_compact), patch.object(
+        with patch("widgets.presentation.commands.session_commands.compact_session", new=fake_compact), patch.object(
             app, "push_screen", MagicMock()
         ):
             await CompactCommand().execute(app)
@@ -1397,7 +1398,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.query_one = lambda target, default=None: SimpleApp.query_one.__get__(app)(target, default)
 
         outcome = SimpleNamespace(success=True, message="ok")
-        with patch("widgets.commands.compact_session", return_value=outcome):
+        with patch("widgets.presentation.commands.session_commands.compact_session", return_value=outcome):
             await CompactCommand().execute(app)
         for _ in range(5):
             await asyncio.sleep(0)
@@ -1427,7 +1428,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.notified, [("No pending questions", "warning")])
 
     async def test_sandbox_command_toggles_state(self):
-        from widgets.commands import SandboxCommand
+        from widgets.presentation.commands import SandboxCommand
 
         app = SimpleApp()
         app.sandbox_enabled = False
@@ -1446,7 +1447,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             mock_save.assert_called_once_with(False)
 
     async def test_copy_command_success(self):
-        from widgets.commands import CopyCommand
+        from widgets.presentation.commands import CopyCommand
 
         app = SimpleApp()
         app.copy_to_clipboard = MagicMock()
@@ -1462,7 +1463,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_called_once_with("Copied to clipboard", severity="information", timeout=1.5)
 
     async def test_copy_command_no_response(self):
-        from widgets.commands import CopyCommand
+        from widgets.presentation.commands import CopyCommand
 
         app = SimpleApp()
         app.notify = MagicMock()
@@ -1475,7 +1476,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_called_once_with("No assistant response to copy", severity="warning")
 
     async def test_copy_command_error_handled(self):
-        from widgets.commands import CopyCommand
+        from widgets.presentation.commands import CopyCommand
 
         app = SimpleApp()
         app.notify = MagicMock()

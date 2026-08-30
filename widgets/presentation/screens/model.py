@@ -12,7 +12,7 @@ from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, option_list_row_width
 
 
-class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
+class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str], None]]):
     """Modal model selection screen (/models)"""
 
     BINDINGS = expand_bindings([
@@ -24,7 +24,7 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
 
     def __init__(
         self,
-        models_data: Union[List[str], Dict[str, Dict[str, Any]]],
+        models_data: Dict[str, Dict[str, Any]],
         current_model: str = "",
         current_provider: str = "",
         pm: Optional[Any] = None,
@@ -122,88 +122,65 @@ class ModelScreen(BaseSelectionScreen[Union[str, Tuple[str, str], None]]):
             self.notify(f"Failed to refresh models: {e}", severity="error")
 
     @staticmethod
-    def _is_active_model(p_key: str, m: str, target_prov: str, target_model: str) -> bool:
+    def _is_active_model(provider_key: str, model_name: str, target_provider: str, target_model: str) -> bool:
         if not target_model:
             return False
-        if target_prov and p_key and p_key.lower() != target_prov.lower():
+        if target_provider and provider_key != target_provider:
             return False
-
-        m_low, t_low = m.lower(), target_model.lower()
-        if m_low == t_low:
+        if model_name == target_model:
             return True
-
-        clean_m = catalog.get_model_display_name(p_key, m).lower()
-        clean_t = catalog.get_model_display_name(target_prov or p_key, target_model).lower()
-        return bool(clean_m and clean_t and clean_m == clean_t)
+        clean_target = catalog.get_model_display_name(provider_key, target_model)
+        clean_model = catalog.get_model_display_name(provider_key, model_name)
+        if clean_model and clean_target and clean_model == clean_target:
+            return True
+        return False
 
     def _build_data(
         self,
-    ) -> Tuple[List[Union[str, Option]], List[Union[str, Tuple[str, str], None]], Union[str, Tuple[str, str], None]]:
+    ) -> Tuple[List[Union[str, Option]], List[Union[Tuple[str, str, str], None]], Union[Tuple[str, str, str], None]]:
         options: List[Union[str, Option]] = []
-        items: List[Union[str, Tuple[str, str], None]] = []
-        default_val: Union[str, Tuple[str, str], None] = None
+        items: List[Union[Tuple[str, str, str], None]] = []
+        default_val: Union[Tuple[str, str, str], None] = None
 
         target_prov, target_model = self.current_provider, self.current_model
         target_w = self._row_width()
 
-        if isinstance(self.models_data, dict):
-            first_group = True
-            for p_key, p_info in self.models_data.items():
-                p_name = p_info.get("name", p_key)
-                p_models = p_info.get("models", [])
+        first_group = True
+        for p_key, p_info in (self.models_data or {}).items():
+            p_name = p_info.get("name", p_key)
+            p_models = p_info.get("models", [])
 
-                if not p_models:
-                    continue
+            if not p_models:
+                continue
 
-                if not first_group:
-                    options.append(Option("", disabled=True))
-                    items.append(None)
-                first_group = False
-
-                options.append(Option(p_name, disabled=True))
+            if not first_group:
+                options.append(Option("", disabled=True))
                 items.append(None)
+            first_group = False
 
-                active_idx = None
-                if target_model:
-                    for idx, m in enumerate(p_models):
-                        if self._is_active_model(p_key, m, target_prov, target_model):
-                            active_idx = idx
-                            break
-
-                for idx, m in enumerate(p_models):
-                    clean_m = catalog.get_model_display_name(p_key, m)
-                    is_active = bool(active_idx is not None and idx == active_idx)
-                    has_vis = catalog.has_vision(p_key, m)
-                    badge = "vision" if has_vis else ""
-                    prefix = f"{status_tag('ACTIVE')} " if is_active else "  "
-                    opt_label = format_badge_row(clean_m, badge=badge, target_width=target_w, prefix=prefix)
-                    item_val = (p_key, m, p_name)
-                    options.append(opt_label)
-                    items.append(item_val)
-
-                    if is_active:
-                        default_val = item_val
-        else:
-            p_models = self.models_data
+            options.append(Option(p_name, disabled=True))
+            items.append(None)
 
             active_idx = None
             if target_model:
                 for idx, m in enumerate(p_models):
-                    if self._is_active_model(self.current_provider, m, target_prov, target_model):
+                    if self._is_active_model(p_key, m, target_prov, target_model):
                         active_idx = idx
                         break
 
             for idx, m in enumerate(p_models):
-                clean_m = catalog.get_model_display_name(self.current_provider, m)
+                clean_m = catalog.get_model_display_name(p_key, m)
                 is_active = bool(active_idx is not None and idx == active_idx)
-                has_vis = catalog.has_vision(self.current_provider, m)
+                has_vis = catalog.has_vision(p_key, m)
                 badge = "vision" if has_vis else ""
                 prefix = f"{status_tag('ACTIVE')} " if is_active else "  "
                 opt_label = format_badge_row(clean_m, badge=badge, target_width=target_w, prefix=prefix)
+                item_val = (p_key, m, p_name)
                 options.append(opt_label)
-                items.append(m)
+                items.append(item_val)
+
                 if is_active:
-                    default_val = m
+                    default_val = item_val
 
         if default_val is None:
             for it in items:

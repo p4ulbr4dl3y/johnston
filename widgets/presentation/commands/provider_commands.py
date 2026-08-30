@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from typing import Any
 
 from core.application.provider.actions import (
@@ -17,11 +16,6 @@ from widgets.presentation.commands.base import BaseCommand
 from widgets.presentation.screens.constants import MESSAGE_INPUT
 from widgets.presentation.screens.model import ModelScreen
 from widgets.presentation.screens.thinking_effort import ThinkingEffortScreen
-
-
-def _get_cmd_attr(name: str, fallback: Any) -> Any:
-    mod = sys.modules.get("widgets.commands")
-    return getattr(mod, name, fallback) if mod else fallback
 
 
 class ProvidersCommand(BaseCommand):
@@ -48,22 +42,15 @@ class ProvidersCommand(BaseCommand):
 
         act_key, cfg_keys, dis_provs = await asyncio.to_thread(_load_cfg)
 
-        def on_provider_selected(result: tuple[str, str] | str | None) -> None:
-            if not result:
+        def on_provider_selected(result: tuple[str, str] | None) -> None:
+            if not result or not isinstance(result, tuple):
                 app.query_one(MESSAGE_INPUT, ChatInput).focus()
                 return
 
-            if isinstance(result, tuple):
-                selected_key, entered_key = result
-            elif isinstance(result, str):
-                selected_key, entered_key = result, ""
-            else:
-                app.query_one(MESSAGE_INPUT, ChatInput).focus()
-                return
+            selected_key, entered_key = result
 
             if entered_key is not None:
-                set_creds_fn = _get_cmd_attr("set_provider_credentials", set_provider_credentials)
-                fetched = set_creds_fn(app.pm, selected_key, entered_key, app)
+                fetched = set_provider_credentials(app.pm, selected_key, entered_key, app)
                 if fetched:
                     asyncio.create_task(ModelsCommand().execute(app))
                 else:
@@ -123,8 +110,7 @@ class ModelsCommand(BaseCommand):
             app.notify("Provider manager not available", severity="warning")
             return
 
-        fetch_models_fn = _get_cmd_attr("fetch_grouped_models", fetch_grouped_models)
-        grouped_models, is_disconnected = await fetch_models_fn(app.pm)
+        grouped_models, is_disconnected = await fetch_grouped_models(app.pm)
         if not grouped_models:
             if is_disconnected:
                 await ProvidersCommand().execute(app)
@@ -138,17 +124,9 @@ class ModelsCommand(BaseCommand):
             curr_model = app.pm.get_provider_model(curr_provider)
 
         def on_model_selected(selection: Any) -> None:
-            if selection:
-                item_val = selection
-
-                if isinstance(item_val, (tuple, list)):
-                    selected_prov, selected_model = item_val[0], item_val[1]
-                else:
-                    selected_prov = curr_provider
-                    selected_model = item_val
-
-                select_model_fn = _get_cmd_attr("select_model", select_model)
-                select_model_fn(app.pm, app.agent, selected_prov, selected_model, app)
+            if selection and isinstance(selection, (tuple, list)):
+                selected_prov, selected_model = selection[0], selection[1]
+                select_model(app.pm, app.agent, selected_prov, selected_model, app)
                 app.refresh_status_footer()
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
@@ -165,16 +143,14 @@ class ThinkingEffortCommand(BaseCommand):
             app.notify("Provider manager not available", severity="warning")
             return
 
-        get_effort_fn = _get_cmd_attr("get_current_thinking_effort", get_current_thinking_effort)
-        provider_key, model_name, current_effort = get_effort_fn(app.pm, app.agent)
+        provider_key, model_name, current_effort = get_current_thinking_effort(app.pm, app.agent)
 
         def on_effort_selected(effort: str):
             if not effort:
                 app.query_one(MESSAGE_INPUT, ChatInput).focus()
                 return
 
-            set_effort_fn = _get_cmd_attr("set_thinking_effort", set_thinking_effort)
-            set_effort_fn(app.pm, provider_key, model_name, effort, app)
+            set_thinking_effort(app.pm, provider_key, model_name, effort, app)
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
         app.push_screen(ThinkingEffortScreen(current_effort), callback=on_effort_selected)

@@ -16,7 +16,7 @@ from widgets.presentation.screens.diff import DiffFooter, DiffHeader
 from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
 from widgets.presentation.screens.session_conflict import SessionConflictScreen
 from widgets.presentation.screens.thinking_effort import ThinkingEffortScreen
-from widgets.status_footer import SubagentStatusFooter
+from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 from widgets.utils.responsive import (
     BREAKPOINT_BANNER,
     BREAKPOINT_COMPACT,

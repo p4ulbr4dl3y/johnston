@@ -82,11 +82,11 @@ class LifecycleMixin:
         if not active_key or not self.pm.is_provider_connected(active_key):
             if not getattr(self, "is_app_active", True):
                 return
-            from widgets.commands import ProvidersCommand
+            from widgets.presentation.commands import ProvidersCommand
 
             await ProvidersCommand().execute(self)
         elif not getattr(getattr(self, "agent", None), "model", ""):
-            from widgets.commands import ModelsCommand
+            from widgets.presentation.commands import ModelsCommand
 
             await ModelsCommand().execute(self)
 

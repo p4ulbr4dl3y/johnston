@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from widgets.commands import RenameCommand
+from widgets.presentation.commands import RenameCommand
 
 
 class TestRenameCommand(unittest.IsolatedAsyncioTestCase):

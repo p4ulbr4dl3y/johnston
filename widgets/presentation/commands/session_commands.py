@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from typing import Any
 
 from core.application.session.actions import (
@@ -27,11 +26,6 @@ from widgets.presentation.screens.rewind import RewindScreen, RewindSelection
 from widgets.presentation.widgets.chat_container import ChatView
 
 
-def _get_cmd_attr(name: str, fallback: Any) -> Any:
-    mod = sys.modules.get("widgets.commands")
-    return getattr(mod, name, fallback) if mod else fallback
-
-
 class NewCommand(BaseCommand):
     name = "/new"
     aliases = ["/clear", "/reset"]
@@ -54,8 +48,7 @@ class NewCommand(BaseCommand):
         if old_id and hasattr(app.sm, "release_session_lock"):
             app.sm.release_session_lock(old_id)
 
-        new_sess_fn = _get_cmd_attr("new_session", new_session)
-        new_id = await new_sess_fn(
+        new_id = await new_session(
             app.sm,
             app.agent,
             cancel_workers=cancel_workers,
@@ -152,8 +145,7 @@ class CompactCommand(BaseCommand):
                 divider.update_title(title)
 
         try:
-            compact_fn = _get_cmd_attr("compact_session", compact_session)
-            outcome = await compact_fn(
+            outcome = await compact_session(
                 app.agent,
                 save_session_cb=save_cb,
                 on_begin=on_begin,
@@ -236,24 +228,16 @@ class RewindCommand(BaseCommand):
             app.notify("History is empty: no messages to rollback", severity="warning")
             return
 
-        get_stats_fn = _get_cmd_attr("get_rewind_git_stats", get_rewind_git_stats)
-        msgs_with_stats = await get_stats_fn(curr_sid, user_msgs, proj_path, session=session)
+        msgs_with_stats = await get_rewind_git_stats(curr_sid, user_msgs, proj_path, session=session)
         checkpoints_enabled = any(m.git_stats for m in msgs_with_stats)
 
         async def on_rewind_selected(selection: Any) -> None:
-            if selection is None:
+            if selection is None or not isinstance(selection, RewindSelection):
                 app.query_one(MESSAGE_INPUT).focus()
                 return
 
-            if isinstance(selection, RewindSelection):
-                selected_idx = selection.index
-                restore_code = selection.restore_code
-            elif isinstance(selection, int):
-                selected_idx = selection
-                restore_code = True
-            else:
-                app.query_one(MESSAGE_INPUT).focus()
-                return
+            selected_idx = selection.index
+            restore_code = selection.restore_code
 
             if selected_idx >= 0:
                 await cancel_active_workers_and_tasks(
@@ -294,8 +278,7 @@ class RewindCommand(BaseCommand):
                 sm = getattr(app, "sm", None)
                 session = sm.get(curr_sid, reload=False) if (sm and curr_sid) else None
 
-                rewind_fn = _get_cmd_attr("rewind_session", rewind_session)
-                rewind_fn(
+                rewind_session(
                     app.agent,
                     curr_sid,
                     proj_path,

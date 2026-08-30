@@ -66,7 +66,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget._clean_markup_text(None), "")
 
     def test_format_truncation_for_ui(self):
-        from widgets.chat_toolcall import _format_truncation_for_ui
+        from widgets.presentation.tool_renderers import format_truncation_for_ui
 
         # Shell truncation header with log path & LLM hint
         header = (
@@ -74,7 +74,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
             "Full log: /Users/yegor/.johnston/logs/shell-c14f.log. "
             "Pipe command to grep/head, or read full log.]\n...\ndiff content"
         )
-        cleaned = _format_truncation_for_ui(header)
+        cleaned = format_truncation_for_ui(header)
         self.assertEqual(
             cleaned,
             "[Output truncated: showing last 4000 chars | Log: /Users/yegor/.johnston/logs/shell-c14f.log]\n...\ndiff content",
@@ -85,7 +85,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
             "diff content\n... [Output truncated: showing first 8000 chars (lines 1-100 of 500). "
             "Full log: /path/to/log. Use read to inspect.]"
         )
-        cleaned_footer = _format_truncation_for_ui(footer)
+        cleaned_footer = format_truncation_for_ui(footer)
         self.assertEqual(
             cleaned_footer,
             "diff content\n... [Output truncated: showing first 8000 chars | Log: /path/to/log]",
@@ -93,17 +93,17 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
 
         # Truncated without log
         recent = "[Output truncated: showing recent output]\nsome output"
-        self.assertEqual(_format_truncation_for_ui(recent), "[Output truncated: showing recent output]\nsome output")
+        self.assertEqual(format_truncation_for_ui(recent), "[Output truncated: showing recent output]\nsome output")
 
         # New unified pipe-separated format
         pipe_footer = "file text\n... [Truncated: lines 1-100 of 500 | Log: /path/to/log.json | Next: read(path='/path/to/log.json', start_line=101)]"
         self.assertEqual(
-            _format_truncation_for_ui(pipe_footer),
+            format_truncation_for_ui(pipe_footer),
             "file text\n... [Truncated: lines 1-100 of 500 | Log: /path/to/log.json]",
         )
 
         # Double cleaning / idempotency
-        double_cleaned = _format_truncation_for_ui(cleaned)
+        double_cleaned = format_truncation_for_ui(cleaned)
         self.assertEqual(double_cleaned, cleaned)
 
 
@@ -853,7 +853,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
             render_mock.assert_called_once()
 
     def test_format_manage_shell_display(self):
-        from widgets.chat_toolcall import format_manage_shell_display
+        from widgets.presentation.tool_renderers import format_manage_shell_display
 
         # Empty
         t_empty = format_manage_shell_display("no tasks active")
@@ -885,7 +885,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("t1", text_obj.plain)
 
     def test_format_manage_subagent_display(self):
-        from widgets.chat_toolcall import format_manage_subagent_display
+        from widgets.presentation.tool_renderers import format_manage_subagent_display
 
         # Empty
         t_empty = format_manage_subagent_display("No subagent sessions found for current session.")

@@ -542,13 +542,6 @@ class JohnstonSettings:
     ui: UISettings = field(default_factory=UISettings)
     storage: StorageSettings = field(default_factory=StorageSettings)
 
-    @property
-    def sandbox_enabled(self) -> bool:
-        return self.sandbox.enabled
-
-    @sandbox_enabled.setter
-    def sandbox_enabled(self, val: bool) -> None:
-        self.sandbox.enabled = bool(val)
 
     @property
     def active_provider(self) -> Optional[str]:
@@ -646,7 +639,6 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
     data = read_json(target_file, default={})
     if not isinstance(data, dict):
         data = {}
-    data.pop("provider_models", None)
     if settings.model is not None:
         data["model"] = settings.model
     else:
@@ -656,8 +648,6 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
     elif "theme" in data:
         data.pop("theme", None)
     data["sandbox"] = asdict(settings.sandbox)
-    data.pop("sandbox_enabled", None)
-    data.pop("provider_thinking_efforts", None)
     data["permissions"] = settings.permissions
     data["subagents"] = asdict(settings.subagents)
     data["llm"] = asdict(settings.llm)
@@ -673,10 +663,7 @@ def patch_settings(config_file: Optional[str] = None, **kwargs: Any) -> Johnston
     target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
     current = load_settings(target_file)
     for key, value in kwargs.items():
-        if key == "sandbox_enabled":
-            current.sandbox.enabled = bool(value)
-        elif hasattr(current, key):
+        if hasattr(current, key):
             setattr(current, key, value)
     save_settings(current, target_file)
     return get_settings(target_file, force_reload=True)
-

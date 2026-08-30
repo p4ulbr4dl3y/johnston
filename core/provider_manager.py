@@ -402,7 +402,6 @@ class ProviderManager:
     def set_provider_model(self, key: str, model_name: str):
         """Saves selected model to config.json as ``model: key/model_name``."""
         data = self._read_config()
-        data.pop("provider_models", None)
         data["model"] = f"{key}/{model_name}" if model_name else key
         self._save_config(data)
         self.invalidate_cache()

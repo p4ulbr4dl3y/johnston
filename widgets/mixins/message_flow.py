@@ -130,11 +130,11 @@ class MessageFlowMixin:
         state = ensure_provider_ready(self.pm, self.agent)
         if state is not ProviderReadyState.READY:
             if state is ProviderReadyState.NEEDS_PROVIDER:
-                from widgets.commands import ProvidersCommand
+                from widgets.presentation.commands import ProvidersCommand
 
                 await ProvidersCommand().execute(self)
             else:
-                from widgets.commands import ModelsCommand
+                from widgets.presentation.commands import ModelsCommand
 
                 await ModelsCommand().execute(self)
             self.is_generating = False

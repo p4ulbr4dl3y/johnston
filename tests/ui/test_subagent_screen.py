@@ -352,7 +352,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
             um = screen.query_one(UserMessage)
             self.assertIn("My initial subagent prompt", um.raw_text)
-            from widgets.status_footer import SubagentHeader, SubagentStatusFooter
+            from widgets.presentation.widgets.subagent_footer import SubagentHeader, SubagentStatusFooter
 
             header = screen.query_one("#subagent-header", SubagentHeader)
             self.assertTrue(header.is_mounted)
@@ -398,7 +398,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(um.allow_select)
 
     def test_subagent_status_footer_token_cache(self):
-        from widgets.status_footer import SubagentStatusFooter
+        from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 
         footer = SubagentStatusFooter()
         sess = self._mk("task-tok-cache", "Tok Agent", "prompt")

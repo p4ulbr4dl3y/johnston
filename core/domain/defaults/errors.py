@@ -27,8 +27,7 @@ class FormattedToolError(ValueError):
 class ToolResultStatus(str, Enum):
     """Canonical lifecycle status of a tool execution.
 
-    ``str``-mixed so legacy string comparisons (``status == "error"``) keep
-    working and ``.value`` yields the wire/JSON string.
+    ``str``-subclassed for direct JSON/string serialization.
     """
 
     DONE = "done"

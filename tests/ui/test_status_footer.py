@@ -232,7 +232,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 )
 
     async def test_subagent_footer_mount_unmount_and_update(self):
-        from widgets.status_footer import SubagentStatusFooter
+        from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 
         class SubagentFooterApp(App[None]):
             def compose(self):
@@ -261,7 +261,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(footer._resize_timer)
 
     async def test_subagent_footer_old_session_fallback_metrics(self):
-        from widgets.status_footer import SubagentStatusFooter
+        from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 
         class SubagentFooterApp(App[None]):
             def compose(self):

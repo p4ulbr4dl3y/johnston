@@ -3,7 +3,7 @@
 import pytest
 from pygments.token import Token
 
-from core.domain.defaults.themes import BUILTIN_THEMES
+from core.domain.defaults.themes import list_themes
 from core.domain.entities.theme import Theme
 from widgets.app.theme_manager import ThemeManager
 
@@ -30,7 +30,8 @@ def test_theme_entity_creation():
 
 
 def test_builtin_themes_presence():
-    names = {t.name for t in BUILTIN_THEMES}
+    themes = list_themes()
+    names = {t.name for t in themes}
     assert "zinc" in names
     assert "charcoal" in names
     assert "catppuccin-mocha" in names
@@ -57,7 +58,7 @@ def test_builtin_themes_presence():
     assert "vesper" in names
     assert "dracula" in names
     assert "native" in names
-    assert len(BUILTIN_THEMES) == 26
+    assert len(themes) == 26
 
 
 def test_theme_manager_registration_and_switching():
@@ -106,7 +107,7 @@ def test_theme_manager_textual_theme_conversion():
     assert "bg-app" in tt.variables
 
     all_tt = tm.get_all_textual_themes()
-    assert len(all_tt) == len(BUILTIN_THEMES)
+    assert len(all_tt) == len(list_themes())
 
 
 def test_theme_persistence(tmp_path, monkeypatch):
@@ -186,7 +187,7 @@ def test_theme_manager_load_user_themes(tmp_path):
 
     # Check non-existent directory handled gracefully
     tm_empty = ThemeManager(load_config=False, custom_themes_dir=tmp_path / "nonexistent")
-    assert len(tm_empty.list_themes()) == len(BUILTIN_THEMES)
+    assert len(tm_empty.list_themes()) == len(list_themes())
 
 
 def test_theme_manager_singleton_and_reset():
@@ -203,29 +204,22 @@ def test_theme_manager_singleton_and_reset():
 def test_themes_loader_module():
     import core.domain.defaults.themes as themes_mod
     from core.domain.defaults.themes import (
-        BUILTIN_THEMES,
-        EVERFOREST_DARK,
-        THEMES,
+        DEFAULT_THEME_NAME,
         ZINC_DARK,
         get_theme,
         list_themes,
-        load_builtin_themes,
     )
 
-    assert len(THEMES) == 26
-    assert len(BUILTIN_THEMES) == 26
+    themes = list_themes()
+    assert len(themes) == 26
+    assert DEFAULT_THEME_NAME == "zinc"
     assert get_theme("zinc") is not None
     assert get_theme("zinc").name == "zinc"
     assert get_theme("native") is not None
     assert get_theme("native").name == "native"
     assert get_theme("nonexistent") is None
-    assert len(list_themes()) == 26
-    assert len(load_builtin_themes()) == 26
     assert ZINC_DARK.name == "zinc"
-    assert EVERFOREST_DARK.name == "everforest"
-    assert themes_mod.NATIVE.name == "native"
-    assert themes_mod.NORD.name == "nord"
-    assert "THEMES" in dir(themes_mod)
+    assert "DEFAULT_THEME_NAME" in dir(themes_mod)
 
     with pytest.raises(AttributeError):
         _ = themes_mod.NON_EXISTENT_THEME_XYZ

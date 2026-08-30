@@ -330,7 +330,7 @@ class BotMessage(Vertical):
         await self.set_final_content(content)
 
     def _schedule_markdown_render(self, content: str) -> None:
-        """Coalesce compatibility assignments so only one Markdown render runs."""
+        """Coalesce rapid content updates so only one Markdown render task runs at a time."""
         self._pending_markdown_content = content
         if self._markdown_render_task is not None and not self._markdown_render_task.done():
             return

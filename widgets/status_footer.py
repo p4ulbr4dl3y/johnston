@@ -1,4 +1,4 @@
-"""Two-line status footer below chat and re-exports for subagent footer/headers."""
+"""Two-line status footer below chat."""
 from __future__ import annotations
 
 import os
@@ -11,27 +11,14 @@ from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 from widgets.presentation.widgets.footer_layout import (
-    STATUS_SEP,
-    STATUS_SEP_COMPACT,
-    _build_subagent_grid,
     format_display_path,
     get_theme_colors,
-)
-from widgets.presentation.widgets.subagent_footer import (
-    SubagentHeader,
-    SubagentStatusFooter,
 )
 from widgets.utils.responsive import is_compact_width, resolve_width
 from widgets.utils.row_format import display_width, ellipsize
 
 __all__ = [
-    "STATUS_SEP",
-    "STATUS_SEP_COMPACT",
     "StatusFooter",
-    "SubagentHeader",
-    "SubagentStatusFooter",
-    "_build_subagent_grid",
-    "format_display_path",
 ]
 
 

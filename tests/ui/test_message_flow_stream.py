@@ -29,7 +29,7 @@ class TestGenerateNotConnected(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.1)
             app.pm.is_provider_connected = MagicMock(return_value=False)
             app.pm.get_active_provider_key = MagicMock(return_value="openai")
-            with patch("widgets.commands.ProvidersCommand", return_value=MagicMock()) as mock_cls:
+            with patch("widgets.presentation.commands.ProvidersCommand", return_value=MagicMock()) as mock_cls:
                 mock_cls.return_value.execute = unittest.mock.AsyncMock()
                 app.generate_ai_response("hello")
                 deadline = asyncio.get_running_loop().time() + 10
@@ -48,7 +48,7 @@ class TestGenerateNotConnected(unittest.IsolatedAsyncioTestCase):
             app.pm.get_active_provider_key = MagicMock(return_value="openai")
             app.agent = MagicMock()
             app.agent.model = ""
-            with patch("widgets.commands.ModelsCommand", return_value=MagicMock()) as mock_cls:
+            with patch("widgets.presentation.commands.ModelsCommand", return_value=MagicMock()) as mock_cls:
                 mock_cls.return_value.execute = unittest.mock.AsyncMock()
                 app.generate_ai_response("hello")
                 deadline = asyncio.get_running_loop().time() + 10

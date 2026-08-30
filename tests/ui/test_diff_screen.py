@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.widgets import OptionList
 
-from widgets.commands import DiffCommand
+from widgets.presentation.commands import DiffCommand
 from widgets.presentation.screens.diff import DiffFooter, DiffHeader, DiffScreen
 
 
