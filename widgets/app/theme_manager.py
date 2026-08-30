@@ -49,6 +49,7 @@ class ThemeManager(CoreThemeManager):
         md_styles["markdown.text"] = palette["fg_primary"]
         md_styles["markdown.item"] = palette["fg_primary"]
         md_styles["markdown.em"] = f"italic {palette['fg_primary']}"
+        md_styles["markdown.code"] = f"{palette['fg_primary']} on {palette['bg_surface']}"
 
         return Theme(
             name=theme.name,

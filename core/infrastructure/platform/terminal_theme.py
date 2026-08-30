@@ -221,7 +221,7 @@ def compute_adaptive_palette(
         "fg-muted": fg_muted,
         "fg-inverted": norm_bg,
         "border": border,
-        "bg-code": "#27272a" if is_dark else "#e4e4e7",
+        "bg-code": surface,
         "accent-info": "#61afef",
         "accent-warning": "#e5c07b",
         "accent-error": "#e06c75",

@@ -241,6 +241,8 @@ def test_ui_theme_manager_adapted_theme(monkeypatch):
     assert adapted.dark is False
     assert adapted.primary == "#000000"
     assert adapted.tcss_vars["bg-app"] == "ansi_default"
+    assert "markdown.code" in adapted.markdown_styles
+    assert adapted.markdown_styles["markdown.code"].startswith("#000000 on ")
 
     textual_theme = mgr.get_textual_theme("native")
     assert textual_theme.dark is False
@@ -255,6 +257,9 @@ def test_ui_theme_manager_adapted_theme(monkeypatch):
     adapted_dark = mgr.get_adapted_theme("native")
     assert adapted_dark.dark is True
     assert adapted_dark.primary == "#c9d1d9"
+    assert "markdown.code" in adapted_dark.markdown_styles
+    assert adapted_dark.markdown_styles["markdown.code"].startswith("#c9d1d9 on ")
+    UIThemeManager.reset_instance()
 
 
 def test_theme_variable_resolution():
@@ -307,6 +312,7 @@ def test_ui_theme_manager_native_listener_receives_adapted(monkeypatch):
     assert received[0].name == "native"
     assert received[0].dark is False
     assert received[0].primary == "#000000"
+    UIThemeManager.reset_instance()
 
 
 def test_chat_markdown_theme_sync():
@@ -343,6 +349,9 @@ def test_chat_markdown_theme_sync():
     assert cell_style is not None
     assert cell_style.foreground.hex.lower() == "#ff0000"
     assert cell_style.background.hex.lower() == "#00ff00"
+
+    from core.domain.defaults.themes import ZINC_DARK
+    sync_theme_styles(ZINC_DARK)
 
 
 

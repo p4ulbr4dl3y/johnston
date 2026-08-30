@@ -17,8 +17,8 @@ STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
 def get_theme_colors() -> tuple[str, str, str, str]:
     """Get active theme colors (primary, secondary, muted, subtle)."""
     try:
-        from widgets.app.theme_manager import theme_manager
-        t = theme_manager.current_theme
+        from widgets.app.theme_manager import ThemeManager
+        t = ThemeManager.get_instance().current_theme
         return t.primary, t.secondary, t.muted, t.subtle
     except Exception:
         return THEME_PRIMARY, THEME_SECONDARY, THEME_MUTED, THEME_SUBTLE

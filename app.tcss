@@ -1164,7 +1164,7 @@ MarkdownTableContent > .markdown-table--header {
 }
 
 MarkdownTableContent > .cell {
-    color: $fg-secondary;
+    color: $fg-primary;
 }
 
 /* Markdown List Bullets & Numbers - Muted Zinc */
