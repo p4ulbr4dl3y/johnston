@@ -82,6 +82,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         fake_path = "/tmp/cli_doc.docx"
         with (
             patch("tools.read.get_cached_doc_markdown", return_value=None),
+            patch("core.infrastructure.converter.convert_file", side_effect=RuntimeError("fail")),
             patch("shutil.which", return_value="/usr/local/bin/markitdown"),
             patch("subprocess.Popen") as mock_popen,
         ):
@@ -90,18 +91,19 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             proc.returncode = 0
             proc.poll.return_value = 0
             mock_popen.return_value = proc
-            # Force python import to fail
-            with patch.dict("sys.modules", {"markitdown": None}):
-                res = convert_doc_to_markdown_sync(fake_path)
-                self.assertEqual(res, "# CLI Output")
+            res = convert_doc_to_markdown_sync(fake_path)
+            self.assertEqual(res, "# CLI Output")
 
     def test_convert_doc_to_markdown_sync_failure_raises(self):
         fake_path = "/tmp/failed.docx"
-        with patch("tools.read.get_cached_doc_markdown", return_value=None), patch("shutil.which", return_value=None):
-            with patch.dict("sys.modules", {"markitdown": None}):
-                with self.assertRaises(RuntimeError) as ctx:
-                    convert_doc_to_markdown_sync(fake_path)
-                self.assertIn("Unable to convert", str(ctx.exception))
+        with (
+            patch("tools.read.get_cached_doc_markdown", return_value=None),
+            patch("core.infrastructure.converter.convert_file", side_effect=RuntimeError("fail")),
+            patch("shutil.which", return_value=None),
+        ):
+            with self.assertRaises(RuntimeError) as ctx:
+                convert_doc_to_markdown_sync(fake_path)
+            self.assertIn("Unable to convert", str(ctx.exception))
 
     def test_convert_doc_to_markdown_sync_cooperative_cancel(self):
         # A pre-set cancel_event makes the worker skip the CLI fallback and
@@ -113,9 +115,9 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         fake_path = "/tmp/cancel_doc.docx"
         with (
             patch("tools.read.get_cached_doc_markdown", return_value=None),
+            patch("core.infrastructure.converter.convert_file", side_effect=RuntimeError("fail")),
             patch("shutil.which", return_value="/usr/local/bin/markitdown"),
             patch("subprocess.Popen") as mock_popen,
-            patch.dict("sys.modules", {"markitdown": None}),
         ):
             # Post-cancel the worker skips the CLI fallback, so no subprocess is
             # launched and no result is produced -> returns empty instead of

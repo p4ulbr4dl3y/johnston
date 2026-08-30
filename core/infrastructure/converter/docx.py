@@ -1,0 +1,218 @@
+import io
+import re
+import xml.etree.ElementTree as ET
+import zipfile
+from typing import BinaryIO, Dict, List, Union
+
+W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+
+
+def _local_tag(elem: ET.Element) -> str:
+    tag = elem.tag
+    if tag.startswith("{"):
+        return tag.split("}", 1)[1]
+    return tag
+
+
+def docx_to_markdown(docx_input: Union[str, bytes, BinaryIO]) -> str:
+    """
+    Converts a Word document (.docx) to Markdown using Python stdlib zipfile and ElementTree.
+    Extracts headings, paragraphs, lists, tables, and hyperlinks.
+    """
+    if isinstance(docx_input, (str, bytes)):
+        source: Union[str, io.BytesIO] = io.BytesIO(docx_input) if isinstance(docx_input, bytes) else docx_input
+    else:
+        source = docx_input
+
+    try:
+        zf = zipfile.ZipFile(source)
+    except Exception as e:
+        raise ValueError(f"Invalid DOCX file: {e}") from e
+
+    # Read relationships for hyperlinks
+    rels: Dict[str, str] = {}
+    if "word/_rels/document.xml.rels" in zf.namelist():
+        try:
+            rels_tree = ET.fromstring(zf.read("word/_rels/document.xml.rels"))
+            for elem in rels_tree:
+                r_id = elem.attrib.get("Id")
+                target = elem.attrib.get("Target")
+                if r_id and target:
+                    rels[r_id] = target
+        except Exception:
+            pass
+
+    # Read document.xml
+    if "word/document.xml" not in zf.namelist():
+        return ""
+
+    doc_tree = ET.fromstring(zf.read("word/document.xml"))
+    body = doc_tree.find(f".//{W_NS}body")
+    if body is None:
+        body = doc_tree.find(".//body")
+    if body is None:
+        return ""
+
+    output: List[str] = []
+
+    for child in body:
+        tag = _local_tag(child)
+        if tag == "p":
+            para_md = _parse_paragraph(child, rels)
+            if para_md:
+                output.append(para_md)
+        elif tag == "tbl":
+            table_md = _parse_table(child, rels)
+            if table_md:
+                output.append(table_md)
+
+    text = "\n\n".join(output).strip()
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
+def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
+    heading_prefix = ""
+    is_list = False
+    list_indent = 0
+    p_pr = None
+    for child in p_elem:
+        if _local_tag(child) == "pPr":
+            p_pr = child
+            break
+
+    if p_pr is not None:
+        for pr_child in p_pr:
+            tag = _local_tag(pr_child)
+            if tag == "pStyle":
+                val = ""
+                for k, v in pr_child.attrib.items():
+                    if k.endswith("val") or k == "val":
+                        val = v
+                        break
+                val_lower = val.lower()
+                if "heading1" in val_lower or "heading 1" in val_lower or val_lower == "title":
+                    heading_prefix = "# "
+                elif "heading2" in val_lower or "heading 2" in val_lower:
+                    heading_prefix = "## "
+                elif "heading3" in val_lower or "heading 3" in val_lower:
+                    heading_prefix = "### "
+                elif "heading4" in val_lower or "heading 4" in val_lower:
+                    heading_prefix = "#### "
+                elif "heading5" in val_lower or "heading 5" in val_lower:
+                    heading_prefix = "##### "
+                elif "heading6" in val_lower or "heading 6" in val_lower:
+                    heading_prefix = "###### "
+            elif tag == "numPr":
+                is_list = True
+                for num_child in pr_child:
+                    if _local_tag(num_child) == "ilvl":
+                        for k, v in num_child.attrib.items():
+                            if k.endswith("val") or k == "val":
+                                try:
+                                    list_indent = int(v)
+                                except ValueError:
+                                    list_indent = 0
+
+    runs_text: List[str] = []
+    for item in p_elem:
+        item_tag = _local_tag(item)
+        if item_tag == "r":
+            runs_text.append(_parse_run(item))
+        elif item_tag == "hyperlink":
+            r_id = item.attrib.get(f"{R_NS}id", "") or item.attrib.get("id", "")
+            url = rels.get(r_id, "")
+            link_text = "".join(_parse_run(r) for r in item if _local_tag(r) == "r")
+            if url and link_text:
+                runs_text.append(f"[{link_text}]({url})")
+            elif link_text:
+                runs_text.append(link_text)
+
+    content = "".join(runs_text).strip()
+    if not content:
+        return ""
+
+    if heading_prefix:
+        return f"{heading_prefix}{content}"
+    if is_list:
+        indent_str = "  " * max(0, list_indent)
+        return f"{indent_str}- {content}"
+    return content
+
+
+def _parse_run(r_elem: ET.Element) -> str:
+    r_pr = r_elem.find(f"{W_NS}rPr") or r_elem.find("rPr")
+    is_bold = False
+    is_italic = False
+    is_strike = False
+
+    if r_pr is not None:
+        if r_pr.find(f"{W_NS}b") is not None or r_pr.find("b") is not None:
+            is_bold = True
+        if r_pr.find(f"{W_NS}i") is not None or r_pr.find("i") is not None:
+            is_italic = True
+        if r_pr.find(f"{W_NS}strike") is not None or r_pr.find("strike") is not None:
+            is_strike = True
+
+    text_parts: List[str] = []
+    for elem in r_elem:
+        tag = _local_tag(elem)
+        if tag == "t" and elem.text:
+            text_parts.append(elem.text)
+        elif tag == "tab":
+            text_parts.append("\t")
+        elif tag == "br":
+            text_parts.append("\n")
+
+    text = "".join(text_parts)
+    if not text:
+        return ""
+
+    if is_bold and is_italic:
+        text = f"***{text}***"
+    elif is_bold:
+        text = f"**{text}**"
+    elif is_italic:
+        text = f"*{text}*"
+    if is_strike:
+        text = f"~~{text}~~"
+
+    return text
+
+
+def _parse_table(tbl_elem: ET.Element, rels: Dict[str, str]) -> str:
+    rows: List[List[str]] = []
+
+    for tr in tbl_elem:
+        if _local_tag(tr) != "tr":
+            continue
+        row_cells: List[str] = []
+        for tc in tr:
+            if _local_tag(tc) != "tc":
+                continue
+            cell_paragraphs = []
+            for p in tc:
+                if _local_tag(p) == "p":
+                    p_text = _parse_paragraph(p, rels)
+                    if p_text:
+                        cell_paragraphs.append(p_text)
+            cell_content = " ".join(cell_paragraphs).strip().replace("\n", " ").replace("|", "\\|")
+            row_cells.append(cell_content)
+        if row_cells:
+            rows.append(row_cells)
+
+    if not rows:
+        return ""
+
+    col_count = max(len(r) for r in rows)
+    if col_count == 0:
+        return ""
+
+    normalized_rows = [r + [""] * (col_count - len(r)) for r in rows]
+    header = normalized_rows[0]
+    out = ["| " + " | ".join(header) + " |", "| " + " | ".join(["---"] * col_count) + " |"]
+
+    for row in normalized_rows[1:]:
+        out.append("| " + " | ".join(row) + " |")
+
+    return "\n".join(out)

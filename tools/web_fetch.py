@@ -1,9 +1,7 @@
 import asyncio
 import ipaddress
-import os
 import re
 import socket
-import tempfile
 import threading
 import time
 from typing import Any, Dict
@@ -133,20 +131,11 @@ def _sanitize_web_content(text: str) -> str:
 def _convert_content_to_md_sync(
     content_bytes: bytes, suffix: str = ".html", cancel_event: threading.Event | None = None
 ) -> str:
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(content_bytes)
-        tmp_path = tmp.name
+    if cancel_event and cancel_event.is_set():
+        return ""
+    from core.infrastructure.converter import convert_bytes
 
-    try:
-        from tools.read import convert_doc_to_markdown_sync
-
-        return convert_doc_to_markdown_sync(tmp_path, cancel_event=cancel_event)
-    finally:
-        if os.path.exists(tmp_path):
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
+    return convert_bytes(content_bytes, suffix)
 
 
 async def _guard_request(req: "httpx.Request") -> None:

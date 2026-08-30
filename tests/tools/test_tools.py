@@ -425,11 +425,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         from unittest.mock import patch
 
         with patch("tools.read.set_cached_doc_markdown") as mock_set:
-            with patch("markitdown.MarkItDown") as mock_md_cls:
-                mock_md = mock_md_cls.return_value
-                mock_res = type("Result", (), {"text_content": "# Cached Doc Header\nDoc text"})()
-                mock_md.convert.return_value = mock_res
-
+            with patch("core.infrastructure.converter.convert_file", return_value="# Cached Doc Header\nDoc text"):
                 res1 = convert_doc_to_markdown_sync(pdf_path)
                 self.assertIn("Cached Doc Header", res1)
                 self.assertTrue(mock_set.called)

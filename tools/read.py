@@ -15,13 +15,11 @@ from tools.utils import DEFAULT_LINE_WINDOW, get_max_tool_payload_bytes
 
 logger = logging.getLogger(__name__)
 
-DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub"}
+DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub", ".ipynb"}
 _DOC_CACHE: "OrderedDict[str, Tuple[float, float, str]]" = OrderedDict()  # key: path, val: (mtime, timestamp, md_text)
 MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes
 
-_MARKITDOWN_CLS = None
-_MARKITDOWN_INSTANCE = None
 _LINE_COUNT_CACHE: "OrderedDict[Tuple[str, float, int], int]" = OrderedDict()
 MAX_LINE_COUNT_CACHE = 500
 _CACHE_LOCK = threading.Lock()
@@ -35,17 +33,6 @@ def _tools_settings():
         return get_settings().tools
     except Exception:
         return None
-
-
-def _get_markitdown():
-    global _MARKITDOWN_CLS, _MARKITDOWN_INSTANCE
-    import markitdown
-
-    current_cls = markitdown.MarkItDown
-    if _MARKITDOWN_INSTANCE is None or _MARKITDOWN_CLS is not current_cls:
-        _MARKITDOWN_CLS = current_cls
-        _MARKITDOWN_INSTANCE = current_cls()
-    return _MARKITDOWN_INSTANCE
 
 
 def _get_file_line_count(file_path: str, mtime: float, size: int) -> int:
@@ -117,7 +104,7 @@ def convert_doc_to_markdown_sync(
     sandbox_enabled: bool = False,
     cwd: str | None = None,
 ) -> str:
-    """Synchronous CPU worker to convert rich documents to markdown via markitdown."""
+    """Synchronous CPU worker to convert rich documents to markdown."""
     cached = get_cached_doc_markdown(path)
     if cached is not None:
         return cached
@@ -125,25 +112,20 @@ def convert_doc_to_markdown_sync(
     def _interrupted() -> bool:
         return bool(cancel_event and cancel_event.is_set())
 
-    # On cancellation the awaiting coroutine is already gone, so any exception we
-    # raise here would be "never retrieved" by asyncio. Return an empty string
-    # instead and let the caller's formatting layer decide. This keeps the worker
-    # side-effect-free and warning-free.
     if _interrupted():
         return ""
 
     result_text = None
 
-    # 1. Try Python API
+    # 1. Try Johnston's built-in document converter
     try:
-        md = _get_markitdown()
-        result = md.convert(path)
-        if result and getattr(result, "text_content", None) is not None:
-            result_text = result.text_content
-    except Exception:
-        pass
+        from core.infrastructure.converter import convert_file
 
-    # 2. Try CLI fallback
+        result_text = convert_file(path)
+    except Exception as exc:
+        logger.debug("Built-in document converter error for %s: %s", path, exc)
+
+    # 2. Try CLI fallback if available
     if result_text is None and not _interrupted():
         cli_path = shutil.which("markitdown")
         if cli_path:
@@ -162,9 +144,6 @@ def convert_doc_to_markdown_sync(
                     [cli_path, path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
                 )
             try:
-                # Poll communicate() in short slices so a cancellation that lands
-                # mid-conversion can kill the subprocess promptly instead of
-                # leaving it to run up to the full timeout window.
                 tools = _tools_settings()
                 doc_timeout = tools.doc_conversion_timeout if tools else 30.0
                 stdout, _ = _communicate_cancellable(proc, _interrupted, timeout=doc_timeout)
@@ -175,7 +154,6 @@ def convert_doc_to_markdown_sync(
                     proc.kill()
                 raise
 
-
     if _interrupted():
         return ""
     if result_text is not None:
@@ -183,7 +161,7 @@ def convert_doc_to_markdown_sync(
         return result_text
 
     raise RuntimeError(
-        f"Unable to convert '{path}' with markitdown. Ensure 'markitdown' Python package or CLI is installed."
+        f"Unable to convert '{path}' to markdown."
     )
 
 

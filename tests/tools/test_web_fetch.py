@@ -130,15 +130,10 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Log: ", res.content)
 
 
-    async def test_convert_content_to_md_sync_unlink_oserror(self):
-        # A failing tmp-file cleanup must be swallowed while the converted
-        # markdown is still returned.
+    async def test_convert_content_to_md_sync(self):
         from tools.web_fetch import _convert_content_to_md_sync
 
-        with (
-            patch("tools.read.convert_doc_to_markdown_sync", return_value="converted md"),
-            patch("os.unlink", side_effect=OSError("file in use")),
-        ):
+        with patch("core.infrastructure.converter.convert_bytes", return_value="converted md"):
             res = _convert_content_to_md_sync(b"<p>hi</p>", ".html")
         self.assertEqual(res, "converted md")
 
