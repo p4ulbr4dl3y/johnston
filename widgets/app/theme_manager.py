@@ -34,6 +34,7 @@ class ThemeManager(CoreThemeManager):
         palette = compute_adaptive_palette(detected_bg, detected_fg)
         adapted_tcss = dict(tcss_vars)
         adapted_tcss.update(palette["tcss_vars"])
+        adapted_tcss["bg-overlay"] = "transparent"
 
         if not palette["dark"]:
             from core.domain.defaults.themes import get_theme

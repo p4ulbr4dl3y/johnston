@@ -1,7 +1,6 @@
 import unittest
 
-from core.domain.defaults.config import THEME_MUTED, THEME_SECONDARY
-from widgets.presentation.widgets.footer_layout import format_modal_hint
+from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
 from widgets.presentation.widgets.modal_hint import ModalHint
 
 
@@ -11,21 +10,23 @@ class TestModalHintFormatting(unittest.TestCase):
         self.assertEqual(format_modal_hint(None), "")
 
     def test_format_colon_hints(self):
+        _, t_sec, t_mut, _ = get_theme_colors()
         raw = "enter: select • esc: close"
         formatted = format_modal_hint(raw)
-        self.assertIn(f"[{THEME_SECONDARY}]enter[/]", formatted)
-        self.assertIn(f"[{THEME_MUTED}]: select[/]", formatted)
-        self.assertIn(f"[{THEME_MUTED}]•[/]", formatted)
-        self.assertIn(f"[{THEME_SECONDARY}]esc[/]", formatted)
-        self.assertIn(f"[{THEME_MUTED}]: close[/]", formatted)
+        self.assertIn(f"[{t_sec}]enter[/]", formatted)
+        self.assertIn(f"[{t_mut}]: select[/]", formatted)
+        self.assertIn(f"[{t_mut}]•[/]", formatted)
+        self.assertIn(f"[{t_sec}]esc[/]", formatted)
+        self.assertIn(f"[{t_mut}]: close[/]", formatted)
 
     def test_format_compact_hints_without_colons(self):
+        _, t_sec, t_mut, _ = get_theme_colors()
         raw = "enter • ↑↓ • esc"
         formatted = format_modal_hint(raw)
-        self.assertIn(f"[{THEME_SECONDARY}]enter[/]", formatted)
-        self.assertIn(f"[{THEME_SECONDARY}]↑↓[/]", formatted)
-        self.assertIn(f"[{THEME_SECONDARY}]esc[/]", formatted)
-        self.assertIn(f"[{THEME_MUTED}]•[/]", formatted)
+        self.assertIn(f"[{t_sec}]enter[/]", formatted)
+        self.assertIn(f"[{t_sec}]↑↓[/]", formatted)
+        self.assertIn(f"[{t_sec}]esc[/]", formatted)
+        self.assertIn(f"[{t_mut}]•[/]", formatted)
 
     def test_format_preserves_existing_markup(self):
         raw = "[#ffffff]custom[/] [#71717a]hint[/]"

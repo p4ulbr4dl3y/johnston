@@ -91,6 +91,11 @@ class Theme:
         subtle = str(data.get("subtle", "#e4e4e7"))
 
         tcss_vars = {str(k): str(v) for k, v in data.get("tcss_vars", {}).items()}
+        if "bg-overlay" not in tcss_vars:
+            bg_app = tcss_vars.get("bg-app", "#09090b")
+            tcss_vars["bg-overlay"] = (
+                "transparent" if (bg_app in ("ansi_default", "transparent") or name == "native") else "#000000 45%"
+            )
 
         var_map: dict[str, str] = {
             "primary": primary,

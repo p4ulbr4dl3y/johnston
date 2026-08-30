@@ -78,6 +78,9 @@ def test_theme_manager_registration_and_switching():
     with pytest.raises(ValueError, match="Unknown theme"):
         tm.set_theme("nonexistent-theme-xyz")
 
+    tm.set_theme("zinc")
+    ThemeManager.reset_instance()
+
 
 def test_theme_manager_listeners():
     tm = ThemeManager()
@@ -199,6 +202,7 @@ def test_theme_manager_singleton_and_reset():
     ThemeManager.reset_instance()
     inst3 = ThemeManager.get_instance()
     assert inst3 is not inst1
+    ThemeManager.reset_instance()
 
 
 def test_themes_loader_module():
@@ -241,6 +245,7 @@ def test_ui_theme_manager_adapted_theme(monkeypatch):
     assert adapted.dark is False
     assert adapted.primary == "#000000"
     assert adapted.tcss_vars["bg-app"] == "ansi_default"
+    assert adapted.tcss_vars["bg-overlay"] == "transparent"
     assert "markdown.code" in adapted.markdown_styles
     assert adapted.markdown_styles["markdown.code"].startswith("#000000 on ")
 
@@ -257,6 +262,7 @@ def test_ui_theme_manager_adapted_theme(monkeypatch):
     adapted_dark = mgr.get_adapted_theme("native")
     assert adapted_dark.dark is True
     assert adapted_dark.primary == "#c9d1d9"
+    assert adapted_dark.tcss_vars["bg-overlay"] == "transparent"
     assert "markdown.code" in adapted_dark.markdown_styles
     assert adapted_dark.markdown_styles["markdown.code"].startswith("#c9d1d9 on ")
     UIThemeManager.reset_instance()

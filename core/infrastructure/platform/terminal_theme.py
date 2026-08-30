@@ -216,6 +216,7 @@ def compute_adaptive_palette(
         "bg-app": "ansi_default",
         "bg-surface": surface,
         "bg-inverted": norm_fg,
+        "bg-overlay": "transparent",
         "fg-primary": norm_fg,
         "fg-secondary": fg_secondary,
         "fg-muted": fg_muted,
