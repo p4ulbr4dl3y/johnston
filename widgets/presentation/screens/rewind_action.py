@@ -3,7 +3,7 @@ from typing import Optional
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Label, Markdown, OptionList, Static
+from textual.widgets import Markdown, OptionList, Static
 
 from core.application.session.actions import RewindEntry
 from widgets.presentation.screens.base_modal import BaseModalScreen
@@ -17,6 +17,7 @@ from widgets.presentation.screens.constants import (
     TAB_KEYS,
 )
 from widgets.presentation.screens.rewind import RewindSelection, format_rewind_files
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.responsive import (
     MODAL_MEDIUM_MAX_WIDTH,
     MODAL_MIN_WIDTH,
@@ -52,7 +53,7 @@ class RewindActionScreen(BaseModalScreen[Optional[RewindSelection]]):
             yield Markdown("### **Rollback Action**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Static("", id="rewind-files", classes=MODAL_MARKDOWN, markup=False)
             yield HeaderWrapOptionList(*self.options, id=MODAL_OPTION_LIST_ID)
-            yield Label("enter: select • ↑↓: nav • esc: back", id=MODAL_HINT_ID)
+            yield ModalHint("enter: select • ↑↓: nav • esc: back", id=MODAL_HINT_ID)
 
     def _row_width(self) -> int:
         try:

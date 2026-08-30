@@ -20,6 +20,7 @@ from widgets.presentation.screens.constants import (
     WRITE_IN_INPUT,
     WRITE_IN_INPUT_ID,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings, normalize_key_to_latin
 
 WRITE_IN_LABEL = "Other (custom answer)"
@@ -133,7 +134,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 yield Static("", id="wizard-summary", classes=f"{MODAL_MARKDOWN} wizard-summary", markup=False)
             yield HeaderWrapOptionList(id=OPTIONS_LIST_ID)
             yield WriteInInput(placeholder="Type custom answer and press Enter...", id=WRITE_IN_INPUT_ID)
-            yield Label("", id=MODAL_HINT_ID)
+            yield ModalHint("", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         import time

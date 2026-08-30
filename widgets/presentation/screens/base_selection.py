@@ -6,7 +6,7 @@ from textual import events
 from textual._widget_navigation import find_first_enabled, find_last_enabled
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList
+from textual.widgets import Input, Markdown, OptionList
 from textual.widgets.option_list import Option
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
@@ -20,6 +20,7 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.responsive import (
     MODAL_COMPACT_MAX_WIDTH,
     MODAL_MAX_WIDTH,
@@ -179,7 +180,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             if self.show_search:
                 yield Input(placeholder=self.search_placeholder, id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
-            yield Label(self.hint_text, id=MODAL_HINT_ID)
+            yield ModalHint(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         super().on_mount()

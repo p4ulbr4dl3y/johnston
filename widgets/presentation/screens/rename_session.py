@@ -1,7 +1,7 @@
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown
+from textual.widgets import Input, Markdown
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
@@ -11,6 +11,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 
 
 class RenameSessionScreen(BaseModalScreen[str | None]):
@@ -28,7 +29,7 @@ class RenameSessionScreen(BaseModalScreen[str | None]):
                 value=self.current_title,
                 id="session-rename-input",
             )
-            yield Label("enter: save • esc: cancel", id=MODAL_HINT_ID)
+            yield ModalHint("enter: save • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         inp = self.query_one("#session-rename-input", Input)

@@ -14,6 +14,7 @@ from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.tool_renderers import build_synthetic_create_diff
 from widgets.presentation.widgets.chat_diff import format_edit_diff
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import (
     BREAKPOINT_HINT,
@@ -311,7 +312,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             inp.display = False
             inp.can_focus = False
             yield inp
-            yield Label(self._build_hint_text(), id="modal-hint")
+            yield ModalHint(self._build_hint_text(), id="modal-hint")
 
     def _calculate_content_width(self) -> int:
         options = [

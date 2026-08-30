@@ -1087,6 +1087,7 @@ ModalScreen OptionList > .option-list--option-hover {
     color: $fg-inverted;
 }
 
+ModalHint,
 #modal-hint {
     width: 100%;
     height: auto;

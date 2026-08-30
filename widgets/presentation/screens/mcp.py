@@ -23,6 +23,7 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import (
     MODAL_DEFAULT_ROW_WIDTH,
@@ -66,7 +67,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield Markdown("### **Manage MCP Servers**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="mcp-option-list")
-            yield Label("enter/space/tab: toggle • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint("enter/space/tab: toggle • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()

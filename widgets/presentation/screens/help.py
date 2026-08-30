@@ -11,6 +11,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN,
     MODAL_MARKDOWN_CENTERED,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 
 COMMANDS_DATA: list[tuple[str, str]] = [
@@ -150,7 +151,7 @@ class HelpScreen(BaseModalScreen[None]):
                 yield Static("Keybindings", id="help-tab-keybindings", classes="help-tab")
             with ToolScrollBox(id="help-scroll-box"):
                 yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
-            yield Label("tab/←→: switch • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint("tab/←→: switch • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._apply_dialog_fit()

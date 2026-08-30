@@ -1,7 +1,7 @@
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown
+from textual.widgets import Input, Markdown
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
@@ -11,6 +11,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.responsive import (
     MODAL_COMPACT_MAX_WIDTH,
     MODAL_MIN_WIDTH,
@@ -45,7 +46,7 @@ class ApiKeyScreen(BaseModalScreen[str | None]):
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-compact"):
             yield Markdown(f"### **Connect {self.provider_name}**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Input(placeholder=placeholder, password=True, id="providers-key-input")
-            yield Label("enter: save • esc: cancel", id=MODAL_HINT_ID)
+            yield ModalHint("enter: save • esc: cancel", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:

@@ -1,7 +1,7 @@
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Label, Markdown
+from textual.widgets import Markdown
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
@@ -11,6 +11,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN_CENTERED,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import normalize_key_to_latin
 from widgets.utils.responsive import (
     MODAL_COMPACT_MAX_WIDTH,
@@ -40,7 +41,7 @@ class ConfirmScreen(BaseModalScreen[bool]):
             yield Markdown(self.confirm_title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             if self.message:
                 yield Markdown(self.message, classes=MODAL_MARKDOWN)
-            yield Label(f"enter: {self.confirm_label} • esc: {self.cancel_label}", id=MODAL_HINT_ID)
+            yield ModalHint(f"enter: {self.confirm_label} • esc: {self.cancel_label}", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:

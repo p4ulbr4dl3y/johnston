@@ -24,6 +24,7 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, ellipsize, format_badge_row, option_list_row_width
 
 
@@ -172,7 +173,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
-            yield Label(self.hint_text, id=MODAL_HINT_ID)
+            yield ModalHint(self.hint_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._refresh_options()

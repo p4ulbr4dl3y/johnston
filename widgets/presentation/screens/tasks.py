@@ -25,6 +25,7 @@ from widgets.presentation.tool_display import (
     extract_subagent_progress,
     is_subagent_running,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import (
     MODAL_WIDE_ROW_WIDTH,
@@ -155,7 +156,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             yield Markdown(f"### **Shell Task: {clean_preview}**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
             yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
             yield Input(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input")
-            yield Label(
+            yield ModalHint(
                 "enter: send stdin • ctrl+k: kill • esc: back" if is_running else "esc: back",
                 id=MODAL_HINT_ID,
             )
@@ -332,7 +333,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             )
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id=self.option_list_id)
-            yield Label(f"{self.hint_action_name} • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint(f"{self.hint_action_name} • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.search_nav_option_list_id = self.option_list_id

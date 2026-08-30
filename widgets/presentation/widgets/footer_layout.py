@@ -24,6 +24,32 @@ def get_theme_colors() -> tuple[str, str, str, str]:
         return THEME_PRIMARY, THEME_SECONDARY, THEME_MUTED, THEME_SUBTLE
 
 
+def format_modal_hint(raw_hint: str) -> str:
+    """Format modal hotkey hint string with theme colors for keys, descriptions, and separators."""
+    if not raw_hint:
+        return ""
+    if "[" in raw_hint and "]" in raw_hint and ("[/]" in raw_hint or "[/" in raw_hint):
+        return raw_hint
+
+    _, t_secondary, t_muted, _ = get_theme_colors()
+    raw_segments = [s.strip() for s in raw_hint.split("•")]
+    formatted_segments: list[str] = []
+
+    for seg in raw_segments:
+        if not seg:
+            continue
+        if ":" in seg:
+            key, _, desc = seg.partition(":")
+            key = key.strip()
+            desc = desc.strip()
+            formatted_segments.append(f"[{t_secondary}]{key}[/][{t_muted}]: {desc}[/]")
+        else:
+            formatted_segments.append(f"[{t_secondary}]{seg}[/]")
+
+    sep = f" [{t_muted}]•[/] "
+    return sep.join(formatted_segments)
+
+
 def format_display_path(raw_path: str, max_length: int = 40) -> str:
     """Format directory path for footer display with worktree: prefix, ~/ for $HOME and middle truncation if long."""
     if not raw_path:
