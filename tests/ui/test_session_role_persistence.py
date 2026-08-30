@@ -75,3 +75,33 @@ class TestSessionRolePersistence(unittest.TestCase):
         self.assertEqual(app.role, "explorer")
         self.assertEqual(session.role, "explorer")
         app.save_current_session.assert_called_once()
+
+    def test_write_session_data_skips_save_and_touch_when_unchanged(self):
+        app = DummyApp()
+        orig_ts = 1000.0
+        session = AgentSession(
+            session_id="test-session",
+            role="worker",
+            title="My Session",
+            updated_at=orig_ts,
+        )
+        session.messages = [{"type": "user", "text": "hi"}]
+        app.sm.get.return_value = session
+
+        session_data = {
+            "title": "My Session",
+            "role": "worker",
+            "messages": [{"type": "user", "text": "hi"}],
+            "agent_history": [],
+            "tokens_input": 0,
+            "tokens_output": 0,
+            "total_tokens": 0,
+            "cost_usd": 0.0,
+            "last_context_tokens": 0,
+            "tokens_cache_read": 0,
+        }
+        app._write_session_data(session_data)
+
+        app.sm.save.assert_not_called()
+        self.assertEqual(session.updated_at, orig_ts)
+

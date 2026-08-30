@@ -160,21 +160,64 @@ class SessionPersistenceMixin:
         if getattr(self, "is_read_only", False):
             return
         with _global_session_write_lock:
-            session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
-            if session_data.get("title"):
-                session.title = session_data["title"]
-            if "role" in session_data:
-                session.role = session_data["role"]
-            session.messages = session_data.get("messages", [])
-            session.agent_history = session_data.get("agent_history", [])
-            session.tokens_input = session_data.get("tokens_input", 0)
-            session.tokens_output = session_data.get("tokens_output", 0)
-            session.total_tokens = session_data.get("total_tokens", 0)
-            session.cost_usd = session_data.get("cost_usd", 0.0)
-            session.last_context_tokens = session_data.get("last_context_tokens", 0)
-            session.tokens_cache_read = session_data.get("tokens_cache_read", 0)
-            session.touch()
-            self.sm.save(session)
+            existing = self.sm.get(self.current_session_id, reload=False)
+            is_new = existing is None
+            session = existing or self.sm.create_main(self.current_session_id)
+            changed = is_new
+
+            new_title = session_data.get("title")
+            if new_title and session.title != new_title:
+                session.title = new_title
+                changed = True
+
+            new_role = session_data.get("role")
+            if new_role and session.role != new_role:
+                session.role = new_role
+                changed = True
+
+            new_messages = session_data.get("messages", [])
+            if session.messages != new_messages:
+                session.messages = new_messages
+                changed = True
+
+            new_agent_history = session_data.get("agent_history", [])
+            if session.agent_history != new_agent_history:
+                session.agent_history = new_agent_history
+                changed = True
+
+            new_tok_in = session_data.get("tokens_input", 0)
+            if session.tokens_input != new_tok_in:
+                session.tokens_input = new_tok_in
+                changed = True
+
+            new_tok_out = session_data.get("tokens_output", 0)
+            if session.tokens_output != new_tok_out:
+                session.tokens_output = new_tok_out
+                changed = True
+
+            new_tot_tokens = session_data.get("total_tokens", 0)
+            if session.total_tokens != new_tot_tokens:
+                session.total_tokens = new_tot_tokens
+                changed = True
+
+            new_cost = session_data.get("cost_usd", 0.0)
+            if session.cost_usd != new_cost:
+                session.cost_usd = new_cost
+                changed = True
+
+            new_last_ctx = session_data.get("last_context_tokens", 0)
+            if session.last_context_tokens != new_last_ctx:
+                session.last_context_tokens = new_last_ctx
+                changed = True
+
+            new_cache_read = session_data.get("tokens_cache_read", 0)
+            if session.tokens_cache_read != new_cache_read:
+                session.tokens_cache_read = new_cache_read
+                changed = True
+
+            if changed:
+                session.touch()
+                self.sm.save(session)
             self.sm.set_active_session_id(self.current_session_id)
 
     async def save_current_session_async(self, force: bool = False) -> None:
