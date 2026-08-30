@@ -145,7 +145,7 @@ async def _guard_request(req: "httpx.Request") -> None:
 
 class WebFetchTool(BaseTool):
     name = "web_fetch"
-    description = "Fetch content from HTTP/HTTPS URL and convert HTML/documents to Markdown."
+    description = "Fetch content from HTTP/HTTPS URL and convert HTML/documents (PDF, DOCX, XLSX, etc.) to Markdown."
 
     schema = {
         "type": "function",
