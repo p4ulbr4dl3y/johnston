@@ -8,17 +8,26 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("System prompt test", [], role="worker")
         sys_prompt = builder.build_system_prompt()
         self.assertIn("System prompt test", sys_prompt)
-        self.assertIn("<environment", sys_prompt)
-        self.assertIn('cwd="', sys_prompt)
-        self.assertIn('date="', sys_prompt)
-        self.assertIn('os="', sys_prompt)
+        self.assertIn("<environment>", sys_prompt)
+        self.assertIn("cwd:", sys_prompt)
+        self.assertIn("date:", sys_prompt)
+        self.assertIn("os:", sys_prompt)
+        self.assertIn("sandbox: ", sys_prompt)
         self.assertIn('<role name="worker"', sys_prompt)
+
+    def test_build_system_prompt_sandbox_states(self):
+        b_on = PromptBuilder("Test", [], sandbox_enabled=True)
+        self.assertIn("sandbox: active (fs write: cwd/tmp only, creds/keys blocked)", b_on.build_system_prompt())
+
+        b_off = PromptBuilder("Test", [], sandbox_enabled=False)
+        self.assertIn("sandbox: disabled", b_off.build_system_prompt())
 
     def test_build_system_prompt_explorer_mode(self):
         builder = PromptBuilder("System prompt test", [], role="explorer")
         sys_prompt = builder.build_system_prompt()
         self.assertIn('<role name="explorer"', sys_prompt)
         self.assertIn("Read-Only", sys_prompt)
+        self.assertIn("sandbox: active (fs write: cwd/tmp only, creds/keys blocked)", sys_prompt)
 
     def test_build_tools_explorer_mode_filters_create_edit(self):
         builder = PromptBuilder(
@@ -151,12 +160,13 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_system_prompt_sandbox_active(self):
         builder = PromptBuilder("Test", [], role="worker", sandbox_enabled=True)
         prompt = builder.build_system_prompt()
-        self.assertIn('sandbox="active"', prompt)
+        self.assertIn("sandbox: active (fs write: cwd/tmp only, creds/keys blocked)", prompt)
 
     def test_build_system_prompt_sandbox_disabled(self):
         builder = PromptBuilder("Test", [], role="worker", sandbox_enabled=False)
         prompt = builder.build_system_prompt()
-        self.assertNotIn('sandbox="active"', prompt)
+        self.assertIn("sandbox: disabled", prompt)
+        self.assertNotIn("sandbox: active", prompt)
 
     def test_build_system_prompt_subagent_worktree_guidelines(self):
         builder = PromptBuilder(

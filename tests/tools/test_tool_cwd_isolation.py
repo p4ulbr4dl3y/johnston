@@ -142,7 +142,7 @@ class TestPromptBuilderCwd(unittest.TestCase):
             builder = PromptBuilder("You are X.", [], model_name="m", cwd=base)
             prompt = builder.build_system_prompt()
             self.assertIn(os.path.realpath(base), prompt)
-            self.assertIn('cwd="', prompt)
+            self.assertIn("cwd: ", prompt)
             self.assertIn("Worktree rules", prompt)
 
     def test_system_prompt_loads_project_rules_from_cwd(self):

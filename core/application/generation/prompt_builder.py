@@ -305,19 +305,7 @@ class PromptBuilder:
         os_info = f"{platform.system()} {platform.release()}"
         git_info = get_git_info(self.cwd)
 
-        from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-        env_attrs = [
-            f'cwd="{escape_xml_attr(cwd)}"',
-            f'date="{now_str}"',
-            f'os="{escape_xml_attr(os_info)}"',
-        ]
-        if git_info:
-            env_attrs.append(f'git_branch="{escape_xml_attr(git_info)}"')
-        if self.sandbox_enabled:
-            env_attrs.append('sandbox="active"')
-
-        env_block = f"<environment {' '.join(env_attrs)}/>"
+        env_block = self._format_environment_block(cwd, now_str, os_info, git_info)
 
         stable_core = self._build_stable_core(mcp_snippet, skills_snippet, subagents_snippet)
 
@@ -356,19 +344,7 @@ class PromptBuilder:
         os_info = f"{platform.system()} {platform.release()}"
         git_info = await get_git_info_async(self.cwd)
 
-        from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-        env_attrs = [
-            f'cwd="{escape_xml_attr(cwd)}"',
-            f'date="{now_str}"',
-            f'os="{escape_xml_attr(os_info)}"',
-        ]
-        if git_info:
-            env_attrs.append(f'git_branch="{escape_xml_attr(git_info)}"')
-        if self.sandbox_enabled:
-            env_attrs.append('sandbox="active"')
-
-        env_block = f"<environment {' '.join(env_attrs)}/>"
+        env_block = self._format_environment_block(cwd, now_str, os_info, git_info)
 
         stable_core = await self._build_stable_core_async(mcp_snippet, skills_snippet, subagents_snippet)
 
@@ -381,6 +357,27 @@ class PromptBuilder:
         sys_prompt = f"{sys_prompt}\n\n{env_block}"
 
         return sys_prompt
+
+    def _format_environment_block(
+        self,
+        cwd: str,
+        now_str: str,
+        os_info: str,
+        git_info: Optional[str],
+    ) -> str:
+        lines = [
+            f"cwd: {cwd}",
+            f"date: {now_str}",
+            f"os: {os_info}",
+        ]
+        if git_info:
+            lines.append(f"git: {git_info}")
+        if self.sandbox_enabled:
+            lines.append("sandbox: active (fs write: cwd/tmp only, creds/keys blocked)")
+        else:
+            lines.append("sandbox: disabled")
+        content = "\n".join(lines)
+        return f"<environment>\n{content}\n</environment>"
 
     def _build_stable_core(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
         """Assemble + cache the stable (non-volatile) system-prompt prefix.

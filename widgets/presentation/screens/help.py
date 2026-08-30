@@ -40,7 +40,7 @@ KEYBINDINGS_DATA: list[tuple[str, str]] = [
     ("Ctrl+B", "Move active shell tasks to background"),
     ("Ctrl+O", "Expand / collapse tool output & thinking"),
     ("PageUp / PgDn", "Scroll chat history"),
-    ("Shift+PgUp / Shift+PgDn", "Scroll to top / bottom of chat"),
+    ("Shift+PgUp / PgDn", "Scroll to top / bottom of chat"),
     ("Enter", "Send message"),
     ("Ctrl+Enter", "Insert new line in input (also Shift+Enter)"),
     ("Ctrl+V", "Paste text or clipboard image"),
@@ -58,6 +58,7 @@ def _format_help_key(key: str, is_compact: bool) -> str:
     if not is_compact:
         return key
     replacements = {
+        "Shift+PgUp / PgDn": "S-PgUp/Dn",
         "Shift+PgUp / Shift+PgDn": "S-PgUp/Dn",
         "PageUp / PgDn": "PgUp/Dn",
         "Shift+Tab": "S-Tab",
@@ -108,18 +109,30 @@ class HelpScreen(BaseModalScreen[None]):
             from widgets.utils.responsive import apply_modal_fit, modal_content_width
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-            # Max width across commands/keybindings with generous column gap
-            sample_items = [f"{k}        {d}" for k, d in COMMANDS_DATA + KEYBINDINGS_DATA]
-            content_w = modal_content_width(sample_items, "### **Johnston Help**", "tab / ←→: switch • esc: close")
-            apply_modal_fit(dialog, content_w, min_width=70, max_width=92)
-        except Exception:
-            pass
+            max_cmd_w = max(len(k) for k, _ in COMMANDS_DATA) + 2 + max(len(d) for _, d in COMMANDS_DATA)
+            max_kb_w = max(len(k) for k, _ in KEYBINDINGS_DATA) + 2 + max(len(d) for _, d in KEYBINDINGS_DATA)
+            sample_items = ["x" * max(max_cmd_w, max_kb_w)]
+            content_w = modal_content_width(sample_items, "### **Johnston Help**", "tab/←→: switch • esc: close")
+            apply_modal_fit(dialog, content_w, min_width=76, max_width=96)
 
-        try:
-            scroll_box = self.query_one("#help-scroll-box")
             screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            if not isinstance(screen_h, int) or screen_h <= 0:
+                screen_h = 24
+
+            if screen_h < 18:
+                dialog.styles.padding = (0, 1)
+                dialog.styles.max_height = max(7, screen_h - 1)
+                usable_h = screen_h - 1
+                overhead = 7
+            else:
+                dialog.styles.padding = (1, 2)
+                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
+                usable_h = int(dialog.styles.max_height.value) if dialog.styles.max_height else screen_h - 2
+                overhead = 10
+
+            scroll_box = self.query_one("#help-scroll-box")
             max_items = max(len(COMMANDS_DATA), len(KEYBINDINGS_DATA))
-            scroll_box.styles.max_height = max(5, min(max_items, screen_h - 9))
+            scroll_box.styles.max_height = max(3, min(max_items, usable_h - overhead))
         except Exception:
             pass
 
@@ -137,7 +150,7 @@ class HelpScreen(BaseModalScreen[None]):
                 yield Static("Keybindings", id="help-tab-keybindings", classes="help-tab")
             with ToolScrollBox(id="help-scroll-box"):
                 yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
-            yield Label("tab / ←→: switch • esc: close", id=MODAL_HINT_ID)
+            yield Label("tab/←→: switch • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._apply_dialog_fit()
@@ -165,7 +178,7 @@ class HelpScreen(BaseModalScreen[None]):
 
             hint_lbl = self.query_one(f"#{MODAL_HINT_ID}", Label)
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
-            hint_lbl.update("tab/←→: switch • esc" if is_compact else "tab / ←→: switch • esc: close")
+            hint_lbl.update("tab/←→: switch • esc" if is_compact else "tab/←→: switch • esc: close")
         except Exception:
             pass
 
