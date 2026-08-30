@@ -4,7 +4,7 @@
 Johnston equips the primary agent and subagents with a suite of 10 builtin tools for codebase navigation, file manipulation, execution, subagent orchestration, and external research.
 
 ## Core Filesystem & Execution Tools
-1. **`read`**: Read file contents, inspect line slices, search directory listings, and convert documents (PDF, DOCX, XLSX, PPTX, EPUB, IPYNB, ZIP, images) to markdown.
+1. **`read`**: Read file contents, inspect directory listings, view archive contents (ZIP/TAR), inspect line slices, and convert documents (PDF, DOCX, XLSX, PPTX, EPUB, IPYNB, images) to markdown.
 2. **`create`**: Atomically create new files or overwrite existing files with full contents.
 3. **`edit`**: Apply precise, surgical search-and-replace edits to existing files using exact content matching.
 4. **`shell`**: Execute synchronous shell commands or spawn long-running background tasks.

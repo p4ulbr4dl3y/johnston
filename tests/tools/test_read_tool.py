@@ -375,6 +375,87 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with open(saved_path, "r", encoding="utf-8") as f:
             self.assertEqual(f.read(), long_md)
 
+    async def test_read_directory_listing(self):
+        tool = ReadTool()
+        subdir = os.path.join(self.test_dir, "sub")
+        os.makedirs(subdir, exist_ok=True)
+        with open(os.path.join(self.test_dir, "file_a.txt"), "w") as f:
+            f.write("hello")
+        res = await tool.execute({"path": self.test_dir})
+        self.assertIn("[dir: ", res.content)
+        self.assertIn("sub/", res.content)
+        self.assertIn("file_a.txt", res.content)
+
+    async def test_read_directory_empty(self):
+        tool = ReadTool()
+        empty_dir = os.path.join(self.test_dir, "empty_folder")
+        os.makedirs(empty_dir, exist_ok=True)
+        res = await tool.execute({"path": empty_dir})
+        self.assertIn("(empty)", res.content)
+
+    async def test_read_zip_archive(self):
+        import zipfile
+        tool = ReadTool()
+        zip_path = os.path.join(self.test_dir, "sample.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("src/", "")
+            zf.writestr("src/main.py", "print(1)")
+            zf.writestr("README.md", "# Hello")
+            zf.writestr("__MACOSX/._test", "junk")
+        res = await tool.execute({"path": zip_path})
+        self.assertIn("[archive: ", res.content)
+        self.assertIn("total 3", res.content)
+        self.assertIn("src/", res.content)
+        self.assertIn("src/main.py", res.content)
+        self.assertIn("README.md", res.content)
+        self.assertNotIn("__MACOSX", res.content)
+
+    async def test_read_tar_archive(self):
+        import tarfile
+        tool = ReadTool()
+        tar_path = os.path.join(self.test_dir, "sample.tar.gz")
+        with tarfile.open(tar_path, "w:gz") as tf:
+            ti = tarfile.TarInfo("docs/")
+            ti.type = tarfile.DIRTYPE
+            tf.addfile(ti)
+            data = b"content"
+            ti2 = tarfile.TarInfo("docs/guide.txt")
+            ti2.size = len(data)
+            import io
+            tf.addfile(ti2, io.BytesIO(data))
+        res = await tool.execute({"path": tar_path})
+        self.assertIn("[archive: ", res.content)
+        self.assertIn("docs/", res.content)
+        self.assertIn("docs/guide.txt", res.content)
+
+    async def test_read_archive_empty(self):
+        import zipfile
+        tool = ReadTool()
+        zip_path = os.path.join(self.test_dir, "empty.zip")
+        with zipfile.ZipFile(zip_path, "w"):
+            pass
+        res = await tool.execute({"path": zip_path})
+        self.assertIn("(empty)", res.content)
+
+    async def test_read_archive_truncated(self):
+        import zipfile
+        tool = ReadTool()
+        zip_path = os.path.join(self.test_dir, "many.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            for i in range(70):
+                zf.writestr(f"item_{i}.txt", f"data {i}")
+        res = await tool.execute({"path": zip_path})
+        self.assertIn("(truncated)", res.content)
+        self.assertIn("total 70", res.content)
+
+    async def test_read_archive_corrupted(self):
+        tool = ReadTool()
+        bad_zip = os.path.join(self.test_dir, "bad.zip")
+        with open(bad_zip, "wb") as f:
+            f.write(b"not a real zip content")
+        res = await tool.execute({"path": bad_zip})
+        self.assertIn("ERR: archive", str(res))
+
 
 if __name__ == "__main__":
     unittest.main()

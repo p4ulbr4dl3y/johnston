@@ -292,10 +292,78 @@ def process_image_file_sync(path: str, detail: str | None = None, cancel_event: 
         raise RuntimeError(f"Unable to process image file '{path}': {e}")
 
 
+ARCHIVE_EXTENSIONS = (
+    ".zip",
+    ".tar",
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tar.xz",
+    ".txz",
+)
+
+
+def is_archive_file(path: str) -> bool:
+    lower = path.lower()
+    return any(lower.endswith(ext) for ext in ARCHIVE_EXTENSIONS)
+
+
+def _inspect_archive(path: str, max_entries: int) -> ToolResult:
+    import tarfile
+    import zipfile
+
+    lower = path.lower()
+    dirs: set[str] = set()
+    files: list[str] = []
+
+    try:
+        if lower.endswith(".zip"):
+            with zipfile.ZipFile(path, "r") as zf:
+                for info in zf.infolist():
+                    name = info.filename
+                    if not name or "__MACOSX" in name or os.path.basename(name).startswith("._"):
+                        continue
+                    if info.is_dir() or name.endswith("/"):
+                        dirs.add(name.rstrip("/") + "/")
+                    else:
+                        files.append(name)
+        else:
+            with tarfile.open(path, "r:*") as tf:
+                for member in tf.getmembers():
+                    name = member.name
+                    if not name or "__MACOSX" in name or os.path.basename(name).startswith("._"):
+                        continue
+                    if member.isdir() or name.endswith("/"):
+                        dirs.add(name.rstrip("/") + "/")
+                    else:
+                        files.append(name)
+
+        entries = sorted(dirs) + sorted(files)
+        total_count = len(entries)
+        if total_count == 0:
+            content_str = f"[archive: {path} (empty)]"
+        elif len(entries) > max_entries:
+            body = "\n".join(entries[:max_entries])
+            content_str = f"[archive: {path} | total {total_count} (truncated)]\n{body}"
+        else:
+            body = "\n".join(entries)
+            content_str = f"[archive: {path} | total {total_count}]\n{body}"
+
+        return ToolResult.done(
+            content=content_str,
+            display="",
+        )
+    except Exception as e:
+        return ToolResult.error("archive", detail=str(e), name=path)
+
+
 class ReadTool(BaseTool):
     name = "read"
     description = (
-        f"Read file contents (text, images, PDF/DOCX/XLSX/PPTX/EPUB/IPYNB/ZIP converted to Markdown). Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers."
+        f"Read file contents, inspect directory listings, or view archive contents (ZIP/TAR). "
+        f"Converts images and docs (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB). "
+        f"Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers."
     )
     schema = {
         "type": "function",
@@ -304,7 +372,10 @@ class ReadTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute or relative file path"},
+                    "path": {
+                        "type": "string",
+                        "description": "Absolute or relative file, directory, or archive path",
+                    },
                     "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
                     "end_line": {"type": "integer", "description": "End line (inclusive)"},
                     "content_offset": {
@@ -410,6 +481,11 @@ class ReadTool(BaseTool):
                 except Exception as e:
                     return ToolResult.error("listing", detail=str(e), name=path)
 
+            if is_archive_file(path):
+                tools = _tools_settings()
+                max_dir_entries = tools.max_dir_entries if tools else 60
+                return _inspect_archive(path, max_dir_entries)
+
             try:
                 file_size = os.path.getsize(path)
                 limit = get_max_tool_payload_bytes()
@@ -462,8 +538,7 @@ class ReadTool(BaseTool):
                 lines = [ln.rstrip("\r\n") for ln in md_text.splitlines(keepends=True)]
                 from tools.base import _write_output_log
 
-                base_name = os.path.splitext(os.path.basename(path))[0]
-                converted_path = _write_output_log(md_text, tool_name=f"read_{base_name}", ext=".md")
+                converted_path = _write_output_log(md_text, tool_name="read", ext=".md")
             except Exception as e:
                 return ToolResult.error("doc", detail=str(e), name=path)
         else:

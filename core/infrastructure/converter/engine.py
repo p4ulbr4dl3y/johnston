@@ -1,9 +1,6 @@
-import io
-import json
 import os
-import zipfile
 from pathlib import Path
-from typing import BinaryIO, List, Set, Union
+from typing import Set, Union
 
 from core.infrastructure.converter.csv_tsv import csv_to_markdown
 from core.infrastructure.converter.docx import docx_to_markdown
@@ -12,7 +9,6 @@ from core.infrastructure.converter.html import html_to_markdown
 from core.infrastructure.converter.ipynb import ipynb_to_markdown
 from core.infrastructure.converter.pdf import pdf_to_markdown
 from core.infrastructure.converter.pptx import pptx_to_markdown
-from core.infrastructure.converter.utils import MAX_ZIP_TOTAL_BYTES, safe_read_zip_member
 from core.infrastructure.converter.xlsx import xlsx_to_markdown
 
 SUPPORTED_EXTENSIONS: Set[str] = {
@@ -29,9 +25,6 @@ SUPPORTED_EXTENSIONS: Set[str] = {
     ".csv",
     ".tsv",
     ".ipynb",
-    ".json",
-    ".xml",
-    ".zip",
 }
 
 
@@ -72,23 +65,8 @@ def convert_bytes(
         return csv_to_markdown(data, delimiter=delim)
     if ext == ".ipynb":
         return ipynb_to_markdown(data)
-    if ext == ".json":
-        try:
-            parsed = json.loads(data.decode("utf-8", errors="replace"))
-            formatted = json.dumps(parsed, indent=2, ensure_ascii=False)
-            return f"```json\n{formatted}\n```"
-        except Exception:
-            return f"```json\n{data.decode('utf-8', errors='replace')}\n```"
-    if ext == ".xml":
-        return f"```xml\n{data.decode('utf-8', errors='replace')}\n```"
-    if ext == ".zip":
-        return _convert_zip(io.BytesIO(data))
 
-    # Fallback to plain text
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        return data.decode("latin-1", errors="replace")
+    raise ValueError(f"Unsupported document format: '{ext}'")
 
 
 def convert_file(file_path: Union[str, Path]) -> str:
@@ -101,9 +79,6 @@ def convert_file(file_path: Union[str, Path]) -> str:
 
     ext = path.suffix.lower()
 
-    if ext == ".zip":
-        with open(path, "rb") as f:
-            return _convert_zip(f)
     if ext == ".docx":
         return docx_to_markdown(str(path))
     if ext in (".xlsx", ".xlsm"):
@@ -124,54 +99,5 @@ def convert_file(file_path: Union[str, Path]) -> str:
     if ext in (".html", ".htm", ".xhtml"):
         with open(path, "rb") as f:
             return html_to_markdown(f.read())
-    if ext == ".json":
-        with open(path, "rb") as f:
-            return convert_bytes(f.read(), ".json")
-    if ext == ".xml":
-        with open(path, "rb") as f:
-            return convert_bytes(f.read(), ".xml")
 
-    # Fallback for plain text files
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    except UnicodeDecodeError:
-        with open(path, "r", encoding="latin-1", errors="replace") as f:
-            return f.read()
-
-
-def _convert_zip(source: Union[str, BinaryIO, io.BytesIO], depth: int = 0) -> str:
-    """Recursively convert files inside a ZIP archive to Markdown."""
-    if depth > 2:
-        return ""
-    try:
-        zf = zipfile.ZipFile(source)
-    except Exception:
-        return ""
-    output: List[str] = []
-    total_decompressed = 0
-
-    for name in sorted(zf.namelist()):
-        basename = os.path.basename(name)
-        if name.endswith("/") or "__MACOSX" in name or basename.startswith(".") or basename == "Thumbs.db":
-            continue
-        ext = os.path.splitext(name)[1].lower()
-        if not ext:
-            continue
-        try:
-            # Decompression-bomb guard: cap per-member size via safe_read_zip_member
-            # and stop once the archive's cumulative decompressed size blows the budget.
-            if total_decompressed >= MAX_ZIP_TOTAL_BYTES:
-                break
-            file_data = safe_read_zip_member(zf, name)
-            total_decompressed += len(file_data)
-            if ext == ".zip":
-                md_content = _convert_zip(io.BytesIO(file_data), depth=depth + 1)
-            else:
-                md_content = convert_bytes(file_data, ext)
-            if md_content.strip():
-                output.append(f"## File: {name}\n\n{md_content}")
-        except Exception:
-            continue
-
-    return "\n\n---\n\n".join(output).strip()
+    raise ValueError(f"Unsupported document format: '{ext}'")

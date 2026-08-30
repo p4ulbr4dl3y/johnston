@@ -4,11 +4,10 @@ import re
 import zipfile
 from typing import List, Optional
 
-# Decompression limits: a crafted archive (or office document, which is a ZIP
+# Decompression limits: a crafted office document (which is a ZIP
 # of XML parts) may expand enormously. Converters must never read more than
-# these caps from a single member or a single archive.
+# this cap from a single member.
 MAX_MEMBER_BYTES = 64 * 1024 * 1024  # 64 MiB per archive member
-MAX_ZIP_TOTAL_BYTES = 256 * 1024 * 1024  # 256 MiB per archive
 
 _CHUNK_SIZE = 1024 * 1024
 

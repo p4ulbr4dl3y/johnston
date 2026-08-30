@@ -847,10 +847,10 @@ class TestConverterEngine(unittest.TestCase):
         self.assertIn("| a | b |", convert_bytes(b"a,b\n1,2", ".csv"))
         self.assertIn("| a | b |", convert_bytes(b"a\tb\n1\t2", ".tsv"))
         self.assertIn("# Title", convert_bytes(b"<h1>Title</h1>", ".html"))
-        self.assertIn("```json", convert_bytes(b'{"a": 1}', ".json"))
-        self.assertIn("```xml", convert_bytes(b"<x>1</x>", ".xml"))
-        self.assertEqual(convert_bytes(b"plain text", ".txt"), "plain text")
-        self.assertEqual(convert_bytes(b"\xe9", ".unknown"), "\xe9")
+        with self.assertRaises(ValueError):
+            convert_bytes(b"plain text", ".txt")
+        with self.assertRaises(ValueError):
+            convert_bytes(b'{"a": 1}', ".json")
 
     def test_convert_file_all_types(self):
         docx_data = TestDOCXToMarkdown()._create_mock_docx()
@@ -868,9 +868,6 @@ class TestConverterEngine(unittest.TestCase):
                 (".csv", b"a,b\n1,2"),
                 (".tsv", b"a\tb\n1\t2"),
                 (".html", b"<h1>Hello</h1>"),
-                (".json", b'{"x": 42}'),
-                (".xml", b"<y>10</y>"),
-                (".txt", b"plain"),
             ]:
                 tf = tempfile.NamedTemporaryFile(suffix=ext, mode="wb", delete=False)
                 tf.write(data)
@@ -887,58 +884,21 @@ class TestConverterEngine(unittest.TestCase):
             temp_files.append(tf_nb.name)
             self.assertIn("# NB", convert_file(tf_nb.name))
 
-            # Test zip file
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, "w") as zf:
-                zf.writestr("test.csv", "a,b\n1,2\n")
-            tf_zip = tempfile.NamedTemporaryFile(suffix=".zip", mode="wb", delete=False)
-            tf_zip.write(buf.getvalue())
-            tf_zip.close()
-            temp_files.append(tf_zip.name)
-            self.assertIn("## File: test.csv", convert_file(tf_zip.name))
-
         finally:
             for p in temp_files:
                 if os.path.exists(p):
                     os.unlink(p)
 
-    def test_convert_zip_archive(self):
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as zf:
-            zf.writestr("test.csv", "a,b\n1,2\n")
-            zf.writestr("notes.html", "<h1>Notes</h1>")
-            zf.writestr("__MACOSX/._test.csv", "mac junk")
-            zf.writestr("nested/__MACOSX/._inner.csv", "mac junk")
-            zf.writestr(".DS_Store", "junk")
-            zf.writestr("subfolder/", "")
-
-        md = convert_bytes(buf.getvalue(), ".zip")
-        self.assertIn("## File: notes.html", md)
-        self.assertIn("# Notes", md)
-        self.assertIn("## File: test.csv", md)
-        self.assertIn("| a | b |", md)
-        self.assertNotIn("__MACOSX", md)
-        self.assertNotIn(".DS_Store", md)
-
-    def test_zip_recursion_depth_limit(self):
-        # Create 4 levels of nested zip
-        inner_buf = io.BytesIO()
-        with zipfile.ZipFile(inner_buf, "w") as zf:
-            zf.writestr("deep.txt", "deep text")
-
-        for _ in range(4):
-            outer_buf = io.BytesIO()
-            with zipfile.ZipFile(outer_buf, "w") as zf:
-                zf.writestr("nested.zip", inner_buf.getvalue())
-            inner_buf = outer_buf
-
-        md = convert_bytes(inner_buf.getvalue(), ".zip")
-        # Ensure it terminates cleanly without infinite recursion
-        self.assertIsInstance(md, str)
-
     def test_file_not_found(self):
         with self.assertRaises(FileNotFoundError):
             convert_file("/path/to/nonexistent/file.docx")
+
+    def test_convert_file_unsupported_format(self):
+        with tempfile.NamedTemporaryFile(suffix=".exe", mode="wb") as tf:
+            tf.write(b"binary")
+            tf.flush()
+            with self.assertRaises(ValueError):
+                convert_file(tf.name)
 
 
 class TestConverterRegressions(unittest.TestCase):
@@ -1056,38 +1016,6 @@ class TestConverterRegressions(unittest.TestCase):
         md = docx_to_markdown(_wrap_docx(xml))
         self.assertIn("cell with", md)
         self.assertIn("NESTED", md)
-
-    # --- ZIP: decompression-bomb guards ---
-
-    def test_zip_member_size_guard(self):
-        big = b"a,b\n" + b"1,2\n" * (1024 * 1024)
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("big.csv", big)
-        with patch("core.infrastructure.converter.utils.MAX_MEMBER_BYTES", 64):
-            md = convert_bytes(buf.getvalue(), ".zip")
-        self.assertEqual(md, "")
-
-    def test_zip_total_budget_guard(self):
-        rows = b"a,b\n" + b"1,2\n" * 4096
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("one.csv", rows)
-            zf.writestr("two.csv", rows)
-        # engine binds MAX_ZIP_TOTAL_BYTES at import time, so patch it there.
-        # Budget is checked before each member: exactly one member fits.
-        with patch("core.infrastructure.converter.engine.MAX_ZIP_TOTAL_BYTES", len(rows)):
-            md = convert_bytes(buf.getvalue(), ".zip")
-        self.assertIn("one.csv", md)
-        self.assertNotIn("two.csv", md)
-
-    def test_zip_legitimate_content_still_converted(self):
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as zf:
-            zf.writestr("data.csv", "a,b\n1,2\n")
-        md = convert_bytes(buf.getvalue(), ".zip")
-        self.assertIn("## File: data.csv", md)
-        self.assertIn("| a | b |", md)
 
     # --- utils: dynamic fence length ---
 
