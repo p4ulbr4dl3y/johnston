@@ -125,8 +125,10 @@ def convert_doc_to_markdown_sync(
     except Exception as exc:
         logger.debug("Built-in document converter error for %s: %s", path, exc)
 
-    # 2. Try CLI fallback if available
-    if result_text is None and not _interrupted():
+    # 2. Try CLI fallback if available — also when the built-in converter
+    # returned empty output (e.g. a scanned PDF or a sparse document), since
+    # an empty string still means "nothing converted".
+    if (result_text is None or not result_text.strip()) and not _interrupted():
         cli_path = shutil.which("markitdown")
         if cli_path:
             if sandbox_enabled:
@@ -157,7 +159,10 @@ def convert_doc_to_markdown_sync(
     if _interrupted():
         return ""
     if result_text is not None:
-        set_cached_doc_markdown(path, result_text)
+        # Don't cache empty conversions — retry them (and the CLI fallback)
+        # on the next read instead of pinning "" for the whole cache TTL.
+        if result_text.strip():
+            set_cached_doc_markdown(path, result_text)
         return result_text
 
     raise RuntimeError(

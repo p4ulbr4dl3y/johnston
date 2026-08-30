@@ -4,6 +4,8 @@ import xml.etree.ElementTree as ET
 import zipfile
 from typing import BinaryIO, Dict, List, Union
 
+from core.infrastructure.converter.utils import safe_read_zip_member
+
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 
@@ -34,7 +36,7 @@ def docx_to_markdown(docx_input: Union[str, bytes, BinaryIO]) -> str:
     rels: Dict[str, str] = {}
     if "word/_rels/document.xml.rels" in zf.namelist():
         try:
-            rels_tree = ET.fromstring(zf.read("word/_rels/document.xml.rels"))
+            rels_tree = ET.fromstring(safe_read_zip_member(zf, "word/_rels/document.xml.rels"))
             for elem in rels_tree:
                 r_id = elem.attrib.get("Id")
                 target = elem.attrib.get("Target")
@@ -47,7 +49,7 @@ def docx_to_markdown(docx_input: Union[str, bytes, BinaryIO]) -> str:
     if "word/document.xml" not in zf.namelist():
         return ""
 
-    doc_tree = ET.fromstring(zf.read("word/document.xml"))
+    doc_tree = ET.fromstring(safe_read_zip_member(zf, "word/document.xml"))
     body = None
     for elem in doc_tree.iter():
         if _local_tag(elem) == "body":
@@ -205,10 +207,17 @@ def _parse_table(tbl_elem: ET.Element, rels: Dict[str, str]) -> str:
                 continue
             cell_paragraphs = []
             for p in tc:
-                if _local_tag(p) == "p":
+                item_tag = _local_tag(p)
+                if item_tag == "p":
                     p_text = _parse_paragraph(p, rels)
                     if p_text:
                         cell_paragraphs.append(p_text)
+                elif item_tag == "tbl":
+                    # Nested table: pipe tables cannot nest, so its markdown is
+                    # flattened into the enclosing cell (pipes get escaped below).
+                    nested_md = _parse_table(p, rels)
+                    if nested_md:
+                        cell_paragraphs.append(nested_md)
             cell_content = " ".join(cell_paragraphs).strip().replace("\n", " ").replace("|", "\\|")
             row_cells.append(cell_content)
         if row_cells:

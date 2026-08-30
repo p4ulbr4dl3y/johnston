@@ -941,6 +941,173 @@ class TestConverterEngine(unittest.TestCase):
             convert_file("/path/to/nonexistent/file.docx")
 
 
+class TestConverterRegressions(unittest.TestCase):
+    """Regression tests for converter bug fixes (layout mode, BOM, fences,
+    nested tables, zip-bomb guards, etc.)."""
+
+    # --- PDF: extraction_mode="layout" must actually be used ---
+
+    def test_pdf_layout_mode_actually_used(self):
+        # A plain extraction renders the two distant lines back-to-back
+        # ("Header\nBody"); layout mode inserts blank lines between them.
+        writer = PdfWriter()
+        writer.add_blank_page(width=612, height=792)
+        page = writer.pages[0]
+        from pypdf.generic import (
+            DecodedStreamObject,
+            DictionaryObject,
+            NameObject,
+        )
+
+        stream = DecodedStreamObject()
+        stream.set_data(
+            b"BT /F1 24 Tf 72 720 Td (Header) Tj ET\nBT /F1 12 Tf 72 400 Td (Body far below) Tj ET\n"
+        )
+        page[NameObject("/Contents")] = writer._add_object(stream)
+        font = writer._add_object(
+            DictionaryObject(
+                {
+                    NameObject("/Type"): NameObject("/Font"),
+                    NameObject("/Subtype"): NameObject("/Type1"),
+                    NameObject("/BaseFont"): NameObject("/Helvetica"),
+                }
+            )
+        )
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+        )
+        buf = io.BytesIO()
+        writer.write(buf)
+
+        md = pdf_to_markdown(buf.getvalue())
+        self.assertIn("Header", md)
+        self.assertIn("Body far below", md)
+        # Plain mode would produce "Header\nBody far below" with no blank line.
+        self.assertIn("Header\n\n", md)
+
+    # --- ipynb: null source and fence content preservation ---
+
+    def test_ipynb_null_source_skipped(self):
+        nb = json.dumps(
+            {"cells": [{"cell_type": "code", "source": None, "outputs": []}], "metadata": {}, "nbformat": 4}
+        )
+        self.assertEqual(convert_bytes(nb.encode(), ".ipynb"), "")
+
+    def test_ipynb_preserves_blank_lines_in_code(self):
+        nb = json.dumps(
+            {
+                "cells": [{"cell_type": "code", "source": ["x = 1", "\n", "\n", "\n", "\n", "y = 2"], "outputs": []}],
+                "metadata": {},
+                "nbformat": 4,
+            }
+        )
+        md = convert_bytes(nb.encode(), ".ipynb")
+        # The blank-line collapse must not touch content inside the fence.
+        self.assertIn("x = 1\n\n\n\ny = 2", md)
+
+    # --- CSV: UTF-8 BOM must not leak into the first header cell ---
+
+    def test_csv_bom_stripped(self):
+        md = convert_bytes(b"\xef\xbb\xbfa,b\n1,2", ".csv")
+        self.assertIn("| a | b |", md)
+        self.assertNotIn("\ufeff", md)
+
+    # --- HTML: <title>, images in links, nested anchors and tables ---
+
+    def test_html_title_used_when_no_heading(self):
+        html = b"<html><head><title>My Page</title></head><body><p>Hi</p></body></html>"
+        self.assertEqual(convert_bytes(html, ".html"), "# My Page\n\nHi")
+
+    def test_html_title_not_duplicated_with_heading(self):
+        html = b"<html><head><title>T</title></head><body><h1>H</h1></body></html>"
+        self.assertEqual(convert_bytes(html, ".html"), "# H")
+
+    def test_html_img_inside_link(self):
+        html = b'<a href="http://x"><img src="a.png" alt="pic"></a>'
+        self.assertEqual(convert_bytes(html, ".html"), "[![pic](a.png)](http://x)")
+
+    def test_html_nested_anchor_keeps_outer_text(self):
+        html = b'<a href="a">text <a href="b">nested</a> tail</a>'
+        self.assertEqual(convert_bytes(html, ".html"), "[text nested tail](a)")
+
+    def test_html_nested_table_data_preserved(self):
+        html = b"<table><tr><td>outer<table><tr><td>inner</td></tr></table>after</td></tr></table>"
+        md = convert_bytes(html, ".html")
+        for fragment in ("outer", "inner", "after"):
+            self.assertIn(fragment, md)
+        # The flattened inner table stays inside the enclosing cell.
+        self.assertTrue(md.startswith("| outer"))
+
+    def test_html_preserves_blank_lines_in_pre(self):
+        html = b"<pre>line1\n\n\n\nline2</pre>"
+        md = convert_bytes(html, ".html")
+        self.assertIn("line1\n\n\n\nline2", md)
+
+    # --- DOCX: nested tables must not be dropped ---
+
+    def test_docx_nested_table_data_preserved(self):
+        xml = """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>
+<w:tbl>
+<w:tr><w:tc><w:p><w:r><w:t>cell with</w:t></w:r></w:p>
+<w:tbl><w:tr><w:tc><w:p><w:r><w:t>NESTED</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+</w:tc></w:tr></w:tbl>
+</w:body></w:document>"""
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertIn("cell with", md)
+        self.assertIn("NESTED", md)
+
+    # --- ZIP: decompression-bomb guards ---
+
+    def test_zip_member_size_guard(self):
+        big = b"a,b\n" + b"1,2\n" * (1024 * 1024)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("big.csv", big)
+        with patch("core.infrastructure.converter.utils.MAX_MEMBER_BYTES", 64):
+            md = convert_bytes(buf.getvalue(), ".zip")
+        self.assertEqual(md, "")
+
+    def test_zip_total_budget_guard(self):
+        rows = b"a,b\n" + b"1,2\n" * 4096
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("one.csv", rows)
+            zf.writestr("two.csv", rows)
+        # engine binds MAX_ZIP_TOTAL_BYTES at import time, so patch it there.
+        # Budget is checked before each member: exactly one member fits.
+        with patch("core.infrastructure.converter.engine.MAX_ZIP_TOTAL_BYTES", len(rows)):
+            md = convert_bytes(buf.getvalue(), ".zip")
+        self.assertIn("one.csv", md)
+        self.assertNotIn("two.csv", md)
+
+    def test_zip_legitimate_content_still_converted(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("data.csv", "a,b\n1,2\n")
+        md = convert_bytes(buf.getvalue(), ".zip")
+        self.assertIn("## File: data.csv", md)
+        self.assertIn("| a | b |", md)
+
+    # --- utils: dynamic fence length ---
+
+    def test_fenced_code_block_dynamic_length(self):
+        from core.infrastructure.converter.utils import fenced_code_block
+
+        self.assertEqual(fenced_code_block("x = 1"), "```\nx = 1\n```")
+        block = fenced_code_block("code with ``` inline", lang="python")
+        self.assertTrue(block.startswith("````python\n"))
+        self.assertTrue(block.endswith("\n````"))
+
+
+def _wrap_docx(document_xml: str) -> bytes:
+    """Wrap a document.xml payload into a minimal DOCX zip."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("word/document.xml", document_xml)
+    return buf.getvalue()
+
+
 if __name__ == "__main__":
     unittest.main()
 

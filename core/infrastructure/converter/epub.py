@@ -1,12 +1,12 @@
 import io
 import posixpath
-import re
 import urllib.parse
 import xml.etree.ElementTree as ET
 import zipfile
 from typing import BinaryIO, Dict, List, Union
 
 from core.infrastructure.converter.html import html_to_markdown
+from core.infrastructure.converter.utils import collapse_blank_lines, safe_read_zip_member
 
 
 def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
@@ -30,7 +30,7 @@ def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
     opf_path = ""
     if "META-INF/container.xml" in namelist:
         try:
-            container_tree = ET.fromstring(zf.read("META-INF/container.xml"))
+            container_tree = ET.fromstring(safe_read_zip_member(zf, "META-INF/container.xml"))
             for elem in container_tree.iter():
                 tag = elem.tag.split("}", 1)[-1] if "}" in elem.tag else elem.tag
                 if tag == "rootfile":
@@ -52,7 +52,7 @@ def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
     opf_dir = opf_path.rsplit("/", 1)[0] if "/" in opf_path else ""
 
     # 2. Parse OPF metadata, manifest, and spine
-    opf_tree = ET.fromstring(zf.read(opf_path))
+    opf_tree = ET.fromstring(safe_read_zip_member(zf, opf_path))
     manifest: Dict[str, str] = {}
     spine_ids: List[str] = []
     title = ""
@@ -88,7 +88,7 @@ def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
         chap_path = manifest.get(idref, "")
         if chap_path and chap_path in namelist:
             try:
-                html_bytes = zf.read(chap_path)
+                html_bytes = safe_read_zip_member(zf, chap_path)
                 chap_md = html_to_markdown(html_bytes)
                 if chap_md:
                     output.append(chap_md)
@@ -96,4 +96,4 @@ def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
                 continue
 
     text = "\n\n---\n\n".join(output).strip()
-    return re.sub(r"\n{3,}", "\n\n", text)
+    return collapse_blank_lines(text)

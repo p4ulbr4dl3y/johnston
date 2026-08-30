@@ -23,8 +23,8 @@ def pdf_to_markdown(pdf_input: Union[str, bytes, BinaryIO]) -> str:
 
     for i, page in enumerate(reader.pages, start=1):
         try:
-            # layout_mode=True preserves whitespace and columns
-            text = page.extract_text(layout_mode=True)
+            # layout mode preserves whitespace and columns
+            text = page.extract_text(extraction_mode="layout")
         except Exception:
             try:
                 text = page.extract_text()

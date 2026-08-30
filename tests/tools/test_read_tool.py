@@ -105,6 +105,39 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
                 convert_doc_to_markdown_sync(fake_path)
             self.assertIn("Unable to convert", str(ctx.exception))
 
+    def test_convert_doc_to_markdown_sync_empty_result_falls_back_to_cli(self):
+        # An empty built-in conversion (e.g. a scanned PDF) must still try the
+        # CLI fallback instead of returning "" right away.
+        fake_path = "/tmp/empty_result.pdf"
+        with (
+            patch("tools.read.get_cached_doc_markdown", return_value=None),
+            patch("core.infrastructure.converter.convert_file", return_value=""),
+            patch("shutil.which", return_value="/usr/local/bin/markitdown"),
+            patch("subprocess.Popen") as mock_popen,
+        ):
+            proc = MagicMock()
+            proc.communicate.return_value = ("# CLI Output", "")
+            proc.returncode = 0
+            proc.poll.return_value = 0
+            mock_popen.return_value = proc
+            res = convert_doc_to_markdown_sync(fake_path)
+            self.assertEqual(res, "# CLI Output")
+
+    def test_empty_conversion_result_not_cached(self):
+        fake_path = "/tmp/empty_not_cached.pdf"
+        _DOC_CACHE.pop(fake_path, None)
+        try:
+            with (
+                patch("tools.read.get_cached_doc_markdown", return_value=None),
+                patch("core.infrastructure.converter.convert_file", return_value=""),
+                patch("shutil.which", return_value=None),
+            ):
+                res = convert_doc_to_markdown_sync(fake_path)
+                self.assertEqual(res, "")
+                self.assertNotIn(fake_path, _DOC_CACHE)
+        finally:
+            _DOC_CACHE.pop(fake_path, None)
+
     def test_convert_doc_to_markdown_sync_cooperative_cancel(self):
         # A pre-set cancel_event makes the worker skip the CLI fallback and
         # skip caching, returning without launching the subprocess.

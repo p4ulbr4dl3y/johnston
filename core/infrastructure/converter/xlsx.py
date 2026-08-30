@@ -4,6 +4,8 @@ import xml.etree.ElementTree as ET
 import zipfile
 from typing import BinaryIO, Dict, List, Tuple, Union
 
+from core.infrastructure.converter.utils import safe_read_zip_member
+
 SS_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 
 
@@ -46,7 +48,7 @@ def xlsx_to_markdown(xlsx_input: Union[str, bytes, BinaryIO]) -> str:
     shared_strings: List[str] = []
     if "xl/sharedStrings.xml" in namelist:
         try:
-            ss_tree = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+            ss_tree = ET.fromstring(safe_read_zip_member(zf, "xl/sharedStrings.xml"))
             for si in ss_tree:
                 text_parts = []
                 for child in si:
@@ -68,7 +70,7 @@ def xlsx_to_markdown(xlsx_input: Union[str, bytes, BinaryIO]) -> str:
 
     if "xl/_rels/workbook.xml.rels" in namelist:
         try:
-            wb_rels = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+            wb_rels = ET.fromstring(safe_read_zip_member(zf, "xl/_rels/workbook.xml.rels"))
             for rel in wb_rels:
                 r_id = rel.attrib.get("Id")
                 target = rel.attrib.get("Target", "").lstrip("/")
@@ -81,7 +83,7 @@ def xlsx_to_markdown(xlsx_input: Union[str, bytes, BinaryIO]) -> str:
 
     if "xl/workbook.xml" in namelist:
         try:
-            wb_tree = ET.fromstring(zf.read("xl/workbook.xml"))
+            wb_tree = ET.fromstring(safe_read_zip_member(zf, "xl/workbook.xml"))
             for sheet_elem in wb_tree.iter():
                 tag = sheet_elem.tag.split("}", 1)[-1] if "}" in sheet_elem.tag else sheet_elem.tag
                 if tag == "sheet":
@@ -112,7 +114,7 @@ def xlsx_to_markdown(xlsx_input: Union[str, bytes, BinaryIO]) -> str:
         if sheet_path not in namelist:
             continue
         try:
-            sheet_tree = ET.fromstring(zf.read(sheet_path))
+            sheet_tree = ET.fromstring(safe_read_zip_member(zf, sheet_path))
             table_md = _parse_sheet_to_table(sheet_tree, shared_strings)
             if table_md:
                 output.append(f"## {sheet_name}\n\n{table_md}")

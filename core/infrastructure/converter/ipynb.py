@@ -2,6 +2,8 @@ import json
 import re
 from typing import Any, Dict, List, Union
 
+from core.infrastructure.converter.utils import collapse_blank_lines, fenced_code_block
+
 
 def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
     """
@@ -28,8 +30,14 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
 
     for cell in cells:
         cell_type = cell.get("cell_type", "")
-        source_lines = cell.get("source", [])
-        source = "".join(source_lines) if isinstance(source_lines, list) else str(source_lines)
+        # "source" may be a list of lines, a plain string, or explicitly null.
+        source_lines = cell.get("source")
+        if isinstance(source_lines, list):
+            source = "".join(source_lines)
+        elif isinstance(source_lines, str):
+            source = source_lines
+        else:
+            source = ""
         source = source.strip()
         if not source:
             continue
@@ -37,35 +45,44 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
         if cell_type == "markdown":
             output.append(source)
         elif cell_type == "code":
-            code_block = f"```python\n{source}\n```"
+            code_block = fenced_code_block(source, lang="python")
             # Optional outputs
             outputs = cell.get("outputs", [])
             out_texts: List[str] = []
             for out in outputs:
                 out_type = out.get("output_type", "")
                 if out_type == "stream":
-                    text = "".join(out.get("text", []))
+                    text = _as_text(out.get("text", []))
                     if text.strip():
-                        out_texts.append(f"```output\n{text.strip()}\n```")
+                        out_texts.append(fenced_code_block(text.strip(), lang="output"))
                 elif out_type in ("execute_result", "display_data"):
                     data_dict = out.get("data", {})
                     if "text/plain" in data_dict:
-                        text = "".join(data_dict["text/plain"])
+                        text = _as_text(data_dict["text/plain"])
                         if text.strip():
-                            out_texts.append(f"```output\n{text.strip()}\n```")
+                            out_texts.append(fenced_code_block(text.strip(), lang="output"))
                 elif out_type == "error":
                     tb = out.get("traceback", [])
                     clean_tb = re.sub(r"\x1b\[[0-9;]*[mGKF]", "", "\n".join(tb))
                     if clean_tb.strip():
-                        out_texts.append(f"```output\n{clean_tb.strip()}\n```")
+                        out_texts.append(fenced_code_block(clean_tb.strip(), lang="output"))
                     elif out.get("evalue"):
-                        out_texts.append(f"```output\n{out.get('ename')}: {out.get('evalue')}\n```")
+                        out_texts.append(
+                            fenced_code_block(f"{out.get('ename')}: {out.get('evalue')}", lang="output")
+                        )
             if out_texts:
                 output.append(code_block + "\n\n" + "\n\n".join(out_texts))
             else:
                 output.append(code_block)
         elif cell_type == "raw":
-            output.append(f"```\n{source}\n```")
+            output.append(fenced_code_block(source))
 
-    text = "\n\n".join(output).strip()
-    return re.sub(r"\n{3,}", "\n\n", text)
+    text = collapse_blank_lines("\n\n".join(output).strip())
+    return text
+
+
+def _as_text(value: Union[List[str], str, None]) -> str:
+    """Join notebook text fields, which may be a list of lines or a string."""
+    if isinstance(value, list):
+        return "".join(value)
+    return value or ""

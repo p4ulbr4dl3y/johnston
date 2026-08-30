@@ -4,6 +4,8 @@ import xml.etree.ElementTree as ET
 import zipfile
 from typing import BinaryIO, Dict, List, Tuple, Union
 
+from core.infrastructure.converter.utils import safe_read_zip_member
+
 P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
 A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
@@ -30,7 +32,7 @@ def pptx_to_markdown(pptx_input: Union[str, bytes, BinaryIO]) -> str:
     pres_rels: Dict[str, str] = {}
     if "ppt/_rels/presentation.xml.rels" in namelist:
         try:
-            rel_tree = ET.fromstring(zf.read("ppt/_rels/presentation.xml.rels"))
+            rel_tree = ET.fromstring(safe_read_zip_member(zf, "ppt/_rels/presentation.xml.rels"))
             for elem in rel_tree:
                 r_id = elem.attrib.get("Id")
                 target = elem.attrib.get("Target", "").lstrip("/")
@@ -44,7 +46,7 @@ def pptx_to_markdown(pptx_input: Union[str, bytes, BinaryIO]) -> str:
     slide_files: List[str] = []
     if "ppt/presentation.xml" in namelist:
         try:
-            pres_tree = ET.fromstring(zf.read("ppt/presentation.xml"))
+            pres_tree = ET.fromstring(safe_read_zip_member(zf, "ppt/presentation.xml"))
             for sld in pres_tree.iter():
                 tag = sld.tag.split("}", 1)[-1] if "}" in sld.tag else sld.tag
                 if tag == "sldId":
@@ -66,7 +68,7 @@ def pptx_to_markdown(pptx_input: Union[str, bytes, BinaryIO]) -> str:
         if slide_path not in namelist:
             continue
         try:
-            slide_tree = ET.fromstring(zf.read(slide_path))
+            slide_tree = ET.fromstring(safe_read_zip_member(zf, slide_path))
             slide_md = _parse_slide(slide_tree, zf, slide_path, idx)
             if slide_md:
                 output.append(slide_md)
@@ -99,14 +101,14 @@ def _parse_slide(slide_tree: ET.Element, zf: zipfile.ZipFile, slide_path: str, s
     rels_path = f"{slide_dir}/_rels/{slide_filename}.rels"
     if rels_path in zf.namelist():
         try:
-            rels_tree = ET.fromstring(zf.read(rels_path))
+            rels_tree = ET.fromstring(safe_read_zip_member(zf, rels_path))
             for rel in rels_tree:
                 target = rel.attrib.get("Target", "")
                 if "notesSlide" in target:
                     if not target.startswith("ppt/"):
                         target = "ppt/" + target.replace("../", "").lstrip("/")
                     if target in zf.namelist():
-                        notes_tree = ET.fromstring(zf.read(target))
+                        notes_tree = ET.fromstring(safe_read_zip_member(zf, target))
                         notes_text = _extract_notes_text(notes_tree)
                         if notes_text:
                             slide_lines.append(f"### Speaker Notes:\n{notes_text}\n")

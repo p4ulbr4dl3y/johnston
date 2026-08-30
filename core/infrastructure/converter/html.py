@@ -2,6 +2,8 @@ import re
 from html.parser import HTMLParser
 from typing import List, Optional, Tuple
 
+from core.infrastructure.converter.utils import collapse_blank_lines, fenced_code_block
+
 
 class HTMLToMarkdownParser(HTMLParser):
     """
@@ -69,14 +71,19 @@ class HTMLToMarkdownParser(HTMLParser):
         self._ignore_stack_depth = 0
         self._list_stack: List[Tuple[str, int]] = []  # ('ul' | 'ol', current_count)
         self._in_pre = False
+        self._pre_buffer: Optional[List[str]] = None  # buffered until </pre> to size the fence
         self._in_code = False
         self._table_rows: List[List[str]] = []
         self._current_row: Optional[List[str]] = None
         self._current_cell: Optional[List[str]] = None
         self._in_table = False
+        # Enclosing table state pushed aside while a nested table is parsed.
+        self._table_stack: List[Tuple[Optional[List[str]], Optional[List[str]], List[List[str]]]] = []
         self._current_link: Optional[Tuple[str, str, List[str]]] = None  # (href, title, text_parts)
+        self._nested_link_depth = 0
         self._title: Optional[str] = None
         self._in_title = False
+        self._saw_heading = False
 
     def _append_token(self, token: str) -> None:
         if self._current_link is not None:
@@ -94,6 +101,13 @@ class HTMLToMarkdownParser(HTMLParser):
             if tag_lower in ("meta", "link", "base", "input", "param", "track", "wbr"):
                 return
 
+        if tag_lower == "title":
+            # <title> lives inside <head>, which is otherwise ignored — handle
+            # it before the ignore-depth gate so the document title is captured.
+            if not self._in_title:
+                self._in_title = True
+            return
+
         if tag_lower in self.IGNORE_TAGS:
             self._ignore_stack_depth += 1
             return
@@ -101,14 +115,10 @@ class HTMLToMarkdownParser(HTMLParser):
         if self._ignore_stack_depth > 0:
             return
 
-        if tag_lower == "title":
-            self._in_title = True
-            return
-
         if tag_lower == "pre":
             self._in_pre = True
+            self._pre_buffer = []
             self._ensure_newline(2)
-            self._output.append("```\n")
             return
 
         if tag_lower == "code":
@@ -137,6 +147,7 @@ class HTMLToMarkdownParser(HTMLParser):
         if tag_lower in ("h1", "h2", "h3", "h4", "h5", "h6"):
             level = int(tag_lower[1])
             self._ensure_newline(2)
+            self._saw_heading = True
             self._output.append("#" * level + " ")
             return
 
@@ -147,7 +158,10 @@ class HTMLToMarkdownParser(HTMLParser):
 
         if tag_lower == "br":
             if self._in_pre:
-                self._output.append("\n")
+                if self._pre_buffer is not None:
+                    self._pre_buffer.append("\n")
+                else:
+                    self._output.append("\n")
             elif self._in_table:
                 if self._current_cell is not None:
                     self._current_cell.append(" ")
@@ -187,9 +201,17 @@ class HTMLToMarkdownParser(HTMLParser):
             return
 
         if tag_lower == "table":
-            self._ensure_newline(2)
-            self._in_table = True
-            self._table_rows = []
+            if self._in_table:
+                # Nested table: pause the enclosing table's state; the rendered
+                # inner table will be spliced into the enclosing cell text.
+                self._table_stack.append((self._current_row, self._current_cell, self._table_rows))
+                self._table_rows = []
+                self._current_row = None
+                self._current_cell = None
+            else:
+                self._in_table = True
+                self._table_rows = []
+                self._ensure_newline(2)
             return
 
         if tag_lower == "tr":
@@ -203,6 +225,11 @@ class HTMLToMarkdownParser(HTMLParser):
             return
 
         if tag_lower == "a":
+            if self._current_link is not None:
+                # Nested anchor: invalid HTML — keep the outer link, let the
+                # inner text flow into it, and remember to skip its end tag.
+                self._nested_link_depth += 1
+                return
             href = attr_dict.get("href", "").strip()
             title = attr_dict.get("title", "").strip()
             if href.lower().startswith("javascript:"):
@@ -218,7 +245,10 @@ class HTMLToMarkdownParser(HTMLParser):
                 src = "data:..."
             if src:
                 title_suffix = f' "{title}"' if title else ""
-                self._output.append(f"![{alt}]({src}{title_suffix})")
+                # Route through _append_token so images inside links become
+                # proper [![alt](src)](href) and images inside table cells
+                # stay in their cell.
+                self._append_token(f"![{alt}]({src}{title_suffix})")
             return
 
         if tag_lower in ("p", "div", "article", "section", "header"):
@@ -231,6 +261,10 @@ class HTMLToMarkdownParser(HTMLParser):
         if tag_lower in self.VOID_TAGS:
             return
 
+        if tag_lower == "title":
+            self._in_title = False
+            return
+
         if tag_lower in self.IGNORE_TAGS:
             if self._ignore_stack_depth > 0:
                 self._ignore_stack_depth -= 1
@@ -239,14 +273,16 @@ class HTMLToMarkdownParser(HTMLParser):
         if self._ignore_stack_depth > 0:
             return
 
-        if tag_lower == "title":
-            self._in_title = False
-            return
-
         if tag_lower == "pre":
             self._in_pre = False
-            self._ensure_newline(1)
-            self._output.append("```\n\n")
+            # fenced_code_block adds the newline before the closing fence itself,
+            # so strip trailing newlines from the buffered content.
+            content = "".join(self._pre_buffer or []).rstrip("\n")
+            self._pre_buffer = None
+            if content:
+                self._output.append(fenced_code_block(content) + "\n\n")
+            else:
+                self._output.append("```\n```\n\n")
             return
 
         if tag_lower == "code":
@@ -302,13 +338,29 @@ class HTMLToMarkdownParser(HTMLParser):
 
         if tag_lower == "table":
             if self._in_table:
-                self._in_table = False
-                self._render_table()
+                inner_md = self._build_table(self._table_rows)
                 self._table_rows = []
-                self._ensure_newline(2)
+                if self._table_stack:
+                    # Restore the enclosing table and splice the rendered inner
+                    # table into its cell as flattened text (GFM cannot nest
+                    # pipe tables; pipes are escaped when the cell closes).
+                    self._current_row, self._current_cell, self._table_rows = self._table_stack.pop()
+                    if self._current_cell is not None and inner_md:
+                        flat = inner_md.replace("\n", " ").strip()
+                        if flat:
+                            self._current_cell.append(f" {flat} ")
+                else:
+                    self._in_table = False
+                    if inner_md:
+                        self._output.append(inner_md + "\n\n")
+                    self._ensure_newline(2)
             return
 
         if tag_lower == "a":
+            if self._nested_link_depth > 0:
+                # This closes a nested anchor we ignored — the outer link stays open.
+                self._nested_link_depth -= 1
+                return
             if self._current_link is not None:
                 href, title, text_parts = self._current_link
                 text = "".join(text_parts).strip()
@@ -320,18 +372,22 @@ class HTMLToMarkdownParser(HTMLParser):
                 elif text:
                     self._output.append(text)
                 self._current_link = None
+                self._nested_link_depth = 0
             return
 
     def handle_data(self, data: str) -> None:
-        if self._ignore_stack_depth > 0:
-            return
-
         if self._in_title:
             self._title = (self._title or "") + data
             return
 
+        if self._ignore_stack_depth > 0:
+            return
+
         if self._in_pre:
-            self._output.append(data)
+            if self._pre_buffer is not None:
+                self._pre_buffer.append(data)
+            else:
+                self._output.append(data)
             return
 
         if self._in_table and self._current_cell is not None:
@@ -354,32 +410,36 @@ class HTMLToMarkdownParser(HTMLParser):
         if needed > 0:
             self._output.append("\n" * needed)
 
-    def _render_table(self) -> None:
-        if not self._table_rows:
-            return
+    def _build_table(self, rows: List[List[str]]) -> str:
+        """Render collected rows as a GFM pipe table (without trailing blank line)."""
+        if not rows:
+            return ""
 
-        col_count = max(len(row) for row in self._table_rows)
+        col_count = max(len(row) for row in rows)
         if col_count == 0:
-            return
+            return ""
 
         normalized_rows = []
-        for row in self._table_rows:
+        for row in rows:
             padded = row + [""] * (col_count - len(row))
             normalized_rows.append(padded)
 
         header = normalized_rows[0]
-        self._output.append("| " + " | ".join(header) + " |\n")
-        self._output.append("| " + " | ".join(["---"] * col_count) + " |\n")
-
+        lines = ["| " + " | ".join(header) + " |", "| " + " | ".join(["---"] * col_count) + " |"]
         for row in normalized_rows[1:]:
-            self._output.append("| " + " | ".join(row) + " |\n")
-        self._output.append("\n")
+            lines.append("| " + " | ".join(row) + " |")
+        return "\n".join(lines)
 
     def get_markdown(self) -> str:
         raw_text = "".join(self._output)
         lines = [line.rstrip() for line in raw_text.splitlines()]
         cleaned = "\n".join(lines).strip()
-        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        cleaned = collapse_blank_lines(cleaned)
+        # Emit the document <title> as a heading only when the body provides
+        # no heading of its own, to avoid duplicated headings.
+        title = " ".join((self._title or "").split())
+        if title and not self._saw_heading:
+            cleaned = f"# {title}\n\n{cleaned}" if cleaned else f"# {title}"
         return cleaned
 
 

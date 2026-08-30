@@ -12,6 +12,7 @@ from core.infrastructure.converter.html import html_to_markdown
 from core.infrastructure.converter.ipynb import ipynb_to_markdown
 from core.infrastructure.converter.pdf import pdf_to_markdown
 from core.infrastructure.converter.pptx import pptx_to_markdown
+from core.infrastructure.converter.utils import MAX_ZIP_TOTAL_BYTES, safe_read_zip_member
 from core.infrastructure.converter.xlsx import xlsx_to_markdown
 
 SUPPORTED_EXTENSIONS: Set[str] = {
@@ -148,6 +149,7 @@ def _convert_zip(source: Union[str, BinaryIO, io.BytesIO], depth: int = 0) -> st
     except Exception:
         return ""
     output: List[str] = []
+    total_decompressed = 0
 
     for name in sorted(zf.namelist()):
         basename = os.path.basename(name)
@@ -157,7 +159,12 @@ def _convert_zip(source: Union[str, BinaryIO, io.BytesIO], depth: int = 0) -> st
         if not ext:
             continue
         try:
-            file_data = zf.read(name)
+            # Decompression-bomb guard: cap per-member size via safe_read_zip_member
+            # and stop once the archive's cumulative decompressed size blows the budget.
+            if total_decompressed >= MAX_ZIP_TOTAL_BYTES:
+                break
+            file_data = safe_read_zip_member(zf, name)
+            total_decompressed += len(file_data)
             if ext == ".zip":
                 md_content = _convert_zip(io.BytesIO(file_data), depth=depth + 1)
             else:

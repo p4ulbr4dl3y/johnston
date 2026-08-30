@@ -10,7 +10,8 @@ def csv_to_markdown(csv_input: Union[str, bytes, BinaryIO], delimiter: str | Non
     """
     if isinstance(csv_input, bytes):
         try:
-            text = csv_input.decode("utf-8")
+            # utf-8-sig strips a leading UTF-8 BOM (common in Excel-exported CSV)
+            text = csv_input.decode("utf-8-sig")
         except UnicodeDecodeError:
             text = csv_input.decode("latin-1", errors="replace")
     elif isinstance(csv_input, str):
@@ -19,7 +20,7 @@ def csv_to_markdown(csv_input: Union[str, bytes, BinaryIO], delimiter: str | Non
         raw = csv_input.read()
         if isinstance(raw, bytes):
             try:
-                text = raw.decode("utf-8")
+                text = raw.decode("utf-8-sig")
             except UnicodeDecodeError:
                 text = raw.decode("latin-1", errors="replace")
         else:
