@@ -215,14 +215,14 @@ WelcomeWidget {
     margin: 1 0 0 0;
     padding: 0 1;
     background: $bg-surface;
-    color: $fg-secondary;
+    color: $fg-muted;
     border-left: solid $border;
     text-wrap: wrap;
 }
 
 .tool-call Markdown {
     margin-top: 1;
-    color: $fg-secondary;
+    color: $fg-muted;
 }
 
 /* Strict Height Auto & Zero Margin for Markdown Elements */

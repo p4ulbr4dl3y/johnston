@@ -204,11 +204,11 @@ def compute_adaptive_palette(
     is_dark = not is_light_theme(norm_bg)
 
     if norm_fg is None:
-        norm_fg = "#f4f4f5" if is_dark else "#18181b"
+        norm_fg = "#e4e4e7" if is_dark else "#18181b"
 
     surface = compute_adaptive_surface(norm_bg, mode=mode)
     border = compute_adaptive_border(norm_bg)
-    fg_secondary = lerp_oklab(norm_fg, norm_bg, 0.20)
+    fg_secondary = lerp_oklab(norm_fg, norm_bg, 0.25)
     fg_muted = lerp_oklab(norm_fg, norm_bg, 0.48)
     subtle = lerp_oklab(norm_fg, norm_bg, 0.30)
 
@@ -221,7 +221,7 @@ def compute_adaptive_palette(
         "fg-muted": fg_muted,
         "fg-inverted": norm_bg,
         "border": border,
-        "bg-code": "#333338" if is_dark else "#e4e4e7",
+        "bg-code": "#27272a" if is_dark else "#e4e4e7",
         "accent-info": "#61afef",
         "accent-warning": "#e5c07b",
         "accent-error": "#e06c75",

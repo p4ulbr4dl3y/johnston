@@ -187,7 +187,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
         width = resolve_width(self)
         is_compact = is_compact_width(width)
         t_primary, t_secondary, t_muted, t_subtle = get_theme_colors()
-        txt = t_primary
+        txt = t_secondary
         sep = f"  [{t_muted}]•[/]  "
         sep_compact = f" [{t_muted}]•[/] "
         arrow_sep = f" [{t_muted}]›[/] "
@@ -207,7 +207,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 row1_right = f"[{txt}]Run /connect[/]"
 
             # Row 1 (LLM): ⠋ Action • claude-3.7  <left> | <right> 45% ctx • $0.02
-            row1_left_parts = [f"[bold {t_primary}]{role_formatted}[/]"]
+            row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
             if is_connected and clean_model and clean_model != "[Select model: /models]":
                 role_len = display_width(role_formatted) + 3
                 right_len = 16
@@ -249,7 +249,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             diff_text = self._git_diff_stats(cwd=directory)
 
             # Row 1 (LLM): ⠋ Action • OpenRouter › claude-3.7 (high)  <left> | <right> [████░░░░] 45% (58k/128k) • 12.3k tok • $0.02
-            row1_left_parts = [f"[bold {t_primary}]{role_formatted}[/]"]
+            row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 model_part = f"[{txt}]{provider_display}[/]{arrow_sep}[{txt}]{clean_model}[/]"
                 if thinking_effort and thinking_effort != "auto":
@@ -264,7 +264,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 bar_len = 8
                 filled = int(round((pct / 100) * bar_len))
                 empty = bar_len - filled
-                bar_str = f"[{t_primary}]{'█' * filled}[/][{t_muted}]{'░' * empty}[/]"
+                bar_str = f"[{t_secondary}]{'█' * filled}[/][{t_muted}]{'░' * empty}[/]"
                 used_formatted = format_context_tokens(ctx_val)
                 cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
                 tok_str = format_context_tokens(total_tokens)

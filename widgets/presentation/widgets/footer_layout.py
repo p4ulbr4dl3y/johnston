@@ -124,7 +124,7 @@ def _build_subagent_grid(
     grid.add_column(justify="right")
 
     t_primary, t_secondary, t_muted, t_subtle = get_theme_colors()
-    txt = t_primary
+    txt = t_secondary
     sep = f"  [{t_muted}]•[/]  "
     sep_compact = f" [{t_muted}]•[/] "
     arrow_sep = f" [{t_muted}]›[/] "
@@ -138,7 +138,7 @@ def _build_subagent_grid(
 
     if is_compact:
         # Row 1 (Compact): Left [Role • Model] | Right [pct% ctx • $0.02 / tok]
-        row1_left_parts = [f"[bold {txt}]{role_formatted}[/]"]
+        row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
         if is_connected and clean_model and clean_model != "[Select model: /models]":
             row1_left_parts.append(f"[{txt}]{clean_model}[/]")
         row1_left = sep_compact.join(row1_left_parts)
@@ -180,7 +180,7 @@ def _build_subagent_grid(
 
     # Full mode
     # Row 1: Left [Role • Provider › Model (effort)] | Right [Context bar • tokens • cost]
-    row1_left_parts = [f"[bold {txt}]{role_formatted}[/]"]
+    row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
     if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
         model_part = f"[{txt}]{provider_display}[/]{arrow_sep}[{txt}]{clean_model}[/]"
         if thinking_effort and thinking_effort != "auto":
@@ -196,7 +196,7 @@ def _build_subagent_grid(
         bar_len = 8
         filled = int(round((pct / 100) * bar_len))
         empty = bar_len - filled
-        bar_str = f"[{t_primary}]{'█' * filled}[/][{t_muted}]{'░' * empty}[/]"
+        bar_str = f"[{t_secondary}]{'█' * filled}[/][{t_muted}]{'░' * empty}[/]"
         cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
         tok_str = format_context_tokens(total_tokens)
         row1_right_parts = [

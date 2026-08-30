@@ -609,18 +609,22 @@ class TestCommandProviderCoverage:
         cp._command_suggestions_cache_time = 0.0
 
         sample_suggestions = [("/test", "Test description")]
-        with patch("widgets.app.command_provider._build_command_suggestions", return_value=sample_suggestions) as mock_b:
-            res1 = await get_all_command_suggestions()
-            assert res1 == sample_suggestions
-            assert mock_b.call_count == 1
+        try:
+            with patch("widgets.app.command_provider._build_command_suggestions", return_value=sample_suggestions) as mock_b:
+                res1 = await get_all_command_suggestions()
+                assert res1 == sample_suggestions
+                assert mock_b.call_count == 1
 
-            # Call again within 10s -> cache hit
-            res2 = await get_all_command_suggestions()
-            assert res2 == sample_suggestions
-            assert mock_b.call_count == 1
+                # Call again within 10s -> cache hit
+                res2 = await get_all_command_suggestions()
+                assert res2 == sample_suggestions
+                assert mock_b.call_count == 1
 
-            # Advance time by 15s -> cache expired, re-called
-            with patch("widgets.app.command_provider.time.time", return_value=cp._command_suggestions_cache_time + 15.0):
-                res3 = await get_all_command_suggestions()
-                assert res3 == sample_suggestions
-                assert mock_b.call_count == 2
+                # Advance time by 15s -> cache expired, re-called
+                with patch("widgets.app.command_provider.time.time", return_value=cp._command_suggestions_cache_time + 15.0):
+                    res3 = await get_all_command_suggestions()
+                    assert res3 == sample_suggestions
+                    assert mock_b.call_count == 2
+        finally:
+            cp._command_suggestions_cache = []
+            cp._command_suggestions_cache_time = 0.0
