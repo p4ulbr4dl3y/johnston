@@ -293,6 +293,10 @@ class TestThinkingWidget(unittest.TestCase):
         widget2.finish_thinking(1.0)
         self.assertIn("Thought for 1.0 sec", str(widget2.header_label.render()))
 
+        widget_sub = self._make_widget()
+        widget_sub.finish_thinking(0.04)
+        self.assertIn("Thought for <0.1 sec", str(widget_sub.header_label.render()))
+
         widget3 = self._make_widget()
         widget3.is_expanded = False
         widget3.finish_thinking(0.5)

@@ -4,8 +4,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from rich.console import Group
-from rich.syntax import Syntax
 from rich.text import Text
 
 from core.domain.defaults.config import (
@@ -22,7 +20,6 @@ from widgets.presentation.tool_renderers import (
     format_truncation_for_ui,
 )
 from widgets.presentation.widgets.chat_diff import format_edit_diff
-from widgets.presentation.widgets.chat_markdown import CODE_THEME, TransparentSyntax
 from widgets.utils.lexer import guess_lexer_name
 
 _MISSING = object()
@@ -134,7 +131,7 @@ class ParsingMixin:
         except Exception:
             return None
 
-    def _format_json_result(self, raw_text: str) -> Syntax | Group | None:
+    def _format_json_result(self, raw_text: str) -> str | None:
         if not raw_text or not raw_text.strip():
             return None
         text = raw_text.strip()
@@ -149,12 +146,9 @@ class ParsingMixin:
         parsed = self._try_parse_json(text_to_parse)
         if parsed is not None:
             pretty_json = json.dumps(parsed, indent=2, ensure_ascii=False)
-            syntax = TransparentSyntax(
-                pretty_json, "json", theme=CODE_THEME, word_wrap=True, background_color="default"
-            )
             if footer:
-                return Group(syntax, Text("\n" + footer.strip()))
-            return syntax
+                return f"{pretty_json}\n{footer.strip()}"
+            return pretty_json
         return None
 
     def _is_error(self, text: str = "") -> bool:

@@ -8,7 +8,7 @@ from rich.table import Table
 from core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import format_context_tokens
 from widgets.mixins.stream_frame import SPINNER_FRAMES
-from widgets.utils.row_format import ellipsize
+from widgets.utils.row_format import ellipsize, format_cost
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
 STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
@@ -173,7 +173,7 @@ def _build_subagent_grid(
             pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
             pct = min(100.0, max(0.0, pct))
             pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
-            cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
+            cost_str = format_cost(cost_usd)
             right_val = cost_str if cost_usd > 0 else f"{format_context_tokens(total_tokens)}t"
             row1_right = f"[{txt}]{pct_str} ctx[/]{sep_compact}[{txt}]{right_val}[/]"
         else:
@@ -223,7 +223,7 @@ def _build_subagent_grid(
         filled = int(round((pct / 100) * bar_len))
         empty = bar_len - filled
         bar_str = f"[{t_secondary}]{'█' * filled}[/][{t_muted}]{'░' * empty}[/]"
-        cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
+        cost_str = format_cost(cost_usd)
         tok_str = format_context_tokens(total_tokens)
         row1_right_parts = [
             f"[{t_muted}][[/]{bar_str}[{t_muted}]][/] [{txt}]{pct:.0f}% ({format_context_tokens(context_used)}/{context_window})[/]",

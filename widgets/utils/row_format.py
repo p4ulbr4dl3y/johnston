@@ -55,7 +55,7 @@ def format_relative_time(ts: float | int | None, now: float | int | None = None)
 
 
 def format_duration(seconds: float | int | None) -> str:
-    """Format duration in seconds as concise string ('4.2s', '14s', '1m 20s', '2h 15m')."""
+    """Format duration in seconds as concise string ('<0.1s', '4.2s', '14s', '1m 20s', '2h 15m')."""
     if seconds is None:
         return ""
     try:
@@ -65,6 +65,8 @@ def format_duration(seconds: float | int | None) -> str:
     if sec < 0:
         sec = 0.0
     if sec < 60:
+        if sec < 0.1:
+            return "<0.1s" if sec > 0 else "0s"
         if sec < 10:
             return f"{sec:.1f}s"
         return f"{int(sec)}s"
@@ -75,6 +77,21 @@ def format_duration(seconds: float | int | None) -> str:
     hours = int(sec // 3600)
     mins = int((sec % 3600) // 60)
     return f"{hours}h {mins:02d}m"
+
+
+def format_cost(cost_usd: float | int | None) -> str:
+    """Format cost in USD as concise string ('$0', '<$0.01', '$0.05', '$1.20')."""
+    if cost_usd is None:
+        return "$0"
+    try:
+        val = float(cost_usd)
+    except (ValueError, TypeError):
+        return "$0"
+    if val <= 0:
+        return "$0"
+    if val < 0.01:
+        return "<$0.01"
+    return f"${val:.2f}"
 
 
 

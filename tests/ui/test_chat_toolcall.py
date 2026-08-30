@@ -112,9 +112,9 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertIsNone(widget._format_json_result(""))
         self.assertIsNone(widget._format_json_result("   "))
         result = widget._format_json_result('{"x": 1}')
-        self.assertIsNotNone(result)
+        self.assertEqual(result, '{\n  "x": 1\n}')
         truncated = widget._format_json_result('{"x": 1}\n... [Output truncated at 100 chars]')
-        self.assertIsNotNone(truncated)
+        self.assertEqual(truncated, '{\n  "x": 1\n}\n... [Output truncated at 100 chars]')
         self.assertIsNone(widget._format_json_result("plain text"))
 
     def test_is_error(self):

@@ -15,7 +15,7 @@ from widgets.presentation.widgets.footer_layout import (
     get_theme_colors,
 )
 from widgets.utils.responsive import is_compact_width, resolve_width
-from widgets.utils.row_format import display_width, ellipsize
+from widgets.utils.row_format import display_width, ellipsize, format_cost
 
 __all__ = [
     "StatusFooter",
@@ -200,7 +200,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
                 pct = min(100.0, max(0.0, pct))
                 pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
-                cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
+                cost_str = format_cost(cost_usd)
                 right_val = cost_str if cost_usd > 0 else f"{format_context_tokens(total_tokens)}t"
                 row1_right = f"[{txt}]{pct_str} ctx[/]{sep_compact}[{txt}]{right_val}[/]"
             else:
@@ -266,7 +266,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 empty = bar_len - filled
                 bar_str = f"[{t_secondary}]{'█' * filled}[/][{t_muted}]{'░' * empty}[/]"
                 used_formatted = format_context_tokens(ctx_val)
-                cost_str = "$0" if cost_usd == 0 else f"${cost_usd:.2f}"
+                cost_str = format_cost(cost_usd)
                 tok_str = format_context_tokens(total_tokens)
                 row1_right_parts = [
                     f"[{t_muted}][[/]{bar_str}[{t_muted}]][/] [{txt}]{pct:.0f}% ({used_formatted}/{context_window})[/]",

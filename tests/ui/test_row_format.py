@@ -17,6 +17,8 @@ from widgets.utils.row_format import (
     display_width,
     ellipsize,
     format_badge_row,
+    format_cost,
+    format_duration,
     format_relative_time,
     option_list_row_width,
 )
@@ -221,6 +223,49 @@ class TestFormatRelativeTime(unittest.TestCase):
         now = 1000000000.0
         self.assertEqual(format_relative_time(now - 86400 * 365, now=now), "1y ago")
         self.assertEqual(format_relative_time(now - 86400 * 365 * 3, now=now), "3y ago")
+
+
+class TestFormatDuration(unittest.TestCase):
+    def test_none_or_invalid(self):
+        self.assertEqual(format_duration(None), "")
+        self.assertEqual(format_duration("invalid"), "")
+
+    def test_zero_and_negative(self):
+        self.assertEqual(format_duration(0), "0s")
+        self.assertEqual(format_duration(-5), "0s")
+
+    def test_sub_tenth_second(self):
+        self.assertEqual(format_duration(0.04), "<0.1s")
+        self.assertEqual(format_duration(0.09), "<0.1s")
+
+    def test_seconds(self):
+        self.assertEqual(format_duration(0.5), "0.5s")
+        self.assertEqual(format_duration(4.2), "4.2s")
+        self.assertEqual(format_duration(14.8), "14s")
+
+    def test_minutes(self):
+        self.assertEqual(format_duration(80), "1m 20s")
+
+    def test_hours(self):
+        self.assertEqual(format_duration(3665), "1h 01m")
+
+
+class TestFormatCost(unittest.TestCase):
+    def test_none_or_invalid(self):
+        self.assertEqual(format_cost(None), "$0")
+        self.assertEqual(format_cost("invalid"), "$0")
+
+    def test_zero_and_negative(self):
+        self.assertEqual(format_cost(0), "$0")
+        self.assertEqual(format_cost(-1.0), "$0")
+
+    def test_sub_cent(self):
+        self.assertEqual(format_cost(0.001), "<$0.01")
+        self.assertEqual(format_cost(0.009), "<$0.01")
+
+    def test_standard(self):
+        self.assertEqual(format_cost(0.05), "$0.05")
+        self.assertEqual(format_cost(1.2), "$1.20")
 
 
 if __name__ == "__main__":

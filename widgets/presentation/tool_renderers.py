@@ -5,8 +5,6 @@ import os
 import re
 from typing import Any, Callable
 
-from rich.console import Group
-from rich.syntax import Syntax
 from rich.text import Text
 
 from widgets.presentation.widgets.chat_diff import format_edit_diff
@@ -242,7 +240,7 @@ def compute_tool_call_content(
     clean_hints: Callable[[str], str],
     clean_bash_output: Callable[[str], str],
     format_ask_user_display_fn: Callable[[], Any],
-    format_json_result_fn: Callable[[str], Syntax | Group | None],
+    format_json_result_fn: Callable[[str], str | None],
 ) -> tuple[str, Any]:
     """Compute (kind, value) representation for expanded tool-call content."""
     try:
@@ -347,9 +345,9 @@ def compute_tool_call_content(
             return "markup", clean_markup(output_text)
         else:
             clean_res = clean_hints(result_text or "(No result)")
-            syntax = format_json_result_fn(clean_res)
-            if syntax:
-                return "raw", syntax
+            json_res = format_json_result_fn(clean_res)
+            if json_res:
+                return "markup", clean_markup(json_res)
             return "markup", clean_markup(clean_res)
     except Exception:
         return "markup", clean_markup(result_text or "")

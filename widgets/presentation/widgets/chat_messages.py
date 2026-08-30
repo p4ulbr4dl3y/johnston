@@ -469,7 +469,8 @@ class ThinkingWidget(Vertical):
         self.render_collapsed()
 
     def render_collapsed(self) -> None:
-        self.header_label.update(f"Thought for {self.duration_seconds:.1f} sec")
+        dur_str = "<0.1" if self.duration_seconds < 0.1 else f"{self.duration_seconds:.1f}"
+        self.header_label.update(f"Thought for {dur_str} sec")
         if not self.is_expanded:
             self.content_widget.display = False
 
