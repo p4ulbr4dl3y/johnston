@@ -85,7 +85,7 @@ Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, T
     color: $fg-primary;
     border: solid $border;
     padding: 0 1;
-    margin: 0;
+    margin: 1 0 0 0;
 }
 
 #chat-view {
