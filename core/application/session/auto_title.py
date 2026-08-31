@@ -261,13 +261,41 @@ def extract_title_from_thought(thought_text: str, max_len: int = DEFAULT_AUTO_TI
 
 
 def extract_first_user_text(session: AgentSession) -> str:
-    """Extract the first user prompt text from session messages or agent history."""
-    for m in session.messages:
+    """Extract the first user prompt text from session messages or agent history.
+
+    For forked sessions, extracts the user prompt submitted after the fork point.
+    """
+    messages = getattr(session, "messages", None) or []
+    fork_count = getattr(session, "fork_msg_count", 0) or 0
+    if fork_count > 0 and len(messages) > fork_count:
+        for m in messages[fork_count:]:
+            if isinstance(m, dict) and m.get("type") == "user":
+                txt = str(m.get("display_text") or m.get("text", "")).strip()
+                if txt:
+                    return txt
+        history = getattr(session, "agent_history", None) or []
+        if history and len(history) > fork_count:
+            for m in history[fork_count:]:
+                if isinstance(m, dict) and m.get("role") == "user":
+                    content = m.get("content", "")
+                    if isinstance(content, str) and content.strip():
+                        return content.strip()
+                    if isinstance(content, list):
+                        parts = [
+                            c.get("text", "")
+                            for c in content
+                            if isinstance(c, dict) and c.get("type") == "text"
+                        ]
+                        txt = " ".join(parts).strip()
+                        if txt:
+                            return txt
+
+    for m in messages:
         if isinstance(m, dict) and m.get("type") == "user":
             txt = str(m.get("display_text") or m.get("text", "")).strip()
             if txt:
                 return txt
-    if session.agent_history:
+    if getattr(session, "agent_history", None):
         for m in session.agent_history:
             if isinstance(m, dict) and m.get("role") == "user":
                 content = m.get("content", "")
@@ -293,10 +321,13 @@ async def auto_title_session(
 ) -> Optional[str]:
     """Generate and set a concise title for the session.
 
-    If session._title is already set (e.g. manually renamed), it is kept untouched.
+    If session is already auto-titled or manually renamed, it is kept untouched.
     Tries fast LLM completion first; falls back to heuristic if LLM is unavailable or fails.
     """
-    if getattr(session, "_title", None):
+    if getattr(session, "auto_titled", False):
+        return session.title
+
+    if getattr(session, "_title", None) and not getattr(session, "parent_id", None):
         return session.title
 
     first_text = extract_first_user_text(session)
@@ -391,8 +422,9 @@ async def auto_title_session(
     if not generated_title:
         generated_title = clean_heuristic_title(first_text, max_len=configured_max_len)
 
-    if generated_title and not getattr(session, "_title", None):
+    if generated_title:
         session.title = generated_title
+        session.auto_titled = True
         return generated_title
 
     return session.title or None

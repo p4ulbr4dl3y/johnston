@@ -534,3 +534,25 @@ def test_children_fast_path_cold_and_warm(store):
     assert len(cold_children1) == 1
     assert cold_children1[0].id == "sub1"
 
+
+def test_fork_session_persistence_fields(store):
+    """fork_msg_count and auto_titled roundtrip correctly through SessionStore."""
+    parent = store.create_main("parent_sess")
+    parent.messages = [
+        {"type": "user", "text": "Turn 0"},
+        {"type": "bot", "text": "Turn 0 ans"},
+    ]
+    store.save(parent)
+
+    forked = store.fork_session("parent_sess")
+    assert forked is not None
+    assert forked.fork_msg_count == 2
+    assert forked.auto_titled is False
+
+    # Roundtrip from disk
+    loaded = store.get(forked.id)
+    assert loaded is not None
+    assert loaded.fork_msg_count == 2
+    assert loaded.auto_titled is False
+
+

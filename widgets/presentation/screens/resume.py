@@ -296,6 +296,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
                     sess = None
             if sess:
                 sess.title = new_title
+                sess.auto_titled = True
                 if (
                     hasattr(app, "agent")
                     and getattr(app.agent, "history", None)

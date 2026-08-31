@@ -123,6 +123,16 @@ class TestAutoTitleHelpers(unittest.TestCase):
         sess = AgentSession("s3")
         self.assertEqual(extract_first_user_text(sess), "")
 
+    def test_extract_first_user_text_forked_session(self):
+        sess = AgentSession("s_fork", parent_id="s_parent", fork_msg_count=2)
+        sess.messages = [
+            {"type": "user", "text": "Original message from parent"},
+            {"type": "bot", "text": "Original answer"},
+            {"type": "user", "text": "New prompt in the fork branch"},
+            {"type": "bot", "text": "New answer"},
+        ]
+        self.assertEqual(extract_first_user_text(sess), "New prompt in the fork branch")
+
 
 class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -293,6 +303,43 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(res)
         self.assertEqual(sess._title, "")
 
+    async def test_forked_session_auto_titling(self):
+        sess = AgentSession("s_fork", parent_id="s_parent", title="Original Title (fork)", fork_msg_count=2)
+        sess.messages = [
+            {"type": "user", "text": "Original message from parent"},
+            {"type": "bot", "text": "Original answer"},
+            {"type": "user", "text": "Rewrite backend in Rust using Axum"},
+            {"type": "bot", "text": "Sure, here is the Axum server"},
+        ]
+        mock_agent = MagicMock()
+        mock_agent.api_type = "openai"
+        mock_agent.model = "gpt-4o"
+
+        mock_adapter = MagicMock()
+
+        async def dummy_stream(**kwargs):
+            yield "adapter_text", '{"title": "Axum Backend Rewrite"}'
+
+        mock_adapter.stream_chat = dummy_stream
+
+        with patch("core.adapters.get_adapter", return_value=mock_adapter):
+            res = await auto_title_session(mock_agent, sess)
+
+        self.assertEqual(res, "Axum Backend Rewrite")
+        self.assertEqual(sess.title, "Axum Backend Rewrite")
+        self.assertTrue(sess.auto_titled)
+
+    async def test_forked_session_preserves_title_if_already_auto_titled(self):
+        sess = AgentSession("s_fork", parent_id="s_parent", title="Manual Custom Title", auto_titled=True, fork_msg_count=2)
+        sess.messages = [
+            {"type": "user", "text": "Original message"},
+            {"type": "bot", "text": "Original answer"},
+            {"type": "user", "text": "New prompt"},
+        ]
+        res = await auto_title_session(None, sess)
+        self.assertEqual(res, "Manual Custom Title")
+        self.assertEqual(sess.title, "Manual Custom Title")
+
 
 class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
     async def test_schedule_auto_title_invokes_and_saves(self):
@@ -323,6 +370,40 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0.05)
 
         self.assertEqual(sess.title, "Test auto titling integration")
+        app.sm.save.assert_called_with(sess)
+        self.assertTrue(app.footer_refreshed)
+
+    async def test_schedule_auto_title_with_forked_session(self):
+        from widgets.mixins.message_flow import MessageFlowMixin
+
+        class DummyApp(MessageFlowMixin):
+            def __init__(self):
+                self.is_app_active = True
+                self.current_session_id = "s-fork"
+                self.agent = None
+                self.sm = MagicMock()
+                self.footer_refreshed = False
+
+            def refresh_status_footer(self):
+                self.footer_refreshed = True
+
+        app = DummyApp()
+        sess = AgentSession("s-fork", parent_id="s-orig", title="Orig (fork)", fork_msg_count=1)
+        sess.messages = [
+            {"type": "user", "text": "Old prompt"},
+            {"type": "user", "text": "New prompt in fork"},
+        ]
+
+        with patch("core.application.session.auto_title.get_settings") as mock_settings:
+            mock_settings.return_value.llm.auto_title = True
+            mock_settings.return_value.llm.auto_title_timeout = 8.0
+            mock_settings.return_value.llm.auto_title_max_len = 45
+            mock_settings.return_value.llm.auto_title_model = None
+
+            app._schedule_auto_title(sess)
+            await asyncio.sleep(0.05)
+
+        self.assertEqual(sess.title, "New prompt in fork")
         app.sm.save.assert_called_with(sess)
         self.assertTrue(app.footer_refreshed)
 

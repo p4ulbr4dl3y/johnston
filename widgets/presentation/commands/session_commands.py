@@ -462,6 +462,7 @@ class RenameCommand(BaseCommand):
                 new_title = new_title.strip()
                 if new_title:
                     sess.title = new_title
+                    sess.auto_titled = True
                     if hasattr(app, "agent") and getattr(app.agent, "history", None):
                         sess.agent_history = list(app.agent.history)
                     app.sm.save(sess)

@@ -91,6 +91,8 @@ class AgentSession:
         prompt: str = "",
         created_at: Optional[float] = None,
         updated_at: Optional[float] = None,
+        auto_titled: bool = False,
+        fork_msg_count: int = 0,
     ):
         self.id = session_id
         self.kind = kind
@@ -100,6 +102,8 @@ class AgentSession:
         self.project_key = project_key
         self._title = title
         self.prompt = prompt
+        self.auto_titled = auto_titled
+        self.fork_msg_count = fork_msg_count
         self.messages: List[Dict[str, Any]] = []
         self.agent_history: List[Dict[str, Any]] = []
         self.tokens_input: int = 0
@@ -210,6 +214,8 @@ class AgentSession:
             "project_key": self.project_key,
             "title": self._title,
             "prompt": self.prompt,
+            "auto_titled": self.auto_titled,
+            "fork_msg_count": self.fork_msg_count,
             "messages": self.messages,
             "agent_history": history,
             "tokens_input": self.tokens_input,
@@ -238,6 +244,8 @@ class AgentSession:
             "project_key": self.project_key,
             "title": self._title,
             "prompt": self.prompt,
+            "auto_titled": self.auto_titled,
+            "fork_msg_count": self.fork_msg_count,
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,
             "total_tokens": self.total_tokens,
@@ -274,6 +282,8 @@ class AgentSession:
             prompt=data.get("prompt") or "",
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
+            auto_titled=bool(data.get("auto_titled", False)),
+            fork_msg_count=_coerce_int(data.get("fork_msg_count")),
         )
         sess.messages = data.get("messages", [])
         sess.agent_history = data.get("agent_history", [])

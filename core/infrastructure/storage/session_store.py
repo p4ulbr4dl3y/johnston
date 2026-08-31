@@ -509,6 +509,8 @@ class SessionStore:
                 new_sess.agent_history = copy.deepcopy(history_before_turn(source.agent_history, seq_idx))
         new_sess.project_dir = source.project_dir
         new_sess.branch_name = source.branch_name
+        new_sess.fork_msg_count = len(new_sess.messages)
+        new_sess.auto_titled = False
         self.save(new_sess)
         return new_sess
 

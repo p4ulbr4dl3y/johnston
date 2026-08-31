@@ -255,7 +255,13 @@ class MessageFlowMixin:
             except Exception as e:
                 logger.warning("Session save failed: %s", e)
             self.is_generating = False
-            if getattr(self, "is_app_active", True) and session and not getattr(session, "_title", None):
+            should_auto_title = (
+                getattr(self, "is_app_active", True)
+                and session
+                and not getattr(session, "auto_titled", False)
+                and (not getattr(session, "_title", None) or getattr(session, "parent_id", None))
+            )
+            if should_auto_title:
                 self._schedule_auto_title(session)
             if getattr(self, "is_app_active", True):
                 next_item = self._pop_queued_for_current_session()
@@ -274,7 +280,9 @@ class MessageFlowMixin:
 
     def _schedule_auto_title(self, session: Any) -> None:
         """Schedule background auto-titling for a session without blocking UI."""
-        if not session or getattr(session, "_title", None):
+        if not session or getattr(session, "auto_titled", False):
+            return
+        if getattr(session, "_title", None) and not getattr(session, "parent_id", None):
             return
 
         async def _run() -> None:
