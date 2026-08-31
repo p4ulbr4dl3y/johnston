@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import re
 import tempfile
 import unittest
 import zipfile
@@ -1026,6 +1027,170 @@ class TestConverterRegressions(unittest.TestCase):
         block = fenced_code_block("code with ``` inline", lang="python")
         self.assertTrue(block.startswith("````python\n"))
         self.assertTrue(block.endswith("\n````"))
+
+
+class TestConverterFixes(unittest.TestCase):
+    """Regression tests for the 2026-08 converter fixes: block tags leaking
+    out of table cells, charset detection, CDATA recovery, tracked changes,
+    natural slide/sheet order, and xlsx date rendering."""
+
+    # --- HTML: block tags inside table cells must not leak ---
+
+    def test_html_heading_inside_table_cell(self):
+        md = html_to_markdown(b"<table><tr><td><h4>Cell Title</h4>text</td></tr></table>")
+        self.assertEqual(md, "| Cell Title text |\n| --- |")
+
+    def test_html_list_inside_table_cell(self):
+        md = html_to_markdown(b"<table><tr><td><ul><li>a</li><li>b</li></ul></td></tr></table>")
+        self.assertEqual(md, "| a b |\n| --- |")
+
+    def test_html_link_inside_table_cell(self):
+        md = html_to_markdown(b'<table><tr><td><a href="x.html">link</a></td></tr></table>')
+        self.assertEqual(md, "| [link](x.html) |\n| --- |")
+
+    def test_html_paragraphs_inside_table_cell(self):
+        md = html_to_markdown(b"<table><tr><td><p>One</p><p>Two</p></td></tr></table>")
+        self.assertEqual(md, "| One Two |\n| --- |")
+
+    def test_html_pre_inside_table_cell(self):
+        md = html_to_markdown(b"<table><tr><td><pre>x=1</pre></td></tr></table>")
+        # Code fences are flattened like any other cell content.
+        self.assertEqual(md, "| ``` x=1 ``` |\n| --- |")
+
+    def test_html_cdata_in_pre_preserved(self):
+        md = html_to_markdown("<pre><![CDATA[x = 1]]></pre>")
+        self.assertIn("x = 1", md)
+
+    # --- HTML: charset detection ---
+
+    def test_html_declared_meta_charset(self):
+        html = '<html><head><meta charset="windows-1251"></head><body><h1>Заголовок</h1></body></html>'
+        self.assertIn("# Заголовок", html_to_markdown(html.encode("cp1251")))
+
+    def test_html_utf16_bom(self):
+        self.assertIn("# Заголовок", html_to_markdown("<h1>Заголовок</h1>".encode("utf-16")))
+
+    def test_html_undeclared_cp1251_heuristic(self):
+        html = "<h1>Привет</h1><p>Содержимое страницы</p>".encode("cp1251")
+        self.assertIn("# Привет", html_to_markdown(html))
+
+    def test_html_latin1_fallback_unchanged(self):
+        md = html_to_markdown(b"<h1>Header</h1><p>\xe9\xe0\xfc</p>")
+        self.assertIn("# Header", md)
+        self.assertIn("éàü", md)
+
+    # --- DOCX: tracked changes and content controls ---
+
+    def test_docx_tracked_changes_ins_kept_del_skipped(self):
+        xml = """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body><w:p><w:ins><w:r><w:t>Inserted</w:t></w:r></w:ins><w:del><w:r><w:t>Deleted</w:t></w:r></w:del><w:r><w:t> kept</w:t></w:r></w:p></w:body></w:document>"""
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertIn("Inserted", md)
+        self.assertIn("kept", md)
+        self.assertNotIn("Deleted", md)
+
+    def test_docx_sdt_content_control_preserved(self):
+        xml = """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body><w:sdt><w:sdtPr><w:alias w:val="Cover"/></w:sdtPr><w:sdtContent>
+<w:p><w:r><w:t>Control text</w:t></w:r></w:p>
+<w:tbl><w:tr><w:tc><w:p><w:r><w:t>TCell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+</w:sdtContent></w:sdt></w:body></w:document>"""
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertIn("Control text", md)
+        self.assertIn("TCell", md)
+
+    def test_docx_heading10_not_treated_as_level_one(self):
+        xml = """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>
+<w:p><w:pPr><w:pStyle w:val="Heading10"/></w:pPr><w:r><w:t>LevelTen</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="Heading 1"/></w:pPr><w:r><w:t>LevelOne</w:t></w:r></w:p>
+</w:body></w:document>"""
+        md = docx_to_markdown(_wrap_docx(xml))
+        # "Heading10" must not match the "heading1" substring.
+        self.assertNotIn("# LevelTen", md)
+        self.assertIn("# LevelOne", md)
+
+    # --- PPTX: fallback slide order ---
+
+    def test_pptx_fallback_natural_slide_order(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            for i in range(1, 12):
+                zf.writestr(
+                    f"ppt/slides/slide{i}.xml",
+                    '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
+                    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+                    f"<p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Slide number {i}</a:t></a:r></a:p>"
+                    "</p:txBody></p:sp></p:spTree></p:cSld></p:sld>",
+                )
+        md = pptx_to_markdown(buf.getvalue())
+        order = [int(m) for m in re.findall(r"Slide number (\d+)", md)]
+        self.assertEqual(order, list(range(1, 12)))
+
+    # --- XLSX: dates/percents and fallback sheet order ---
+
+    def _create_xlsx(self, styles_xml: str, worksheet_xml: str, workbook_extras: str = "") -> bytes:
+        ss = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("xl/styles.xml", styles_xml)
+            zf.writestr(
+                "xl/workbook.xml",
+                f'<?xml version="1.0"?><workbook xmlns="{ss}" '
+                'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+                f"{workbook_extras}<sheets><sheet name=\"Data\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>",
+            )
+            zf.writestr(
+                "xl/_rels/workbook.xml.rels",
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                '<Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+            )
+            zf.writestr("xl/worksheets/sheet1.xml", worksheet_xml)
+        return buf.getvalue()
+
+    def test_xlsx_builtin_date_style_rendered(self):
+        ss = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        data = self._create_xlsx(
+            f'<?xml version="1.0"?><styleSheet xmlns="{ss}"><cellXfs count="2">'
+            '<xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>',
+            f'<?xml version="1.0"?><worksheet xmlns="{ss}"><sheetData>'
+            '<row r="1"><c r="A1" s="1"><v>45000</v></c><c r="B1"><v>42.5</v></c></row>'
+            "</sheetData></worksheet>",
+        )
+        md = xlsx_to_markdown(data)
+        self.assertIn("2023-03-15", md)
+        self.assertIn("42.5", md)
+        self.assertNotIn("45000", md)
+
+    def test_xlsx_custom_date_and_percent_styles(self):
+        ss = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        data = self._create_xlsx(
+            f'<?xml version="1.0"?><styleSheet xmlns="{ss}">'
+            '<numFmts count="3"><numFmt numFmtId="164" formatCode="yyyy-mm-dd hh:mm:ss"/>'
+            '<numFmt numFmtId="165" formatCode="0.00%"/></numFmts>'
+            '<cellXfs count="3"><xf numFmtId="0"/><xf numFmtId="164"/><xf numFmtId="165"/></cellXfs>'
+            "</styleSheet>",
+            f'<?xml version="1.0"?><worksheet xmlns="{ss}"><sheetData>'
+            '<row r="1"><c r="A1" s="1"><v>45999.5</v></c><c r="B1" s="2"><v>0.155</v></c></row>'
+            "</sheetData></worksheet>",
+        )
+        md = xlsx_to_markdown(data)
+        self.assertIn("2025-12-08 12:00:00", md)
+        self.assertIn("15.50%", md)
+
+    def test_xlsx_fallback_natural_sheet_order(self):
+        ss = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            for i in range(1, 12):
+                zf.writestr(
+                    f"xl/worksheets/sheet{i}.xml",
+                    f'<?xml version="1.0"?><worksheet xmlns="{ss}"><sheetData>'
+                    f'<row r="1"><c r="A1"><v>{i}</v></c></row></sheetData></worksheet>',
+                )
+        md = xlsx_to_markdown(buf.getvalue())
+        order = [int(m) for m in re.findall(r"## Sheet (\d+)", md)]
+        self.assertEqual(order, list(range(1, 12)))
 
 
 def _wrap_docx(document_xml: str) -> bytes:

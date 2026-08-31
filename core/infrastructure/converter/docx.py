@@ -2,12 +2,17 @@ import io
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-from typing import BinaryIO, Dict, List, Union
+from typing import BinaryIO, Dict, Iterator, List, Union
 
 from core.infrastructure.converter.utils import safe_read_zip_member
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+
+# Paragraph/block wrappers whose descendants hold real content: content
+# controls (w:sdt), smart tags and tracked-change insertions.
+_INLINE_WRAPPERS = {"ins", "smartTag", "moveTo"}
+_BLOCK_WRAPPERS = {"sdt"}
 
 
 def _local_tag(elem: ET.Element) -> str:
@@ -15,6 +20,42 @@ def _local_tag(elem: ET.Element) -> str:
     if tag.startswith("{"):
         return tag.split("}", 1)[1]
     return tag
+
+
+def _iter_blocks(elem: ET.Element) -> Iterator[ET.Element]:
+    """Yield block-level w:p / w:tbl elements.
+
+    Descends into w:sdt content controls, which commonly wrap whole
+    paragraphs or tables (Word cover pages, TOCs, templates) — without this
+    their content is silently dropped.
+    """
+    for child in elem:
+        tag = _local_tag(child)
+        if tag in ("p", "tbl"):
+            yield child
+        elif tag in _BLOCK_WRAPPERS:
+            content = None
+            for sub in child.iter():
+                if _local_tag(sub) == "sdtContent":
+                    content = sub
+                    break
+            if content is not None:
+                yield from _iter_blocks(content)
+
+
+def _iter_inline(elem: ET.Element) -> Iterator[ET.Element]:
+    """Yield inline w:r / w:hyperlink elements of a paragraph.
+
+    Descends into tracked-change insertion containers (w:ins, w:moveTo) and
+    smart tags so their runs are kept; w:del/w:moveFrom (deleted text) are
+    skipped so the output matches the document with changes accepted.
+    """
+    for child in elem:
+        tag = _local_tag(child)
+        if tag in ("r", "hyperlink"):
+            yield child
+        elif tag in _INLINE_WRAPPERS:
+            yield from _iter_inline(child)
 
 
 def docx_to_markdown(docx_input: Union[str, bytes, BinaryIO]) -> str:
@@ -28,51 +69,52 @@ def docx_to_markdown(docx_input: Union[str, bytes, BinaryIO]) -> str:
         source = docx_input
 
     try:
-        zf = zipfile.ZipFile(source)
+        zf_cm = zipfile.ZipFile(source)
     except Exception as e:
         raise ValueError(f"Invalid DOCX file: {e}") from e
 
-    # Read relationships for hyperlinks
-    rels: Dict[str, str] = {}
-    if "word/_rels/document.xml.rels" in zf.namelist():
-        try:
-            rels_tree = ET.fromstring(safe_read_zip_member(zf, "word/_rels/document.xml.rels"))
-            for elem in rels_tree:
-                r_id = elem.attrib.get("Id")
-                target = elem.attrib.get("Target")
-                if r_id and target:
-                    rels[r_id] = target
-        except Exception:
-            pass
+    with zf_cm as zf:
+        # Read relationships for hyperlinks
+        rels: Dict[str, str] = {}
+        if "word/_rels/document.xml.rels" in zf.namelist():
+            try:
+                rels_tree = ET.fromstring(safe_read_zip_member(zf, "word/_rels/document.xml.rels"))
+                for elem in rels_tree:
+                    r_id = elem.attrib.get("Id")
+                    target = elem.attrib.get("Target")
+                    if r_id and target:
+                        rels[r_id] = target
+            except Exception:
+                pass
 
-    # Read document.xml
-    if "word/document.xml" not in zf.namelist():
-        return ""
+        # Read document.xml
+        if "word/document.xml" not in zf.namelist():
+            return ""
 
-    doc_tree = ET.fromstring(safe_read_zip_member(zf, "word/document.xml"))
-    body = None
-    for elem in doc_tree.iter():
-        if _local_tag(elem) == "body":
-            body = elem
-            break
-    if body is None:
-        return ""
+        doc_tree = ET.fromstring(safe_read_zip_member(zf, "word/document.xml"))
+        body = None
+        for elem in doc_tree.iter():
+            if _local_tag(elem) == "body":
+                body = elem
+                break
+        if body is None:
+            return ""
 
-    output: List[str] = []
+        output: List[str] = []
 
-    for child in body:
-        tag = _local_tag(child)
-        if tag == "p":
-            para_md = _parse_paragraph(child, rels)
-            if para_md:
-                output.append(para_md)
-        elif tag == "tbl":
-            table_md = _parse_table(child, rels)
-            if table_md:
-                output.append(table_md)
+        for child in _iter_blocks(body):
+            tag = _local_tag(child)
+            if tag == "p":
+                para_md = _parse_paragraph(child, rels)
+                if para_md:
+                    output.append(para_md)
+            elif tag == "tbl":
+                table_md = _parse_table(child, rels)
+                if table_md:
+                    output.append(table_md)
 
-    text = "\n\n".join(output).strip()
-    return re.sub(r"\n{3,}", "\n\n", text)
+        text = "\n\n".join(output).strip()
+        return re.sub(r"\n{3,}", "\n\n", text)
 
 
 def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
@@ -95,10 +137,13 @@ def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
                         val = v
                         break
                 val_lower = val.lower()
-                for level in range(1, 7):
-                    if f"heading{level}" in val_lower or f"heading {level}" in val_lower:
+                # Exact level capture: "heading10" must not match level 1 the
+                # way a naive substring check does.
+                match = re.search(r"heading\s*(\d+)", val_lower)
+                if match:
+                    level = int(match.group(1))
+                    if 1 <= level <= 6:
                         heading_prefix = "#" * level + " "
-                        break
                 if not heading_prefix and val_lower == "title":
                     heading_prefix = "# "
             elif tag == "numPr":
@@ -113,14 +158,14 @@ def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
                                     list_indent = 0
 
     runs_text: List[str] = []
-    for item in p_elem:
+    for item in _iter_inline(p_elem):
         item_tag = _local_tag(item)
         if item_tag == "r":
             runs_text.append(_parse_run(item))
         elif item_tag == "hyperlink":
             r_id = item.attrib.get(f"{R_NS}id", "") or item.attrib.get("id", "")
             url = rels.get(r_id, "")
-            link_text = "".join(_parse_run(r) for r in item if _local_tag(r) == "r")
+            link_text = "".join(_parse_run(r) for r in _iter_inline(item) if _local_tag(r) == "r")
             if url and link_text:
                 runs_text.append(f"[{link_text}]({url})")
             elif link_text:

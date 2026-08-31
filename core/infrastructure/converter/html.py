@@ -1,8 +1,70 @@
+import codecs
 import re
 from html.parser import HTMLParser
 from typing import List, Optional, Tuple
 
 from core.infrastructure.converter.utils import collapse_blank_lines, fenced_code_block
+
+# Frequent Cyrillic bytes/letters used by the windows-1251 heuristic below.
+_CYRILLIC_LETTERS_RE = re.compile(r"[\u0400-\u04FF]")
+_COMMON_RUSSIAN_RE = re.compile(r"[оеаинтстрвл]", re.IGNORECASE)
+
+
+def _decode_html_bytes(data: bytes) -> str:
+    """Decode raw HTML bytes to text.
+
+    Order: BOM → declared ``<meta charset>`` / XML ``encoding`` → strict UTF-8
+    → windows-1251 heuristic → latin-1 (never fails). Pages without any
+    declared charset in a non-UTF-8 encoding (common for legacy windows-1251
+    content) are recovered instead of degrading to mojibake.
+    """
+    if data.startswith((codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE)):
+        return data.decode("utf-32", errors="replace")
+    if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        return data.decode("utf-16", errors="replace")
+    if data.startswith(codecs.BOM_UTF8):
+        return data.decode("utf-8-sig", errors="replace")
+
+    # The charset declaration lives in the document head; scan a generous
+    # prefix. Search inside <meta> tags (and XML prologs) only, so the literal
+    # word "charset" in body text cannot hijack decoding.
+    head = data[:4096]
+    match = re.search(rb"""<meta[^>]+charset\s*=\s*["']?\s*([a-zA-Z0-9_.\-]+)""", head, re.IGNORECASE)
+    if not match:
+        match = re.search(rb"""<\?xml[^>]+encoding\s*=\s*["']([^"']+)""", head, re.IGNORECASE)
+    if match:
+        declared = match.group(1).decode("ascii", "ignore")
+        try:
+            codecs.lookup(declared)
+        except LookupError:
+            declared = ""
+        if declared:
+            return data.decode(declared, errors="replace")
+
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+
+    # Undeclared legacy Cyrillic: dense 0xC0-0xFF bytes, almost no cp1252
+    # smart-quote bytes, and the cp1251 decoding must look like Russian text
+    # (top frequent letters dominate) before committing to it.
+    size = len(data)
+    if size:
+        high = sum(1 for b in data if 0xC0 <= b <= 0xFF)
+        smart = sum(1 for b in data if 0x91 <= b <= 0x94)
+        if high / size >= 0.30 and smart / size <= 0.01:
+            try:
+                text = data.decode("cp1251")
+            except UnicodeDecodeError:
+                text = ""
+            cyr = len(_CYRILLIC_LETTERS_RE.findall(text))
+            if cyr >= 3:
+                common = len(_COMMON_RUSSIAN_RE.findall(text))
+                if common / cyr >= 0.35:
+                    return text
+
+    return data.decode("latin-1", errors="replace")
 
 
 class HTMLToMarkdownParser(HTMLParser):
@@ -140,20 +202,27 @@ class HTMLToMarkdownParser(HTMLParser):
             return
 
         if tag_lower == "blockquote":
-            self._ensure_newline(2)
-            self._output.append("> ")
+            if self._current_cell is None:
+                self._ensure_newline(2)
+                self._append_token("> ")
             return
 
         if tag_lower in ("h1", "h2", "h3", "h4", "h5", "h6"):
             level = int(tag_lower[1])
+            if self._current_cell is not None:
+                # Headings are invalid inside pipe-table cells; keep only the
+                # text (the closing tag adds a separator) so no '#' leaks out.
+                return
             self._ensure_newline(2)
             self._saw_heading = True
             self._output.append("#" * level + " ")
             return
 
         if tag_lower == "hr":
-            self._ensure_newline(2)
-            self._output.append("---\n\n")
+            if self._current_cell is None:
+                self._ensure_newline(2)
+                self._output.append("---\n\n")
+            # hr inside a link/cell: no meaningful inline equivalent, drop.
             return
 
         if tag_lower == "br":
@@ -186,18 +255,22 @@ class HTMLToMarkdownParser(HTMLParser):
             return
 
         if tag_lower == "li":
-            self._ensure_newline(1)
+            if self._current_cell is not None:
+                # Lists inside table cells are flattened into the cell text;
+                # no bullet markers may leak into the surrounding output.
+                self._append_token(" ")
+                return
             depth = len(self._list_stack) - 1
             indent = "  " * max(0, depth)
             if self._list_stack:
                 list_type, count = self._list_stack[-1]
                 if list_type == "ol":
-                    self._output.append(f"{indent}{count}. ")
+                    self._append_token(f"{indent}{count}. ")
                     self._list_stack[-1] = (list_type, count + 1)
                 else:
-                    self._output.append(f"{indent}- ")
+                    self._append_token(f"{indent}- ")
             else:
-                self._output.append("- ")
+                self._append_token("- ")
             return
 
         if tag_lower == "table":
@@ -209,9 +282,9 @@ class HTMLToMarkdownParser(HTMLParser):
                 self._current_row = None
                 self._current_cell = None
             else:
+                self._ensure_newline(2)
                 self._in_table = True
                 self._table_rows = []
-                self._ensure_newline(2)
             return
 
         if tag_lower == "tr":
@@ -280,9 +353,9 @@ class HTMLToMarkdownParser(HTMLParser):
             content = "".join(self._pre_buffer or []).rstrip("\n")
             self._pre_buffer = None
             if content:
-                self._output.append(fenced_code_block(content) + "\n\n")
+                self._append_token(fenced_code_block(content) + "\n\n")
             else:
-                self._output.append("```\n```\n\n")
+                self._append_token("```\n```\n\n")
             return
 
         if tag_lower == "code":
@@ -304,11 +377,17 @@ class HTMLToMarkdownParser(HTMLParser):
             return
 
         if tag_lower in ("h1", "h2", "h3", "h4", "h5", "h6"):
-            self._ensure_newline(2)
+            if self._current_cell is not None:
+                self._append_token(" ")
+            else:
+                self._ensure_newline(2)
             return
 
         if tag_lower in ("p", "blockquote"):
-            self._ensure_newline(2)
+            if self._current_cell is not None:
+                self._append_token(" ")
+            else:
+                self._ensure_newline(2)
             return
 
         if tag_lower in ("ul", "ol"):
@@ -363,16 +442,19 @@ class HTMLToMarkdownParser(HTMLParser):
                 return
             if self._current_link is not None:
                 href, title, text_parts = self._current_link
-                text = "".join(text_parts).strip()
+                text = re.sub(r"\s+", " ", "".join(text_parts)).strip()
                 if not text:
                     text = href
-                if href and text:
-                    title_suffix = f' "{title}"' if title else ""
-                    self._output.append(f"[{text}]({href}{title_suffix})")
-                elif text:
-                    self._output.append(text)
+                # Detach the link state first so _append_token routes the
+                # rendered markdown into the enclosing cell/output, not back
+                # into the link text itself (e.g. links inside table cells).
                 self._current_link = None
                 self._nested_link_depth = 0
+                if href and text:
+                    title_suffix = f' "{title}"' if title else ""
+                    self._append_token(f"[{text}]({href}{title_suffix})")
+                elif text:
+                    self._append_token(text)
             return
 
     def handle_data(self, data: str) -> None:
@@ -390,18 +472,31 @@ class HTMLToMarkdownParser(HTMLParser):
                 self._output.append(data)
             return
 
-        if self._in_table and self._current_cell is not None:
-            self._current_cell.append(data)
-            return
-
+        # Link first (mirrors _append_token): text of a link inside a table
+        # cell belongs to the link text, not straight into the cell.
         if self._current_link is not None:
             self._current_link[2].append(data)
             return
 
+        if self._in_table and self._current_cell is not None:
+            self._current_cell.append(data)
+            return
+
         cleaned = re.sub(r"\s+", " ", data)
-        self._output.append(cleaned)
+        self._append_token(cleaned)
+
+    def unknown_decl(self, content: str) -> None:
+        """Recover CDATA section content (``<![CDATA[...]]>``), which
+        ``HTMLParser`` reports as an unknown declaration rather than data."""
+        if content.startswith("CDATA["):
+            self.handle_data(content[len("CDATA[") :])
 
     def _ensure_newline(self, count: int = 1) -> None:
+        if self._in_table or self._current_link is not None:
+            # Layout newlines are meaningless while a table or a link owns the
+            # sink: block tags inside them are flattened into cell/link text,
+            # so they must not leak stray newlines into the main output.
+            return
         if not self._output:
             return
         last_str = self._output[-1]
@@ -446,10 +541,7 @@ class HTMLToMarkdownParser(HTMLParser):
 def html_to_markdown(html_content: str | bytes) -> str:
     """Convert HTML string or bytes to clean Markdown."""
     if isinstance(html_content, bytes):
-        try:
-            html_content = html_content.decode("utf-8")
-        except UnicodeDecodeError:
-            html_content = html_content.decode("latin-1", errors="replace")
+        html_content = _decode_html_bytes(html_content)
 
     parser = HTMLToMarkdownParser()
     parser.feed(html_content)

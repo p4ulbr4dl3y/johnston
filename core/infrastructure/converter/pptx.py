@@ -11,6 +11,12 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 
 
+def _slide_sort_key(name: str) -> Tuple[int, str]:
+    """Natural sort for slideN.xml fallbacks so slide2 precedes slide10."""
+    match = re.search(r"slide(\d+)\.xml$", name)
+    return (int(match.group(1)) if match else 0, name)
+
+
 def pptx_to_markdown(pptx_input: Union[str, bytes, BinaryIO]) -> str:
     """
     Converts a PowerPoint presentation (.pptx) to Markdown using Python stdlib zipfile and ElementTree.
@@ -22,61 +28,61 @@ def pptx_to_markdown(pptx_input: Union[str, bytes, BinaryIO]) -> str:
         source = pptx_input
 
     try:
-        zf = zipfile.ZipFile(source)
+        zf_cm = zipfile.ZipFile(source)
     except Exception as e:
         raise ValueError(f"Invalid PPTX file: {e}") from e
 
-    namelist = zf.namelist()
+    with zf_cm as zf:
+        namelist = zf.namelist()
 
-    # 1. Map presentation relationships for slide order
-    pres_rels: Dict[str, str] = {}
-    if "ppt/_rels/presentation.xml.rels" in namelist:
-        try:
-            rel_tree = ET.fromstring(safe_read_zip_member(zf, "ppt/_rels/presentation.xml.rels"))
-            for elem in rel_tree:
-                r_id = elem.attrib.get("Id")
-                target = elem.attrib.get("Target", "").lstrip("/")
-                if r_id and target:
-                    if not target.startswith("ppt/"):
-                        target = f"ppt/{target}"
-                    pres_rels[r_id] = target
-        except Exception:
-            pass
+        # 1. Map presentation relationships for slide order
+        pres_rels: Dict[str, str] = {}
+        if "ppt/_rels/presentation.xml.rels" in namelist:
+            try:
+                rel_tree = ET.fromstring(safe_read_zip_member(zf, "ppt/_rels/presentation.xml.rels"))
+                for elem in rel_tree:
+                    r_id = elem.attrib.get("Id")
+                    target = elem.attrib.get("Target", "").lstrip("/")
+                    if r_id and target:
+                        if not target.startswith("ppt/"):
+                            target = f"ppt/{target}"
+                        pres_rels[r_id] = target
+            except Exception:
+                pass
 
-    slide_files: List[str] = []
-    if "ppt/presentation.xml" in namelist:
-        try:
-            pres_tree = ET.fromstring(safe_read_zip_member(zf, "ppt/presentation.xml"))
-            for sld in pres_tree.iter():
-                tag = sld.tag.split("}", 1)[-1] if "}" in sld.tag else sld.tag
-                if tag == "sldId":
-                    r_id = sld.attrib.get(f"{R_NS}id") or sld.attrib.get("id")
-                    if r_id and r_id in pres_rels:
-                        slide_files.append(pres_rels[r_id])
-        except Exception:
-            pass
+        slide_files: List[str] = []
+        if "ppt/presentation.xml" in namelist:
+            try:
+                pres_tree = ET.fromstring(safe_read_zip_member(zf, "ppt/presentation.xml"))
+                for sld in pres_tree.iter():
+                    tag = sld.tag.split("}", 1)[-1] if "}" in sld.tag else sld.tag
+                    if tag == "sldId":
+                        r_id = sld.attrib.get(f"{R_NS}id") or sld.attrib.get("id")
+                        if r_id and r_id in pres_rels:
+                            slide_files.append(pres_rels[r_id])
+            except Exception:
+                pass
 
-    if not slide_files:
-        # Fallback: scan namelist for slide*.xml
-        for name in sorted(namelist):
-            if name.startswith("ppt/slides/slide") and name.endswith(".xml") and "notes" not in name:
-                slide_files.append(name)
+        if not slide_files:
+            # Fallback: scan namelist for slide*.xml, in natural numeric order.
+            slide_files = [name for name in namelist if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)]
+            slide_files.sort(key=_slide_sort_key)
 
-    output: List[str] = []
+        output: List[str] = []
 
-    for idx, slide_path in enumerate(slide_files, start=1):
-        if slide_path not in namelist:
-            continue
-        try:
-            slide_tree = ET.fromstring(safe_read_zip_member(zf, slide_path))
-            slide_md = _parse_slide(slide_tree, zf, slide_path, idx)
-            if slide_md:
-                output.append(slide_md)
-        except Exception:
-            continue
+        for idx, slide_path in enumerate(slide_files, start=1):
+            if slide_path not in namelist:
+                continue
+            try:
+                slide_tree = ET.fromstring(safe_read_zip_member(zf, slide_path))
+                slide_md = _parse_slide(slide_tree, zf, slide_path, idx)
+                if slide_md:
+                    output.append(slide_md)
+            except Exception:
+                continue
 
-    text = "\n\n---\n\n".join(output).strip()
-    return re.sub(r"\n{3,}", "\n\n", text)
+        text = "\n\n---\n\n".join(output).strip()
+        return re.sub(r"\n{3,}", "\n\n", text)
 
 
 def _parse_slide(slide_tree: ET.Element, zf: zipfile.ZipFile, slide_path: str, slide_num: int) -> str:
