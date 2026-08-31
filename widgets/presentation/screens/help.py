@@ -181,7 +181,7 @@ class HelpScreen(BaseModalScreen[None]):
 
             hint_lbl = self.query_one(f"#{MODAL_HINT_ID}", Label)
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
-            hint_lbl.update("tab/←→" if is_compact else "tab/←→: switch")
+            hint_lbl.update("tab/←→ • esc" if is_compact else "tab/←→: switch • esc: close")
         except Exception:
             pass
 

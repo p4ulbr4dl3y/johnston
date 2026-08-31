@@ -136,7 +136,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
 
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
             hint_lbl = self.query_one(MODAL_HINT, Label)
-            hint_lbl.update("enter • space" if is_compact else "enter: select • space: toggle")
+            hint_lbl.update("enter • space • esc" if is_compact else "enter: select • space: toggle • esc: close")
         except Exception:
             pass
 
