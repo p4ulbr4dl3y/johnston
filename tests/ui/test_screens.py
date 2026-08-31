@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
@@ -139,7 +140,7 @@ class TestModalSearchShiftTab(unittest.TestCase):
             event.prevent_default = MagicMock()
             event.stop = MagicMock()
 
-            screen._on_key(event)
+            asyncio.run(screen._on_key(event))
 
             event.prevent_default.assert_called_once()
             event.stop.assert_called_once()
@@ -153,7 +154,7 @@ class TestModalSearchShiftTab(unittest.TestCase):
         event.prevent_default = MagicMock()
         event.stop = MagicMock()
 
-        screen._on_key(event)
+        asyncio.run(screen._on_key(event))
 
         event.prevent_default.assert_not_called()
         event.stop.assert_not_called()
@@ -412,7 +413,7 @@ class TestProvidersScreen(unittest.TestCase):
             side_effect=lambda id_name, *args: opt_list if "option-list" in id_name else search_input
         )
         event = MagicMock(key="tab")
-        s._on_key(event)
+        asyncio.run(s._on_key(event))
         self.assertIn("p1", s.disabled_set)
         pm.set_provider_disabled.assert_called_with("p1", True)
         event.prevent_default.assert_called_once()

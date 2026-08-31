@@ -434,13 +434,13 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
 
             # Tab
             tab_ev = events.Key("tab", "tab")
-            screen._on_key(tab_ev)
+            await screen._on_key(tab_ev)
             self.assertTrue(tab_ev._stop_propagation)
 
             # Search nav key (up/down handled by mixin)
             with patch.object(screen, "_handle_search_navigation", return_value=True):
                 up_ev = events.Key("up", "up")
-                screen._on_key(up_ev)
+                await screen._on_key(up_ev)
 
             # Non-nav key delegates to super
             with patch.object(screen, "_handle_search_navigation", return_value=False):
@@ -700,13 +700,13 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
 
             # Tab / Ctrl+T
             tab_ev = events.Key("tab", "tab")
-            screen._on_key(tab_ev)
+            await screen._on_key(tab_ev)
             self.assertEqual(len(toggled), 1)
             self.assertTrue(tab_ev._stop_propagation)
 
             # Space key when search input empty
             space_ev = events.Key("space", " ")
-            screen._on_key(space_ev)
+            await screen._on_key(space_ev)
             self.assertEqual(len(toggled), 2)
             self.assertTrue(space_ev._stop_propagation)
 

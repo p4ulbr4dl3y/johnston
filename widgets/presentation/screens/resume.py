@@ -179,7 +179,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
         self._apply_dialog_fit()
         self._refresh_options()
 
-    def _on_key(self, event: events.Key) -> None:
+    async def _on_key(self, event: events.Key) -> None:
         norm_key = normalize_key_to_latin(event.key)
         if norm_key in ("ctrl+r", "f2"):
             self._start_rename_selected()
@@ -191,7 +191,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             event.prevent_default()
             event.stop()
             return
-        super()._on_key(event)
+        await super()._on_key(event)
 
     def _start_delete_selected(self) -> None:
         try:

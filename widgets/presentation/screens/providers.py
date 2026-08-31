@@ -214,7 +214,7 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
                     except Exception:
                         pass
 
-    def _on_key(self, event: events.Key) -> None:
+    async def _on_key(self, event: events.Key) -> None:
         if event.key in KEY_TOGGLE_DISABLED or event.key in TAB_KEYS:
             self.action_toggle_disabled()
             event.prevent_default()
@@ -227,4 +227,4 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
                 event.prevent_default()
                 event.stop()
                 return
-        super()._on_key(event)
+        await super()._on_key(event)

@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 
 from widgets.presentation.screens.resume import ResumeScreen, _order_sessions_hierarchically
@@ -191,7 +192,7 @@ class TestResumeScreen(unittest.TestCase):
         with unittest.mock.patch.object(ResumeScreen, "app", new=mock_app):
             # Trigger rename hotkey
             key_ev = MagicMock(key="ctrl+r")
-            screen._on_key(key_ev)
+            asyncio.run(screen._on_key(key_ev))
             mock_app.push_screen.assert_called_once()
 
             # Check pushed screen callback execution
@@ -229,21 +230,21 @@ class TestResumeScreen(unittest.TestCase):
             # 1. Try deleting active session (s1, idx 0) -> blocked with warning
             opt_list.highlighted = 0
             key_ev = MagicMock(key="ctrl+d")
-            screen._on_key(key_ev)
+            asyncio.run(screen._on_key(key_ev))
             mock_app.notify.assert_called_once_with("Cannot delete active session", severity="warning")
             mock_app.push_screen.assert_not_called()
 
             # 2. Try deleting locked session (s3, idx 2) -> blocked with warning
             mock_app.notify.reset_mock()
             opt_list.highlighted = 2
-            screen._on_key(key_ev)
+            asyncio.run(screen._on_key(key_ev))
             mock_app.notify.assert_called_once_with("Cannot delete locked session", severity="warning")
             mock_app.push_screen.assert_not_called()
 
             # 3. Delete regular session (s2, idx 1) -> opens ConfirmScreen
             mock_app.notify.reset_mock()
             opt_list.highlighted = 1
-            screen._on_key(key_ev)
+            asyncio.run(screen._on_key(key_ev))
             mock_app.push_screen.assert_called_once()
 
             args, kwargs = mock_app.push_screen.call_args

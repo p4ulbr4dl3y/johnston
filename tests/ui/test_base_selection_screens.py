@@ -4,6 +4,7 @@ Exercises the exception paths, alternate display states, key handlers and
 selection handlers of the BaseSelectionScreen (search filtering included).
 """
 
+import asyncio
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -120,7 +121,7 @@ class TestBaseSelectionCoverage(unittest.TestCase):
         event = Key(key="down", character=None)
         event.prevent_default = MagicMock()
         event.stop = MagicMock()
-        screen._on_key(event)
+        asyncio.run(screen._on_key(event))
         self.assertEqual(screen.query_one("o").highlighted, 0)
         event.prevent_default.assert_called()
         event.stop.assert_called()
@@ -131,7 +132,7 @@ class TestBaseSelectionCoverage(unittest.TestCase):
         event = Key(key="down", character=None)
         event.prevent_default = MagicMock()
         event.stop = MagicMock()
-        screen._on_key(event)
+        asyncio.run(screen._on_key(event))
         self.assertEqual(opt_list.highlighted, 1)
         event.prevent_default.assert_called()
 
@@ -141,7 +142,7 @@ class TestBaseSelectionCoverage(unittest.TestCase):
         event = Key(key="down", character=None)
         event.prevent_default = MagicMock()
         event.stop = MagicMock()
-        screen._on_key(event)
+        asyncio.run(screen._on_key(event))
         opt_list.action_cursor_down.assert_called_once()
         event.prevent_default.assert_called()
 
@@ -151,7 +152,7 @@ class TestBaseSelectionCoverage(unittest.TestCase):
         event = Key(key="up", character=None)
         event.prevent_default = MagicMock()
         event.stop = MagicMock()
-        screen._on_key(event)
+        asyncio.run(screen._on_key(event))
         opt_list.action_cursor_up.assert_called_once()
 
     def test_on_key_search_not_focused(self):
@@ -160,7 +161,7 @@ class TestBaseSelectionCoverage(unittest.TestCase):
         event = Key(key="down", character=None)
         event.prevent_default = MagicMock()
         event.stop = MagicMock()
-        screen._on_key(event)
+        asyncio.run(screen._on_key(event))
         event.prevent_default.assert_not_called()
 
     def test_on_key_exception(self):
@@ -169,7 +170,7 @@ class TestBaseSelectionCoverage(unittest.TestCase):
         event = Key(key="down", character=None)
         event.prevent_default = MagicMock()
         event.stop = MagicMock()
-        screen._on_key(event)  # must not raise
+        asyncio.run(screen._on_key(event))  # must not raise
 
     def test_on_option_selected_none_item_stops(self):
         screen = BaseSelectionScreen("t", ["A"], [None], "a", show_search=False)

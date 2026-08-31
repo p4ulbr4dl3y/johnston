@@ -398,7 +398,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
 
         self.dismiss(self.default_value)
 
-    def _on_key(self, event: events.Key) -> None:
+    async def _on_key(self, event: events.Key) -> None:
         if self.show_search and event.key in TAB_KEYS:
             event.prevent_default()
             event.stop()

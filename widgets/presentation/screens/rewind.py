@@ -217,14 +217,14 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
                 OptionList.OptionSelected(opt_list, Option(""), len(self.filtered_items) - 1)
             )
 
-    def _on_key(self, event: events.Key) -> None:
+    async def _on_key(self, event: events.Key) -> None:
         if event.key in TAB_KEYS:
             event.prevent_default()
             event.stop()
             return
         if self._handle_search_navigation(event):
             return
-        super()._on_key(event)
+        await super()._on_key(event)
 
     def on_resize(self, event: events.Resize) -> None:
         self._refresh_options()
