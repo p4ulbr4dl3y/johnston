@@ -4,7 +4,7 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList
+from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
 from core.application.skills.manager import get_skill_manager
@@ -16,12 +16,11 @@ from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT,
     MODAL_HINT_ID,
-    MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 
@@ -63,10 +62,10 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
-            yield Markdown("### **Available Skills**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield ModalHeader("Available Skills", esc_hint="esc: close")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="skills-option-list")
-            yield ModalHint("enter: select • space/tab: toggle • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint("enter: select • space: toggle", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)
@@ -137,7 +136,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
 
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
             hint_lbl = self.query_one(MODAL_HINT, Label)
-            hint_lbl.update("enter • space/tab: toggle • esc" if is_compact else "enter: select • space/tab: toggle • esc: close")
+            hint_lbl.update("enter • space" if is_compact else "enter: select • space: toggle")
         except Exception:
             pass
 

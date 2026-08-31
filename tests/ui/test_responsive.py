@@ -268,8 +268,8 @@ class TestRefactoredWidgets:
             widget.render_footer()
             return widget.rendered
 
-        assert "pgup/pgdn" not in _table_text(_render(BREAKPOINT_HINT - 1))
-        assert "pgup/pgdn" in _table_text(_render(BREAKPOINT_HINT + 20))
+        assert "pgup" not in _table_text(_render(BREAKPOINT_HINT - 1))
+        assert "pgup" in _table_text(_render(BREAKPOINT_HINT + 20))
 
     def test_permission_hint_adapts_to_width(self):
         screen = PermissionConfirmScreen.__new__(PermissionConfirmScreen)

@@ -25,6 +25,7 @@ from widgets.presentation.tool_display import (
     extract_subagent_progress,
     is_subagent_running,
 )
+from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import (
@@ -328,12 +329,10 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
-            yield Markdown(
-                self._get_header_md(), id=self.title_id, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}"
-            )
+            yield ModalHeader(self._get_header_md(), esc_hint="esc: close", id=self.title_id)
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id=self.option_list_id)
-            yield ModalHint(f"{self.hint_action_name} • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint(f"{self.hint_action_name}", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.search_nav_option_list_id = self.option_list_id
@@ -391,15 +390,15 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             action_short = self.hint_action_name.split(":")[0]
             if is_compact:
                 hint_str = (
-                    f"{action_short} • c-k: kill • esc"
+                    f"{action_short} • c-k: kill"
                     if is_running
-                    else f"{action_short} • ↑↓ • esc"
+                    else f"{action_short}"
                 )
             else:
                 hint_str = (
-                    f"{self.hint_action_name} • ↑↓: nav • ctrl+k: kill • esc: close"
+                    f"{self.hint_action_name} • ctrl+k: kill"
                     if is_running
-                    else f"{self.hint_action_name} • ↑↓: nav • esc: close"
+                    else f"{self.hint_action_name}"
                 )
             hint.update(hint_str)
         except Exception:

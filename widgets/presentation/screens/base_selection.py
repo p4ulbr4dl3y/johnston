@@ -160,7 +160,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         default_value: T,
         show_search: bool = False,
         search_placeholder: str = "Search...",
-        hint_text: str = "enter: select • ↑↓: nav • esc: close",
+        hint_text: str = "enter: select • esc: close",
         option_list_id: str = MODAL_OPTION_LIST_ID,
         dialog_classes: str = "",
         fit_content: bool = False,

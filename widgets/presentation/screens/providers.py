@@ -47,7 +47,7 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             default_value=active_key if active_key in items else (items[0] if items else ""),
             show_search=True,
             search_placeholder="Search...",
-            hint_text="enter: connect • space/tab: toggle • esc: close",
+            hint_text="enter: connect • space: toggle • esc: close",
             dialog_classes="modal-dialog-medium",
         )
 

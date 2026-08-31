@@ -303,7 +303,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
     def test_content_width_calculation_shell(self):
         screen_short = PermissionConfirmScreen("shell", {"command": "git status"})
         w_short = screen_short._calculate_content_width()
-        self.assertGreaterEqual(w_short, 44)
+        self.assertGreaterEqual(w_short, 40)
         self.assertLess(w_short, 70)
 
         screen_med = PermissionConfirmScreen(
@@ -330,7 +330,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         w = screen_prompt._calculate_content_width()
         # Text descriptions and prompts are capped to ~64 + gutter, avoiding 100+ ballooning
         self.assertLessEqual(w, 75)
-        self.assertGreaterEqual(w, 44)
+        self.assertGreaterEqual(w, 40)
 
     async def test_adaptive_modal_width_applied_on_mount(self):
         screen = PermissionConfirmScreen("shell", {"command": "git status"})
@@ -340,7 +340,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             # Should hug content rather than stretching to 104
             self.assertIsNotNone(dialog.styles.width)
             self.assertLessEqual(dialog.styles.width.value, 70)
-            self.assertGreaterEqual(dialog.styles.width.value, 44)
+            self.assertGreaterEqual(dialog.styles.width.value, 40)
 
 
 if __name__ == "__main__":

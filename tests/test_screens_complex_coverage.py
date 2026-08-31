@@ -470,29 +470,29 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
         try:
             screen_create = PermissionConfirmScreen("create", {"path": temp_path, "content": "new code"})
             w1 = screen_create._calculate_content_width()
-            self.assertGreater(w1, 40)
+            self.assertGreaterEqual(w1, 40)
         finally:
             os.unlink(temp_path)
 
         # manage_shell send_input
         screen_ms = PermissionConfirmScreen("manage_shell", {"action": "send_input", "input": "yes\nall\n"})
         w2 = screen_ms._calculate_content_width()
-        self.assertGreater(w2, 40)
+        self.assertGreaterEqual(w2, 40)
 
         # manage_subagent send_message
         screen_sub = PermissionConfirmScreen("manage_subagent", {"action": "send_message", "message": "hello\nworld\n"})
         w3 = screen_sub._calculate_content_width()
-        self.assertGreater(w3, 40)
+        self.assertGreaterEqual(w3, 40)
 
         # invoke_subagent prompt
         screen_sub_prompt = PermissionConfirmScreen("invoke_subagent", {"prompt": "line1\nline2\n"})
         w4 = screen_sub_prompt._calculate_content_width()
-        self.assertGreater(w4, 40)
+        self.assertGreaterEqual(w4, 40)
 
         # generic args dict
         screen_gen = PermissionConfirmScreen("custom", {"k": "v"})
         w5 = screen_gen._calculate_content_width()
-        self.assertGreater(w5, 40)
+        self.assertGreaterEqual(w5, 40)
 
 
 class TestHelpScreenCoverage(unittest.IsolatedAsyncioTestCase):

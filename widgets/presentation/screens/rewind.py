@@ -6,7 +6,7 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList
+from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
 from core.application.session.actions import RewindEntry
@@ -16,14 +16,13 @@ from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT,
     MODAL_HINT_ID,
-    MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
     MODAL_OPTION_LIST,
     MODAL_OPTION_LIST_ID,
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, ellipsize, format_badge_row, option_list_row_width
 
@@ -87,8 +86,8 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
 
         options = self._format_step1_options(MODAL_WIDE_ROW_WIDTH, self.filtered_entries)
 
-        self.title = "### **Select Message to Rollback To**"
-        self.hint_text = "enter: select • ↑↓: nav • esc: cancel"
+        self.title = "Select Message to Rollback To"
+        self.hint_text = "enter: select"
         self.raw_options = list(options)
         self.raw_items = [m.index for m in user_messages]
         self.filtered_options = list(options)
@@ -163,14 +162,14 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
 
             screen_w = resolve_screen_width(self)
             hint_lbl = self.query_one(MODAL_HINT, Label)
-            h_text = "enter • ↑↓ • esc" if screen_w < BREAKPOINT_HINT else self.hint_text
+            h_text = "enter" if screen_w < BREAKPOINT_HINT else self.hint_text
             hint_lbl.update(h_text)
         except Exception:
             pass
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
-            yield Markdown(self.title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield ModalHeader(self.title, esc_hint="esc: cancel")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             yield ModalHint(self.hint_text, id=MODAL_HINT_ID)

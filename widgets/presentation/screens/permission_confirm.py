@@ -328,7 +328,9 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
         hint = self._build_hint_text()
         title = "Confirm Tool Action"
-        base_width = modal_content_width(options=options, title=title, hint=hint, extra=MODAL_CONTENT_GUTTER)
+        base_width = modal_content_width(
+            options=options, title=title, hint=hint, esc_hint="esc: deny", extra=MODAL_CONTENT_GUTTER
+        )
 
         # Cap natural language descriptions so they wrap gracefully rather than ballooning modal width
         TEXT_DESC_CAP = 64
@@ -455,8 +457,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
     def _build_hint_text(self, width: Optional[int] = None) -> str:
         if isinstance(width, int) and is_compact_width(width, breakpoint=BREAKPOINT_HINT):
-            return "enter • ↑↓ • r"
-        return "enter: select • ↑↓: nav • r: feedback"
+            return "enter • r"
+        return "enter: select • r: feedback"
 
     def on_resize(self, event) -> None:
         self._apply_dialog_fit()

@@ -144,9 +144,9 @@ class DiffFooter(ResizeDebounceMixin, Static):
             else:
                 raw_hint = "enter: view • esc: close"
         elif width >= BREAKPOINT_HINT:
-            raw_hint = "↑↓: files • tab: toggle sidebar • pgup/pgdn: scroll"
+            raw_hint = "tab: toggle sidebar • pgup/dn: scroll"
         else:
-            raw_hint = "↑↓: files • tab: sidebar"
+            raw_hint = "tab: sidebar"
 
         right_text = format_modal_hint(raw_hint)
         table.add_row(left_text, right_text)

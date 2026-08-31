@@ -28,7 +28,7 @@ class ThemeScreen(BaseSelectionScreen[str]):
             default_value=current,
             show_search=True,
             search_placeholder="Search themes...",
-            hint_text="enter: select • ↑↓: nav • esc: cancel",
+            hint_text="enter: select • esc: cancel",
             fit_content=True,
         )
 

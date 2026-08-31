@@ -27,7 +27,7 @@ class ForkScreen(BaseSelectionScreen[int]):
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
-            hint_text="enter: fork • ↑↓: nav • esc: cancel",
+            hint_text="enter: fork • esc: cancel",
         )
 
     def _row_width(self) -> int:

@@ -5,7 +5,7 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList
+from textual.widgets import Input, Label, OptionList
 from textual.widgets.option_list import Option
 
 from core.domain.defaults.config import THEME_MUTED
@@ -17,12 +17,11 @@ from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT,
     MODAL_HINT_ID,
-    MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import (
@@ -64,10 +63,10 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
-            yield Markdown("### **Manage MCP Servers**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield ModalHeader("Manage MCP Servers", esc_hint="esc: close")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="mcp-option-list")
-            yield ModalHint("enter/space/tab: toggle • ↑↓: nav • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint("enter: select • space: toggle", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -252,7 +251,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
             hint_lbl = self.query_one(MODAL_HINT, Label)
-            hint_lbl.update("enter/tab: toggle • esc" if is_compact else "enter/space/tab: toggle • ↑↓: nav • esc: close")
+            hint_lbl.update("enter • space" if is_compact else "enter: select • space: toggle")
         except Exception:
             pass
 
