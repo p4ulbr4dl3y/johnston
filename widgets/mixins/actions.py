@@ -49,9 +49,9 @@ class ActionsMixin:
     def action_toggle_plan(self) -> None:
         """Toggle expansion of the top plan notch widget"""
         try:
-            from widgets.presentation.widgets.chat_notch import ChatNotch
+            from widgets.presentation.widgets.plan_notch import PlanNotch
 
-            notch = self.query_one(ChatNotch)
+            notch = self.query_one(PlanNotch)
             notch.toggle_expanded()
         except Exception:
             pass

@@ -11,7 +11,7 @@ from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
 from widgets.presentation.widgets.attachment_bar import AttachmentBar
 from widgets.presentation.widgets.chat_container import ChatView
-from widgets.presentation.widgets.chat_notch import ChatNotchContainer
+from widgets.presentation.widgets.plan_notch import PlanNotchContainer
 from widgets.status_footer import StatusFooter
 
 logger = logging.getLogger("johnston.app")
@@ -21,7 +21,7 @@ class LifecycleMixin:
     """Compose, mount, unmount and initial setup handling for JohnstonApp."""
 
     def compose(self) -> ComposeResult:
-        yield ChatNotchContainer(id="chat-notch-container")
+        yield PlanNotchContainer(id="plan-notch-container")
         with Vertical(id="app-container"):
             yield ChatView(id="chat-view")
             yield CommandSuggestions(id="command-suggestions")

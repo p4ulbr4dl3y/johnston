@@ -3,12 +3,12 @@ import unittest
 import pytest
 
 from widgets.app.app import JohnstonApp
-from widgets.presentation.widgets.chat_notch import ChatNotch, ChatNotchContainer
+from widgets.presentation.widgets.plan_notch import PlanNotch, PlanNotchContainer
 
 
-class TestChatNotch(unittest.TestCase):
+class TestPlanNotch(unittest.TestCase):
     def test_init_and_toggle(self):
-        notch = ChatNotch()
+        notch = PlanNotch()
         self.assertFalse(notch.is_expanded)
         notch.toggle_expanded()
         self.assertTrue(notch.is_expanded)
@@ -16,7 +16,7 @@ class TestChatNotch(unittest.TestCase):
         self.assertFalse(notch.is_expanded)
 
     def test_render_collapsed_and_expanded_default(self):
-        notch = ChatNotch()
+        notch = PlanNotch()
         col = notch._render_collapsed()
         self.assertIsNotNone(col)
         self.assertIn("5/12", col.plain)
@@ -26,7 +26,7 @@ class TestChatNotch(unittest.TestCase):
         self.assertIn("Implement docx/xlsx/pptx/epub safe parser", exp.plain)
 
     def test_empty_plan_items(self):
-        notch = ChatNotch()
+        notch = PlanNotch()
         notch.plan_items = []
         notch.plan_explanation = ""
         col = notch._render_collapsed()
@@ -35,7 +35,7 @@ class TestChatNotch(unittest.TestCase):
         self.assertIn("No tasks in plan", exp.plain)
 
     def test_single_item_plan(self):
-        notch = ChatNotch()
+        notch = PlanNotch()
         notch.plan_items = [{"step": "Single item", "status": "in_progress"}]
         col = notch._render_collapsed()
         self.assertIn("0/1 Single item", col.plain)
@@ -43,7 +43,7 @@ class TestChatNotch(unittest.TestCase):
         self.assertIn("[▶] Single item", exp.plain)
 
     def test_rich_markup_escaping(self):
-        notch = ChatNotch()
+        notch = PlanNotch()
         notch.plan_explanation = "Using regex [\\[0-9]+] and <tag>"
         notch.plan_items = [
             {"step": "Handle [WIP] pattern with <bold>", "status": "in_progress"},
@@ -56,7 +56,7 @@ class TestChatNotch(unittest.TestCase):
         self.assertIn("[/test]", exp.plain)
 
     def test_all_completed_sliding_window(self):
-        notch = ChatNotch()
+        notch = PlanNotch()
         notch.plan_items = [{"step": f"Task {i}", "status": "completed"} for i in range(10)]
         col = notch._render_collapsed()
         self.assertIn("10/10 All tasks completed", col.plain)
@@ -66,7 +66,7 @@ class TestChatNotch(unittest.TestCase):
         self.assertIn("... (4 earlier steps)", exp.plain)
 
     def test_no_in_progress_picks_pending(self):
-        notch = ChatNotch()
+        notch = PlanNotch()
         notch.plan_items = [
             {"step": "Task 0", "status": "completed"},
             {"step": "Task 1", "status": "pending"},
@@ -78,7 +78,7 @@ class TestChatNotch(unittest.TestCase):
         self.assertIn("[ ] Task 1", exp.plain)
 
     def test_sliding_window_at_beginning(self):
-        notch = ChatNotch()
+        notch = PlanNotch()
         notch.plan_items = [
             {"step": f"Task {i}", "status": "in_progress" if i == 0 else "pending"}
             for i in range(10)
@@ -89,24 +89,24 @@ class TestChatNotch(unittest.TestCase):
         self.assertNotIn("earlier steps", exp.plain)
 
     def test_refresh_notch_safe(self):
-        notch = ChatNotch()
+        notch = PlanNotch()
         notch.refresh_notch()
         notch.is_expanded = True
         notch.refresh_notch()
 
     def test_container_compose(self):
-        container = ChatNotchContainer()
+        container = PlanNotchContainer()
         children = list(container.compose())
         self.assertEqual(len(children), 1)
-        self.assertIsInstance(children[0], ChatNotch)
-        self.assertEqual(children[0].id, "chat-notch")
+        self.assertIsInstance(children[0], PlanNotch)
+        self.assertEqual(children[0].id, "plan-notch")
 
 
 @pytest.mark.asyncio
 async def test_action_toggle_plan_pilot():
     app = JohnstonApp()
     async with app.run_test() as pilot:
-        notch = app.query_one(ChatNotch)
+        notch = app.query_one(PlanNotch)
         self_expanded_initial = notch.is_expanded
         app.action_toggle_plan()
         self_expanded_after = notch.is_expanded

@@ -6,7 +6,7 @@ from textual.screen import ModalScreen
 
 from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.presentation.widgets.chat_container import ChatView
-from widgets.presentation.widgets.chat_notch import ChatNotch, ChatNotchContainer
+from widgets.presentation.widgets.plan_notch import PlanNotch, PlanNotchContainer
 from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 from widgets.utils.key_aliases import expand_bindings
 
@@ -37,7 +37,7 @@ class SubagentViewScreen(ModalScreen[None]):
         self.queue_task = None
 
     def compose(self) -> ComposeResult:
-        yield ChatNotchContainer(id="chat-notch-container")
+        yield PlanNotchContainer(id="plan-notch-container")
         with Vertical(id="subagent-container"):
             yield ChatView(id="subagent-chat-view", show_welcome=False)
             yield SubagentStatusFooter(from_tasks=self.from_tasks, id="subagent-status-footer")
@@ -45,7 +45,7 @@ class SubagentViewScreen(ModalScreen[None]):
     def action_toggle_plan(self) -> None:
         """Toggle expansion of the top plan notch widget."""
         try:
-            notch = self.query_one(ChatNotch)
+            notch = self.query_one(PlanNotch)
             notch.toggle_expanded()
         except Exception:
             pass

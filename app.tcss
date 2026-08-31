@@ -65,7 +65,7 @@ Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, T
     background: $bg-app;
 }
 
-#chat-notch-container {
+#plan-notch-container {
     layer: overlay;
     dock: top;
     width: 100%;
@@ -76,7 +76,7 @@ Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, T
     margin: 0;
 }
 
-#chat-notch {
+#plan-notch {
     visibility: visible;
     width: 68;
     max-width: 90%;

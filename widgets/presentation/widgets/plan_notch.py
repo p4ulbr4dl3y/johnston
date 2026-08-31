@@ -18,7 +18,7 @@ class PlanItem(TypedDict, total=False):
     status: str
 
 
-class ChatNotch(Static):
+class PlanNotch(Static):
     """Dynamic island / plan notch pinned at the top center."""
 
     can_focus = False
@@ -191,14 +191,14 @@ class ChatNotch(Static):
             pass
 
 
-class ChatNotchContainer(Container):
-    """Overlay container that anchors the floating notch at the top center."""
+class PlanNotchContainer(Container):
+    """Overlay container that anchors the floating plan notch at the top center."""
 
     can_focus = False
     ALLOW_SELECT = False
 
     def compose(self) -> ComposeResult:
-        yield ChatNotch(id="chat-notch")
+        yield PlanNotch(id="plan-notch")
 
 
 class HudOverlay(Container):
