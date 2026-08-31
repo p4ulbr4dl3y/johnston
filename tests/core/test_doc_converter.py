@@ -277,9 +277,13 @@ class TestIPYNBToMarkdown(unittest.TestCase):
         self.assertIn("ValueError: bad val", md)
 
     def test_corrupted_or_non_dict_ipynb(self):
-        self.assertEqual(ipynb_to_markdown(b"not json at all"), "")
-        self.assertEqual(ipynb_to_markdown(json.dumps([1, 2, 3])), "")
-        self.assertEqual(ipynb_to_markdown({"cells": "not a list"}), "")
+        # Malformed notebooks raise instead of silently converting to "".
+        with self.assertRaises(ValueError):
+            ipynb_to_markdown(b"not json at all")
+        with self.assertRaises(ValueError):
+            ipynb_to_markdown(json.dumps([1, 2, 3]))
+        with self.assertRaises(ValueError):
+            ipynb_to_markdown({"cells": "not a list"})
 
 
 class TestDOCXToMarkdown(unittest.TestCase):
@@ -1199,6 +1203,255 @@ def _wrap_docx(document_xml: str) -> bytes:
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("word/document.xml", document_xml)
     return buf.getvalue()
+
+
+class TestConverterListQuoteAndRunFixes(unittest.TestCase):
+    """Regression tests: list items torn apart by block tags, blockquote
+    nesting, inline tags leaking out of <pre>, stray end tags, caption glue,
+    docx run merging / numId=0 / merged cells, xlsx row indexing, ipynb
+    language detection."""
+
+    # --- HTML: block tags must not tear list items apart ---
+
+    def test_html_paragraph_inside_list_item(self):
+        md = html_to_markdown("<ul><li>a<p>b</p></li><li>c</li></ul>")
+        self.assertEqual(md, "- a\n\n  b\n- c")
+
+    def test_html_div_inside_list_item(self):
+        md = html_to_markdown("<ul><li>a<div>b</div></li></ul>")
+        self.assertEqual(md, "- a\n  b")
+
+    def test_html_hr_inside_list_item_dropped(self):
+        md = html_to_markdown("<ul><li>a<hr>b</li></ul>")
+        self.assertEqual(md, "- ab")
+
+    def test_html_blockquote_inside_list_item_flattened(self):
+        md = html_to_markdown("<ul><li>a<blockquote>q</blockquote></li></ul>")
+        self.assertEqual(md, "- aq")
+
+    def test_html_br_inside_list_item_indents(self):
+        md = html_to_markdown("<ul><li>a<br>b</li></ul>")
+        self.assertEqual(md, "- a\n  b")
+
+    def test_html_pre_inside_list_item_indented(self):
+        md = html_to_markdown("<ul><li>item<pre>x=1</pre>tail</li></ul>")
+        self.assertEqual(md, "- item\n  ```\n  x=1\n  ```\n  tail")
+
+    # --- HTML: blockquote nesting and content prefixes ---
+
+    def test_html_nested_blockquote(self):
+        md = html_to_markdown("<blockquote><blockquote>deep</blockquote></blockquote>")
+        self.assertIn("> > deep", md)
+
+    def test_html_blockquote_paragraphs(self):
+        md = html_to_markdown("<blockquote><p>one</p><p>two</p></blockquote>")
+        self.assertIn("> one", md)
+        self.assertIn("> two", md)
+
+    def test_html_blockquote_keeps_list(self):
+        md = html_to_markdown("<blockquote><ul><li>i1</li><li>i2</li></ul></blockquote>")
+        self.assertIn("> - i1", md)
+        self.assertIn("> - i2", md)
+
+    def test_html_blockquote_keeps_pre(self):
+        md = html_to_markdown("<blockquote><pre>x=1</pre></blockquote>")
+        self.assertIn("> ```", md)
+        self.assertIn("> x=1", md)
+
+    def test_html_blockquote_inline_content(self):
+        md = html_to_markdown("<blockquote>text <b>bold</b> more</blockquote>")
+        self.assertEqual(md, "> text **bold** more")
+
+    def test_html_blockquote_between_headings(self):
+        md = html_to_markdown("<h2>Before</h2><blockquote>quoted</blockquote><h2>After</h2>")
+        self.assertIn("> quoted", md)
+
+    # --- HTML: <pre> must swallow inline tags verbatim ---
+
+    def test_html_formatting_inside_pre_buffered(self):
+        md = html_to_markdown("<pre>def f():\n    <b>bold</b> x = 1\n    return 2</pre>")
+        self.assertFalse(md.startswith("****"))
+        self.assertIn("```\ndef f():\n    bold x = 1\n    return 2\n```", md)
+
+    def test_html_link_inside_pre_buffered(self):
+        md = html_to_markdown('<pre>see <a href="/d">docs</a> here</pre>')
+        self.assertTrue(md.startswith("```"))
+        self.assertIn("see docs here", md)
+
+    def test_html_img_inside_pre_dropped(self):
+        md = html_to_markdown('<pre>x <img src="i.png"> y</pre>')
+        self.assertEqual(md, "```\nx  y\n```")
+
+    # --- HTML: stray end tags must not leak markers ---
+
+    def test_html_stray_end_tags_dropped(self):
+        md = html_to_markdown("<p>ok</p></b></i>tail")
+        self.assertEqual(md, "ok\n\ntail")
+
+    def test_html_unclosed_tag_auto_closed(self):
+        md = html_to_markdown("<p>**start <b>bold</p>")
+        self.assertIn("**bold**", md)
+
+    # --- HTML: table interstitial text separated ---
+
+    def test_html_caption_separated_from_table(self):
+        md = html_to_markdown("<table><caption>Cap text</caption><tr><td>a</td><td>b</td></tr></table>")
+        self.assertEqual(md, "Cap text\n\n| a | b |\n| --- | --- |")
+
+    # --- HTML: escaping and charset ---
+
+    def test_html_link_title_quotes_escaped(self):
+        md = html_to_markdown('<a href="/x" title=\'a "b" c\'>L</a>')
+        self.assertEqual(md, '[L](/x "a \\"b\\" c")')
+
+    def test_html_img_alt_brackets_escaped(self):
+        md = html_to_markdown('<img src="/i.png" alt="a [b] c">')
+        self.assertEqual(md, "![a \\[b\\] c](/i.png)")
+
+    def test_html_unbalanced_parens_in_href_escaped(self):
+        md = html_to_markdown('<a href="http://x/a(b">link</a>')
+        self.assertEqual(md, "[link](http://x/a\\(b)")
+
+    def test_html_balanced_parens_in_href_untouched(self):
+        md = html_to_markdown('<a href="http://x/a(b)">link</a>')
+        self.assertEqual(md, "[link](http://x/a(b))")
+
+    def test_html_space_in_url_encoded(self):
+        md = html_to_markdown('<a href="/a b">L</a>')
+        self.assertEqual(md, "[L](/a%20b)")
+
+    def test_html_nbsp_preserved(self):
+        md = html_to_markdown("<p>a&nbsp;b</p>")
+        self.assertIn("a\xa0b", md)
+
+    def test_html_dt_dd_block_separated(self):
+        md = html_to_markdown("<dl><dt>Term</dt><dd>Def</dd></dl>")
+        self.assertEqual(md, "Term\n\nDef")
+
+    def test_html_cp1252_smart_quotes_recovered(self):
+        md = html_to_markdown(b"<h1>Q&A \x93Section\x94</h1>")
+        self.assertIn("“Section”", md)
+
+    # --- DOCX: run merging, numId=0, merged cells ---
+
+    def test_docx_adjacent_bold_runs_merged(self):
+        xml = (
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:body><w:p>"
+            '<w:r><w:rPr><w:b/></w:rPr><w:t>Bold1 </w:t></w:r>'
+            '<w:r><w:rPr><w:b/></w:rPr><w:t>Bold2</w:t></w:r>'
+            "</w:p></w:body></w:document>"
+        )
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertEqual(md, "**Bold1 Bold2**")
+
+    def test_docx_trailing_space_outside_emphasis(self):
+        xml = (
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:body><w:p>"
+            '<w:r><w:rPr><w:b/></w:rPr><w:t>Bold </w:t></w:r>'
+            "<w:r><w:t>tail</w:t></w:r>"
+            "</w:p></w:body></w:document>"
+        )
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertEqual(md, "**Bold** tail")
+
+    def test_docx_numid_zero_disables_list(self):
+        xml = (
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            "<w:body><w:p>"
+            '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr></w:pPr>'
+            "<w:r><w:t>Plain override</w:t></w:r>"
+            "</w:p></w:body></w:document>"
+        )
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertEqual(md, "Plain override")
+
+    def test_docx_gridspan_keeps_columns_aligned(self):
+        w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+        xml = (
+            f"<w:document {w}><w:body><w:tbl>"
+            '<w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr>'
+            "<w:p><w:r><w:t>Wide</w:t></w:r></w:p></w:tc></w:tr>"
+            "<w:tr><w:tc><w:p><w:r><w:t>a</w:t></w:r></w:p></w:tc>"
+            "<w:tc><w:p><w:r><w:t>b</w:t></w:r></w:p></w:tc></w:tr>"
+            "</w:tbl></w:body></w:document>"
+        )
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertIn("| Wide |  |", md)
+        self.assertIn("| a | b |", md)
+
+    def test_docx_vmerge_continue_cell_emptied(self):
+        w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+        xml = (
+            f"<w:document {w}><w:body><w:tbl>"
+            '<w:tr><w:tc><w:tcPr><w:vMerge w:val="restart"/></w:tcPr>'
+            "<w:p><w:r><w:t>Merged</w:t></w:r></w:p></w:tc>"
+            "<w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr>"
+            '<w:tr><w:tc><w:tcPr><w:vMerge/></w:tcPr><w:p><w:r><w:t>cont</w:t></w:r></w:p></w:tc>'
+            "<w:tc><w:p><w:r><w:t>y</w:t></w:r></w:p></w:tc></w:tr>"
+            "</w:tbl></w:body></w:document>"
+        )
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertIn("| Merged | x |", md)
+        self.assertIn("|  | y |", md)
+        self.assertNotIn("cont", md)
+
+    # --- XLSX: rows without r attribute after blank rows ---
+
+    def test_xlsx_row_without_r_after_blank_row(self):
+        import io as _io
+
+        from core.infrastructure.converter.xlsx import xlsx_to_markdown
+
+        ss = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        buf = _io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(
+                "xl/workbook.xml",
+                f'<?xml version="1.0"?><workbook xmlns="{ss}"><sheets>'
+                '<sheet name="S" sheetId="1"/></sheets></workbook>',
+            )
+            zf.writestr(
+                "xl/worksheets/sheet1.xml",
+                f'<?xml version="1.0"?><worksheet xmlns="{ss}"><sheetData>'
+                '<row r="1"><c r="A1" t="inlineStr"><is><t>h1</t></is></c>'
+                '<c r="B1" t="inlineStr"><is><t>h2</t></is></c></row>'
+                '<row r="2"><c r="A2" t="inlineStr"><is><t>v1</t></is></c></row>'
+                '<row r="3"></row>'
+                "<row>"
+                '<c t="inlineStr"><is><t>v3a</t></is></c>'
+                '<c t="inlineStr"><is><t>v3b</t></is></c></row>'
+                "</sheetData></worksheet>",
+            )
+        md = xlsx_to_markdown(buf.getvalue())
+        # The r-less row must land after v1, not overwrite it.
+        self.assertIn("| v1 |  |", md)
+        self.assertIn("| v3a | v3b |", md)
+
+    # --- IPYNB: language detection and error propagation ---
+
+    def test_ipynb_language_from_metadata(self):
+        nb = {
+            "metadata": {"language_info": {"name": "R"}},
+            "cells": [{"cell_type": "code", "source": "x <- 1", "outputs": []}],
+        }
+        md = ipynb_to_markdown(json.dumps(nb))
+        self.assertIn("```r\nx <- 1\n```", md)
+
+    def test_ipynb_python3_normalized(self):
+        nb = {
+            "metadata": {"language_info": {"name": "python3"}},
+            "cells": [{"cell_type": "code", "source": "x = 1", "outputs": []}],
+        }
+        md = ipynb_to_markdown(json.dumps(nb))
+        self.assertIn("```python\nx = 1\n```", md)
+
+    def test_ipynb_invalid_input_raises(self):
+        with self.assertRaises(ValueError):
+            ipynb_to_markdown(b"not json")
+        with self.assertRaises(ValueError):
+            ipynb_to_markdown([1, 2])
 
 
 if __name__ == "__main__":

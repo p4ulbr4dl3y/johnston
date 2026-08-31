@@ -2,7 +2,7 @@ import io
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-from typing import BinaryIO, Dict, Iterator, List, Union
+from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple, Union
 
 from core.infrastructure.converter.utils import safe_read_zip_member
 
@@ -56,6 +56,55 @@ def _iter_inline(elem: ET.Element) -> Iterator[ET.Element]:
             yield child
         elif tag in _INLINE_WRAPPERS:
             yield from _iter_inline(child)
+
+
+RunFormat = Tuple[bool, bool, bool]  # (bold, italic, strike)
+
+
+def _wrap_inline(text: str, markers: str) -> str:
+    """Wrap ``text`` in emphasis markers, moving edge whitespace outside.
+
+    A closing delimiter preceded by whitespace does not close in CommonMark
+    (e.g. ``**Bold1 **`` renders literally), so trailing/leading whitespace
+    must sit outside the markers.
+    """
+    lead = text[: len(text) - len(text.lstrip())]
+    core = text[len(lead) :]
+    trail = core[len(core.rstrip()) :]
+    core = core[: len(core) - len(trail)]
+    if not core:
+        return text
+    return f"{lead}{markers}{core}{markers}{trail}"
+
+
+def _render_runs(runs: List[Tuple[str, RunFormat]]) -> str:
+    """Merge adjacent runs with identical formatting, then apply emphasis.
+
+    Word splits text into many runs (spell check, rsids); wrapping each run
+    separately produces ``**Bold1 ****Bold2**`` which most parsers refuse to
+    render. Merging first yields a single ``**Bold1 Bold2**``.
+    """
+    merged: List[List] = []
+    for text, fmt in runs:
+        if not text:
+            continue
+        if merged and merged[-1][1] == fmt:
+            merged[-1][0] += text
+        else:
+            merged.append([text, fmt])
+
+    parts: List[str] = []
+    for text, (bold, italic, strike) in merged:
+        if bold and italic:
+            text = _wrap_inline(text, "***")
+        elif bold:
+            text = _wrap_inline(text, "**")
+        elif italic:
+            text = _wrap_inline(text, "*")
+        if strike and text.strip():
+            text = _wrap_inline(text, "~~")
+        parts.append(text)
+    return "".join(parts)
 
 
 def docx_to_markdown(docx_input: Union[str, bytes, BinaryIO]) -> str:
@@ -147,31 +196,47 @@ def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
                 if not heading_prefix and val_lower == "title":
                     heading_prefix = "# "
             elif tag == "numPr":
-                is_list = True
+                num_id: Optional[int] = None
                 for num_child in pr_child:
-                    if _local_tag(num_child) == "ilvl":
+                    num_tag = _local_tag(num_child)
+                    if num_tag == "ilvl":
                         for k, v in num_child.attrib.items():
                             if k.endswith("val") or k == "val":
                                 try:
                                     list_indent = int(v)
                                 except ValueError:
                                     list_indent = 0
+                    elif num_tag == "numId":
+                        for k, v in num_child.attrib.items():
+                            if k.endswith("val") or k == "val":
+                                try:
+                                    num_id = int(v)
+                                except ValueError:
+                                    num_id = None
+                # numId="0" explicitly disables inherited numbering (style
+                # override); only a real list id produces a bullet.
+                if num_id != 0:
+                    is_list = True
 
-    runs_text: List[str] = []
+    run_items: List[Tuple[str, RunFormat]] = []
     for item in _iter_inline(p_elem):
         item_tag = _local_tag(item)
         if item_tag == "r":
-            runs_text.append(_parse_run(item))
+            run_items.append(_parse_run(item))
         elif item_tag == "hyperlink":
             r_id = item.attrib.get(f"{R_NS}id", "") or item.attrib.get("id", "")
             url = rels.get(r_id, "")
-            link_text = "".join(_parse_run(r) for r in _iter_inline(item) if _local_tag(r) == "r")
-            if url and link_text:
-                runs_text.append(f"[{link_text}]({url})")
-            elif link_text:
-                runs_text.append(link_text)
+            link_text = _render_runs(
+                [_parse_run(r) for r in _iter_inline(item) if _local_tag(r) == "r"]
+            )
+            if not link_text:
+                continue
+            if url:
+                run_items.append((f"[{link_text}]({url})", (False, False, False)))
+            else:
+                run_items.append((link_text, (False, False, False)))
 
-    content = "".join(runs_text).strip()
+    content = _render_runs(run_items).strip()
     if not content:
         return ""
 
@@ -193,7 +258,8 @@ def _is_prop_active(elem: ET.Element | None) -> bool:
     return True
 
 
-def _parse_run(r_elem: ET.Element) -> str:
+def _parse_run(r_elem: ET.Element) -> Tuple[str, RunFormat]:
+    """Extract run text and its (bold, italic, strike) format flags."""
     r_pr = None
     for child in r_elem:
         if _local_tag(child) == "rPr":
@@ -224,20 +290,7 @@ def _parse_run(r_elem: ET.Element) -> str:
         elif tag == "br":
             text_parts.append("\n")
 
-    text = "".join(text_parts)
-    if not text:
-        return ""
-
-    if is_bold and is_italic:
-        text = f"***{text}***"
-    elif is_bold:
-        text = f"**{text}**"
-    elif is_italic:
-        text = f"*{text}*"
-    if is_strike:
-        text = f"~~{text}~~"
-
-    return text
+    return "".join(text_parts), (is_bold, is_italic, is_strike)
 
 
 def _parse_table(tbl_elem: ET.Element, rels: Dict[str, str]) -> str:
@@ -249,6 +302,36 @@ def _parse_table(tbl_elem: ET.Element, rels: Dict[str, str]) -> str:
         row_cells: List[str] = []
         for tc in tr:
             if _local_tag(tc) != "tc":
+                continue
+            # Horizontal merges widen the cell: emit the requested number of
+            # columns (text + placeholders) so following columns stay aligned.
+            span = 1
+            vmerge_continue = False
+            for tc_pr in tc:
+                if _local_tag(tc_pr) == "tcPr":
+                    for pr in tc_pr:
+                        ptag = _local_tag(pr)
+                        if ptag == "gridSpan":
+                            for k, v in pr.attrib.items():
+                                if k.endswith("val") or k == "val":
+                                    try:
+                                        span = max(1, int(v))
+                                    except ValueError:
+                                        span = 1
+                        elif ptag == "vMerge":
+                            # <w:vMerge/> (no val) or val="continue" marks a
+                            # vertically merged continuation cell: its content
+                            # belongs to the restart cell, so keep it empty.
+                            val = ""
+                            for k, v in pr.attrib.items():
+                                if k.endswith("val") or k == "val":
+                                    val = v
+                                    break
+                            vmerge_continue = val.lower() != "restart"
+                    break
+            if vmerge_continue:
+                row_cells.append("")
+                row_cells.extend([""] * (span - 1))
                 continue
             cell_paragraphs = []
             for p in tc:
@@ -265,6 +348,7 @@ def _parse_table(tbl_elem: ET.Element, rels: Dict[str, str]) -> str:
                         cell_paragraphs.append(nested_md)
             cell_content = " ".join(cell_paragraphs).strip().replace("\n", " ").replace("|", "\\|")
             row_cells.append(cell_content)
+            row_cells.extend([""] * (span - 1))
         if row_cells:
             rows.append(row_cells)
 

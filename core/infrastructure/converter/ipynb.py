@@ -8,24 +8,23 @@ from core.infrastructure.converter.utils import collapse_blank_lines, fenced_cod
 def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
     """
     Converts a Jupyter Notebook (.ipynb) to Markdown using Python stdlib json.
-    Formats markdown cells and wraps code cells with python syntax fences.
+    Formats markdown cells and wraps code cells with a language fence taken
+    from the notebook's ``language_info`` metadata (default: python).
     """
-    try:
-        if isinstance(ipynb_input, bytes):
-            raw_text = ipynb_input.decode("utf-8", errors="replace")
-            data = json.loads(raw_text)
-        elif isinstance(ipynb_input, str):
-            data = json.loads(ipynb_input)
-        else:
-            data = ipynb_input
-        if not isinstance(data, dict):
-            return ""
-    except Exception:
-        return ""
+    if isinstance(ipynb_input, bytes):
+        data = json.loads(ipynb_input.decode("utf-8", errors="replace"))
+    elif isinstance(ipynb_input, str):
+        data = json.loads(ipynb_input)
+    else:
+        data = ipynb_input
+    if not isinstance(data, dict):
+        raise ValueError("Invalid notebook: top-level JSON must be an object")
 
     cells = data.get("cells", [])
     if not isinstance(cells, list):
-        return ""
+        raise ValueError("Invalid notebook: 'cells' must be a list")
+
+    lang = _notebook_language(data)
     output: List[str] = []
 
     for cell in cells:
@@ -45,7 +44,7 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
         if cell_type == "markdown":
             output.append(source)
         elif cell_type == "code":
-            code_block = fenced_code_block(source, lang="python")
+            code_block = fenced_code_block(source, lang=lang)
             # Optional outputs
             outputs = cell.get("outputs", [])
             out_texts: List[str] = []
@@ -79,6 +78,25 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
 
     text = collapse_blank_lines("\n\n".join(output).strip())
     return text
+
+
+# Normalise common kernel language names to fence-friendly identifiers.
+_LANG_ALIASES = {"python3": "python", "ipython": "python", "ipython3": "python", "ir": "r"}
+
+
+def _notebook_language(data: Dict[str, Any]) -> str:
+    """Best-effort code language from nbformat metadata (default: python)."""
+    meta = data.get("metadata")
+    if not isinstance(meta, dict):
+        return "python"
+    language_info = meta.get("language_info")
+    if not isinstance(language_info, dict):
+        return "python"
+    name = language_info.get("name") or language_info.get("pygments_lexer")
+    if isinstance(name, str) and name.strip():
+        name = name.strip().lower()
+        return _LANG_ALIASES.get(name, name)
+    return "python"
 
 
 def _as_text(value: Union[List[str], str, None]) -> str:

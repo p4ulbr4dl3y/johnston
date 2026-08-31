@@ -1,13 +1,45 @@
 import codecs
 import re
 from html.parser import HTMLParser
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from core.infrastructure.converter.utils import collapse_blank_lines, fenced_code_block
 
 # Frequent Cyrillic bytes/letters used by the windows-1251 heuristic below.
 _CYRILLIC_LETTERS_RE = re.compile(r"[\u0400-\u04FF]")
 _COMMON_RUSSIAN_RE = re.compile(r"[оеаинтстрвл]", re.IGNORECASE)
+
+# The characters cp1252 maps into 0x80-0x9F (smart quotes, dashes, euro) — the
+# bytes that make an undeclared page recoverable as windows-1252.
+_CP1252_HIGH_RE = re.compile(r"[€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]")
+
+# Whitespace class that deliberately excludes \xa0 so &nbsp; survives the
+# inline whitespace collapse instead of degrading into a plain space.
+_INLINE_WS_RE = re.compile(r"[ \t\n\r\f\v]+")
+
+# Blockquote depth sentinels embedded in the output stream (never part of the
+# source: NUL bytes are stripped from data before parsing).
+_BQ_MARKER_RE = re.compile(r"\x00(\d+)\x00")
+
+
+def _escape_title(title: str) -> str:
+    """Escape a link/image title for use inside a double-quoted title."""
+    return title.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _escape_alt(alt: str) -> str:
+    """Escape square brackets in image alt text so they cannot break the
+    ![...](...) markup."""
+    return alt.replace("[", "\\[").replace("]", "\\]")
+
+
+def _clean_url(url: str) -> str:
+    """Make a URL safe inside a Markdown inline link: spaces become %20 and
+    unbalanced parentheses are escaped (balanced ones are valid as-is)."""
+    url = url.replace(" ", "%20")
+    if url.count("(") != url.count(")"):
+        url = url.replace("(", "\\(").replace(")", "\\)")
+    return url
 
 
 def _decode_html_bytes(data: bytes) -> str:
@@ -63,6 +95,17 @@ def _decode_html_bytes(data: bytes) -> str:
                 common = len(_COMMON_RUSSIAN_RE.findall(text))
                 if common / cyr >= 0.35:
                     return text
+
+    # Undeclared windows-1252: bytes in 0x80-0x9F (undefined as printable in
+    # latin-1) decode to smart quotes/dashes; require strict decoding plus at
+    # least one such character so ASCII pages keep the latin-1 fallback.
+    if any(0x80 <= b <= 0x9F for b in data):
+        try:
+            text = data.decode("cp1252")
+        except UnicodeDecodeError:
+            text = ""
+        if text and _CP1252_HIGH_RE.search(text):
+            return text
 
     return data.decode("latin-1", errors="replace")
 
@@ -134,7 +177,6 @@ class HTMLToMarkdownParser(HTMLParser):
         self._list_stack: List[Tuple[str, int]] = []  # ('ul' | 'ol', current_count)
         self._in_pre = False
         self._pre_buffer: Optional[List[str]] = None  # buffered until </pre> to size the fence
-        self._in_code = False
         self._table_rows: List[List[str]] = []
         self._current_row: Optional[List[str]] = None
         self._current_cell: Optional[List[str]] = None
@@ -146,6 +188,55 @@ class HTMLToMarkdownParser(HTMLParser):
         self._title: Optional[str] = None
         self._in_title = False
         self._saw_heading = False
+        # Open list items as (continuation indent, content seen). Block tags
+        # inside an item must not split the item from its list, so paragraph
+        # breaks become indented continuation lines instead of "\n\n".
+        self._li_stack: List[Tuple[str, bool]] = []
+        # Blockquote nesting depth. Emitted as a sentinel token in the output
+        # stream; get_markdown() prefixes every line in the region with "> ",
+        # which also keeps fences/tables inside the quote.
+        self._bq_depth = 0
+        # Open inline emphasis markers ("**", "*", "~~", "`") so a stray end
+        # tag (</b> without <b>) cannot leak raw markers into the output.
+        self._inline_depth: Dict[str, int] = {}
+
+    # --- inline marker helpers -------------------------------------------
+
+    def _open_marker(self, token: str) -> None:
+        self._inline_depth[token] = self._inline_depth.get(token, 0) + 1
+        self._append_token(token)
+
+    def _close_marker(self, token: str) -> None:
+        """Emit the closing marker only when a matching tag is open."""
+        if self._inline_depth.get(token, 0) > 0:
+            self._inline_depth[token] -= 1
+            self._append_token(token)
+
+    # --- block-context helpers -------------------------------------------
+
+    def _line_has_content(self) -> bool:
+        """True when the current output line already carries visible content
+        (blockquote sentinels don't count)."""
+        if not self._output:
+            return False
+        tail = self._output[-1].rsplit("\n", 1)[-1]
+        return bool(_BQ_MARKER_RE.sub("", tail))
+
+    def _li_block_break(self, blank: bool) -> None:
+        """Block boundary inside a list item: emit an indented continuation
+        line (optionally with a blank line before it) instead of a paragraph
+        break at column 0, which would split the item from the list."""
+        if not self._li_stack:
+            return
+        indent, seen = self._li_stack[-1]
+        if not seen:
+            # Item content has not started; keep the marker line clean.
+            return
+        self._ensure_newline(1)
+        if blank:
+            self._append_token("\n" + indent)
+        else:
+            self._append_token(indent)
 
     def _append_token(self, token: str) -> None:
         if self._current_link is not None:
@@ -180,60 +271,79 @@ class HTMLToMarkdownParser(HTMLParser):
         if tag_lower == "pre":
             self._in_pre = True
             self._pre_buffer = []
-            self._ensure_newline(2)
+            if self._li_stack:
+                # A fenced block inside a list item: continuation lines are
+                # indented so the fence stays part of the item.
+                indent, seen = self._li_stack[-1]
+                self._li_stack[-1] = (indent, True)
+                if seen:
+                    self._ensure_newline(1)
+                    self._append_token("\n" + indent)
+                else:
+                    self._append_token(indent)
+            else:
+                self._ensure_newline(2)
+            return
+
+        if self._in_pre:
+            # Inside <pre> everything is verbatim code content: no block or
+            # inline handling may emit outside the fenced buffer.
+            if tag_lower == "br" and self._pre_buffer is not None:
+                self._pre_buffer.append("\n")
             return
 
         if tag_lower == "code":
-            if not self._in_pre:
-                self._in_code = True
-                self._append_token("`")
+            self._open_marker("`")
             return
 
         if tag_lower in ("b", "strong"):
-            self._append_token("**")
+            self._open_marker("**")
             return
 
         if tag_lower in ("i", "em"):
-            self._append_token("*")
+            self._open_marker("*")
             return
 
         if tag_lower in ("s", "strike", "del"):
-            self._append_token("~~")
+            self._open_marker("~~")
             return
 
         if tag_lower == "blockquote":
-            if self._current_cell is None:
-                self._ensure_newline(2)
-                self._append_token("> ")
+            if self._current_cell is None and self._current_link is None and not self._in_table and not self._li_stack:
+                self._bq_depth += 1
+                if self._line_has_content():
+                    self._ensure_newline(2)
+                self._output.append(f"\x00{self._bq_depth}\x00")
             return
 
         if tag_lower in ("h1", "h2", "h3", "h4", "h5", "h6"):
-            level = int(tag_lower[1])
             if self._current_cell is not None:
                 # Headings are invalid inside pipe-table cells; keep only the
                 # text (the closing tag adds a separator) so no '#' leaks out.
                 return
+            if self._li_stack:
+                # Headings are invalid inside list items; keep only the text
+                # as a new paragraph of the item.
+                self._li_block_break(True)
+                return
             self._ensure_newline(2)
             self._saw_heading = True
-            self._output.append("#" * level + " ")
+            self._output.append("#" * int(tag_lower[1]) + " ")
             return
 
         if tag_lower == "hr":
-            if self._current_cell is None:
+            if self._current_cell is None and self._current_link is None and not self._li_stack:
                 self._ensure_newline(2)
                 self._output.append("---\n\n")
-            # hr inside a link/cell: no meaningful inline equivalent, drop.
+            # hr inside a link/cell/list item: no meaningful inline equivalent, drop.
             return
 
         if tag_lower == "br":
-            if self._in_pre:
-                if self._pre_buffer is not None:
-                    self._pre_buffer.append("\n")
-                else:
-                    self._output.append("\n")
-            elif self._in_table:
+            if self._in_table:
                 if self._current_cell is not None:
                     self._current_cell.append(" ")
+            elif self._li_stack:
+                self._append_token("\n" + self._li_stack[-1][0])
             else:
                 self._output.append("\n")
             return
@@ -262,6 +372,7 @@ class HTMLToMarkdownParser(HTMLParser):
                 return
             depth = len(self._list_stack) - 1
             indent = "  " * max(0, depth)
+            self._ensure_newline(1)
             if self._list_stack:
                 list_type, count = self._list_stack[-1]
                 if list_type == "ol":
@@ -271,6 +382,8 @@ class HTMLToMarkdownParser(HTMLParser):
                     self._append_token(f"{indent}- ")
             else:
                 self._append_token("- ")
+            # Continuation lines of this item are indented past its marker.
+            self._li_stack.append(("  " * (max(0, depth) + 1), False))
             return
 
         if tag_lower == "table":
@@ -303,7 +416,7 @@ class HTMLToMarkdownParser(HTMLParser):
                 # inner text flow into it, and remember to skip its end tag.
                 self._nested_link_depth += 1
                 return
-            href = attr_dict.get("href", "").strip()
+            href = _clean_url(attr_dict.get("href", "").strip())
             title = attr_dict.get("title", "").strip()
             if href.lower().startswith("javascript:"):
                 href = ""
@@ -311,21 +424,24 @@ class HTMLToMarkdownParser(HTMLParser):
             return
 
         if tag_lower == "img":
-            src = attr_dict.get("src", "").strip()
-            alt = attr_dict.get("alt", "").strip() or "Image"
+            src = _clean_url(attr_dict.get("src", "").strip())
+            alt = _escape_alt(attr_dict.get("alt", "").strip() or "Image")
             title = attr_dict.get("title", "").strip()
             if src.startswith("data:"):
                 src = "data:..."
             if src:
-                title_suffix = f' "{title}"' if title else ""
+                title_suffix = f' "{_escape_title(title)}"' if title else ""
                 # Route through _append_token so images inside links become
                 # proper [![alt](src)](href) and images inside table cells
                 # stay in their cell.
                 self._append_token(f"![{alt}]({src}{title_suffix})")
             return
 
-        if tag_lower in ("p", "div", "article", "section", "header"):
-            self._ensure_newline(2 if tag_lower == "p" else 1)
+        if tag_lower in ("p", "div", "article", "section", "header", "dt", "dd"):
+            if self._li_stack:
+                self._li_block_break(tag_lower in ("p", "dt", "dd"))
+            else:
+                self._ensure_newline(2 if tag_lower in ("p", "dt", "dd") else 1)
             return
 
     def handle_endtag(self, tag: str) -> None:
@@ -352,40 +468,64 @@ class HTMLToMarkdownParser(HTMLParser):
             # so strip trailing newlines from the buffered content.
             content = "".join(self._pre_buffer or []).rstrip("\n")
             self._pre_buffer = None
-            if content:
-                self._append_token(fenced_code_block(content) + "\n\n")
-            else:
-                self._append_token("```\n```\n\n")
+            block = fenced_code_block(content) if content else "```\n```"
+            if self._li_stack:
+                indent = self._li_stack[-1][0]
+                block = ("\n" + indent).join(block.split("\n"))
+                # Trailing indent so inline content following the fence stays
+                # inside the item (harmlessly rstripped if nothing follows).
+                self._append_token(block + "\n" + indent)
+                return
+            self._append_token(block + "\n\n")
+            return
+
+        if self._in_pre:
             return
 
         if tag_lower == "code":
-            if not self._in_pre:
-                self._in_code = False
-                self._append_token("`")
+            self._close_marker("`")
             return
 
         if tag_lower in ("b", "strong"):
-            self._append_token("**")
+            self._close_marker("**")
             return
 
         if tag_lower in ("i", "em"):
-            self._append_token("*")
+            self._close_marker("*")
             return
 
         if tag_lower in ("s", "strike", "del"):
-            self._append_token("~~")
+            self._close_marker("~~")
+            return
+
+        if tag_lower == "blockquote":
+            if self._current_cell is not None:
+                self._append_token(" ")
+            elif self._li_stack:
+                pass
+            elif self._bq_depth > 0 and not self._in_table:
+                self._bq_depth -= 1
+                self._output.append(f"\x00{self._bq_depth}\x00")
+                if self._line_has_content():
+                    self._ensure_newline(2)
+            else:
+                self._ensure_newline(2)
             return
 
         if tag_lower in ("h1", "h2", "h3", "h4", "h5", "h6"):
             if self._current_cell is not None:
                 self._append_token(" ")
+            elif self._li_stack:
+                pass
             else:
                 self._ensure_newline(2)
             return
 
-        if tag_lower in ("p", "blockquote"):
+        if tag_lower in ("p", "dt", "dd"):
             if self._current_cell is not None:
                 self._append_token(" ")
+            elif self._li_stack:
+                pass
             else:
                 self._ensure_newline(2)
             return
@@ -394,9 +534,14 @@ class HTMLToMarkdownParser(HTMLParser):
             if self._list_stack:
                 self._list_stack.pop()
             self._ensure_newline(1)
+            if self._li_stack:
+                # Keep any trailing item content indented under the item.
+                self._append_token(self._li_stack[-1][0])
             return
 
         if tag_lower == "li":
+            if self._li_stack:
+                self._li_stack.pop()
             self._ensure_newline(1)
             return
 
@@ -431,6 +576,10 @@ class HTMLToMarkdownParser(HTMLParser):
                 else:
                     self._in_table = False
                     if inner_md:
+                        # Separate the table from any text that leaked between
+                        # the rows (e.g. <caption> content), so the first pipe
+                        # row starts on its own line.
+                        self._ensure_newline(2)
                         self._output.append(inner_md + "\n\n")
                     self._ensure_newline(2)
             return
@@ -451,7 +600,7 @@ class HTMLToMarkdownParser(HTMLParser):
                 self._current_link = None
                 self._nested_link_depth = 0
                 if href and text:
-                    title_suffix = f' "{title}"' if title else ""
+                    title_suffix = f' "{_escape_title(title)}"' if title else ""
                     self._append_token(f"[{text}]({href}{title_suffix})")
                 elif text:
                     self._append_token(text)
@@ -482,7 +631,11 @@ class HTMLToMarkdownParser(HTMLParser):
             self._current_cell.append(data)
             return
 
-        cleaned = re.sub(r"\s+", " ", data)
+        cleaned = _INLINE_WS_RE.sub(" ", data.replace("\x00", ""))
+        if cleaned.strip() and self._li_stack:
+            # Mark the open list item as having received content, so later
+            # block tags inside it produce continuation lines.
+            self._li_stack[-1] = (self._li_stack[-1][0], True)
         self._append_token(cleaned)
 
     def unknown_decl(self, content: str) -> None:
@@ -492,10 +645,11 @@ class HTMLToMarkdownParser(HTMLParser):
             self.handle_data(content[len("CDATA[") :])
 
     def _ensure_newline(self, count: int = 1) -> None:
-        if self._in_table or self._current_link is not None:
-            # Layout newlines are meaningless while a table or a link owns the
-            # sink: block tags inside them are flattened into cell/link text,
-            # so they must not leak stray newlines into the main output.
+        if self._in_table or self._current_link is not None or self._in_pre:
+            # Layout newlines are meaningless while a table, a link, or a
+            # pre-buffer owns the sink: block tags inside them are flattened
+            # into cell/link text, so they must not leak stray newlines into
+            # the main output.
             return
         if not self._output:
             return
@@ -527,8 +681,22 @@ class HTMLToMarkdownParser(HTMLParser):
 
     def get_markdown(self) -> str:
         raw_text = "".join(self._output)
+        # Auto-close any inline markers whose tags were never closed, so a
+        # dangling "<b>" still renders instead of leaking a bare "**".
+        for token in ("**", "*", "~~", "`"):
+            depth = self._inline_depth.get(token, 0)
+            if depth > 0:
+                raw_text = raw_text.rstrip("\n") + token * depth
         lines = [line.rstrip() for line in raw_text.splitlines()]
         cleaned = "\n".join(lines).strip()
+
+        # Re-apply blockquote prefixes from the depth sentinels: every line
+        # between an opening and closing sentinel is prefixed with the quote's
+        # depth of "> ". This keeps fences, tables, and lists intact inside
+        # the quote (unlike emitting "> " inline at start-tag time).
+        if _BQ_MARKER_RE.search(cleaned):
+            cleaned = self._apply_blockquote_markers(cleaned)
+
         cleaned = collapse_blank_lines(cleaned)
         # Emit the document <title> as a heading only when the body provides
         # no heading of its own, to avoid duplicated headings.
@@ -536,6 +704,33 @@ class HTMLToMarkdownParser(HTMLParser):
         if title and not self._saw_heading:
             cleaned = f"# {title}\n\n{cleaned}" if cleaned else f"# {title}"
         return cleaned
+
+    @staticmethod
+    def _apply_blockquote_markers(text: str) -> str:
+        """Prefix lines between blockquote depth sentinels with "> " markers.
+
+        Sentinels may sit mid-line (right after content on close, right
+        before content on open), so each line is split on them and every
+        fragment is prefixed with the depth in effect at its position.
+        Blank lines are left untouched: a blank line does not end a quote
+        in Markdown, and the next prefixed line resumes it.
+        """
+        out: List[str] = []
+        depth = 0
+        for line in text.split("\n"):
+            parts = _BQ_MARKER_RE.split(line)
+            if len(parts) == 1:
+                # Marker-less line: prefix with the depth in effect.
+                out.append(("> " * depth) + line if depth else line)
+                continue
+            seg_depth = depth
+            for i, part in enumerate(parts):
+                if i % 2 == 1:
+                    depth = int(part)
+                    seg_depth = depth
+                elif part:
+                    out.append(("> " * seg_depth) + part if seg_depth else part)
+        return "\n".join(out)
 
 
 def html_to_markdown(html_content: str | bytes) -> str:

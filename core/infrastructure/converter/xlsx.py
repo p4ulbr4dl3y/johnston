@@ -288,6 +288,7 @@ def _parse_sheet_to_table(
 ) -> str:
     rows_dict: Dict[int, Dict[int, str]] = {}
     max_col = 0
+    last_row_idx = -1
 
     for row_elem in sheet_tree.iter():
         row_tag = _local(row_elem.tag)
@@ -295,7 +296,14 @@ def _parse_sheet_to_table(
             continue
 
         r_attr = row_elem.attrib.get("r")
-        row_idx = int(r_attr) - 1 if r_attr and r_attr.isdigit() else len(rows_dict)
+        if r_attr and r_attr.isdigit():
+            row_idx = int(r_attr) - 1
+        else:
+            # Rows come in document order; a row without an "r" attribute
+            # follows the previous row. Deriving the index from the number of
+            # stored rows misplaces it when blank rows were skipped.
+            row_idx = last_row_idx + 1
+        last_row_idx = max(last_row_idx, row_idx)
 
         col_dict: Dict[int, str] = {}
         last_col_idx = -1
