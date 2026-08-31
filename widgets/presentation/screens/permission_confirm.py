@@ -227,7 +227,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
         self._action_desc = action_desc
         with Vertical(id="modal-dialog", classes="bash-confirm-dialog"):
-            yield ModalHeader("Confirm Tool Action", esc_hint="esc: deny")
+            yield ModalHeader("Confirm Tool Action", esc_hint="")
             yield Markdown(action_desc, classes="modal-markdown")
 
             if self.tool_name == "create":
@@ -329,7 +329,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         hint = self._build_hint_text()
         title = "Confirm Tool Action"
         base_width = modal_content_width(
-            options=options, title=title, hint=hint, esc_hint="esc: deny", extra=MODAL_CONTENT_GUTTER
+            options=options, title=title, hint=hint, extra=MODAL_CONTENT_GUTTER
         )
 
         # Cap natural language descriptions so they wrap gracefully rather than ballooning modal width
@@ -457,8 +457,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
     def _build_hint_text(self, width: Optional[int] = None) -> str:
         if isinstance(width, int) and is_compact_width(width, breakpoint=BREAKPOINT_HINT):
-            return "enter • r"
-        return "enter: select • r: feedback"
+            return "enter • r • esc"
+        return "enter: select • r: feedback • esc: deny"
 
     def on_resize(self, event) -> None:
         self._apply_dialog_fit()

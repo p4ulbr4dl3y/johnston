@@ -8,9 +8,9 @@ from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import normalize_key_to_latin
 from widgets.utils.responsive import (
@@ -25,7 +25,7 @@ class ConfirmScreen(BaseModalScreen[bool]):
 
     def __init__(
         self,
-        title: str = "### **Confirm Action**",
+        title: str = "Confirm Action",
         message: str = "Are you sure?",
         confirm_label: str = "confirm",
         cancel_label: str = "cancel",
@@ -38,7 +38,7 @@ class ConfirmScreen(BaseModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-compact"):
-            yield Markdown(self.confirm_title, classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield ModalHeader(self.confirm_title, esc_hint="")
             if self.message:
                 yield Markdown(self.message, classes=MODAL_MARKDOWN)
             yield ModalHint(f"enter: {self.confirm_label} • esc: {self.cancel_label}", id=MODAL_HINT_ID)

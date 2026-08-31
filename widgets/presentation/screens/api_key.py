@@ -1,16 +1,15 @@
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Markdown
+from textual.widgets import Input
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
-    MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.responsive import (
     MODAL_COMPACT_MAX_WIDTH,
@@ -44,7 +43,7 @@ class ApiKeyScreen(BaseModalScreen[str | None]):
             placeholder = "API Key..."
 
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-compact"):
-            yield Markdown(f"### **Connect {self.provider_name}**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield ModalHeader(f"Connect {self.provider_name}", esc_hint="")
             yield Input(placeholder=placeholder, password=True, id="providers-key-input")
             yield ModalHint("enter: save • esc: cancel", id=MODAL_HINT_ID)
 

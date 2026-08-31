@@ -176,9 +176,8 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         self.show_search = show_search
         self.search_placeholder = search_placeholder
         self.raw_hint_text = hint_text
-        action_hint, esc_hint = _split_esc_hint(hint_text)
-        self.hint_text = action_hint
-        self.esc_hint = esc_hint or "esc: close"
+        self.hint_text = hint_text
+        self.esc_hint = ""
         self.option_list_id = option_list_id
         self.dialog_classes = dialog_classes
         # Content-hugging dialog width (see widgets/utils/responsive.py):

@@ -329,10 +329,10 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
-            yield ModalHeader(self._get_header_md(), esc_hint="esc: close", id=self.title_id)
+            yield ModalHeader(self._get_header_md(), esc_hint="", id=self.title_id)
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id=self.option_list_id)
-            yield ModalHint(f"{self.hint_action_name}", id=MODAL_HINT_ID)
+            yield ModalHint(f"{self.hint_action_name} • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.search_nav_option_list_id = self.option_list_id
@@ -390,15 +390,15 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             action_short = self.hint_action_name.split(":")[0]
             if is_compact:
                 hint_str = (
-                    f"{action_short} • c-k: kill"
+                    f"{action_short} • c-k: kill • esc"
                     if is_running
-                    else f"{action_short}"
+                    else f"{action_short} • esc"
                 )
             else:
                 hint_str = (
-                    f"{self.hint_action_name} • ctrl+k: kill"
+                    f"{self.hint_action_name} • ctrl+k: kill • esc: close"
                     if is_running
-                    else f"{self.hint_action_name}"
+                    else f"{self.hint_action_name} • esc: close"
                 )
             hint.update(hint_str)
         except Exception:

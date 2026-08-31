@@ -1,16 +1,15 @@
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Markdown
+from textual.widgets import Input
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
-    MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 
 
@@ -23,7 +22,7 @@ class RenameSessionScreen(BaseModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
-            yield Markdown("### **Rename Session**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+            yield ModalHeader("Rename Session", esc_hint="")
             yield Input(
                 placeholder="New session title...",
                 value=self.current_title,

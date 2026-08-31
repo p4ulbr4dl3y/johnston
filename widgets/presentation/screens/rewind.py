@@ -89,13 +89,13 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         options = self._format_step1_options(MODAL_WIDE_ROW_WIDTH, self.filtered_entries)
 
         self.title = "Select Message to Rollback To"
-        self.hint_text = "enter: select"
+        self.hint_text = "enter: select • esc: cancel"
         self.raw_options = list(options)
         self.raw_items = [m.index for m in user_messages]
         self.raw_items.append(REWIND_CURRENT_STATE)
         self.filtered_options = list(options)
         self.filtered_items = list(self.raw_items)
-        self.default_value = user_messages[-1].index if user_messages else REWIND_CURRENT_STATE
+        self.default_value = REWIND_CURRENT_STATE
         self.option_list_id = MODAL_OPTION_LIST_ID
 
     def _row_width(self) -> int:
@@ -167,14 +167,14 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
 
             screen_w = resolve_screen_width(self)
             hint_lbl = self.query_one(MODAL_HINT, Label)
-            h_text = "enter" if screen_w < BREAKPOINT_HINT else self.hint_text
+            h_text = "enter • esc" if screen_w < BREAKPOINT_HINT else self.hint_text
             hint_lbl.update(h_text)
         except Exception:
             pass
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
-            yield ModalHeader(self.title, esc_hint="esc: cancel")
+            yield ModalHeader(self.title, esc_hint="")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             yield ModalHint(self.hint_text, id=MODAL_HINT_ID)

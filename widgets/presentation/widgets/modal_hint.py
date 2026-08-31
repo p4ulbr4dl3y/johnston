@@ -28,7 +28,7 @@ class ModalHint(Label):
         text-align: left;
         margin-top: 1;
         margin-bottom: 0;
-        padding: 0 1;
+        padding: 0;
         text-wrap: wrap;
     }
     """

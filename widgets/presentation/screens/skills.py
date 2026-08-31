@@ -62,10 +62,10 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
-            yield ModalHeader("Available Skills", esc_hint="esc: close")
+            yield ModalHeader("Available Skills", esc_hint="")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
             yield HeaderWrapOptionList(id="skills-option-list")
-            yield ModalHint("enter: select • space: toggle", id=MODAL_HINT_ID)
+            yield ModalHint("enter: select • space: toggle • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)

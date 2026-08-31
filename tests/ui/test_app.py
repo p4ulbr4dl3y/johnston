@@ -55,6 +55,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.screen, RewindScreen)
 
             # Select message (Step 1) and confirm (Step 2 if checkpoints active)
+            await pilot.press("up")
             await pilot.press("enter")
             await pilot.pause(0.3)
             if isinstance(app.screen, RewindScreen) and getattr(app.screen, "step", 1) == 2:

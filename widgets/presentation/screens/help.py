@@ -118,7 +118,7 @@ class HelpScreen(BaseModalScreen[None]):
             max_kb_w = max(len(k) for k, _ in KEYBINDINGS_DATA) + 2 + max(len(d) for _, d in KEYBINDINGS_DATA)
             sample_items = ["x" * max(max_cmd_w, max_kb_w)]
             content_w = modal_content_width(
-                sample_items, "Johnston Help", "tab/←→: switch", esc_hint="esc: close"
+                sample_items, "Johnston Help", "tab/←→: switch • esc: close"
             )
             apply_modal_fit(dialog, content_w, min_width=76, max_width=96)
 
@@ -147,13 +147,13 @@ class HelpScreen(BaseModalScreen[None]):
         from widgets.chat_toolcall import ToolScrollBox
 
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
-            yield ModalHeader("Johnston Help", esc_hint="esc: close", id="help-header-md")
+            yield ModalHeader("Johnston Help", esc_hint="", id="help-header-md")
             with Horizontal(id="help-tabs"):
                 yield Static("Commands", id="help-tab-commands", classes="help-tab active")
                 yield Static("Keybindings", id="help-tab-keybindings", classes="help-tab")
             with ToolScrollBox(id="help-scroll-box"):
                 yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
-            yield ModalHint("tab/←→: switch", id=MODAL_HINT_ID)
+            yield ModalHint("tab/←→: switch • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._apply_dialog_fit()
