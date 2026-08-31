@@ -249,10 +249,11 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             await chat_view.add_user_message("one")
             await chat_view.add_user_message("two")
             await chat_view.add_bot_message()
-            await pilot.pause()
+            chat_view._auto_follow = False
             chat_view.rollback_to(0)
             await pilot.pause()
             self.assertLessEqual(len(list(chat_view.children)), 2)
+            self.assertTrue(chat_view._auto_follow)
 
     async def test_toggle_expand_modes(self):
         app = JohnstonApp()

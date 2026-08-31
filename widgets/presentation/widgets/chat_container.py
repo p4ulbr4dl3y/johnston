@@ -443,6 +443,8 @@ class ChatView(VerticalScroll):
         for child in children[start_idx:]:
             child.remove()
         self.check_welcome()
+        self._auto_follow = True
+        self.call_after_refresh(lambda: self.scroll_end(animate=False))
 
     def toggle_expand(self, mode: str = "all") -> None:
         """
