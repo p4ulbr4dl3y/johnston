@@ -577,17 +577,9 @@ ModalScreen {
     background: $bg-app;
 }
 
-#subagent-header {
-    width: 100%;
-    height: 3;
-    padding: 1 1;
-    background: $bg-surface;
-    color: $fg-muted;
-}
-
 #subagent-chat-view {
     height: 1fr;
-    padding: 0 2 1 2;
+    padding: 1 2 1 2;
     background: $bg-app;
     scrollbar-size: 0 0;
 }

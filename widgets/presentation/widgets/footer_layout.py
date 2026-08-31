@@ -143,6 +143,8 @@ def _build_subagent_grid(
     is_compact: bool = False,
     sandbox_enabled: bool = True,
     execution_mode: str = "review",
+    is_running: bool = False,
+    from_tasks: bool = False,
 ) -> tuple[Table, list[tuple[str, str]]]:
     """Shared subagent-status table builder (2-line layout, with compact support)."""
     grid = Table.grid(expand=True)
@@ -162,6 +164,13 @@ def _build_subagent_grid(
     else:
         role_formatted = role_str
 
+    esc_label = "esc: back" if from_tasks else "esc: close"
+    if is_compact:
+        raw_hints = f"{esc_label} • ctrl+k" if is_running else esc_label
+    else:
+        raw_hints = f"{esc_label} • ctrl+k: kill" if is_running else esc_label
+    row2_right = format_modal_hint(raw_hints)
+
     if is_compact:
         # Row 1 (Compact): Left [Role • Model] | Right [pct% ctx • $0.02 / tok]
         row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
@@ -179,7 +188,7 @@ def _build_subagent_grid(
         else:
             row1_right = f"[{txt}]Run /connect[/]"
 
-        # Row 2 (Compact): Left [dir • branch (+N/-M) • sb:on • mode] | Right []
+        # Row 2 (Compact): Left [dir • branch (+N/-M) • sb:on • mode] | Right [esc • ctrl+k]
         dir_basename = os.path.basename(os.path.abspath(directory)) or directory
         row2_left_parts = [f"[{txt}]{dir_basename}[/]"]
         diff_text = git_diff_stats()
@@ -194,7 +203,6 @@ def _build_subagent_grid(
         if execution_mode:
             row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
         row2_left = sep_compact.join(row2_left_parts)
-        row2_right = ""
 
         grid.add_row(row1_left, row1_right)
         grid.add_row(row2_left, row2_right)
@@ -235,7 +243,7 @@ def _build_subagent_grid(
         row1_right = f"[{txt}]Run /connect to set up API key.[/]"
     grid.add_row(row1_left, row1_right)
 
-    # Row 2: Left [directory • branch (+N/-M) • sandbox: on • mode] | Right []
+    # Row 2: Left [directory • branch (+N/-M) • sandbox: on • mode] | Right [esc: close • ctrl+k: kill]
     dir_text = format_display_path(directory)
     row2_left_parts = [f"[{txt}]{dir_text}[/]"]
     diff_text = git_diff_stats()
@@ -251,7 +259,6 @@ def _build_subagent_grid(
         row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
     row2_left = sep.join(row2_left_parts)
 
-    row2_right = ""
     grid.add_row(row2_left, row2_right)
 
     rows = [

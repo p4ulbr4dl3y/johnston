@@ -348,14 +348,9 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
-            from widgets.presentation.widgets.chat_messages import UserMessage
 
-            um = screen.query_one(UserMessage)
-            self.assertIn("My initial subagent prompt", um.raw_text)
-            from widgets.presentation.widgets.subagent_footer import SubagentHeader, SubagentStatusFooter
+            from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 
-            header = screen.query_one("#subagent-header", SubagentHeader)
-            self.assertTrue(header.is_mounted)
             footer = screen.query_one("#subagent-status-footer", SubagentStatusFooter)
             self.assertTrue(footer.is_mounted)
             await pilot.press("escape")

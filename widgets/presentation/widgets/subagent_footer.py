@@ -25,9 +25,10 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
     can_focus = False
     ALLOW_SELECT = False
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, from_tasks: bool = False, **kwargs) -> None:
         super().__init__("", *args, **kwargs)
         self.session = None
+        self.from_tasks = from_tasks
         self.is_generating: bool = False
         self._spinner_idx: int = 0
         self._spinner_timer = None
@@ -207,6 +208,8 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
                 is_compact=is_compact,
                 sandbox_enabled=sandbox_enabled,
                 execution_mode=execution_mode,
+                is_running=bool(getattr(session, "status", "") == "running" or self.is_generating),
+                from_tasks=getattr(self, "from_tasks", False),
             )
 
             self._last_grid_rows = rows

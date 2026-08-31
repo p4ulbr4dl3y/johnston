@@ -255,7 +255,8 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         self.assertIn("[Select model: /models]", footer._last_grid_rows[0][0])
         self.assertIn("sandboxed", footer._last_grid_rows[1][0])
         self.assertIn("review", footer._last_grid_rows[1][0])
-        self.assertEqual(footer._last_grid_rows[1][1], "")
+        self.assertIn("esc", footer._last_grid_rows[1][1])
+        self.assertIn("close", footer._last_grid_rows[1][1])
 
     def test_render_footer_reflects_execution_mode_and_sandbox_off(self):
         from core.permission_manager import PermissionManager
@@ -319,7 +320,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         self.assertIn("ctx", footer._last_grid_rows[0][1])
         self.assertIn("my_repo", footer._last_grid_rows[1][0])
         self.assertIn("sandboxed", footer._last_grid_rows[1][0])
-        self.assertEqual(footer._last_grid_rows[1][1], "")
+        self.assertIn("esc", footer._last_grid_rows[1][1])
 
     def test_render_footer_sandbox_disabled(self):
         footer = SubagentStatusFooter()

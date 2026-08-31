@@ -14,7 +14,7 @@ from widgets.chat_toolcall import ToolScrollBox
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_selection import ModalSearchNavMixin
 from widgets.presentation.widgets.chat_diff import format_edit_diff, get_diff_colors
-from widgets.presentation.widgets.footer_layout import get_theme_colors
+from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import BREAKPOINT_COMPACT, BREAKPOINT_HINT, is_compact_width, resolve_width
 from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width, ellipsize
@@ -126,8 +126,7 @@ class DiffFooter(ResizeDebounceMixin, Static):
         table.add_column(justify="right")
 
         width = resolve_width(self)
-        t_primary, t_secondary, t_muted, _ = get_theme_colors()
-        sep = f" [{t_muted}]•[/] "
+        t_primary, _, t_muted, _ = get_theme_colors()
 
         max_path_len = min(45, max(18, width // 3))
 
@@ -139,16 +138,17 @@ class DiffFooter(ResizeDebounceMixin, Static):
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             if width < 52:
-                right_text = f"[{t_muted}]esc: back[/]" if self.compact_view == "diff" else f"[{t_muted}]enter • esc[/]"
+                raw_hint = "esc: back" if self.compact_view == "diff" else "enter • esc"
             elif self.compact_view == "diff":
-                right_text = f"[{t_muted}]esc: files{sep}pgup/dn[/]"
+                raw_hint = "esc: files • pgup/dn"
             else:
-                right_text = f"[{t_muted}]enter: view{sep}esc: close[/]"
+                raw_hint = "enter: view • esc: close"
         elif width >= BREAKPOINT_HINT:
-            right_text = f"[{t_muted}]↑↓: files{sep}tab: toggle sidebar{sep}pgup/pgdn: scroll[/]"
+            raw_hint = "↑↓: files • tab: toggle sidebar • pgup/pgdn: scroll"
         else:
-            right_text = f"[{t_muted}]↑↓: files{sep}tab: sidebar[/]"
+            raw_hint = "↑↓: files • tab: sidebar"
 
+        right_text = format_modal_hint(raw_hint)
         table.add_row(left_text, right_text)
         self.update(table)
 

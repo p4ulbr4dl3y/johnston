@@ -6,7 +6,8 @@ from textual.screen import ModalScreen
 
 from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.presentation.widgets.chat_container import ChatView
-from widgets.presentation.widgets.subagent_footer import SubagentHeader, SubagentStatusFooter
+from widgets.presentation.widgets.chat_notch import ChatNotch, ChatNotchContainer
+from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 from widgets.utils.key_aliases import expand_bindings
 
 
@@ -17,6 +18,7 @@ class SubagentViewScreen(ModalScreen[None]):
     BINDINGS = expand_bindings([
         ("escape", "close", "Close Screen"),
         ("ctrl+k", "kill_subagent", "Kill Subagent"),
+        ("ctrl+p", "toggle_plan", "Toggle Plan"),
         ("ctrl+o", "toggle_expand", "Toggle Expand"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
@@ -35,10 +37,18 @@ class SubagentViewScreen(ModalScreen[None]):
         self.queue_task = None
 
     def compose(self) -> ComposeResult:
+        yield ChatNotchContainer(id="chat-notch-container")
         with Vertical(id="subagent-container"):
-            yield SubagentHeader(from_tasks=self.from_tasks, id="subagent-header")
             yield ChatView(id="subagent-chat-view", show_welcome=False)
-            yield SubagentStatusFooter(id="subagent-status-footer")
+            yield SubagentStatusFooter(from_tasks=self.from_tasks, id="subagent-status-footer")
+
+    def action_toggle_plan(self) -> None:
+        """Toggle expansion of the top plan notch widget."""
+        try:
+            notch = self.query_one(ChatNotch)
+            notch.toggle_expanded()
+        except Exception:
+            pass
 
     def on_mount(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
@@ -65,9 +75,7 @@ class SubagentViewScreen(ModalScreen[None]):
             self.run_worker(_no_sess())
             return
 
-        header = self.query_one("#subagent-header", SubagentHeader)
         footer = self.query_one("#subagent-status-footer", SubagentStatusFooter)
-        header.update_session(self.session)
         footer.update_session(self.session)
 
         # Stop any stale interval from a previous mount
@@ -81,10 +89,6 @@ class SubagentViewScreen(ModalScreen[None]):
         self._history_worker = self.run_worker(self._load_history_session())
 
     def _refresh_chrome(self) -> None:
-        try:
-            self.query_one("#subagent-header", SubagentHeader).update_session(self.session)
-        except Exception:
-            pass
         try:
             self.query_one("#subagent-status-footer", SubagentStatusFooter).update_session(self.session)
         except Exception:
