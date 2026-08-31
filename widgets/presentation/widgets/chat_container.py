@@ -388,11 +388,17 @@ class ChatView(VerticalScroll):
         last_child = None
         children_to_check = self.children if before is None else [c for c in self.children if c != before]
         for child in reversed(children_to_check):
+            if getattr(child, "_pruning", False):
+                continue
             if isinstance(child, BotMessage):
                 c_str = (
-                    child._join_stream_content()
-                    if hasattr(child, "_join_stream_content") and child._stream_parts
-                    else getattr(child, "content", "")
+                    child.raw_text
+                    if hasattr(child, "raw_text")
+                    else (
+                        child._join_stream_content()
+                        if hasattr(child, "_join_stream_content") and child._stream_parts
+                        else getattr(child, "content", "")
+                    )
                 )
                 if not (c_str or "").strip():
                     continue

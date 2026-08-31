@@ -203,28 +203,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         except ValueError:
             return
         for child in children[idx + 1 :]:
-            from widgets.presentation.widgets.chat_messages import BotMessage
-
-            if isinstance(child, BotMessage):
-                c_str = child.raw_text if hasattr(child, "raw_text") else getattr(child, "content", "")
-                if not (c_str or "").strip():
-                    continue
-            if isinstance(child, ToolCallWidget) and getattr(child, "is_sequential", False):
-                if self.is_expanded:
-                    child.remove_class("tool-sequential")
-                else:
-                    child.add_class("tool-sequential")
-            break
-
-    def _sync_sequential_with_prev(self) -> None:
-        if not getattr(self, "is_sequential", False) or not self.parent:
-            return
-        children = list(self.parent.children)
-        try:
-            idx = children.index(self)
-        except ValueError:
-            return
-        for child in reversed(children[:idx]):
+            if getattr(child, "_pruning", False):
+                continue
             from widgets.presentation.widgets.chat_messages import BotMessage
 
             if isinstance(child, BotMessage):
@@ -232,10 +212,39 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 if not (c_str or "").strip():
                     continue
             if isinstance(child, ToolCallWidget):
+                child.is_sequential = True
+                if self.is_expanded:
+                    child.remove_class("tool-sequential")
+                else:
+                    child.add_class("tool-sequential")
+            break
+
+    def _sync_sequential_with_prev(self) -> None:
+        if not self.parent:
+            return
+        children = list(self.parent.children)
+        try:
+            idx = children.index(self)
+        except ValueError:
+            return
+        for child in reversed(children[:idx]):
+            if getattr(child, "_pruning", False):
+                continue
+            from widgets.presentation.widgets.chat_messages import BotMessage
+
+            if isinstance(child, BotMessage):
+                c_str = child.raw_text if hasattr(child, "raw_text") else getattr(child, "content", "")
+                if not (c_str or "").strip():
+                    continue
+            if isinstance(child, ToolCallWidget):
+                self.is_sequential = True
                 if child.is_expanded:
                     self.remove_class("tool-sequential")
                 else:
                     self.add_class("tool-sequential")
+            else:
+                self.is_sequential = False
+                self.remove_class("tool-sequential")
             break
 
     def set_result(
