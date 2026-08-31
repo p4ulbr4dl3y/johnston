@@ -65,12 +65,42 @@ Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, T
     background: $bg-app;
 }
 
+#chat-notch-container {
+    layer: overlay;
+    dock: top;
+    width: 100%;
+    height: auto;
+    align: center top;
+    visibility: hidden;
+    padding: 0;
+    margin: 0;
+}
+
+#chat-notch {
+    visibility: visible;
+    width: auto;
+    height: auto;
+    background: $bg-surface;
+    color: $fg-primary;
+    border-left: solid $accent-info;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 0 1;
+    margin: 1;
+}
+
 #chat-view {
     height: 1fr;
     min-height: 3;
-    padding: 0 2 1 2;
+    padding: 0 2;
     background: $bg-app;
     scrollbar-size: 0 0;
+}
+
+#chat-view > *:last-child {
+    margin-top: 1;
+    margin-bottom: 1;
 }
 
 /* Loading Indicator Overlay - Zinc Monochrome */
