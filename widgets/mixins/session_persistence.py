@@ -137,6 +137,34 @@ class SessionPersistenceMixin:
         elif hasattr(session, "role") and session.role:
             self.role = session.role
 
+        # Restore active plan from session messages if present
+        restored_plan = None
+        restored_explanation = ""
+        try:
+            msg_seq = list(saved_msgs) if saved_msgs is not None else []
+            for msg in reversed(msg_seq):
+                if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "update_plan":
+                    args = msg.get("args") or {}
+                    if isinstance(args, dict) and isinstance(args.get("plan"), list):
+                        restored_plan = [p for p in args.get("plan") if isinstance(p, dict)]
+                        restored_explanation = str(args.get("explanation") or "").strip()
+                        break
+        except Exception:
+            pass
+
+        self.current_plan = restored_plan
+        self.current_plan_explanation = restored_explanation
+        try:
+            from widgets.presentation.widgets.plan_notch import PlanNotch
+
+            notch = self.query_one(PlanNotch)
+            if restored_plan:
+                notch.set_plan(restored_plan, restored_explanation)
+            else:
+                notch.clear_plan()
+        except Exception:
+            pass
+
         self.refresh_status_footer()
 
     def _get_current_session_data(self) -> Optional[dict]:

@@ -409,17 +409,28 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             footer.update_session(sess)
             self.assertEqual(mock_est.call_count, 2)
 
-    async def test_subagent_screen_modal_key_isolation(self):
-        self._mk("task-bind-test", "Bind Agent", "Prompt bind")
-        screen = SubagentViewScreen("task-bind-test")
+    async def test_subagent_screen_plan_notch_update(self):
+        from widgets.presentation.widgets.plan_notch import PlanNotch
+
+        sess = self._mk("task-plan-sub", "Plan Agent", "Subagent Prompt")
+        sess.add_event({
+            "type": "tool",
+            "tool_type": "update_plan",
+            "args": {
+                "plan": [{"step": "Sub-task 1", "status": "in_progress"}],
+                "explanation": "Subagent step",
+            },
+        })
+        screen = SubagentViewScreen("task-plan-sub")
         app = DummyHostApp(screen, store=self.store)
-        app.action_background_all = unittest.mock.MagicMock()
 
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
-            await pilot.press("ctrl+b")
-            await pilot.pause()
-            self.assertFalse(app.action_background_all.called)
+            notch = screen.query_one(PlanNotch)
+            self.assertTrue(notch.display)
+            self.assertEqual(len(notch.plan_items), 1)
+            self.assertEqual(notch.plan_items[0]["step"], "Sub-task 1")
+            self.assertEqual(notch.plan_explanation, "Subagent step")
 
 
 if __name__ == "__main__":

@@ -56,6 +56,19 @@ class ActionsMixin:
         except Exception:
             pass
 
+    def on_plan_update(self, plan: list[dict], explanation: str = "") -> None:
+        """Handle plan update event from update_plan tool."""
+        validated_plan = [p for p in plan if isinstance(p, dict)] if isinstance(plan, list) else []
+        self.current_plan = validated_plan
+        self.current_plan_explanation = str(explanation or "").strip()
+        try:
+            from widgets.presentation.widgets.plan_notch import PlanNotch
+
+            notch = self.query_one(PlanNotch)
+            notch.set_plan(validated_plan, self.current_plan_explanation)
+        except Exception:
+            pass
+
     def action_background_all(self) -> None:
         """Background all running foreground shell tasks.
 

@@ -71,3 +71,12 @@ def reset_app_state(
         app.current_session_id = session_id
     if role is not None:
         app.role = role
+    app.current_plan = None
+    app.current_plan_explanation = ""
+    if hasattr(app, "query_one"):
+        try:
+            from widgets.presentation.widgets.plan_notch import PlanNotch
+
+            app.query_one(PlanNotch).clear_plan()
+        except Exception:
+            pass

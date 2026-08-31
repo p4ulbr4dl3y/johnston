@@ -147,6 +147,16 @@ class SubagentViewScreen(ModalScreen[None]):
             if len(current_msgs) > rendered_count:
                 for evt in current_msgs[rendered_count:]:
                     self.event_queue.put_nowait(evt)
+
+            for evt in reversed(current_msgs or []):
+                if isinstance(evt, dict) and evt.get("type") == "tool" and evt.get("tool_type") == "update_plan":
+                    args = evt.get("args") or {}
+                    if isinstance(args, dict) and args.get("plan"):
+                        try:
+                            self.query_one(PlanNotch).set_plan(args.get("plan", []), args.get("explanation", ""))
+                        except Exception:
+                            pass
+                        break
             self._refresh_chrome()
 
     def on_unmount(self) -> None:
@@ -247,6 +257,13 @@ class SubagentViewScreen(ModalScreen[None]):
                     animate=animate,
                 )
                 self.current_tool_widget = widget
+                if evt.get("tool_type") == "update_plan":
+                    args = evt.get("args") or {}
+                    if isinstance(args, dict) and args.get("plan"):
+                        try:
+                            self.query_one(PlanNotch).set_plan(args.get("plan", []), args.get("explanation", ""))
+                        except Exception:
+                            pass
                 if not evt.get("result_text"):
                     if not hasattr(self, "pending_tool_widgets") or self.pending_tool_widgets is None:
                         self.pending_tool_widgets = []

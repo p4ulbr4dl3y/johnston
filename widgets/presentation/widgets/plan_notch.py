@@ -27,25 +27,30 @@ class PlanNotch(Static):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.is_expanded: bool = False
-
-        # Mock static plan data for visual verification (12 steps)
-        self.plan_explanation: str = "Switching to AST parser due to nested tags"
-        self.plan_items: list[PlanItem] = [
-            {"step": "Inspect document XML namespaces", "status": "completed"},
-            {"step": "Audit zip decompression bomb protection", "status": "completed"},
-            {"step": "Implement shared string table decoder", "status": "completed"},
-            {"step": "Analyze zip container structure", "status": "completed"},
-            {"step": "Add binary sanitize stream wrapper", "status": "completed"},
-            {"step": "Implement docx/xlsx/pptx/epub safe parser", "status": "in_progress"},
-            {"step": "Add regression and security tests", "status": "pending"},
-            {"step": "Verify fast streaming tokenizer", "status": "pending"},
-            {"step": "Benchmark memory limits on 256MB archives", "status": "pending"},
-            {"step": "Update converter documentation and specs", "status": "pending"},
-            {"step": "Run full test suite & verify", "status": "pending"},
-            {"step": "Prepare release tag and changelog entry", "status": "pending"},
-        ]
+        self.plan_explanation: str = ""
+        self.plan_items: list[PlanItem] = []
+        self.display = False
 
     def on_mount(self) -> None:
+        self.display = bool(self.plan_items)
+        self.refresh_notch()
+
+    def set_plan(self, plan_items: list[PlanItem] | list[dict], explanation: str = "") -> None:
+        """Update active plan checklist and refresh notch display."""
+        if not isinstance(plan_items, list):
+            plan_items = []
+        self.plan_items = [item for item in plan_items if isinstance(item, dict)]
+        self.plan_explanation = str(explanation or "").strip()
+        self.display = bool(self.plan_items)
+        self.refresh_notch()
+
+    def clear_plan(self) -> None:
+        """Clear active plan and hide notch."""
+        self.plan_items = []
+        self.plan_explanation = ""
+        self.is_expanded = False
+        self.remove_class("expanded")
+        self.display = False
         self.refresh_notch()
 
     def on_click(self) -> None:

@@ -96,6 +96,18 @@ class MessageFlowMixin:
         if not user_text and attachments:
             user_text = "What is in this image?"
 
+        # Clear completed plan notch upon new user interaction turn
+        cur_plan = getattr(self, "current_plan", None)
+        if isinstance(cur_plan, list) and cur_plan and all(isinstance(p, dict) and p.get("status") == "completed" for p in cur_plan):
+            self.current_plan = None
+            self.current_plan_explanation = ""
+            try:
+                from widgets.presentation.widgets.plan_notch import PlanNotch
+
+                self.query_one(PlanNotch).clear_plan()
+            except Exception:
+                pass
+
         kwargs = {"attachments": attachments} if attachments else {}
         if self.is_generating:
             self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)

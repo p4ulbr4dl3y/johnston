@@ -15,15 +15,51 @@ class TestPlanNotch(unittest.TestCase):
         notch.on_click()
         self.assertFalse(notch.is_expanded)
 
-    def test_render_collapsed_and_expanded_default(self):
+    def test_set_and_clear_plan(self):
         notch = PlanNotch()
+        self.assertEqual(len(notch.plan_items), 0)
+        self.assertFalse(notch.display)
+
+        plan = [
+            {"step": "Step 1", "status": "completed"},
+            {"step": "Step 2", "status": "in_progress"},
+            {"step": "Step 3", "status": "pending"},
+        ]
+        notch.set_plan(plan, "Refactoring parser")
+        self.assertTrue(notch.display)
+        self.assertEqual(len(notch.plan_items), 3)
+        self.assertEqual(notch.plan_explanation, "Refactoring parser")
+
         col = notch._render_collapsed()
-        self.assertIsNotNone(col)
-        self.assertIn("5/12", col.plain)
+        self.assertIn("1/3", col.plain)
+        self.assertIn("Step 2", col.plain)
+
         exp = notch._render_expanded()
-        self.assertIsNotNone(exp)
-        self.assertIn("Plan (5/12)", exp.plain)
-        self.assertIn("Implement docx/xlsx/pptx/epub safe parser", exp.plain)
+        self.assertIn("Plan (1/3)", exp.plain)
+        self.assertIn("Refactoring parser", exp.plain)
+        self.assertIn("[▶] Step 2", exp.plain)
+
+        notch.clear_plan()
+        self.assertEqual(len(notch.plan_items), 0)
+        self.assertFalse(notch.display)
+        self.assertFalse(notch.is_expanded)
+
+    def test_malformed_plan_items_resilience(self):
+        notch = PlanNotch()
+        # 1. String instead of list
+        notch.set_plan("malformed string plan", explanation=123)
+        self.assertEqual(notch.plan_items, [])
+        self.assertFalse(notch.display)
+        col = notch._render_collapsed()
+        self.assertIn("No active plan", col.plain)
+        exp = notch._render_expanded()
+        self.assertIn("No tasks in plan", exp.plain)
+
+        # 2. List of strings/invalid types instead of dicts
+        notch.set_plan(["step 1", 123, None, {"step": "Valid step", "status": "pending"}])
+        self.assertEqual(len(notch.plan_items), 1)
+        self.assertEqual(notch.plan_items[0]["step"], "Valid step")
+        self.assertTrue(notch.display)
 
     def test_empty_plan_items(self):
         notch = PlanNotch()
@@ -113,3 +149,78 @@ async def test_action_toggle_plan_pilot():
         assert self_expanded_after != self_expanded_initial
         await pilot.press("ctrl+p")
         assert notch.is_expanded == self_expanded_initial
+
+
+@pytest.mark.asyncio
+async def test_app_on_plan_update_and_auto_clear_pilot():
+    from widgets.chat_input import ChatInput
+
+    app = JohnstonApp()
+    async with app.run_test():
+        notch = app.query_one(PlanNotch)
+        assert not notch.display
+        assert notch.plan_items == []
+
+        # 1. Update plan via host method
+        plan = [
+            {"step": "Step 1", "status": "completed"},
+            {"step": "Step 2", "status": "completed"},
+        ]
+        app.on_plan_update(plan, "Done all tasks")
+        assert notch.display
+        assert len(notch.plan_items) == 2
+        assert app.current_plan == plan
+        assert app.current_plan_explanation == "Done all tasks"
+
+        # 2. Submitting new message when plan is completed auto-clears the notch
+        event = ChatInput.Submitted(value="Start next feature")
+        await app.on_chat_input_submitted(event)
+        assert app.current_plan is None
+        assert app.current_plan_explanation == ""
+        assert not notch.display
+        assert notch.plan_items == []
+
+
+@pytest.mark.asyncio
+async def test_session_persistence_restores_plan():
+    from core.domain.entities.session import AgentSession
+
+    app = JohnstonApp()
+    sess = AgentSession("test-plan-sess")
+    sess.messages = [
+        {"type": "user", "text": "do task"},
+        {
+            "type": "tool",
+            "tool_type": "update_plan",
+            "args": {
+                "plan": [{"step": "Analyze codebase", "status": "in_progress"}],
+                "explanation": "Research phase",
+            },
+        },
+    ]
+    app.sm.save(sess)
+
+    async with app.run_test():
+        app.load_session_ui("test-plan-sess")
+        notch = app.query_one(PlanNotch)
+        assert app.current_plan == [{"step": "Analyze codebase", "status": "in_progress"}]
+        assert app.current_plan_explanation == "Research phase"
+        assert notch.display
+        assert len(notch.plan_items) == 1
+
+
+@pytest.mark.asyncio
+async def test_app_on_chat_input_submitted_malformed_plan_does_not_crash():
+    from widgets.chat_input import ChatInput
+
+    app = JohnstonApp()
+    async with app.run_test():
+        # Set malformed plan
+        app.current_plan = "malformed string"
+        app.current_plan_explanation = "test"
+
+        event = ChatInput.Submitted(value="Hello")
+        await app.on_chat_input_submitted(event)
+        # Should not crash and handle smoothly
+
+
