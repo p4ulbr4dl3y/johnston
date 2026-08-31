@@ -63,12 +63,34 @@ class ManageSubagentTool(BaseTool):
             disp_lines = ["Active/Past Subagent Sessions:"]
             for sess in target_sessions:
                 s_id = str(sess.id)
-                s_status = str(sess.status)
+                raw_st = getattr(sess, "status", None)
+                if isinstance(raw_st, SessionStatus):
+                    st = raw_st.value.lower()
+                else:
+                    st = str(raw_st or "").lower()
+
+                if getattr(sess, "async_task", None) and not sess.async_task.done():
+                    s_status = "running"
+                elif st in ("active", "running"):
+                    s_status = "running"
+                elif st in ("completed", "done", "finished"):
+                    s_status = "completed"
+                elif st in ("cancelled", "canceled", "killed"):
+                    s_status = "cancelled"
+                elif st in ("error", "failed"):
+                    s_status = "error"
+                else:
+                    s_status = st or "unknown"
+
                 s_role = str(sess.role or "worker")
-                s_title = str(sess.title or "")
+                raw_title = getattr(sess, "title", "") or ""
+                if (not raw_title or raw_title.lower() == "untitled") and getattr(sess, "prompt", ""):
+                    raw_title = getattr(sess, "prompt", "")
+                raw_title = raw_title or "(subagent task)"
+                s_title = " ".join(str(raw_title).split())
                 items.append(f"{s_id}|{s_status}|{s_role}|{s_title}")
                 disp_lines.append(
-                    f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {s_role.capitalize()} | Title: {sess.title}"
+                    f"• ID: {sess.id} | Status: {s_status.upper()} | Type: {s_role.capitalize()} | Title: {s_title}"
                 )
 
             content_txt = f"[subagents {len(target_sessions)} | id|status|role|title]\n" + "\n".join(items)
