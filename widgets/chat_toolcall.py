@@ -109,6 +109,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.content_widget = Static("", classes="tool-content", markup=False)
         self.md_widget = Markdown("", classes="tool-content-md")
         self.scroll_box = ToolScrollBox(self.content_widget, self.md_widget, classes=TOOL_SCROLL_BOX)
+        self.scroll_box.display = False
 
     def is_expandable(self) -> bool:
         from core.infrastructure.runtime.tool_name import normalize_tool_name
@@ -175,9 +176,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def on_mount(self) -> None:
         if self.is_expanded and self.is_expandable():
+            self.scroll_box.display = True
             self._should_scroll_on_render = self._is_parent_at_bottom()
             self.render_content()
         else:
+            self.scroll_box.display = False
             self.content_widget.display = False
             self.md_widget.display = False
         self.render_header()
@@ -281,6 +284,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.is_expanded = False
             self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
             self.header_label.add_class(TOOL_HEADER)
+            self.scroll_box.display = False
             self.content_widget.display = False
             self.md_widget.display = False
             if was_expanded:
@@ -291,8 +295,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             parent = getattr(self, "parent", None)
             if getattr(parent, "auto_expand_all", False) and self.is_expandable():
                 self.is_expanded = True
+                self.scroll_box.display = True
         self.render_header()
         if self.is_expanded:
+            self.scroll_box.display = True
             self._should_scroll_on_render = self._is_parent_at_bottom()
             self.render_content()
 
@@ -309,6 +315,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if not self.is_clickable_header():
             self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
             self.header_label.add_class(TOOL_HEADER)
+            self.scroll_box.display = False
             self.content_widget.display = False
             self.md_widget.display = False
         else:
@@ -491,12 +498,14 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.is_expanded = not self.is_expanded
         self.render_header()
         if self.is_expanded:
+            self.scroll_box.display = True
             if getattr(self, "_shell_update_scheduled", False):
                 self._flush_shell_update()
             self._should_scroll_to_widget = scroll
             self.render_content()
         else:
             self._should_scroll_to_widget = False
+            self.scroll_box.display = False
             self.content_widget.display = False
             self.md_widget.display = False
         self._update_next_sibling_spacing()
@@ -574,6 +583,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             except RuntimeError:
                 loop = None
             if loop is not None and getattr(self, "is_mounted", True):
+                self.scroll_box.display = True
                 self.content_widget.display = True
                 self.md_widget.display = False
                 gate: asyncio.Task | None = self._render_gate if hasattr(self, "_render_gate") else None

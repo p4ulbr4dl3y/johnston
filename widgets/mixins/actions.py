@@ -56,6 +56,16 @@ class ActionsMixin:
         except Exception:
             pass
 
+    def action_toggle_plan_hidden(self) -> None:
+        """Toggle visibility/hidden state of the top plan notch widget"""
+        try:
+            from widgets.presentation.widgets.plan_notch import PlanNotch
+
+            notch = self.query_one(PlanNotch)
+            notch.toggle_hidden()
+        except Exception:
+            pass
+
     def on_plan_update(self, plan: list[dict], explanation: str = "") -> None:
         """Handle plan update event from update_plan tool."""
         validated_plan = [p for p in plan if isinstance(p, dict)] if isinstance(plan, list) else []

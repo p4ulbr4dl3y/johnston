@@ -152,6 +152,32 @@ async def test_action_toggle_plan_pilot():
 
 
 @pytest.mark.asyncio
+async def test_action_toggle_plan_hidden_pilot():
+    app = JohnstonApp()
+    async with app.run_test() as pilot:
+        notch = app.query_one(PlanNotch)
+        plan = [{"step": "Step 1", "status": "in_progress"}]
+        app.on_plan_update(plan, "Running")
+        assert notch.display
+
+        # Press ctrl+h to hide
+        await pilot.press("ctrl+h")
+        assert not notch.display
+
+        # Press ctrl+h again to restore
+        await pilot.press("ctrl+h")
+        assert notch.display
+
+        # When hidden, ctrl+p should make it visible and expanded
+        await pilot.press("ctrl+h")
+        assert not notch.display
+        await pilot.press("ctrl+p")
+        assert notch.display
+        assert notch.is_expanded
+
+
+
+@pytest.mark.asyncio
 async def test_app_on_plan_update_and_auto_clear_pilot():
     from widgets.chat_input import ChatInput
 
@@ -215,6 +241,68 @@ async def test_session_persistence_restores_plan():
 
 
 @pytest.mark.asyncio
+async def test_session_persistence_does_not_restore_completed_plan_if_subsequent_user_message():
+    from core.domain.entities.session import AgentSession
+
+    app = JohnstonApp()
+    sess = AgentSession("test-completed-plan-sess")
+    sess.messages = [
+        {"type": "user", "text": "do task"},
+        {
+            "type": "tool",
+            "tool_type": "update_plan",
+            "args": {
+                "plan": [{"step": "Analyze codebase", "status": "completed"}],
+                "explanation": "Research done",
+            },
+        },
+        {"type": "bot", "text": "All tasks completed!"},
+        {"type": "user", "text": "Great, now commit"},
+        {"type": "bot", "text": "Committed changes."},
+    ]
+    app.sm.save(sess)
+
+    async with app.run_test() as pilot:
+        app.load_session_ui("test-completed-plan-sess")
+        notch = app.query_one(PlanNotch)
+        assert app.current_plan is None
+        assert app.current_plan_explanation == ""
+        await pilot.pause(0.3)
+        assert not notch.display
+        assert notch.plan_items == []
+
+
+@pytest.mark.asyncio
+async def test_session_persistence_restores_completed_plan_if_no_subsequent_user_message():
+    from core.domain.entities.session import AgentSession
+
+    app = JohnstonApp()
+    sess = AgentSession("test-completed-plan-latest-sess")
+    sess.messages = [
+        {"type": "user", "text": "do task"},
+        {
+            "type": "tool",
+            "tool_type": "update_plan",
+            "args": {
+                "plan": [{"step": "Analyze codebase", "status": "completed"}],
+                "explanation": "Research done",
+            },
+        },
+        {"type": "bot", "text": "All tasks completed!"},
+    ]
+    app.sm.save(sess)
+
+    async with app.run_test() as pilot:
+        app.load_session_ui("test-completed-plan-latest-sess")
+        notch = app.query_one(PlanNotch)
+        assert app.current_plan == [{"step": "Analyze codebase", "status": "completed"}]
+        assert app.current_plan_explanation == "Research done"
+        await pilot.pause(0.3)
+        assert notch.display
+        assert len(notch.plan_items) == 1
+
+
+@pytest.mark.asyncio
 async def test_app_on_chat_input_submitted_malformed_plan_does_not_crash():
     from widgets.chat_input import ChatInput
 
@@ -227,5 +315,6 @@ async def test_app_on_chat_input_submitted_malformed_plan_does_not_crash():
         event = ChatInput.Submitted(value="Hello")
         await app.on_chat_input_submitted(event)
         # Should not crash and handle smoothly
+
 
 

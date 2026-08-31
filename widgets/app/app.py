@@ -32,6 +32,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         ("ctrl+b", "background_all", "Background All"),
         ("ctrl+o", "toggle_expand", "Toggle Expand"),
         ("ctrl+p", "toggle_plan", "Toggle Plan"),
+        ("ctrl+h", "toggle_plan_hidden", "Hide/Show Plan"),
         ("tab", "toggle_role", "Toggle Role"),
         ("shift+tab", "toggle_mode", "Toggle Mode"),
     ])

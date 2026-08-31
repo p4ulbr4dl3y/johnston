@@ -56,7 +56,21 @@ class PlanNotch(Static):
     def on_click(self) -> None:
         self.toggle_expanded()
 
+    def toggle_hidden(self) -> None:
+        """Toggle complete visibility of the plan notch."""
+        if not self.plan_items:
+            self.display = False
+            return
+        self.display = not self.display
+        self.refresh_notch()
+
     def toggle_expanded(self) -> None:
+        if not self.display:
+            self.display = True
+            self.is_expanded = True
+            self.add_class("expanded")
+            self.refresh_notch()
+            return
         self.is_expanded = not self.is_expanded
         if self.is_expanded:
             self.add_class("expanded")
@@ -69,8 +83,8 @@ class PlanNotch(Static):
 
         total = len(self.plan_items)
         target_width = 64
-        badge = format_modal_hint("ctrl+p: plan")
-        badge_plain = "ctrl+p: plan"
+        badge = format_modal_hint("ctrl+p: plan • ctrl+h: hide")
+        badge_plain = "ctrl+p: plan • ctrl+h: hide"
 
         if total == 0:
             no_plan = "No active plan"
@@ -113,8 +127,8 @@ class PlanNotch(Static):
 
         target_width = 64
         header_title = f"Plan ({done}/{total})" if total > 0 else "Plan"
-        badge = format_modal_hint("ctrl+p: close")
-        badge_plain = "ctrl+p: close"
+        badge = format_modal_hint("ctrl+p: close • ctrl+h: hide")
+        badge_plain = "ctrl+p: close • ctrl+h: hide"
         pad = max(2, target_width - display_width(header_title) - display_width(badge_plain))
 
         t = Text()

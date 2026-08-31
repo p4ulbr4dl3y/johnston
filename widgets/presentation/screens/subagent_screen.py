@@ -19,6 +19,7 @@ class SubagentViewScreen(ModalScreen[None]):
         ("escape", "close", "Close Screen"),
         ("ctrl+k", "kill_subagent", "Kill Subagent"),
         ("ctrl+p", "toggle_plan", "Toggle Plan"),
+        ("ctrl+h", "toggle_plan_hidden", "Hide/Show Plan"),
         ("ctrl+o", "toggle_expand", "Toggle Expand"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
@@ -47,6 +48,14 @@ class SubagentViewScreen(ModalScreen[None]):
         try:
             notch = self.query_one(PlanNotch)
             notch.toggle_expanded()
+        except Exception:
+            pass
+
+    def action_toggle_plan_hidden(self) -> None:
+        """Toggle visibility/hidden state of the top plan notch widget."""
+        try:
+            notch = self.query_one(PlanNotch)
+            notch.toggle_hidden()
         except Exception:
             pass
 
@@ -154,12 +163,21 @@ class SubagentViewScreen(ModalScreen[None]):
                 for evt in current_msgs[rendered_count:]:
                     self.event_queue.put_nowait(evt)
 
+            has_subsequent_user_msg = False
             for evt in reversed(current_msgs or []):
-                if isinstance(evt, dict) and evt.get("type") == "tool" and evt.get("tool_type") == "update_plan":
+                if not isinstance(evt, dict):
+                    continue
+                etype = evt.get("type")
+                if etype == "user":
+                    has_subsequent_user_msg = True
+                elif etype == "tool" and evt.get("tool_type") == "update_plan":
                     args = evt.get("args") or {}
                     if isinstance(args, dict) and args.get("plan"):
+                        p_items = [p for p in args.get("plan", []) if isinstance(p, dict)]
+                        if p_items and all(p.get("status") == "completed" for p in p_items) and has_subsequent_user_msg:
+                            break
                         try:
-                            self.query_one(PlanNotch).set_plan(args.get("plan", []), args.get("explanation", ""))
+                            self.query_one(PlanNotch).set_plan(p_items, args.get("explanation", ""))
                         except Exception:
                             pass
                         break

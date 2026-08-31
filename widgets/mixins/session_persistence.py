@@ -160,12 +160,24 @@ class SessionPersistenceMixin:
         restored_explanation = ""
         try:
             msg_seq = list(saved_msgs) if saved_msgs is not None else []
+            has_subsequent_user_msg = False
             for msg in reversed(msg_seq):
-                if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "update_plan":
+                if not isinstance(msg, dict):
+                    continue
+                m_type = msg.get("type")
+                if m_type == "user":
+                    has_subsequent_user_msg = True
+                elif m_type == "tool" and msg.get("tool_type") == "update_plan":
                     args = msg.get("args") or {}
                     if isinstance(args, dict) and isinstance(args.get("plan"), list):
-                        restored_plan = [p for p in args.get("plan") if isinstance(p, dict)]
-                        restored_explanation = str(args.get("explanation") or "").strip()
+                        candidate_plan = [p for p in args.get("plan") if isinstance(p, dict)]
+                        candidate_explanation = str(args.get("explanation") or "").strip()
+                        if candidate_plan and all(p.get("status") == "completed" for p in candidate_plan) and has_subsequent_user_msg:
+                            restored_plan = None
+                            restored_explanation = ""
+                        else:
+                            restored_plan = candidate_plan
+                            restored_explanation = candidate_explanation
                         break
         except Exception:
             pass
