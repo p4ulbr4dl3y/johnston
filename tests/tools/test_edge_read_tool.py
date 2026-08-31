@@ -194,7 +194,7 @@ async def test_path_with_quotes_and_escaped(ctx, tmp_path):
 async def test_directory_path_returns_listing(tmp_path, ctx):
     os.makedirs(os.path.join(tmp_path, "adir"), exist_ok=True)
     res = str(await ReadTool().execute({"path": os.path.join(tmp_path, "adir")}, ctx=ctx))
-    assert "[dir:" in res or "is a directory" in res
+    assert "[dir " in res or "is a directory" in res
 
 
 @pytest.mark.asyncio

@@ -32,7 +32,7 @@ def list_lines(tasks: List[Any], *, header: str = "Active Background Tasks:") ->
 def format_tasks_plain(tasks: List[Any]) -> str:
     """Render a canonical plain representation of tasks for LLM consumption."""
     if not tasks:
-        return "no active background tasks"
+        return "[tasks 0]"
 
     items = []
     for t in tasks:
@@ -40,11 +40,10 @@ def format_tasks_plain(tasks: List[Any]) -> str:
         is_running = getattr(t, "is_running", True)
         status = "running" if is_running else "finished"
         cmd = str(getattr(t, "command", ""))
-        raw_log = getattr(t, "log_path", None)
-        log_part = f" | log: {raw_log}" if raw_log and str(raw_log).strip() else ""
-        items.append(f"- ID: {tid} | status: {status} | cmd: {cmd}{log_part}")
+        raw_log = str(getattr(t, "log_path", "") or "").strip()
+        items.append(f"{tid}|{status}|{cmd}|{raw_log}")
 
-    return f"Active Background Tasks ({len(tasks)}):\n" + "\n".join(items)
+    return f"[tasks {len(tasks)} | id|status|cmd|log]\n" + "\n".join(items)
 
 
 def not_found_message(task_id: str, tasks: List[Any], manager_name: str) -> str:

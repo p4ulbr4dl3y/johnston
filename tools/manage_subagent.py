@@ -55,7 +55,7 @@ class ManageSubagentTool(BaseTool):
             target_sessions = store.children(curr_session_id) if curr_session_id else store.list(kind="subagent")
             if not target_sessions:
                 return ToolResult.done(
-                    content="no active subagents",
+                    content="[subagents 0]",
                     display="No subagent sessions found for current session.",
                 )
 
@@ -66,12 +66,12 @@ class ManageSubagentTool(BaseTool):
                 s_status = str(sess.status)
                 s_role = str(sess.role or "worker")
                 s_title = str(sess.title or "")
-                items.append(f"- ID: {s_id} | status: {s_status} | role: {s_role} | title: {s_title}")
+                items.append(f"{s_id}|{s_status}|{s_role}|{s_title}")
                 disp_lines.append(
                     f"• ID: {sess.id} | Status: {sess.status.upper()} | Type: {s_role.capitalize()} | Title: {sess.title}"
                 )
 
-            content_txt = f"Active Subagent Sessions ({len(target_sessions)}):\n" + "\n".join(items)
+            content_txt = f"[subagents {len(target_sessions)} | id|status|role|title]\n" + "\n".join(items)
             display_txt = "\n".join(disp_lines)
             return ToolResult.done(content=content_txt, display=display_txt)
 
@@ -88,7 +88,7 @@ class ManageSubagentTool(BaseTool):
 
         if action == "kill":
             if session.status != "running":
-                msg = f"{session.id} already in '{session.status}'"
+                msg = f"[killed {session.id}]"
                 return ToolResult.done(content=msg, display=msg)
 
             if session.async_task and not session.async_task.done():
@@ -99,7 +99,7 @@ class ManageSubagentTool(BaseTool):
 
             session.finish(SessionStatus.CANCELLED, "Cancelled via subagent tool")
             store.save(session)
-            msg = f"{session.id} terminated"
+            msg = f"[killed {session.id}]"
             return ToolResult.done(content=msg, display=msg)
 
         elif action == "send_message":

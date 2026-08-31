@@ -307,7 +307,7 @@ class WebFetchTool(BaseTool):
                 out_ext = ".md"
 
         type_name = out_ext.lstrip(".")
-        header = f"[URL: {url} | status: 200 | type: {type_name}]"
+        header = f"[url {url} | status 200 | type {type_name}]"
         from tools.base import truncate_output
 
         body = truncate_output(text_content, tool_name="web_fetch", ext=out_ext)

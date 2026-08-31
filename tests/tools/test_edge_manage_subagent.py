@@ -181,7 +181,7 @@ async def test_subagent_status_action_removed(sub_tool, store):
 async def test_kill_completed_session_soft(sub_tool, store):
     _mk("skdone", status="completed")
     res = await sub_tool.execute({"action": "kill", "session_id": "skdone"})
-    assert "already in" in str(res) or "completed" in str(res)
+    assert "[killed skdone]" in str(res)
 
 
 async def test_kill_nonexistent_soft(sub_tool, store):
@@ -203,7 +203,7 @@ async def test_kill_twice_idempotent(sub_tool, store):
     r1 = await sub_tool.execute({"action": "kill", "session_id": "sk2"})
     assert "sk2" in r1.content
     r2 = await sub_tool.execute({"action": "kill", "session_id": "sk2"})
-    assert "already in" in str(r2) or "cancelled" in str(r2)
+    assert "[killed sk2]" in str(r2)
 
 
 # --- list edge cases -------------------------------------------------------
@@ -211,7 +211,7 @@ async def test_kill_twice_idempotent(sub_tool, store):
 
 async def test_list_no_subagents_no_crash(sub_tool, store):
     res = await sub_tool.execute({"action": "list"})
-    assert res.content == "no active subagents"
+    assert res.content == "[subagents 0]"
     assert "No subagent sessions found" in res.display
 
 
@@ -232,7 +232,7 @@ async def test_list_invalid_parent_id_no_crash(sub_tool, store):
     _mk("sip", parent="parent-a")
     app = _SmApp(store, current_session_id="parent-zzz")
     res = await sub_tool.execute({"action": "list"}, ctx=_ctx(app))
-    assert res.content == "no active subagents"
+    assert res.content == "[subagents 0]"
     assert "sip" not in res.content
 
 

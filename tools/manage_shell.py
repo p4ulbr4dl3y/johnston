@@ -92,7 +92,7 @@ class ManageShellTool(BaseTool):
                     elif getattr(t, "process", None) and t.process.returncode is None:
                         t.process.kill()
                     ctx.refresh_status()
-                    msg = f"{task_id} killed"
+                    msg = f"[killed {task_id}]"
                     return ToolResult.done(content=msg, display=msg)
                 except Exception as e:
                     return ToolResult.error("kill", detail=str(e), name=task_id)

@@ -79,7 +79,7 @@ def test_new_task_id():
 async def test_sleep_chain_no_remainder(tool):
     cmd = "sleep 0.001" if os.name != "nt" else "cd ."
     res = await tool.execute({"command": cmd})
-    assert _plain(res) == "(no output)" or '<cmd exit="0"' in str(res)
+    assert _plain(res) == "[no output]" or '<cmd exit="0"' in str(res)
 
 
 async def test_sleep_chain_with_remainder(tool):
@@ -96,7 +96,7 @@ async def test_standard_pipe_execution(tool):
 async def test_normal_execution_empty_output(tool):
     # `true` is POSIX-only; `cd .` produces no output on both cmd/PowerShell and sh.
     res = await tool.execute({"command": "true" if os.name != "nt" else "cd ."})
-    assert _plain(res) == "(no output)" or '<cmd exit="0"' in str(res)
+    assert _plain(res) == "[no output]" or '<cmd exit="0"' in str(res)
 
 
 async def test_invalid_timeout_value_falls_back_to_default(tool):
@@ -226,7 +226,7 @@ async def test_move_to_background_during_sync_execution(tool, make_app_mock, mak
         task.move_to_background()
 
         res = await exec_task
-        assert "background task moved to background by user" in res.content
+        assert "task backgrounded" in res.content
         assert "Recent Output:\nserver started on port 8080" in res.content
         assert task.is_background
         assert len([t for t in app.task_manager]) == 1
@@ -255,7 +255,7 @@ async def test_move_to_background_no_output(tool, make_app_mock, make_tool_conte
         tasks[0].move_to_background()
 
         res = await exec_task
-        assert "background task moved to background by user" in res.content
+        assert "task backgrounded" in res.content
         assert "no output yet" in res.content
         assert "Recent Output:" not in res.content
 
@@ -283,7 +283,7 @@ async def test_move_to_background_truncated_output(tool, make_app_mock, make_too
         tasks[0].move_to_background()
 
         res = await exec_task
-        assert "background task moved to background by user" in res.content
+        assert "task backgrounded" in res.content
         assert "Recent Output:" in res.content
         assert "Truncated: last 2000 chars" in res.content
 
@@ -379,7 +379,7 @@ async def test_main_sync_read_task_drain_timeout(tool, make_app_mock, make_tool_
         patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
     ):
         res = await tool.execute({"command": "echo test"}, ctx=ctx)
-    assert _plain(res) == "(no output)" or '<cmd exit="0"' in str(res)
+    assert _plain(res) == "[no output]" or '<cmd exit="0"' in str(res)
 
 
 async def test_main_sync_not_registered_as_background_task(tool, make_app_mock, make_tool_context):
@@ -389,7 +389,7 @@ async def test_main_sync_not_registered_as_background_task(tool, make_app_mock, 
 
     with patch.object(ShellTool, "_create_std_process", return_value=p):
         res = await tool.execute({"command": "echo sync"}, ctx=ctx)
-        assert _plain(res) == "(no output)" or '<cmd exit="0"' in str(res)
+        assert _plain(res) == "[no output]" or '<cmd exit="0"' in str(res)
         # Sync task is dropped from the manager after completion (never
         # converted to a persistent background task).
         assert len([t for t in app.task_manager]) == 0
@@ -444,7 +444,7 @@ async def test_subagent_no_stdout_stream(tool, make_app_mock, make_tool_context)
 
     with patch.object(ShellTool, "_create_std_process", return_value=p):
         res = str(await tool.execute({"command": "true"}, ctx=ctx))
-        assert _plain(res) == "(no output)"
+        assert _plain(res) == "[no output]"
 
 
 async def test_subagent_read_task_drain_timeout(tool, make_app_mock, make_tool_context):
@@ -463,7 +463,7 @@ async def test_subagent_read_task_drain_timeout(tool, make_app_mock, make_tool_c
         patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
     ):
         res = str(await tool.execute({"command": "true"}, ctx=ctx))
-        assert _plain(res) == "(no output)"
+        assert _plain(res) == "[no output]"
 
 
 async def test_subagent_timeout_read_task_exception_ignored(tool, make_app_mock, make_tool_context):
@@ -536,7 +536,7 @@ async def test_explicit_run_in_background(tool, make_app_mock, make_tool_context
         patch.object(ShellTool, "_create_std_process", return_value=p),
     ):
         res = await tool.execute({"command": "tail -f log.txt", "background": True}, ctx=ctx)
-        assert "background task started" in res.content
+        assert "task started" in res.content
         assert len([t for t in app.task_manager]) == 1
 
 
@@ -552,7 +552,7 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
     mgr = ManageShellTool()
     with patch("tools.shell.shell_executable", return_value="/bin/sh"):
         res = await tool.execute({"command": "cat", "background": True}, ctx=app)
-    m = re.search(r'(?:Task ID: |id:\s*|id=")(shell-[a-f0-9]+)', str(res.content) + " " + str(res.display))
+    m = re.search(r'(?:Task ID: |id:\s*|id\s+|id=")(shell-[a-f0-9]+)', str(res.content) + " " + str(res.display))
     assert m is not None
     task_id = m.group(1)
 
@@ -569,7 +569,7 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
     got_output = asyncio.Event()
     tasks[0].add_listener(lambda chunk: got_output.set() if "hello_manage" in chunk else None)
     r = await mgr.execute({"action": "send_input", "task_id": task_id, "input": "hello_manage"}, ctx=app)
-    assert "stdin_sent" in r.content or "OK: input sent" in str(r.display)
+    assert "[input sent" in r.content or "input sent" in str(r.display)
     await asyncio.wait_for(got_output.wait(), timeout=3.0)
 
     # background output is streamed into the task buffer (file log too)
@@ -709,7 +709,7 @@ async def test_redirect_stdout_to_devnull_loses_output(tool, make_tool_context):
 @pytest.mark.skipif(os.name == "nt", reason="/dev/null is POSIX-only")
 async def test_redirect_append(tool, make_tool_context):
     res = str(await tool.execute({"command": "echo x >> /dev/null"}, ctx=_ctx(make_tool_context)))
-    assert _plain(res) == "(no output)"
+    assert _plain(res) == "[no output]"
 
 
 @pytest.mark.skipif(os.name == "nt", reason="/dev/null and < redirection are POSIX-only")
@@ -809,7 +809,7 @@ async def test_false_exit_code_surfaced(tool, make_tool_context):
     # `false` exits 1 and the tool surfaces the exit code when there is no output.
     res = await tool.execute({"command": "false"}, ctx=_ctx(make_tool_context))
     assert res.returncode == 1
-    assert _plain(res) == "(exit code 1)"
+    assert _plain(res) == "[exit 1]"
 
 
 @pytest.mark.skipif(os.name == "nt", reason="bash ; exit syntax is POSIX-only")

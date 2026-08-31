@@ -284,7 +284,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com/page"})
         self.assertIn("Truncated", res.content)
-        self.assertIn("type: md", res.content)
+        self.assertIn("type md", res.content)
         self.assertIn("Log: ", res.content)
         self.assertIn(".md", res.content)
 
@@ -296,7 +296,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com/raw_page", "raw": True})
         self.assertIn("Truncated", res.content)
-        self.assertIn("type: html", res.content)
+        self.assertIn("type html", res.content)
         self.assertIn("Log: ", res.content)
         self.assertIn(".html", res.content)
 

@@ -63,10 +63,10 @@ class CreateTool(BaseTool):
             new_lines = content.splitlines()
             cnt = len(new_lines) if content else 0
             if not file_existed:
-                return f"OK: created '{path_arg}' ({cnt} lines)"
+                return f"[created {path_arg} | {cnt} lines]"
             diff_text = format_file_diff(old_content, content, str(path_arg))
             if not diff_text:
-                return f"OK: file '{path_arg}' unchanged ({cnt} lines)"
+                return f"[unchanged {path_arg} | {cnt} lines]"
             return diff_text
 
         try:

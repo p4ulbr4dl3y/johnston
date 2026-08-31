@@ -178,7 +178,7 @@ class ShellTool(BaseTool):
         ctx.add_background_task(task)
         task.start_reading(on_completed=callback)
 
-        plain_content = f"[background task started | id: {task_id} | log: {task.log_path}]"
+        plain_content = f"[task started | id {task_id} | log {task.log_path}]"
         notice = _sandbox_fallback_notice(ctx)
         if notice:
             plain_content = notice + plain_content
@@ -232,12 +232,12 @@ class ShellTool(BaseTool):
                         raw_out, max_chars=2000, tool_name="shell", save_log=False, from_end=True
                     ).strip()
                     plain_content = (
-                        f"[background task moved to background by user | id: {task_id} | log: {task.log_path} | elapsed: {elapsed}s]\n\n"
+                        f"[task backgrounded | id {task_id} | log {task.log_path} | elapsed {elapsed}s]\n\n"
                         f"Recent Output:\n{truncated}"
                     )
                 else:
                     plain_content = (
-                        f"[background task moved to background by user | id: {task_id} | log: {task.log_path} | elapsed: {elapsed}s | no output yet]"
+                        f"[task backgrounded | id {task_id} | log {task.log_path} | elapsed {elapsed}s | no output yet]"
                     )
                 return ToolResult(
                     status=ToolResultStatus.RUNNING,
@@ -254,7 +254,7 @@ class ShellTool(BaseTool):
             raw_rc = p.returncode if p.returncode is not None else getattr(task, "returncode", None)
             returncode = raw_rc if isinstance(raw_rc, int) else None
             if not res.strip():
-                content_str = f"(exit code {returncode})" if (returncode is not None and returncode != 0) else "(no output)"
+                content_str = f"[exit {returncode}]" if (returncode is not None and returncode != 0) else "[no output]"
                 return ToolResult.done(content=content_str, display=content_str, returncode=returncode)
             truncated = _truncate_output(res).strip()
             return ToolResult.done(content=truncated, display=truncated, returncode=returncode)

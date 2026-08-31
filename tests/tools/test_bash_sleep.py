@@ -23,8 +23,8 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
 
         cmd = "sleep 0.05" if os.name != "nt" else "cd ."
         res = await tool.execute({"command": cmd}, ctx=mock_app)
-        self.assertEqual(res.content, "(no output)")
-        self.assertEqual(res.display, "(no output)")
+        self.assertEqual(res.content, "[no output]")
+        self.assertEqual(res.display, "[no output]")
 
     async def test_sleep_chain(self):
         tool = ShellTool()
@@ -42,8 +42,8 @@ class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):
 
         # `true` is POSIX-only; `cd .` produces no output on both cmd/PowerShell and sh.
         res = await tool.execute({"command": "true" if os.name != "nt" else "cd ."}, ctx=mock_app)
-        self.assertEqual(res.content, "(no output)")
-        self.assertEqual(res.display, "(no output)")
+        self.assertEqual(res.content, "[no output]")
+        self.assertEqual(res.display, "[no output]")
 
 
 if __name__ == "__main__":

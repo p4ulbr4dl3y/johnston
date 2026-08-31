@@ -358,7 +358,7 @@ async def send_subagent_followup(
         from core.infrastructure.runtime.subagent_tracker import _mark_subagent_running
 
         _mark_subagent_running(ctx.host, session.id, text=f"follow-up queued for {session.id}")
-        return ToolResult.done(f"queued for {session.id}")
+        return ToolResult.done(f"[queued | id {session.id}]")
 
     try:
         subagent = session.agent

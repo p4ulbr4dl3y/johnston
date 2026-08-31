@@ -15,9 +15,9 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             ],
         }
         res = await tool.execute(args)
-        self.assertIn("plan updated (1/3 completed)", res.content)
+        self.assertIn("[plan updated | 1/3 done | Refactoring module for safety]", res.content)
         self.assertIn("Refactoring module for safety", res.content)
-        self.assertIn("plan updated (1/3 completed)", res.display)
+        self.assertIn("[plan updated | 1/3 done | Refactoring module for safety]", res.display)
 
     async def test_update_plan_tool_invalid_payload(self):
         tool = UpdatePlanTool()
@@ -37,8 +37,8 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             ]
         }
         res = await tool.execute(args)
-        self.assertIn("plan updated (0/3 completed)", res.content)
-        self.assertIn("plan updated (0/3 completed)", res.display)
+        self.assertIn("[plan updated | 0/3 done]", res.content)
+        self.assertIn("[plan updated | 0/3 done]", res.display)
 
     async def test_update_plan_normalization_and_skipping(self):
         tool = UpdatePlanTool()
@@ -55,8 +55,8 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             ]
         }
         res = await tool.execute(args)
-        self.assertIn("plan updated (1/4 completed)", res.content)
-        self.assertIn("plan updated (1/4 completed)", res.display)
+        self.assertIn("[plan updated | 1/4 done]", res.content)
+        self.assertIn("[plan updated | 1/4 done]", res.display)
 
     async def test_update_plan_no_valid_items(self):
         tool = UpdatePlanTool()
@@ -82,8 +82,8 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             },
             ctx=app,
         )
-        self.assertIn("plan updated (0/1 completed)", res.content)
-        self.assertIn("plan updated (0/1 completed)", res.display)
+        self.assertIn("[plan updated | 0/1 done | App update test]", res.content)
+        self.assertIn("[plan updated | 0/1 done | App update test]", res.display)
         self.assertTrue(app.updated)
         self.assertEqual(app.current_plan_explanation, "App update test")
         self.assertEqual(app.current_plan, [{"step": "Step 1", "status": "in_progress"}])
@@ -99,8 +99,8 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             {"plan": [{"step": "Step 1", "status": "completed"}]},
             ctx=app,
         )
-        self.assertIn("plan updated (1/1 completed)", res.content)
-        self.assertIn("plan updated (1/1 completed)", res.display)
+        self.assertIn("[plan updated | 1/1 done]", res.content)
+        self.assertIn("[plan updated | 1/1 done]", res.display)
 
     async def test_update_plan_json_string_payload(self):
         tool = UpdatePlanTool()
@@ -108,7 +108,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             "plan": '[{"step": "Step 1", "status": "completed"}, {"step": "Step 2", "status": "in_progress"}]'
         }
         res = await tool.execute(args)
-        self.assertIn("plan updated (1/2 completed)", res.content)
+        self.assertIn("[plan updated | 1/2 done]", res.content)
 
     async def test_update_plan_nested_agent_host_integration(self):
         class MockApp:
@@ -136,7 +136,7 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
             },
             ctx=agent,
         )
-        self.assertIn("plan updated (1/1 completed)", res.content)
+        self.assertIn("[plan updated | 1/1 done | Nested test]", res.content)
         self.assertTrue(app.updated)
         self.assertEqual(app.current_plan_explanation, "Nested test")
         self.assertEqual(agent.current_plan_explanation, "Nested test")

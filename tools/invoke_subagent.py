@@ -187,8 +187,8 @@ class InvokeSubagentTool(BaseTool):
         session.async_task = bg_task
         ctx.refresh_status()
 
-        branch_info = f" | branch: {branch_name}" if branch_name else ""
-        content_txt = f"[subagent started | id: {session_id} | role: {canonical_role}{branch_info}]"
+        branch_info = f" | branch {branch_name}" if branch_name else ""
+        content_txt = f"[subagent started | id {session_id} | role {canonical_role}{branch_info}]"
         return ToolResult(
             status=ToolResultStatus.RUNNING,
             content=content_txt,

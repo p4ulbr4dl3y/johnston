@@ -44,7 +44,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         # Test Create
         res_create = await execute_tool("create", {"path": file_path, "content": "hello world"})
-        self.assertIn("OK: created", res_create.content)
+        self.assertIn("[created", res_create.content)
         self.assertTrue(os.path.exists(file_path))
 
         # Test Read
@@ -113,7 +113,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)
-        self.assertEqual(res_list.content, "no active background tasks")
+        self.assertEqual(res_list.content, "[tasks 0]")
 
     async def test_task_tool_foreground(self):
         import tempfile
@@ -146,7 +146,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             "invoke_subagent", {"prompt": "do research", "title": "research task", "branch": "main"}, app=app
         )
         self.assertIn("subagent started", res.content)
-        self.assertIn("role: worker", res.content)
+        self.assertIn("role worker", res.content)
 
     async def test_task_tool_background(self):
         import tempfile
@@ -191,7 +191,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
             app=app,
         )
         self.assertIn("subagent started", res.content)
-        self.assertIn("role: worker", res.content)
+        self.assertIn("role worker", res.content)
         sessions = _store.list(kind="subagent")
         self.assertEqual(len(sessions), 1)
         self.assertEqual(sessions[0].title, "bg job")

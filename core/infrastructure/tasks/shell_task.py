@@ -236,7 +236,7 @@ class ShellTask(BaseTask):
             if self.process is not None and getattr(self.process, "stdin", None) is not None:
                 await asyncio.to_thread(self.process.stdin.write, data)
                 await self.process.stdin.drain()
-                return f"OK: input sent to {self.task_id}"
+                return f"[input sent | id {self.task_id}]"
             return format_tool_error("task", f"{self.task_id} stdin not writable")
         except Exception as exc:
             return format_tool_error("task", f"send input to {self.task_id}: {exc}")

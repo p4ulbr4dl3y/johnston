@@ -40,17 +40,16 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_list_action(self):
         tool = ManageSubagentTool()
         res_empty = await tool.execute({"action": "list"})
-        self.assertEqual(res_empty.content, "no active subagents")
+        self.assertEqual(res_empty.content, "[subagents 0]")
         self.assertIn("No subagent sessions found for current session", res_empty.display)
 
         self._mk_subagent("sub-1", "Search files", "find python files", role="explorer")
         self._mk_subagent("sub-2", "Run tests", "run pytest", role="worker", status="completed")
 
         res = await tool.execute({"action": "list"})
-        self.assertIn("sub-1", res.content)
-        self.assertIn("Search files", res.content)
-        self.assertIn("sub-2", res.content)
-        self.assertIn("Run tests", res.content)
+        self.assertIn("[subagents 2 | id|status|role|title]", res.content)
+        self.assertIn("sub-1|running|explorer|Search files", res.content)
+        self.assertIn("sub-2|completed|worker|Run tests", res.content)
         self.assertIn("Explorer", res.display)
         self.assertIn("RUNNING", res.display)
         self.assertIn("COMPLETED", res.display)
@@ -63,7 +62,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         sess.async_task = mock_task
 
         res = await tool.execute({"action": "kill", "session_id": "sub-kill"})
-        self.assertEqual(res.content, "sub-kill terminated")
+        self.assertEqual(res.content, "[killed sub-kill]")
         self.assertEqual(sess.status, "cancelled")
         mock_task.cancel.assert_called_once()
 
@@ -274,7 +273,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute(
             {"action": "send_message", "session_id": "sub-busy", "message": "again"}, ctx=mock_app
         ))
-        self.assertIn("queued for sub-busy", res)
+        self.assertIn("[queued | id sub-busy]", res)
         self.assertEqual(sess.pending_messages, ["again"])
 
     async def test_send_message_setup_error_handled(self):
@@ -382,7 +381,7 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute(
             {"action": "send_message", "session_id": "sub-queue", "message": "again"}, ctx=app
         ))
-        self.assertIn("queued for sub-queue", res)
+        self.assertIn("[queued | id sub-queue]", res)
         spy.mark_running.assert_called_once()
         self.assertIn("sub-queue", spy.mark_running.call_args.kwargs.get("text", ""))
 

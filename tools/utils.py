@@ -157,7 +157,7 @@ def format_line_pagination(
     if is_truncated or actual_end < end:
         meta_parts.append("truncated")
     if converted_path:
-        meta_parts.append(f"converted_log: {converted_path}")
+        meta_parts.append(f"converted {converted_path}")
 
     header = f"[{' | '.join(meta_parts)}]"
     content_str = f"{header}\n" + "\n".join(out_lines) if out_lines else header

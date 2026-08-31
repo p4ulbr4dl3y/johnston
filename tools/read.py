@@ -208,7 +208,7 @@ def process_image_file_sync(path: str, detail: str | None = None, cancel_event: 
             b64_str = base64.b64encode(img_bytes).decode("ascii")
             file_kb = len(img_bytes) / 1024.0
 
-            summary = f"[Image file: '{path}' ({w}x{h} px, format: {target_format}, size: {file_kb:.1f} KB)]"
+            summary = f"[image {path} | {w}x{h} | {target_format.lower()} | {file_kb:.1f} KB]"
 
             return json.dumps(
                 {
@@ -276,13 +276,13 @@ def _inspect_archive(path: str, max_entries: int) -> ToolResult:
         entries = sorted(dirs) + sorted(files)
         total_count = len(entries)
         if total_count == 0:
-            content_str = f"[archive: {path} (empty)]"
+            content_str = f"[archive {path} | total 0]"
         elif len(entries) > max_entries:
             body = "\n".join(entries[:max_entries])
-            content_str = f"[archive: {path} | total {total_count} (truncated)]\n{body}"
+            content_str = f"[archive {path} | total {total_count} | truncated]\n{body}"
         else:
             body = "\n".join(entries)
-            content_str = f"[archive: {path} | total {total_count}]\n{body}"
+            content_str = f"[archive {path} | total {total_count}]\n{body}"
 
         return ToolResult.done(
             content=content_str,
@@ -400,13 +400,13 @@ class ReadTool(BaseTool):
 
                     entries = dirs + files
                     if total_count == 0:
-                        content_str = f"[dir: {path} (empty)]"
+                        content_str = f"[dir {path} | total 0]"
                     elif len(entries) > max_dir_entries:
                         body = "\n".join(entries[:max_dir_entries])
-                        content_str = f"[dir: {path} | total {total_count} (truncated)]\n{body}"
+                        content_str = f"[dir {path} | total {total_count} | truncated]\n{body}"
                     else:
                         body = "\n".join(entries)
-                        content_str = f"[dir: {path} | total {total_count}]\n{body}"
+                        content_str = f"[dir {path} | total {total_count}]\n{body}"
 
                     return ToolResult.done(
                         content=content_str,

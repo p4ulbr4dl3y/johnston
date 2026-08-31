@@ -298,7 +298,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
 
         res = await tool.execute({"path": file_path})
 
-        self.assertIn("converted_log: ", res.content)
+        self.assertIn("converted ", res.content)
         self.assertIn(".md", res.content)
 
         import asyncio
@@ -307,7 +307,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0.05)
 
         # Extract path and verify file exists on disk
-        m = re.search(r'converted_log:\s*([^\]\s]+)', res.content)
+        m = re.search(r'converted\s+([^\]\s]+)', res.content)
         self.assertIsNotNone(m)
         saved_path = m.group(1)
         self.assertTrue(os.path.exists(saved_path))
@@ -321,7 +321,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with open(os.path.join(self.test_dir, "file_a.txt"), "w") as f:
             f.write("hello")
         res = await tool.execute({"path": self.test_dir})
-        self.assertIn("[dir: ", res.content)
+        self.assertIn("[dir ", res.content)
         self.assertIn("sub/", res.content)
         self.assertIn("file_a.txt", res.content)
 
@@ -330,7 +330,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         empty_dir = os.path.join(self.test_dir, "empty_folder")
         os.makedirs(empty_dir, exist_ok=True)
         res = await tool.execute({"path": empty_dir})
-        self.assertIn("(empty)", res.content)
+        self.assertIn("total 0", res.content)
 
     async def test_read_zip_archive(self):
         import zipfile
@@ -342,7 +342,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             zf.writestr("README.md", "# Hello")
             zf.writestr("__MACOSX/._test", "junk")
         res = await tool.execute({"path": zip_path})
-        self.assertIn("[archive: ", res.content)
+        self.assertIn("[archive ", res.content)
         self.assertIn("total 3", res.content)
         self.assertIn("src/", res.content)
         self.assertIn("src/main.py", res.content)
@@ -363,7 +363,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             import io
             tf.addfile(ti2, io.BytesIO(data))
         res = await tool.execute({"path": tar_path})
-        self.assertIn("[archive: ", res.content)
+        self.assertIn("[archive ", res.content)
         self.assertIn("docs/", res.content)
         self.assertIn("docs/guide.txt", res.content)
 
@@ -374,7 +374,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with zipfile.ZipFile(zip_path, "w"):
             pass
         res = await tool.execute({"path": zip_path})
-        self.assertIn("(empty)", res.content)
+        self.assertIn("total 0", res.content)
 
     async def test_read_archive_truncated(self):
         import zipfile
@@ -384,7 +384,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             for i in range(70):
                 zf.writestr(f"item_{i}.txt", f"data {i}")
         res = await tool.execute({"path": zip_path})
-        self.assertIn("(truncated)", res.content)
+        self.assertIn("truncated", res.content)
         self.assertIn("total 70", res.content)
 
     async def test_read_archive_corrupted(self):

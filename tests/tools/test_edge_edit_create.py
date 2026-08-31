@@ -332,7 +332,7 @@ class TestCreateTool(_Base):
         tool = CreateTool()
         p = os.path.join(self.tmp, "c.bin")
         res = str(await tool.execute({"path": p, "content": b"\x00\x01binary"}))
-        self.assertIn("OK: created", res)
+        self.assertIn("[created", res)
 
     async def test_create_parent_path_is_file_returns_err(self):
         tool = CreateTool()
