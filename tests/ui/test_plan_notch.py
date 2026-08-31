@@ -200,11 +200,16 @@ async def test_session_persistence_restores_plan():
     ]
     app.sm.save(sess)
 
-    async with app.run_test():
+    async with app.run_test() as pilot:
         app.load_session_ui("test-plan-sess")
         notch = app.query_one(PlanNotch)
+        # 1. While loading, notch is hidden
+        assert not notch.display
         assert app.current_plan == [{"step": "Analyze codebase", "status": "in_progress"}]
         assert app.current_plan_explanation == "Research phase"
+
+        # 2. After load finishes, notch becomes visible
+        await pilot.pause(0.3)
         assert notch.display
         assert len(notch.plan_items) == 1
 

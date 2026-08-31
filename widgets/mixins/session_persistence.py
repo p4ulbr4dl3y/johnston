@@ -48,6 +48,13 @@ class SessionPersistenceMixin:
         for child in list(chat_view.children):
             child.remove()
 
+        try:
+            from widgets.presentation.widgets.plan_notch import PlanNotch
+
+            self.query_one(PlanNotch).clear_plan()
+        except Exception:
+            pass
+
         # Restore complete element history in UI (user, bot, thinking, tool) with pagination
         saved_msgs = session.messages
 
@@ -93,6 +100,17 @@ class SessionPersistenceMixin:
                     pass
                 chat_view._is_loading_session = False
                 chat_view.loading = False
+                try:
+                    from widgets.presentation.widgets.plan_notch import PlanNotch
+
+                    notch = self.query_one(PlanNotch)
+                    cur_plan = getattr(self, "current_plan", None)
+                    if cur_plan:
+                        notch.set_plan(cur_plan, getattr(self, "current_plan_explanation", ""))
+                    else:
+                        notch.clear_plan()
+                except Exception:
+                    pass
 
             try:
                 if hasattr(chat_view, "call_after_refresh") and callable(chat_view.call_after_refresh):
@@ -137,7 +155,7 @@ class SessionPersistenceMixin:
         elif hasattr(session, "role") and session.role:
             self.role = session.role
 
-        # Restore active plan from session messages if present
+        # Restore active plan state from session messages
         restored_plan = None
         restored_explanation = ""
         try:
@@ -154,17 +172,6 @@ class SessionPersistenceMixin:
 
         self.current_plan = restored_plan
         self.current_plan_explanation = restored_explanation
-        try:
-            from widgets.presentation.widgets.plan_notch import PlanNotch
-
-            notch = self.query_one(PlanNotch)
-            if restored_plan:
-                notch.set_plan(restored_plan, restored_explanation)
-            else:
-                notch.clear_plan()
-        except Exception:
-            pass
-
         self.refresh_status_footer()
 
     def _get_current_session_data(self) -> Optional[dict]:

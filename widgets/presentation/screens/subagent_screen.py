@@ -98,6 +98,12 @@ class SubagentViewScreen(ModalScreen[None]):
         chat_view = self.query_one("#subagent-chat-view", ChatView)
         chat_view.loading = True
         chat_view._is_loading_session = True
+        try:
+            from widgets.presentation.widgets.plan_notch import PlanNotch
+
+            self.query_one(PlanNotch).clear_plan()
+        except Exception:
+            pass
 
         for child in list(chat_view.children):
             child.remove()
@@ -257,9 +263,9 @@ class SubagentViewScreen(ModalScreen[None]):
                     animate=animate,
                 )
                 self.current_tool_widget = widget
-                if evt.get("tool_type") == "update_plan":
+                if animate and evt.get("tool_type") == "update_plan":
                     args = evt.get("args") or {}
-                    if isinstance(args, dict) and args.get("plan"):
+                    if isinstance(args, dict) and isinstance(args.get("plan"), list):
                         try:
                             self.query_one(PlanNotch).set_plan(args.get("plan", []), args.get("explanation", ""))
                         except Exception:
