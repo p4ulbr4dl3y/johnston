@@ -11,6 +11,12 @@ def _mk_task(tid: str, sid: str = None, running: bool = True) -> MagicMock:
     t.command = f"cmd {tid}"
     t.is_running = running
     t.session_id = sid
+    t.status = "running" if running else "finished"
+    t.created_at = None
+    t.completed_at = None
+    t.exit_code = None
+    t.process = None
+    t.was_killed = False
     return t
 
 
@@ -34,9 +40,11 @@ class TestListLines(unittest.TestCase):
     def test_rows(self):
         t1 = _mk_task("a", running=True)
         t2 = _mk_task("b", running=False)
+        t2.created_at = 100.0
+        t2.completed_at = 105.0
         out = list_lines([t1, t2])
         self.assertIn("RUNNING", out)
-        self.assertIn("FINISHED", out)
+        self.assertIn("EXIT:0 (5.0s)", out)
 
 
 class TestFindAny(unittest.TestCase):

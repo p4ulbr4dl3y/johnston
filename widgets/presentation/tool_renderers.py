@@ -137,13 +137,13 @@ def format_manage_shell_display(result_text: str) -> Text:
             continue
         # Pattern: "- ID: {id} | Status: {status} | Command: {cmd}"
         m = re.match(
-            r"^[-\*]?\s*ID:\s*([^\s|]+)\s*\|\s*Status:\s*([^\s|]+)\s*\|\s*Command:\s*(.*)$",
+            r"^[-\*]?\s*ID:\s*([^|]+?)\s*\|\s*Status:\s*([^|]+?)\s*\|\s*Command:\s*(.*)$",
             line_clean,
             re.IGNORECASE,
         )
         if m:
-            t_id, status, cmd = m.group(1), m.group(2).upper(), m.group(3).strip()
-            if status == "RUNNING":
+            t_id, status, cmd = m.group(1).strip(), m.group(2).strip().upper(), m.group(3).strip()
+            if status.startswith("RUNNING"):
                 task_t = Text("[▶] ", style="bold") + Text(f"{t_id}  ", style="bold") + Text(cmd)
             else:
                 task_t = Text("[✓] ", style="dim") + Text(f"{t_id}  ", style="dim") + Text(cmd, style="dim")

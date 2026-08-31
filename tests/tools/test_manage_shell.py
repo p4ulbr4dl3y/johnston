@@ -80,12 +80,14 @@ async def test_list_scoped_to_current_session(tool, make_app_mock):
 async def test_list_with_tasks(tool, make_app_mock):
     t1 = _make_task("t1", "echo hello", proc=MagicMock())
     t2 = _make_task("t2", "ls -la", status=TaskStatus.COMPLETED)
+    t2.completed_at = t2.created_at + 2.5
     app = _app(make_app_mock, [t1, t2])
     res = await tool.execute({"action": "list"}, ctx=app)
     assert "Active Background Tasks" in res.display
-    assert "[tasks 2 | id|status|cmd|log]" in res.content
-    assert "t1|running|echo hello|" in res.content
-    assert "t2|finished|ls -la|" in res.content
+    assert "[tasks 2 | id|status|duration|cmd|log]" in res.content
+    assert "t1|running|" in res.content
+    assert "|echo hello|" in res.content
+    assert "t2|exit:0|2.5s|ls -la|" in res.content
 
 
 async def test_list_many_tasks_preserves_input_order(tool, make_app_mock):
@@ -114,7 +116,19 @@ async def test_background_task_already_finished_is_excluded_from_list(tool, make
     # Race: t1 finishes right before manage runs.
     t1.status = TaskStatus.COMPLETED
     res = await tool.execute({"action": "list"}, ctx=app)
-    assert "tbkg|finished|sleep 1|" in res.content
+    assert "tbkg|exit:0|" in res.content
+    assert "|sleep 1|" in res.content
+
+
+async def test_list_task_status_variants(tool, make_app_mock):
+    t_killed = _make_task("tk", "sleep 10", status=TaskStatus.KILLED)
+    t_err = _make_task("terr", "bad cmd", status=TaskStatus.ERROR)
+    t_err.exit_code = 127
+    t_err.completed_at = t_err.created_at + 0.05
+    app = _app(make_app_mock, [t_killed, t_err])
+    res = await tool.execute({"action": "list"}, ctx=app)
+    assert "tk|killed|" in res.content
+    assert "terr|exit:127|<0.1s|bad cmd|" in res.content
 
 
 async def test_no_task_manager_no_app(tool):
