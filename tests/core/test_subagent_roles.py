@@ -15,7 +15,25 @@ class TestSubagentRoles(unittest.TestCase):
 
         explorer_def = registry.get_role("explorer")
         self.assertEqual(explorer_def.name, "Explorer")
-        self.assertIn('<role name="explorer"', explorer_def.prompt)
+        self.assertIn("Read-Only", explorer_def.prompt)
+
+    def test_format_role_prompt(self):
+        from core.roles.prompt import format_role_prompt
+
+        self.assertEqual(format_role_prompt("", ""), "")
+        self.assertEqual(
+            format_role_prompt("worker", "Do work."),
+            '<role name="worker">\nDo work.\n</role>',
+        )
+        self.assertEqual(
+            format_role_prompt("custom", '<role name="custom">\nAlready wrapped\n</role>'),
+            '<role name="custom">\nAlready wrapped\n</role>',
+        )
+        self.assertEqual(
+            format_role_prompt("", "No key role."),
+            "<role>\nNo key role.\n</role>",
+        )
+
 
     def test_load_markdown_subagents(self):
         with tempfile.TemporaryDirectory() as tmpdir:

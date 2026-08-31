@@ -413,11 +413,12 @@ class PromptBuilder:
         if not self.is_subagent:
             role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=self.cwd or os.getcwd())
             if getattr(role_def, "prompt", None):
-                p_text = role_def.prompt.strip()
-                if not p_text.startswith("<role"):
-                    sys_prompt += f'\n\n<role name="{self.role}">\n{p_text}\n</role>'
-                else:
-                    sys_prompt += f"\n\n{p_text}"
+                from core.roles.prompt import format_role_prompt
+
+                formatted_role = format_role_prompt(self.role, role_def.prompt)
+                if formatted_role:
+                    sys_prompt += f"\n\n{formatted_role}"
+
 
         if self.is_subagent and self.worktree_branch and "<worktree_guidelines>" not in sys_prompt:
             sys_prompt += f"\n\n{SUBAGENT_WORKTREE_PROMPT.format(branch_name=self.worktree_branch)}"

@@ -19,11 +19,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="Worker",
         description="Execution mode: creation, editing, and shell command execution.",
         prompt=(
-            '<role name="worker">\n'
             "1. Surgical Edits: Modify only what the task strictly requires. NEVER do unrelated refactoring or touch unrelated files.\n"
             "2. Preservation: Maintain existing code conventions, architecture, and comments.\n"
-            "3. Verification: Run tests/linters before finishing to ensure changes do not break the codebase.\n"
-            "</role>"
+            "3. Verification: Run tests/linters before finishing to ensure changes do not break the codebase."
         ),
         scope="any",
         source="builtin",
@@ -33,11 +31,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         name="Explorer",
         description="Read-only mode for information gathering, research, analysis, and action planning.",
         prompt=(
-            '<role name="explorer">\n'
             "1. Read-Only: Strictly exploration and analysis. NEVER attempt to create, modify, or delete files.\n"
             "2. Evidence: Anchor all findings in exact file paths, line numbers, and search results.\n"
-            "3. Actionable Plans: When proposing solutions, specify target files, required changes, and verification steps.\n"
-            "</role>"
+            "3. Actionable Plans: When proposing solutions, specify target files, required changes, and verification steps."
         ),
         read_only=True,
         scope="any",
