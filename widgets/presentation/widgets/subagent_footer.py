@@ -13,6 +13,7 @@ from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 from widgets.presentation.widgets.footer_layout import (
     _build_subagent_grid,
+    format_modal_hint,
     get_theme_colors,
 )
 from widgets.utils.responsive import BREAKPOINT_COMPACT, is_compact_width, resolve_width
@@ -295,9 +296,9 @@ class SubagentHeader(ResizeDebounceMixin, Static):
                 else ("esc" if is_compact else "esc: close")
             )
             if is_running and not is_compact:
-                row_right = f"[{t_muted}]{esc_label} • ctrl+k: kill[/{t_muted}]"
+                row_right = format_modal_hint(f"{esc_label} • ctrl+k: kill")
             else:
-                row_right = f"[{t_muted}]{esc_label}[/{t_muted}]"
+                row_right = format_modal_hint(esc_label)
 
             grid.add_row(row_left, row_right)
             self._last_grid_rows = [(row_left, row_right)]

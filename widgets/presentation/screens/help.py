@@ -2,15 +2,15 @@ from rich.table import Table
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Label, Markdown, Static
+from textual.widgets import Label, Static
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
 )
+from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 
@@ -113,7 +113,9 @@ class HelpScreen(BaseModalScreen[None]):
             max_cmd_w = max(len(k) for k, _ in COMMANDS_DATA) + 2 + max(len(d) for _, d in COMMANDS_DATA)
             max_kb_w = max(len(k) for k, _ in KEYBINDINGS_DATA) + 2 + max(len(d) for _, d in KEYBINDINGS_DATA)
             sample_items = ["x" * max(max_cmd_w, max_kb_w)]
-            content_w = modal_content_width(sample_items, "### **Johnston Help**", "tab/←→: switch • esc: close")
+            content_w = modal_content_width(
+                sample_items, "Johnston Help", "tab/←→: switch", esc_hint="esc: close"
+            )
             apply_modal_fit(dialog, content_w, min_width=76, max_width=96)
 
             screen_h = self.app.size.height if getattr(self, "app", None) else 24
@@ -141,17 +143,13 @@ class HelpScreen(BaseModalScreen[None]):
         from widgets.chat_toolcall import ToolScrollBox
 
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
-            yield Markdown(
-                "### **Johnston Help**",
-                id="help-header-md",
-                classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}",
-            )
+            yield ModalHeader("Johnston Help", esc_hint="esc: close", id="help-header-md")
             with Horizontal(id="help-tabs"):
                 yield Static("Commands", id="help-tab-commands", classes="help-tab active")
                 yield Static("Keybindings", id="help-tab-keybindings", classes="help-tab")
             with ToolScrollBox(id="help-scroll-box"):
                 yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
-            yield ModalHint("tab/←→: switch • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint("tab/←→: switch", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._apply_dialog_fit()
@@ -179,7 +177,7 @@ class HelpScreen(BaseModalScreen[None]):
 
             hint_lbl = self.query_one(f"#{MODAL_HINT_ID}", Label)
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
-            hint_lbl.update("tab/←→: switch • esc" if is_compact else "tab/←→: switch • esc: close")
+            hint_lbl.update("tab/←→" if is_compact else "tab/←→: switch")
         except Exception:
             pass
 
