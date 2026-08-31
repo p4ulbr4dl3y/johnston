@@ -13,33 +13,63 @@ def pdf_to_markdown(pdf_input: Union[str, bytes, BinaryIO]) -> str:
     except ImportError as e:
         raise RuntimeError("pypdf is required to convert PDF documents. Install with 'uv add pypdf'.") from e
 
-    if isinstance(pdf_input, (str, bytes)):
-        source: Union[str, io.BytesIO] = io.BytesIO(pdf_input) if isinstance(pdf_input, bytes) else pdf_input
-    else:
-        source = pdf_input
+    stream_to_close = None
+    reader = None
+    try:
+        if isinstance(pdf_input, bytes):
+            source: Union[str, io.BytesIO, BinaryIO] = io.BytesIO(pdf_input)
+        elif isinstance(pdf_input, str):
+            stream_to_close = open(pdf_input, "rb")
+            source = stream_to_close
+        else:
+            source = pdf_input
 
-    reader = PdfReader(source)
-    pages_text: List[str] = []
-
-    for i, page in enumerate(reader.pages, start=1):
-        try:
-            # layout mode preserves whitespace and columns
-            text = page.extract_text(extraction_mode="layout")
-        except Exception:
+        reader = PdfReader(source)
+        if reader.is_encrypted:
             try:
-                text = page.extract_text()
+                reader.decrypt("")
             except Exception:
-                text = ""
+                pass
 
-        if text and text.strip():
-            cleaned = text.strip()
-            # Clean excessive trailing spaces per line
-            cleaned_lines = [line.rstrip() for line in cleaned.splitlines()]
-            page_content = "\n".join(cleaned_lines)
-            if len(reader.pages) > 1:
-                pages_text.append(f"<!-- Page {i} -->\n\n{page_content}")
-            else:
-                pages_text.append(page_content)
+        pages_text: List[str] = []
 
-    output = "\n\n---\n\n".join(pages_text).strip()
-    return re.sub(r"\n{3,}", "\n\n", output)
+        try:
+            pages = reader.pages
+            num_pages = len(pages)
+        except Exception:
+            pages = []
+            num_pages = 0
+
+        for i, page in enumerate(pages, start=1):
+            try:
+                # layout mode preserves whitespace and columns
+                text = page.extract_text(extraction_mode="layout")
+            except Exception:
+                try:
+                    text = page.extract_text()
+                except Exception:
+                    text = ""
+
+            if text and text.strip():
+                cleaned = text.strip()
+                # Clean excessive trailing spaces per line
+                cleaned_lines = [line.rstrip() for line in cleaned.splitlines()]
+                page_content = "\n".join(cleaned_lines)
+                if num_pages > 1:
+                    pages_text.append(f"<!-- Page {i} -->\n\n{page_content}")
+                else:
+                    pages_text.append(page_content)
+
+        output = "\n\n---\n\n".join(pages_text).strip()
+        return re.sub(r"\n{3,}", "\n\n", output)
+    finally:
+        if reader is not None:
+            try:
+                reader.close()
+            except Exception:
+                pass
+        if stream_to_close is not None:
+            try:
+                stream_to_close.close()
+            except Exception:
+                pass

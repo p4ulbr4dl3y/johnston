@@ -1454,6 +1454,427 @@ class TestConverterListQuoteAndRunFixes(unittest.TestCase):
             ipynb_to_markdown([1, 2])
 
 
+class TestDocConverterRegressionFixes(unittest.TestCase):
+    # 1. XML Comment / Processing Instruction crash guard
+    def test_xml_comment_and_pi_guard(self):
+        # DOCX with comment & PI
+        docx_buf = io.BytesIO()
+        with zipfile.ZipFile(docx_buf, "w") as zf:
+            zf.writestr(
+                "word/document.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <?custom-pi data="test"?>
+                <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                    <!-- Top comment -->
+                    <w:body>
+                        <!-- Body comment -->
+                        <?body-pi ?>
+                        <w:p>
+                            <!-- Paragraph comment -->
+                            <w:r><w:t>Guarded Text</w:t></w:r>
+                        </w:p>
+                    </w:body>
+                </w:document>""",
+            )
+        self.assertIn("Guarded Text", docx_to_markdown(docx_buf.getvalue()))
+
+        # XLSX with comment & PI
+        xlsx_buf = io.BytesIO()
+        with zipfile.ZipFile(xlsx_buf, "w") as zf:
+            zf.writestr(
+                "xl/worksheets/sheet1.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <?sheet-pi ?>
+                <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                    <!-- Sheet comment -->
+                    <sheetData>
+                        <!-- Row comment -->
+                        <row r="1"><c r="A1" t="inlineStr"><!-- Cell comment --><is><t>XLSX Guarded</t></is></c></row>
+                    </sheetData>
+                </worksheet>""",
+            )
+        self.assertIn("XLSX Guarded", xlsx_to_markdown(xlsx_buf.getvalue()))
+
+        # PPTX with comment & PI
+        pptx_buf = io.BytesIO()
+        with zipfile.ZipFile(pptx_buf, "w") as zf:
+            zf.writestr(
+                "ppt/slides/slide1.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <?slide-pi ?>
+                <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                    <!-- Slide comment -->
+                    <p:cSld>
+                        <p:spTree>
+                            <!-- Tree comment -->
+                            <p:sp><p:txBody><a:p><a:r><a:t>PPTX Guarded</a:t></a:r></a:p></p:txBody></p:sp>
+                        </p:spTree>
+                    </p:cSld>
+                </p:sld>""",
+            )
+        self.assertIn("PPTX Guarded", pptx_to_markdown(pptx_buf.getvalue()))
+
+        # EPUB with comment & PI
+        epub_buf = io.BytesIO()
+        with zipfile.ZipFile(epub_buf, "w") as zf:
+            zf.writestr(
+                "META-INF/container.xml",
+                """<?xml version="1.0"?>
+                <!-- Container comment -->
+                <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                    <rootfiles>
+                        <!-- Rootfiles comment -->
+                        <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+                    </rootfiles>
+                </container>""",
+            )
+            zf.writestr(
+                "content.opf",
+                """<?xml version="1.0"?>
+                <!-- OPF comment -->
+                <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+                    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>EPUB Guarded</dc:title></metadata>
+                    <manifest><item id="c1" href="c1.html"/></manifest>
+                    <spine><!-- Spine comment --><itemref idref="c1"/></spine>
+                </package>""",
+            )
+            zf.writestr("c1.html", "<p>EPUB content</p>")
+        self.assertIn("EPUB Guarded", epub_to_markdown(epub_buf.getvalue()))
+
+    # 2. PDF resource leak and encrypted PDF handling
+    def test_pdf_resource_leak_and_encryption(self):
+        writer = PdfWriter()
+        writer.add_blank_page(width=100, height=100)
+        buf = io.BytesIO()
+        writer.write(buf)
+
+        # File path handling and stream cleanup
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            f.write(buf.getvalue())
+            pdf_path = f.name
+
+        try:
+            res = pdf_to_markdown(pdf_path)
+            self.assertIsInstance(res, str)
+        finally:
+            os.remove(pdf_path)
+
+        # Encrypted PDF with empty password
+        enc_writer = PdfWriter()
+        enc_writer.add_blank_page(width=100, height=100)
+        enc_writer.encrypt("")
+        enc_buf = io.BytesIO()
+        enc_writer.write(enc_buf)
+        res_enc = pdf_to_markdown(enc_buf.getvalue())
+        self.assertIsInstance(res_enc, str)
+
+        # Encrypted PDF with non-empty password handled gracefully
+        secret_writer = PdfWriter()
+        secret_writer.add_blank_page(width=100, height=100)
+        secret_writer.encrypt("secret_pass")
+        secret_buf = io.BytesIO()
+        secret_writer.write(secret_buf)
+        res_secret = pdf_to_markdown(secret_buf.getvalue())
+        self.assertIsInstance(res_secret, str)
+
+    # 3. PPTX speaker notes idx="1", subtitle, and list indent
+    def test_pptx_notes_idx1_subtitle_and_indent(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(
+                "ppt/slides/_rels/slide1.xml.rels",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                    <Relationship Id="rNotes" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="../notesSlides/notesSlide1.xml"/>
+                </Relationships>""",
+            )
+            # Notes slide using idx="1" without type="body"
+            zf.writestr(
+                "ppt/notesSlides/notesSlide1.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                         xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                    <p:cSld><p:spTree><p:sp>
+                        <p:nvSpPr><p:nvPr><p:ph idx="1"/></p:nvPr></p:nvSpPr>
+                        <p:txBody><a:p><a:r><a:t>Speaker note via idx 1</a:t></a:r></a:p></p:txBody>
+                    </p:sp></p:spTree></p:cSld>
+                </p:notes>""",
+            )
+            # Slide with subtitle and indented list levels
+            zf.writestr(
+                "ppt/slides/slide1.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                    <p:cSld><p:spTree>
+                        <p:sp>
+                            <p:nvSpPr><p:nvPr><p:ph type="subtitle"/></p:nvPr></p:nvSpPr>
+                            <p:txBody><a:p><a:r><a:t>Slide Subtitle</a:t></a:r></a:p></p:txBody>
+                        </p:sp>
+                        <p:sp>
+                            <p:txBody>
+                                <a:p><a:pPr lvl="0"/><a:r><a:t>Level 0</a:t></a:r></a:p>
+                                <a:p><a:pPr lvl="1"/><a:r><a:t>Level 1</a:t></a:r></a:p>
+                                <a:p><a:pPr lvl="2"/><a:r><a:t>Level 2</a:t></a:r></a:p>
+                            </p:txBody>
+                        </p:sp>
+                    </p:spTree></p:cSld>
+                </p:sld>""",
+            )
+        md = pptx_to_markdown(buf.getvalue())
+        self.assertIn("## Slide Subtitle", md)
+        self.assertNotIn("# Slide Subtitle", [line.strip() for line in md.splitlines()])
+        self.assertIn("Level 0", md)
+        self.assertIn("  - Level 1", md)
+        self.assertIn("    - Level 2", md)
+        self.assertIn("Speaker note via idx 1", md)
+
+    # 4. EPUB OPF path normalization and title duplication fix
+    def test_epub_opf_path_and_title_dedup(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(
+                "META-INF/container.xml",
+                """<?xml version="1.0"?>
+                <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                    <rootfiles>
+                        <rootfile full-path="/OEBPS/my%20content.opf" media-type="application/oebps-package+xml"/>
+                    </rootfiles>
+                </container>""",
+            )
+            zf.writestr(
+                "OEBPS/my content.opf",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+                    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Book Title</dc:title></metadata>
+                    <manifest>
+                        <item id="c1" href="chap1.xhtml"/>
+                        <item id="c2" href="chap2.xhtml"/>
+                    </manifest>
+                    <spine>
+                        <itemref idref="c1"/>
+                        <itemref idref="c2"/>
+                    </spine>
+                </package>""",
+            )
+            zf.writestr(
+                "OEBPS/chap1.xhtml",
+                """<html><head><title>Book Title</title></head><body><p>Chapter 1 text</p></body></html>""",
+            )
+            zf.writestr(
+                "OEBPS/chap2.xhtml",
+                """<html><head><title>Book Title</title></head><body><p>Chapter 2 text</p></body></html>""",
+            )
+        md = epub_to_markdown(buf.getvalue())
+        # "# Book Title" should appear only once as metadata header, not repeated per chapter
+        self.assertEqual(md.count("# Book Title"), 1)
+        self.assertIn("Chapter 1 text", md)
+        self.assertIn("Chapter 2 text", md)
+
+    # 5. HTML converter fixes: blockquote sentinels, br in link, colspan, nested delimiters
+    def test_html_regression_fixes(self):
+        # Mid-line sentinel splitting in blockquote
+        html_bq = "<blockquote>Quote text</blockquote> After quote text"
+        md_bq = html_to_markdown(html_bq)
+        self.assertIn("> Quote text", md_bq)
+        self.assertIn("After quote text", md_bq)
+
+        # <br> inside link
+        html_link = '<a href="https://example.com">Line 1<br/>Line 2</a>'
+        md_link = html_to_markdown(html_link)
+        self.assertIn("[Line 1 Line 2](https://example.com)", md_link)
+
+        # Table colspan padding
+        html_table = """
+        <table>
+            <tr><th colspan="2">Span Header</th><th>Single Header</th></tr>
+            <tr><td>Cell 1</td><td>Cell 2</td><td>Cell 3</td></tr>
+        </table>
+        """
+        md_table = html_to_markdown(html_table)
+        self.assertIn("| Span Header |  | Single Header |", md_table)
+        self.assertIn("| Cell 1 | Cell 2 | Cell 3 |", md_table)
+
+        # Nested delimiters
+        html_nested = "<p><b>A <strong>B</strong> C</b></p><p><i>X <em>Y</em> Z</i></p>"
+        md_nested = html_to_markdown(html_nested)
+        self.assertIn("**A B C**", md_nested)
+        self.assertNotIn("**A **B** C**", md_nested)
+        self.assertIn("*X Y Z*", md_nested)
+        self.assertNotIn("*X *Y* Z*", md_nested)
+
+    # 6. DOCX fixes: <w:cr/>, <w:sdt> table rows, URL sanitization
+    def test_docx_cr_sdt_table_and_url_sanitization(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(
+                "word/_rels/document.xml.rels",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.org/path with spaces (test)"/>
+                </Relationships>""",
+            )
+            zf.writestr(
+                "word/document.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                    <w:body>
+                        <w:p>
+                            <w:r>
+                                <w:t>Before CR</w:t>
+                                <w:cr/>
+                                <w:t>After CR</w:t>
+                            </w:r>
+                        </w:p>
+                        <w:p>
+                            <w:hyperlink r:id="rId1">
+                                <w:r><w:t>Spaced URL</w:t></w:r>
+                            </w:hyperlink>
+                        </w:p>
+                        <w:tbl>
+                            <w:sdt>
+                                <w:sdtContent>
+                                    <w:tr>
+                                        <w:tc><w:p><w:r><w:t>SDT Row Col 1</w:t></w:r></w:p></w:tc>
+                                        <w:tc><w:p><w:r><w:t>SDT Row Col 2</w:t></w:r></w:p></w:tc>
+                                    </w:tr>
+                                </w:sdtContent>
+                            </w:sdt>
+                            <w:tr>
+                                <w:tc><w:p><w:r><w:t>Regular Row 1</w:t></w:r></w:p></w:tc>
+                                <w:tc><w:p><w:r><w:t>Regular Row 2</w:t></w:r></w:p></w:tc>
+                            </w:tr>
+                        </w:tbl>
+                    </w:body>
+                </w:document>""",
+            )
+        md = docx_to_markdown(buf.getvalue())
+        self.assertIn("Before CR\nAfter CR", md)
+        self.assertIn("[Spaced URL](https://example.org/path%20with%20spaces%20(test))", md)
+        self.assertIn("| SDT Row Col 1 | SDT Row Col 2 |", md)
+        self.assertIn("| Regular Row 1 | Regular Row 2 |", md)
+
+    # 7. XLSX fixes: custom date format stripping, percent with #, inlineStr furigana
+    def test_xlsx_date_percent_and_furigana(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(
+                "xl/styles.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                    <numFmts count="2">
+                        <numFmt numFmtId="164" formatCode="0.00\\m"/>
+                        <numFmt numFmtId="165" formatCode="0.##%"/>
+                    </numFmts>
+                    <cellXfs count="3">
+                        <xf numFmtId="0"/>
+                        <xf numFmtId="164"/>
+                        <xf numFmtId="165"/>
+                    </cellXfs>
+                </styleSheet>""",
+            )
+            zf.writestr(
+                "xl/worksheets/sheet1.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                    <sheetData>
+                        <row r="1">
+                            <c r="A1" t="inlineStr"><is><t>京都</t><rPh sb="0" eb="2"><t>きょうと</t></rPh></is></c>
+                            <c r="B1" s="1"><v>123.45</v></c>
+                            <c r="C1" s="2"><v>0.125</v></c>
+                        </row>
+                    </sheetData>
+                </worksheet>""",
+            )
+        md = xlsx_to_markdown(buf.getvalue())
+        self.assertIn("京都", md)
+        self.assertNotIn("きょうと", md)
+        # 123.45 with format 0.00\m should NOT be converted to a date
+        self.assertIn("123.45", md)
+        # 0.125 with format 0.##% should be 12.50%
+        self.assertIn("12.50%", md)
+
+    # 8. IPYNB fixes: ANSI escape regex and _as_text non-string handling
+    def test_ipynb_ansi_and_as_text_types(self):
+        nb = {
+            "cells": [
+                {
+                    "cell_type": "code",
+                    "source": ["print(1)"],
+                    "outputs": [
+                        {
+                            "output_type": "error",
+                            "ename": "TestError",
+                            "evalue": "err",
+                            "traceback": [
+                                "\x1b[31;1mError Line\x1b[0m",
+                                "\x1b[2KCleared",
+                                42,  # non-string item in traceback list
+                            ],
+                        },
+                        {
+                            "output_type": "stream",
+                            "text": [100, " text\n", None],
+                        },
+                    ],
+                }
+            ]
+        }
+        md = ipynb_to_markdown(nb)
+        self.assertIn("Error Line", md)
+        self.assertIn("Cleared", md)
+        self.assertIn("42", md)
+        self.assertNotIn("\x1b[", md)
+        self.assertIn("100 text", md)
+
+    # 9. OpenXML extensions in engine.py
+    def test_engine_openxml_extensions(self):
+        extensions = [".docm", ".dotx", ".dotm", ".potx", ".potm", ".xltx", ".xltm"]
+        for ext in extensions:
+            self.assertTrue(is_convertible(f"sample{ext}"))
+            self.assertTrue(is_convertible(ext))
+
+        # Test convert_bytes with dummy zip content
+        docx_buf = io.BytesIO()
+        with zipfile.ZipFile(docx_buf, "w") as zf:
+            zf.writestr(
+                "word/document.xml",
+                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Docm Text</w:t></w:r></w:p></w:body></w:document>',
+            )
+        self.assertIn("Docm Text", convert_bytes(docx_buf.getvalue(), ".docm"))
+        self.assertIn("Docm Text", convert_bytes(docx_buf.getvalue(), ".dotx"))
+        self.assertIn("Docm Text", convert_bytes(docx_buf.getvalue(), ".dotm"))
+
+        pptx_buf = io.BytesIO()
+        with zipfile.ZipFile(pptx_buf, "w") as zf:
+            zf.writestr(
+                "ppt/slides/slide1.xml",
+                '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Potx Text</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>',
+            )
+        self.assertIn("Potx Text", convert_bytes(pptx_buf.getvalue(), ".potx"))
+        self.assertIn("Potx Text", convert_bytes(pptx_buf.getvalue(), ".potm"))
+
+        xlsx_buf = io.BytesIO()
+        with zipfile.ZipFile(xlsx_buf, "w") as zf:
+            zf.writestr(
+                "xl/worksheets/sheet1.xml",
+                '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Xltx Text</t></is></c></row></sheetData></worksheet>',
+            )
+        self.assertIn("Xltx Text", convert_bytes(xlsx_buf.getvalue(), ".xltx"))
+        self.assertIn("Xltx Text", convert_bytes(xlsx_buf.getvalue(), ".xltm"))
+
+        # Test convert_file
+        with tempfile.NamedTemporaryFile(suffix=".docm", delete=False) as f:
+            f.write(docx_buf.getvalue())
+            temp_path = f.name
+        try:
+            self.assertIn("Docm Text", convert_file(temp_path))
+        finally:
+            os.remove(temp_path)
+
+
 if __name__ == "__main__":
     unittest.main()
 

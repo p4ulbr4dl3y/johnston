@@ -169,7 +169,7 @@ class HTMLToMarkdownParser(HTMLParser):
         "hr",
     }
 
-    def __init__(self) -> None:
+    def __init__(self, extract_title: bool = True) -> None:
         super().__init__()
         self._output: List[str] = []
         self._tag_stack: List[str] = []
@@ -180,6 +180,7 @@ class HTMLToMarkdownParser(HTMLParser):
         self._table_rows: List[List[str]] = []
         self._current_row: Optional[List[str]] = None
         self._current_cell: Optional[List[str]] = None
+        self._current_colspan = 1
         self._in_table = False
         # Enclosing table state pushed aside while a nested table is parsed.
         self._table_stack: List[Tuple[Optional[List[str]], Optional[List[str]], List[List[str]]]] = []
@@ -188,6 +189,7 @@ class HTMLToMarkdownParser(HTMLParser):
         self._title: Optional[str] = None
         self._in_title = False
         self._saw_heading = False
+        self._extract_title = extract_title
         # Open list items as (continuation indent, content seen). Block tags
         # inside an item must not split the item from its list, so paragraph
         # breaks become indented continuation lines instead of "\n\n".
@@ -203,14 +205,18 @@ class HTMLToMarkdownParser(HTMLParser):
     # --- inline marker helpers -------------------------------------------
 
     def _open_marker(self, token: str) -> None:
-        self._inline_depth[token] = self._inline_depth.get(token, 0) + 1
-        self._append_token(token)
+        depth = self._inline_depth.get(token, 0) + 1
+        self._inline_depth[token] = depth
+        if depth == 1:
+            self._append_token(token)
 
     def _close_marker(self, token: str) -> None:
         """Emit the closing marker only when a matching tag is open."""
-        if self._inline_depth.get(token, 0) > 0:
-            self._inline_depth[token] -= 1
-            self._append_token(token)
+        depth = self._inline_depth.get(token, 0)
+        if depth > 0:
+            self._inline_depth[token] = depth - 1
+            if depth == 1:
+                self._append_token(token)
 
     # --- block-context helpers -------------------------------------------
 
@@ -339,7 +345,9 @@ class HTMLToMarkdownParser(HTMLParser):
             return
 
         if tag_lower == "br":
-            if self._in_table:
+            if self._current_link is not None:
+                self._append_token(" ")
+            elif self._in_table:
                 if self._current_cell is not None:
                     self._current_cell.append(" ")
             elif self._li_stack:
@@ -408,6 +416,13 @@ class HTMLToMarkdownParser(HTMLParser):
         if tag_lower in ("th", "td"):
             if self._in_table and self._current_row is not None:
                 self._current_cell = []
+                colspan = 1
+                if "colspan" in attr_dict:
+                    try:
+                        colspan = max(1, int(attr_dict["colspan"]))
+                    except ValueError:
+                        colspan = 1
+                self._current_colspan = colspan
             return
 
         if tag_lower == "a":
@@ -550,7 +565,10 @@ class HTMLToMarkdownParser(HTMLParser):
                 cell_text = "".join(self._current_cell).strip().replace("\n", " ").replace("|", "\\|")
                 if self._current_row is not None:
                     self._current_row.append(cell_text)
+                    for _ in range(self._current_colspan - 1):
+                        self._current_row.append("")
                 self._current_cell = None
+                self._current_colspan = 1
             return
 
         if tag_lower == "tr":
@@ -686,7 +704,7 @@ class HTMLToMarkdownParser(HTMLParser):
         for token in ("**", "*", "~~", "`"):
             depth = self._inline_depth.get(token, 0)
             if depth > 0:
-                raw_text = raw_text.rstrip("\n") + token * depth
+                raw_text = raw_text.rstrip("\n") + token
         lines = [line.rstrip() for line in raw_text.splitlines()]
         cleaned = "\n".join(lines).strip()
 
@@ -698,11 +716,12 @@ class HTMLToMarkdownParser(HTMLParser):
             cleaned = self._apply_blockquote_markers(cleaned)
 
         cleaned = collapse_blank_lines(cleaned)
-        # Emit the document <title> as a heading only when the body provides
-        # no heading of its own, to avoid duplicated headings.
-        title = " ".join((self._title or "").split())
-        if title and not self._saw_heading:
-            cleaned = f"# {title}\n\n{cleaned}" if cleaned else f"# {title}"
+        # Emit the document <title> as a heading only when enabled and the body
+        # provides no heading of its own, to avoid duplicated headings.
+        if self._extract_title:
+            title = " ".join((self._title or "").split())
+            if title and not self._saw_heading:
+                cleaned = f"# {title}\n\n{cleaned}" if cleaned else f"# {title}"
         return cleaned
 
     @staticmethod
@@ -710,10 +729,8 @@ class HTMLToMarkdownParser(HTMLParser):
         """Prefix lines between blockquote depth sentinels with "> " markers.
 
         Sentinels may sit mid-line (right after content on close, right
-        before content on open), so each line is split on them and every
-        fragment is prefixed with the depth in effect at its position.
-        Blank lines are left untouched: a blank line does not end a quote
-        in Markdown, and the next prefixed line resumes it.
+        before content on open), so each line is split on them and the full line
+        is assembled with the depth in effect. Blank lines are left untouched.
         """
         out: List[str] = []
         depth = 0
@@ -723,22 +740,29 @@ class HTMLToMarkdownParser(HTMLParser):
                 # Marker-less line: prefix with the depth in effect.
                 out.append(("> " * depth) + line if depth else line)
                 continue
-            seg_depth = depth
+            line_depth = depth
+            line_parts = []
             for i, part in enumerate(parts):
                 if i % 2 == 1:
                     depth = int(part)
-                    seg_depth = depth
+                    line_depth = max(line_depth, depth)
                 elif part:
-                    out.append(("> " * seg_depth) + part if seg_depth else part)
+                    line_parts.append(part)
+            if line_parts:
+                line_text = "".join(line_parts)
+                prefix = ("> " * line_depth) if line_depth else ""
+                out.append(prefix + line_text)
+            elif not line:
+                out.append("")
         return "\n".join(out)
 
 
-def html_to_markdown(html_content: str | bytes) -> str:
+def html_to_markdown(html_content: str | bytes, extract_title: bool = True) -> str:
     """Convert HTML string or bytes to clean Markdown."""
     if isinstance(html_content, bytes):
         html_content = _decode_html_bytes(html_content)
 
-    parser = HTMLToMarkdownParser()
+    parser = HTMLToMarkdownParser(extract_title=extract_title)
     parser.feed(html_content)
     parser.close()
     return parser.get_markdown()

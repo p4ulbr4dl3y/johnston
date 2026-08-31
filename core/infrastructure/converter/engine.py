@@ -14,10 +14,17 @@ from core.infrastructure.converter.xlsx import xlsx_to_markdown
 SUPPORTED_EXTENSIONS: Set[str] = {
     ".pdf",
     ".docx",
+    ".docm",
+    ".dotx",
+    ".dotm",
     ".xlsx",
     ".xlsm",
+    ".xltx",
+    ".xltm",
     ".pptx",
     ".ppsx",
+    ".potx",
+    ".potm",
     ".epub",
     ".html",
     ".htm",
@@ -50,11 +57,11 @@ def convert_bytes(
 
     if ext in (".html", ".htm", ".xhtml"):
         return html_to_markdown(data)
-    if ext == ".docx":
+    if ext in (".docx", ".docm", ".dotx", ".dotm"):
         return docx_to_markdown(data)
-    if ext in (".xlsx", ".xlsm"):
+    if ext in (".xlsx", ".xlsm", ".xltx", ".xltm"):
         return xlsx_to_markdown(data)
-    if ext in (".pptx", ".ppsx"):
+    if ext in (".pptx", ".ppsx", ".potx", ".potm"):
         return pptx_to_markdown(data)
     if ext == ".pdf":
         return pdf_to_markdown(data)
@@ -79,11 +86,11 @@ def convert_file(file_path: Union[str, Path]) -> str:
 
     ext = path.suffix.lower()
 
-    if ext == ".docx":
+    if ext in (".docx", ".docm", ".dotx", ".dotm"):
         return docx_to_markdown(str(path))
-    if ext in (".xlsx", ".xlsm"):
+    if ext in (".xlsx", ".xlsm", ".xltx", ".xltm"):
         return xlsx_to_markdown(str(path))
-    if ext in (".pptx", ".ppsx"):
+    if ext in (".pptx", ".ppsx", ".potx", ".potm"):
         return pptx_to_markdown(str(path))
     if ext == ".pdf":
         return pdf_to_markdown(str(path))

@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Union
 
 from core.infrastructure.converter.utils import collapse_blank_lines, fenced_code_block
 
+_ANSI_ESCAPE_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
 
 def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
     """
@@ -32,9 +34,11 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
         # "source" may be a list of lines, a plain string, or explicitly null.
         source_lines = cell.get("source")
         if isinstance(source_lines, list):
-            source = "".join(source_lines)
+            source = "".join(str(s) for s in source_lines if s is not None)
         elif isinstance(source_lines, str):
             source = source_lines
+        elif source_lines is not None:
+            source = str(source_lines)
         else:
             source = ""
         source = source.strip()
@@ -62,7 +66,8 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
                             out_texts.append(fenced_code_block(text.strip(), lang="output"))
                 elif out_type == "error":
                     tb = out.get("traceback", [])
-                    clean_tb = re.sub(r"\x1b\[[0-9;]*[mGKF]", "", "\n".join(tb))
+                    tb_str = "\n".join(str(line) for line in tb if line is not None) if isinstance(tb, list) else _as_text(tb)
+                    clean_tb = _ANSI_ESCAPE_RE.sub("", tb_str)
                     if clean_tb.strip():
                         out_texts.append(fenced_code_block(clean_tb.strip(), lang="output"))
                     elif out.get("evalue"):
@@ -99,8 +104,12 @@ def _notebook_language(data: Dict[str, Any]) -> str:
     return "python"
 
 
-def _as_text(value: Union[List[str], str, None]) -> str:
-    """Join notebook text fields, which may be a list of lines or a string."""
+def _as_text(value: Any) -> str:
+    """Join notebook text fields, which may be a list of lines, a string, or other types."""
     if isinstance(value, list):
-        return "".join(value)
-    return value or ""
+        return "".join(str(item) for item in value if item is not None)
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return ""
+    return str(value)

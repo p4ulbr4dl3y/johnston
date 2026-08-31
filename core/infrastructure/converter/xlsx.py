@@ -3,7 +3,7 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime, timedelta
-from typing import BinaryIO, Dict, List, Optional, Tuple, Union
+from typing import Any, BinaryIO, Dict, List, Optional, Tuple, Union
 
 from core.infrastructure.converter.utils import safe_read_zip_member
 
@@ -39,10 +39,29 @@ _BUILTIN_NUMFMT_CODES = {
 
 _QUOTED_RE = re.compile(r'"[^"]*"')
 _BRACKET_RE = re.compile(r"\[[^\]]*\]")
+_ESCAPED_RE = re.compile(r"\\.")
+_UNDERSCORE_RE = re.compile(r"_.")
+_ASTERISK_RE = re.compile(r"\*.")
 
 
-def _local(tag: str) -> str:
+def _local(tag: Any) -> str:
+    if not isinstance(tag, str):
+        return ""
     return tag.split("}", 1)[-1] if "}" in tag else tag
+
+
+def _extract_si_text(elem: ET.Element) -> str:
+    text_parts = []
+    for child in elem:
+        tag = _local(child.tag)
+        if tag == "t" and child.text:
+            text_parts.append(child.text)
+        elif tag == "r":
+            for r_child in child:
+                rtag = _local(r_child.tag)
+                if rtag == "t" and r_child.text:
+                    text_parts.append(r_child.text)
+    return "".join(text_parts)
 
 
 def _col_letter_to_index(col_str: str) -> int:
@@ -107,6 +126,9 @@ def _load_numfmt_styles(zf: zipfile.ZipFile) -> Dict[int, Tuple[int, str]]:
 def _format_is_datetime(fmt_id: int, code: str) -> bool:
     if code:
         stripped = _QUOTED_RE.sub("", _BRACKET_RE.sub("", code))
+        stripped = _ESCAPED_RE.sub("", stripped)
+        stripped = _UNDERSCORE_RE.sub("", stripped)
+        stripped = _ASTERISK_RE.sub("", stripped)
         return bool(re.search(r"[ymdhs]", stripped, re.IGNORECASE))
     return fmt_id in _BUILTIN_DATE_NUMFMT_IDS
 
@@ -129,7 +151,10 @@ def _format_serial(value: float, code: str, epoch: datetime) -> Optional[str]:
     if seconds >= 86400:
         days += 1
         seconds -= 86400
-    stripped = _QUOTED_RE.sub("", code).lower() if code else ""
+    stripped = _QUOTED_RE.sub("", code)
+    stripped = _ESCAPED_RE.sub("", stripped)
+    stripped = _UNDERSCORE_RE.sub("", stripped)
+    stripped = _ASTERISK_RE.sub("", stripped).lower() if stripped else ""
 
     elapsed = re.search(r"\[([hms])\]", stripped)
     if elapsed:
@@ -157,7 +182,8 @@ def _format_serial(value: float, code: str, epoch: datetime) -> Optional[str]:
 
 def _format_percent(value: float, code: str) -> str:
     section = code.split(";")[0] if code else ""
-    match = re.search(r"\.(0*)%", _QUOTED_RE.sub("", _BRACKET_RE.sub("", section)))
+    stripped = _QUOTED_RE.sub("", _BRACKET_RE.sub("", section))
+    match = re.search(r"\.([0#]+)%", stripped)
     decimals = len(match.group(1)) if match else 0
     return f"{value * 100:.{decimals}f}%"
 
@@ -200,17 +226,7 @@ def xlsx_to_markdown(xlsx_input: Union[str, bytes, BinaryIO]) -> str:
             try:
                 ss_tree = ET.fromstring(safe_read_zip_member(zf, "xl/sharedStrings.xml"))
                 for si in ss_tree:
-                    text_parts = []
-                    for child in si:
-                        tag = _local(child.tag)
-                        if tag == "t" and child.text:
-                            text_parts.append(child.text)
-                        elif tag == "r":
-                            for r_child in child:
-                                rtag = _local(r_child.tag)
-                                if rtag == "t" and r_child.text:
-                                    text_parts.append(r_child.text)
-                    shared_strings.append("".join(text_parts))
+                    shared_strings.append(_extract_si_text(si))
             except Exception:
                 pass
 
@@ -339,7 +355,7 @@ def _parse_sheet_to_table(
                 except ValueError:
                     val_text = v_elem.text or ""
             elif cell_type == "inlineStr" and is_elem is not None:
-                val_text = "".join(t.text for t in is_elem.iter() if t.text)
+                val_text = _extract_si_text(is_elem)
             elif cell_type == "b" and v_elem is not None:
                 val_text = "TRUE" if v_elem.text == "1" else "FALSE"
             elif cell_type == "str" and v_elem is not None:

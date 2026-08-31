@@ -3,10 +3,17 @@ import posixpath
 import urllib.parse
 import xml.etree.ElementTree as ET
 import zipfile
-from typing import BinaryIO, Dict, List, Union
+from typing import Any, BinaryIO, Dict, List, Union
 
 from core.infrastructure.converter.html import html_to_markdown
 from core.infrastructure.converter.utils import collapse_blank_lines, safe_read_zip_member
+
+
+def _local_tag(elem_or_tag: Any) -> str:
+    tag = elem_or_tag.tag if hasattr(elem_or_tag, "tag") else elem_or_tag
+    if not isinstance(tag, str):
+        return ""
+    return tag.split("}", 1)[-1] if "}" in tag else tag
 
 
 def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
@@ -33,10 +40,16 @@ def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
             try:
                 container_tree = ET.fromstring(safe_read_zip_member(zf, "META-INF/container.xml"))
                 for elem in container_tree.iter():
-                    tag = elem.tag.split("}", 1)[-1] if "}" in elem.tag else elem.tag
-                    if tag == "rootfile":
-                        opf_path = elem.attrib.get("full-path", "")
-                        if opf_path:
+                    if _local_tag(elem) == "rootfile":
+                        raw_path = elem.attrib.get("full-path", "")
+                        if raw_path:
+                            norm_path = posixpath.normpath(urllib.parse.unquote(raw_path)).lstrip("/")
+                            if norm_path in namelist:
+                                opf_path = norm_path
+                            elif raw_path in namelist:
+                                opf_path = raw_path
+                            else:
+                                opf_path = norm_path
                             break
             except Exception:
                 pass
@@ -60,7 +73,7 @@ def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
         creator = ""
 
         for elem in opf_tree.iter():
-            tag = elem.tag.split("}", 1)[-1] if "}" in elem.tag else elem.tag
+            tag = _local_tag(elem)
             if tag == "title" and elem.text and not title:
                 title = elem.text.strip()
             elif tag == "creator" and elem.text and not creator:
@@ -90,7 +103,7 @@ def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
             if chap_path and chap_path in namelist:
                 try:
                     html_bytes = safe_read_zip_member(zf, chap_path)
-                    chap_md = html_to_markdown(html_bytes)
+                    chap_md = html_to_markdown(html_bytes, extract_title=False)
                     if chap_md:
                         output.append(chap_md)
                 except Exception:

@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple, Union
 
-from core.infrastructure.converter.utils import safe_read_zip_member
+from core.infrastructure.converter.utils import clean_url, safe_read_zip_member
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
@@ -17,6 +17,8 @@ _BLOCK_WRAPPERS = {"sdt"}
 
 def _local_tag(elem: ET.Element) -> str:
     tag = elem.tag
+    if not isinstance(tag, str):
+        return ""
     if tag.startswith("{"):
         return tag.split("}", 1)[1]
     return tag
@@ -232,7 +234,7 @@ def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
             if not link_text:
                 continue
             if url:
-                run_items.append((f"[{link_text}]({url})", (False, False, False)))
+                run_items.append((f"[{link_text}]({clean_url(url)})", (False, False, False)))
             else:
                 run_items.append((link_text, (False, False, False)))
 
@@ -287,7 +289,7 @@ def _parse_run(r_elem: ET.Element) -> Tuple[str, RunFormat]:
             text_parts.append(elem.text)
         elif tag == "tab":
             text_parts.append("\t")
-        elif tag == "br":
+        elif tag in ("br", "cr"):
             text_parts.append("\n")
 
     return "".join(text_parts), (is_bold, is_italic, is_strike)
@@ -296,7 +298,21 @@ def _parse_run(r_elem: ET.Element) -> Tuple[str, RunFormat]:
 def _parse_table(tbl_elem: ET.Element, rels: Dict[str, str]) -> str:
     rows: List[List[str]] = []
 
-    for tr in tbl_elem:
+    def _iter_table_rows(elem: ET.Element) -> Iterator[ET.Element]:
+        for child in elem:
+            tag = _local_tag(child)
+            if tag == "tr":
+                yield child
+            elif tag in _BLOCK_WRAPPERS:
+                content = None
+                for sub in child.iter():
+                    if _local_tag(sub) == "sdtContent":
+                        content = sub
+                        break
+                if content is not None:
+                    yield from _iter_table_rows(content)
+
+    for tr in _iter_table_rows(tbl_elem):
         if _local_tag(tr) != "tr":
             continue
         row_cells: List[str] = []

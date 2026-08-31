@@ -2,13 +2,20 @@ import io
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-from typing import BinaryIO, Dict, List, Tuple, Union
+from typing import Any, BinaryIO, Dict, List, Tuple, Union
 
 from core.infrastructure.converter.utils import safe_read_zip_member
 
 P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
 A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+
+
+def _local_tag(elem_or_tag: Any) -> str:
+    tag = elem_or_tag.tag if hasattr(elem_or_tag, "tag") else elem_or_tag
+    if not isinstance(tag, str):
+        return ""
+    return tag.split("}", 1)[-1] if "}" in tag else tag
 
 
 def _slide_sort_key(name: str) -> Tuple[int, str]:
@@ -55,8 +62,7 @@ def pptx_to_markdown(pptx_input: Union[str, bytes, BinaryIO]) -> str:
             try:
                 pres_tree = ET.fromstring(safe_read_zip_member(zf, "ppt/presentation.xml"))
                 for sld in pres_tree.iter():
-                    tag = sld.tag.split("}", 1)[-1] if "}" in sld.tag else sld.tag
-                    if tag == "sldId":
+                    if _local_tag(sld) == "sldId":
                         r_id = sld.attrib.get(f"{R_NS}id") or sld.attrib.get("id")
                         if r_id and r_id in pres_rels:
                             slide_files.append(pres_rels[r_id])
@@ -89,12 +95,12 @@ def _parse_slide(slide_tree: ET.Element, zf: zipfile.ZipFile, slide_path: str, s
     slide_lines: List[str] = [f"## Slide {slide_num}\n"]
 
     for shape in slide_tree.iter():
-        tag = shape.tag.split("}", 1)[-1] if "}" in shape.tag else shape.tag
+        tag = _local_tag(shape)
         if tag == "sp":
-            shape_text, is_title = _parse_shape(shape)
+            shape_text, heading_prefix = _parse_shape(shape)
             if shape_text:
-                if is_title:
-                    slide_lines.append(f"# {shape_text}\n")
+                if heading_prefix:
+                    slide_lines.append(f"{heading_prefix}{shape_text}\n")
                 else:
                     slide_lines.append(f"{shape_text}\n")
         elif tag == "tbl":
@@ -124,58 +130,66 @@ def _parse_slide(slide_tree: ET.Element, zf: zipfile.ZipFile, slide_path: str, s
     return "\n".join(slide_lines).strip()
 
 
-def _parse_shape(sp_elem: ET.Element) -> Tuple[str, bool]:
-    is_title = False
+def _parse_shape(sp_elem: ET.Element) -> Tuple[str, str]:
+    heading_prefix = ""
     for ph in sp_elem.iter():
-        tag = ph.tag.split("}", 1)[-1] if "}" in ph.tag else ph.tag
-        if tag == "ph":
+        if _local_tag(ph) == "ph":
             ph_type = ph.attrib.get("type", "").lower()
-            if ph_type in ("title", "ctrtitle", "sub_title", "subtitle"):
-                is_title = True
+            if ph_type in ("title", "ctrtitle"):
+                heading_prefix = "# "
+            elif ph_type in ("sub_title", "subtitle"):
+                heading_prefix = "## "
 
     paragraphs: List[str] = []
     for p in sp_elem.iter():
-        tag = p.tag.split("}", 1)[-1] if "}" in p.tag else p.tag
-        if tag == "p":
+        if _local_tag(p) == "p":
+            lvl = 0
+            for child in p:
+                if _local_tag(child) == "pPr":
+                    lvl_attr = child.attrib.get("lvl", "0")
+                    try:
+                        lvl = int(lvl_attr)
+                    except ValueError:
+                        lvl = 0
+                    break
             runs = []
             for r in p:
-                rtag = r.tag.split("}", 1)[-1] if "}" in r.tag else r.tag
+                rtag = _local_tag(r)
                 if rtag in ("r", "fld"):
                     for t in r:
-                        ttag = t.tag.split("}", 1)[-1] if "}" in t.tag else t.tag
-                        if ttag == "t" and t.text:
+                        if _local_tag(t) == "t" and t.text:
                             runs.append(t.text)
                 elif rtag == "br":
                     runs.append("\n")
             p_text = "".join(runs).strip()
             if p_text:
-                paragraphs.append(p_text)
+                if lvl > 0 and not heading_prefix:
+                    indent = "  " * lvl
+                    paragraphs.append(f"{indent}- {p_text}")
+                else:
+                    paragraphs.append(p_text)
 
-    return "\n\n".join(paragraphs).strip(), is_title
+    return "\n\n".join(paragraphs).strip(), heading_prefix
 
 
 def _parse_pptx_table(tbl_elem: ET.Element) -> str:
     rows: List[List[str]] = []
     for tr in tbl_elem:
-        tag = tr.tag.split("}", 1)[-1] if "}" in tr.tag else tr.tag
-        if tag != "tr":
+        if _local_tag(tr) != "tr":
             continue
         row_cells: List[str] = []
         for tc in tr:
-            ctag = tc.tag.split("}", 1)[-1] if "}" in tc.tag else tc.tag
-            if ctag != "tc":
+            if _local_tag(tc) != "tc":
                 continue
             cell_paras: List[str] = []
             for p in tc:
-                ptag = p.tag.split("}", 1)[-1] if "}" in p.tag else p.tag
-                if ptag == "p":
+                if _local_tag(p) == "p":
                     p_runs = []
                     for child in p:
-                        crtag = child.tag.split("}", 1)[-1] if "}" in child.tag else child.tag
+                        crtag = _local_tag(child)
                         if crtag in ("r", "fld"):
                             for t in child:
-                                ttag = t.tag.split("}", 1)[-1] if "}" in t.tag else t.tag
-                                if ttag == "t" and t.text:
+                                if _local_tag(t) == "t" and t.text:
                                     p_runs.append(t.text)
                         elif crtag == "br":
                             p_runs.append(" ")
@@ -184,7 +198,7 @@ def _parse_pptx_table(tbl_elem: ET.Element) -> str:
                         cell_paras.append(p_text)
             if not cell_paras:
                 # Fallback: any t in tc
-                all_t = [t.text for t in tc.iter() if (t.tag.split("}", 1)[-1] if "}" in t.tag else t.tag) == "t" and t.text]
+                all_t = [t.text for t in tc.iter() if _local_tag(t) == "t" and t.text]
                 if all_t:
                     cell_paras.append(" ".join(all_t))
             clean_cell = " ".join(cell_paras).strip().replace("\n", " ").replace("|", "\\|")
@@ -211,14 +225,16 @@ def _parse_pptx_table(tbl_elem: ET.Element) -> str:
 def _extract_notes_text(notes_tree: ET.Element) -> str:
     lines: List[str] = []
     for sp in notes_tree.iter():
-        tag = sp.tag.split("}", 1)[-1] if "}" in sp.tag else sp.tag
-        if tag == "sp":
+        if _local_tag(sp) == "sp":
             # Check if this shape is the body placeholder for notes
             is_body = False
             for ph in sp.iter():
-                ptag = ph.tag.split("}", 1)[-1] if "}" in ph.tag else ph.tag
-                if ptag == "ph" and ph.attrib.get("type") == "body":
-                    is_body = True
+                if _local_tag(ph) == "ph":
+                    ph_type = ph.attrib.get("type", "").lower()
+                    ph_idx = ph.attrib.get("idx", "")
+                    if ph_type == "body" or ph_idx == "1":
+                        is_body = True
+                        break
             if is_body:
                 text, _ = _parse_shape(sp)
                 if text:

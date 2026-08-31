@@ -85,3 +85,13 @@ def safe_read_zip_member(
                 raise ValueError(f"zip member '{name}' exceeds {limit} decompressed bytes")
             chunks.append(chunk)
     return b"".join(chunks)
+
+
+def clean_url(url: str) -> str:
+    """Make a URL safe inside a Markdown inline link: spaces become %20 and
+    unbalanced parentheses are escaped (balanced ones are valid as-is)."""
+    url = url.replace(" ", "%20")
+    if url.count("(") != url.count(")"):
+        url = url.replace("(", "\\(").replace(")", "\\)")
+    return url
+
