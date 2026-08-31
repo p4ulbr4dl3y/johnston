@@ -317,10 +317,7 @@ def compute_tool_call_content(
                 lines = block.split("\n", 1)
                 if len(lines) == 2:
                     q_line, ans_line = lines
-                    clean_q = q_line.strip()
-                    if clean_q.startswith("**") and clean_q.endswith("**") and len(clean_q) > 4:
-                        clean_q = clean_q[2:-2].strip()
-                    t.append(f"{clean_q}\n", style="bold")
+                    t.append(f"{q_line.strip()}\n", style="bold")
                     t.append(ans_line.strip(), style="dim" if ans_line.strip() == "(No response)" else "")
                 else:
                     t.append(block)
