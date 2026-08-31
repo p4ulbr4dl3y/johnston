@@ -46,6 +46,16 @@ class ActionsMixin:
         except Exception:
             pass
 
+    def action_toggle_plan(self) -> None:
+        """Toggle expansion of the top plan notch widget"""
+        try:
+            from widgets.presentation.widgets.chat_notch import ChatNotch
+
+            notch = self.query_one(ChatNotch)
+            notch.toggle_expanded()
+        except Exception:
+            pass
+
     def action_background_all(self) -> None:
         """Background all running foreground shell tasks.
 

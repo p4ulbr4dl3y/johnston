@@ -78,16 +78,14 @@ Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, T
 
 #chat-notch {
     visibility: visible;
-    width: auto;
+    width: 68;
+    max-width: 90%;
     height: auto;
     background: $bg-surface;
     color: $fg-primary;
-    border-left: solid $accent-info;
-    border-top: none;
-    border-right: none;
-    border-bottom: none;
+    border: solid $border;
     padding: 0 1;
-    margin: 1;
+    margin: 0;
 }
 
 #chat-view {
