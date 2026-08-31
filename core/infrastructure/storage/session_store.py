@@ -15,6 +15,7 @@ from core.domain.policies.messages import (
     history_before_turn,
     transcript_before_turn,
 )
+from core.domain.policies.session_naming import build_fork_title
 from core.infrastructure.config.settings import get_settings
 from core.infrastructure.platform.paths import PROJECTS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_json, atomic_write_jsonl, read_json
@@ -473,11 +474,8 @@ class SessionStore:
             return None
         new_id = self.generate_session_id()
         parent_id = source.id if source.kind == SessionKind.MAIN else source.parent_id
-        if new_title:
-            fork_title = new_title
-        else:
-            base = source.title.removesuffix(" (fork)")
-            fork_title = f"{base} (fork)"
+        siblings = sum(1 for s in self.list() if s.parent_id == parent_id and s.kind == source.kind)
+        fork_title = build_fork_title(new_title or source.title, siblings + 1)
         new_sess = AgentSession(
             session_id=new_id,
             kind=source.kind,

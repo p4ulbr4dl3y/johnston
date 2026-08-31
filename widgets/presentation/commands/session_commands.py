@@ -11,7 +11,9 @@ from core.application.session.actions import (
     reset_token_counters,
     rewind_session,
 )
+from core.application.session.auto_title import clean_heuristic_title
 from core.domain.policies.messages import count_history_user_turns
+from core.domain.policies.session_naming import FORK_BASE_MAX_LEN
 from widgets.chat_input import ChatInput
 from widgets.presentation.commands.base import BaseCommand
 from widgets.presentation.commands.helpers import (
@@ -333,11 +335,8 @@ class ForkCommand(BaseCommand):
             if selected_child_idx == FORK_CURRENT_STATE:
                 up_to_idx = None
                 msg_text = ""
-                parent_sess = app.sm.get(curr_sid)
-                fork_title = None
-                if parent_sess:
-                    base = (parent_sess.title or "Session").removesuffix(" (fork)")
-                    fork_title = f"{base} (fork)"
+                # No branch point: the store falls back to the parent title.
+                fork_base: str | None = None
             else:
                 found = False
                 msg_text = ""
@@ -354,16 +353,9 @@ class ForkCommand(BaseCommand):
                     return
 
                 up_to_idx = seq_idx
-                fork_title = None
-                if seq_idx > 0 and msg_text:
-                    clean_msg = " ".join(msg_text.replace("\n", " ").replace("\r", " ").split())
-                    if clean_msg:
-                        fork_title = clean_msg
-                elif seq_idx == 0:
-                    parent_sess = app.sm.get(curr_sid)
-                    if parent_sess:
-                        base = parent_sess.title.removesuffix(" (fork)")
-                        fork_title = f"{base} (fork)"
+                # Base hint only: the store strips any old marker, numbers the
+                # fork among its siblings and appends the "(fork N)" marker.
+                fork_base = clean_heuristic_title(msg_text, max_len=FORK_BASE_MAX_LEN) or None
 
             cancel_active_workers(app)
             reset_app_state(app, is_generating=False, clear_queue=True)
@@ -371,7 +363,7 @@ class ForkCommand(BaseCommand):
             app.pending_fork = {
                 "parent_session_id": curr_sid,
                 "up_to_msg_index": up_to_idx,
-                "title": fork_title,
+                "title": fork_base,
             }
 
             if up_to_idx is not None:

@@ -158,6 +158,27 @@ class TestSessionStoreLockingAndFork(unittest.TestCase):
         # Forking invalid session returns None
         self.assertIsNone(self.store.fork_session("non_existent"))
 
+    def test_store_fork_session_numbers_siblings(self):
+        sess = self.store.create_main()
+        sess.title = "Initial task"
+        sess.messages = [{"type": "user", "text": "hello"}]
+        self.store.save(sess)
+
+        first = self.store.fork_session(sess.id)
+        second = self.store.fork_session(sess.id)
+        third = self.store.fork_session(sess.id, new_title="Branched from prompt")
+
+        self.assertEqual(first.title, "Initial task (fork)")
+        self.assertEqual(second.title, "Initial task (fork 2)")
+        # An explicit title is a base hint: it is normalized and numbered too.
+        self.assertEqual(third.title, "Branched from prompt (fork 3)")
+
+        # Fork of a fork: numbering restarts inside the new sibling group and
+        # the parent marker is stripped, so it never becomes "(fork) (fork)".
+        nested = self.store.fork_session(first.id)
+        self.assertEqual(nested.parent_id, first.id)
+        self.assertEqual(nested.title, "Initial task (fork)")
+
     def test_store_fork_session_with_slicing(self):
         sess = self.store.create_main()
         sess.title = "Task multi"

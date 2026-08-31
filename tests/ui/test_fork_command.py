@@ -48,7 +48,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         app.sm.fork_session.assert_not_called()
         self.assertEqual(
             app.pending_fork,
-            {"parent_session_id": "orig_sid", "up_to_msg_index": 0, "title": "Parent Title (fork)"},
+            {"parent_session_id": "orig_sid", "up_to_msg_index": 0, "title": "prompt 0"},
         )
         chat_view.rollback_to.assert_called_with(-1)
         chat_input.load_text.assert_called_with("prompt 0")
@@ -87,6 +87,38 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         chat_view.rollback_to.assert_called_with(19)
         chat_input.load_text.assert_called_with("second turn prompt")
 
+    async def test_fork_command_truncates_long_branch_title(self):
+        from core.domain.policies.session_naming import FORK_BASE_MAX_LEN
+
+        app = MagicMock()
+        chat_view = MagicMock()
+        long_prompt = "rewrite the parser " * 10
+        chat_view.get_user_messages.return_value = [(10, "prompt 0"), (20, long_prompt)]
+        app.query_one.return_value = chat_view
+        app.current_session_id = "orig_sid"
+
+        chat_input = MagicMock()
+        chat_input.text = long_prompt
+
+        def query_one_mock(target, *args, **kwargs):
+            if target == "#message-input" or "ChatInput" in str(args):
+                return chat_input
+            return chat_view
+
+        app.query_one = query_one_mock
+
+        def push_screen_mock(screen, callback):
+            callback(20)
+
+        app.push_screen = push_screen_mock
+
+        cmd = ForkCommand()
+        await cmd.execute(app)
+
+        base = app.pending_fork["title"]
+        self.assertLessEqual(len(base), FORK_BASE_MAX_LEN)
+        self.assertNotIn("(fork", base)
+
     async def test_fork_command_successful_fork_current_state(self):
         from widgets.presentation.screens.fork import FORK_CURRENT_STATE
 
@@ -121,7 +153,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         app.sm.fork_session.assert_not_called()
         self.assertEqual(
             app.pending_fork,
-            {"parent_session_id": "orig_sid", "up_to_msg_index": None, "title": "My Session (fork)"},
+            {"parent_session_id": "orig_sid", "up_to_msg_index": None, "title": None},
         )
         chat_input.load_text.assert_called_with("")
         chat_input.focus.assert_called()
@@ -138,7 +170,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
                 self.pending_fork = {
                     "parent_session_id": "orig_sid",
                     "up_to_msg_index": 0,
-                    "title": "Parent Title (fork)",
+                    "title": "Parent Title",
                 }
                 self.sm = MagicMock()
                 self.trigger_ai_response = MagicMock()
@@ -156,7 +188,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         await test_app.on_chat_input_submitted(ev)
 
         test_app.sm.fork_session.assert_called_with(
-            "orig_sid", new_title="Parent Title (fork)", up_to_msg_index=0
+            "orig_sid", new_title="Parent Title", up_to_msg_index=0
         )
         self.assertEqual(test_app.current_session_id, "forked_sid")
         self.assertIsNone(test_app.pending_fork)
