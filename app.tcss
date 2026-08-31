@@ -1,4 +1,4 @@
-/* Dynamic True Color Inversion Selection for all Screens, Input fields and TextAreas */
+/* Text Selection for all Screens, Input fields and TextAreas */
 .screen--selection,
 .text-area--selection,
 .input--selection,
@@ -11,8 +11,8 @@ Input > .selection,
 #modal-search-input > .input--selection,
 #diff-search-input > .input--selection,
 #api-key-input > .input--selection {
-    background: $bg-inverted !important;
-    color: $fg-inverted !important;
+    background: $subtle !important;
+    color: $fg-primary !important;
     text-style: none !important;
 }
 
@@ -476,8 +476,8 @@ CommandSuggestions > .option-list--option-hover {
 }
 
 #message-input > .text-area--selection {
-    background: $bg-inverted;
-    color: $fg-inverted;
+    background: $subtle;
+    color: $fg-primary;
 }
 
 #message-input > .text-area--placeholder {
@@ -1100,8 +1100,8 @@ ModalScreen OptionList > .option-list--option-hover {
 #modal-search-input > .input--selection,
 #write-in-input > .input--selection,
 #api-key-input > .input--selection {
-    background: $bg-inverted;
-    color: $fg-inverted;
+    background: $subtle;
+    color: $fg-primary;
 }
 
 ModalHint,
