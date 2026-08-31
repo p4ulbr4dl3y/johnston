@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
+from core.infrastructure.adapters.models_fetcher import fetch_catalog_endpoints
 from core.infrastructure.config.settings import JohnstonSettings, LLMSettings
 from core.models_catalog import ModelsCatalog, format_context_tokens, get_context_window
 
@@ -484,6 +485,29 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
         with patch("core.models_catalog.asyncio.gather", side_effect=RuntimeError("boom")):
             limits = await cat.refresh()
         self.assertEqual(limits, {})
+
+    async def test_refresh_outer_exception_emits_no_unawaited_coroutine_warnings(self):
+        """Regression: when asyncio.gather raises before awaiting the created
+        request coroutines (e.g. monkeypatched gather), fetch_catalog_endpoints
+        must close them instead of leaking 'AsyncClient.get never awaited'
+        RuntimeWarnings."""
+        created = []
+        orig_get = httpx.AsyncClient.get
+
+        def spy_get(self, url, **kwargs):
+            coro = orig_get(self, url, **kwargs)
+            created.append(coro)
+            return coro
+
+        async with httpx.AsyncClient() as client:
+            with patch.object(httpx.AsyncClient, "get", spy_get):
+                with patch("core.models_catalog.asyncio.gather", side_effect=RuntimeError("boom")):
+                    with self.assertRaises(RuntimeError):
+                        await fetch_catalog_endpoints(client)
+        # A live, never-awaited coroutine still has a frame; close() clears it.
+        self.assertEqual(len(created), 2)
+        for coro in created:
+            self.assertIsNone(coro.cr_frame)
 
 
 # ---------------------------------------------------------------------------

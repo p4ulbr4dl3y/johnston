@@ -112,6 +112,30 @@ async def test_gemini_close_with_running_loop_swallowed():
 
 
 @pytest.mark.asyncio
+async def test_gemini_close_with_running_loop_closes_pending_coroutine():
+    """Regression: the _close_all coroutine created before asyncio.run() raises
+    (running loop) must be closed, not leaked as 'never awaited' RuntimeWarning."""
+    import core.infrastructure.adapters.base as base_module
+
+    adapter = GeminiAdapter()
+    adapter._clients = {("u", "k"): MagicMock()}
+    orig_close_all = base_module.BaseApiAdapter._close_all
+    recorded = []
+
+    def spy_close_all(clients):
+        coro = orig_close_all(clients)
+        recorded.append(coro)
+        return coro
+
+    with patch.object(base_module.BaseApiAdapter, "_close_all", staticmethod(spy_close_all)):
+        adapter.close()  # RuntimeError from asyncio.run stays swallowed
+    assert adapter._clients == {}
+    # A live, never-awaited coroutine still has a frame; close() clears it.
+    assert len(recorded) == 1
+    assert recorded[0].cr_frame is None
+
+
+@pytest.mark.asyncio
 async def test_gemini_close_all_aclose_error():
     client = MagicMock()
     client.aclose = AsyncMock(side_effect=RuntimeError("close fail"))

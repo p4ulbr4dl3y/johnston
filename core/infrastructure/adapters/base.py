@@ -61,10 +61,15 @@ class BaseApiAdapter:
         clients, self._clients = self._clients, {}
         if not clients:
             return
+        close_coro = self._close_all(clients)
         try:
-            asyncio.run(self._close_all(clients))
+            asyncio.run(close_coro)
         except Exception:
-            pass
+            # asyncio.run raises immediately when a loop is already running,
+            # without ever touching the coroutine — close it so it does not
+            # leak as a "coroutine never awaited" RuntimeWarning. The close
+            # failure itself stays swallowed (best-effort atexit-style hook).
+            close_coro.close()
 
     @staticmethod
     async def _close_all(clients: Dict[Tuple[str, str], Any]) -> None:

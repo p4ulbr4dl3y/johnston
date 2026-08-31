@@ -32,11 +32,18 @@ async def fetch_catalog_endpoints(
     model_modalities: Dict[str, List[str]] = {}
     provider_catalog: Dict[str, Dict[str, Any]] = {}
 
-    mdev_res, openrouter_res = await asyncio.gather(
-        client.get(MODELS_DEV_URL, timeout=10),
-        client.get(OPENROUTER_MODELS_URL, timeout=10),
-        return_exceptions=True,
-    )
+    # Requests are created up front so that if asyncio.gather raises before
+    # awaiting them (e.g. a monkeypatched gather in tests, or a cancellation
+    # delivered between creation and await), the coroutines are still closed
+    # instead of surfacing as "coroutine was never awaited" RuntimeWarnings.
+    requests = [client.get(MODELS_DEV_URL, timeout=10), client.get(OPENROUTER_MODELS_URL, timeout=10)]
+    try:
+        mdev_res, openrouter_res = await asyncio.gather(*requests, return_exceptions=True)
+    except BaseException:
+        for req in requests:
+            if asyncio.iscoroutine(req):
+                req.close()
+        raise
 
     # 1. Parse models.dev response
     if isinstance(mdev_res, httpx.Response) and mdev_res.status_code == 200:
