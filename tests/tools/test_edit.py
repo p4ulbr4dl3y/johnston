@@ -130,3 +130,28 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
             res = str(await tool.execute({"path": file_path, "old_str": "x = 1", "new_str": "x = 2"}))
         self.assertIn("ERR: params", res)
         self.assertIn("boom", res)
+
+    def test_whitespace_agnostic_match_recovers_indentation(self):
+        content = "class Foo:\n    def bar(self):\n        return 42\n"
+        # LLM provided unindented old_str and new_str
+        old_str = "def bar(self):\n    return 42"
+        new_str = "def bar(self):\n    return 100"
+        new_content, _ = apply_edit(content, old_str, new_str, False, "test.py")
+        self.assertEqual(new_content, "class Foo:\n    def bar(self):\n        return 100\n")
+
+    def test_whitespace_agnostic_match_recovers_nested_indentation(self):
+        content = "    if cond:\n        x = 1\n        y = 2\n"
+        # LLM provided old_str with 0-indent and new_str with an extra inner level
+        old_str = "if cond:\n    x = 1\n    y = 2"
+        new_str = "if cond:\n    x = 1\n    if sub:\n        y = 2"
+        new_content, _ = apply_edit(content, old_str, new_str, False, "test.py")
+        self.assertEqual(new_content, "    if cond:\n        x = 1\n        if sub:\n            y = 2\n")
+
+    def test_whitespace_agnostic_duplicate_match_returns_hint(self):
+        content = "    x = 1\n    y = 2\n        x = 1\n        y = 2\n"
+        # Non-unique whitespace match
+        old_str = "x = 1\ny = 2"
+        res = apply_edit(content, old_str, "x = 9\ny = 9", False, "test.py")
+        self.assertTrue(res.is_error)
+        self.assertIn("Closest match in 'test.py'", res.content)
+
