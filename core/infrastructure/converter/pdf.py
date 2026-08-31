@@ -1,9 +1,10 @@
 import io
+import os
 import re
 from typing import BinaryIO, List, Union
 
 
-def pdf_to_markdown(pdf_input: Union[str, bytes, BinaryIO]) -> str:
+def pdf_to_markdown(pdf_input: Union[str, bytes, BinaryIO, os.PathLike]) -> str:
     """
     Converts a PDF document to Markdown using the pure-Python pypdf library.
     Extracts text with layout preservation and page separation.
@@ -17,14 +18,17 @@ def pdf_to_markdown(pdf_input: Union[str, bytes, BinaryIO]) -> str:
     reader = None
     try:
         if isinstance(pdf_input, bytes):
-            source: Union[str, io.BytesIO, BinaryIO] = io.BytesIO(pdf_input)
-        elif isinstance(pdf_input, str):
+            source: Union[str, io.BytesIO, BinaryIO, os.PathLike] = io.BytesIO(pdf_input)
+        elif isinstance(pdf_input, (str, os.PathLike)):
             stream_to_close = open(pdf_input, "rb")
             source = stream_to_close
         else:
             source = pdf_input
 
-        reader = PdfReader(source)
+        try:
+            reader = PdfReader(source)
+        except Exception as e:
+            raise ValueError(f"Invalid PDF file: {e}") from e
         if reader.is_encrypted:
             try:
                 reader.decrypt("")

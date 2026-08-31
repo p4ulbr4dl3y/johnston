@@ -51,6 +51,9 @@ def convert_bytes(
     """
     Converts raw document bytes to Markdown based on extension or filename.
     """
+    if not isinstance(data, (bytes, bytearray, memoryview)):
+        raise TypeError(f"data must be bytes-like object, got {type(data).__name__}")
+
     s = str(extension_or_filename).strip()
     ext = os.path.splitext(s)[1].lower()
     if not ext and s:
@@ -84,6 +87,8 @@ def convert_file(file_path: Union[str, Path]) -> str:
     path = Path(file_path)
     if not path.exists():
         raise FileNotFoundError(f"File not found: {path}")
+    if path.is_dir():
+        raise IsADirectoryError(f"Expected file, found directory: {path}")
 
     ext = path.suffix.lower()
 

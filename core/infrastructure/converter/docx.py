@@ -58,6 +58,14 @@ def _iter_inline(elem: ET.Element) -> Iterator[ET.Element]:
             yield child
         elif tag in _INLINE_WRAPPERS:
             yield from _iter_inline(child)
+        elif tag == "sdt":
+            content = None
+            for sub in child.iter():
+                if _local_tag(sub) == "sdtContent":
+                    content = sub
+                    break
+            if content is not None:
+                yield from _iter_inline(content)
 
 
 RunFormat = Tuple[bool, bool, bool]  # (bold, italic, strike)
@@ -227,11 +235,15 @@ def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
             run_items.append(_parse_run(item))
         elif item_tag == "hyperlink":
             r_id = ""
+            anchor = ""
             for k, v in item.attrib.items():
                 if k.endswith("}id") or k.endswith(":id") or k.lower() == "id":
                     r_id = v
-                    break
+                elif k.endswith("}anchor") or k.endswith(":anchor") or k.lower() == "anchor":
+                    anchor = v
             url = rels.get(r_id, "")
+            if anchor:
+                url = f"{url}#{anchor}" if url else f"#{anchor}"
             link_text = _render_runs(
                 [_parse_run(r) for r in _iter_inline(item) if _local_tag(r) == "r"]
             )
@@ -279,11 +291,11 @@ def _parse_run(r_elem: ET.Element) -> Tuple[str, RunFormat]:
     if r_pr is not None:
         for prop in r_pr:
             ptag = _local_tag(prop)
-            if ptag == "b" and _is_prop_active(prop):
+            if ptag in ("b", "bCs") and _is_prop_active(prop):
                 is_bold = True
-            elif ptag == "i" and _is_prop_active(prop):
+            elif ptag in ("i", "iCs") and _is_prop_active(prop):
                 is_italic = True
-            elif ptag == "strike" and _is_prop_active(prop):
+            elif ptag in ("strike", "dstrike") and _is_prop_active(prop):
                 is_strike = True
 
     text_parts: List[str] = []

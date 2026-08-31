@@ -1,4 +1,5 @@
 import io
+import math
 import re
 import xml.etree.ElementTree as ET
 import zipfile
@@ -195,6 +196,8 @@ def _format_number(raw: str, fmt_id: int, code: str, epoch: datetime) -> Optiona
         value = float(raw)
     except ValueError:
         return None
+    if math.isnan(value) or math.isinf(value):
+        return None
     code = code or _BUILTIN_NUMFMT_CODES.get(fmt_id, "")
     if _format_is_datetime(fmt_id, code):
         return _format_serial(value, code, epoch)
@@ -361,6 +364,8 @@ def _parse_sheet_to_table(
             elif cell_type == "b" and v_elem is not None:
                 val_text = "TRUE" if v_elem.text == "1" else "FALSE"
             elif cell_type == "str" and v_elem is not None:
+                val_text = v_elem.text or ""
+            elif cell_type == "e" and v_elem is not None:
                 val_text = v_elem.text or ""
             elif v_elem is not None and v_elem.text:
                 # Numeric cell: render through the cell's number format so

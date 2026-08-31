@@ -67,14 +67,14 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
                 elif out_type in ("execute_result", "display_data"):
                     data_dict = out.get("data", {})
                     if isinstance(data_dict, dict):
-                        if "text/plain" in data_dict:
-                            text = _as_text(data_dict["text/plain"])
-                            if text.strip():
-                                out_texts.append(fenced_code_block(text.strip(), lang="output"))
-                        elif "text/markdown" in data_dict:
+                        if "text/markdown" in data_dict:
                             text = _as_text(data_dict["text/markdown"])
                             if text.strip():
                                 out_texts.append(text.strip())
+                        elif "text/plain" in data_dict:
+                            text = _as_text(data_dict["text/plain"])
+                            if text.strip():
+                                out_texts.append(fenced_code_block(text.strip(), lang="output"))
                 elif out_type == "error":
                     tb = out.get("traceback", [])
                     tb_str = "\n".join(str(line) for line in tb if line is not None) if isinstance(tb, list) else _as_text(tb)

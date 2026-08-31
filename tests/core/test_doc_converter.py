@@ -2097,6 +2097,141 @@ class TestDocConverterSecondaryAuditFixes(unittest.TestCase):
         self.assertIn("```typescript\nconst x: number = 10;\n```", md_lang)
 
 
+class TestDocConverterTertiaryAuditFixes(unittest.TestCase):
+    """Regression tests for tertiary audit edge cases:
+    - IPYNB text/markdown precedence over text/plain in outputs
+    - PDF invalid/corrupted data ValueError and os.PathLike support
+    - DOCX inline <w:sdt> controls in paragraphs
+    - DOCX w:anchor bookmark links
+    - DOCX bCs, iCs, and dstrike formatting
+    - XLSX NaN/Inf number formatting guards and cell_type="e" formula errors
+    - Engine convert_bytes non-bytes TypeError and convert_file IsADirectoryError
+    """
+
+    def test_ipynb_markdown_output_precedence_over_plain(self):
+        nb = {
+            "cells": [
+                {
+                    "cell_type": "code",
+                    "source": "display(Markdown('### Rich Title'))",
+                    "outputs": [
+                        {
+                            "output_type": "execute_result",
+                            "data": {
+                                "text/plain": ["<IPython.core.display.Markdown object>"],
+                                "text/markdown": ["### Rich Title"],
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        md = ipynb_to_markdown(nb)
+        self.assertIn("### Rich Title", md)
+        self.assertNotIn("<IPython.core.display.Markdown object>", md)
+
+    def test_pdf_invalid_bytes_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            pdf_to_markdown(b"corrupted pdf data not valid")
+
+        with self.assertRaises(ValueError):
+            pdf_to_markdown(b"")
+
+    def test_pdf_pathlike_input(self):
+        writer = PdfWriter()
+        writer.add_blank_page(width=100, height=100)
+        buf = io.BytesIO()
+        writer.write(buf)
+
+        from pathlib import Path
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf:
+            tf.write(buf.getvalue())
+            path = Path(tf.name)
+
+        try:
+            res = pdf_to_markdown(path)
+            self.assertIsInstance(res, str)
+        finally:
+            if path.exists():
+                path.unlink()
+
+    def test_docx_inline_sdt_in_paragraph(self):
+        xml = """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>
+    <w:p>
+        <w:r><w:t>Author: </w:t></w:r>
+        <w:sdt>
+            <w:sdtPr><w:alias w:val="AuthorName"/></w:sdtPr>
+            <w:sdtContent>
+                <w:r><w:t>John Doe</w:t></w:r>
+            </w:sdtContent>
+        </w:sdt>
+    </w:p>
+</w:body></w:document>"""
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertIn("Author: John Doe", md)
+
+    def test_docx_hyperlink_internal_anchor(self):
+        xml = """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>
+    <w:p>
+        <w:hyperlink w:anchor="_Section1">
+            <w:r><w:t>Jump to Section 1</w:t></w:r>
+        </w:hyperlink>
+    </w:p>
+</w:body></w:document>"""
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertIn("[Jump to Section 1](#_Section1)", md)
+
+    def test_docx_bcs_ics_dstrike_formatting(self):
+        xml = """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>
+    <w:p>
+        <w:r><w:rPr><w:bCs/></w:rPr><w:t>ComplexBold</w:t></w:r>
+        <w:r><w:t> </w:t></w:r>
+        <w:r><w:rPr><w:iCs/></w:rPr><w:t>ComplexItalic</w:t></w:r>
+        <w:r><w:t> </w:t></w:r>
+        <w:r><w:rPr><w:dstrike/></w:rPr><w:t>DoubleStrike</w:t></w:r>
+    </w:p>
+</w:body></w:document>"""
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertIn("**ComplexBold**", md)
+        self.assertIn("*ComplexItalic*", md)
+        self.assertIn("~~DoubleStrike~~", md)
+
+    def test_xlsx_nan_inf_guards_and_error_cells(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(
+                "xl/worksheets/sheet1.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                    <sheetData>
+                        <row r="1">
+                            <c r="A1" t="e"><v>#N/A</v></c>
+                            <c r="B1" t="e"><v>#DIV/0!</v></c>
+                            <c r="C1"><v>NaN</v></c>
+                            <c r="D1"><v>Infinity</v></c>
+                        </row>
+                    </sheetData>
+                </worksheet>""",
+            )
+        md = xlsx_to_markdown(buf.getvalue())
+        self.assertIn("| #N/A | #DIV/0! | NaN | Infinity |", md)
+
+    def test_engine_convert_bytes_non_bytes_type_error(self):
+        with self.assertRaises(TypeError):
+            convert_bytes(None, ".html")  # type: ignore
+
+        with self.assertRaises(TypeError):
+            convert_bytes("not bytes", ".html")  # type: ignore
+
+    def test_engine_convert_file_directory_raises_is_a_directory_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            with self.assertRaises(IsADirectoryError):
+                convert_file(td)
+
+
 if __name__ == "__main__":
     unittest.main()
 
