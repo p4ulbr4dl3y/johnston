@@ -212,7 +212,7 @@ async def test_kill_twice_idempotent(sub_tool, store):
 async def test_list_no_subagents_no_crash(sub_tool, store):
     res = await sub_tool.execute({"action": "list"})
     assert res.content == "[subagents 0]"
-    assert "No subagent sessions found" in res.display
+    assert res.display == ""
 
 
 async def test_list_filters_by_parent(sub_tool, store):

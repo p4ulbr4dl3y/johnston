@@ -63,7 +63,7 @@ async def test_list_no_tasks(tool, make_app_mock):
     app = _app(make_app_mock, tasks=[])
     res = await tool.execute({"action": "list"}, ctx=app)
     assert res.content == "[tasks 0]"
-    assert "no tasks active" in res.display
+    assert res.display == ""
 
 
 async def test_list_scoped_to_current_session(tool, make_app_mock):
@@ -83,7 +83,6 @@ async def test_list_with_tasks(tool, make_app_mock):
     t2.completed_at = t2.created_at + 2.5
     app = _app(make_app_mock, [t1, t2])
     res = await tool.execute({"action": "list"}, ctx=app)
-    assert "Active Background Tasks" in res.display
     assert "[tasks 2 | id|status|duration|cmd|log]" in res.content
     assert "t1|running|" in res.content
     assert "|echo hello|" in res.content
@@ -289,7 +288,7 @@ async def test_send_input_task_without_stdin(tool, make_app_mock):
     t.send_input = _send
     app = _app(make_app_mock, [t], session_id="s1")
     res = await tool.execute({"action": "send_input", "task_id": "tsnoproc", "input": "x"}, ctx=app)
-    assert res.display == "HANDLED"
+    assert res.content == "HANDLED"
 
 
 # --------------------------------------------------------------------------- #

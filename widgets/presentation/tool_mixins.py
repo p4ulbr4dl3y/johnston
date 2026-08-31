@@ -12,7 +12,6 @@ from core.domain.defaults.config import (
     COLOR_STATUS_SUCCESS,
 )
 from widgets.presentation.tool_renderers import (
-    format_ask_user_display,
     format_code_with_line_numbers,
     format_manage_shell_display,
     format_manage_subagent_display,
@@ -43,14 +42,6 @@ class FormattingMixin:
 
     def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
         return format_plan_display(plan_items, explanation)
-
-    def _format_ask_user_display(self) -> Any:
-        questions = self._parse_ask_user_questions()
-        answers = self._parse_ask_user_answers(questions)
-        display = format_ask_user_display(questions, answers)
-        if not display:
-            display.append(self._clean_hints_for_ui(self.result_text or "(No answers)"))
-        return display
 
     def _format_manage_shell_display(self) -> Any:
         return format_manage_shell_display(self.result_text or "")

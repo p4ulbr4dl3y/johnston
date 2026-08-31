@@ -482,14 +482,15 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             self.q_idx += 1
             self.update_step()
         else:
-            out_summary = ""
+            out_parts = []
             for idx, q in enumerate(self.questions):
                 q_clean = q.get("question", "")
                 ans_info = self.answers.get(idx, {})
                 ans_val = ans_info.get("answer", "")
                 ans_display = ans_val if ans_val else "(No response)"
-                out_summary += f"Question: {q_clean}\nAnswer: {ans_display}\n"
-            self.dismiss(out_summary.strip())
+                prefix = f"**{idx + 1}. {q_clean}**" if len(self.questions) > 1 else f"**{q_clean}**"
+                out_parts.append(f"{prefix}\n{ans_display}")
+            self.dismiss("\n\n".join(out_parts).strip())
 
     def action_toggle_selection(self) -> None:
         if not self.raw_options or self.q_idx >= len(self.questions):

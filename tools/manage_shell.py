@@ -5,7 +5,6 @@ from core.infrastructure.tasks.manage import (
     filter_to_session,
     find_any,
     format_tasks_plain,
-    list_lines,
     not_found_message,
 )
 from tools.base import BaseTool
@@ -54,8 +53,7 @@ class ManageShellTool(BaseTool):
 
         if action == "list":
             content_plain = format_tasks_plain(tasks)
-            display_txt = list_lines(tasks)
-            return ToolResult.done(content=content_plain, display=display_txt)
+            return ToolResult.done(content=content_plain, display="")
 
         if action == "send_input":
             if not task_id:
@@ -67,12 +65,12 @@ class ManageShellTool(BaseTool):
             input_text = args.get("input", "") or ""
             t = find_any(tasks, task_id)
             if t is None:
-                return ToolResult.done(not_found_message(task_id, tasks, "background"))
+                return ToolResult.done(not_found_message(task_id, tasks, "background"), display="")
             if not getattr(t, "is_running", False):
                 return ToolResult.error("notrunning", name=task_id)
             if hasattr(t, "send_input"):
                 res = await t.send_input(input_text)
-                return ToolResult.done(content=res, display=res)
+                return ToolResult.done(content=res, display="")
             return ToolResult.error("nowrite", name=task_id, detail="stdin not writable")
 
         elif action == "kill":
@@ -84,7 +82,7 @@ class ManageShellTool(BaseTool):
                 )
             t = find_any(tasks, task_id)
             if t is None:
-                return ToolResult.done(not_found_message(task_id, tasks, "background"))
+                return ToolResult.done(not_found_message(task_id, tasks, "background"), display="")
             if getattr(t, "is_running", False):
                 try:
                     if hasattr(t, "kill"):
@@ -93,7 +91,7 @@ class ManageShellTool(BaseTool):
                         t.process.kill()
                     ctx.refresh_status()
                     msg = f"[killed {task_id}]"
-                    return ToolResult.done(content=msg, display=msg)
+                    return ToolResult.done(content=msg, display="")
                 except Exception as e:
                     return ToolResult.error("kill", detail=str(e), name=task_id)
             return ToolResult.error("notrunning", name=task_id)

@@ -447,8 +447,8 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("enter")
             await pilot.pause()
 
-            self.assertIn("Question: Pick color", str(app.dismiss_result))
-            self.assertIn("Answer: Red", str(app.dismiss_result))
+            self.assertIn("Pick color", str(app.dismiss_result))
+            self.assertIn("Red", str(app.dismiss_result))
 
     async def test_ask_user_wizard_deselect_preserves_highlight_index(self):
         from widgets.presentation.screens.ask_user import AskUserWizardScreen

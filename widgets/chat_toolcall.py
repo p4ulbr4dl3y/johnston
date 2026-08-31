@@ -120,7 +120,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.status in ("error", "cancelled"):
             return False
         if canonical == "ask_user":
-            return "Answer:" in (self.result_text or "")
+            return bool((self.result_text or "").strip())
         if canonical in (
             "read",
             "web_fetch",
@@ -446,42 +446,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if callable(pending):
             pending()
 
-    def _parse_ask_user_questions(self) -> list[dict]:
-        args = self.args
-        qs = args.get("questions")
-        out = []
-        if isinstance(qs, list):
-            for q in qs:
-                if not isinstance(q, dict):
-                    continue
-                q_text = q.get("question") or ""
-                opts = q.get("options")
-                if q_text and isinstance(opts, list):
-                    out.append({"question": str(q_text), "options": [str(o) for o in opts]})
-        return out
-
-    def _parse_ask_user_answers(self, questions: list[dict]) -> dict:
-        answers = {}
-        text = self.result_text or ""
-        if "Answer:" not in text:
-            return answers
-        q_pairs = re.findall(r"^Question:\s*(.*?)\nAnswer:\s*(.*)$", text, re.MULTILINE)
-        if not q_pairs:
-            return answers
-        used = set()
-        for q_text, ans in q_pairs:
-            for i, q in enumerate(questions):
-                if i in used:
-                    continue
-                if (q.get("question") or "").strip() == q_text.strip():
-                    answers[i] = {"answer": ans.strip()}
-                    used.add(i)
-                    break
-        for i in range(len(questions)):
-            if i not in answers:
-                answers[i] = {"answer": "(No response)"}
-        return answers
-
     def _scroll_if_needed(self, force: bool = False) -> None:
         from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
 
@@ -553,7 +517,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             clean_markup=self._clean_markup_text,
             clean_hints=self._clean_hints_for_ui,
             clean_bash_output=self._clean_bash_output,
-            format_ask_user_display_fn=self._format_ask_user_display,
             format_json_result_fn=self._format_json_result,
         )
 

@@ -404,23 +404,19 @@ class TestToolExpansion(unittest.TestCase):
         widget = ToolCallWidget(
             tool_type="ask_user",
             target="ask_user",
-            result_text="Question: What is your name?\nAnswer: Johnston",
+            result_text="**What is your name?**\nJohnston",
             args={"questions": [{"question": "What is your name?", "options": ["Johnston"]}]},
         )
-        display = widget._format_ask_user_display()
-        self.assertIsInstance(display, Text)
-        plain = display.plain
-        self.assertNotIn("Q:", plain)
-        self.assertNotIn("A:", plain)
-        self.assertIn("What is your name?", plain)
-        self.assertIn("Johnston", plain)
-        self.assertEqual(plain, "What is your name?\nJohnston")
+        kind, value = widget._compute_content()
+        self.assertEqual(kind, "md")
+        self.assertIn("What is your name?", value)
+        self.assertIn("Johnston", value)
 
     def test_ask_user_display_multi_questions_and_no_response(self):
         widget = ToolCallWidget(
             tool_type="ask_user",
             target="ask_user",
-            result_text="Question: First?\nAnswer: Yes\nQuestion: Second?\nAnswer: ",
+            result_text="**1. First?**\nYes\n\n**2. Second?**\n(No response)",
             args={
                 "questions": [
                     {"question": "First?", "options": ["Yes", "No"]},
@@ -428,11 +424,10 @@ class TestToolExpansion(unittest.TestCase):
                 ]
             },
         )
-        display = widget._format_ask_user_display()
-        self.assertIsInstance(display, Text)
-        plain = display.plain
-        expected = "1. First?\nYes\n\n2. Second?\n(No response)"
-        self.assertEqual(plain, expected)
+        kind, value = widget._compute_content()
+        self.assertEqual(kind, "md")
+        expected = "**1. First?**\nYes\n\n**2. Second?**\n(No response)"
+        self.assertEqual(value, expected)
 
     def test_shell_running_bg_task_click_toggles_expansion(self):
         task_mock = MagicMock()

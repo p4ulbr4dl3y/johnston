@@ -56,11 +56,10 @@ class ManageSubagentTool(BaseTool):
             if not target_sessions:
                 return ToolResult.done(
                     content="[subagents 0]",
-                    display="No subagent sessions found for current session.",
+                    display="",
                 )
 
             items = []
-            disp_lines = ["Active/Past Subagent Sessions:"]
             for sess in target_sessions:
                 s_id = str(sess.id)
                 raw_st = getattr(sess, "status", None)
@@ -89,13 +88,9 @@ class ManageSubagentTool(BaseTool):
                 raw_title = raw_title or "(subagent task)"
                 s_title = " ".join(str(raw_title).split())
                 items.append(f"{s_id}|{s_status}|{s_role}|{s_title}")
-                disp_lines.append(
-                    f"• ID: {sess.id} | Status: {s_status.upper()} | Type: {s_role.capitalize()} | Title: {s_title}"
-                )
 
             content_txt = f"[subagents {len(target_sessions)} | id|status|role|title]\n" + "\n".join(items)
-            display_txt = "\n".join(disp_lines)
-            return ToolResult.done(content=content_txt, display=display_txt)
+            return ToolResult.done(content=content_txt, display="")
 
         if not session_id:
             return ToolResult.error(
@@ -111,7 +106,7 @@ class ManageSubagentTool(BaseTool):
         if action == "kill":
             if session.status != "running":
                 msg = f"[killed {session.id}]"
-                return ToolResult.done(content=msg, display=msg)
+                return ToolResult.done(content=msg, display="")
 
             if session.async_task and not session.async_task.done():
                 try:
@@ -122,7 +117,7 @@ class ManageSubagentTool(BaseTool):
             session.finish(SessionStatus.CANCELLED, "Cancelled via subagent tool")
             store.save(session)
             msg = f"[killed {session.id}]"
-            return ToolResult.done(content=msg, display=msg)
+            return ToolResult.done(content=msg, display="")
 
         elif action == "send_message":
             if not message:

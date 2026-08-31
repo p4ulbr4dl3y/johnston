@@ -564,67 +564,9 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         self.assertFalse(widget.is_expanded)
         parent_mock = MagicMock(auto_expand_all=True)
         widget._parent = parent_mock
-        widget.set_result("Question: Q1\nAnswer: A", status="done")
+        widget.set_result("**Q1**\nA", status="done")
         self.assertTrue(widget.is_expandable())
         self.assertTrue(widget.is_expanded)
-
-    def test_parse_ask_user_answers_multi_question(self):
-        widget = self._widget(
-            "ask_user",
-            "q",
-            args={"questions": [{"question": "Q1", "options": ["A", "B"]}, {"question": "Q2", "options": ["C"]}]},
-            result_text="Question: Q1\nAnswer: A\nQuestion: Q2\nAnswer: C",
-        )
-        qs = widget._parse_ask_user_questions()
-        self.assertEqual(
-            widget._parse_ask_user_answers(qs), {0: {"answer": "A"}, 1: {"answer": "C"}}
-        )
-
-    def test_parse_ask_user_answer_containing_question_marker(self):
-        widget = self._widget(
-            "ask_user",
-            "q",
-            args={"questions": [{"question": "Q1", "options": ["A"]}, {"question": "Q2", "options": ["C"]}]},
-            result_text="Question: Q1\nAnswer: Question: foo\nQuestion: Q2\nAnswer: C",
-        )
-        qs = widget._parse_ask_user_questions()
-        self.assertEqual(
-            widget._parse_ask_user_answers(qs), {0: {"answer": "Question: foo"}, 1: {"answer": "C"}}
-        )
-
-    def test_parse_ask_user_missing_answer_defaults_no_response(self):
-        widget = self._widget(
-            "ask_user",
-            "q",
-            args={"questions": [{"question": "Q1", "options": ["A"]}, {"question": "Q2", "options": ["C"]}]},
-            result_text="Question: Q1\nAnswer: A",
-        )
-        qs = widget._parse_ask_user_questions()
-        self.assertEqual(
-            widget._parse_ask_user_answers(qs), {0: {"answer": "A"}, 1: {"answer": "(No response)"}}
-        )
-
-    def test_parse_ask_user_cancelled_has_no_answers(self):
-        widget = self._widget(
-            "ask_user",
-            "q",
-            args={"questions": [{"question": "Q1", "options": ["A"]}]},
-            result_text="Cancelled by user.",
-        )
-        qs = widget._parse_ask_user_questions()
-        self.assertEqual(widget._parse_ask_user_answers(qs), {})
-        self.assertFalse(widget.is_expandable())
-
-    def test_parse_ask_user_questions(self):
-        widget = self._widget(
-            "ask_user",
-            "q",
-            args={"questions": [{"question": "F", "options": ["X", "Y"]}]},
-            result_text="Question: F\nAnswer: X",
-        )
-        qs = widget._parse_ask_user_questions()
-        self.assertEqual(qs, [{"question": "F", "options": ["X", "Y"]}])
-        self.assertEqual(widget._parse_ask_user_answers(qs), {0: {"answer": "X"}})
 
     def test_on_click_exception_is_suppressed(self):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})

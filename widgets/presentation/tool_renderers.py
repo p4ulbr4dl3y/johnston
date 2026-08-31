@@ -241,7 +241,6 @@ def compute_tool_call_content(
     clean_markup: Callable[[str], str],
     clean_hints: Callable[[str], str],
     clean_bash_output: Callable[[str], str],
-    format_ask_user_display_fn: Callable[[], Any],
     format_json_result_fn: Callable[[str], str | None],
 ) -> tuple[str, Any]:
     """Compute (kind, value) representation for expanded tool-call content."""
@@ -309,7 +308,7 @@ def compute_tool_call_content(
             explanation = args.get("explanation", "")
             return "raw", format_plan_display(plan_items, explanation)
         elif canonical_tool == "ask_user":
-            return "raw", format_ask_user_display_fn()
+            return "md", clean_hints(result_text or "(No response)")
         elif canonical_tool == "manage_shell":
             action = (args.get("action") or "list").lower()
             if action == "list":

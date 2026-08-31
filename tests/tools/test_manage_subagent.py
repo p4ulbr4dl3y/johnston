@@ -41,7 +41,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool = ManageSubagentTool()
         res_empty = await tool.execute({"action": "list"})
         self.assertEqual(res_empty.content, "[subagents 0]")
-        self.assertIn("No subagent sessions found for current session", res_empty.display)
+        self.assertEqual(res_empty.display, "")
 
         self._mk_subagent("sub-1", "Search files", "find python files", role="explorer")
         self._mk_subagent("sub-2", "Run tests", "run pytest", role="worker", status="completed")
@@ -54,11 +54,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sub-2|completed|worker|Run tests", res.content)
         self.assertIn("sub-3|error|tester|fallback prompt text", res.content)
         self.assertIn("sub-4|cancelled|coder|Cancelled task", res.content)
-        self.assertIn("Explorer", res.display)
-        self.assertIn("RUNNING", res.display)
-        self.assertIn("COMPLETED", res.display)
-        self.assertIn("ERROR", res.display)
-        self.assertIn("CANCELLED", res.display)
+        self.assertEqual(res.display, "")
 
     async def test_kill_action(self):
         tool = ManageSubagentTool()
