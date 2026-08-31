@@ -271,7 +271,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         session.messages = [
             {"type": "user", "text": "First", "show_in_ui": True},
             {"type": "bot", "text": "Resp 0"},
-            {"type": "user", "text": "[System Notification]: bg shell done", "show_in_ui": False},
+            {"type": "user", "text": '<notification type="shell" id="1" title="sh">bg shell done</notification>', "show_in_ui": False},
             {"type": "user", "text": "Second", "show_in_ui": True},
             {"type": "bot", "text": "Resp 1"},
         ]
@@ -314,7 +314,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
             [
                 {"type": "user", "text": "First", "show_in_ui": True},
                 {"type": "bot", "text": "Resp 0"},
-                {"type": "user", "text": "[System Notification]: bg shell done", "show_in_ui": False},
+                {"type": "user", "text": '<notification type="shell" id="1" title="sh">bg shell done</notification>', "show_in_ui": False},
             ],
         )
 
@@ -448,7 +448,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.sm.get.return_value = session
         # Compacted history: checkpoint replaced A+B; only Tail 0 survived.
         app.agent.history = [
-            {"role": "user", "content": "<conversation_checkpoint>\n<summary>early</summary>\n</conversation_checkpoint>"},
+            {"role": "user", "content": "<conversation_checkpoint>\nearly\n</conversation_checkpoint>"},
             {"role": "user", "content": "Tail 0"},
             {"role": "assistant", "content": "Resp"},
         ]

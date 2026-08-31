@@ -435,8 +435,8 @@ class TestSessionInterruptionFiltering:
 
     def test_is_ui_visible_user_message_filters_interruption_note(self):
         normal_msg = {"type": "user", "text": "Can you check this?"}
-        interruption_note = {"type": "user", "text": "[System Note: Response interrupted by user]"}
-        short_interruption_note = {"type": "user", "text": "[System Note: Response interrupted]"}
+        interruption_note = {"type": "user", "text": "<system_note>Response interrupted by user</system_note>"}
+        short_interruption_note = {"type": "user", "text": "<system_note>Response interrupted</system_note>"}
 
         assert is_ui_visible_user_message(normal_msg) is True
         assert is_ui_visible_user_message(interruption_note) is False

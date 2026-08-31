@@ -158,8 +158,6 @@ class LLMSettings:
         sec = data.get("llm") if isinstance(data.get("llm"), dict) else {}
         efforts = sec.get("thinking_efforts") if isinstance(sec.get("thinking_efforts"), dict) else {}
         raw_max_tokens = sec.get("default_max_tokens")
-        if raw_max_tokens == 8192:  # Legacy default migration
-            raw_max_tokens = None
         return cls(
             context_limit=_env_int(
                 "JOHNSTON_CONTEXT_LIMIT",

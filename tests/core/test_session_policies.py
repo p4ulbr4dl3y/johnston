@@ -37,9 +37,9 @@ def _make_store(test_dir: str) -> SessionStore:
 TRANSCRIPT = [
     {"type": "user", "text": "first"},
     {"type": "bot", "text": "reply1"},
-    {"type": "user", "text": "[System Notification] Background shell finished"},
+    {"type": "user", "text": '<notification type="shell" id="1" title="ls">Background shell finished</notification>'},
     {"type": "tool", "tool_type": "shell", "target": "ls", "result_text": "ok"},
-    {"type": "user", "text": "[System Note: Response interrupted by user]"},
+    {"type": "user", "text": "<system_note>Response interrupted by user</system_note>"},
     {"type": "user", "text": "second", "show_in_ui": True},
     {"type": "bot", "text": "reply2"},
     {"type": "user", "text": "third-hidden", "show_in_ui": False},
@@ -50,7 +50,7 @@ HISTORY = [
     {"role": "user", "content": "<conversation_checkpoint>\nEarlier summary."},
     {"role": "assistant", "content": "summary text"},
     {"role": "user", "content": [{"type": "text", "text": "<conversation_checkpoint> list form"}]},
-    {"role": "user", "content": "[System Note: interrupted]"},
+    {"role": "user", "content": "<system_note>interrupted</system_note>"},
     {"role": "user", "content": "first"},
     {"role": "assistant", "content": "reply1"},
     {"role": "user", "content": "second"},
@@ -62,9 +62,10 @@ HISTORY = [
 class TestTranscriptPolicy(unittest.TestCase):
     def test_is_ui_visible_user_message(self):
         self.assertTrue(is_ui_visible_user_message({"type": "user", "text": "hello"}))
+        self.assertTrue(is_ui_visible_user_message({"type": "user", "text": "hi", "show_in_ui": True}))
         self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "hi", "show_in_ui": False}))
-        self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "[System Note: x]"}))
-        self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "[System Notification] y"}))
+        self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "<system_note>x</system_note>"}))
+        self.assertFalse(is_ui_visible_user_message({"type": "user", "text": '<notification type="shell">y</notification>'}))
         self.assertFalse(is_ui_visible_user_message("not a dict"))
         self.assertFalse(is_ui_visible_user_message(None))
 
@@ -78,15 +79,15 @@ class TestTranscriptPolicy(unittest.TestCase):
     def test_drop_stale_system_notes_keeps_notifications(self):
         kept = drop_stale_system_notes(TRANSCRIPT[:6])
         texts = [m.get("text") for m in kept]
-        self.assertIn("[System Notification] Background shell finished", texts)
-        self.assertNotIn("[System Note: Response interrupted by user]", texts)
+        self.assertIn('<notification type="shell" id="1" title="ls">Background shell finished</notification>', texts)
+        self.assertNotIn("<system_note>Response interrupted by user</system_note>", texts)
 
     def test_transcript_before_turn(self):
         kept = transcript_before_turn(TRANSCRIPT, 1)
-        # Notifications are kept; only stale [System Note: entries are dropped.
+        # Notifications are kept; only stale <system_note entries are dropped.
         self.assertEqual(
             [m.get("text") for m in kept if m.get("type") == "user"],
-            ["first", "[System Notification] Background shell finished"],
+            ["first", '<notification type="shell" id="1" title="ls">Background shell finished</notification>'],
         )
 
     def test_transcript_before_turn_unknown_turn_returns_filtered_full(self):
@@ -95,9 +96,8 @@ class TestTranscriptPolicy(unittest.TestCase):
 
 
 class TestHistoryPolicy(unittest.TestCase):
-    def test_is_checkpoint_message_matches_list_content_and_summary(self):
+    def test_is_checkpoint_message_matches_list_content_and_marker(self):
         self.assertTrue(is_checkpoint_message({"role": "user", "content": "<conversation_checkpoint> x"}))
-        self.assertTrue(is_checkpoint_message({"role": "user", "content": "<summary> x"}))
         self.assertTrue(
             is_checkpoint_message({"role": "user", "content": [{"type": "text", "text": "<conversation_checkpoint>"}]})
         )
@@ -105,8 +105,9 @@ class TestHistoryPolicy(unittest.TestCase):
         self.assertFalse(is_checkpoint_message(None))
 
     def test_is_system_note(self):
-        self.assertTrue(is_system_note({"role": "user", "content": "[System Note: x]"}))
-        self.assertFalse(is_system_note({"role": "user", "content": ["[System Note: x]"]}))
+        self.assertTrue(is_system_note({"role": "user", "content": "<system_note>x</system_note>"}))
+        self.assertTrue(is_system_note({"role": "user", "content": '<notification type="shell">x</notification>'}))
+        self.assertFalse(is_system_note({"role": "user", "content": ["<system_note>x</system_note>"]}))
         self.assertFalse(is_system_note("not a dict"))
 
     def test_real_user_turn_excludes_checkpoints_and_notes(self):

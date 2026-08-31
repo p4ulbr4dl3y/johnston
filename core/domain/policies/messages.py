@@ -19,15 +19,10 @@ from typing import Any, List, Optional
 USER_EVENT_TYPE = "user"
 
 TRANSCRIPT_HIDDEN_PREFIXES = (
-    "[System Notification]",
-    "[System Note:",
     "<system_note",
     "<notification",
-    "<task_notification",
-    "<system_notification",
 )
 STALE_NOTE_PREFIX = (
-    "[System Note:",
     "<system_note",
 )
 
@@ -89,13 +84,10 @@ def transcript_before_turn(messages: List[Any], seq_idx: int) -> List[Any]:
 # ---------------------------------------------------------------------------
 
 # Compaction embeds summaries into history as fake user messages.
-HISTORY_CHECKPOINT_MARKERS = ("<conversation_checkpoint>", "<summary>")
+HISTORY_CHECKPOINT_MARKERS = ("<conversation_checkpoint>",)
 HISTORY_NOTE_PREFIX = (
-    "[System Note:",
     "<system_note",
     "<notification",
-    "<task_notification",
-    "<system_notification",
 )
 
 

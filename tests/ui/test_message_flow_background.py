@@ -38,7 +38,7 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             with patch.object(app, "generate_ai_response", side_effect=lambda msg, **k: sent.append(msg)):
                 app.on_background_shell_completed("t1", "ls", "x" * 5000)
             self.assertEqual(len(sent), 1)
-            self.assertIn("Truncated", sent[0])
+            self.assertIn("[truncated", sent[0])
             self.assertIn("x" * 4000, sent[0])
             self.assertNotIn("x" * 5000, sent[0].strip(" \n[].<>"))
 

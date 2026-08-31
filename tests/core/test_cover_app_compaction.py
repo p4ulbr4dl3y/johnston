@@ -204,7 +204,7 @@ async def test_compact_history_report_before_after_same_method():
 async def test_compact_history_previous_summary_from_tags():
     agent = _agent(
         [
-            {"role": "user", "content": "<summary>earlier objective summary</summary>"},
+            {"role": "user", "content": "<conversation_checkpoint>\nearlier objective summary\n</conversation_checkpoint>"},
             {"role": "assistant", "content": "a"},
             {"role": "user", "content": "b"},
             {"role": "assistant", "content": "c"},

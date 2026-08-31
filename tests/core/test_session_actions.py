@@ -262,7 +262,7 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
                 self.messages = [
                     {"type": "user", "text": "Msg 0", "show_in_ui": True},
                     {"type": "bot", "text": "Resp 0"},
-                    {"type": "user", "text": "[System Note: Response interrupted by user]", "show_in_ui": True},
+                    {"type": "user", "text": "<system_note>Response interrupted by user</system_note>", "show_in_ui": True},
                     {"type": "user", "text": "Msg 1", "show_in_ui": True},
                     {"type": "bot", "text": "Resp 1"},
                 ]

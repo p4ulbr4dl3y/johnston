@@ -287,10 +287,10 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
         )
         agent.history = [
-            {"role": "user", "content": "<conversation_checkpoint>\n<summary>earlier work</summary>\n</conversation_checkpoint>"},
+            {"role": "user", "content": "<conversation_checkpoint>\nearlier work\n</conversation_checkpoint>"},
             {"role": "user", "content": "Tail 0"},
             {"role": "assistant", "content": "Resp 0"},
-            {"role": "user", "content": "[System Note: Response interrupted by user]"},
+            {"role": "user", "content": "<system_note>Response interrupted by user</system_note>"},
             {"role": "user", "content": "Tail 1"},
             {"role": "assistant", "content": "Resp 1"},
         ]
@@ -299,7 +299,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
         # are not user turns). Truncate to the 2nd real user turn -> keep Tail 0.
         agent.truncate_history_to_user_message(1)
         contents = [m["content"] for m in agent.history]
-        self.assertEqual(contents, ["<conversation_checkpoint>\n<summary>earlier work</summary>\n</conversation_checkpoint>", "Tail 0", "Resp 0"])
+        self.assertEqual(contents, ["<conversation_checkpoint>\nearlier work\n</conversation_checkpoint>", "Tail 0", "Resp 0"])
 
         # Truncate to the 1st real user turn -> drops the checkpoint too.
         agent.truncate_history_to_user_message(0)
@@ -310,7 +310,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
         )
         agent.history = [
-            {"role": "user", "content": "<conversation_checkpoint>\n<summary>earlier work</summary>\n</conversation_checkpoint>"},
+            {"role": "user", "content": "<conversation_checkpoint>\nearlier work\n</conversation_checkpoint>"},
             {"role": "user", "content": "Tail 0"},
             {"role": "assistant", "content": "Resp 0"},
         ]
