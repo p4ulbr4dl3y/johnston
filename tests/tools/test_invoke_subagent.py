@@ -211,8 +211,8 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         # Clipped and annotated with a pointer to the full session log
         self.assertLess(len(result), len(long_text))
         self.assertTrue(result.startswith("x" * MAX_SUBAGENT_RESULT_CHARS))
-        self.assertIn("Truncated:", result)
-        self.assertIn("Next: read(path=", result)
+        self.assertIn("truncated", result)
+        self.assertIn("next read(path=", result)
 
     def test_truncate_subagent_result_with_session_id(self):
         long_text = "x" * (MAX_SUBAGENT_RESULT_CHARS + 500)

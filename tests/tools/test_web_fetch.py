@@ -126,8 +126,8 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com/long"})
 
-        self.assertIn("Truncated", res.content)
-        self.assertIn("Log: ", res.content)
+        self.assertIn("truncated", res.content)
+        self.assertIn("log ", res.content)
 
 
     async def test_convert_content_to_md_sync(self):
@@ -283,9 +283,9 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com/page"})
-        self.assertIn("Truncated", res.content)
+        self.assertIn("truncated", res.content)
         self.assertIn("type md", res.content)
-        self.assertIn("Log: ", res.content)
+        self.assertIn("log ", res.content)
         self.assertIn(".md", res.content)
 
     @patch("httpx.AsyncClient")
@@ -295,9 +295,9 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = await tool.execute({"url": "https://example.com/raw_page", "raw": True})
-        self.assertIn("Truncated", res.content)
+        self.assertIn("truncated", res.content)
         self.assertIn("type html", res.content)
-        self.assertIn("Log: ", res.content)
+        self.assertIn("log ", res.content)
         self.assertIn(".html", res.content)
 
 

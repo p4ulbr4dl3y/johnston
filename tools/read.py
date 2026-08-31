@@ -350,13 +350,13 @@ class ReadTool(BaseTool):
                             if text is not None:
                                 out_parts.append(text)
                             elif c.get("blob") is not None:
-                                out_parts.append(f"[Binary Blob: {c.get('mimeType', 'unknown')}]")
+                                out_parts.append(f"[blob {c.get('mimeType', 'unknown')}]")
                             else:
                                 out_parts.append(str(c))
                         else:
                             out_parts.append(str(c))
                     return ToolResult.done(
-                        content="\n".join(out_parts).strip() or "[Empty Resource]",
+                        content="\n".join(out_parts).strip() or "[resource empty]",
                         display=f"Resource {raw_path}",
                     )
             except Exception as e:

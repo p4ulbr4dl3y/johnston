@@ -9,8 +9,8 @@ class TestTruncateOutput(unittest.TestCase):
         large_text = "A" * 5000
         res = truncate_output(large_text, max_chars=1000)
 
-        self.assertIn("Log:", res)
-        self.assertIn("Next: read(path=", res)
+        self.assertIn("log ", res)
+        self.assertIn("next read(path=", res)
         log_path = (
             [word for word in res.split() if word.endswith(".log") or ".log." in word or ".log]" in word or ".log|" in word or word.endswith(".log'")][0]
             .rstrip(".")
@@ -26,8 +26,8 @@ class TestTruncateOutput(unittest.TestCase):
     def test_truncate_output_start_line_hint(self):
         multi_line_text = "\n".join([f"Line {i}" for i in range(1, 200)])
         res = truncate_output(multi_line_text, max_chars=100)
-        self.assertIn("lines 1-", res)
-        self.assertIn("Next: read(path=", res)
+        self.assertIn("lines 1..", res)
+        self.assertIn("next read(path=", res)
         self.assertIn("start_line=", res)
 
     def test_truncate_output_unique_log_per_tool(self):
@@ -68,7 +68,7 @@ class TestTruncateOutput(unittest.TestCase):
         self.assertNotIn("\n", single_line_json)
 
         res = truncate_output(single_line_json, max_chars=100, tool_name="mcp_test")
-        self.assertIn("Log:", res)
+        self.assertIn("log ", res)
         self.assertIn(".json", res)
 
         log_path = [word for word in res.split() if ".json" in word][0].rstrip(".").rstrip("'")
@@ -100,7 +100,7 @@ class TestTruncateOutput(unittest.TestCase):
         cfg = JohnstonSettings(tools=ToolsSettings(max_tool_output_chars=10))
         with mock.patch("core.infrastructure.config.settings.get_settings", return_value=cfg):
             res = truncate_output("X" * 100, tool_name="cap")
-        self.assertIn("Log:", res)
+        self.assertIn("log ", res)
 
     def test_truncate_output_clips_log_at_max_size(self):
         import unittest.mock as mock
@@ -115,8 +115,8 @@ class TestTruncateOutput(unittest.TestCase):
         with open(log_path, "r", encoding="utf-8") as f:
             log_content = f.read()
 
-        self.assertIn("snapshot clipped at max size", log_content)
-        self.assertTrue(len(log_content) <= 1000 + len("\n... [snapshot clipped at max size]\n"))
+        self.assertIn("snapshot clipped | max size", log_content)
+        self.assertTrue(len(log_content) <= 1000 + len("\n... [snapshot clipped | max size]\n"))
 
     def test_truncate_output_mcp_name_has_no_duplicate_prefix(self):
         res = truncate_output("M" * 5000, max_chars=100, tool_name="mcp_huge_tool")
@@ -152,8 +152,8 @@ class TestTruncateOutput(unittest.TestCase):
             save_log=False,
             log_path="/path/to/custom.log",
         )
-        self.assertIn("Log: /path/to/custom.log", res_end)
-        self.assertIn("Truncated: last 30 chars", res_end)
+        self.assertIn("log /path/to/custom.log", res_end)
+        self.assertIn("last 30 chars", res_end)
 
         # from_end=False with explicit log_path and save_log=False
         res_lead = truncate_output(
@@ -163,5 +163,5 @@ class TestTruncateOutput(unittest.TestCase):
             save_log=False,
             log_path="/path/to/custom.log",
         )
-        self.assertIn("Log: /path/to/custom.log", res_lead)
-        self.assertIn("Next: read(path='/path/to/custom.log'", res_lead)
+        self.assertIn("log /path/to/custom.log", res_lead)
+        self.assertIn("next read(path='/path/to/custom.log'", res_lead)

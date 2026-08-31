@@ -35,7 +35,7 @@ def _sandbox_fallback_notice(ctx: Any) -> str:
     except Exception:
         pass
     logger.warning("sandbox enabled but no usable backend on %s; command ran unsandboxed", platform.system())
-    return "[sandbox unavailable on this platform: executed unsandboxed]\n"
+    return "[sandbox unavailable | executed unsandboxed]\n"
 
 
 def _new_task_id() -> str:

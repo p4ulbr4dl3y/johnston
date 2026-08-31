@@ -285,7 +285,7 @@ async def test_move_to_background_truncated_output(tool, make_app_mock, make_too
         res = await exec_task
         assert "task backgrounded" in res.content
         assert "Recent Output:" in res.content
-        assert "Truncated: last 2000 chars" in res.content
+        assert "last 2000 chars" in res.content
 
 
 async def test_main_sync_task_visible_and_running_while_alive(tool, make_app_mock, make_tool_context):
@@ -633,7 +633,7 @@ def _ctx(make_tool_context, cwd=None, is_subagent=True):
     return make_tool_context(is_subagent=is_subagent, cwd=cwd)
 
 
-_SANDBOX_NOTICE = "[sandbox unavailable on this platform: executed unsandboxed]\n"
+_SANDBOX_NOTICE = "[sandbox unavailable | executed unsandboxed]\n"
 
 
 def _plain(res) -> str:
@@ -850,7 +850,7 @@ async def test_crlf_normalized(tool, make_tool_context):
 async def test_very_large_output_truncated(tool, make_tool_context):
     cmd = "python3 -c 'import sys; sys.stdout.write(\"X\"*6000)'" if os.name != "nt" else "echo"
     res = str(await tool.execute({"command": cmd}, ctx=_ctx(make_tool_context)))
-    assert "Truncated:" in res
+    assert "truncated" in res
     assert "X" * 3900 in res  # tail preserved near 4000-char limit
 
 

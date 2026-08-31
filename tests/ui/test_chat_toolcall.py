@@ -96,10 +96,10 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(format_truncation_for_ui(recent), "[Output truncated: showing recent output]\nsome output")
 
         # New unified pipe-separated format
-        pipe_footer = "file text\n... [Truncated: lines 1-100 of 500 | Log: /path/to/log.json | Next: read(path='/path/to/log.json', start_line=101)]"
+        pipe_footer = "file text\n... [truncated | lines 1..100 of 500 | log /path/to/log.json | next read(path='/path/to/log.json', start_line=101)]"
         self.assertEqual(
             format_truncation_for_ui(pipe_footer),
-            "file text\n... [Truncated: lines 1-100 of 500 | Log: /path/to/log.json]",
+            "file text\n... [truncated | lines 1..100 of 500 | log /path/to/log.json]",
         )
 
         # Double cleaning / idempotency

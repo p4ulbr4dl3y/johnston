@@ -162,7 +162,7 @@ def _write_output_log(
     if max_bytes is None:
         max_bytes = _max_snapshot_log_bytes()
     if len(content) > max_bytes:
-        content = content[:max_bytes] + "\n... [snapshot clipped at max size]\n"
+        content = content[:max_bytes] + "\n... [snapshot clipped | max size]\n"
 
     def _write() -> None:
         os.makedirs(LOGS_DIR, exist_ok=True)
@@ -229,13 +229,13 @@ def truncate_output(
         shown_lines = truncated.count("\n") + (1 if truncated else 0)
         start_line_shown = max(1, total_lines - shown_lines + 1)
         if total_lines > 1:
-            line_info = f"lines {start_line_shown}-{total_lines} of {total_lines}"
+            line_info = f"lines {start_line_shown}..{total_lines} of {total_lines}"
         else:
             line_info = f"{shown_lines} lines"
 
-        parts = [f"Truncated: last {max_chars} chars ({line_info})"]
+        parts = ["truncated", f"last {max_chars} chars ({line_info})"]
         if log_path:
-            parts.append(f"Log: {log_path}")
+            parts.append(f"log {log_path}")
         if hint:
             parts.append(hint)
         header = f"[{' | '.join(parts)}]\n...\n"
@@ -246,20 +246,20 @@ def truncate_output(
         truncated, shown_lines = truncate_leading(text, max_chars)
         next_line = shown_lines + 1
         if total_lines > 1:
-            line_info = f"lines 1-{shown_lines} of {total_lines}"
+            line_info = f"lines 1..{shown_lines} of {total_lines}"
         else:
             line_info = f"{shown_lines} lines"
 
-        parts = [f"Truncated: {line_info}"]
+        parts = ["truncated", line_info]
         if log_path:
-            parts.append(f"Log: {log_path}")
+            parts.append(f"log {log_path}")
             if "\n" not in text:
-                parts.append(f"Next: read(path='{log_path}', content_offset={max_chars})")
+                parts.append(f"next read(path='{log_path}', content_offset={max_chars})")
             else:
-                parts.append(f"Next: read(path='{log_path}', start_line={next_line})")
+                parts.append(f"next read(path='{log_path}', start_line={next_line})")
         if hint:
             parts.append(hint)
-        footer = f"\n... [{ ' | '.join(parts) }]"
+        footer = f"\n... [{' | '.join(parts)}]"
         return truncated + footer
 
 

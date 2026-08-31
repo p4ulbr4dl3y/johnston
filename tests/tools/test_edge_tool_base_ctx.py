@@ -46,7 +46,7 @@ class TestTruncateTailEdge(unittest.TestCase):
 
     def test_truncate_negative_max_chars(self):
         res = truncate_output("hello", -5, save_log=False)
-        self.assertIn("Truncated:", res)
+        self.assertIn("truncated", res)
 
     def test_truncate_does_not_break_surrogate(self):
         # 4-byte emoji sliced mid-character must remain valid UTF-8
@@ -56,14 +56,14 @@ class TestTruncateTailEdge(unittest.TestCase):
 
     def test_truncate_zero(self):
         res = truncate_output("abc", max_chars=0, save_log=False)
-        self.assertIn("Truncated:", res)
+        self.assertIn("truncated", res)
 
     def test_truncate_unicode_short(self):
         self.assertEqual(truncate_output("привет", max_chars=100, save_log=False), "привет")
 
     def test_truncate_huge(self):
         res = truncate_output("x" * 100_000, max_chars=100, save_log=False)
-        self.assertIn("Truncated:", res)
+        self.assertIn("truncated", res)
 
 
 class TestFormatEdge(unittest.TestCase):

@@ -206,7 +206,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         long_text = "a" * 100
         truncated = truncate_output(long_text, max_chars=10, hint="Use line ranges.", save_log=False)
         self.assertTrue(truncated.startswith("aaaaaaaaaa"))
-        self.assertIn("Truncated: 1 lines", truncated)
+        self.assertIn("truncated | 1 lines", truncated)
         self.assertIn("Use line ranges.", truncated)
 
 

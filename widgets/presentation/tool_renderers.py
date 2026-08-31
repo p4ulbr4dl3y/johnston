@@ -20,12 +20,14 @@ def clean_truncation_marker(match: re.Match) -> str:
         parts = [p.strip() for p in inner.split("|") if p.strip()]
         ui_parts = []
         for p in parts:
-            if re.match(r"^Next:\s*", p, re.IGNORECASE):
+            if re.match(r"^(?:Next:?|next)\s*", p, re.IGNORECASE):
                 continue
             if re.match(r"^Use\s+.*to inspect", p, re.IGNORECASE):
                 continue
             ui_parts.append(p)
         if ui_parts:
+            if tag_name.lower() == "truncated":
+                return f"{prefix}[truncated | {' | '.join(ui_parts)}]"
             return f"{prefix}[{tag_name}: {' | '.join(ui_parts)}]"
     showing_match = re.search(
         r"showing\s+(?:first|last|recent)\s+[^\s.(),|]+(?:\s+chars|\s+output)?",
