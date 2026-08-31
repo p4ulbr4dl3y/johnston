@@ -5,13 +5,12 @@ the tasks/subagents, resume, rewind, MCP and diff-sidebar lists. All padding
 math uses visible terminal-cell width (``rich.cells.cell_len``), so wide/CJK
 characters keep the badge flush right instead of drifting.
 
-Layout constants mirror ``app.tcss`` geometry (OptionList options render
-with Textual's default ``padding: 0 1``, so 2 columns are subtracted):
-- ``modal-dialog-medium``: max-width 86 - dialog padding 2x2 - border 2
-  - option padding 2x1 = 78.
-- ``modal-dialog`` (default): max-width 78 - dialog padding 2x2 - border 2
-  - option padding 2x1 = 70.
-- diff sidebar: CSS width 34 - border-right 1 - option padding 2x1 = 31.
+Layout constants mirror ``app.tcss`` geometry (modal OptionList options render
+with ``padding: 0`` so badges sit flush against the dialog boundary):
+- ``modal-dialog-wide``: max-width 104 - dialog padding 2x2 - border 2 = 98.
+- ``modal-dialog-medium``: max-width 86 - dialog padding 2x2 - border 2 = 80.
+- ``modal-dialog`` (default): max-width 78 - dialog padding 2x2 - border 2 = 72.
+- diff sidebar: CSS width 32 - border-right 1 = 31.
 """
 import time
 from typing import Any
@@ -20,9 +19,9 @@ from rich.cells import cell_len
 from rich.markup import escape
 from rich.text import Text
 
-MODAL_WIDE_ROW_WIDTH = 96
-MODAL_MEDIUM_ROW_WIDTH = 78
-MODAL_DEFAULT_ROW_WIDTH = 70
+MODAL_WIDE_ROW_WIDTH = 98
+MODAL_MEDIUM_ROW_WIDTH = 80
+MODAL_DEFAULT_ROW_WIDTH = 72
 DIFF_SIDEBAR_ROW_WIDTH = 31
 
 
@@ -98,14 +97,13 @@ def format_cost(cost_usd: float | int | None) -> str:
 def option_list_row_width(opt_list: Any, default: int) -> int:
     """Visible content width of a mounted OptionList for badge padding math.
 
-    Subtracts Textual's OptionList option padding (0 1 -> 2 cells) from the
-    widget width. When unmounted or before layout, clamps ``default`` against
+    When unmounted or before layout, clamps ``default`` against
     the screen width so narrow terminals don't overflow even on initial draw.
     """
     try:
         width = opt_list.size.width
-        if isinstance(width, int) and width > 20:
-            return max(20, width - 2)
+        if isinstance(width, int) and width > 0:
+            return max(20, width)
     except Exception:
         pass
 

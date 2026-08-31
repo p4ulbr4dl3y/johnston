@@ -95,7 +95,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         self.raw_items.append(REWIND_CURRENT_STATE)
         self.filtered_options = list(options)
         self.filtered_items = list(self.raw_items)
-        self.default_value = REWIND_CURRENT_STATE
+        self.default_value = user_messages[-1].index if user_messages else REWIND_CURRENT_STATE
         self.option_list_id = MODAL_OPTION_LIST_ID
 
     def _row_width(self) -> int:
@@ -111,13 +111,11 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             clean = " ".join(m.text.replace("\n", " ").replace("\r", " ").split())
             if not clean:
                 clean = "(empty message)"
-            clean_preview = ellipsize(clean, 60)
-            clean_escaped = escape(clean_preview)
             badge_plain = (m.git_stats or "no checkpoint") if self.checkpoints_enabled else ""
             if self.checkpoints_enabled and badge_plain:
-                options.append(format_badge_row(clean_escaped, badge_plain, target_width=target_width))
+                options.append(format_badge_row(clean, badge_plain, target_width=target_width))
             else:
-                options.append(clean_escaped)
+                options.append(escape(ellipsize(clean, max(10, target_width))))
         options.append("Current state [dim](cancel rollback)[/]")
         return options
 

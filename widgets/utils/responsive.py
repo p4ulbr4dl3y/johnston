@@ -45,8 +45,8 @@ MODAL_MEDIUM_MAX_WIDTH = 86
 MODAL_WIDE_MAX_WIDTH = 104
 MODAL_WIDTH_RATIO = 0.9
 
-# dialog padding (1 2) + border (2) + option row padding (0 1): 4 + 2 + 2
-MODAL_CONTENT_GUTTER = 8
+# dialog padding (1 2) + border (2): 4 + 2
+MODAL_CONTENT_GUTTER = 6
 
 _MARKUP_RE = re.compile(r"[#*`]")
 

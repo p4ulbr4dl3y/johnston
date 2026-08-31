@@ -164,7 +164,7 @@ class TestDiffScreenCoverage(unittest.IsolatedAsyncioTestCase):
             mock_sidebar = MagicMock()
             mock_sidebar.size.width = 40
             screen.query_one = MagicMock(return_value=mock_sidebar)
-            self.assertEqual(screen._sidebar_row_width(), 37)
+            self.assertEqual(screen._sidebar_row_width(), 39)
 
             # Query one fails -> fallback to default DIFF_SIDEBAR_ROW_WIDTH
             screen.query_one = MagicMock(side_effect=Exception("not found"))
@@ -477,22 +477,22 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
         # manage_shell send_input
         screen_ms = PermissionConfirmScreen("manage_shell", {"action": "send_input", "input": "yes\nall\n"})
         w2 = screen_ms._calculate_content_width()
-        self.assertGreaterEqual(w2, 40)
+        self.assertGreaterEqual(w2, 38)
 
         # manage_subagent send_message
         screen_sub = PermissionConfirmScreen("manage_subagent", {"action": "send_message", "message": "hello\nworld\n"})
         w3 = screen_sub._calculate_content_width()
-        self.assertGreaterEqual(w3, 40)
+        self.assertGreaterEqual(w3, 38)
 
         # invoke_subagent prompt
         screen_sub_prompt = PermissionConfirmScreen("invoke_subagent", {"prompt": "line1\nline2\n"})
         w4 = screen_sub_prompt._calculate_content_width()
-        self.assertGreaterEqual(w4, 40)
+        self.assertGreaterEqual(w4, 38)
 
         # generic args dict
         screen_gen = PermissionConfirmScreen("custom", {"k": "v"})
         w5 = screen_gen._calculate_content_width()
-        self.assertGreaterEqual(w5, 40)
+        self.assertGreaterEqual(w5, 38)
 
 
 class TestHelpScreenCoverage(unittest.IsolatedAsyncioTestCase):

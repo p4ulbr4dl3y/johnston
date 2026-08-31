@@ -464,7 +464,7 @@ class TestModalFitPilot:
 
     async def test_session_conflict_hugs_content(self):
         width = await self._dialog_width(SessionConflictScreen("sess-1"), (120, 40))
-        assert width == MODAL_COMPACT_MAX_WIDTH == 56
+        assert width == 54
 
     async def test_session_conflict_respects_ratio_cap_on_narrow_terminal(self):
         width = await self._dialog_width(SessionConflictScreen("sess-1"), (46, 20))

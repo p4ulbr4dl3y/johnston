@@ -851,7 +851,7 @@ DiffScreen {
 
 #diff-file-list > .option-list--option {
     background: transparent;
-    padding: 0 1;
+    padding: 0;
     text-wrap: nowrap;
 }
 
@@ -1007,6 +1007,7 @@ ModalScreen OptionList:hover {
 ModalScreen OptionList > .option-list--option {
     background: transparent;
     color: $fg-secondary;
+    padding: 0;
     text-wrap: nowrap;
 }
 
@@ -1020,6 +1021,7 @@ ModalScreen OptionList > .option-list--option {
 #modal-dialog.wizard-dialog OptionList > .option-list--option,
 #modal-dialog.wizard-dialog HeaderWrapOptionList > .option-list--option,
 #options-list > .option-list--option {
+    padding: 0;
     text-wrap: nowrap;
 }
 

@@ -129,31 +129,28 @@ class TestIsSubagentRunning(unittest.TestCase):
 
 class TestDiffSidebarWidthConstant(unittest.TestCase):
     def test_constant_matches_css_geometry(self):
-        # app.tcss: #diff-sidebar width 34 - border-right 1 - option padding 2x1.
+        # app.tcss: #diff-sidebar width 32 - border-right 1.
         self.assertEqual(DIFF_SIDEBAR_ROW_WIDTH, 31)
 
 
 class TestDialogWidthConstants(unittest.TestCase):
     def test_modal_widths_account_for_option_padding(self):
-        # Modal OptionList options render with Textual default padding 0 1;
-        # rows wider than the remaining text area get ellipsized by CSS.
-        self.assertEqual(MODAL_WIDE_ROW_WIDTH, 96)  # 104 - 4 - 2 - 2
-        self.assertEqual(MODAL_MEDIUM_ROW_WIDTH, 78)  # 86 - 4 - 2 - 2
-        self.assertEqual(MODAL_DEFAULT_ROW_WIDTH, 70)  # 78 - 4 - 2 - 2
+        # Modal OptionList options render with padding 0.
+        self.assertEqual(MODAL_WIDE_ROW_WIDTH, 98)  # 104 - 4 - 2
+        self.assertEqual(MODAL_MEDIUM_ROW_WIDTH, 80)  # 86 - 4 - 2
+        self.assertEqual(MODAL_DEFAULT_ROW_WIDTH, 72)  # 78 - 4 - 2
 
 
 class TestOptionListRowWidth(unittest.TestCase):
-    def test_mounted_widget_subtracts_option_padding(self):
+    def test_mounted_widget_uses_full_width(self):
         widget = MagicMock()
         widget.size.width = 60
-        # 60 - 2 = 58
-        self.assertEqual(option_list_row_width(widget, default=78), 58)
+        self.assertEqual(option_list_row_width(widget, default=80), 60)
 
     def test_mounted_widget_clamps_at_minimum_20(self):
         widget = MagicMock()
-        widget.size.width = 21
-        # max(20, 21 - 2) = 20
-        self.assertEqual(option_list_row_width(widget, default=78), 20)
+        widget.size.width = 19
+        self.assertEqual(option_list_row_width(widget, default=80), 20)
 
     def test_unmounted_widget_clamps_against_screen_width(self):
         widget = MagicMock()
@@ -161,8 +158,8 @@ class TestOptionListRowWidth(unittest.TestCase):
         app = MagicMock()
         app.size.width = 80
         widget.app = app
-        # 80 * 0.9 - 8 = 64
-        self.assertEqual(option_list_row_width(widget, default=78), 64)
+        # 80 * 0.9 - 6 = 66
+        self.assertEqual(option_list_row_width(widget, default=80), 66)
 
     def test_unmounted_widget_wide_screen_uses_default(self):
         widget = MagicMock()
@@ -170,14 +167,14 @@ class TestOptionListRowWidth(unittest.TestCase):
         app = MagicMock()
         app.size.width = 120
         widget.app = app
-        # 120 * 0.9 - 8 = 100 > 78 -> returns 78
-        self.assertEqual(option_list_row_width(widget, default=78), 78)
+        # 120 * 0.9 - 6 = 102 > 80 -> returns 80
+        self.assertEqual(option_list_row_width(widget, default=80), 80)
 
     def test_unmounted_no_size_info_clamps_to_default_terminal(self):
         widget = object()
-        # Default terminal is 80 -> cap is 64; 78 clamped to 64
-        self.assertEqual(option_list_row_width(widget, default=78), 64)
-        # Small default (e.g. 50 < 64) remains 50
+        # Default terminal is 80 -> cap is 66; 80 clamped to 66
+        self.assertEqual(option_list_row_width(widget, default=80), 66)
+        # Small default (e.g. 50 < 66) remains 50
         self.assertEqual(option_list_row_width(widget, default=50), 50)
 
 

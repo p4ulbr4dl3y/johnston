@@ -35,7 +35,7 @@ class TestResumeScreenAdaptivity(unittest.TestCase):
     def test_refresh_options_adapts_to_narrow_width(self):
         screen = ResumeScreen(self.sessions, current_session_id="sess-1")
         opt_list = MagicMock()
-        opt_list.size.width = 46  # 46 - 2 = 44 usable row width
+        opt_list.size.width = 44
         opt_list.highlighted = 0
         screen.query_one = MagicMock(return_value=opt_list)
 
@@ -79,7 +79,7 @@ class TestRewindScreenAdaptivity(unittest.TestCase):
     def test_refresh_step1_adapts_to_narrow_width(self):
         screen = RewindScreen(self.messages, checkpoints_enabled=True)
         opt_list = MagicMock()
-        opt_list.size.width = 50  # 50 - 2 = 48 usable width
+        opt_list.size.width = 48
         opt_list.highlighted = 0
         screen.query_one = MagicMock(return_value=opt_list)
 
