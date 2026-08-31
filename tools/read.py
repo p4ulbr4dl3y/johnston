@@ -13,7 +13,7 @@ from tools.utils import DEFAULT_LINE_WINDOW, get_max_tool_payload_bytes
 
 logger = logging.getLogger(__name__)
 
-DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".epub", ".ipynb"}
+DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".xlsm", ".ppsx", ".epub", ".ipynb"}
 _DOC_CACHE: "OrderedDict[str, Tuple[float, float, str]]" = OrderedDict()  # key: path, val: (mtime, timestamp, md_text)
 MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes
