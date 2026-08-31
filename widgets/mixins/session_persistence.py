@@ -104,12 +104,15 @@ class SessionPersistenceMixin:
                 try:
                     from widgets.presentation.widgets.plan_notch import PlanNotch
 
-                    notch = self.query_one(PlanNotch)
+                    notches = list(self.query(PlanNotch))
+                    if not notches and hasattr(self, "screen") and self.screen:
+                        notches = list(self.screen.query(PlanNotch))
                     cur_plan = getattr(self, "current_plan", None)
-                    if cur_plan:
-                        notch.set_plan(cur_plan, getattr(self, "current_plan_explanation", ""))
-                    else:
-                        notch.clear_plan()
+                    for notch in notches:
+                        if cur_plan:
+                            notch.set_plan(cur_plan, getattr(self, "current_plan_explanation", ""))
+                        else:
+                            notch.clear_plan()
                 except Exception:
                     pass
 
@@ -132,6 +135,8 @@ class SessionPersistenceMixin:
             except Exception:
                 self.agent = None
 
+        if self.agent is not None:
+            self.agent.app = self
         if self.agent is not None and hasattr(self.agent, "history"):
             self.agent.history = session.agent_history
             self.agent.tokens_input = session.tokens_input

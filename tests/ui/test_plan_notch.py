@@ -10,6 +10,11 @@ class TestPlanNotch(unittest.TestCase):
     def test_init_and_toggle(self):
         notch = PlanNotch()
         self.assertFalse(notch.is_expanded)
+        # Empty notch should not expand
+        notch.toggle_expanded()
+        self.assertFalse(notch.is_expanded)
+
+        notch.set_plan([{"step": "Step 1", "status": "pending"}])
         notch.toggle_expanded()
         self.assertTrue(notch.is_expanded)
         notch.on_click()
@@ -139,10 +144,26 @@ class TestPlanNotch(unittest.TestCase):
 
 
 @pytest.mark.asyncio
+async def test_action_toggle_plan_empty_notifies_pilot():
+    app = JohnstonApp()
+    async with app.run_test() as pilot:
+        notch = app.query_one(PlanNotch)
+        assert not notch.plan_items
+        app.action_toggle_plan()
+        assert not notch.is_expanded
+        assert not notch.display
+        await pilot.press("ctrl+p")
+        assert not notch.is_expanded
+        assert not notch.display
+
+
+@pytest.mark.asyncio
 async def test_action_toggle_plan_pilot():
     app = JohnstonApp()
     async with app.run_test() as pilot:
         notch = app.query_one(PlanNotch)
+        plan = [{"step": "Step 1", "status": "in_progress"}]
+        app.on_plan_update(plan, "Running")
         self_expanded_initial = notch.is_expanded
         app.action_toggle_plan()
         self_expanded_after = notch.is_expanded

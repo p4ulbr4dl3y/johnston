@@ -47,6 +47,9 @@ class SubagentViewScreen(ModalScreen[None]):
         """Toggle expansion of the top plan notch widget."""
         try:
             notch = self.query_one(PlanNotch)
+            if not notch.plan_items:
+                self.notify("No active plan", severity="information")
+                return
             notch.toggle_expanded()
         except Exception:
             pass

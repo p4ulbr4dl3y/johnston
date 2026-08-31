@@ -102,6 +102,46 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("plan updated (1/1 completed)", res.content)
         self.assertIn("plan updated (1/1 completed)", res.display)
 
+    async def test_update_plan_json_string_payload(self):
+        tool = UpdatePlanTool()
+        args = {
+            "plan": '[{"step": "Step 1", "status": "completed"}, {"step": "Step 2", "status": "in_progress"}]'
+        }
+        res = await tool.execute(args)
+        self.assertIn("plan updated (1/2 completed)", res.content)
+
+    async def test_update_plan_nested_agent_host_integration(self):
+        class MockApp:
+            def __init__(self):
+                self.updated = False
+                self.current_plan = None
+                self.current_plan_explanation = None
+
+            def on_plan_update(self, plan, explanation):
+                self.updated = True
+
+        class MockAgent:
+            def __init__(self, host_app):
+                self.app = host_app
+                self.current_plan = None
+                self.current_plan_explanation = None
+
+        app = MockApp()
+        agent = MockAgent(app)
+        tool = UpdatePlanTool()
+        res = await tool.execute(
+            {
+                "explanation": "Nested test",
+                "plan": [{"step": "Step 1", "status": "completed"}],
+            },
+            ctx=agent,
+        )
+        self.assertIn("plan updated (1/1 completed)", res.content)
+        self.assertTrue(app.updated)
+        self.assertEqual(app.current_plan_explanation, "Nested test")
+        self.assertEqual(agent.current_plan_explanation, "Nested test")
+
 
 if __name__ == "__main__":
     unittest.main()
+

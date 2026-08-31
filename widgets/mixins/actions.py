@@ -51,7 +51,16 @@ class ActionsMixin:
         try:
             from widgets.presentation.widgets.plan_notch import PlanNotch
 
-            notch = self.query_one(PlanNotch)
+            notches = list(self.query(PlanNotch))
+            if not notches and hasattr(self, "screen") and self.screen:
+                notches = list(self.screen.query(PlanNotch))
+            if not notches:
+                return
+            notch = notches[0]
+            if not notch.plan_items:
+                if hasattr(self, "notify"):
+                    self.notify("No active plan", severity="information")
+                return
             notch.toggle_expanded()
         except Exception:
             pass
@@ -74,8 +83,11 @@ class ActionsMixin:
         try:
             from widgets.presentation.widgets.plan_notch import PlanNotch
 
-            notch = self.query_one(PlanNotch)
-            notch.set_plan(validated_plan, self.current_plan_explanation)
+            notches = list(self.query(PlanNotch))
+            if not notches and hasattr(self, "screen") and self.screen:
+                notches = list(self.screen.query(PlanNotch))
+            for notch in notches:
+                notch.set_plan(validated_plan, self.current_plan_explanation)
         except Exception:
             pass
 

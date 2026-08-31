@@ -49,6 +49,16 @@ class UpdatePlanTool(BaseTool):
         raw_plan = args.get("plan")
         explanation = str(args.get("explanation") or "").strip()
 
+        if isinstance(raw_plan, str):
+            import json
+
+            try:
+                parsed = json.loads(raw_plan)
+                if isinstance(parsed, list):
+                    raw_plan = parsed
+            except Exception:
+                pass
+
         if not raw_plan or not isinstance(raw_plan, list):
             return ToolResult.error("params", name="plan", detail="must be non-empty")
 
@@ -75,10 +85,16 @@ class UpdatePlanTool(BaseTool):
             return ToolResult.error("params", name="plan", detail="items need 'step'/'status'")
 
         # Store active plan in app state if app exists
-        if ctx.host:
-            setattr(ctx.host, "current_plan", validated_plan)
-            setattr(ctx.host, "current_plan_explanation", explanation)
-            on_plan_update = getattr(ctx.host, "on_plan_update", None)
+        host = ctx.host
+        if host:
+            app_target = getattr(host, "app", None) or host
+            setattr(host, "current_plan", validated_plan)
+            setattr(host, "current_plan_explanation", explanation)
+            if app_target is not host:
+                setattr(app_target, "current_plan", validated_plan)
+                setattr(app_target, "current_plan_explanation", explanation)
+
+            on_plan_update = getattr(app_target, "on_plan_update", None) or getattr(host, "on_plan_update", None)
             if callable(on_plan_update):
                 try:
                     on_plan_update(validated_plan, explanation)

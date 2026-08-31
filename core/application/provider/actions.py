@@ -52,6 +52,7 @@ def _recreate_agent(pm: ProviderManager, on_recreate: Any = None, provider_key: 
             agent = None
         if agent is not None:
             on_recreate.agent = agent
+            agent.app = on_recreate
             if hasattr(agent, "role") and hasattr(on_recreate, "role"):
                 agent.role = on_recreate.role
         if hasattr(on_recreate, "refresh_status_footer"):

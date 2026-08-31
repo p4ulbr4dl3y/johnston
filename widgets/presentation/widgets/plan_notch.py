@@ -65,6 +65,12 @@ class PlanNotch(Static):
         self.refresh_notch()
 
     def toggle_expanded(self) -> None:
+        if not self.plan_items:
+            self.display = False
+            self.is_expanded = False
+            self.remove_class("expanded")
+            self.refresh_notch()
+            return
         if not self.display:
             self.display = True
             self.is_expanded = True
