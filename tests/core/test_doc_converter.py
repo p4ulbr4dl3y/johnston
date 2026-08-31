@@ -14,7 +14,6 @@ from core.infrastructure.converter import (
     convert_file,
     is_convertible,
 )
-from core.infrastructure.converter.csv_tsv import csv_to_markdown
 from core.infrastructure.converter.docx import docx_to_markdown
 from core.infrastructure.converter.epub import epub_to_markdown
 from core.infrastructure.converter.html import html_to_markdown
@@ -172,58 +171,6 @@ class TestHTMLToMarkdown(unittest.TestCase):
         latin_bytes = b"<h1>Header</h1><p>\xe9\xe0\xfc</p>"
         md_latin = html_to_markdown(latin_bytes)
         self.assertIn("# Header", md_latin)
-
-
-class TestCSVAndTSVToMarkdown(unittest.TestCase):
-    def test_csv_table(self):
-        data = "Name,Age,Role\nAlice,30,Engineer\nBob,25,Designer\n"
-        md = csv_to_markdown(data)
-        self.assertIn("| Name | Age | Role |", md)
-        self.assertIn("| --- | --- | --- |", md)
-        self.assertIn("| Alice | 30 | Engineer |", md)
-
-    def test_tsv_table(self):
-        data = "A\tB\tC\n1\t2\t3\n"
-        md = csv_to_markdown(data, delimiter="\t")
-        self.assertIn("| A | B | C |", md)
-        self.assertIn("| 1 | 2 | 3 |", md)
-
-    def test_semicolon_and_sniffer(self):
-        data = "Col1;Col2;Col3\nVal1;Val2;Val3\n"
-        md = csv_to_markdown(data)
-        self.assertIn("| Col1 | Col2 | Col3 |", md)
-        self.assertIn("| Val1 | Val2 | Val3 |", md)
-
-    def test_stream_and_bytes_inputs(self):
-        buf = io.BytesIO(b"X,Y\n10,20\n")
-        md = csv_to_markdown(buf)
-        self.assertIn("| X | Y |", md)
-        self.assertIn("| 10 | 20 |", md)
-
-        sbuf = io.StringIO("M,N\n1,2\n")
-        md_str = csv_to_markdown(sbuf)
-        self.assertIn("| M | N |", md_str)
-
-        self.assertEqual(csv_to_markdown("   \n\n  "), "")
-
-    def test_latin1_bytes(self):
-        raw = "Name,City\nRen\xe9,Montr\xe9al\n".encode("latin-1")
-        md = csv_to_markdown(raw)
-        self.assertIn("Ren\xe9", md)
-
-        # Stream with non-utf8 bytes
-        stream = io.BytesIO(raw)
-        md_stream = csv_to_markdown(stream)
-        self.assertIn("Montr\xe9al", md_stream)
-
-        # Empty lines only
-        self.assertEqual(csv_to_markdown(",,\n  ,  ,\n"), "")
-
-    def test_nul_byte(self):
-        raw = "Name,Age\x00,City\nAlice\x00,30,NYC\n"
-        md = csv_to_markdown(raw)
-        self.assertIn("| Name | Age | City |", md)
-        self.assertIn("| Alice | 30 | NYC |", md)
 
 
 class TestIPYNBToMarkdown(unittest.TestCase):
@@ -849,8 +796,6 @@ class TestConverterEngine(unittest.TestCase):
         self.assertIn("## Sales", convert_bytes(xlsx_data, ".xlsx"))
         self.assertIn("## Slide 1", convert_bytes(pptx_data, ".pptx"))
         self.assertIn("# Sample eBook", convert_bytes(epub_data, ".epub"))
-        self.assertIn("| a | b |", convert_bytes(b"a,b\n1,2", ".csv"))
-        self.assertIn("| a | b |", convert_bytes(b"a\tb\n1\t2", ".tsv"))
         self.assertIn("# Title", convert_bytes(b"<h1>Title</h1>", ".html"))
         with self.assertRaises(ValueError):
             convert_bytes(b"plain text", ".txt")
@@ -870,8 +815,6 @@ class TestConverterEngine(unittest.TestCase):
                 (".xlsx", xlsx_data),
                 (".pptx", pptx_data),
                 (".epub", epub_data),
-                (".csv", b"a,b\n1,2"),
-                (".tsv", b"a\tb\n1\t2"),
                 (".html", b"<h1>Hello</h1>"),
             ]:
                 tf = tempfile.NamedTemporaryFile(suffix=ext, mode="wb", delete=False)
@@ -970,12 +913,6 @@ class TestConverterRegressions(unittest.TestCase):
         # The blank-line collapse must not touch content inside the fence.
         self.assertIn("x = 1\n\n\n\ny = 2", md)
 
-    # --- CSV: UTF-8 BOM must not leak into the first header cell ---
-
-    def test_csv_bom_stripped(self):
-        md = convert_bytes(b"\xef\xbb\xbfa,b\n1,2", ".csv")
-        self.assertIn("| a | b |", md)
-        self.assertNotIn("\ufeff", md)
 
     # --- HTML: <title>, images in links, nested anchors and tables ---
 
@@ -1913,28 +1850,6 @@ class TestDocConverterSecondaryAuditFixes(unittest.TestCase):
         self.assertIn("# Header", convert_bytes(html_data, " .html "))
         self.assertIn("# Header", convert_bytes(html_data, " html "))
 
-    def test_csv_tsv_utf16_and_utf32_bom(self):
-        # UTF-16 LE CSV
-        raw_utf16_le = "Name,Score\nAlice,95\n".encode("utf-16-le")
-        bom_utf16_le = b"\xff\xfe" + raw_utf16_le
-        md_16 = csv_to_markdown(bom_utf16_le)
-        self.assertIn("| Name | Score |", md_16)
-        self.assertIn("| Alice | 95 |", md_16)
-        self.assertNotIn("\xff", md_16)
-
-        # UTF-16 BE CSV
-        raw_utf16_be = "Name,Score\nBob,88\n".encode("utf-16-be")
-        bom_utf16_be = b"\xfe\xff" + raw_utf16_be
-        md_16_be = csv_to_markdown(bom_utf16_be)
-        self.assertIn("| Name | Score |", md_16_be)
-        self.assertIn("| Bob | 88 |", md_16_be)
-
-        # UTF-32 LE CSV
-        raw_utf32_le = "A,B\n1,2\n".encode("utf-32-le")
-        bom_utf32_le = b"\xff\xfe\x00\x00" + raw_utf32_le
-        md_32 = csv_to_markdown(bom_utf32_le)
-        self.assertIn("| A | B |", md_32)
-        self.assertIn("| 1 | 2 |", md_32)
 
     def test_docx_cell_sdt_and_nobreakhyphen(self):
         xml = """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">

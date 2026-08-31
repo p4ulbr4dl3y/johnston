@@ -17,7 +17,7 @@ Johnston equips the primary agent and subagents with a suite of 10 builtin tools
 ## Workflow & Research
 8. **`ask_user`**: Prompt the user with interactive single-choice or multi-choice questions to resolve design ambiguity.
 9. **`update_plan`**: Maintain and update structured multi-step task execution plans in the UI.
-10. **`web_fetch`**: Fetch and extract web page content as clean markdown via HTTP requests.
+10. **`web_fetch`**: Fetch and extract web page content and documents (PDF, DOCX, XLSX, PPTX, EPUB, IPYNB) as clean markdown via HTTP requests.
 
 ## Subagent Tool Exclusions
 To prevent nested delegation loops, interactive stalls, and background task collision, the following tools are strictly disabled inside child subagents:

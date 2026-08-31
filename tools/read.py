@@ -6,6 +6,7 @@ from collections import OrderedDict
 from typing import Any, Dict, Tuple
 
 from core.domain.defaults.errors import ToolResult
+from core.infrastructure.converter import DOC_EXTENSIONS
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
 from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
 from tools.cancel import run_cancellable
@@ -13,7 +14,6 @@ from tools.utils import DEFAULT_LINE_WINDOW, get_max_tool_payload_bytes
 
 logger = logging.getLogger(__name__)
 
-DOC_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".xlsm", ".ppsx", ".epub", ".ipynb"}
 _DOC_CACHE: "OrderedDict[str, Tuple[float, float, str]]" = OrderedDict()  # key: path, val: (mtime, timestamp, md_text)
 MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes
@@ -296,7 +296,7 @@ class ReadTool(BaseTool):
     name = "read"
     description = (
         f"Read file contents, inspect directory listings, or view archive contents (ZIP/TAR). "
-        f"Converts images and docs (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB). "
+        f"Converts docs (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) and images. "
         f"Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers."
     )
     schema = {

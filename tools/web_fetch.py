@@ -145,7 +145,7 @@ async def _guard_request(req: "httpx.Request") -> None:
 
 class WebFetchTool(BaseTool):
     name = "web_fetch"
-    description = "Fetch content from HTTP/HTTPS URL and convert HTML/documents (PDF, DOCX, XLSX, etc.) to Markdown."
+    description = "Fetch content from HTTP/HTTPS URL and convert HTML/documents (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) to Markdown."
 
     schema = {
         "type": "function",
@@ -255,7 +255,7 @@ class WebFetchTool(BaseTool):
         if raw_mode:
             text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
         else:
-            from tools.read import DOC_EXTENSIONS
+            from core.infrastructure.converter import DOC_EXTENSIONS
 
             url_path_ext = url.lower().split("?", 1)[0]
             url_ext = url_path_ext.rsplit(".", 1)[-1] if "." in url_path_ext else ""

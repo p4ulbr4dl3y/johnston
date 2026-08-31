@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 from typing import Set, Union
 
-from core.infrastructure.converter.csv_tsv import csv_to_markdown
 from core.infrastructure.converter.docx import docx_to_markdown
 from core.infrastructure.converter.epub import epub_to_markdown
 from core.infrastructure.converter.html import html_to_markdown
@@ -11,7 +10,13 @@ from core.infrastructure.converter.pdf import pdf_to_markdown
 from core.infrastructure.converter.pptx import pptx_to_markdown
 from core.infrastructure.converter.xlsx import xlsx_to_markdown
 
-SUPPORTED_EXTENSIONS: Set[str] = {
+HTML_EXTENSIONS: Set[str] = {
+    ".html",
+    ".htm",
+    ".xhtml",
+}
+
+DOC_EXTENSIONS: Set[str] = {
     ".pdf",
     ".docx",
     ".docm",
@@ -26,13 +31,10 @@ SUPPORTED_EXTENSIONS: Set[str] = {
     ".potx",
     ".potm",
     ".epub",
-    ".html",
-    ".htm",
-    ".xhtml",
-    ".csv",
-    ".tsv",
     ".ipynb",
 }
+
+SUPPORTED_EXTENSIONS: Set[str] = DOC_EXTENSIONS | HTML_EXTENSIONS
 
 
 def is_convertible(path_or_ext: Union[str, Path]) -> bool:
@@ -71,9 +73,6 @@ def convert_bytes(
         return pdf_to_markdown(data)
     if ext == ".epub":
         return epub_to_markdown(data)
-    if ext in (".csv", ".tsv"):
-        delim = "\t" if ext == ".tsv" else None
-        return csv_to_markdown(data, delimiter=delim)
     if ext == ".ipynb":
         return ipynb_to_markdown(data)
 
@@ -102,10 +101,6 @@ def convert_file(file_path: Union[str, Path]) -> str:
         return pdf_to_markdown(str(path))
     if ext == ".epub":
         return epub_to_markdown(str(path))
-    if ext in (".csv", ".tsv"):
-        delim = "\t" if ext == ".tsv" else None
-        with open(path, "rb") as f:
-            return csv_to_markdown(f.read(), delimiter=delim)
     if ext == ".ipynb":
         with open(path, "rb") as f:
             return ipynb_to_markdown(f.read())
