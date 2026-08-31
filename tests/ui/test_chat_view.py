@@ -255,6 +255,21 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             self.assertLessEqual(len(list(chat_view.children)), 2)
             self.assertTrue(chat_view._auto_follow)
 
+    async def test_rollback_to_negative_mounts_welcome(self):
+        from widgets.presentation.widgets.chat_welcome import WelcomeWidget
+
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            await chat_view.add_user_message("one")
+            await chat_view.add_bot_message()
+            await pilot.pause()
+            self.assertFalse(any(isinstance(c, WelcomeWidget) for c in chat_view.children))
+
+            chat_view.rollback_to(-1)
+            await pilot.pause()
+            self.assertTrue(any(isinstance(c, WelcomeWidget) for c in chat_view.children))
+
     async def test_toggle_expand_modes(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:

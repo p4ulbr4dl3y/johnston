@@ -266,12 +266,12 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
             screen._apply_filter("beta")
             self.assertEqual(len(screen.filtered_entries), 2)
             opt_list = screen.query_one(MODAL_OPTION_LIST, OptionList)
-            self.assertEqual(opt_list.highlighted, 1)
+            self.assertEqual(opt_list.highlighted, 2)
 
             # Filter with no match
             screen._apply_filter("nonexistent token")
             self.assertEqual(len(screen.filtered_entries), 0)
-            self.assertIsNone(opt_list.highlighted)
+            self.assertEqual(opt_list.highlighted, 0)
 
             # Filter reset
             screen._apply_filter("")
@@ -280,12 +280,12 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
             # _refresh_options when opt_list.highlighted is None
             opt_list.highlighted = None
             screen._refresh_options()
-            self.assertEqual(opt_list.highlighted, 2)
+            self.assertEqual(opt_list.highlighted, 3)
 
             # _refresh_options when opt_list.highlighted is out of range
             opt_list.highlighted = 999
             screen._refresh_options()
-            self.assertEqual(opt_list.highlighted, 2)
+            self.assertEqual(opt_list.highlighted, 3)
 
             # Resize triggers refresh
             screen.on_resize(events.Resize(40, 20, 40, 20))
@@ -343,21 +343,18 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
             screen.on_input_changed(Input.Changed(inp, "second"))
             self.assertEqual(len(screen.filtered_entries), 1)
 
-            # on_input_submitted with highlighted index
+            # on_input_submitted with matched entry (highlighted = 0)
+            opt_list = screen.query_one(MODAL_OPTION_LIST, OptionList)
+            opt_list.highlighted = 0
             dismissed = []
             screen.dismiss = lambda val: dismissed.append(val)
             screen.on_input_submitted(Input.Submitted(inp, "second"))
             self.assertEqual(dismissed[-1], RewindSelection(index=1, restore_code=False))
 
-            # on_input_submitted with highlighted None but entries exist
-            opt_list = screen.query_one(MODAL_OPTION_LIST, OptionList)
-            opt_list.highlighted = None
+            # on_input_submitted with Current state (highlighted = 1)
+            opt_list.highlighted = 1
             screen.on_input_submitted(Input.Submitted(inp, "second"))
-            self.assertEqual(dismissed[-1], RewindSelection(index=1, restore_code=False))
-
-            # on_input_submitted with empty filtered entries
-            screen.filtered_entries = []
-            screen.on_input_submitted(Input.Submitted(inp, "none"))
+            self.assertIsNone(dismissed[-1])
 
     async def test_on_option_list_option_selected_invalid_and_out_of_bounds(self):
         app = ModalTestApp()

@@ -313,7 +313,7 @@ async def get_session_diff(
 # rewind helpers (_reset_token_counters, _truncate_transcript)
 # ---------------------------------------------------------------------------
 
-def _reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
+def reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
     """Reset cumulative token/cost metrics after a rollback.
 
     ``reset_context=False`` keeps the freshly recomputed
@@ -331,6 +331,9 @@ def _reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
             continue
         if hasattr(agent, attr):
             setattr(agent, attr, value)
+
+
+_reset_token_counters = reset_token_counters
 
 
 def _truncate_transcript(session: Any, seq_idx: int) -> None:
@@ -443,7 +446,7 @@ def rewind_session(
     # /resume does not resurrect rolled-back turns.
     _truncate_transcript(session, seq_idx)
 
-    target_idx = selected_child_idx - 1
+    target_idx = -1 if seq_idx == 0 else selected_child_idx - 1
     rollback_ui(target_idx)
 
     # Restore Git checkpoints in background

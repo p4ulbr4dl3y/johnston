@@ -26,6 +26,8 @@ from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.row_format import MODAL_WIDE_ROW_WIDTH, ellipsize, format_badge_row, option_list_row_width
 
+REWIND_CURRENT_STATE = -1
+
 
 @dataclass
 class RewindSelection:
@@ -90,9 +92,10 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         self.hint_text = "enter: select"
         self.raw_options = list(options)
         self.raw_items = [m.index for m in user_messages]
+        self.raw_items.append(REWIND_CURRENT_STATE)
         self.filtered_options = list(options)
         self.filtered_items = list(self.raw_items)
-        self.default_value = self.raw_items[-1] if self.raw_items else -1
+        self.default_value = REWIND_CURRENT_STATE
         self.option_list_id = MODAL_OPTION_LIST_ID
 
     def _row_width(self) -> int:
@@ -115,6 +118,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
                 options.append(format_badge_row(clean_escaped, badge_plain, target_width=target_width))
             else:
                 options.append(clean_escaped)
+        options.append("Current state [dim](cancel rollback)[/]")
         return options
 
     def _apply_filter(self, query: str) -> None:
@@ -129,6 +133,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         target_w = self._row_width()
         self.filtered_options = self._format_step1_options(target_w, self.filtered_entries)
         self.filtered_items = [m.index for m in self.filtered_entries]
+        self.filtered_items.append(REWIND_CURRENT_STATE)
         try:
             opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
             opt_list.clear_options()
@@ -138,6 +143,8 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
                 opt_list.scroll_to_highlight()
             else:
                 opt_list.highlighted = None
+        except Exception:
+            pass
         except Exception:
             pass
 
@@ -205,11 +212,11 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
     def on_input_submitted(self, event: Input.Submitted) -> None:
         opt_list = self.query_one(MODAL_OPTION_LIST, OptionList)
         idx = opt_list.highlighted
-        if idx is not None and 0 <= idx < len(self.filtered_entries):
+        if idx is not None and 0 <= idx < len(self.filtered_items):
             self.on_option_list_option_selected(OptionList.OptionSelected(opt_list, Option(""), idx))
-        elif self.filtered_entries:
+        elif self.filtered_items:
             self.on_option_list_option_selected(
-                OptionList.OptionSelected(opt_list, Option(""), len(self.filtered_entries) - 1)
+                OptionList.OptionSelected(opt_list, Option(""), len(self.filtered_items) - 1)
             )
 
     def _on_key(self, event: events.Key) -> None:
@@ -227,6 +234,12 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         idx = event.option_index
         if idx < 0 or idx >= len(self.filtered_items):
+            event.stop()
+            return
+
+        item_val = self.filtered_items[idx]
+        if item_val == REWIND_CURRENT_STATE:
+            self.dismiss(None)
             event.stop()
             return
 

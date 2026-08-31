@@ -67,6 +67,29 @@ class TestResumeScreen(unittest.TestCase):
         len_c = cell_len(Text.from_markup(screen.raw_options[1]).plain)
         self.assertEqual(len_p, len_c)
 
+    def test_resume_screen_multilevel_fork_depth_indentation(self):
+        from rich.cells import cell_len
+        from rich.text import Text
+
+        sessions = [
+            {"id": "p1", "title": "Root", "message_count": 5},
+            {"id": "c1", "parent_id": "p1", "title": "Fork 1", "message_count": 2},
+            {"id": "c2", "parent_id": "c1", "title": "Fork of Fork", "message_count": 1},
+        ]
+        screen = ResumeScreen(sessions)
+        self.assertEqual(len(screen.raw_options), 3)
+        self.assertNotIn("└─", screen.raw_options[0])
+        self.assertIn("└─ ", screen.raw_options[1])
+        self.assertNotIn("   └─ ", screen.raw_options[1])
+        self.assertIn("   └─ ", screen.raw_options[2])
+
+        # All rows have identical visible cell width
+        len_0 = cell_len(Text.from_markup(screen.raw_options[0]).plain)
+        len_1 = cell_len(Text.from_markup(screen.raw_options[1]).plain)
+        len_2 = cell_len(Text.from_markup(screen.raw_options[2]).plain)
+        self.assertEqual(len_0, len_1)
+        self.assertEqual(len_1, len_2)
+
     def test_resume_screen_fork_ellipsis_alignment(self):
         from rich.cells import cell_len
         from rich.text import Text

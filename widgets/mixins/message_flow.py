@@ -66,6 +66,58 @@ class MessageFlowMixin:
             except Exception as e:
                 logger.warning("Notify failed: %s", e)
 
+    def _apply_pending_fork_or_readonly(self) -> None:
+        """Commit pending lazy fork or fork a read-only session on user input."""
+        pending_fork = getattr(self, "pending_fork", None)
+        if pending_fork and hasattr(self, "sm"):
+            parent_sid = pending_fork.get("parent_session_id")
+            up_to_idx = pending_fork.get("up_to_msg_index")
+            fork_title = pending_fork.get("title")
+            self.pending_fork = None
+            forked = self.sm.fork_session(parent_sid, new_title=fork_title, up_to_msg_index=up_to_idx)
+            if forked:
+                old_sid = getattr(self, "current_session_id", None)
+                if old_sid and old_sid != forked.id and hasattr(self.sm, "release_session_lock"):
+                    self.sm.release_session_lock(old_sid)
+                self.current_session_id = forked.id
+                if hasattr(self.sm, "acquire_session_lock"):
+                    self.sm.acquire_session_lock(forked.id)
+                if hasattr(self.sm, "set_active_session_id"):
+                    self.sm.set_active_session_id(forked.id)
+                self.is_read_only = False
+                try:
+                    chat_input = self.query_one("#message-input", ChatInput)
+                    chat_input.placeholder = "Type a message or / for commands..."
+                except Exception:
+                    pass
+                if hasattr(self, "notify"):
+                    self.notify("Session forked", severity="information", timeout=1.5)
+                if hasattr(self, "refresh_status_footer"):
+                    self.refresh_status_footer()
+        elif getattr(self, "is_read_only", False) and hasattr(self, "sm"):
+            curr_id = getattr(self, "current_session_id", None)
+            if curr_id and hasattr(self.sm, "fork_session"):
+                forked = self.sm.fork_session(curr_id)
+                if forked:
+                    old_sid = getattr(self, "current_session_id", None)
+                    if old_sid and old_sid != forked.id and hasattr(self.sm, "release_session_lock"):
+                        self.sm.release_session_lock(old_sid)
+                    self.current_session_id = forked.id
+                    if hasattr(self.sm, "acquire_session_lock"):
+                        self.sm.acquire_session_lock(forked.id)
+                    if hasattr(self.sm, "set_active_session_id"):
+                        self.sm.set_active_session_id(forked.id)
+                    self.is_read_only = False
+                    try:
+                        chat_input = self.query_one("#message-input", ChatInput)
+                        chat_input.placeholder = "Type a message or / for commands..."
+                    except Exception:
+                        pass
+                    if hasattr(self, "notify"):
+                        self.notify("Session forked", severity="information", timeout=1.5)
+                    if hasattr(self, "refresh_status_footer"):
+                        self.refresh_status_footer()
+
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle input and slash commands (/help, /new, /skills)"""
         user_text = event.value.strip()
@@ -80,18 +132,7 @@ class MessageFlowMixin:
         chat_input = self.query_one("#message-input", ChatInput)
         chat_input.focus()
 
-        if getattr(self, "is_read_only", False) and hasattr(self, "sm"):
-            curr_id = getattr(self, "current_session_id", None)
-            if curr_id and hasattr(self.sm, "fork_session"):
-                forked = self.sm.fork_session(curr_id)
-                if forked:
-                    self.current_session_id = forked.id
-                    if hasattr(self.sm, "acquire_session_lock"):
-                        self.sm.acquire_session_lock(forked.id)
-                    if hasattr(self.sm, "set_active_session_id"):
-                        self.sm.set_active_session_id(forked.id)
-                    self.is_read_only = False
-                    chat_input.placeholder = "Type a message or / for commands..."
+        self._apply_pending_fork_or_readonly()
 
         if not user_text and attachments:
             user_text = "What is in this image?"
@@ -152,6 +193,7 @@ class MessageFlowMixin:
             self.is_generating = False
             return
 
+        self._apply_pending_fork_or_readonly()
         self.is_generating = True
         chat_view = self.query_one(ChatView)
 

@@ -461,6 +461,64 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
                 )
                 mock_purge.assert_called_once_with("sess-1", 0, project_path="/tmp/project")
 
+    async def test_forked_session_rewind_keeps_parent_intact(self):
+        import tempfile
+
+        from core.infrastructure.storage.session_store import SessionStore
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sm = SessionStore(project_path=tmpdir)
+            parent = sm.create_main()
+            parent.title = "Parent"
+            parent.prompt = "prompt 0"
+            parent.messages = [
+                {"type": "user", "text": "prompt 0", "show_in_ui": True},
+                {"type": "bot", "text": "answer 0"},
+                {"type": "user", "text": "prompt 1", "show_in_ui": True},
+                {"type": "bot", "text": "answer 1"},
+                {"type": "user", "text": "prompt 2", "show_in_ui": True},
+                {"type": "bot", "text": "answer 2"},
+            ]
+            sm.save(parent)
+
+            # Fork at prompt 1 (up_to_msg_index=1 -> preserves turn 0 before prompt 1)
+            forked = sm.fork_session(parent.id, new_title="Forked Branch", up_to_msg_index=1)
+            self.assertIsNotNone(forked)
+            self.assertEqual(len(forked.messages), 2)  # prompt 0, bot 0
+
+            # Rewind forked session to turn 0 (first user message)
+            agent = MockAgent()
+            agent.history = [
+                {"role": "user", "content": "prompt 0"},
+                {"role": "assistant", "content": "answer 0"},
+                {"role": "user", "content": "prompt 1"},
+                {"role": "assistant", "content": "answer 1"},
+            ]
+
+            forked_user_msgs = [(0, "prompt 0"), (2, "prompt 1")]
+            rewind_session(
+                agent,
+                forked.id,
+                tmpdir,
+                forked_user_msgs,
+                0,
+                restore_git=False,
+                session=forked,
+                rollback_ui=lambda i: None,
+                load_text_into_input=lambda t: None,
+                save_session_cb=lambda: sm.save(forked),
+                refresh_footer_cb=lambda: None,
+            )
+
+            # Forked session truncated
+            self.assertEqual(len(forked.messages), 0)
+            self.assertEqual(agent.history, [])
+
+            # Parent session MUST remain completely unchanged
+            parent_reloaded = sm.get(parent.id)
+            self.assertEqual(len(parent_reloaded.messages), 6)
+            self.assertEqual(parent_reloaded.messages[4]["text"], "prompt 2")
+
 
 if __name__ == "__main__":
     unittest.main()

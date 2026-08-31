@@ -49,23 +49,25 @@ def _order_sessions_hierarchically(sessions: list[dict]) -> list[dict]:
     ordered: list[dict] = []
     visited: set[str] = set()
 
-    def dfs(s: dict) -> None:
+    def dfs(s: dict, depth: int = 0) -> None:
         sid = str(s.get("id"))
         if sid in visited:
             return
         visited.add(sid)
-        ordered.append(s)
+        s_with_depth = dict(s)
+        s_with_depth["_depth"] = depth
+        ordered.append(s_with_depth)
         children = children_map.get(sid, [])
         children.sort(key=subtree_updated, reverse=True)
         for child in children:
-            dfs(child)
+            dfs(child, depth + 1)
 
     for root in roots:
-        dfs(root)
+        dfs(root, 0)
 
     for s in sessions:
         if str(s.get("id")) not in visited:
-            dfs(s)
+            dfs(s, 0)
 
     return ordered
 
@@ -123,6 +125,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             is_active = self.has_active and sid == str(self.current_session_id)
             is_locked = bool(s.get("is_locked")) and not is_active
             is_fork = bool(s.get("parent_id") and str(s.get("parent_id")) in session_ids)
+            depth = s.get("_depth", 1 if is_fork else 0)
 
             if is_active:
                 status_pfx = f"{status_tag('ACTIVE')} "
@@ -131,7 +134,11 @@ class ResumeScreen(BaseSelectionScreen[str]):
             else:
                 status_pfx = "  " if has_indicator else ""
 
-            branch_pfx = "[dim]└─ [/]" if is_fork else ""
+            if is_fork and depth > 0:
+                indent = "   " * min(depth - 1, 3)
+                branch_pfx = f"[dim]{indent}└─ [/]"
+            else:
+                branch_pfx = ""
             prefix = f"{status_pfx}{branch_pfx}"
             title = str(s.get("title", ""))
             count = s.get("message_count", 0)

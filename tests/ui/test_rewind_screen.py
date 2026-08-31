@@ -14,7 +14,8 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
             RewindEntry(1, "line 1\r\nline 2\r\nline 3"),
         ]
         screen = RewindScreen(user_messages)
-        self.assertEqual(len(screen.raw_options), 2)
+        self.assertEqual(len(screen.raw_options), 3)
+        self.assertIn("cancel rollback", screen.raw_options[2])
         self.assertNotIn("\n", screen.raw_options[0])
         self.assertNotIn("\r", screen.raw_options[0])
         self.assertIn("@/Users/yegor/testing/", screen.raw_options[0])
@@ -205,8 +206,8 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
             await app.push_screen(screen)
             await pilot.pause()
             opt_list = screen.query_one(OptionList)
-            self.assertEqual(opt_list.highlighted, 2)
-            self.assertEqual(screen.filtered_items[opt_list.highlighted], 2)
+            self.assertEqual(opt_list.highlighted, 3)
+            self.assertEqual(screen.filtered_items[opt_list.highlighted], -1)
 
     async def test_rewind_screen_arrow_key_navigation(self):
         from textual.app import App
@@ -226,21 +227,21 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             opt_list = screen.query_one(OptionList)
-            self.assertEqual(opt_list.highlighted, 2)
+            self.assertEqual(opt_list.highlighted, 3)
 
             # Press up arrow while focus is in search input
             await pilot.press("up")
             await pilot.pause()
-            self.assertEqual(opt_list.highlighted, 1)
+            self.assertEqual(opt_list.highlighted, 2)
 
             # Press up again
             await pilot.press("up")
             await pilot.pause()
-            self.assertEqual(opt_list.highlighted, 0)
+            self.assertEqual(opt_list.highlighted, 1)
 
             # Press down arrow
             await pilot.press("down")
             await pilot.pause()
-            self.assertEqual(opt_list.highlighted, 1)
+            self.assertEqual(opt_list.highlighted, 2)
 
 

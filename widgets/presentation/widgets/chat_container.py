@@ -173,10 +173,10 @@ class ChatView(VerticalScroll):
         self.check_welcome()
 
     def clear_welcome(self) -> None:
-        welcomes = [c for c in self.children if isinstance(c, WelcomeWidget)]
+        welcomes = [c for c in self.children if isinstance(c, WelcomeWidget) and not getattr(c, "_pruning", False)]
         if not welcomes:
             try:
-                welcomes = list(self.query(WelcomeWidget))
+                welcomes = [w for w in self.query(WelcomeWidget) if not getattr(w, "_pruning", False)]
             except Exception:
                 welcomes = []
         for w in welcomes:
@@ -190,13 +190,19 @@ class ChatView(VerticalScroll):
         if not getattr(self, "show_welcome", True):
             self.clear_welcome()
             return
-        welcomes = [c for c in self.children if isinstance(c, WelcomeWidget)]
+        welcomes = [c for c in self.children if isinstance(c, WelcomeWidget) and not getattr(c, "_pruning", False)]
         if not welcomes:
             try:
-                welcomes = list(self.query(WelcomeWidget))
+                welcomes = [w for w in self.query(WelcomeWidget) if not getattr(w, "_pruning", False)]
             except Exception:
                 welcomes = []
-        msg_children = [c for c in self.children if not isinstance(c, WelcomeWidget)]
+        msg_children = [
+            c
+            for c in self.children
+            if not isinstance(c, WelcomeWidget)
+            and not getattr(c, "_pruning", False)
+            and not getattr(c, "_closing", False)
+        ]
         if not msg_children:
             if not welcomes:
                 self.mount(WelcomeWidget())
@@ -438,7 +444,7 @@ class ChatView(VerticalScroll):
         return None
 
     def rollback_to(self, target_index: int) -> None:
-        children = list(self.children)
+        children = [c for c in self.children if not getattr(c, "_pruning", False)]
         start_idx = max(0, target_index + 1)
         for child in children[start_idx:]:
             child.remove()

@@ -26,6 +26,7 @@ class SessionPersistenceMixin:
 
         self.current_session_id = session_id
         self.is_read_only = read_only
+        self.pending_fork = None
 
         try:
             from widgets.chat_input import ChatInput

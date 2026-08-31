@@ -8,8 +8,10 @@ from core.application.session.actions import (
     compact_session,
     get_rewind_git_stats,
     new_session,
+    reset_token_counters,
     rewind_session,
 )
+from core.domain.policies.messages import count_history_user_turns
 from widgets.chat_input import ChatInput
 from widgets.presentation.commands.base import BaseCommand
 from widgets.presentation.commands.helpers import (
@@ -363,16 +365,54 @@ class ForkCommand(BaseCommand):
                         base = parent_sess.title.removesuffix(" (fork)")
                         fork_title = f"{base} (fork)"
 
-            forked = app.sm.fork_session(curr_sid, new_title=fork_title, up_to_msg_index=up_to_idx)
-            if not forked:
-                app.notify("Failed to fork session", severity="error")
-                app.query_one(MESSAGE_INPUT).focus()
-                return
-
             cancel_active_workers(app)
             reset_app_state(app, is_generating=False, clear_queue=True)
 
-            app.load_session_ui(forked.id)
+            app.pending_fork = {
+                "parent_session_id": curr_sid,
+                "up_to_msg_index": up_to_idx,
+                "title": fork_title,
+            }
+
+            if up_to_idx is not None:
+                try:
+                    cv = app.query_one(ChatView)
+                    if session and isinstance(getattr(session, "messages", None), list):
+                        page_size = getattr(cv, "PAGE_SIZE", 50)
+                        if len(session.messages) > page_size:
+                            cv._unloaded_messages = session.messages[:-page_size]
+                        else:
+                            cv._unloaded_messages = []
+                    cv.rollback_to(-1 if up_to_idx == 0 else selected_child_idx - 1)
+                except Exception:
+                    pass
+
+                agent = getattr(app, "agent", None)
+                if agent:
+                    if up_to_idx == 0:
+                        if hasattr(agent, "clear_history"):
+                            agent.clear_history()
+                        elif hasattr(agent, "history"):
+                            agent.history = []
+                        reset_token_counters(agent)
+                    else:
+                        real_tail = count_history_user_turns(agent.history) if hasattr(agent, "history") else 0
+                        tail_start = len(user_msgs) - real_tail
+                        if up_to_idx >= tail_start:
+                            truncate_idx = max(0, up_to_idx - tail_start)
+                            if hasattr(agent, "truncate_history_to_user_message"):
+                                agent.truncate_history_to_user_message(truncate_idx)
+                            elif hasattr(agent, "history"):
+                                agent.history = []
+                        else:
+                            if hasattr(agent, "clear_history"):
+                                agent.clear_history()
+                            elif hasattr(agent, "history"):
+                                agent.history = []
+                        reset_token_counters(agent, reset_context=False)
+
+            if hasattr(app, "refresh_status_footer"):
+                app.refresh_status_footer()
 
             chat_input = app.query_one(MESSAGE_INPUT, ChatInput)
             if msg_text:
@@ -382,7 +422,6 @@ class ForkCommand(BaseCommand):
             else:
                 chat_input.load_text("")
             chat_input.focus()
-            app.notify("Session forked", severity="information", timeout=1.5)
 
         result = app.push_screen(
             ForkScreen(user_msgs),

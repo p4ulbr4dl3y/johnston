@@ -92,6 +92,8 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
                 self.current_session_id = "orig_sess"
                 self.sm = MagicMock()
                 self.trigger_ai_response = MagicMock()
+                self.notify = MagicMock()
+                self.refresh_status_footer = MagicMock()
                 self._input = MagicMock()
                 self._input.placeholder = ""
                 self.query_one = lambda sel, cls=None: self._input
@@ -108,4 +110,6 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         test_app.sm.acquire_session_lock.assert_called_with("orig_sess_fork")
         test_app.sm.set_active_session_id.assert_called_with("orig_sess_fork")
         self.assertFalse(test_app.is_read_only)
+        test_app.notify.assert_called_with("Session forked", severity="information", timeout=1.5)
+        test_app.refresh_status_footer.assert_called_once()
         test_app.trigger_ai_response.assert_called_with("hello from readonly", show_in_ui=True)

@@ -71,9 +71,10 @@ class TestRewindScreenAdaptivity(unittest.TestCase):
 
     def test_init_formats_step1_options(self):
         screen = RewindScreen(self.messages, checkpoints_enabled=True)
-        self.assertEqual(len(screen.raw_options), 2)
+        self.assertEqual(len(screen.raw_options), 3)
         self.assertIn("2 files (+10 -2)", screen.raw_options[0])
         self.assertIn("no checkpoint", screen.raw_options[1])
+        self.assertIn("Current state", screen.raw_options[2])
 
     def test_refresh_step1_adapts_to_narrow_width(self):
         screen = RewindScreen(self.messages, checkpoints_enabled=True)

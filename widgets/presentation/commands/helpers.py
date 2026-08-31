@@ -61,10 +61,13 @@ def reset_app_state(
     clear_queue: bool = True,
     session_id: str | None = None,
     role: str | None = None,
+    clear_pending_fork: bool = True,
 ) -> None:
     """Reset standard UI state flags and message queues."""
     app.is_generating = is_generating
     app.is_read_only = is_read_only
+    if clear_pending_fork and hasattr(app, "pending_fork"):
+        app.pending_fork = None
     if clear_queue and hasattr(app, "message_queue"):
         app.message_queue.clear()
     if session_id is not None:

@@ -102,7 +102,7 @@ class TestRewindEdge(unittest.TestCase):
             s = RewindScreen([RewindEntry(1, "")])
         except IndexError as exc:
             self.fail(f"single RewindEntry raised IndexError: {exc}")
-        self.assertEqual(len(s.raw_items), 1)
+        self.assertEqual(len(s.raw_items), 2)
 
     def test_empty_message_uses_placeholder(self):
         s = RewindScreen([RewindEntry(0, "")])
