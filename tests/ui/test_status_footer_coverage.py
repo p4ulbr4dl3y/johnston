@@ -1,3 +1,4 @@
+import asyncio
 import os
 import tempfile
 import unittest
@@ -192,6 +193,11 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         upd.assert_called_once()
 
     def test_update_session_running_and_completed(self):
+        """Running status on a *mounted* footer starts the spinner timer; a
+        completed status stops and clears it. (Scheduling on an unmounted
+        widget is guarded against — see SubagentStatusFooter.update_session.)"""
+        from textual.app import App
+
         footer = SubagentStatusFooter()
         session = MagicMock()
         session.status = "running"
@@ -199,16 +205,25 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         session.role = "explorer"
         session.project_dir = "/tmp"
         session.branch_name = ""
-        footer.set_interval = MagicMock(return_value=MagicMock())
 
-        footer.update_session(session)
-        self.assertTrue(footer.is_generating)
-        self.assertIsNotNone(footer._spinner_timer)
+        class _Host(App[None]):
+            def compose(self):
+                yield footer
 
-        session.status = "completed"
-        footer.update_session(session)
-        self.assertFalse(footer.is_generating)
-        self.assertIsNone(footer._spinner_timer)
+        async def _scenario():
+            async with _Host().run_test() as pilot:
+                await pilot.pause()
+                self.assertTrue(footer.is_mounted)
+                footer.update_session(session)
+                self.assertTrue(footer.is_generating)
+                self.assertIsNotNone(footer._spinner_timer)
+
+                session.status = "completed"
+                footer.update_session(session)
+                self.assertFalse(footer.is_generating)
+                self.assertIsNone(footer._spinner_timer)
+
+        asyncio.run(_scenario())
 
     def test_spin_no_rows_renders(self):
         footer = SubagentStatusFooter()

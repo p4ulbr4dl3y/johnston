@@ -409,6 +409,22 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             footer.update_session(sess)
             self.assertEqual(mock_est.call_count, 2)
 
+    def test_unmounted_footer_update_never_schedules_spinner_timer(self):
+        """Regression: update_session on an unmounted footer used to call
+        set_interval(); its Timer coroutine is created before the scheduling
+        RuntimeError, leaking a 'Timer._run_timer never awaited' warning."""
+        from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
+
+        footer = SubagentStatusFooter()
+        sess = self._mk("task-unmounted-spin", "Spin Agent", "prompt")
+        sess.status = "running"
+        with patch.object(SubagentStatusFooter, "set_interval") as mock_interval:
+            footer.update_session(sess)
+            mock_interval.assert_not_called()
+        self.assertIsNone(footer._spinner_timer)
+        # Generating flag still set so a later mounted update starts the spinner.
+        self.assertTrue(footer.is_generating)
+
     async def test_subagent_screen_plan_notch_update(self):
         from widgets.presentation.widgets.plan_notch import PlanNotch
 

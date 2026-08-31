@@ -60,7 +60,10 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
         is_running = getattr(session, "status", "") == "running"
         if is_running and not self.is_generating:
             self.is_generating = True
-            if not self._spinner_timer:
+            # set_interval() creates the Timer coroutine before it can fail;
+            # scheduling without a mounted widget (no running loop) leaks that
+            # coroutine as a "never awaited" RuntimeWarning — guard first.
+            if not self._spinner_timer and self.is_mounted:
                 try:
                     self._spinner_timer = self.set_interval(0.2, self._spin)
                 except Exception:

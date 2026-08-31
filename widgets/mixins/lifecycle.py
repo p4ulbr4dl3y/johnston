@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import threading
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
@@ -15,6 +16,14 @@ from widgets.presentation.widgets.plan_notch import PlanNotchContainer
 from widgets.status_footer import StatusFooter
 
 logger = logging.getLogger("johnston.app")
+
+
+def _close_catalog_sync() -> None:
+    """Run catalog.close() on a private loop (used from the shutdown thread)."""
+    try:
+        asyncio.run(catalog.close())
+    except Exception as err:
+        logger.debug(f"Catalog close error: {err}")
 
 
 class LifecycleMixin:
@@ -115,7 +124,14 @@ class LifecycleMixin:
             loop = None
         try:
             if loop is not None:
-                loop.create_task(self._kill_all_tasks())
+                kill_coro = self._kill_all_tasks()
+                try:
+                    loop.create_task(kill_coro)
+                except Exception:
+                    # Coroutine was built before create_task could fail — close
+                    # it so it never surfaces as a "never awaited" warning.
+                    kill_coro.close()
+                    raise
             else:
                 self._kill_all_tasks_sync()
         except Exception as err:
@@ -143,8 +159,16 @@ class LifecycleMixin:
             from core.models_catalog import catalog
 
             if loop is not None and loop.is_running():
-                loop.create_task(catalog.close())
+                # A fire-and-forget create_task() here races app shutdown: the
+                # loop can close before the task ever runs, leaking the close
+                # coroutine ("never awaited") and skipping the client close.
+                # A short-lived daemon thread with its own loop always runs it.
+                threading.Thread(
+                    target=_close_catalog_sync, name="johnston-catalog-close", daemon=True
+                ).start()
             else:
+                # No running loop: run the close coroutine to completion in a
+                # dedicated loop instead of leaving it un-awaited.
                 try:
                     asyncio.run(catalog.close())
                 except Exception:
@@ -190,7 +214,14 @@ class LifecycleMixin:
                 else:
                     kill = getattr(task, "kill", None)
                     if callable(kill) and asyncio.iscoroutinefunction(kill):
-                        asyncio.create_task(kill())
+                        # Only schedule when a loop is actually running: creating
+                        # the coroutine first (asyncio.create_task) and failing
+                        # afterwards leaks it as a "never awaited" warning, and
+                        # without a loop nothing could ever run it anyway.
+                        try:
+                            asyncio.get_running_loop().create_task(kill())
+                        except RuntimeError:
+                            pass
                     elif callable(kill):
                         kill()
                     elif callable(kill_sync):
