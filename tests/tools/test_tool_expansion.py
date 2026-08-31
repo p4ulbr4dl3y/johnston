@@ -404,11 +404,12 @@ class TestToolExpansion(unittest.TestCase):
         widget = ToolCallWidget(
             tool_type="ask_user",
             target="ask_user",
-            result_text="What is your name?\nJohnston",
+            result_text="**What is your name?**\nJohnston",
             args={"questions": [{"question": "What is your name?", "options": ["Johnston"]}]},
         )
         kind, value = widget._compute_content()
         self.assertEqual(kind, "raw")
+        self.assertNotIn("**", value.plain)
         self.assertIn("What is your name?", value.plain)
         self.assertIn("Johnston", value.plain)
 
