@@ -1,6 +1,20 @@
+import codecs
 import csv
 import io
 from typing import BinaryIO, List, Union
+
+
+def _decode_csv_bytes(data: bytes) -> str:
+    """Decode CSV bytes, checking for UTF-16/32/8 BOMs before falling back to latin-1."""
+    if data.startswith((codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE)):
+        return data.decode("utf-32", errors="replace")
+    if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        return data.decode("utf-16", errors="replace")
+    try:
+        # utf-8-sig strips a leading UTF-8 BOM (common in Excel-exported CSV)
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("latin-1", errors="replace")
 
 
 def csv_to_markdown(csv_input: Union[str, bytes, BinaryIO], delimiter: str | None = None) -> str:
@@ -9,20 +23,13 @@ def csv_to_markdown(csv_input: Union[str, bytes, BinaryIO], delimiter: str | Non
     Auto-detects delimiters if not specified.
     """
     if isinstance(csv_input, bytes):
-        try:
-            # utf-8-sig strips a leading UTF-8 BOM (common in Excel-exported CSV)
-            text = csv_input.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            text = csv_input.decode("latin-1", errors="replace")
+        text = _decode_csv_bytes(csv_input)
     elif isinstance(csv_input, str):
         text = csv_input
     else:
         raw = csv_input.read()
         if isinstance(raw, bytes):
-            try:
-                text = raw.decode("utf-8-sig")
-            except UnicodeDecodeError:
-                text = raw.decode("latin-1", errors="replace")
+            text = _decode_csv_bytes(raw)
         else:
             text = raw
 
@@ -44,7 +51,7 @@ def csv_to_markdown(csv_input: Union[str, bytes, BinaryIO], delimiter: str | Non
     rows: List[List[str]] = []
     for r in reader:
         if any(cell.strip() for cell in r):
-            rows.append([cell.strip().replace("\n", " ").replace("|", "\\|") for cell in r])
+            rows.append([cell.strip().replace("\r", "").replace("\n", " ").replace("|", "\\|") for cell in r])
 
     if not rows:
         return ""

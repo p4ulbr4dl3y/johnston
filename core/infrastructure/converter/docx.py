@@ -226,7 +226,11 @@ def _parse_paragraph(p_elem: ET.Element, rels: Dict[str, str]) -> str:
         if item_tag == "r":
             run_items.append(_parse_run(item))
         elif item_tag == "hyperlink":
-            r_id = item.attrib.get(f"{R_NS}id", "") or item.attrib.get("id", "")
+            r_id = ""
+            for k, v in item.attrib.items():
+                if k.endswith("}id") or k.endswith(":id") or k.lower() == "id":
+                    r_id = v
+                    break
             url = rels.get(r_id, "")
             link_text = _render_runs(
                 [_parse_run(r) for r in _iter_inline(item) if _local_tag(r) == "r"]
@@ -291,6 +295,8 @@ def _parse_run(r_elem: ET.Element) -> Tuple[str, RunFormat]:
             text_parts.append("\t")
         elif tag in ("br", "cr"):
             text_parts.append("\n")
+        elif tag == "noBreakHyphen":
+            text_parts.append("-")
 
     return "".join(text_parts), (is_bold, is_italic, is_strike)
 
@@ -350,7 +356,7 @@ def _parse_table(tbl_elem: ET.Element, rels: Dict[str, str]) -> str:
                 row_cells.extend([""] * (span - 1))
                 continue
             cell_paragraphs = []
-            for p in tc:
+            for p in _iter_blocks(tc):
                 item_tag = _local_tag(p)
                 if item_tag == "p":
                     p_text = _parse_paragraph(p, rels)
@@ -362,7 +368,7 @@ def _parse_table(tbl_elem: ET.Element, rels: Dict[str, str]) -> str:
                     nested_md = _parse_table(p, rels)
                     if nested_md:
                         cell_paragraphs.append(nested_md)
-            cell_content = " ".join(cell_paragraphs).strip().replace("\n", " ").replace("|", "\\|")
+            cell_content = " ".join(cell_paragraphs).strip().replace("\r", "").replace("\n", " ").replace("|", "\\|")
             row_cells.append(cell_content)
             row_cells.extend([""] * (span - 1))
         if row_cells:

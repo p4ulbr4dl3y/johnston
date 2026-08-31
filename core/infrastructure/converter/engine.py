@@ -51,9 +51,10 @@ def convert_bytes(
     """
     Converts raw document bytes to Markdown based on extension or filename.
     """
-    ext = os.path.splitext(extension_or_filename)[1].lower()
-    if not ext and extension_or_filename:
-        ext = extension_or_filename.lower() if extension_or_filename.startswith(".") else f".{extension_or_filename.lower()}"
+    s = str(extension_or_filename).strip()
+    ext = os.path.splitext(s)[1].lower()
+    if not ext and s:
+        ext = s.lower() if s.startswith(".") else f".{s.lower()}"
 
     if ext in (".html", ".htm", ".xhtml"):
         return html_to_markdown(data)

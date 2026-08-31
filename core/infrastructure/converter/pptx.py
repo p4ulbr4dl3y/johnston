@@ -63,7 +63,11 @@ def pptx_to_markdown(pptx_input: Union[str, bytes, BinaryIO]) -> str:
                 pres_tree = ET.fromstring(safe_read_zip_member(zf, "ppt/presentation.xml"))
                 for sld in pres_tree.iter():
                     if _local_tag(sld) == "sldId":
-                        r_id = sld.attrib.get(f"{R_NS}id") or sld.attrib.get("id")
+                        r_id = ""
+                        for k, v in sld.attrib.items():
+                            if k.endswith("}id") or k.endswith(":id") or k.lower() == "id":
+                                r_id = v
+                                break
                         if r_id and r_id in pres_rels:
                             slide_files.append(pres_rels[r_id])
             except Exception:
@@ -201,7 +205,7 @@ def _parse_pptx_table(tbl_elem: ET.Element) -> str:
                 all_t = [t.text for t in tc.iter() if _local_tag(t) == "t" and t.text]
                 if all_t:
                     cell_paras.append(" ".join(all_t))
-            clean_cell = " ".join(cell_paras).strip().replace("\n", " ").replace("|", "\\|")
+            clean_cell = " ".join(cell_paras).strip().replace("\r", "").replace("\n", " ").replace("|", "\\|")
             row_cells.append(clean_cell)
         if row_cells:
             rows.append(row_cells)

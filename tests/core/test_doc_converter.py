@@ -1875,6 +1875,228 @@ class TestDocConverterRegressionFixes(unittest.TestCase):
             os.remove(temp_path)
 
 
+class TestDocConverterSecondaryAuditFixes(unittest.TestCase):
+    """Regression tests for secondary audit edge cases:
+    - Inverted parens in clean_url
+    - CRLF normalization in collapse_blank_lines
+    - convert_bytes whitespace tolerance
+    - CSV/TSV UTF-16/32 BOM decoding
+    - DOCX cell <w:sdt>, noBreakHyphen, and strict namespace hyperlink IDs
+    - XLSX $ cell refs and comment-safe xf indexing
+    - PPTX strict namespace sldId
+    - EPUB manifest href anchor/query stripping
+    - IPYNB malformed cell/output type safety and text/markdown display
+    - HTML <template> exclusion, semantic block tags, <kbd>, and code language classes
+    """
+
+    def test_clean_url_inverted_parens(self):
+        from core.infrastructure.converter.utils import clean_url
+
+        # Balanced parens kept
+        self.assertEqual(clean_url("https://example.com/wiki/(term)"), "https://example.com/wiki/(term)")
+        # Inverted parens (count is equal, but closing before opening) must be escaped
+        self.assertEqual(clean_url("https://example.com/foo)bar("), "https://example.com/foo\\)bar\\(")
+        # Unbalanced parens
+        self.assertEqual(clean_url("https://example.com/a(b"), "https://example.com/a\\(b")
+
+    def test_collapse_blank_lines_crlf(self):
+        from core.infrastructure.converter.utils import collapse_blank_lines
+
+        text = "Line 1\r\n\r\n\r\n\r\nLine 2\r\n```\r\ncode\r\n\r\n\r\nblock\r\n```"
+        collapsed = collapse_blank_lines(text)
+        self.assertIn("Line 1\n\nLine 2", collapsed)
+        self.assertIn("code\n\n\nblock", collapsed)
+        self.assertNotIn("\r", collapsed)
+
+    def test_convert_bytes_whitespace_in_extension(self):
+        html_data = b"<h1>Header</h1>"
+        self.assertIn("# Header", convert_bytes(html_data, " .html "))
+        self.assertIn("# Header", convert_bytes(html_data, " html "))
+
+    def test_csv_tsv_utf16_and_utf32_bom(self):
+        # UTF-16 LE CSV
+        raw_utf16_le = "Name,Score\nAlice,95\n".encode("utf-16-le")
+        bom_utf16_le = b"\xff\xfe" + raw_utf16_le
+        md_16 = csv_to_markdown(bom_utf16_le)
+        self.assertIn("| Name | Score |", md_16)
+        self.assertIn("| Alice | 95 |", md_16)
+        self.assertNotIn("\xff", md_16)
+
+        # UTF-16 BE CSV
+        raw_utf16_be = "Name,Score\nBob,88\n".encode("utf-16-be")
+        bom_utf16_be = b"\xfe\xff" + raw_utf16_be
+        md_16_be = csv_to_markdown(bom_utf16_be)
+        self.assertIn("| Name | Score |", md_16_be)
+        self.assertIn("| Bob | 88 |", md_16_be)
+
+        # UTF-32 LE CSV
+        raw_utf32_le = "A,B\n1,2\n".encode("utf-32-le")
+        bom_utf32_le = b"\xff\xfe\x00\x00" + raw_utf32_le
+        md_32 = csv_to_markdown(bom_utf32_le)
+        self.assertIn("| A | B |", md_32)
+        self.assertIn("| 1 | 2 |", md_32)
+
+    def test_docx_cell_sdt_and_nobreakhyphen(self):
+        xml = """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>
+    <w:p><w:r><w:t>pre</w:t><w:noBreakHyphen/><w:t>post</w:t></w:r></w:p>
+    <w:tbl>
+        <w:tr>
+            <w:tc>
+                <w:sdt>
+                    <w:sdtContent>
+                        <w:p><w:r><w:t>SDT in Cell</w:t></w:r></w:p>
+                    </w:sdtContent>
+                </w:sdt>
+            </w:tc>
+        </w:tr>
+    </w:tbl>
+</w:body></w:document>"""
+        md = docx_to_markdown(_wrap_docx(xml))
+        self.assertIn("pre-post", md)
+        self.assertIn("| SDT in Cell |", md)
+
+    def test_xlsx_absolute_cell_ref_and_comments_in_cellxfs(self):
+        styles_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+    <cellXfs count="2">
+        <!-- Comment before style 0 -->
+        <xf numFmtId="0"/>
+        <!-- Comment between styles -->
+        <?custom-pi ?>
+        <xf numFmtId="14"/>
+    </cellXfs>
+</styleSheet>"""
+        sheet_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+    <sheetData>
+        <row r="1">
+            <c r="$A$1" s="1"><v>45000</v></c>
+            <c r="$B$1"><v>Regular</v></c>
+        </row>
+    </sheetData>
+</worksheet>"""
+        xlsx_data = TestConverterFixes()._create_xlsx(styles_xml, sheet_xml)
+        md = xlsx_to_markdown(xlsx_data)
+        # Style index 1 is numFmtId 14 (date), must render as 2023-03-15 despite comments in cellXfs
+        self.assertIn("2023-03-15", md)
+        self.assertIn("Regular", md)
+
+    def test_pptx_generic_ooxml_sldid(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(
+                "ppt/presentation.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                                xmlns:strict="http://purl.oclc.org/ooxml/officeDocument/relationships">
+                    <p:sldIdLst>
+                        <p:sldId id="100" strict:id="rId1"/>
+                    </p:sldIdLst>
+                </p:presentation>""",
+            )
+            zf.writestr(
+                "ppt/_rels/presentation.xml.rels",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>
+                </Relationships>""",
+            )
+            zf.writestr(
+                "ppt/slides/slide1.xml",
+                """<?xml version="1.0" encoding="UTF-8"?>
+                <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                    <p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Strict Rel Slide</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>
+                </p:sld>""",
+            )
+        md = pptx_to_markdown(buf.getvalue())
+        self.assertIn("Strict Rel Slide", md)
+
+    def test_epub_manifest_href_with_fragment_or_query(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr(
+                "META-INF/container.xml",
+                """<?xml version="1.0"?>
+                <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+                    <rootfiles>
+                        <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+                    </rootfiles>
+                </container>""",
+            )
+            zf.writestr(
+                "content.opf",
+                """<?xml version="1.0"?>
+                <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
+                    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>EPUB Frag</dc:title></metadata>
+                    <manifest>
+                        <item id="c1" href="chap1.xhtml#section1?v=1"/>
+                    </manifest>
+                    <spine><itemref idref="c1"/></spine>
+                </package>""",
+            )
+            zf.writestr("chap1.xhtml", "<p>Fragment text content</p>")
+        md = epub_to_markdown(buf.getvalue())
+        self.assertIn("Fragment text content", md)
+
+    def test_ipynb_malformed_cells_and_markdown_display(self):
+        nb = {
+            "cells": [
+                "not a dict cell",
+                42,
+                {
+                    "cell_type": "code",
+                    "source": "display(Markdown('**rich**'))",
+                    "outputs": [
+                        "not a dict output",
+                        None,
+                        {
+                            "output_type": "display_data",
+                            "data": {"text/markdown": ["**rich**\n", "content"]},
+                        },
+                    ],
+                },
+            ]
+        }
+        md = ipynb_to_markdown(nb)
+        self.assertIn("**rich**\ncontent", md)
+
+    def test_html_template_ignored(self):
+        html = "<p>Visible</p><template><div>Hidden Template Content</div></template><p>After</p>"
+        md = html_to_markdown(html)
+        self.assertIn("Visible", md)
+        self.assertIn("After", md)
+        self.assertNotIn("Hidden Template Content", md)
+
+    def test_html_semantic_blocks_and_kbd(self):
+        html = """
+        <figure>
+            <img src="pic.png" alt="Pic">
+            <figcaption>Figure caption text</figcaption>
+        </figure>
+        <details>
+            <summary>Summary Title</summary>
+            <p>Details body</p>
+        </details>
+        <p>Press <kbd>Ctrl</kbd> + <kbd>C</kbd></p>
+        """
+        md = html_to_markdown(html)
+        self.assertIn("Figure caption text", md)
+        self.assertIn("Summary Title", md)
+        self.assertIn("Details body", md)
+        self.assertIn("`Ctrl` + `C`", md)
+
+    def test_html_code_language_class(self):
+        html = '<pre><code class="language-python">def add(a, b):\n    return a + b</code></pre>'
+        md = html_to_markdown(html)
+        self.assertIn("```python\ndef add(a, b):\n    return a + b\n```", md)
+
+        html_lang = '<pre class="lang-typescript">const x: number = 10;</pre>'
+        md_lang = html_to_markdown(html_lang)
+        self.assertIn("```typescript\nconst x: number = 10;\n```", md_lang)
+
+
 if __name__ == "__main__":
     unittest.main()
 

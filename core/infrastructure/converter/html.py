@@ -3,7 +3,7 @@ import re
 from html.parser import HTMLParser
 from typing import Dict, List, Optional, Tuple
 
-from core.infrastructure.converter.utils import collapse_blank_lines, fenced_code_block
+from core.infrastructure.converter.utils import clean_url, collapse_blank_lines, fenced_code_block
 
 # Frequent Cyrillic bytes/letters used by the windows-1251 heuristic below.
 _CYRILLIC_LETTERS_RE = re.compile(r"[\u0400-\u04FF]")
@@ -31,15 +31,6 @@ def _escape_alt(alt: str) -> str:
     """Escape square brackets in image alt text so they cannot break the
     ![...](...) markup."""
     return alt.replace("[", "\\[").replace("]", "\\]")
-
-
-def _clean_url(url: str) -> str:
-    """Make a URL safe inside a Markdown inline link: spaces become %20 and
-    unbalanced parentheses are escaped (balanced ones are valid as-is)."""
-    url = url.replace(" ", "%20")
-    if url.count("(") != url.count(")"):
-        url = url.replace("(", "\\(").replace(")", "\\)")
-    return url
 
 
 def _decode_html_bytes(data: bytes) -> str:
@@ -127,6 +118,7 @@ class HTMLToMarkdownParser(HTMLParser):
         "footer",
         "aside",
         "iframe",
+        "template",
     }
 
     VOID_TAGS = {
@@ -167,6 +159,12 @@ class HTMLToMarkdownParser(HTMLParser):
         "tr",
         "pre",
         "hr",
+        "figure",
+        "figcaption",
+        "details",
+        "summary",
+        "address",
+        "dialog",
     }
 
     def __init__(self, extract_title: bool = True) -> None:
@@ -177,6 +175,7 @@ class HTMLToMarkdownParser(HTMLParser):
         self._list_stack: List[Tuple[str, int]] = []  # ('ul' | 'ol', current_count)
         self._in_pre = False
         self._pre_buffer: Optional[List[str]] = None  # buffered until </pre> to size the fence
+        self._pre_lang = ""
         self._table_rows: List[List[str]] = []
         self._current_row: Optional[List[str]] = None
         self._current_cell: Optional[List[str]] = None
@@ -277,6 +276,11 @@ class HTMLToMarkdownParser(HTMLParser):
         if tag_lower == "pre":
             self._in_pre = True
             self._pre_buffer = []
+            self._pre_lang = ""
+            cls = attr_dict.get("class", "")
+            lang_match = re.search(r"(?:language|lang)-([a-zA-Z0-9_\-+]+)", cls, re.IGNORECASE)
+            if lang_match:
+                self._pre_lang = lang_match.group(1).lower()
             if self._li_stack:
                 # A fenced block inside a list item: continuation lines are
                 # indented so the fence stays part of the item.
@@ -294,11 +298,16 @@ class HTMLToMarkdownParser(HTMLParser):
         if self._in_pre:
             # Inside <pre> everything is verbatim code content: no block or
             # inline handling may emit outside the fenced buffer.
+            if tag_lower == "code" and not self._pre_lang:
+                cls = attr_dict.get("class", "")
+                lang_match = re.search(r"(?:language|lang)-([a-zA-Z0-9_\-+]+)", cls, re.IGNORECASE)
+                if lang_match:
+                    self._pre_lang = lang_match.group(1).lower()
             if tag_lower == "br" and self._pre_buffer is not None:
                 self._pre_buffer.append("\n")
             return
 
-        if tag_lower == "code":
+        if tag_lower in ("code", "kbd"):
             self._open_marker("`")
             return
 
@@ -431,7 +440,7 @@ class HTMLToMarkdownParser(HTMLParser):
                 # inner text flow into it, and remember to skip its end tag.
                 self._nested_link_depth += 1
                 return
-            href = _clean_url(attr_dict.get("href", "").strip())
+            href = clean_url(attr_dict.get("href", "").strip())
             title = attr_dict.get("title", "").strip()
             if href.lower().startswith("javascript:"):
                 href = ""
@@ -439,7 +448,7 @@ class HTMLToMarkdownParser(HTMLParser):
             return
 
         if tag_lower == "img":
-            src = _clean_url(attr_dict.get("src", "").strip())
+            src = clean_url(attr_dict.get("src", "").strip())
             alt = _escape_alt(attr_dict.get("alt", "").strip() or "Image")
             title = attr_dict.get("title", "").strip()
             if src.startswith("data:"):
@@ -452,11 +461,14 @@ class HTMLToMarkdownParser(HTMLParser):
                 self._append_token(f"![{alt}]({src}{title_suffix})")
             return
 
-        if tag_lower in ("p", "div", "article", "section", "header", "dt", "dd"):
+        if tag_lower in (
+            "p", "div", "article", "section", "header", "main", "figure", "figcaption", "details", "summary", "address", "dialog", "dt", "dd"
+        ):
+            is_tight = tag_lower in ("p", "dt", "dd", "figcaption", "summary")
             if self._li_stack:
-                self._li_block_break(tag_lower in ("p", "dt", "dd"))
+                self._li_block_break(is_tight)
             else:
-                self._ensure_newline(2 if tag_lower in ("p", "dt", "dd") else 1)
+                self._ensure_newline(2 if is_tight else 1)
             return
 
     def handle_endtag(self, tag: str) -> None:
@@ -482,8 +494,10 @@ class HTMLToMarkdownParser(HTMLParser):
             # fenced_code_block adds the newline before the closing fence itself,
             # so strip trailing newlines from the buffered content.
             content = "".join(self._pre_buffer or []).rstrip("\n")
+            lang = self._pre_lang
             self._pre_buffer = None
-            block = fenced_code_block(content) if content else "```\n```"
+            self._pre_lang = ""
+            block = fenced_code_block(content, lang=lang) if content else "```\n```"
             if self._li_stack:
                 indent = self._li_stack[-1][0]
                 block = ("\n" + indent).join(block.split("\n"))
@@ -497,7 +511,7 @@ class HTMLToMarkdownParser(HTMLParser):
         if self._in_pre:
             return
 
-        if tag_lower == "code":
+        if tag_lower in ("code", "kbd"):
             self._close_marker("`")
             return
 
@@ -536,13 +550,24 @@ class HTMLToMarkdownParser(HTMLParser):
                 self._ensure_newline(2)
             return
 
-        if tag_lower in ("p", "dt", "dd"):
+        if tag_lower in (
+            "p", "dt", "dd", "figcaption", "summary", "address", "dialog"
+        ):
             if self._current_cell is not None:
                 self._append_token(" ")
             elif self._li_stack:
                 pass
             else:
                 self._ensure_newline(2)
+            return
+
+        if tag_lower in ("figure", "details"):
+            if self._current_cell is not None:
+                self._append_token(" ")
+            elif self._li_stack:
+                pass
+            else:
+                self._ensure_newline(1)
             return
 
         if tag_lower in ("ul", "ol"):
@@ -562,7 +587,7 @@ class HTMLToMarkdownParser(HTMLParser):
 
         if tag_lower in ("th", "td"):
             if self._in_table and self._current_cell is not None:
-                cell_text = "".join(self._current_cell).strip().replace("\n", " ").replace("|", "\\|")
+                cell_text = "".join(self._current_cell).strip().replace("\r", "").replace("\n", " ").replace("|", "\\|")
                 if self._current_row is not None:
                     self._current_row.append(cell_text)
                     for _ in range(self._current_colspan - 1):

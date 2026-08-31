@@ -30,6 +30,8 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
     output: List[str] = []
 
     for cell in cells:
+        if not isinstance(cell, dict):
+            continue
         cell_type = cell.get("cell_type", "")
         # "source" may be a list of lines, a plain string, or explicitly null.
         source_lines = cell.get("source")
@@ -51,8 +53,12 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
             code_block = fenced_code_block(source, lang=lang)
             # Optional outputs
             outputs = cell.get("outputs", [])
+            if not isinstance(outputs, list):
+                outputs = []
             out_texts: List[str] = []
             for out in outputs:
+                if not isinstance(out, dict):
+                    continue
                 out_type = out.get("output_type", "")
                 if out_type == "stream":
                     text = _as_text(out.get("text", []))
@@ -60,10 +66,15 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
                         out_texts.append(fenced_code_block(text.strip(), lang="output"))
                 elif out_type in ("execute_result", "display_data"):
                     data_dict = out.get("data", {})
-                    if "text/plain" in data_dict:
-                        text = _as_text(data_dict["text/plain"])
-                        if text.strip():
-                            out_texts.append(fenced_code_block(text.strip(), lang="output"))
+                    if isinstance(data_dict, dict):
+                        if "text/plain" in data_dict:
+                            text = _as_text(data_dict["text/plain"])
+                            if text.strip():
+                                out_texts.append(fenced_code_block(text.strip(), lang="output"))
+                        elif "text/markdown" in data_dict:
+                            text = _as_text(data_dict["text/markdown"])
+                            if text.strip():
+                                out_texts.append(text.strip())
                 elif out_type == "error":
                     tb = out.get("traceback", [])
                     tb_str = "\n".join(str(line) for line in tb if line is not None) if isinstance(tb, list) else _as_text(tb)

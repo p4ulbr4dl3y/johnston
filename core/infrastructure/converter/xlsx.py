@@ -74,8 +74,8 @@ def _col_letter_to_index(col_str: str) -> int:
 
 
 def _split_cell_ref(ref: str) -> Tuple[int, int]:
-    """Split cell reference 'BC12' into (col_idx, row_idx). Row is 0-based."""
-    match = re.match(r"^([A-Za-z]+)(\d+)$", ref)
+    """Split cell reference 'BC12' or '$BC$12' into (col_idx, row_idx). Row is 0-based."""
+    match = re.match(r"^\$?([A-Za-z]+)\$?(\d+)$", ref)
     if not match:
         return 0, 0
     col_str, row_str = match.groups()
@@ -111,14 +111,16 @@ def _load_numfmt_styles(zf: zipfile.ZipFile) -> Dict[int, Tuple[int, str]]:
     styles: Dict[int, Tuple[int, str]] = {}
     for elem in tree.iter():
         if _local(elem.tag) == "cellXfs":
-            for idx, xf in enumerate(elem):
-                if _local(xf.tag) != "xf":
+            xf_idx = 0
+            for child in elem:
+                if _local(child.tag) != "xf":
                     continue
                 try:
-                    fmt_id = int(xf.attrib.get("numFmtId", "0"))
+                    fmt_id = int(child.attrib.get("numFmtId", "0"))
                 except ValueError:
                     fmt_id = 0
-                styles[idx] = (fmt_id, custom.get(fmt_id, ""))
+                styles[xf_idx] = (fmt_id, custom.get(fmt_id, ""))
+                xf_idx += 1
             break
     return styles
 
@@ -374,7 +376,7 @@ def _parse_sheet_to_table(
                 else:
                     val_text = v_elem.text
 
-            clean_val = val_text.strip().replace("\n", " ").replace("|", "\\|")
+            clean_val = val_text.strip().replace("\r", "").replace("\n", " ").replace("|", "\\|")
             if clean_val:
                 col_dict[c_idx] = clean_val
                 if c_idx > max_col:

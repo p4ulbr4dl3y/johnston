@@ -21,7 +21,7 @@ def collapse_blank_lines(text: str) -> str:
     opening fence is a line starting with 3+ backticks; a fence closes on a
     line of backticks at least as long as the opening fence.
     """
-    lines = text.split("\n")
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     out: List[str] = []
     in_fence = False
     fence_len = 0
@@ -89,9 +89,21 @@ def safe_read_zip_member(
 
 def clean_url(url: str) -> str:
     """Make a URL safe inside a Markdown inline link: spaces become %20 and
-    unbalanced parentheses are escaped (balanced ones are valid as-is)."""
+    unbalanced/inverted parentheses are escaped (balanced ones are valid as-is)."""
     url = url.replace(" ", "%20")
-    if url.count("(") != url.count(")"):
+    depth = 0
+    balanced = True
+    for ch in url:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth < 0:
+                balanced = False
+                break
+    if depth != 0:
+        balanced = False
+    if not balanced:
         url = url.replace("(", "\\(").replace(")", "\\)")
     return url
 

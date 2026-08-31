@@ -82,7 +82,8 @@ def epub_to_markdown(epub_input: Union[str, bytes, BinaryIO]) -> str:
                 item_id = elem.attrib.get("id")
                 href = elem.attrib.get("href")
                 if item_id and href:
-                    raw_href = f"{opf_dir}/{href}" if opf_dir else href
+                    href_clean = href.split("#", 1)[0].split("?", 1)[0]
+                    raw_href = f"{opf_dir}/{href_clean}" if opf_dir else href_clean
                     full_href = posixpath.normpath(urllib.parse.unquote(raw_href))
                     manifest[item_id] = full_href
             elif tag == "itemref":
