@@ -449,6 +449,26 @@ class ChatView(VerticalScroll):
                     return str(content)
         return None
 
+    async def reset_to_messages(self, messages: list[dict] | None, task_manager=None) -> None:
+        """Atomically reset mounted widgets and pagination buffer to the given messages."""
+        for child in list(self.children):
+            child.remove()
+        msg_list = list(messages) if messages is not None else []
+        page_size = getattr(self, "PAGE_SIZE", 50)
+        if len(msg_list) > page_size:
+            self._unloaded_messages = msg_list[:-page_size]
+            msgs_to_render = msg_list[-page_size:]
+        else:
+            self._unloaded_messages = []
+            msgs_to_render = msg_list
+
+        for msg in msgs_to_render:
+            if isinstance(msg, dict):
+                await self.restore_message(msg, task_manager=task_manager)
+        self.check_welcome()
+        self._auto_follow = True
+        self.call_after_refresh(lambda: self.scroll_end(animate=False))
+
     def rollback_to(self, target_index: int) -> None:
         children = [c for c in self.children if not getattr(c, "_pruning", False)]
         start_idx = max(0, target_index + 1)

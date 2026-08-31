@@ -669,3 +669,31 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
 
             self.assertFalse(chat_view.has_older_messages())
             self.assertEqual(len(chat_view.get_user_messages()), 10)
+
+    async def test_reset_to_messages(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            chat_view.PAGE_SIZE = 3
+            # Initial 10 messages
+            msgs = [{"type": "user", "text": f"turn_{i}"} for i in range(10)]
+            await chat_view.reset_to_messages(msgs)
+            await pilot.pause()
+
+            self.assertEqual(len(chat_view._unloaded_messages), 7)
+            self.assertEqual([text for _, text in chat_view.get_user_messages()], [f"turn_{i}" for i in range(7, 10)])
+
+            # Truncate / reset to earlier 4 messages
+            truncated = msgs[:4]
+            await chat_view.reset_to_messages(truncated)
+            await pilot.pause()
+
+            self.assertEqual(len(chat_view._unloaded_messages), 1)
+            self.assertEqual(chat_view._unloaded_messages, [{"type": "user", "text": "turn_0"}])
+            self.assertEqual([text for _, text in chat_view.get_user_messages()], [f"turn_{i}" for i in range(1, 4)])
+
+            # Reset to empty
+            await chat_view.reset_to_messages([])
+            await pilot.pause()
+            self.assertEqual(len(chat_view._unloaded_messages), 0)
+            self.assertEqual(len(chat_view.get_user_messages()), 0)

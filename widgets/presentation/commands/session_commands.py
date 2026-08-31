@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from typing import Any
 
 from core.application.session.actions import (
@@ -257,13 +258,27 @@ class RewindCommand(BaseCommand):
                 def rollback_ui(target_idx: int) -> None:
                     try:
                         cv = app.query_one(ChatView)
-                        if session and getattr(session, "messages", None) is not None:
-                            page_size = getattr(cv, "PAGE_SIZE", 50)
-                            if len(session.messages) > page_size:
-                                cv._unloaded_messages = session.messages[:-page_size]
-                            else:
-                                cv._unloaded_messages = []
-                        cv.rollback_to(target_idx)
+                        target_msgs = (
+                            session.messages
+                            if (session and getattr(session, "messages", None) is not None)
+                            else []
+                        )
+                        raw_page_size = getattr(cv, "PAGE_SIZE", 50)
+                        page_size = raw_page_size if isinstance(raw_page_size, int) else 50
+                        if len(target_msgs) > page_size:
+                            cv._unloaded_messages = target_msgs[:-page_size]
+                        else:
+                            cv._unloaded_messages = []
+                        if hasattr(cv, "reset_to_messages") and callable(cv.reset_to_messages):
+                            task_mgr = getattr(app, "task_manager", None)
+                            res = cv.reset_to_messages(target_msgs, task_manager=task_mgr)
+                            if inspect.isawaitable(res):
+                                try:
+                                    asyncio.create_task(res)
+                                except RuntimeError:
+                                    pass
+                        else:
+                            cv.rollback_to(target_idx)
                     except Exception:
                         pass
 
@@ -369,13 +384,27 @@ class ForkCommand(BaseCommand):
             if up_to_idx is not None:
                 try:
                     cv = app.query_one(ChatView)
-                    if session and isinstance(getattr(session, "messages", None), list):
-                        page_size = getattr(cv, "PAGE_SIZE", 50)
-                        if len(session.messages) > page_size:
-                            cv._unloaded_messages = session.messages[:-page_size]
-                        else:
-                            cv._unloaded_messages = []
-                    cv.rollback_to(-1 if up_to_idx == 0 else selected_child_idx - 1)
+                    from core.domain.policies.messages import transcript_before_turn
+
+                    target_msgs = []
+                    if up_to_idx > 0 and session and isinstance(getattr(session, "messages", None), list):
+                        target_msgs = transcript_before_turn(session.messages, up_to_idx)
+                    raw_page_size = getattr(cv, "PAGE_SIZE", 50)
+                    page_size = raw_page_size if isinstance(raw_page_size, int) else 50
+                    if len(target_msgs) > page_size:
+                        cv._unloaded_messages = target_msgs[:-page_size]
+                    else:
+                        cv._unloaded_messages = []
+                    if hasattr(cv, "reset_to_messages") and callable(cv.reset_to_messages):
+                        task_mgr = getattr(app, "task_manager", None)
+                        res = cv.reset_to_messages(target_msgs, task_manager=task_mgr)
+                        if inspect.isawaitable(res):
+                            try:
+                                asyncio.create_task(res)
+                            except RuntimeError:
+                                pass
+                    else:
+                        cv.rollback_to(-1 if up_to_idx == 0 else selected_child_idx - 1)
                 except Exception:
                     pass
 

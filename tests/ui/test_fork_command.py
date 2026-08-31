@@ -44,13 +44,12 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         cmd = ForkCommand()
         await cmd.execute(app)
 
-        # Lazy fork: session is NOT forked immediately on disk
         app.sm.fork_session.assert_not_called()
         self.assertEqual(
             app.pending_fork,
             {"parent_session_id": "orig_sid", "up_to_msg_index": 0, "title": "prompt 0"},
         )
-        chat_view.rollback_to.assert_called_with(-1)
+        chat_view.reset_to_messages.assert_called_with([], task_manager=unittest.mock.ANY)
         chat_input.load_text.assert_called_with("prompt 0")
         chat_input.focus.assert_called()
 
@@ -84,7 +83,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
             app.pending_fork,
             {"parent_session_id": "orig_sid", "up_to_msg_index": 1, "title": "second turn prompt"},
         )
-        chat_view.rollback_to.assert_called_with(19)
+        chat_view.reset_to_messages.assert_called()
         chat_input.load_text.assert_called_with("second turn prompt")
 
     async def test_fork_command_truncates_long_branch_title(self):
@@ -240,8 +239,8 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
 
         # Pending fork must be cancelled
         self.assertIsNone(app.pending_fork)
-        # UI rollback called for turn 0
-        chat_view.rollback_to.assert_called_with(-1)
+        # UI reset called for turn 0
+        chat_view.reset_to_messages.assert_called()
 
     async def test_fork_then_rewind_cancel_preserves_pending_fork(self):
         import inspect
@@ -277,3 +276,46 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         # Pending fork must still be preserved
         self.assertEqual(app.pending_fork, {"parent_session_id": "orig_sid", "up_to_msg_index": 1, "title": "fork"})
         chat_input.focus.assert_called()
+
+    async def test_fork_command_truncates_unloaded_messages(self):
+        from unittest.mock import AsyncMock
+
+        app = MagicMock()
+        chat_view = MagicMock()
+        chat_view.PAGE_SIZE = 50
+        chat_view.reset_to_messages = AsyncMock()
+        app.query_one.return_value = chat_view
+        app.current_session_id = "orig_sid"
+
+        parent_sess = MagicMock()
+        parent_sess.title = "Parent Title"
+        parent_sess.messages = [
+            {"type": "user", "text": f"prompt {i}"} for i in range(10)
+        ]
+        app.sm.get.return_value = parent_sess
+
+        chat_input = MagicMock()
+        chat_input.text = "prompt 2"
+
+        def query_one_mock(target, *args, **kwargs):
+            if target == "#message-input" or "ChatInput" in str(args):
+                return chat_input
+            return chat_view
+
+        app.query_one = query_one_mock
+
+        def push_screen_mock(screen, callback):
+            # Select turn 2 (index 2)
+            callback(2)
+
+        app.push_screen = push_screen_mock
+
+        cmd = ForkCommand()
+        await cmd.execute(app)
+
+        # reset_to_messages must receive only messages before turn 2 (turns 0 and 1)
+        chat_view.reset_to_messages.assert_called_once()
+        passed_msgs = chat_view.reset_to_messages.call_args[0][0]
+        self.assertEqual(len(passed_msgs), 2)
+        self.assertEqual(passed_msgs[0]["text"], "prompt 0")
+        self.assertEqual(passed_msgs[1]["text"], "prompt 1")
