@@ -1,6 +1,8 @@
 import asyncio
 import inspect
 import re
+import threading
+from collections import OrderedDict
 from typing import Any
 
 from markdown_it import MarkdownIt
@@ -10,6 +12,7 @@ from pygments.styles import get_style_by_name
 from pygments.token import Token
 from rich.segment import Segment
 from rich.syntax import PygmentsSyntaxTheme, Syntax
+from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.content import Content
@@ -42,6 +45,97 @@ class TransparentSyntax(Syntax):
 
 CODE_THEME = "one-dark"
 _CURRENT_SYNTAX_THEME: PygmentsSyntaxTheme | str | None = None
+
+# Highlight result cache. Fences get re-mounted whenever a Markdown document is
+# rebuilt (final render after streaming, session load, theme switch), and
+# pygments highlighting is the dominant cost of that pass (~10ms per large
+# block, synchronously on the UI thread inside compose()). The pre-warmed
+# Content lets compose() mount instantly; the cache also survives stream →
+# final re-renders of the same code. Keyed by the code string, lexer name,
+# syntax-theme object (identity) and dark flag, so entries can never outlive
+# the theme they were rendered for. LRU-bounded + lock-guarded (pre-warm runs
+# in worker threads while compose() may read from the UI thread).
+_HIGHLIGHT_CACHE_MAX = 256
+_highlight_cache: "OrderedDict[tuple, Content]" = OrderedDict()
+_highlight_cache_lock = threading.Lock()
+
+# Shared truecolor console for syntax rendering: creating a fresh Console per
+# highlight call is measurable overhead when a message mounts many fences.
+_HIGHLIGHT_CONSOLE: Any = None
+
+
+def _get_highlight_console() -> Any:
+    global _HIGHLIGHT_CONSOLE
+    if _HIGHLIGHT_CONSOLE is None:
+        from rich.console import Console
+
+        _HIGHLIGHT_CONSOLE = Console(force_terminal=True, color_system="truecolor")
+    return _HIGHLIGHT_CONSOLE
+
+
+def resolve_highlight_lexer(language: str | None) -> str:
+    """Map a fence info string to a pygments lexer name ("text" when unknown)."""
+    clean_lang = (language or "").strip().lower()
+    if clean_lang in ("text", "txt", "plaintext", "none", "raw", "output", "code", "log", ""):
+        return "text"
+    try:
+        get_lexer_by_name(clean_lang)
+        return clean_lang
+    except Exception:
+        return "text"
+
+
+def prewarm_fences_from_markdown(markdown: str, dark: bool = True) -> int:
+    """Highlight code fences from a markdown document off the UI thread.
+
+    Scans for fenced blocks and fills the highlight cache so the subsequent
+    Markdown mount composes instantly. Called via asyncio.to_thread from
+    BotMessage._render_markdown; returns the number of blocks highlighted.
+    Block detection mirrors clean_markdown_for_rendering (fence lines may be
+    indented); over-matching indented-code blocks only wastes a cache entry.
+    """
+    count = 0
+    lines = markdown.splitlines()
+    i = 0
+    n = len(lines)
+    while i < n:
+        if not lines[i].strip().startswith("```"):
+            i += 1
+            continue
+        lang = lines[i].strip()[3:].strip()
+        i += 1
+        code_lines: list[str] = []
+        closed = False
+        while i < n:
+            if lines[i].strip().startswith("```"):
+                closed = True
+                i += 1
+                break
+            code_lines.append(lines[i])
+            i += 1
+        # Unclosed trailing fence: the parser autocloses it at EOF, but
+        # clean_markdown_for_rendering appends the closer first — either way
+        # only pre-warm blocks with actual content.
+        if closed and code_lines:
+            try:
+                CustomMarkdownFence.highlight("\n".join(code_lines), lang, dark=dark)
+                count += 1
+            except Exception:
+                pass
+    return count
+
+
+def prepare_markdown_text(text: str, dark: bool = True) -> str:
+    """clean_markdown_for_rendering + fence pre-highlight in one worker hop.
+
+    Runs inside asyncio.to_thread from BotMessage._render_markdown so the
+    subsequent Markdown mount never blocks the UI loop on pygments.
+    """
+    cleaned = clean_markdown_for_rendering(text)
+    if "```" in cleaned:
+        prewarm_fences_from_markdown(cleaned, dark=dark)
+    return cleaned
+
 
 _RE_ITALIC_COLON = re.compile(r"(?<!\*)\*([^*:]+):\*(?!\*)")
 _RE_DOUBLE_BULLET = re.compile(r"^(\s*)(?:[-*]|\d+\.)\s+[-*]\s+")
@@ -139,30 +233,24 @@ class CustomMarkdownFence(MarkdownFence):
     def highlight(
         cls, code: str, language: str | None = None, ansi: bool = False, dark: bool = True
     ) -> Content:
-        clean_lang = (language or "").strip().lower()
-        if clean_lang in ("text", "txt", "plaintext", "none", "raw", "output", "code", "log", ""):
-            target_lexer = "text"
-        else:
-            try:
-                get_lexer_by_name(clean_lang)
-                target_lexer = clean_lang
-            except Exception:
-                target_lexer = "text"
-
         code_str = code if isinstance(code, str) else str(code)
         clean_code = code_str.rstrip("\r\n")
-
-        from rich.console import Console
-        from rich.text import Text
-        from textual.content import Content
+        target_lexer = resolve_highlight_lexer(language)
 
         if target_lexer == "text":
             return Content.from_rich_text(Text(clean_code))
 
         syntax_theme = _CURRENT_SYNTAX_THEME or (CODE_THEME if dark else "github-light")
+        key = (clean_code, target_lexer, syntax_theme, dark)
+        with _highlight_cache_lock:
+            cached = _highlight_cache.get(key)
+            if cached is not None:
+                _highlight_cache.move_to_end(key)
+                return cached
+
         try:
             syntax = Syntax(clean_code, target_lexer, theme=syntax_theme, word_wrap=True)
-            console = Console(force_terminal=True, color_system="truecolor")
+            console = _get_highlight_console()
             rich_text = Text()
             for segment in syntax._get_syntax(console, console.options):
                 style = segment.style.copy() if segment.style else None
@@ -170,9 +258,15 @@ class CustomMarkdownFence(MarkdownFence):
                     style._bgcolor = None
                 rich_text.append(segment.text, style=style)
             rich_text.rstrip()
-            return Content.from_rich_text(rich_text)
+            content = Content.from_rich_text(rich_text)
         except Exception:
-            return MarkdownFence.highlight(clean_code, language=target_lexer, ansi=ansi, dark=dark)
+            content = MarkdownFence.highlight(clean_code, language=target_lexer, ansi=ansi, dark=dark)
+
+        with _highlight_cache_lock:
+            _highlight_cache[key] = content
+            while len(_highlight_cache) > _HIGHLIGHT_CACHE_MAX:
+                _highlight_cache.popitem(last=False)
+        return content
 
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "text"

@@ -11,7 +11,7 @@ from textual.widgets import Label, Markdown, Static
 from core.infrastructure.config.settings import get_settings
 from widgets.presentation.widgets.chat_markdown import (
     _handle_markdown_task_done,
-    clean_markdown_for_rendering,
+    prepare_markdown_text,
     safe_update_markdown,
 )
 from widgets.utils.row_format import ellipsize
@@ -352,7 +352,14 @@ class BotMessage(Vertical):
     async def _render_markdown(self, content: str) -> None:
         if not self.md_widget.is_attached:
             return
-        cleaned = await asyncio.to_thread(clean_markdown_for_rendering, content)
+        # Clean + pre-highlight code fences in a worker thread so mounting the
+        # document never blocks the UI loop on pygments (highlight cache in
+        # chat_markdown makes compose() cheap).
+        try:
+            dark = bool(getattr(self.app.current_theme, "dark", True))
+        except Exception:
+            dark = True
+        cleaned = await asyncio.to_thread(prepare_markdown_text, content, dark)
         try:
             await self.md_widget.update(cleaned)
         except asyncio.CancelledError:

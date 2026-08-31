@@ -322,3 +322,117 @@ class TestCleanMarkdownExtended(unittest.TestCase):
         cleaned = clean_markdown_for_rendering(raw)
         self.assertNotIn("\n\n\n", cleaned)
         self.assertEqual(cleaned, "para one\n\npara two")
+
+
+class TestFenceHighlightCache(unittest.TestCase):
+    """Regression: fence highlighting is cached + pre-warmed off the UI thread.
+
+    Before the fix, every Markdown mount re-ran pygments synchronously inside
+    CustomMarkdownFence.compose() (~10ms per large block; 250ms+ for an answer
+    with many code blocks), freezing the event loop at final render.
+    """
+
+    def _clear_cache(self):
+        from widgets.presentation.widgets import chat_markdown
+
+        chat_markdown._highlight_cache.clear()
+
+    def setUp(self):
+        self._clear_cache()
+
+    def tearDown(self):
+        self._clear_cache()
+
+    def test_highlight_returns_cached_content_for_same_inputs(self):
+        code = "def f():\n    return 1\n"
+        first = CustomMarkdownFence.highlight(code, "python")
+        second = CustomMarkdownFence.highlight(code, "python")
+        self.assertIs(first, second)
+
+    def test_highlight_distinguishes_language_dark_and_code(self):
+        code = "x = 1"
+        py = CustomMarkdownFence.highlight(code, "python")
+        py_dark2 = CustomMarkdownFence.highlight(code, "python", dark=True)
+        self.assertIs(py, py_dark2)  # same key -> same object
+        js = CustomMarkdownFence.highlight(code, "javascript")
+        plain = CustomMarkdownFence.highlight(code, "text")
+        light = CustomMarkdownFence.highlight(code, "python", dark=False)
+        self.assertIsNot(py, js)
+        self.assertIsNot(py, plain)
+        self.assertIsNot(py, light)
+
+    def test_resolve_highlight_lexer_fallbacks(self):
+        from widgets.presentation.widgets.chat_markdown import resolve_highlight_lexer
+
+        self.assertEqual(resolve_highlight_lexer("python"), "python")
+        self.assertEqual(resolve_highlight_lexer(" PYTHON "), "python")
+        self.assertEqual(resolve_highlight_lexer("not-a-real-lexer-xyz"), "text")
+        self.assertEqual(resolve_highlight_lexer(""), "text")
+        self.assertEqual(resolve_highlight_lexer(None), "text")
+        self.assertEqual(resolve_highlight_lexer("log"), "text")
+
+    def test_prewarm_fills_cache_and_compose_hits_it(self):
+        from widgets.presentation.widgets.chat_markdown import (
+            _highlight_cache,
+            prewarm_fences_from_markdown,
+        )
+
+        md = "intro\n\n```python\nx = 1\n```\n\nmid\n\n```js\nlet y = 2;\n```\n"
+        count = prewarm_fences_from_markdown(md, dark=True)
+        self.assertEqual(count, 2)
+        self.assertEqual(len(_highlight_cache), 2)
+        # compose() path (same normalized inputs) must hit the warm entries.
+        content = CustomMarkdownFence.highlight("x = 1", "python")
+        self.assertIn(content, list(_highlight_cache.values()))
+
+    def test_prewarm_skips_empty_and_unclosed_blocks(self):
+        from widgets.presentation.widgets.chat_markdown import _highlight_cache, prewarm_fences_from_markdown
+
+        self.assertEqual(prewarm_fences_from_markdown("no fences here", dark=True), 0)
+        self.assertEqual(_highlight_cache, {})
+        # Unclosed fence at EOF is not pre-warmed.
+        self.assertEqual(prewarm_fences_from_markdown("```python\ncode without closer\n", dark=True), 0)
+        # An immediately-closed empty fence is not pre-warmed.
+        self.assertEqual(prewarm_fences_from_markdown("```\n```\n", dark=True), 0)
+        self.assertEqual(_highlight_cache, {})
+
+    def test_prewarm_matches_indented_fence_like_clean_markdown(self):
+        from widgets.presentation.widgets.chat_markdown import prewarm_fences_from_markdown
+
+        md = "text\n\n  ```python\n  y = 3\n  ```\n"
+        self.assertEqual(prewarm_fences_from_markdown(md, dark=True), 1)
+
+    def test_highlight_cache_invalidated_by_theme_change(self):
+        from widgets.presentation.widgets import chat_markdown
+
+        code = "z = 9"
+        before = CustomMarkdownFence.highlight(code, "python")
+        sentinel = object()  # hashable theme-object stand-in
+        original = chat_markdown._CURRENT_SYNTAX_THEME
+        chat_markdown._CURRENT_SYNTAX_THEME = sentinel
+        try:
+            after = CustomMarkdownFence.highlight(code, "python")
+        finally:
+            chat_markdown._CURRENT_SYNTAX_THEME = original
+        self.assertIsNot(before, after)
+
+    def test_prepare_markdown_text_prewarms_and_cleans(self):
+        from widgets.presentation.widgets.chat_markdown import (
+            _highlight_cache,
+            prepare_markdown_text,
+        )
+
+        md = "para\n\n```python\nq = 4\n```\n"
+        cleaned = prepare_markdown_text(md, dark=True)
+        self.assertEqual(cleaned, clean_markdown_for_rendering(md))
+        self.assertTrue(any("q = 4" in key[0] for key in _highlight_cache))
+
+    def test_highlight_cache_lru_bounded(self):
+        from widgets.presentation.widgets.chat_markdown import (
+            _HIGHLIGHT_CACHE_MAX,
+            _highlight_cache,
+        )
+
+        for i in range(_HIGHLIGHT_CACHE_MAX + 10):
+            CustomMarkdownFence.highlight(f"v = {i}\n", "python")
+        self.assertEqual(len(_highlight_cache), _HIGHLIGHT_CACHE_MAX)
