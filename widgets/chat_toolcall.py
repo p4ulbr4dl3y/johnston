@@ -141,8 +141,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             )
         if self.canonical_tool == "manage_subagent":
             args = self.args
-            action = (args.get("action") or "list").lower()
-            return bool(getattr(self, "subagent_session_id", None) or args.get("session_id") or action == "list")
+            return bool(getattr(self, "subagent_session_id", None) or args.get("session_id"))
         return (
             self.is_expandable()
             or self.canonical_tool in ("invoke_subagent", "ask_user")
@@ -422,34 +421,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 except Exception:
                     pass
                 return
-            else:
-                action = (args.get("action") or "list").lower()
-                if action == "list":
-                    store = getattr(app, "sm", None) if app else None
-                    if store is None:
-                        from core.infrastructure.storage.session_store import SessionStore
-
-                        store = SessionStore.get_instance()
-                    curr_session_id = getattr(app, "current_session_id", None) if app else None
-                    subagents = (
-                        store.children(curr_session_id)
-                        if curr_session_id and store
-                        else (store.list(kind="subagent") if store else [])
-                    )
-                    has_active = any(getattr(s, "status", "") == "running" for s in (subagents or []))
-                    event.stop()
-                    if has_active:
-                        try:
-                            from widgets.presentation.screens.tasks import SubagentsScreen
-
-                            if app:
-                                app.push_screen(SubagentsScreen())
-                        except Exception:
-                            pass
-                    else:
-                        if app and hasattr(app, "notify"):
-                            app.notify("No active subagents", severity="information")
-                    return
 
 
         if self.canonical_tool == "ask_user":

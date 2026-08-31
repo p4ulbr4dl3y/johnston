@@ -83,9 +83,9 @@ def format_plan_display(plan_items: Any, explanation: str = "") -> Text:
             status = str(item.get("status") or "pending").lower()
 
             if status == "completed":
-                line = Text("[x] ") + Text(step, style="strike")
+                line = Text("[✓] ", style="dim") + Text(step, style="strike dim")
             elif status == "in_progress":
-                line = Text("[>] ", style="bold") + Text(step, style="bold")
+                line = Text("[▶] ", style="bold") + Text(step, style="bold")
             else:
                 line = Text("[ ] ") + Text(step)
             plan_lines.append(line)
@@ -142,9 +142,9 @@ def format_manage_shell_display(result_text: str) -> Text:
         if m:
             t_id, status, cmd = m.group(1), m.group(2).upper(), m.group(3).strip()
             if status == "RUNNING":
-                task_t = Text("[>] ", style="bold") + Text(f"{t_id}  ", style="bold") + Text(cmd)
+                task_t = Text("[▶] ", style="bold") + Text(f"{t_id}  ", style="bold") + Text(cmd)
             else:
-                task_t = Text("[x] ", style="dim") + Text(f"{t_id}  ", style="dim") + Text(cmd, style="dim")
+                task_t = Text("[✓] ", style="dim") + Text(f"{t_id}  ", style="dim") + Text(cmd, style="dim")
             task_lines.append(task_t)
         else:
             task_lines.append(Text(line_clean))
@@ -189,13 +189,13 @@ def format_manage_subagent_display(result_text: str) -> Text:
             desc = f"{role_cap}: {title}" if title else (role_cap or "(no description)")
             if status == "RUNNING":
                 item_t = (
-                    Text("[>] ", style="bold")
+                    Text("[▶] ", style="bold")
                     + Text(f"{s_id}  ", style="bold")
                     + Text(desc)
                 )
             else:
                 item_t = (
-                    Text("[x] ", style="dim")
+                    Text("[✓] ", style="dim")
                     + Text(f"{s_id}  ", style="dim")
                     + Text(desc, style="dim")
                 )
