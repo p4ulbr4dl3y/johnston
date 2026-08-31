@@ -13,10 +13,10 @@ from widgets.presentation.screens.theme import ThemeScreen
 async def test_theme_modal_search_live_preview_and_confirm():
     app = JohnstonApp()
     async with app.run_test() as pilot:
-        # 1. Start in Zinc Dark (#09090B)
+        # 1. Start in Zinc Dark (#18181B)
         app.set_app_theme("zinc")
         assert app.theme == "zinc"
-        assert app.screen.styles.background.hex[:7].upper() == "#09090B"
+        assert app.screen.styles.background.hex[:7].upper() == "#18181B"
 
         # 2. Open /theme modal
         input_widget = app.query_one("#message-input", ChatInput)
@@ -30,8 +30,8 @@ async def test_theme_modal_search_live_preview_and_confirm():
         # 3. Live preview on down arrow
         await pilot.press("down")
         await pilot.pause()
-        assert app.theme == "charcoal"
-        assert theme_manager.current_theme.name == "charcoal"
+        assert app.theme == "zinc-oled"
+        assert theme_manager.current_theme.name == "zinc-oled"
 
         # 4. Search for "everforest"
         search_input = theme_screen.query_one("#modal-search-input", Input)
@@ -51,4 +51,4 @@ async def test_theme_modal_search_live_preview_and_confirm():
         # Restore zinc
         app.set_app_theme("zinc")
         assert app.theme == "zinc"
-        assert app.screen.styles.background.hex[:7].upper() == "#09090B"
+        assert app.screen.styles.background.hex[:7].upper() == "#18181B"

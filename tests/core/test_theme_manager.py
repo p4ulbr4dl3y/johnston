@@ -33,6 +33,7 @@ def test_builtin_themes_presence():
     themes = list_themes()
     names = {t.name for t in themes}
     assert "zinc" in names
+    assert "zinc-oled" in names
     assert "charcoal" in names
     assert "catppuccin-mocha" in names
     assert "catppuccin-macchiato" in names
@@ -58,7 +59,7 @@ def test_builtin_themes_presence():
     assert "vesper" in names
     assert "dracula" in names
     assert "native" in names
-    assert len(themes) == 26
+    assert len(themes) == 27
 
 
 def test_theme_manager_registration_and_switching():
@@ -215,7 +216,7 @@ def test_themes_loader_module():
     )
 
     themes = list_themes()
-    assert len(themes) == 26
+    assert len(themes) == 27
     assert DEFAULT_THEME_NAME == "zinc"
     assert get_theme("zinc") is not None
     assert get_theme("zinc").name == "zinc"
