@@ -14,6 +14,7 @@ from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.tool_renderers import build_synthetic_create_diff
 from widgets.presentation.widgets.chat_diff import format_edit_diff
+from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import (
@@ -226,7 +227,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
         self._action_desc = action_desc
         with Vertical(id="modal-dialog", classes="bash-confirm-dialog"):
-            yield Markdown("### **Confirm Tool Action**", classes="modal-markdown modal-markdown-centered")
+            yield ModalHeader("Confirm Tool Action", esc_hint="esc: deny")
             yield Markdown(action_desc, classes="modal-markdown")
 
             if self.tool_name == "create":
@@ -454,8 +455,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
     def _build_hint_text(self, width: Optional[int] = None) -> str:
         if isinstance(width, int) and is_compact_width(width, breakpoint=BREAKPOINT_HINT):
-            return "enter • ↑↓ • r • esc"
-        return "enter: select • ↑↓: nav • r: feedback • esc: deny"
+            return "enter • ↑↓ • r"
+        return "enter: select • ↑↓: nav • r: feedback"
 
     def on_resize(self, event) -> None:
         self._apply_dialog_fit()

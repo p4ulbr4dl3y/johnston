@@ -182,10 +182,10 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         # Hint text is unified with OptionList and collapses below BREAKPOINT_HINT (60)
         screen = PermissionConfirmScreen("read", {})
         self.assertIn("enter: select", screen._build_hint_text(width=80))
-        self.assertIn("esc: deny", screen._build_hint_text(width=80))
+        self.assertIn("r: feedback", screen._build_hint_text(width=80))
         compact = screen._build_hint_text(width=40)
         self.assertIn("enter", compact)
-        self.assertIn("esc", compact)
+        self.assertIn("r", compact)
         self.assertNotIn("enter: select", compact)
 
     async def test_reject_with_reason_flow(self):
@@ -303,7 +303,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
     def test_content_width_calculation_shell(self):
         screen_short = PermissionConfirmScreen("shell", {"command": "git status"})
         w_short = screen_short._calculate_content_width()
-        self.assertGreaterEqual(w_short, 52)
+        self.assertGreaterEqual(w_short, 44)
         self.assertLess(w_short, 70)
 
         screen_med = PermissionConfirmScreen(
@@ -330,7 +330,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         w = screen_prompt._calculate_content_width()
         # Text descriptions and prompts are capped to ~64 + gutter, avoiding 100+ ballooning
         self.assertLessEqual(w, 75)
-        self.assertGreaterEqual(w, 52)
+        self.assertGreaterEqual(w, 44)
 
     async def test_adaptive_modal_width_applied_on_mount(self):
         screen = PermissionConfirmScreen("shell", {"command": "git status"})
@@ -340,7 +340,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             # Should hug content rather than stretching to 104
             self.assertIsNotNone(dialog.styles.width)
             self.assertLessEqual(dialog.styles.width.value, 70)
-            self.assertGreaterEqual(dialog.styles.width.value, 52)
+            self.assertGreaterEqual(dialog.styles.width.value, 44)
 
 
 if __name__ == "__main__":

@@ -766,14 +766,14 @@ ModalScreen {
 }
 
 DiffScreen {
-    background: $bg-app;
+    background: $bg-surface;
 }
 
 #diff-container {
     width: 100%;
     height: 100%;
     layout: vertical;
-    background: $bg-app;
+    background: $bg-surface;
 }
 
 #diff-header {
@@ -789,7 +789,7 @@ DiffScreen {
     width: 100%;
     height: 1fr;
     layout: horizontal;
-    background: $bg-app;
+    background: $bg-surface;
 }
 
 #diff-sidebar {
@@ -876,7 +876,7 @@ DiffScreen {
     width: 1fr;
     height: 100%;
     padding: 0 2 0 2;
-    background: $bg-app;
+    background: $bg-surface;
 }
 
 #diff-scroll-box,

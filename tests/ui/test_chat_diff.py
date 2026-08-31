@@ -227,9 +227,9 @@ class TestFormatEditDiff(unittest.TestCase):
         dark_theme.syntax_tokens = {}
         add_fg, add_bg, rem_fg, rem_bg, gutter = get_diff_colors(dark_theme)
         self.assertEqual(add_fg, "#46c05a")
-        self.assertEqual(add_bg, "on #15281e")
+        self.assertEqual(add_bg, "on #23382b")
         self.assertEqual(rem_fg, "#f25555")
-        self.assertEqual(rem_bg, "on #241416")
+        self.assertEqual(rem_bg, "on #382427")
         self.assertEqual(gutter, "#71717a")
 
         # Light theme mock

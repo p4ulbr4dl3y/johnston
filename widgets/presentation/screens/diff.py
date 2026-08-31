@@ -62,14 +62,14 @@ class DiffHeader(ResizeDebounceMixin, Static):
                     f"[{t_secondary}]{title_short}[/] "
                     f"[{t_muted}]({escape(stat)})[/]"
                 )
-            right_text = f"[{t_muted}]esc[/]"
+            right_text = format_modal_hint("esc")
         else:
             left_text = (
                 f"[bold {t_primary}]Diff Viewer[/]{sep}"
                 f"[{t_secondary}]{escape(self.title_text)}[/]{sep}"
                 f"[{t_muted}]({escape(self.stats_summary)})[/]"
             )
-            right_text = f"[{t_muted}]{esc_label}[/]"
+            right_text = format_modal_hint(esc_label)
 
         table.add_row(left_text, right_text)
         self.update(table)

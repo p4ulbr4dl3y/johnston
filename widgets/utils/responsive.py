@@ -142,22 +142,26 @@ def modal_content_width(
     options: Iterable[Any] | None = None,
     title: str = "",
     hint: str = "",
+    esc_hint: str = "",
     *,
     extra: int = MODAL_CONTENT_GUTTER,
 ) -> int:
     """Rendered content width of a selection-style modal in terminal cells.
 
     Measures option rows (duck-typed ``prompt`` for Option instances), the
-    title markdown with ``#``/``*``/backtick markup stripped, and the hint
-    line; adds ``extra`` for dialog padding + border + option padding.
+    title markdown with ``#``/``*``/backtick markup stripped, the hint
+    line, and header with esc_hint; adds ``extra`` for dialog padding + border + option padding.
     """
     widest = 0
     for opt in options or ():
         text = getattr(opt, "prompt", opt)
         widest = max(widest, display_width(str(text)))
-    for block in (title, hint):
+    for block in (title, hint, esc_hint):
         for line in str(block).splitlines():
             widest = max(widest, display_width(_MARKUP_RE.sub("", line).strip()))
+    if title and esc_hint:
+        header_w = display_width(_MARKUP_RE.sub("", title).strip()) + display_width(esc_hint) + 4
+        widest = max(widest, header_w)
     return widest + extra
 
 
