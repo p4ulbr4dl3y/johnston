@@ -325,8 +325,9 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
         with patch("core.adapters.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(mock_agent, sess)
 
-        self.assertEqual(res, "Axum Backend Rewrite")
-        self.assertEqual(sess.title, "Axum Backend Rewrite")
+        # The fork marker survives auto-titling so lineage stays visible.
+        self.assertEqual(res, "Axum Backend Rewrite (fork)")
+        self.assertEqual(sess.title, "Axum Backend Rewrite (fork)")
         self.assertTrue(sess.auto_titled)
 
     async def test_forked_session_preserves_title_if_already_auto_titled(self):
@@ -403,7 +404,7 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
             app._schedule_auto_title(sess)
             await asyncio.sleep(0.05)
 
-        self.assertEqual(sess.title, "New prompt in fork")
+        self.assertEqual(sess.title, "New prompt in fork (fork)")
         app.sm.save.assert_called_with(sess)
         self.assertTrue(app.footer_refreshed)
 

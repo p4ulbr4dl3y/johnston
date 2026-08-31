@@ -13,6 +13,7 @@ from core.domain.defaults.config import (
     DEFAULT_AUTO_TITLE_TIMEOUT,
 )
 from core.domain.entities.session import AgentSession
+from core.domain.policies.session_naming import FORK_BASE_MAX_LEN, fork_marker
 from core.infrastructure.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -423,8 +424,13 @@ async def auto_title_session(
         generated_title = clean_heuristic_title(first_text, max_len=configured_max_len)
 
     if generated_title:
-        session.title = generated_title
+        marker = fork_marker(getattr(session, "_title", ""))
+        if marker:
+            # Keep the fork marker and cap the descriptive part, so the final
+            # "<base> (fork N)" still fits a resume row without being ellipsized.
+            generated_title = clean_heuristic_title(generated_title, max_len=FORK_BASE_MAX_LEN)
+        session.title = f"{generated_title}{marker}"
         session.auto_titled = True
-        return generated_title
+        return session.title
 
     return session.title or None

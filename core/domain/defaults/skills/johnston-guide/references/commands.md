@@ -6,7 +6,7 @@ Johnston TUI provides slash commands entered directly in the message input and k
 ## Session & History Management
 - `/new` (aliases: `/clear`, `/reset`): Start a new chat session (cancels background workers/tasks/subagents and resets context).
 - `/resume [session_id]`: Resume a previous session from disk (opens interactive session picker or resumes specified ID).
-- `/fork`: Fork the current conversation and working tree state into an independent branched session.
+- `/fork`: Fork the current conversation and working tree state into an independent branched session. Forks are named `<base> (fork N)`: base is the branch-point message (trimmed) or the parent title when forking the current state, `N` numbers siblings from the same parent (`(fork)` for the first).
 - `/rename [title]`: Rename the title of the current chat session.
 - `/compact`: Summarize prior conversation turns and compact context history to free up LLM token window.
 - `/rewind`: Select an earlier conversation turn to restore context and revert disk changes using git snapshots.
