@@ -11,6 +11,7 @@ from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optiona
 from core.base_provider.compaction import CompactionMixin, should_compact
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
 from core.base_provider.tools import ToolMixin
+from core.domain.defaults.config import DEFAULT_MAX_TOKENS, ESCALATED_MAX_TOKENS
 from core.domain.defaults.errors import ToolResult
 from core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT
 from core.infrastructure.adapters.base import (
@@ -124,7 +125,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         reasoning_effort: str = None,
         thinking_effort: str = None,
         chunk_timeout: float = 30.0,
-        max_tokens: int = 8192,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
         max_retries: int = 3,
         retry_delay: float = 1.0,
         retry_backoff: float = 2.0,
@@ -513,6 +514,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     raise CircuitBreakerOpenError(pkey, cb_rem)
 
                 attempt = 0
+                current_max_tokens = getattr(self, "max_tokens", DEFAULT_MAX_TOKENS)
                 while True:
                     attempt += 1
                     full_assistant_parts = []
@@ -521,6 +523,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     tool_calls_dict = {}
                     thinking_started = False
                     thinking_t0 = time.time()
+                    last_finish_reason = None
 
                     try:
                         from core.adapters import get_adapter
@@ -532,7 +535,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             "model": self.model,
                             "messages": messages,
                             "tools": all_tools if all_tools else None,
-                            "max_tokens": getattr(self, "max_tokens", 4096),
+                            "max_tokens": current_max_tokens,
                             "thinking_effort": getattr(self, "thinking_effort", None),
                         }
                         if self.api_type == "openai":
@@ -570,8 +573,33 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     "name": payload.get("name", ""),
                                     "arguments": payload.get("arguments", "") or "",
                                 }
+                            elif tag == "adapter_finish_reason":
+                                last_finish_reason = payload
                             elif tag == "adapter_usage":
                                 step_usage = payload
+
+                        # Check for empty response caused by max tokens cutoff
+                        is_token_limit = (
+                            last_finish_reason is not None
+                            and str(last_finish_reason).upper() in ("MAX_TOKENS", "LENGTH", "MAX_OUTPUT_TOKENS")
+                        )
+                        if not tool_calls_dict and not full_assistant_parts:
+                            if is_token_limit or active_thought_parts:
+                                if attempt < max_retries and current_max_tokens < ESCALATED_MAX_TOKENS:
+                                    current_max_tokens = min(ESCALATED_MAX_TOKENS, max(current_max_tokens * 2, 65536))
+                                    if thinking_started:
+                                        dt = time.time() - thinking_t0
+                                        yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
+                                        thinking_started = False
+                                    yield (
+                                        "thinking",
+                                        f"Token limit reached during reasoning. Retrying with {current_max_tokens} tokens...",
+                                        "",
+                                    )
+                                    continue
+                                raise RuntimeError(
+                                    "Token limit reached during reasoning without generating response text. Try increasing max_tokens or lowering thinking effort."
+                                )
 
                         # Stream completed successfully
                         circuit_breaker.record_success(pkey)

@@ -117,7 +117,7 @@ class GeminiAdapter(BaseApiAdapter):
         model: str,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        max_tokens: int = 4096,
+        max_tokens: int = 32768,
         thinking_effort: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         extra_body: Optional[Dict[str, Any]] = None,
@@ -131,11 +131,14 @@ class GeminiAdapter(BaseApiAdapter):
         if system_instruction:
             payload["systemInstruction"] = system_instruction
         generation_config: Dict[str, Any] = {}
-        if max_tokens and max_tokens > 0:
-            generation_config["maxOutputTokens"] = max_tokens
         thinking_config = build_gemini_thinking_config(model, thinking_effort)
         if thinking_config:
             generation_config["thinkingConfig"] = thinking_config
+            budget = thinking_config.get("thinkingBudget")
+            if isinstance(budget, int) and budget > 0:
+                max_tokens = max(max_tokens or 32768, budget + 8192)
+        if max_tokens and max_tokens > 0:
+            generation_config["maxOutputTokens"] = max_tokens
         if generation_config:
             payload["generationConfig"] = generation_config
         if tools:
@@ -167,6 +170,9 @@ class GeminiAdapter(BaseApiAdapter):
                     continue
 
                 for cand in evt.get("candidates") or []:
+                    finish_reason = cand.get("finishReason")
+                    if finish_reason:
+                        yield ("adapter_finish_reason", finish_reason)
                     parts = ((cand.get("content") or {}).get("parts")) or []
                     for p in parts:
                         if not isinstance(p, dict):

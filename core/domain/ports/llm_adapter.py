@@ -14,7 +14,7 @@ class LLMAdapterPort(Protocol):
         model: str,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        max_tokens: int = 4096,
+        max_tokens: int = 32768,
         thinking_effort: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         extra_body: Optional[Dict[str, Any]] = None,

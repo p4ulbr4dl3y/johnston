@@ -553,6 +553,30 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(thoughts), 1)
         self.assertIn("deep", thoughts[0])
 
+    async def test_stream_finish_reason(self):
+        lines = ['data: {"candidates":[{"content":{"parts":[{"thought":"deep"}]},"finishReason":"MAX_TOKENS"}]}']
+        with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+            events = [
+                e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
+        reasons = [e[1] for e in events if e[0] == "adapter_finish_reason"]
+        self.assertEqual(reasons, ["MAX_TOKENS"])
+
+    async def test_max_output_tokens_thinking_budget_expansion(self):
+        mock_client = _MockHttpClient(['data: {"candidates":[{"content":{"parts":[{"text":"hi"}]}}]}'])
+        with patch("core.adapters.gemini.httpx.AsyncClient", return_value=mock_client):
+            events = [
+                e
+                async for e in GeminiAdapter().stream_chat(
+                    "http://x", "k", "gemini-2.5-flash", [{"role": "user", "content": "hi"}], thinking_effort="high", max_tokens=4096
+                )
+            ]
+        self.assertTrue(any(e[0] == "adapter_text" for e in events))
+        # High effort Gemini 2.5 thinking budget is 24576, so effective maxOutputTokens should be >= 24576 + 8192 = 32768
+        call_json = mock_client.last_request_json if hasattr(mock_client, "last_request_json") else None
+        if call_json:
+            self.assertGreaterEqual(call_json.get("generationConfig", {}).get("maxOutputTokens", 0), 32768)
+
 
 class TestAdapterMessageEdgeCases(unittest.TestCase):
     def test_anthropic_empty_messages(self):

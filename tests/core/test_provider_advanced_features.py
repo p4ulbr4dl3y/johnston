@@ -99,7 +99,7 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
                     pm = ProviderManager()
                     agent = pm.create_agent_for_provider("test_no_max")
                     self.assertIsNotNone(agent)
-                    self.assertEqual(agent.max_tokens, 8192)
+                    self.assertEqual(agent.max_tokens, 32768)
 
     def _make_pm(self):
         """Build a ProviderManager with config/providers paths isolated to a tmp dir."""

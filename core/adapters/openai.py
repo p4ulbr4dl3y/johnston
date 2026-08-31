@@ -208,6 +208,7 @@ class OpenAIAdapter(BaseApiAdapter):
                 native_reason = choice.get("native_finish_reason") if choice_is_dict else getattr(choice, "native_finish_reason", None)
                 if isinstance(f_reason, str):
                     last_finish_reason = f_reason
+                    yield ("adapter_finish_reason", f_reason)
                 if isinstance(native_reason, str):
                     last_native_finish_reason = native_reason
 
@@ -287,7 +288,7 @@ class OpenAIAdapter(BaseApiAdapter):
         model: str,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        max_tokens: int = 4096,
+        max_tokens: int = 32768,
         thinking_effort: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         extra_body: Optional[Dict[str, Any]] = None,

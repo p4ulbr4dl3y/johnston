@@ -55,11 +55,11 @@ class TestBaseAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(metrics["context_used"], 0)
         self.assertEqual(agent._last_sys_tokens, 0)
 
-    def test_default_max_tokens_is_8192(self):
+    def test_default_max_tokens_is_32768(self):
         agent = BaseAgent(api_key="t", model="m", base_url="http://t", system_prompt="t", provider_key="p")
         self.addAsyncCleanup(agent.close)
-        # Raised from 4096 so long code answers are not truncated mid-generation.
-        self.assertEqual(agent.max_tokens, 8192)
+        # Standard production default (32768) so reasoning and long code answers are not truncated mid-generation.
+        self.assertEqual(agent.max_tokens, 32768)
 
     async def test_sanitize_history_for_model(self):
         agent = BaseAgent(api_key="test", model="non-vision-model", base_url="http://test", provider_key="opencode")
@@ -823,3 +823,51 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         queued = [s for s in steps if s[0] == "queued_user_message"]
         self.assertEqual([s[1] for s in queued], ["follow up 1", "follow up 2"])
         self.assertEqual(sess.pending_messages, [])
+
+    async def test_stream_steps_escalates_on_token_limit_during_reasoning(self):
+        agent = BaseAgent(api_key="k", model="m", base_url="http://t", provider_key="p", max_tokens=1024, max_retries=2)
+        self.addAsyncCleanup(agent.close)
+
+        call_count = 0
+
+        async def mock_stream_chat(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # First attempt: only thoughts, hits MAX_TOKENS
+                yield ("adapter_thought", "thinking a lot")
+                yield ("adapter_finish_reason", "MAX_TOKENS")
+            else:
+                # Escalated attempt: produces answer
+                yield ("adapter_thought", "quick think")
+                yield ("adapter_text", "Here is the final answer")
+
+        with unittest.mock.patch("core.adapters.get_adapter") as mock_get_adapter:
+            mock_adapter = unittest.mock.MagicMock()
+            mock_adapter.stream_chat = mock_stream_chat
+            mock_get_adapter.return_value = mock_adapter
+
+            steps = [s async for s in agent.stream_steps("Hello")]
+
+        self.assertEqual(call_count, 2)
+        bot_texts = [s[1] for s in steps if s[0] == "bot_text"]
+        self.assertEqual(bot_texts, ["Here is the final answer"])
+
+    async def test_stream_steps_yields_error_on_empty_reasoning_when_limit_exhausted(self):
+        agent = BaseAgent(api_key="k", model="m", base_url="http://t", provider_key="p", max_tokens=65536, max_retries=1)
+        self.addAsyncCleanup(agent.close)
+
+        async def mock_stream_chat(**kwargs):
+            yield ("adapter_thought", "thinking forever")
+            yield ("adapter_finish_reason", "MAX_TOKENS")
+
+        with unittest.mock.patch("core.adapters.get_adapter") as mock_get_adapter:
+            mock_adapter = unittest.mock.MagicMock()
+            mock_adapter.stream_chat = mock_stream_chat
+            mock_get_adapter.return_value = mock_adapter
+
+            steps = [s async for s in agent.stream_steps("Hello")]
+
+        dividers = [s[1] for s in steps if s[0] == "event_divider"]
+        self.assertTrue(any("Token limit reached during reasoning" in d for d in dividers))
+

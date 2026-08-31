@@ -157,11 +157,14 @@ class LLMSettings:
     def from_dict(cls, data: Dict[str, Any]) -> LLMSettings:
         sec = data.get("llm") if isinstance(data.get("llm"), dict) else {}
         efforts = sec.get("thinking_efforts") if isinstance(sec.get("thinking_efforts"), dict) else {}
+        raw_max_tokens = sec.get("default_max_tokens")
+        if raw_max_tokens == 8192:  # Legacy default migration
+            raw_max_tokens = None
         return cls(
             context_limit=_env_int(
                 "JOHNSTON_CONTEXT_LIMIT",
-                _safe_int(sec.get("context_limit"), DEFAULT_CONTEXT_LIMIT, min_val=1024),
-                min_val=1024,
+                _safe_int(sec.get("context_limit"), DEFAULT_CONTEXT_LIMIT, min_val=1000),
+                min_val=1000,
             ),
             compaction_threshold_ratio=_env_float(
                 "JOHNSTON_COMPACTION_RATIO",
@@ -190,7 +193,7 @@ class LLMSettings:
             ),
             default_max_tokens=_env_int(
                 "JOHNSTON_MAX_TOKENS",
-                _safe_int(sec.get("default_max_tokens"), DEFAULT_MAX_TOKENS, min_val=1),
+                _safe_int(raw_max_tokens, DEFAULT_MAX_TOKENS, min_val=1),
                 min_val=1,
             ),
             max_retries=_env_int(
@@ -630,30 +633,61 @@ def reload_settings(config_file: Optional[str] = None) -> JohnstonSettings:
     return get_settings(config_file=config_file, force_reload=True)
 
 
-def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None) -> None:
-    """Saves structured settings back to config_file.
+def _diff_dataclass(current_obj: Any, default_obj: Any) -> Dict[str, Any]:
+    """Return dictionary with fields that differ from default."""
+    cur = asdict(current_obj)
+    base = asdict(default_obj)
+    diff = {}
+    for k, v in cur.items():
+        if v != base.get(k):
+            diff[k] = v
+    return diff
 
-    Write failures propagate to the caller so a lost update is never silent.
+
+def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None) -> None:
+    """Saves structured settings back to config_file using sparse representation.
+
+    Only fields differing from defaults are persisted, allowing codebase
+    improvements to take effect seamlessly on existing configurations.
     """
     target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
-    data = read_json(target_file, default={})
-    if not isinstance(data, dict):
-        data = {}
+    existing = read_json(target_file, default={})
+    data = existing if isinstance(existing, dict) else {}
+
     if settings.model is not None:
         data["model"] = settings.model
     else:
         data.pop("model", None)
+
     if settings.theme is not None:
         data["theme"] = settings.theme
-    elif "theme" in data:
+    else:
         data.pop("theme", None)
-    data["sandbox"] = asdict(settings.sandbox)
-    data["permissions"] = settings.permissions
-    data["subagents"] = asdict(settings.subagents)
-    data["llm"] = asdict(settings.llm)
-    data["tools"] = asdict(settings.tools)
-    data["ui"] = asdict(settings.ui)
-    data["storage"] = asdict(settings.storage)
+
+    sb_diff = _diff_dataclass(settings.sandbox, SandboxSettings())
+    if sb_diff:
+        data["sandbox"] = sb_diff
+    else:
+        data.pop("sandbox", None)
+
+    if settings.permissions != DEFAULT_PERMISSIONS:
+        data["permissions"] = settings.permissions
+    else:
+        data.pop("permissions", None)
+
+    for sec_name, cur_obj, def_obj in [
+        ("subagents", settings.subagents, SubagentsSettings()),
+        ("llm", settings.llm, LLMSettings()),
+        ("tools", settings.tools, ToolsSettings()),
+        ("ui", settings.ui, UISettings()),
+        ("storage", settings.storage, StorageSettings()),
+    ]:
+        diff = _diff_dataclass(cur_obj, def_obj)
+        if diff:
+            data[sec_name] = diff
+        else:
+            data.pop(sec_name, None)
+
     atomic_write_json(target_file, data, indent=2)
     reload_settings(target_file)
 

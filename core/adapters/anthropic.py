@@ -199,7 +199,7 @@ class AnthropicAdapter(BaseApiAdapter):
         model: str,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        max_tokens: int = 4096,
+        max_tokens: int = 32768,
         thinking_effort: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         extra_body: Optional[Dict[str, Any]] = None,
@@ -219,7 +219,7 @@ class AnthropicAdapter(BaseApiAdapter):
         payload: Dict[str, Any] = {
             "model": model,
             "messages": anthropic_msgs,
-            "max_tokens": max_tokens or 4096,
+            "max_tokens": max_tokens or 32768,
             "stream": True,
         }
         if extra_body:
@@ -316,6 +316,10 @@ class AnthropicAdapter(BaseApiAdapter):
                             },
                         )
                 elif etype == "message_delta":
+                    delta = evt.get("delta") or {}
+                    stop_reason = delta.get("stop_reason")
+                    if stop_reason:
+                        yield ("adapter_finish_reason", stop_reason)
                     u = evt.get("usage") or {}
                     if u.get("output_tokens") is not None:
                         pending_usage["completion_tokens"] = u.get("output_tokens", 0) or 0
