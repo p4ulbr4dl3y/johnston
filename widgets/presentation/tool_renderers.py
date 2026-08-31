@@ -308,7 +308,20 @@ def compute_tool_call_content(
             explanation = args.get("explanation", "")
             return "raw", format_plan_display(plan_items, explanation)
         elif canonical_tool == "ask_user":
-            return "md", clean_hints(result_text or "(No response)")
+            raw_text = clean_hints(result_text or "(No response)")
+            t = Text()
+            blocks = raw_text.split("\n\n")
+            for i, block in enumerate(blocks):
+                if i > 0:
+                    t.append("\n\n")
+                lines = block.split("\n", 1)
+                if len(lines) == 2:
+                    q_line, ans_line = lines
+                    t.append(f"{q_line}\n", style="bold")
+                    t.append(ans_line, style="dim" if ans_line == "(No response)" else "")
+                else:
+                    t.append(block)
+            return "raw", t
         elif canonical_tool == "manage_shell":
             action = (args.get("action") or "list").lower()
             if action == "list":

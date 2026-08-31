@@ -488,8 +488,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 ans_info = self.answers.get(idx, {})
                 ans_val = ans_info.get("answer", "")
                 ans_display = ans_val if ans_val else "(No response)"
-                prefix = f"**{idx + 1}. {q_clean}**" if len(self.questions) > 1 else f"**{q_clean}**"
-                out_parts.append(f"{prefix}\n{ans_display}")
+                prefix = f"{idx + 1}. " if len(self.questions) > 1 else ""
+                out_parts.append(f"{prefix}{q_clean}\n{ans_display}")
             self.dismiss("\n\n".join(out_parts).strip())
 
     def action_toggle_selection(self) -> None:

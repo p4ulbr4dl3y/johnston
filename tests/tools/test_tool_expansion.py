@@ -404,19 +404,19 @@ class TestToolExpansion(unittest.TestCase):
         widget = ToolCallWidget(
             tool_type="ask_user",
             target="ask_user",
-            result_text="**What is your name?**\nJohnston",
+            result_text="What is your name?\nJohnston",
             args={"questions": [{"question": "What is your name?", "options": ["Johnston"]}]},
         )
         kind, value = widget._compute_content()
-        self.assertEqual(kind, "md")
-        self.assertIn("What is your name?", value)
-        self.assertIn("Johnston", value)
+        self.assertEqual(kind, "raw")
+        self.assertIn("What is your name?", value.plain)
+        self.assertIn("Johnston", value.plain)
 
     def test_ask_user_display_multi_questions_and_no_response(self):
         widget = ToolCallWidget(
             tool_type="ask_user",
             target="ask_user",
-            result_text="**1. First?**\nYes\n\n**2. Second?**\n(No response)",
+            result_text="1. First?\nYes\n\n2. Second?\n(No response)",
             args={
                 "questions": [
                     {"question": "First?", "options": ["Yes", "No"]},
@@ -425,9 +425,9 @@ class TestToolExpansion(unittest.TestCase):
             },
         )
         kind, value = widget._compute_content()
-        self.assertEqual(kind, "md")
-        expected = "**1. First?**\nYes\n\n**2. Second?**\n(No response)"
-        self.assertEqual(value, expected)
+        self.assertEqual(kind, "raw")
+        expected = "1. First?\nYes\n\n2. Second?\n(No response)"
+        self.assertEqual(value.plain, expected)
 
     def test_shell_running_bg_task_click_toggles_expansion(self):
         task_mock = MagicMock()
