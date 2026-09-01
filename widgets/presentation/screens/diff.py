@@ -199,6 +199,26 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         self.filtered_indices: list[int] = list(range(len(self.diff_items)))
         self.sidebar_options: list[str] = self._format_sidebar_options(DIFF_SIDEBAR_ROW_WIDTH)
 
+    def _apply_selection_policy(self) -> None:
+        """Selection is opt-in per branch (P1-8).
+
+        `widgets/patch.py` walks the ancestor chain, so the diff body only
+        becomes selectable if the screen allows it too — hence the screen is
+        enabled and the chrome (header, footer, search box, file list) is
+        switched back off, which keeps click-to-select-file working.
+        """
+        self.ALLOW_SELECT = True
+        for widget in self.query("#diff-container, #diff-body, #diff-content-container"):
+            widget.ALLOW_SELECT = True
+        for widget in self.query(
+            "#diff-scroll-box, #diff-content-view, #diff-empty-container, #diff-empty-label"
+        ):
+            widget.ALLOW_SELECT = True
+        for widget in self.query(
+            "#diff-header, #diff-footer, #diff-sidebar, #diff-file-list, #diff-search-input"
+        ):
+            widget.ALLOW_SELECT = False
+
     def _format_sidebar_options(self, target_width: int = DIFF_SIDEBAR_ROW_WIDTH) -> list[str]:
         options = []
         add_fg, _, remove_fg, _, _ = get_diff_colors()
@@ -303,6 +323,7 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
 
     def on_mount(self) -> None:
         self._update_layout()
+        self._apply_selection_policy()
         if self.diff_items:
             try:
                 search_input = self.query_one("#diff-search-input", Input)

@@ -47,7 +47,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     """Tool call widget (Create, Read, Edit, Shell) with expansion support."""
 
     can_focus = False
-    ALLOW_SELECT = False
+    # P1-8: tool output is content the user will want to copy (paths, stack
+    # traces, command output). The copy button on code fences is not enough,
+    # and mouse selection is the baseline expectation in a terminal today.
+    ALLOW_SELECT = True
 
     EXPANDABLE_TOOLS = {
         "create",
