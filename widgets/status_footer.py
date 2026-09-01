@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 from textual.widgets import Static
 
@@ -11,6 +12,7 @@ from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 from widgets.presentation.widgets.footer_layout import (
     format_display_path,
+    format_modal_hint,
     get_theme_colors,
 )
 from widgets.utils.responsive import is_compact_width, resolve_width
@@ -30,6 +32,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.is_generating: bool = False
+        self._generation_started: float | None = None
         self._spinner_idx: int = 0
         self._spinner_timer = None
         self._mcp_poll_timer = None
@@ -39,14 +42,33 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             return
         self.is_generating = generating
         if generating:
+            if self._generation_started is None:
+                self._generation_started = time.monotonic()
             if not self._spinner_timer:
                 self._spinner_timer = self.set_interval(0.2, self._spin)
         else:
+            self._generation_started = None
             if self._spinner_timer:
                 self._spinner_timer.stop()
                 self._spinner_timer = None
             self._spinner_idx = 0
         self.refresh_footer()
+
+    def generation_elapsed(self) -> float:
+        """Seconds since the current response started streaming."""
+        if not self.is_generating or self._generation_started is None:
+            return 0.0
+        return time.monotonic() - self._generation_started
+
+    def render_timed_cell(self) -> str:
+        """Live `esc: interrupt • 12.4s` for the footer's right cell (P1-9).
+
+        Interrupting is documented in /help but was never surfaced at the moment
+        it matters; the elapsed time is the other half of "is it stuck?".
+        """
+        t_primary, t_secondary, t_muted, t_subtle = get_theme_colors()
+        hint = format_modal_hint("esc: interrupt")
+        return f"{hint} [{t_muted}]•[/] [{t_secondary}]{self.generation_elapsed():.1f}s[/]"
 
     def _spin(self) -> None:
         self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
@@ -237,7 +259,10 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 task_parts.append(f"[{txt}]{active_bg_tasks}s[/]")
             if mcp_total > 0:
                 task_parts.append(f"[{txt}]{mcp_active}mcp[/]")
-            row2_right = f"[{txt}]⚡[/] {sep_compact.join(task_parts)}" if task_parts else ""
+            if self.is_generating:
+                row2_right = f"[{t_secondary}]esc[/] {sep_compact}[{txt}]{self.generation_elapsed():.1f}s[/]"
+            else:
+                row2_right = f"[{txt}]⚡[/] {sep_compact.join(task_parts)}" if task_parts else ""
 
             self._apply_two_row_grid(row1_left, row1_right, row2_left, row2_right)
         else:
@@ -300,7 +325,11 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 mcp_str = f"{mcp_active} MCP" if mcp_active == mcp_total else f"{mcp_active}/{mcp_total} MCP"
                 service_parts.append(f"[{txt}]{mcp_str}[/]")
 
-            if service_parts:
+            if self.is_generating:
+                # While streaming, "how do I stop this / how long has it been"
+                # beats the service counters; the spinner redraw keeps it live.
+                row2_right = self.render_timed_cell()
+            elif service_parts:
                 row2_right = f"[{txt}]⚡[/] {sep.join(service_parts)}"
             else:
                 row2_right = ""

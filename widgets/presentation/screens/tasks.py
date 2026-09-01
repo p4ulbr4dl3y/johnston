@@ -399,6 +399,11 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     hint_action_name: str = "enter: select"
     search_nav_filtered_attr: str = "filtered_tasks"
 
+    # Empty state (P1-9): an empty list used to close the screen silently (or
+    # never open at all, with the command firing a toast instead).
+    empty_title: str = "Nothing running."
+    empty_hint: str = ""
+
     def __init__(self):
         super().__init__()
         self.search_query = ""
@@ -555,16 +560,14 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         self._last_signatures = new_signatures
 
         if not tasks:
-            if not self.search_query:
-                self.filtered_tasks = []
-                self.dismiss()
-                return
-            try:
-                opt_list = self._get_option_list()
-                opt_list.clear_options()
-            except Exception:
-                pass
             self.filtered_tasks = []
+            if self.search_query:
+                try:
+                    self._get_option_list().clear_options()
+                except Exception:
+                    pass
+            else:
+                self._show_empty_state()
             return
 
         try:
@@ -601,6 +604,24 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                     break
         self._update_hint()
 
+    def _show_empty_state(self) -> None:
+        """Render "nothing here" plus what to do about it (P1-9)."""
+        try:
+            from widgets.presentation.widgets.footer_layout import get_theme_colors
+
+            _primary, _secondary, muted, _subtle = get_theme_colors()
+            opt_list = self._get_option_list()
+            opt_list.clear_options()
+            opt_list.add_option(Option(f"[{muted}]{self.empty_title}[/]", disabled=True))
+            if self.empty_hint:
+                opt_list.add_option(Option(f"[{muted}]{self.empty_hint}[/]", disabled=True))
+            try:
+                self.query_one(f"#{MODAL_HINT_ID}", Label).update("esc: close")
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_tasks):
             item = self.filtered_tasks[event.option_index]
@@ -630,6 +651,8 @@ class ShellTasksScreen(BaseTasksListScreen):
     title_id = "shell-title"
     option_list_id = "shell-option-list"
     hint_action_name = "enter: console"
+    empty_title = "No background shell tasks."
+    empty_hint = "Commands ending in & run in the background."
 
     def __init__(self):
         super().__init__()
@@ -729,6 +752,8 @@ class SubagentsScreen(BaseTasksListScreen):
     title_id = "subagents-title"
     option_list_id = "subagents-option-list"
     hint_action_name = "enter: details"
+    empty_title = "No subagents yet."
+    empty_hint = "Ask Johnston to delegate a task and they show up here."
 
     def __init__(self):
         super().__init__()

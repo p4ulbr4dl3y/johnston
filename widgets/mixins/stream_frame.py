@@ -31,6 +31,20 @@ class StreamFrameMixin:
         self._last_grid_rows = list(rows)
         self.update(compose_rows([tuple(row) for row in rows], self.row_width()))
 
+    def _timed_cell(self) -> str | None:
+        """Live text for the last row's right cell, if the footer has one.
+
+        The spinner tick only swaps glyphs, so a footer that renders an elapsed
+        time has to rebuild that one cell per frame (see P1-9).
+        """
+        builder = getattr(self, "render_timed_cell", None)
+        if not callable(builder):
+            return None
+        try:
+            return builder()
+        except Exception:
+            return None
+
     def _render_stream_frame(self) -> None:
         """Redraw only the animated frame from cached status rows (no git/rebuild)."""
         if not self.is_generating:
@@ -46,6 +60,11 @@ class StreamFrameMixin:
                 if i == 0:
                     left = self._swap_frame(left, frame)
                 redrawn.append((left, row[1]) if len(row) > 1 else (left,))
+            timed = self._timed_cell()
+            if timed is not None and redrawn and len(redrawn[-1]) > 1:
+                last = list(redrawn[-1])
+                last[1] = timed
+                redrawn[-1] = tuple(last)
             self.update(compose_rows(redrawn, self.row_width()))
         except Exception:
             pass
