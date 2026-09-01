@@ -34,17 +34,10 @@ class TestPlatformUtils(unittest.TestCase):
         with patch.dict(os.environ, {"JOHNSTON_CONFIG_DIR": "/custom/johnston/home"}):
             self.assertEqual(johnston_config_dir(), Path("/custom/johnston/home"))
 
-    def test_windows_config_dir_uses_appdata(self):
+    def test_windows_config_dir_defaults_to_home_dot_johnston(self):
         with (
             patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
-            patch.dict(os.environ, {"JOHNSTON_CONFIG_DIR": "", "APPDATA": r"C:\Users\me\AppData\Roaming"}),
-        ):
-            self.assertEqual(johnston_config_dir(), Path(r"C:\Users\me\AppData\Roaming") / "johnston")
-
-    def test_windows_config_dir_without_appdata(self):
-        with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
-            patch.dict(os.environ, {"JOHNSTON_CONFIG_DIR": "", "APPDATA": ""}),
+            patch.dict(os.environ, {"JOHNSTON_CONFIG_DIR": ""}),
         ):
             self.assertEqual(johnston_config_dir(), Path.home() / ".johnston")
 
