@@ -311,6 +311,13 @@ async def test_unknown_action(tool, make_app_mock):
     assert "bogus" in res
 
 
+async def test_none_action_defaults_to_list(tool, make_app_mock):
+    app = _app(make_app_mock, [])
+    res = await tool.execute({"action": None}, ctx=app)
+    assert not res.is_error
+    assert res.content == "[tasks 0]"
+
+
 async def test_unknown_action_none_task_id_should_not_crash(tool, make_app_mock):
     """Bug B1: task_id=None -> AttributeError on .strip() (tools/manage_shell.py:28)."""
     app = _app(make_app_mock, [])

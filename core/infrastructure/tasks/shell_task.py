@@ -234,7 +234,7 @@ class ShellTask(BaseTask):
         data = (text + "\n").encode("utf-8")
         try:
             if self.process is not None and getattr(self.process, "stdin", None) is not None:
-                await asyncio.to_thread(self.process.stdin.write, data)
+                self.process.stdin.write(data)
                 await self.process.stdin.drain()
                 return f"[input sent | id {self.task_id}]"
             return format_tool_error("task", f"{self.task_id} stdin not writable")

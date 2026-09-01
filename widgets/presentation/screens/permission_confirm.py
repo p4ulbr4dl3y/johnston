@@ -465,7 +465,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         try:
             inp = self.query_one("#reject-reason-input", Input)
             if inp.display:
-                self._focus_input()
+                self.focus_reject_input()
         except Exception:
             pass
         try:

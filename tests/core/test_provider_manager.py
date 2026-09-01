@@ -860,3 +860,12 @@ def _load_json(path):
         return json.load(f)
 
 
+def test_get_provider_model_catalog_fallback(pm):
+    with patch.object(pm, "load_providers", return_value={}):
+        mock_def = MagicMock()
+        mock_def.model = "default-catalog-model"
+        with patch.object(pm, "load_provider_def", return_value=mock_def):
+            model = pm.get_provider_model("catalog_provider")
+            assert model == "default-catalog-model"
+
+

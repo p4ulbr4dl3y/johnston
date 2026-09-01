@@ -764,6 +764,59 @@ class TestAdapterClientPooling(unittest.TestCase):
         adapter.close()
         self.assertEqual(len(adapter._clients), 0)
 
+    async def test_gemini_thought_streaming_order(self):
+        import json
+        adapter = GeminiAdapter()
+
+        sse_data = (
+            "data: "
+            + json.dumps(
+                {
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [
+                                    {"thought": True, "text": "let me think"},
+                                    {"text": "final answer"},
+                                ]
+                            }
+                        }
+                    ]
+                }
+            )
+            + "\n\n"
+        )
+
+        class FakeStreamResponse:
+            def __init__(self, text):
+                self.text = text
+
+            async def aiter_lines(self):
+                for line in self.text.splitlines():
+                    yield line
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        class FakeClient:
+            def stream(self, *args, **kwargs):
+                return FakeStreamResponse(sse_data)
+
+        with patch.object(adapter, "_get_client", return_value=FakeClient()):
+            with patch("core.adapters.gemini.check_httpx_response_status", return_value=None):
+                events = [e async for e in adapter.stream_chat(base_url="http://test", api_key="k", model="gemini-2.5-flash", messages=[{"role": "user", "content": "hi"}])]
+
+        tags = [e[0] for e in events]
+        self.assertIn("adapter_thought", tags)
+        self.assertIn("adapter_text", tags)
+        thought_events = [e[1] for e in events if e[0] == "adapter_thought"]
+        text_events = [e[1] for e in events if e[0] == "adapter_text"]
+        self.assertEqual(thought_events, ["let me think"])
+        self.assertEqual(text_events, ["final answer"])
+
 
 if __name__ == "__main__":
     unittest.main()

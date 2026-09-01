@@ -72,8 +72,8 @@ class InvokeSubagentTool(BaseTool):
         args = args or {}
         prompt = (args.get("prompt") or "").strip()
         title = (args.get("title") or prompt[:30] or "subagent task").strip()
-        subagent_type = args.get("type", "worker").strip().lower()
-        branch_name = args.get("branch", "").strip()
+        subagent_type = (args.get("type") or "worker").strip().lower()
+        branch_name = (args.get("branch") or "").strip()
 
         if not prompt:
             return ToolResult.error("params", name="prompt", detail="required")

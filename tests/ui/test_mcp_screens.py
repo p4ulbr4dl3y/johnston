@@ -833,6 +833,18 @@ class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
         event.option_index = 0
         screen.on_option_list_option_selected(event)  # header row -> return
 
+    def test_on_key_space_query_one_does_not_crash(self):
+        screen = MCPScreen.__new__(MCPScreen)
+        screen._toggle_highlighted = MagicMock()
+        screen.query_one = MagicMock(side_effect=Exception("no match"))
+        screen.action_toggle_search = MagicMock()
+        screen.action_select_cursor = MagicMock()
+
+        event = MagicMock()
+        event.key = "space"
+        screen._on_key(event)
+        screen._toggle_highlighted.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

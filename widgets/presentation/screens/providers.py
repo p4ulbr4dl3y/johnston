@@ -221,7 +221,10 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             event.stop()
             return
         if event.key == "space":
-            search_input = self.query_one_optional(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+            try:
+                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+            except Exception:
+                search_input = None
             if not search_input or not search_input.has_focus or not search_input.value:
                 self.action_toggle_disabled()
                 event.prevent_default()

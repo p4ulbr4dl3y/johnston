@@ -337,10 +337,20 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with HostApp(screen).run_test(size=(120, 40)) as pilot:
             await pilot.pause()
             dialog = screen.query_one("#modal-dialog")
-            # Should hug content rather than stretching to 104
             self.assertIsNotNone(dialog.styles.width)
             self.assertLessEqual(dialog.styles.width.value, 70)
             self.assertGreaterEqual(dialog.styles.width.value, 38)
+
+    def test_on_resize_focuses_reject_input_when_displayed(self):
+        screen = PermissionConfirmScreen("shell", {"command": "ls"})
+        screen.focus_reject_input = MagicMock()
+        mock_inp = MagicMock()
+        mock_inp.display = True
+        screen.query_one = MagicMock(return_value=mock_inp)
+        screen._apply_dialog_fit = MagicMock()
+
+        screen.on_resize(MagicMock())
+        screen.focus_reject_input.assert_called_once()
 
 
 if __name__ == "__main__":

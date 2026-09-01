@@ -177,11 +177,11 @@ class GeminiAdapter(BaseApiAdapter):
                     for p in parts:
                         if not isinstance(p, dict):
                             continue
-                        if p.get("text"):
-                            yield ("adapter_text", p["text"])
-                        elif p.get("thought"):
-                            t = p["thought"]
+                        if p.get("thought"):
+                            t = p["thought"] if not isinstance(p["thought"], bool) else p.get("text", "")
                             yield ("adapter_thought", t if isinstance(t, str) else json.dumps(t, ensure_ascii=False))
+                        elif p.get("text"):
+                            yield ("adapter_text", p["text"])
                         elif "functionCall" in p:
                             fc = p.get("functionCall") or {}
                             yield (

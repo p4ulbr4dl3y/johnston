@@ -401,10 +401,13 @@ class ProviderManager:
         3. Empty string when neither is configured.
         """
         providers = self.load_providers()
-        if provider_key not in providers:
+        target_provider = providers.get(provider_key)
+        p_def = self.load_provider_def(provider_key) if target_provider is None else None
+
+        if target_provider is None and p_def is None:
             return ""
 
-        target_provider = providers[provider_key]
+        default_model = target_provider.get("model") if target_provider else (p_def.model if p_def else "")
 
         cfg_model = self._get_config_data().get("model", "")
         if isinstance(cfg_model, str) and cfg_model.strip():
@@ -415,12 +418,12 @@ class ProviderManager:
                     return m_name.strip()
             elif raw.strip().lower() == provider_key.strip().lower():
                 # ``model`` is the bare provider key: fall back to its default model.
-                if target_provider.get("model"):
-                    return target_provider["model"]
+                if default_model:
+                    return default_model
                 return ""
 
-        if target_provider.get("model"):
-            return target_provider["model"]
+        if default_model:
+            return default_model
 
         return ""
 
