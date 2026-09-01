@@ -231,12 +231,12 @@ class ShellTool(BaseTool):
                         raw_out, max_chars=2000, tool_name="shell", save_log=False, from_end=True
                     ).strip()
                     plain_content = (
-                        f"[task backgrounded | id {task_id} | log {task.log_path} | elapsed {elapsed}s]\n\n"
+                        f"[task backgrounded by user | id {task_id} | log {task.log_path} | elapsed {elapsed}s]\n\n"
                         f"Recent Output:\n{truncated}"
                     )
                 else:
                     plain_content = (
-                        f"[task backgrounded | id {task_id} | log {task.log_path} | elapsed {elapsed}s | no output yet]"
+                        f"[task backgrounded by user | id {task_id} | log {task.log_path} | elapsed {elapsed}s | no output yet]"
                     )
                 return ToolResult(
                     status=ToolResultStatus.RUNNING,

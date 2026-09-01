@@ -268,22 +268,21 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.status = "done"
 
         if self.tool_type == "shell":
-            if getattr(self, "_shell_update_handle", None) is not None:
-                try:
-                    self._shell_update_handle.cancel()
-                except Exception:
-                    pass
-                self._shell_update_handle = None
-            self._shell_update_scheduled = False
-            is_bg_banner = "[Background Task ID:" in cleaned or "[background task" in cleaned
-            if is_bg_banner:
-                bg_m = re.search(r"(?:Background Task ID:|id:)\s*([^\s\]\|]+)", cleaned)
+            if status == "running":
+                bg_m = re.search(r"(?:Background Task ID:|id:)\s*([^\s\]\|]+)", cleaned, re.IGNORECASE)
                 if bg_m and not self.background_task_id:
                     self.background_task_id = bg_m.group(1)
-                log_m = re.search(r"(?:Full Log:|log:)\s*([^\s\(\)\|\]]+)", cleaned)
+                log_m = re.search(r"(?:Full Log:|log:)\s*([^\s\(\)\|\]]+)", cleaned, re.IGNORECASE)
                 if log_m and not self.log_path:
                     self.log_path = log_m.group(1).rstrip(".]")
-            if cleaned and not (status == "running" and is_bg_banner):
+            else:
+                if getattr(self, "_shell_update_handle", None) is not None:
+                    try:
+                        self._shell_update_handle.cancel()
+                    except Exception:
+                        pass
+                    self._shell_update_handle = None
+                self._shell_update_scheduled = False
                 self.result_text = cleaned
         else:
             self.result_text = cleaned
