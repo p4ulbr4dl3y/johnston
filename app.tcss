@@ -291,7 +291,7 @@ MarkdownOrderedList MarkdownParagraph {
 MarkdownBlockQuote MarkdownBlockQuote {
     margin: 0 0 0 2;
     padding: 0 0 0 1;
-    border-left: solid $border;
+    border-left: solid $border-subtle;
     background: transparent;
 }
 
@@ -1180,9 +1180,12 @@ MarkdownHeader {
     padding: 0;
 }
 
-/* Markdown Table Styling - Clean Monochrome Slate header and borders */
+/* Markdown Table Styling - Clean Monochrome Slate header and borders.
+   Table rules live *inside* prose: they are decoration, not a component
+   boundary, so they use $border-subtle and leave $border (>=3:1) for panels,
+   dialogs and other edges the user has to identify. */
 MarkdownTableContent {
-    keyline: thin $border;
+    keyline: thin $border-subtle;
 }
 
 MarkdownTableContent > .header {
@@ -1208,7 +1211,7 @@ MarkdownBullet {
 
 /* Markdown Horizontal Rule (---) - Subtle Divider */
 MarkdownHorizontalRule {
-    border-bottom: solid $border;
+    border-bottom: solid $border-subtle;
     height: 1;
     padding-top: 1;
     margin-bottom: 1;

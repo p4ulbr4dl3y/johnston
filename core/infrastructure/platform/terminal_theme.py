@@ -14,7 +14,12 @@ LIFT_DAMPING = 3.0
 CHROMA_NUDGE = 0.003
 LIGHT_THEME_THRESHOLD = 0.5
 RULE_BASE_LIFT = 0.20
+RULE_SUBTLE_LIFT = 0.10
 MUTED_BLEND = 0.48
+# Decorative rules (markdown tables, `---`) are intentionally *not* UI
+# components: 1.4.11 does not apply, and a 3:1 rule inside prose reads as
+# noise. They only have to be visible.
+DECORATIVE_CONTRAST_MIN = 1.35
 
 _HEX6_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _CACHED_TERMINAL_COLORS: Optional[Tuple[Optional[str], Optional[str]]] = None
@@ -254,6 +259,9 @@ def compute_adaptive_palette(
     # the WCAG thresholds instead of hard-coded lerp factors.
     fg_muted = _contrast_safe_lerp(norm_fg, norm_bg, surface, MUTED_BLEND, TEXT_CONTRAST_AA)
     border = _contrast_safe_lerp(norm_fg, norm_bg, surface, RULE_BASE_LIFT, UI_CONTRAST_AA, reverse=True)
+    border_subtle = _contrast_safe_lerp(
+        norm_fg, norm_bg, surface, RULE_SUBTLE_LIFT, DECORATIVE_CONTRAST_MIN, reverse=True
+    )
 
     tcss_vars = {
         "bg-app": "ansi_default",
@@ -265,6 +273,7 @@ def compute_adaptive_palette(
         "fg-muted": fg_muted,
         "fg-inverted": norm_bg,
         "border": border,
+        "border-subtle": border_subtle,
         "accent-info": "#61afef",
         "accent-warning": "#d4a259",
         "accent-error": "#d15858",
@@ -280,6 +289,7 @@ def compute_adaptive_palette(
         "subtle": subtle,
         "bg_surface": surface,
         "border": border,
+        "border_subtle": border_subtle,
         "fg_primary": norm_fg,
         "fg_secondary": fg_secondary,
         "fg_muted": fg_muted,

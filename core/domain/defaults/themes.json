@@ -20,7 +20,8 @@
       "accent-warning": "#d4a259",
       "accent-error": "#d15858",
       "accent-success": "#5ea876",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#3f3f46"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -98,7 +99,8 @@
       "accent-warning": "#cca700",
       "accent-error": "#f14c4c",
       "accent-success": "#89d185",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#3c3c3c"
     },
     "markdown_styles": {
       "markdown.paragraph": "#d4d4d4",
@@ -176,7 +178,8 @@
       "accent-warning": "#f9e2af",
       "accent-error": "#f38ba8",
       "accent-success": "#a6e3a1",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#353648"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -254,7 +257,8 @@
       "accent-warning": "#e0af68",
       "accent-error": "#f7768e",
       "accent-success": "#9ece6a",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#196473"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -332,7 +336,8 @@
       "accent-warning": "#f6c177",
       "accent-error": "#eb6f92",
       "accent-success": "#31748f",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#37354a"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -410,7 +415,8 @@
       "accent-warning": "#d29922",
       "accent-error": "#f85149",
       "accent-success": "#3fb950",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#30363d"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -488,7 +494,8 @@
       "accent-warning": "#c69026",
       "accent-error": "#f47067",
       "accent-success": "#57ab5a",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#444c56"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -566,7 +573,8 @@
       "accent-warning": "#e6c384",
       "accent-error": "#e46876",
       "accent-success": "#76946a",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#40404f"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -644,7 +652,8 @@
       "accent-warning": "#dbbc7f",
       "accent-error": "#e67e80",
       "accent-success": "#a7c080",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#475258"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -722,7 +731,8 @@
       "accent-warning": "#ffb454",
       "accent-error": "#ff3333",
       "accent-success": "#c2d94c",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#2d323e"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -800,7 +810,8 @@
       "accent-warning": "#ebcb8b",
       "accent-error": "#d87b84",
       "accent-success": "#a3be8c",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#4e5768"
     },
     "markdown_styles": {
       "markdown.paragraph": "#e5e9f0",
@@ -878,7 +889,8 @@
       "accent-warning": "#e5c07b",
       "accent-error": "#e06c75",
       "accent-success": "#98c379",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#3c414d"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -956,7 +968,8 @@
       "accent-warning": "#d8a657",
       "accent-error": "#ea6962",
       "accent-success": "#a9b665",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#494441"
     },
     "markdown_styles": {
       "markdown.paragraph": "$primary",
@@ -1034,7 +1047,8 @@
       "accent-warning": "#ffd35e",
       "accent-error": "#ff6e5e",
       "accent-success": "#5eff6c",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#3c4048"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -1112,7 +1126,8 @@
       "accent-warning": "#ffc799",
       "accent-error": "#ff8080",
       "accent-success": "#99ffe4",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#313131"
     },
     "markdown_styles": {
       "markdown.paragraph": "$secondary",
@@ -1190,7 +1205,8 @@
       "accent-warning": "#f1fa8c",
       "accent-error": "#ff5555",
       "accent-success": "#50fa7b",
-      "bg-overlay": "rgba(0,0,0,0.62)"
+      "bg-overlay": "rgba(0,0,0,0.62)",
+      "border-subtle": "#44475a"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -1268,7 +1284,8 @@
       "accent-warning": "#b15e00",
       "accent-error": "#d20f39",
       "accent-success": "#2e8218",
-      "bg-overlay": "rgba(216,218,224,0.85)"
+      "bg-overlay": "rgba(216,218,224,0.85)",
+      "border-subtle": "#c6cad3"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -1346,7 +1363,8 @@
       "accent-warning": "#b87009",
       "accent-error": "#b4637a",
       "accent-success": "#286983",
-      "bg-overlay": "rgba(218,219,224,0.85)"
+      "bg-overlay": "rgba(218,219,224,0.85)",
+      "border-subtle": "#ccc8cb"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -1424,7 +1442,8 @@
       "accent-warning": "#9a6700",
       "accent-error": "#cf222e",
       "accent-success": "#1a7f37",
-      "bg-overlay": "rgba(218,220,225,0.85)"
+      "bg-overlay": "rgba(218,220,225,0.85)",
+      "border-subtle": "#d0d7de"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",
@@ -1502,7 +1521,8 @@
       "accent-warning": "#b45309",
       "accent-error": "#dc2626",
       "accent-success": "#15803d",
-      "bg-overlay": "rgba(218,220,225,0.85)"
+      "bg-overlay": "rgba(218,220,225,0.85)",
+      "border-subtle": "#d2d2d5"
     },
     "markdown_styles": {
       "markdown.paragraph": "$secondary",
@@ -1580,7 +1600,8 @@
       "accent-warning": "#d4a259",
       "accent-error": "#d15858",
       "accent-success": "#5ea876",
-      "bg-overlay": "transparent"
+      "bg-overlay": "transparent",
+      "border-subtle": "#323235"
     },
     "markdown_styles": {
       "markdown.paragraph": "$fg-primary",

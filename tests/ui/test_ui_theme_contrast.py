@@ -66,6 +66,34 @@ def test_theme_defines_overlay_token(theme):
     assert theme.tcss_vars.get("bg-overlay"), f"{theme.name}: missing bg-overlay"
 
 
+DECORATIVE_VISIBLE = 1.3  # a rule nobody can see is just broken layout
+
+
+@pytest.mark.parametrize("theme", _themes(), ids=lambda t: t.name)
+def test_decorative_rule_token_exists_and_stays_decorative(theme):
+    """`border-subtle` is referenced by app.tcss for rules that live inside
+    prose (markdown tables, `---`). It must exist on every theme, stay visible,
+    and stay clearly quieter than `border` — otherwise the 3:1 component edges
+    stop reading as the important ones.
+    """
+    subtle = theme.tcss_vars.get("border-subtle")
+    border = theme.tcss_vars.get("border")
+    assert subtle, f"{theme.name}: missing border-subtle"
+    backgrounds = [bg for bg in (theme.tcss_vars.get("bg-app"), theme.tcss_vars.get("bg-surface"))
+                   if isinstance(bg, str) and bg.startswith("#")]
+    if not backgrounds:  # native/ANSI: resolved from the terminal at runtime
+        pytest.skip(f"{theme.name}: background resolved by the terminal")
+    ratios = [contrast_ratio(subtle, bg) for bg in backgrounds]
+    assert min(ratios) >= DECORATIVE_VISIBLE, f"{theme.name}: border-subtle {subtle} invisible ({min(ratios):.2f}:1)"
+    assert max(ratios) < UI_CONTRAST_AA, (
+        f"{theme.name}: border-subtle {subtle} is as loud as a component border ({max(ratios):.2f}:1)"
+    )
+    if isinstance(border, str) and border.startswith("#"):
+        assert min(ratios) < min(contrast_ratio(border, bg) for bg in backgrounds), (
+            f"{theme.name}: border-subtle must stay weaker than border"
+        )
+
+
 @pytest.mark.parametrize("theme", _themes(), ids=lambda t: t.name)
 def test_border_stays_visible_behind_modal_scrim(theme):
     """A modal paints `bg-overlay` over the app, so the dialog outline is the
@@ -114,3 +142,6 @@ def test_native_palette_meets_contrast(bg, fg):
     assert contrast_ratio(tcss["fg-muted"], surface) >= TEXT_CONTRAST_AA
     assert contrast_ratio(tcss["border"], bg) >= UI_CONTRAST_AA
     assert contrast_ratio(tcss["border"], surface) >= UI_CONTRAST_AA
+    subtle = tcss["border-subtle"]
+    assert min(contrast_ratio(subtle, bg), contrast_ratio(subtle, surface)) >= DECORATIVE_VISIBLE
+    assert max(contrast_ratio(subtle, bg), contrast_ratio(subtle, surface)) < UI_CONTRAST_AA
