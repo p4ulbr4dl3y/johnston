@@ -18,7 +18,7 @@ from widgets.presentation.widgets.chat_diff import format_edit_diff, get_diff_co
 from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import BREAKPOINT_COMPACT, BREAKPOINT_HINT, is_compact_width, resolve_width
-from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width, ellipsize
+from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width, ellipsize, middle_ellipsize
 
 
 class DiffHeader(ResizeDebounceMixin, Static):
@@ -225,22 +225,32 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         add_fg, _, remove_fg, _, _ = get_diff_colors()
         _, _, t_muted, _ = get_theme_colors()
         for file_path, _, added, deleted in self.diff_items:
-            short_name = os.path.basename(file_path) or file_path
+            short_name = self._display_file_path(file_path)
             stat_plain = f"+{added}/-{deleted}"
             if display_width(short_name) + display_width(stat_plain) + 1 > target_width:
                 max_name_len = max(4, target_width - display_width(stat_plain) - 1)
-                dot_idx = short_name.rfind(".")
-                if dot_idx > 3 and len(short_name) - dot_idx <= 5:
-                    ext = short_name[dot_idx:]
-                    base = short_name[:dot_idx]
-                    short_name = base[: max_name_len - display_width(ext) - 1] + "…" + ext
-                else:
-                    short_name = short_name[: max_name_len - 1] + "…"
+                # Middle ellipsis: two files in different folders must not
+                # collapse to the same label (P2-13).
+                short_name = middle_ellipsize(short_name, max_name_len)
 
             spaces = " " * max(1, target_width - display_width(short_name) - display_width(stat_plain))
             stat_markup = f"[{add_fg}]+{added}[/][{t_muted}]/[/][{remove_fg}]-{deleted}[/]"
             options.append(f"{escape(short_name)}{spaces}{stat_markup}")
         return options
+
+    @staticmethod
+    def _display_file_path(file_path: str) -> str:
+        """Path relative to the workspace, so `ui/test_a.py` and `tests/test_a.py`
+        are distinguishable in a narrow sidebar (P2-13)."""
+        if not file_path:
+            return file_path
+        try:
+            rel = os.path.relpath(os.path.abspath(file_path), os.getcwd())
+        except Exception:
+            return file_path
+        if rel.startswith(".."):
+            return file_path
+        return rel
 
     def _sidebar_row_width(self) -> int:
         screen_w = resolve_width(self)

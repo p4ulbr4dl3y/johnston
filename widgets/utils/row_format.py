@@ -146,6 +146,37 @@ def ellipsize(text: str, max_width: int) -> str:
     return "".join(out) + "..."
 
 
+def middle_ellipsize(text: str, max_width: int) -> str:
+    """Clip text to ``max_width`` cells keeping both ends: ``widgets/…/diff.py``.
+
+    Paths are told apart by their last segment, so a trailing ``...`` (see
+    :func:`ellipsize`) makes ``tests/ui/test_a.py`` and ``tests/ui/test_b.py``
+    look identical — hence the middle ellipsis.
+    """
+    if display_width(text) <= max_width:
+        return text
+    if max_width <= 1:
+        return "…"[:max_width]
+
+    sep = "/" if "/" in text else ("\\" if "\\" in text else "")
+    tail = text.rsplit(sep, 1)[-1] if sep else text[-max(1, max_width // 3) :]
+    if display_width(tail) > max_width - 1:
+        # Even the tail does not fit: fall back to clipping its start.
+        tail = tail[-(max_width - 1) :]
+        return "…" + tail
+
+    head_budget = max_width - 1 - display_width(tail)
+    head: list[str] = []
+    used = 0
+    for ch in text[: len(text) - len(tail)]:
+        width = display_width(ch)
+        if used + width > head_budget:
+            break
+        head.append(ch)
+        used += width
+    return "".join(head) + "…" + tail
+
+
 def format_badge_row(
     title: str,
     badge: str = "",
