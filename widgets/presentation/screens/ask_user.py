@@ -306,6 +306,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                     )
 
                 input_field.placeholder = "Type custom answer and press Enter..."
+                input_field.remove_class("standalone")
+                input_field.add_class("subordinate")
                 opt_list.highlighted = highlight_idx
                 if highlight_idx == len(self.options) - 1:
                     self.focus_write_in_input()
@@ -316,6 +318,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             else:
                 opt_list.display = False
                 input_field.placeholder = "Type your answer and press Enter..."
+                input_field.remove_class("subordinate")
+                input_field.add_class("standalone")
                 input_field.display = True
                 input_field.value = prev_answer
                 input_field.focus()

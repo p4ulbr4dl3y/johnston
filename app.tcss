@@ -1071,6 +1071,18 @@ ModalScreen OptionList > .option-list--option-hover {
     padding: 0 1;
 }
 
+#modal-dialog.wizard-dialog #write-in-input.subordinate,
+#modal-dialog.wizard-dialog #write-in-input.subordinate:focus {
+    margin: 1 0 0 0;
+    padding: 0 0 0 4;
+}
+
+#modal-dialog.wizard-dialog #write-in-input.standalone,
+#modal-dialog.wizard-dialog #write-in-input.standalone:focus {
+    margin: 1 0 0 0;
+    padding: 0 1;
+}
+
 #modal-dialog #reject-reason-input,
 #modal-dialog #reject-reason-input:focus,
 #reject-reason-input,
