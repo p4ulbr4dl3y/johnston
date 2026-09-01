@@ -27,6 +27,7 @@ class RenameSessionScreen(BaseModalScreen[str | None]):
                 placeholder="New session title...",
                 value=self.current_title,
                 id="session-rename-input",
+                classes="modal-input",
             )
             yield ModalHint("enter: save • esc: cancel", id=MODAL_HINT_ID)
 

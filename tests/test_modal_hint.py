@@ -1,7 +1,7 @@
 import unittest
 
 from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
-from widgets.presentation.widgets.modal_hint import ModalHint
+from widgets.presentation.widgets.modal_hint import ModalHint, ModalHintConfig
 
 
 class TestModalHintFormatting(unittest.TestCase):
@@ -32,17 +32,40 @@ class TestModalHintFormatting(unittest.TestCase):
         raw = "[#ffffff]custom[/] [#71717a]hint[/]"
         self.assertEqual(format_modal_hint(raw), raw)
 
-    def test_modal_hint_widget(self):
-        widget = ModalHint("enter: save • esc: cancel")
+    def test_modal_hint_config_methods(self):
+        cfg = ModalHintConfig(
+            actions=[("enter", "select"), ("tab", "toggle")],
+            close_key="esc",
+            close_label="close",
+        )
+        self.assertEqual(cfg.actions_text(), "enter: select • tab: toggle")
+        self.assertEqual(cfg.close_text(), "esc: close")
+        self.assertEqual(cfg.to_hint_string(), "enter: select • tab: toggle • esc: close")
+
+        formatted_actions = cfg.format_actions()
+        self.assertIn("enter", formatted_actions)
+        self.assertIn("select", formatted_actions)
+
+        formatted_close = cfg.format_close()
+        self.assertIn("esc", formatted_close)
+        self.assertIn("close", formatted_close)
+
+    def test_modal_hint_config_widget(self):
+        cfg = ModalHintConfig(actions=[("enter", "confirm")], close_key="esc", close_label="cancel")
+        widget = ModalHint(cfg)
         rendered = str(widget.render())
         self.assertIn("enter", rendered)
-        self.assertIn("save", rendered)
+        self.assertIn("confirm", rendered)
+        self.assertIn("esc", rendered)
+        self.assertIn("cancel", rendered)
 
-        widget.update("enter • esc")
+        new_cfg = ModalHintConfig(actions=[("space", "pause")])
+        widget.update(new_cfg)
         rendered_after = str(widget.render())
-        self.assertIn("enter", rendered_after)
-        self.assertIn("esc", rendered_after)
+        self.assertIn("space", rendered_after)
+        self.assertIn("pause", rendered_after)
 
 
 if __name__ == "__main__":
     unittest.main()
+

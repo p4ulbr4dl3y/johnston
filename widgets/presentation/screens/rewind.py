@@ -175,7 +175,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
             yield ModalHeader(self.title, esc_hint="")
-            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
+            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             yield ModalHint(self.hint_text, id=MODAL_HINT_ID)
 

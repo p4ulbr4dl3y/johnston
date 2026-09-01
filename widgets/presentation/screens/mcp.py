@@ -64,7 +64,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID):
             yield ModalHeader("Manage MCP Servers", esc_hint="")
-            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
+            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id="mcp-option-list")
             yield ModalHint("enter: select • space: toggle • esc: close", id=MODAL_HINT_ID)
 

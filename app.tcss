@@ -6,11 +6,8 @@ Screen > .screen--selection,
 TextArea > .text-area--selection,
 Input > .input--selection,
 Input > .selection,
-#message-input > .text-area--selection,
-#write-in-input > .input--selection,
-#modal-search-input > .input--selection,
-#diff-search-input > .input--selection,
-#api-key-input > .input--selection {
+.modal-input > .input--selection,
+#message-input > .text-area--selection {
     background: $subtle !important;
     color: $fg-primary !important;
     text-style: none !important;
@@ -21,15 +18,13 @@ Input > .selection,
 .text-area--cursor,
 Input > .input--cursor,
 TextArea > .text-area--cursor,
-#message-input > .text-area--cursor,
-#write-in-input > .input--cursor,
-#modal-search-input > .input--cursor,
-#diff-search-input > .input--cursor,
-#api-key-input > .input--cursor {
+.modal-input > .input--cursor,
+#message-input > .text-area--cursor {
     background: $fg-primary !important;
     color: $fg-inverted !important;
     text-style: none !important;
 }
+
 
 Screen {
     background: $bg-app;
@@ -1063,12 +1058,8 @@ ModalScreen OptionList > .option-list--option-hover {
 
 #modal-dialog Input,
 #modal-dialog Input:focus,
-#write-in-input,
-#write-in-input:focus,
-#modal-search-input,
-#modal-search-input:focus,
-#api-key-input,
-#api-key-input:focus {
+.modal-input,
+.modal-input:focus {
     width: 100%;
     height: 1;
     margin: 0 0 1 0;
@@ -1116,19 +1107,13 @@ ModalScreen OptionList > .option-list--option-hover {
 }
 
 #modal-dialog Input > .input--placeholder,
-#modal-search-input > .input--placeholder,
-#write-in-input > .input--placeholder,
-#api-key-input > .input--placeholder,
-#shell-stdin-input > .input--placeholder {
+.modal-input > .input--placeholder {
     color: $fg-muted;
     background: transparent;
 }
 
 #modal-dialog Input > .input--selection,
-#modal-search-input > .input--selection,
-#write-in-input > .input--selection,
-#api-key-input > .input--selection,
-#shell-stdin-input > .input--selection {
+.modal-input > .input--selection {
     background: $subtle;
     color: $fg-primary;
 }

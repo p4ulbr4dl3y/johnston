@@ -19,7 +19,7 @@ from widgets.presentation.screens.constants import (
     TAB_KEYS,
 )
 from widgets.presentation.widgets.modal_header import ModalHeader
-from widgets.presentation.widgets.modal_hint import ModalHint
+from widgets.presentation.widgets.modal_hint import ModalHint, ModalHintConfig
 from widgets.utils.responsive import (
     MODAL_COMPACT_MAX_WIDTH,
     MODAL_MAX_WIDTH,
@@ -33,21 +33,6 @@ from widgets.utils.responsive import (
 T = TypeVar("T")
 
 _NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
-
-
-def _split_esc_hint(hint: str) -> tuple[str, str]:
-    if not hint:
-        return "", ""
-    parts = [p.strip() for p in hint.split("•")]
-    esc_part = ""
-    action_parts = []
-    for p in parts:
-        lower_p = p.lower()
-        if lower_p.startswith("esc") or ": close" in lower_p or ": cancel" in lower_p or ": back" in lower_p:
-            esc_part = p
-        else:
-            action_parts.append(p)
-    return " • ".join(action_parts), esc_part
 
 
 class HeaderWrapOptionList(OptionList):
@@ -160,13 +145,14 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         default_value: T,
         show_search: bool = False,
         search_placeholder: str = "Search...",
-        hint_text: str = "enter: select • esc: close",
+        hint_text: str | ModalHintConfig = "enter: select • esc: close",
         option_list_id: str = MODAL_OPTION_LIST_ID,
         dialog_classes: str = "",
         fit_content: bool = False,
         min_dialog_width: int = MODAL_MIN_WIDTH,
         max_dialog_width: int | None = None,
         max_options_height: int = 12,
+        esc_hint: str = "",
     ):
         super().__init__()
         self.title = title
@@ -175,9 +161,16 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         self.default_value = default_value
         self.show_search = show_search
         self.search_placeholder = search_placeholder
-        self.raw_hint_text = hint_text
-        self.hint_text = hint_text
-        self.esc_hint = ""
+        if isinstance(hint_text, ModalHintConfig):
+            self.hint_config = hint_text
+            self.raw_hint_text = hint_text.actions_text() if (esc_hint or hint_text.close_key) else hint_text.to_hint_string()
+            self.hint_text = self.raw_hint_text
+            self.esc_hint = esc_hint or hint_text.close_text()
+        else:
+            self.hint_config = None
+            self.raw_hint_text = hint_text
+            self.hint_text = hint_text
+            self.esc_hint = esc_hint
         self.option_list_id = option_list_id
         self.dialog_classes = dialog_classes
         # Content-hugging dialog width (see widgets/utils/responsive.py):
@@ -194,7 +187,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         with Vertical(id=MODAL_DIALOG_ID, classes=self.dialog_classes or None):
             yield ModalHeader(self.title, esc_hint=self.esc_hint)
             if self.show_search:
-                yield Input(placeholder=self.search_placeholder, id=MODAL_SEARCH_INPUT_ID)
+                yield Input(placeholder=self.search_placeholder, id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             if self.hint_text:
                 yield ModalHint(self.hint_text, id=MODAL_HINT_ID)

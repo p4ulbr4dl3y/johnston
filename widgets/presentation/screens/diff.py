@@ -290,7 +290,7 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
             yield DiffHeader(self.title_text, self.stats_summary, from_rewind=self.from_rewind, id="diff-header")
             with Horizontal(id="diff-body"):
                 with Vertical(id="diff-sidebar"):
-                    yield Input(placeholder="Search files...", id="diff-search-input")
+                    yield Input(placeholder="Search files...", id="diff-search-input", classes="modal-input")
                     yield OptionList(*self.sidebar_options, id="diff-file-list")
                 with Vertical(id="diff-content-container"):
                     if not self.diff_items:

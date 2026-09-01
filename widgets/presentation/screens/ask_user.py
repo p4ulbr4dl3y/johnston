@@ -168,7 +168,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             with ToolScrollBox(id="wizard-summary-scroll", classes="tool-scroll-box"):
                 yield Static("", id="wizard-summary", classes=f"{MODAL_MARKDOWN} wizard-summary", markup=False)
             yield HeaderWrapOptionList(id=OPTIONS_LIST_ID)
-            yield WriteInInput(placeholder="Type custom answer and press Enter...", id=WRITE_IN_INPUT_ID)
+            yield WriteInInput(placeholder="Type custom answer and press Enter...", id=WRITE_IN_INPUT_ID, classes="modal-input")
             yield ModalHint("", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:

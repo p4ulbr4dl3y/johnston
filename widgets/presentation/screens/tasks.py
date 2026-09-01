@@ -191,7 +191,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             with ToolScrollBox(classes="tool-scroll-box"):
                 yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
             yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
-            yield TaskStdinInput(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input")
+            yield TaskStdinInput(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input", classes="modal-input")
             yield ModalHint(
                 "enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • esc: back"
                 if is_running
@@ -435,7 +435,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
             yield ModalHeader(self._get_header_md(), esc_hint="", id=self.title_id)
-            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID)
+            yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id=self.option_list_id)
             yield ModalHint(f"{self.hint_action_name} • esc: close", id=MODAL_HINT_ID)
 

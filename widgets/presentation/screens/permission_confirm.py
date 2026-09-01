@@ -309,7 +309,11 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
             yield PermissionOptionList(*options, id="permission-options-list")
 
-            inp = RejectReasonInput(placeholder="Type feedback for agent and press Enter...", id="reject-reason-input")
+            inp = RejectReasonInput(
+                placeholder="Type feedback for agent and press Enter...",
+                id="reject-reason-input",
+                classes="modal-input",
+            )
             inp.display = False
             inp.can_focus = False
             yield inp
