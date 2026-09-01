@@ -47,6 +47,40 @@ ScrollBar, ScrollBarCorner, ScrollBar > *, ScrollBarCorner > * {
     height: 0 !important;
 }
 
+/* Scroll position feedback (P1-6). Prose and the chat stay clean, but a list
+   that is longer than its viewport must not hide that fact: 21 themes in 12
+   rows and 57 slash commands in the popup gave no hint that anything was
+   below the fold. Lists get a one-column bar plus a "n/m" counter in the hint
+   row; see `widgets/presentation/widgets/modal_hint.py`. */
+ModalScreen OptionList,
+#modal-dialog OptionList,
+CommandSuggestions OptionList,
+#diff-file-list,
+ModalScreen ListView,
+#modal-dialog ListView,
+ModalScreen Tree,
+#modal-dialog Tree,
+ModalScreen DataTable,
+#modal-dialog DataTable {
+    scrollbar-size: 0 1 !important;
+    scrollbar-size-vertical: 1 !important;
+    scrollbar-size-horizontal: 0 !important;
+    scrollbar-color: $fg-muted;
+    scrollbar-color-hover: $fg-primary;
+    scrollbar-background: $bg-surface;
+    scrollbar-background-hover: $bg-surface;
+}
+
+ModalScreen ScrollBar,
+#modal-dialog ScrollBar,
+CommandSuggestions ScrollBar,
+#diff-file-list ScrollBar {
+    display: block !important;
+    visibility: visible !important;
+    width: 1 !important;
+    height: auto !important;
+}
+
 Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, TextArea, Markdown, MarkdownViewer, DataTable, Tree, ListView, DirectoryTree, ScrollBar, ScrollBarCorner {
     scrollbar-size: 0 0 !important;
     scrollbar-size-vertical: 0 !important;
@@ -403,7 +437,7 @@ OptionList > .option-list--option-hover {
     margin-bottom: 5;
     width: 100%;
     height: auto;
-    max-height: 5;
+    max-height: 9;
     padding: 0;
     border: solid $border;
     background: $bg-surface;
