@@ -163,11 +163,71 @@ def normalize_action(action: str, default: str = "ask") -> str:
 
 
 def extract_shell_subcommands(cmd: str) -> List[str]:
-    """Splits compound shell commands (&&, ||, ;, |, &) into individual subcommands."""
+    """Splits compound shell commands (&&, ||, ;, |, &) into individual subcommands.
+
+    Quote-aware: delimiters inside single/double quotes (and backslash-escaped
+    characters) do not split, so ``git commit -m "fix; rm -rf tmp"`` stays a
+    single subcommand instead of producing false ASK/deny fragments.
+    """
     if not cmd or not isinstance(cmd, str):
         return []
-    # Split by chain and pipeline delimiters, ignoring redirection operators like 2>&1
-    parts = re.split(r"&&|\|\||;|\||\n|(?<![0-9>&])&(?!>)", cmd)
+    parts: List[str] = []
+    buf: List[str] = []
+    quote: Optional[str] = None
+    escaped = False
+    i, n = 0, len(cmd)
+    while i < n:
+        ch = cmd[i]
+        if escaped:
+            buf.append(ch)
+            escaped = False
+            i += 1
+            continue
+        if ch == "\\":
+            buf.append(ch)
+            escaped = True
+            i += 1
+            continue
+        if quote:
+            buf.append(ch)
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            buf.append(ch)
+            i += 1
+            continue
+        if ch == "\n":
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        if ch in (";", "|"):
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        if ch == "&":
+            nxt = cmd[i + 1] if i + 1 < n else ""
+            prev = cmd[i - 1] if i > 0 else ""
+            if nxt == "&":  # '&&' chain delimiter
+                parts.append("".join(buf))
+                buf = []
+                i += 2
+                continue
+            if prev in (">", "&") or nxt == ">":  # keep redirections like 2>&1
+                buf.append(ch)
+                i += 1
+                continue
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        buf.append(ch)
+        i += 1
+    parts.append("".join(buf))
     cleaned = []
     for part in parts:
         stripped = part.strip()

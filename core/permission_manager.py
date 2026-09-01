@@ -186,6 +186,17 @@ class PermissionManager:
 
         effective_perms = self.get_effective_permissions()
 
+        # Config deny patterns always win: a session-scoped allow granted via
+        # the confirmation dialog must never bypass an explicit admin-configured
+        # DENY. Session allows may only override config ASK/ALLOW rules.
+        config_patterns = effective_perms.get("patterns", {}).get(canonical_name, [])
+        config_decision = evaluate_pattern_rules(canonical_name, args, config_patterns)
+        if (
+            config_decision is not None
+            and config_decision.action == PermissionAction.DENY
+        ):
+            return config_decision
+
         # 2. Runtime session pattern overrides
         decision = evaluate_pattern_rules(
             canonical_name, args, self.session_pattern_overrides.get(canonical_name, [])
@@ -194,11 +205,8 @@ class PermissionManager:
             return decision
 
         # 3. Pattern rules from config
-        decision = evaluate_pattern_rules(
-            canonical_name, args, effective_perms.get("patterns", {}).get(canonical_name, [])
-        )
-        if decision is not None:
-            return decision
+        if config_decision is not None:
+            return config_decision
 
         # 4. Explicit tool permission from user's config file (normalized during merge)
         explicit_action = effective_perms.get("tools", {}).get(canonical_name)

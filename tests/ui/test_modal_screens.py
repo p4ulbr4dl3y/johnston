@@ -252,3 +252,24 @@ if __name__ == "__main__":
     unittest.main()
 
 
+
+    async def test_action_allow_pattern_no_pattern_no_escalation(self):
+        """'p' with no suggested pattern must NOT silently always-allow."""
+        from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+
+        screen = PermissionConfirmScreen("manage_shell", {"action": "list"})
+        self.assertIsNone(screen.suggested_pattern)
+        dismissed = []
+        screen.dismiss = dismissed.append
+        screen.action_allow_pattern()
+        self.assertEqual(dismissed, [])
+
+    async def test_action_allow_pattern_with_pattern_dismisses_pattern(self):
+        from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+
+        screen = PermissionConfirmScreen("shell", {"command": "cat a.txt"})
+        self.assertEqual(screen.suggested_pattern, "cat *")
+        dismissed = []
+        screen.dismiss = dismissed.append
+        screen.action_allow_pattern()
+        self.assertEqual(dismissed, ["pattern:cat *"])

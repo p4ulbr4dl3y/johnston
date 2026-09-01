@@ -206,3 +206,67 @@ class TestPermissionManagerPatterns(unittest.TestCase):
                 # Read normal file -> allow via tool default
                 dec_read_py = self.pm.check_permission("read", {"path": "/app/src/main.py"})
                 self.assertEqual(dec_read_py.action, PermissionAction.ALLOW)
+
+
+class TestQuotedCompoundRegression(unittest.TestCase):
+    """Regression: quotes must protect delimiters in compound splitting."""
+
+    def test_quotes_protect_delimiters(self):
+        self.assertEqual(
+            extract_shell_subcommands('git commit -m "fix; rm -rf tmp"'),
+            ['git commit -m "fix; rm -rf tmp"'],
+        )
+        self.assertEqual(extract_shell_subcommands("echo 'a && b'"), ["echo 'a && b'"])
+
+    def test_unquoted_compound_still_splits(self):
+        self.assertEqual(
+            extract_shell_subcommands("git status && pytest -v ; echo done || cat log.txt | grep error"),
+            ["git status", "pytest -v", "echo done", "cat log.txt", "grep error"],
+        )
+
+    def test_redirections_kept(self):
+        self.assertEqual(extract_shell_subcommands("cargo test 2>&1"), ["cargo test 2>&1"])
+
+    def test_escaped_chars_do_not_split(self):
+        self.assertEqual(extract_shell_subcommands(r"echo \$HOME; ls"), [r"echo \$HOME", "ls"])
+
+    def test_quoted_allow_pattern_no_false_ask(self):
+        """Allowed pattern must match a quoted compound command (no fallback to ASK)."""
+        rules = [{"pattern": "git commit *", "action": "allow"}]
+        dec = evaluate_pattern_rules("shell", {"command": 'git commit -m "fix; rm -rf tmp"'}, rules)
+        self.assertIsNotNone(dec)
+        self.assertEqual(dec.action, PermissionAction.ALLOW)
+
+
+class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
+    """Regression: session allow must never bypass an admin-configured deny."""
+
+    def test_config_deny_wins_over_session_allow(self):
+        pm = PermissionManager()
+        pm.clear_session_overrides()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {"permissions": {"patterns": {"read": [{"pattern": ".env*", "action": "deny"}]}}},
+                    f,
+                )
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                pm.set_session_pattern_override("read", "/app/.env.local", "allow")
+                dec = pm.check_permission("read", {"path": "/app/.env.local"})
+                self.assertEqual(dec.action, PermissionAction.DENY)
+
+    def test_session_allow_still_overrides_config_ask(self):
+        pm = PermissionManager()
+        pm.clear_session_overrides()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {"permissions": {"patterns": {"shell": [{"pattern": "pytest *", "action": "ask"}]}}},
+                    f,
+                )
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                pm.set_session_pattern_override("shell", "pytest *", "allow")
+                dec = pm.check_permission("shell", {"command": "pytest -v"})
+                self.assertEqual(dec.action, PermissionAction.ALLOW)

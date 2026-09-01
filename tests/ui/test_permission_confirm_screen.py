@@ -61,10 +61,12 @@ class TestPermissionConfirmScreen(unittest.TestCase):
         self.assertEqual(dismissed_val, "pattern:git status *")
 
         # Fallback when no pattern suggested
+        # No pattern suggested: 'p' must NOT escalate to a broader always-allow
+        dismissed_val = "sentinel"
         screen_no_pat = PermissionConfirmScreen("ask_user", {})
         screen_no_pat.dismiss = mock_dismiss
         screen_no_pat.action_allow_pattern()
-        self.assertEqual(dismissed_val, "always_allow")
+        self.assertEqual(dismissed_val, "sentinel")
 
 
     def test_build_diff_text_pre_set_diff(self):

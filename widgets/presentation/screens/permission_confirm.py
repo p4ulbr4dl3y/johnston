@@ -586,10 +586,10 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 return
         except Exception:
             pass
+        # No suggested pattern: pressing 'p' must NOT silently escalate to a
+        # broader 'always allow'; the binding simply does nothing.
         if self.suggested_pattern:
             self.dismiss(f"pattern:{self.suggested_pattern}")
-        else:
-            self.dismiss("always_allow")
 
     def action_always_allow(self) -> None:
         try:

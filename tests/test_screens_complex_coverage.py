@@ -448,12 +448,14 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
             screen.action_reject_with_reason()
             self.assertTrue(inp.display)
 
-            # Test allow_pattern without suggested_pattern
+            # allow_pattern without suggested_pattern must NOT escalate
+            # to always-allow; the action is a no-op and dismisses nothing.
+            dismiss_val = "sentinel"
             screen_no_pat = PermissionConfirmScreen("read", {"path": "a.txt"})
             screen_no_pat.dismiss = fake_dismiss
             screen_no_pat.suggested_pattern = ""
             screen_no_pat.action_allow_pattern()
-            self.assertEqual(dismiss_val, "always_allow")
+            self.assertEqual(dismiss_val, "sentinel")
 
             # Test hint text compact width
             self.assertIn("enter", screen._build_hint_text(width=50))
