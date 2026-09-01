@@ -8,7 +8,7 @@ from typing import Any, Callable
 from rich.text import Text
 
 from widgets.presentation.widgets.chat_diff import format_edit_diff
-from widgets.presentation.widgets.chat_markdown import CODE_THEME, TransparentSyntax
+from widgets.presentation.widgets.chat_markdown import TransparentSyntax, get_current_syntax_theme
 
 
 def clean_truncation_marker(match: re.Match) -> str:
@@ -275,10 +275,15 @@ def compute_tool_call_content(
                 content = content.rstrip("\r\n")
                 lexer = guess_lexer(file_path)
                 try:
+                    from widgets.app.theme_manager import theme_manager
+
+                    curr_theme = getattr(theme_manager, "current_theme", None)
+                    is_dark = getattr(curr_theme, "dark", True) if curr_theme else True
+                    syntax_theme = get_current_syntax_theme(dark=is_dark)
                     syntax = TransparentSyntax(
                         content,
                         lexer,
-                        theme=CODE_THEME,
+                        theme=syntax_theme,
                         line_numbers=True,
                         word_wrap=True,
                         background_color="default",

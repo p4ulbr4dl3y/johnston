@@ -46,6 +46,14 @@ class TransparentSyntax(Syntax):
 CODE_THEME = "one-dark"
 _CURRENT_SYNTAX_THEME: PygmentsSyntaxTheme | str | None = None
 
+
+def get_current_syntax_theme(dark: bool = True) -> PygmentsSyntaxTheme | str:
+    """Return the active dynamic PygmentsSyntaxTheme or fallback to dark/light base theme."""
+    global _CURRENT_SYNTAX_THEME
+    if _CURRENT_SYNTAX_THEME is not None:
+        return _CURRENT_SYNTAX_THEME
+    return CODE_THEME if dark else "github-light"
+
 # Highlight result cache. Fences get re-mounted whenever a Markdown document is
 # rebuilt (final render after streaming, session load, theme switch), and
 # pygments highlighting is the dominant cost of that pass (~10ms per large
