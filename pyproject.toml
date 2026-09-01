@@ -6,6 +6,12 @@ build-backend = "hatchling.build"
 name = "johnston"
 version = "0.28.0"
 description = "Textual AI Johnston Application"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "p4ulbr4dl3y" },
+]
+keywords = ["ai", "assistant", "cli", "terminal", "llm"]
 requires-python = ">=3.10, <3.14"
 dependencies = [
     "textual>=8.0.0,<9",
@@ -13,10 +19,16 @@ dependencies = [
     "rich>=13.0.0,<16",
     "pygments>=2.18.0,<3",
     "markdown-it-py>=3.0.0,<5",
-    "pillow>=12.3.0",
+    "pillow>=12.3.0,<13",
     "tomli>=2.0,<3; python_version < '3.11'",
     "pypdf>=5.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/p4ulbr4dl3y/johnston"
+Repository = "https://github.com/p4ulbr4dl3y/johnston"
+Issues = "https://github.com/p4ulbr4dl3y/johnston/issues"
+Changelog = "https://github.com/p4ulbr4dl3y/johnston/blob/main/CHANGELOG.md"
 
 [project.scripts]
 johnston = "cli:main"
