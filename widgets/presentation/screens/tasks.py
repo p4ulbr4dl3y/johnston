@@ -9,14 +9,14 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList, RichLog
 from textual.widgets.option_list import Option
 
+from core.infrastructure.platform.platform_utils import is_windows
 from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
+from widgets.chat_toolcall import ToolScrollBox
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
-    MODAL_MARKDOWN,
-    MODAL_MARKDOWN_CENTERED,
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
@@ -30,7 +30,6 @@ from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import (
     MODAL_WIDE_ROW_WIDTH,
-    ellipsize,
     format_badge_row,
     format_duration,
     option_list_row_width,
@@ -128,6 +127,38 @@ def _filter_and_sort_tasks(items: list, search_query: str) -> list:
     return sorted(items, key=lambda item: not item["is_running"])
 
 
+class TaskStdinInput(Input):
+    """Input widget for task stdin that routes scroll keys to the screen's log."""
+
+    async def _on_key(self, event: events.Key) -> None:
+        key = (event.key or "").lower()
+        if key in ("pageup", "page_up"):
+            if self.screen and hasattr(self.screen, "action_scroll_page_up"):
+                getattr(self.screen, "action_scroll_page_up")()
+                event.stop()
+                event.prevent_default()
+                return
+        elif key in ("pagedown", "page_down"):
+            if self.screen and hasattr(self.screen, "action_scroll_page_down"):
+                getattr(self.screen, "action_scroll_page_down")()
+                event.stop()
+                event.prevent_default()
+                return
+        elif key in ("shift+up", "ctrl+up"):
+            if self.screen and hasattr(self.screen, "action_scroll_up"):
+                getattr(self.screen, "action_scroll_up")()
+                event.stop()
+                event.prevent_default()
+                return
+        elif key in ("shift+down", "ctrl+down"):
+            if self.screen and hasattr(self.screen, "action_scroll_down"):
+                getattr(self.screen, "action_scroll_down")()
+                event.stop()
+                event.prevent_default()
+                return
+        await super()._on_key(event)
+
+
 class TaskConsoleScreen(BaseModalScreen[None]):
     """Modal screen for viewing console output of a specific task in real-time, with stdin and kill.
 
@@ -138,6 +169,8 @@ class TaskConsoleScreen(BaseModalScreen[None]):
     BINDINGS = expand_bindings([
         ("escape", "back", "Back to list"),
         ("ctrl+k", "kill_task", "Kill Task"),
+        ("pageup", "scroll_page_up", "Page Up"),
+        ("pagedown", "scroll_page_down", "Page Down"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ])
@@ -149,24 +182,86 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self._pending_line = ""
 
     def compose(self) -> ComposeResult:
-        clean = " ".join(getattr(self.bg_task, "command", "").replace("\n", " ").replace("\r", " ").split())
-        clean_preview = ellipsize(clean, 50) if clean else "(task)"
+        cmd = getattr(self.bg_task, "command", "") or "(shell task)"
         is_running = getattr(self.bg_task, "is_running", False)
+        lang = "powershell" if is_windows() else "bash"
 
-        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
-            yield Markdown(f"### **Shell Task: {clean_preview}**", classes=f"{MODAL_MARKDOWN} {MODAL_MARKDOWN_CENTERED}")
+        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide task-console-dialog"):
+            yield ModalHeader("### **Shell Task**", esc_hint="")
+            with ToolScrollBox(classes="tool-scroll-box"):
+                yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
             yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
-            yield Input(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input")
+            yield TaskStdinInput(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input")
             yield ModalHint(
-                "enter: send stdin • ctrl+k: kill • esc: back" if is_running else "esc: back",
+                "enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • esc: back"
+                if is_running
+                else "pgup/pgdn: scroll • esc: back",
                 id=MODAL_HINT_ID,
             )
 
     def _apply_dynamic_log_height(self) -> None:
         if not self.log_widget:
             return
+        try:
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+        except Exception:
+            dialog = None
+
         screen_h = self.app.size.height if getattr(self, "app", None) else 24
-        self.log_widget.styles.max_height = max(5, min(18, screen_h - 8))
+        if not isinstance(screen_h, int) or screen_h <= 0:
+            screen_h = 24
+
+        is_running = getattr(self.bg_task, "is_running", False)
+
+        cmd = getattr(self.bg_task, "command", "") or ""
+        cmd_lines = max(1, len(cmd.strip().splitlines()))
+        cmd_h = min(4, cmd_lines)
+
+        try:
+            cmd_box = self.query_one(".tool-scroll-box")
+            cmd_box.styles.max_height = cmd_h
+        except Exception:
+            pass
+
+        if screen_h < 18:
+            if dialog:
+                dialog.styles.padding = (0, 1)
+                dialog.styles.max_height = max(7, screen_h - 1)
+            usable_h = screen_h - 1
+            overhead = 8 + cmd_h + (2 if is_running else 0)
+        else:
+            if dialog:
+                dialog.styles.padding = (1, 2)
+                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
+            usable_h = screen_h - 2
+            overhead = 11 + cmd_h + (2 if is_running else 0)
+
+        target_h = max(2, min(14, usable_h - overhead))
+
+        if is_running:
+            self.log_widget.styles.height = target_h
+        else:
+            self.log_widget.styles.height = "auto"
+        self.log_widget.styles.max_height = target_h
+
+    def _update_hint(self) -> None:
+        try:
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
+            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
+            is_running = getattr(self.bg_task, "is_running", False)
+            if is_running:
+                hint_str = (
+                    "enter: stdin • c-k: kill • esc"
+                    if is_compact
+                    else "enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • esc: back"
+                )
+            else:
+                hint_str = "pgup/pgdn • esc" if is_compact else "pgup/pgdn: scroll • esc: back"
+            hint.update(hint_str)
+        except Exception:
+            pass
 
     def on_mount(self) -> None:
         self.log_widget = self.query_one("#console-log", RichLog)
@@ -190,6 +285,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             self.bg_task.add_listener(self._on_output)
 
     def _update_state(self) -> None:
+        self._apply_dynamic_log_height()
         is_running = getattr(self.bg_task, "is_running", False)
         try:
             stdin_inp = self.query_one("#shell-stdin-input", Input)
@@ -202,18 +298,11 @@ class TaskConsoleScreen(BaseModalScreen[None]):
                     self.log_widget.focus()
         except Exception:
             pass
-
-        try:
-            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
-            if is_running:
-                hint.update("enter: send stdin • ctrl+k: kill • esc: back")
-            else:
-                hint.update("esc: back")
-        except Exception:
-            pass
+        self._update_hint()
 
     def on_resize(self, event: events.Resize) -> None:
         self._apply_dynamic_log_height()
+        self._update_hint()
 
     def on_unmount(self) -> None:
         if self.bg_task is not None and hasattr(self.bg_task, "remove_listener"):
@@ -267,6 +356,22 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             if self.bg_task and getattr(self.bg_task, "is_running", False):
                 if hasattr(self.bg_task, "send_input"):
                     asyncio.create_task(self.bg_task.send_input(val))
+
+    def action_scroll_page_up(self) -> None:
+        if self.log_widget:
+            self.log_widget.scroll_page_up(animate=False)
+
+    def action_scroll_page_down(self) -> None:
+        if self.log_widget:
+            self.log_widget.scroll_page_down(animate=False)
+
+    def action_scroll_up(self) -> None:
+        if self.log_widget:
+            self.log_widget.scroll_up(animate=False)
+
+    def action_scroll_down(self) -> None:
+        if self.log_widget:
+            self.log_widget.scroll_down(animate=False)
 
     async def action_kill_task(self) -> None:
         if self.bg_task and getattr(self.bg_task, "is_running", False):
@@ -334,9 +439,33 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield HeaderWrapOptionList(id=self.option_list_id)
             yield ModalHint(f"{self.hint_action_name} • esc: close", id=MODAL_HINT_ID)
 
+    def _apply_dialog_fit(self) -> None:
+        try:
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+            screen_h = self.app.size.height if getattr(self, "app", None) else 24
+            if not isinstance(screen_h, int) or screen_h <= 0:
+                screen_h = 24
+
+            if screen_h < 18:
+                dialog.styles.padding = (0, 1)
+                dialog.styles.max_height = max(7, screen_h - 1)
+                usable_h = screen_h - 1
+                overhead = 8
+            else:
+                dialog.styles.padding = (1, 2)
+                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
+                usable_h = screen_h - 2
+                overhead = 10
+
+            opt_list = self._get_option_list()
+            opt_list.styles.max_height = max(2, min(12, usable_h - overhead))
+        except Exception:
+            pass
+
     def on_mount(self) -> None:
         self.search_nav_option_list_id = self.option_list_id
         self._last_signatures = None
+        self._apply_dialog_fit()
         self.update_tasks_list()
         try:
             self.query_one(MODAL_SEARCH_INPUT, Input).focus()
@@ -409,6 +538,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     def on_resize(self, event: events.Resize) -> None:
         self._last_signatures = None
+        self._apply_dialog_fit()
         self.update_tasks_list()
 
     def update_tasks_list(self) -> None:

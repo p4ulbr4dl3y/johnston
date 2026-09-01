@@ -914,7 +914,8 @@ DiffScreen {
     color: $fg-muted;
 }
 
-#modal-dialog.bash-confirm-dialog {
+#modal-dialog.bash-confirm-dialog,
+#modal-dialog.task-console-dialog {
     width: 90%;
     max-width: 104;
     height: auto;
@@ -927,7 +928,9 @@ DiffScreen {
 }
 
 #modal-dialog.bash-confirm-dialog CustomMarkdownFence,
-#modal-dialog.bash-confirm-dialog MarkdownFence {
+#modal-dialog.bash-confirm-dialog MarkdownFence,
+#modal-dialog.task-console-dialog CustomMarkdownFence,
+#modal-dialog.task-console-dialog MarkdownFence {
     background: transparent;
     border: none;
     color: $fg-secondary;
@@ -936,12 +939,16 @@ DiffScreen {
 }
 
 #modal-dialog.bash-confirm-dialog CustomMarkdownFence .fence-header,
-#modal-dialog.bash-confirm-dialog MarkdownFence .fence-header {
+#modal-dialog.bash-confirm-dialog MarkdownFence .fence-header,
+#modal-dialog.task-console-dialog CustomMarkdownFence .fence-header,
+#modal-dialog.task-console-dialog MarkdownFence .fence-header {
     display: none;
 }
 
 #modal-dialog.bash-confirm-dialog CustomMarkdownFence #code-content,
-#modal-dialog.bash-confirm-dialog MarkdownFence #code-content {
+#modal-dialog.bash-confirm-dialog MarkdownFence #code-content,
+#modal-dialog.task-console-dialog CustomMarkdownFence #code-content,
+#modal-dialog.task-console-dialog MarkdownFence #code-content {
     background: transparent;
     color: $fg-secondary;
     padding: 0;
@@ -952,7 +959,8 @@ DiffScreen {
     margin-top: 1;
 }
 
-#modal-dialog.bash-confirm-dialog .tool-scroll-box {
+#modal-dialog.bash-confirm-dialog .tool-scroll-box,
+#modal-dialog.task-console-dialog .tool-scroll-box {
     margin: 1 0 0 0;
     max-height: 18;
     overflow-y: auto;
@@ -963,7 +971,13 @@ DiffScreen {
     scrollbar-size: 0 0 !important;
 }
 
-#modal-dialog.bash-confirm-dialog .modal-diff-view {
+#modal-dialog.task-console-dialog .tool-scroll-box {
+    margin: 0 0 1 0;
+    max-height: 8;
+}
+
+#modal-dialog.bash-confirm-dialog .modal-diff-view,
+#modal-dialog.task-console-dialog .modal-diff-view {
     width: 100%;
     height: auto;
     background: transparent;
@@ -1095,15 +1109,16 @@ ModalScreen OptionList > .option-list--option-hover {
 #modal-dialog #shell-stdin-input:focus,
 #shell-stdin-input,
 #shell-stdin-input:focus {
-    margin: 0;
-    border-left: solid $border;
+    margin: 1 0 0 0;
+    border: none;
     padding: 0 1;
 }
 
 #modal-dialog Input > .input--placeholder,
 #modal-search-input > .input--placeholder,
 #write-in-input > .input--placeholder,
-#api-key-input > .input--placeholder {
+#api-key-input > .input--placeholder,
+#shell-stdin-input > .input--placeholder {
     color: $fg-muted;
     background: transparent;
 }
@@ -1111,7 +1126,8 @@ ModalScreen OptionList > .option-list--option-hover {
 #modal-dialog Input > .input--selection,
 #modal-search-input > .input--selection,
 #write-in-input > .input--selection,
-#api-key-input > .input--selection {
+#api-key-input > .input--selection,
+#shell-stdin-input > .input--selection {
     background: $subtle;
     color: $fg-primary;
 }
