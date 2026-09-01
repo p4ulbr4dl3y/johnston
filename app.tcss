@@ -148,6 +148,20 @@ WelcomeWidget {
     text-style: bold;
 }
 
+#welcome-tagline {
+    width: 100%;
+    height: auto;
+    text-align: center;
+    color: $fg-muted;
+}
+
+#welcome-tips {
+    width: 100%;
+    height: auto;
+    text-align: center;
+    color: $fg-muted;
+}
+
 .user-msg {
     width: 100%;
     height: auto;
