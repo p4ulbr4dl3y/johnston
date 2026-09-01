@@ -995,6 +995,7 @@ ModalScreen #console-log {
     border-left: solid $border;
     padding: 0 1;
     background: transparent;
+    color: $fg-secondary;
     scrollbar-size: 0 0 !important;
 }
 
