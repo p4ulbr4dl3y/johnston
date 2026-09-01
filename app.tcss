@@ -1,3 +1,9 @@
+/* `!important` is deliberate only here: Textual styles the caret and the
+   selection per theme (`TextArea:dark .text-area--cursor` and friends), and
+   Johnston forces a true-colour caret instead of inverting the theme. See
+   §"P2-14" in docs/ui-audit/UI_AUDIT.md — everything else in this file wins by
+   specificity so themes and future CSS can still override it. */
+
 /* Text Selection for all Screens, Input fields and TextAreas */
 .screen--selection,
 .text-area--selection,
@@ -34,17 +40,22 @@ Screen {
     layers: default overlay;
 }
 
-* {
-    scrollbar-size: 0 0 !important;
-    scrollbar-size-vertical: 0 !important;
-    scrollbar-size-horizontal: 0 !important;
+/* Scrollbars are off by default (P2-14). `Widget` matches every node —
+   including `Screen` — so this is as blanket as the old `* { ... !important }`,
+   but it wins by cascade order over Textual's own
+   `Widget { scrollbar-size-vertical: 2 }` instead of by force, so any more
+   specific rule below can switch a bar back on without another `!important`. */
+Widget {
+    scrollbar-size: 0 0;
+    scrollbar-size-vertical: 0;
+    scrollbar-size-horizontal: 0;
 }
 
 ScrollBar, ScrollBarCorner, ScrollBar > *, ScrollBarCorner > * {
-    display: none !important;
-    visibility: hidden !important;
-    width: 0 !important;
-    height: 0 !important;
+    display: none;
+    visibility: hidden;
+    width: 0;
+    height: 0;
 }
 
 /* Scroll position feedback (P1-6). Prose and the chat stay clean, but a list
@@ -62,9 +73,9 @@ ModalScreen Tree,
 #modal-dialog Tree,
 ModalScreen DataTable,
 #modal-dialog DataTable {
-    scrollbar-size: 0 1 !important;
-    scrollbar-size-vertical: 1 !important;
-    scrollbar-size-horizontal: 0 !important;
+    scrollbar-size: 0 1;
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 0;
     scrollbar-color: $fg-muted;
     scrollbar-color-hover: $fg-primary;
     scrollbar-background: $bg-surface;
@@ -75,17 +86,12 @@ ModalScreen ScrollBar,
 #modal-dialog ScrollBar,
 CommandSuggestions ScrollBar,
 #diff-file-list ScrollBar {
-    display: block !important;
-    visibility: visible !important;
-    width: 1 !important;
-    height: auto !important;
+    display: block;
+    visibility: visible;
+    width: 1;
+    height: auto;
 }
 
-Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, TextArea, Markdown, MarkdownViewer, DataTable, Tree, ListView, DirectoryTree, ScrollBar, ScrollBarCorner {
-    scrollbar-size: 0 0 !important;
-    scrollbar-size-vertical: 0 !important;
-    scrollbar-size-horizontal: 0 !important;
-}
 
 #app-container {
     width: 100%;
@@ -253,7 +259,7 @@ WelcomeWidget {
 .tool-scroll-box {
     width: 100%;
     height: auto;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 .tool-sequential {
@@ -413,7 +419,7 @@ CustomMarkdownFence .fence-scroll-box,
 MarkdownFence .fence-scroll-box {
     width: 100%;
     height: auto;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 CustomMarkdownFence #code-content,
@@ -537,7 +543,7 @@ TextArea > .text-area--matching-bracket,
 
 /* Suppress hover tooltips globally */
 Tooltip {
-    display: none !important;
+    display: none;
 }
 
 /* Notifications (Toast) Docked Top Right - Monochrome Slate */
@@ -578,7 +584,7 @@ ModalScreen {
     align: center middle;
     background: $bg-overlay;
     overflow: hidden;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog {
@@ -690,7 +696,7 @@ ModalScreen {
     max-height: 20;
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #help-body {
@@ -728,16 +734,16 @@ ModalScreen {
 #wizard-title MarkdownH1,
 #wizard-title MarkdownH2,
 #wizard-title MarkdownH3 {
-    content-align: left top !important;
-    text-align: left !important;
+    content-align: left top;
+    text-align: left;
     color: $fg-primary;
     margin: 0 0 1 0;
 }
 
 .modal-markdown-centered MarkdownParagraph,
 #modal-dialog .modal-markdown-centered MarkdownParagraph {
-    content-align: left top !important;
-    text-align: left !important;
+    content-align: left top;
+    text-align: left;
     color: $fg-secondary;
     margin: 0 0 1 0;
 }
@@ -796,7 +802,7 @@ ModalScreen {
     background: transparent;
     border: none;
     padding: 0;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog.wizard-dialog #wizard-summary-scroll {
@@ -869,7 +875,7 @@ DiffScreen {
     margin: 1 0 1 0;
     padding: 0 1;
     border: none;
-    background: transparent !important;
+    background: transparent;
     color: $fg-primary;
 }
 
@@ -881,8 +887,8 @@ DiffScreen {
 #diff-file-list:focus,
 #diff-file-list:hover {
     height: 1fr;
-    background: transparent !important;
-    border: none !important;
+    background: transparent;
+    border: none;
     margin: 0;
     padding: 0;
     overflow-y: auto;
@@ -926,7 +932,7 @@ DiffScreen {
     background: transparent;
     border: none;
     padding: 0 1;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #diff-content-view {
@@ -1011,7 +1017,7 @@ DiffScreen {
     background: transparent;
     border-left: solid $border;
     padding: 0 1;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog.task-console-dialog .tool-scroll-box {
@@ -1039,7 +1045,7 @@ ModalScreen #console-log {
     padding: 0 1;
     background: transparent;
     color: $fg-secondary;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog OptionList,
@@ -1055,8 +1061,7 @@ ModalScreen OptionList:hover {
     max-height: 12;
     margin: 0;
     border: none;
-    background: transparent !important;
-    scrollbar-size: 0 0;
+    background: transparent;
     text-wrap: nowrap;
     text-overflow: ellipsis;
 }
@@ -1115,7 +1120,7 @@ ModalScreen OptionList > .option-list--option-hover {
     margin: 0 0 1 0;
     padding: 0 1;
     border: none;
-    background: transparent !important;
+    background: transparent;
     color: $fg-primary;
 }
 
