@@ -11,6 +11,7 @@ from textual.widgets.option_list import Option
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
+    ESC_HINT_CLOSE,
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_OPTION_LIST_ID,
@@ -104,6 +105,34 @@ class ModalSearchNavMixin:
     search_nav_input_id: str = MODAL_SEARCH_INPUT
     search_nav_option_list_id: str = ""
     search_nav_filtered_attr: str = ""
+    #: actions bound to `space`; they must not fire while a query is being typed
+    space_actions: tuple[str, ...] = ()
+
+    def _search_input_is_typing(self) -> bool:
+        """True when the search box has focus with text in it.
+
+        Screens that toggle something on `space` (skills, MCP, providers) also
+        have a search box, so the key has to stay a space while the user types.
+        """
+        try:
+            selector = self.search_nav_input_id
+            if not selector.startswith("#"):
+                selector = f"#{selector}"
+            search_input = self.query_one(selector, Input)
+        except Exception:
+            return False
+        return bool(search_input.has_focus and search_input.value)
+
+    def check_action(self, action: str, parameters) -> bool | None:
+        """Block space-bound actions while typing so the space reaches the input.
+
+        The `space` key is declared in ``BINDINGS`` so the footer and /help can
+        advertise it, but Textual would otherwise consume it before the search
+        Input sees it.
+        """
+        if action in self.space_actions and self._search_input_is_typing():
+            return False
+        return super().check_action(action, parameters)
 
     def _handle_search_navigation(self, event: events.Key) -> bool:
         """Handle up/down keys while the search Input has focus.
@@ -145,7 +174,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         default_value: T,
         show_search: bool = False,
         search_placeholder: str = "Search...",
-        hint_text: str | ModalHintConfig = "enter: select • esc: close",
+        hint_text: str | ModalHintConfig = f"enter: select • {ESC_HINT_CLOSE}",
         option_list_id: str = MODAL_OPTION_LIST_ID,
         dialog_classes: str = "",
         fit_content: bool = False,

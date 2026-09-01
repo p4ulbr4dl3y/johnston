@@ -13,6 +13,7 @@ from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.constants import (
+    ESC_HINT_CANCEL,
     MODAL_DIALOG_ID,
     MODAL_HINT,
     MODAL_HINT_ID,
@@ -323,7 +324,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 header_parts.append("*(Select multiple)*")
             header_badge = f" • {' '.join(header_parts)}" if header_parts else ""
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**{header_badge}\n{q_text}")
-            hint.update("enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel")
+            hint.update(f"enter: confirm • space: toggle • ←→: nav • tab: min • {ESC_HINT_CANCEL}")
 
             self.raw_options = q.get("options") or []
             self.options = self.raw_options + [WRITE_IN_LABEL] if self.raw_options else []
@@ -448,7 +449,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             if not sample_items:
                 sample_items = ["Type custom answer..."]
 
-            hint = "enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel"
+            hint = f"enter: confirm • space: toggle • ←→: nav • tab: min • {ESC_HINT_CANCEL}"
             content_w = modal_content_width(sample_items, max_q_title or "### **Confirm Your Answers**", hint)
             apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_MEDIUM_MAX_WIDTH)
 
@@ -493,7 +494,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             hint = self.query_one(MODAL_HINT, Label)
             if self.q_idx >= len(self.questions):
                 hint.update(
-                    "enter • ← • ↑↓ • esc" if is_compact else "enter: confirm • ←: back • ↑↓/pgup: scroll • esc: cancel"
+                    "enter • ← • ↑↓ • esc" if is_compact else f"enter: confirm • ←: back • ↑↓/pgup: scroll • {ESC_HINT_CANCEL}"
                 )
                 return
 
@@ -512,7 +513,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 hint.update(
                     f"enter • {back_part_compact}esc"
                     if is_compact
-                    else f"enter: {action} • {back_part}tab: min • esc: cancel"
+                    else f"enter: {action} • {back_part}tab: min • {ESC_HINT_CANCEL}"
                 )
                 return
 
@@ -520,7 +521,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 hint.update(
                     f"enter • ↑ • {back_part_compact}esc"
                     if is_compact
-                    else f"enter: {action} • ↑: list • {back_part}tab: min • esc: cancel"
+                    else f"enter: {action} • ↑: list • {back_part}tab: min • {ESC_HINT_CANCEL}"
                 )
             else:
                 space_part = "space: toggle • " if is_multi else ""
@@ -528,7 +529,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 hint.update(
                     f"enter • {space_part_compact}{back_part_compact}esc"
                     if is_compact
-                    else f"enter: {action} • {space_part}{back_part}tab: min • esc: cancel"
+                    else f"enter: {action} • {space_part}{back_part}tab: min • {ESC_HINT_CANCEL}"
                 )
         except Exception:
             pass

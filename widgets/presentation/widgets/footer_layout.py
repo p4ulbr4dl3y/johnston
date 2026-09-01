@@ -8,6 +8,7 @@ from rich.table import Table
 from core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import format_context_tokens
 from widgets.mixins.stream_frame import SPINNER_FRAMES
+from widgets.presentation.screens.constants import ESC_HINT_BACK, ESC_HINT_CLOSE
 from widgets.utils.row_format import ellipsize, format_cost
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
@@ -164,7 +165,7 @@ def _build_subagent_grid(
     else:
         role_formatted = role_str
 
-    esc_label = "esc: back" if from_tasks else "esc: close"
+    esc_label = ESC_HINT_BACK if from_tasks else ESC_HINT_CLOSE
     if is_compact:
         raw_hints = f"{esc_label} • ctrl+k" if is_running else esc_label
     else:
@@ -243,7 +244,7 @@ def _build_subagent_grid(
         row1_right = f"[{txt}]Run /connect to set up API key.[/]"
     grid.add_row(row1_left, row1_right)
 
-    # Row 2: Left [directory • branch (+N/-M) • sandbox: on • mode] | Right [esc: close • ctrl+k: kill]
+    # Row 2: Left [directory • branch (+N/-M) • sandbox: on • mode] | Right [esc hint • ctrl+k: kill]
     dir_text = format_display_path(directory)
     row2_left_parts = [f"[{txt}]{dir_text}[/]"]
     diff_text = git_diff_stats()

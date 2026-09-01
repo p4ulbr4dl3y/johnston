@@ -4,9 +4,7 @@ from textual.widgets import Input, OptionList
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.confirm import ConfirmScreen
-from widgets.presentation.screens.constants import (
-    MODAL_SEARCH_INPUT,
-)
+from widgets.presentation.screens.constants import ESC_HINT_CLOSE, MODAL_SEARCH_INPUT
 from widgets.presentation.screens.rename_session import RenameSessionScreen
 from widgets.presentation.screens.session_conflict import SessionConflictScreen
 from widgets.utils.key_aliases import normalize_key_to_latin
@@ -105,7 +103,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
-            hint_text="enter: select • ctrl+r: rename • ctrl+d: delete • esc: close",
+            hint_text=f"enter: select • ctrl+r: rename • ctrl+d: delete • {ESC_HINT_CLOSE}",
             dialog_classes="modal-dialog-wide",
         )
 

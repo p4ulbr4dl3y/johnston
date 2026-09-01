@@ -10,6 +10,7 @@ from core.models_catalog import catalog, format_context_tokens
 from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
+from widgets.presentation.screens.constants import ESC_HINT_BACK, ESC_HINT_CLOSE
 from widgets.presentation.widgets.footer_layout import (
     _build_subagent_grid,
     format_modal_hint,
@@ -250,7 +251,7 @@ class SubagentHeader(ResizeDebounceMixin, Static):
         t_primary, t_secondary, t_muted, _ = get_theme_colors()
 
         if not self.session:
-            esc_label = "esc: back" if getattr(self, "from_tasks", False) else "esc: close"
+            esc_label = ESC_HINT_BACK if getattr(self, "from_tasks", False) else ESC_HINT_CLOSE
             row = ("", f"[{t_muted}]{esc_label}[/{t_muted}]")
             self._last_grid_rows = [row]
             self.update(compose_rows([row], max(10, resolve_width(self) - 2)))
@@ -282,9 +283,9 @@ class SubagentHeader(ResizeDebounceMixin, Static):
 
             is_running = getattr(session, "status", "") == "running"
             esc_label = (
-                "esc: back"
+                ESC_HINT_BACK
                 if getattr(self, "from_tasks", False)
-                else ("esc" if is_compact else "esc: close")
+                else ("esc" if is_compact else ESC_HINT_CLOSE)
             )
             if is_running and not is_compact:
                 row_right = format_modal_hint(f"{esc_label} • ctrl+k: kill")

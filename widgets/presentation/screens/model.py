@@ -7,7 +7,7 @@ from textual.widgets.option_list import Option
 from core.models_catalog import catalog
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
-from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT_ID
+from widgets.presentation.screens.constants import ESC_HINT_CLOSE, MODAL_SEARCH_INPUT_ID
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, option_list_row_width
 
@@ -44,7 +44,7 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
-            hint_text="enter: select • ctrl+r: refresh • esc: close",
+            hint_text=f"enter: select • ctrl+r: refresh • {ESC_HINT_CLOSE}",
             dialog_classes="modal-dialog-medium",
         )
 

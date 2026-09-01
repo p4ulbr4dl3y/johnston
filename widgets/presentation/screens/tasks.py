@@ -15,6 +15,8 @@ from widgets.chat_toolcall import ToolScrollBox
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
+    ESC_HINT_BACK,
+    ESC_HINT_CLOSE,
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_SEARCH_INPUT,
@@ -193,9 +195,9 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
             yield TaskStdinInput(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input", classes="modal-input")
             yield ModalHint(
-                "enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • esc: back"
+                f"enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • {ESC_HINT_BACK}"
                 if is_running
-                else "pgup/pgdn: scroll • esc: back",
+                else f"pgup/pgdn: scroll • {ESC_HINT_BACK}",
                 id=MODAL_HINT_ID,
             )
 
@@ -255,10 +257,10 @@ class TaskConsoleScreen(BaseModalScreen[None]):
                 hint_str = (
                     "enter: stdin • c-k: kill • esc"
                     if is_compact
-                    else "enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • esc: back"
+                    else f"enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • {ESC_HINT_BACK}"
                 )
             else:
-                hint_str = "pgup/pgdn • esc" if is_compact else "pgup/pgdn: scroll • esc: back"
+                hint_str = "pgup/pgdn • esc" if is_compact else f"pgup/pgdn: scroll • {ESC_HINT_BACK}"
             hint.update(hint_str)
         except Exception:
             pass
@@ -442,7 +444,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield ModalHeader(self._get_header_md(), esc_hint="", id=self.title_id)
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id=self.option_list_id)
-            yield ModalHint(f"{self.hint_action_name} • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint(f"{self.hint_action_name} • {ESC_HINT_CLOSE}", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:
@@ -530,9 +532,9 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 )
             else:
                 hint_str = (
-                    f"{self.hint_action_name} • ctrl+k: kill • esc: close"
+                    f"{self.hint_action_name} • ctrl+k: kill • {ESC_HINT_CLOSE}"
                     if is_running
-                    else f"{self.hint_action_name} • esc: close"
+                    else f"{self.hint_action_name} • {ESC_HINT_CLOSE}"
                 )
             hint.update(hint_str)
         except Exception:
@@ -616,7 +618,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             if self.empty_hint:
                 opt_list.add_option(Option(f"[{muted}]{self.empty_hint}[/]", disabled=True))
             try:
-                self.query_one(f"#{MODAL_HINT_ID}", Label).update("esc: close")
+                self.query_one(f"#{MODAL_HINT_ID}", Label).update(ESC_HINT_CLOSE)
             except Exception:
                 pass
         except Exception:

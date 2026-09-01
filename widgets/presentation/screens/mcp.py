@@ -14,6 +14,7 @@ from core.infrastructure.platform.paths import CONFIG_DIR
 from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
+    ESC_HINT_CLOSE,
     MODAL_DIALOG_ID,
     MODAL_HINT,
     MODAL_HINT_ID,
@@ -42,8 +43,11 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     search_nav_option_list_id = "mcp-option-list"
     search_nav_filtered_attr = "filtered_servers"
 
+    space_actions = ("toggle_highlighted",)
+
     BINDINGS = expand_bindings([
         ("escape", "cancel", "Close"),
+        ("space", "toggle_highlighted", "Toggle"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ])
@@ -66,7 +70,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield ModalHeader("Manage MCP Servers", esc_hint="")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id="mcp-option-list")
-            yield ModalHint("enter: select • space: toggle • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint(f"enter: select • space: toggle • {ESC_HINT_CLOSE}", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -251,7 +255,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
             hint_lbl = self.query_one(MODAL_HINT, Label)
-            hint_lbl.update("enter • space • esc" if is_compact else "enter: select • space: toggle • esc: close")
+            hint_lbl.update("enter • space • esc" if is_compact else f"enter: select • space: toggle • {ESC_HINT_CLOSE}")
         except Exception:
             pass
 
@@ -321,17 +325,11 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             event.prevent_default()
             event.stop()
             return
-        if event.key == "space":
-            try:
-                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
-            except Exception:
-                search_input = None
-            if not search_input or not search_input.has_focus or not search_input.value:
-                self._toggle_highlighted()
-                event.prevent_default()
-                event.stop()
-                return
+        # `space` is a declared binding now (see space_actions/check_action).
         self._handle_search_navigation(event)
+
+    def action_toggle_highlighted(self) -> None:
+        self._toggle_highlighted()
 
     def action_cancel(self) -> None:
         if hasattr(self.app, "refresh_status_footer"):

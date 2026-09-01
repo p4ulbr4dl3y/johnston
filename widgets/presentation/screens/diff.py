@@ -13,6 +13,7 @@ from textual.widgets import Input, OptionList, Static
 from widgets.chat_toolcall import ToolScrollBox
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_selection import ModalSearchNavMixin
+from widgets.presentation.screens.constants import ESC_HINT_BACK, ESC_HINT_CLOSE
 from widgets.presentation.widgets.chat_diff import format_edit_diff, get_diff_colors
 from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
 from widgets.utils.key_aliases import expand_bindings
@@ -45,7 +46,7 @@ class DiffHeader(ResizeDebounceMixin, Static):
         table.add_column(justify="right")
 
         width = resolve_width(self)
-        esc_label = "esc: back" if self.from_rewind else "esc: close"
+        esc_label = ESC_HINT_BACK if self.from_rewind else ESC_HINT_CLOSE
         t_primary, t_secondary, t_muted, _ = get_theme_colors()
         sep = f" [{t_muted}]•[/] "
 
@@ -138,11 +139,11 @@ class DiffFooter(ResizeDebounceMixin, Static):
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             if width < 52:
-                raw_hint = "esc: back" if self.compact_view == "diff" else "enter • esc"
+                raw_hint = ESC_HINT_BACK if self.compact_view == "diff" else "enter • esc"
             elif self.compact_view == "diff":
                 raw_hint = "esc: files • pgup/dn"
             else:
-                raw_hint = "enter: view • esc: close"
+                raw_hint = f"enter: view • {ESC_HINT_CLOSE}"
         elif width >= BREAKPOINT_HINT:
             raw_hint = "tab: toggle sidebar • pgup/dn: scroll"
         else:
