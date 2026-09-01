@@ -34,11 +34,17 @@ Detailed guidelines and workflows...
 
 ### Frontmatter Fields
 - `name`: Unique skill identifier (defaults to directory name).
-- `description`: Summary text displayed in system prompt `<available_skills>` catalog and CLI/UI listings.
+- `description`: Summary text displayed in system prompt `<skills>` catalog and CLI/UI listings. If omitted, falls back to the first non-empty Markdown line without `#`.
 - `hidden`: (Optional boolean, default `false`). If `true`, excluded from the system prompt catalog unless explicitly requested or viewed.
 
 ## Execution & Discovery
-- **System Prompt Catalog**: All non-hidden skills are cataloged in the system prompt with their `name` and `description`.
+- **System Prompt Catalog**: All non-hidden skills are cataloged in the system prompt inside the `<skills>` block:
+  ```
+  <skills>
+  - skill-name (/absolute/path/to/SKILL.md): Clear summary of what this skill does.
+  </skills>
+  ```
 - **On-Demand Inspection**: Agent inspects `SKILL.md` via `read` tool only when relevant to the user request.
 - **CLI Listing**: Run `johnston --skills` to list available skills and scopes.
 - **Interactive UI**: Use `/skills` slash command in the TUI to browse and inspect installed skills.
+- **Direct Invocation**: Use `/<skill-name> <prompt>` in chat to trigger skills directly.

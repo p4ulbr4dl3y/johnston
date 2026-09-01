@@ -5,31 +5,49 @@ Johnston TUI provides slash commands entered directly in the message input and k
 
 ## Session & History Management
 - `/new` (aliases: `/clear`, `/reset`): Start a new chat session (cancels background workers/tasks/subagents and resets context).
-- `/resume [session_id]`: Resume a previous session from disk (opens interactive session picker or resumes specified ID).
-- `/fork`: Fork the current conversation and working tree state into an independent branched session. Forks are named `<base> (fork N)`: base is the branch-point message (trimmed) or the parent title when forking the current state, `N` numbers siblings from the same parent (`(fork)` for the first).
-- `/rename [title]`: Rename the title of the current chat session.
-- `/compact`: Summarize prior conversation turns and compact context history to free up LLM token window.
-- `/rewind`: Select an earlier conversation turn to restore context and revert disk changes using git snapshots.
+- `/resume` (aliases: `/sessions`, `/continue`, `/load`): Open session picker modal to resume a previous session from disk.
+- `/fork` (alias: `/branch`): Fork current conversation and working tree state into an independent branched session.
+- `/rename` (aliases: `/title`, `/name`): Open rename session modal.
+- `/compact` (aliases: `/compress`, `/summarize`, `/smol`): Summarize prior conversation turns and compact context history.
+- `/rewind` (aliases: `/undo`, `/history`): Select an earlier conversation turn to restore context and revert disk changes via git snapshots.
 
 ## Model & Provider Controls
-- `/providers`: Open interactive provider selection and credential configuration modal.
-- `/models`: Switch the active model for the current LLM provider.
-- `/thinking`: Adjust reasoning/thinking effort level (`none`, `low`, `medium`, `high`, or custom token budget).
+- `/providers` (aliases: `/provider`, `/connect`): Open interactive provider selection and credential configuration modal.
+- `/models` (alias: `/model`): Switch active model for the current LLM provider.
+- `/thinking` (aliases: `/effort`, `/reasoning`): Adjust reasoning effort level (`none`, `low`, `medium`, `high`, or custom token budget).
 
 ## Integration & Inspection
-- `/skills`: Open interactive browser to inspect global and project skills.
-- `/mcp`: Open MCP server dashboard to view registered servers, tool lists, and connection statuses.
-- `/subagents`: Open monitoring screen for running and completed background subagents.
-- `/tasks` (alias: `/shell_tasks`): Monitor background shell processes and async command execution.
-- `/diff`: View workspace git diff and uncommitted changes.
-- `/questions`: View pending interactive user clarification prompts.
-- `/sandbox`: Toggle kernel sandbox enforcement for tool execution and shell commands.
-- `/copy`: Copy last assistant response or full session transcript to the system clipboard.
-- `/theme`: Open theme switcher modal to change UI color scheme.
+- `/skills` (alias: `/skill`): Open interactive browser to inspect global and project skills.
+- `/mcp` (alias: `/mcps`): Open MCP server dashboard to view registered servers, tools, and connection statuses.
+- `/subagents` (aliases: `/agents`, `/subagent`): Open monitoring screen for running and completed background subagents.
+- `/shell` (aliases: `/tasks`, `/shelltasks`, `/ps`): Monitor background shell processes and async command execution.
+- `/diff` (aliases: `/changes`, `/patch`): View workspace git diff and uncommitted changes.
+- `/questions` (aliases: `/q`, `/ask`): View pending interactive user clarification prompts.
+- `/sandbox` (alias: `/sb`): Toggle kernel sandbox enforcement for tool execution and shell commands.
+- `/copy` (aliases: `/cp`, `/yank`): Copy last assistant response text to system clipboard.
+- `/theme` (aliases: `/themes`, `/color`, `/colors`): Open theme switcher modal.
 - `/help` (aliases: `/h`, `/?`): Display interactive help screen and keybindings overview.
 
-## Common Keybindings
-- `Esc` / `Ctrl+C`: Abort ongoing generation or close active modal / overlay screen.
-- `Ctrl+D`: Exit Johnston application cleanly.
-- `Up` / `Down` (on empty input): Browse previously submitted message and command history.
-- `Tab` / `Shift+Tab`: Move focus between input area, chat view, and interactive buttons.
+## Dynamic Slash Capabilities
+- **Skill Invocations**: Execute single or multiple skills directly via `/<skill_name> <prompt>` or `/<skill1> /<skill2> <prompt>`.
+- **MCP Prompts**: Run registered MCP prompts via `/<prompt_name>` or `/<server>__<prompt_name>` with optional `key=value` args.
+- **Homoglyph Normalization**: Auto-translates accidental Cyrillic homoglyphs (`с`, `а`, `о`, `е`...) in slash commands to Latin.
+
+## Keyboard Shortcuts
+- `Esc`: Abort ongoing generation or close active modal / overlay.
+- `Ctrl+C` / `Ctrl+Q`: Exit Johnston application.
+- `Ctrl+D`: Detach last attached image from input buffer.
+- `Tab`: Cycle agent role (`Worker` / `Explorer`).
+- `Shift+Tab`: Cycle execution mode (`review` / `edits` / `yolo`).
+- `Ctrl+B`: Background active shell tasks.
+- `Ctrl+O`: Toggle folded/expanded state of tool calls and thinking blocks.
+- `Ctrl+P`: Toggle task execution plan checklist modal.
+- `Ctrl+H`: Toggle top header plan summary.
+- `PageUp` / `PageDown`: Scroll chat view history.
+- `Shift+PageUp` / `Shift+PageDown`: Jump to very top / bottom of chat.
+- `Ctrl+Enter` / `Shift+Enter`: Insert newline in multi-line chat input.
+- `Ctrl+V`: Paste clipboard text or image into chat input.
+- `Ctrl+X`: Cut selected text.
+- `Up` / `Down` (on empty input): Browse message and command history.
+- `@`: Open file autocomplete popup.
+- `/`: Open slash command and skill autocomplete popup.
