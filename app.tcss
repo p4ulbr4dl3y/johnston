@@ -1074,7 +1074,7 @@ ModalScreen OptionList > .option-list--option-hover {
 #modal-dialog.wizard-dialog #write-in-input.subordinate,
 #modal-dialog.wizard-dialog #write-in-input.subordinate:focus {
     margin: 1 0 0 0;
-    padding: 0 0 0 4;
+    padding: 0 0 0 5;
 }
 
 #modal-dialog.wizard-dialog #write-in-input.standalone,
