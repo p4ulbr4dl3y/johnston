@@ -1087,7 +1087,7 @@ ModalScreen OptionList > .option-list--option-hover {
 #modal-dialog #reject-reason-input:focus,
 #reject-reason-input,
 #reject-reason-input:focus {
-    margin: 0;
+    margin: 1 0 0 0;
     padding: 0 1;
 }
 
