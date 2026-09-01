@@ -27,16 +27,19 @@ from widgets.utils.key_aliases import expand_bindings, normalize_key_to_latin
 WRITE_IN_LABEL = "Other (custom answer)"
 
 
-def _extract_option_info(opt: Any) -> tuple[str, str]:
-    """Extract (label, description) from option item (str or dict)."""
+def _get_option_label(opt: Any) -> str:
+    """Extract label from option dict or string."""
     if isinstance(opt, dict):
-        label = str(opt.get("label") or opt.get("value") or opt.get("name") or opt.get("text") or "").strip()
-        description = str(opt.get("description") or opt.get("desc") or opt.get("details") or "").strip()
-        if not label and description:
-            label = description
-            description = ""
-        return label, description
-    return str(opt).strip(), ""
+        return str(opt.get("label") or "").strip()
+    return str(opt).strip()
+
+
+def _get_option_desc(opt: Any) -> str:
+    """Extract description from option dict."""
+    if isinstance(opt, dict):
+        return str(opt.get("description") or "").strip()
+    return ""
+
 
 
 def format_wizard_option(
@@ -242,7 +245,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             self.raw_options = q.get("options") or []
             self.options = self.raw_options + [WRITE_IN_LABEL] if self.raw_options else []
             prev_answer = self.answers.get(self.q_idx, {}).get("answer", "")
-            raw_labels = [_extract_option_info(o)[0] for o in self.raw_options]
+            raw_labels = [_get_option_label(o) for o in self.raw_options]
 
             if self.raw_options:
                 opt_list.display = True
@@ -272,12 +275,13 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 avail_w = int(screen_w * MODAL_WIDTH_RATIO) - MODAL_CONTENT_GUTTER
                 wrap_width = max(20, min(78, avail_w))
                 has_multi = any(
-                    len(_extract_option_info(o)[0]) + 4 > wrap_width or bool(_extract_option_info(o)[1])
+                    len(_get_option_label(o)) + 4 > wrap_width or bool(_get_option_desc(o))
                     for o in self.options
                 )
 
                 for idx, opt in enumerate(self.options):
-                    opt_label, opt_desc = _extract_option_info(opt)
+                    opt_label = _get_option_label(opt)
+                    opt_desc = _get_option_desc(opt)
                     is_selected = bool(
                         prev_answer
                         and (
@@ -338,7 +342,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 if len(q_text) > len(max_q_title):
                     max_q_title = q_text
                 for opt in q.get("options") or []:
-                    opt_label, opt_desc = _extract_option_info(opt)
+                    opt_label = _get_option_label(opt)
+                    opt_desc = _get_option_desc(opt)
                     sample_items.append(f"[✓] {opt_label}")
                     if opt_desc:
                         sample_items.append(f"    {opt_desc}")
@@ -511,7 +516,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                     answer = val
                 else:
                     if idx is not None and idx < len(self.raw_options):
-                        answer = _extract_option_info(self.raw_options[idx])[0]
+                        answer = _get_option_label(self.raw_options[idx])
                     else:
                         answer = ""
 
@@ -538,7 +543,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 return
             idx = opt_list.highlighted
             if idx is not None and idx < len(self.raw_options):
-                chosen = _extract_option_info(self.raw_options[idx])[0]
+                chosen = _get_option_label(self.raw_options[idx])
                 current_ans = self.answers.get(self.q_idx, {}).get("answer", "")
                 if current_ans == chosen:
                     self.answers[self.q_idx] = {"answer": ""}

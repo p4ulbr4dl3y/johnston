@@ -7,43 +7,53 @@ from tools.ask_user import AskUserTool, _is_recommended_option, _sort_recommende
 class TestRecommendedSorting(unittest.TestCase):
     def test_is_recommended_prefix_variants(self):
         for opt in [
-            "(Recommended) Fix now",
-            "[Recommended] Fix now",
-            "Recommended: Fix now",
-            "recommended fix now",
+            {"label": "(Recommended) Fix now"},
+            {"label": "[Recommended] Fix now"},
+            {"label": "Recommended: Fix now"},
+            {"label": "recommended fix now"},
         ]:
             self.assertTrue(_is_recommended_option(opt), opt)
 
     def test_is_recommended_suffix_variants(self):
         for opt in [
-            "Fix now (Recommended)",
-            "Fix now [Recommended]",
-            "Fix now (recommended)",
-            "Fix now recommended",
+            {"label": "Fix now (Recommended)"},
+            {"label": "Fix now [Recommended]"},
+            {"label": "Fix now (recommended)"},
+            {"label": "Fix now recommended"},
         ]:
             self.assertTrue(_is_recommended_option(opt), opt)
 
     def test_is_not_recommended(self):
-        for opt in ["Fix now", "Recommendation: do this", "Unrelated", ""]:
+        for opt in [{"label": "Fix now"}, {"label": "Recommendation: do this"}, {"label": "Unrelated"}, {"label": ""}]:
             self.assertFalse(_is_recommended_option(opt), opt)
 
     def test_sort_recommended_first(self):
-        options = ["plain", "(Recommended) Fix now", "other", "later (Recommended)"]
+        options = [
+            {"label": "plain"},
+            {"label": "(Recommended) Fix now"},
+            {"label": "other"},
+            {"label": "later (Recommended)"},
+        ]
         self.assertEqual(
             _sort_recommended_first(options),
-            ["(Recommended) Fix now", "later (Recommended)", "plain", "other"],
+            [
+                {"label": "(Recommended) Fix now"},
+                {"label": "later (Recommended)"},
+                {"label": "plain"},
+                {"label": "other"},
+            ],
         )
 
     def test_sort_preserves_relative_order(self):
-        options = ["a", "b", "c"]
-        self.assertEqual(_sort_recommended_first(options), ["a", "b", "c"])
+        options = [{"label": "a"}, {"label": "b"}, {"label": "c"}]
+        self.assertEqual(_sort_recommended_first(options), [{"label": "a"}, {"label": "b"}, {"label": "c"}])
         self.assertEqual(_sort_recommended_first([]), [])
 
 
 class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
     async def test_no_app_returns_error(self):
         tool = AskUserTool()
-        res = str(await tool.execute({"questions": [{"question": "Test?", "options": ["a"]}]}))
+        res = str(await tool.execute({"questions": [{"question": "Test?", "options": [{"label": "a"}]}]}))
         self.assertIn("ERR", res)
         self.assertIn("ERR: context 'app': unavailable", res)
 
@@ -62,7 +72,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="Question: Q?\nAnswer: A")
         res = await tool.execute(
-            {"questions": '[{"question": "Q?", "options": ["A", "B"]}]'},
+            {"questions": '[{"question": "Q?", "options": [{"label": "A"}, {"label": "B"}]}]'},
             ctx=mock_app,
         )
         self.assertIn("Question: Q?", res.display)
@@ -72,7 +82,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
         res = str(await tool.execute(
-            {"question": "Single Q?", "options": ["Opt1", "Opt2"]},
+            {"question": "Single Q?", "options": [{"label": "Opt1"}, {"label": "Opt2"}]},
             ctx=mock_app,
         ))
         self.assertEqual(res, "ERR: params 'questions': missing or invalid")
@@ -82,7 +92,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(side_effect=RuntimeError("no display available"))
         res = str(await tool.execute(
-            {"questions": [{"question": "Pick one", "options": ["red", "blue"]}]},
+            {"questions": [{"question": "Pick one", "options": [{"label": "red"}, {"label": "blue"}]}]},
             ctx=mock_app,
         ))
         self.assertIn("ERR: prompt:", res)
@@ -92,7 +102,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="Question: Choose item\nAnswer: Option A")
         res = await tool.execute(
-            {"questions": [{"question": "Choose item", "options": ["Option A", "Option B"]}]},
+            {"questions": [{"question": "Choose item", "options": [{"label": "Option A"}, {"label": "Option B"}]}]},
             ctx=mock_app,
         )
         self.assertIn("Question: Choose item", res.display)
@@ -112,7 +122,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         tool = AskUserTool()
         mock_app = MagicMock()
         mock_app.ask_user = AsyncMock(return_value="cancelled by user")
-        res = await tool.execute({"questions": [{"question": "Q?", "options": ["a"]}]}, ctx=mock_app)
+        res = await tool.execute({"questions": [{"question": "Q?", "options": [{"label": "a"}]}]}, ctx=mock_app)
         self.assertIn("cancelled by user", res.display)
 
     async def test_execute_sorts_options_before_display(self):
@@ -129,21 +139,31 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
 
         mock_app.ask_user = fake_ask_user
         res = str(await tool.execute(
-            {"questions": [{"question": "Q", "options": ["Maybe", "No", "Yes (Recommended)"]}]},
+            {
+                "questions": [
+                    {
+                        "question": "Q",
+                        "options": [
+                            {"label": "Maybe"},
+                            {"label": "No"},
+                            {"label": "Yes (Recommended)"},
+                        ],
+                    }
+                ]
+            },
             ctx=mock_app,
         ))
         self.assertIn("Yes", res)
 
-    async def test_execute_normalizes_object_options_and_recommended(self):
+    async def test_execute_filters_invalid_options(self):
         tool = AskUserTool()
         mock_app = MagicMock()
 
         async def fake_ask_user(questions):
             opts = questions[0]["options"]
-            self.assertEqual(len(opts), 3)
+            self.assertEqual(len(opts), 2)
             self.assertEqual(opts[0], {"label": "B (Recommended)", "description": "Desc B"})
             self.assertEqual(opts[1], {"label": "A", "description": "Desc A"})
-            self.assertEqual(opts[2], {"label": "C", "description": ""})
             return "Question: Q\nAnswer: B (Recommended)"
 
         mock_app.ask_user = fake_ask_user
@@ -154,8 +174,10 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
                         "question": "Q",
                         "options": [
                             {"label": "A", "description": "Desc A"},
-                            {"value": "B", "description": "Desc B", "recommended": True},
-                            "C",
+                            {"label": "B (Recommended)", "description": "Desc B"},
+                            "invalid_string_option",
+                            None,
+                            {"label": ""},
                         ],
                     }
                 ]
@@ -177,7 +199,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
 
         mock_app.ask_user = fake_ask_user
         res = await tool.execute(
-            {"questions": [{"question": "Choice?", "options": ["Opt1"]}]},
+            {"questions": [{"question": "Choice?", "options": [{"label": "Opt1"}]}]},
             ctx=mock_app,
         )
         self.assertIn("Question: Choice?", res.display)
@@ -199,7 +221,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app.ask_user = cancelled_ask_user
         with self.assertRaises(asyncio.CancelledError):
             await tool.execute(
-                {"questions": [{"question": "Choice?", "options": ["Opt1"]}]},
+                {"questions": [{"question": "Choice?", "options": [{"label": "Opt1"}]}]},
                 ctx=mock_app,
             )
         self.assertIsNone(mock_app._pending_ask_user)

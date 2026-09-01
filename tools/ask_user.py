@@ -5,16 +5,9 @@ from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool
 
 
-def _extract_option_label(opt: Any) -> str:
-    """Extract string label from option (dict or str)."""
-    if isinstance(opt, dict):
-        return str(opt.get("label") or opt.get("value") or opt.get("name") or opt.get("text") or "").strip()
-    return str(opt).strip()
-
-
-def _is_recommended_option(opt: Any) -> bool:
+def _is_recommended_option(opt: dict) -> bool:
     """Detect a '(Recommended)' marker at the start or end of an option label."""
-    s = _extract_option_label(opt).lower()
+    s = str(opt.get("label") or "").strip().lower()
     return (
         s.startswith("(recommended)")
         or s.startswith("[recommended]")
@@ -27,24 +20,10 @@ def _is_recommended_option(opt: Any) -> bool:
     )
 
 
-def _normalize_option(opt: Any) -> dict[str, str]:
-    """Normalize an option entry (string or dict) into a standard {label, description} dict."""
-    if isinstance(opt, dict):
-        label = _extract_option_label(opt)
-        description = str(opt.get("description") or opt.get("desc") or opt.get("details") or "").strip()
-        if opt.get("recommended") is True and not _is_recommended_option(label):
-            label = f"{label} (Recommended)"
-        if not label and description:
-            label = description
-            description = ""
-        return {"label": label, "description": description}
-    label = str(opt).strip()
-    return {"label": label, "description": ""}
-
-
-def _sort_recommended_first(options: list[dict[str, str]]) -> list[dict[str, str]]:
+def _sort_recommended_first(options: list[dict]) -> list[dict]:
     """Stable sort: recommended options float to the top, the rest keep order."""
     return sorted(options, key=lambda o: not _is_recommended_option(o))
+
 
 
 class AskUserTool(BaseTool):
@@ -129,13 +108,20 @@ class AskUserTool(BaseTool):
             options = q.get("options")
             if not q_text or not isinstance(options, list):
                 continue
-            normalized_options = [_normalize_option(opt) for opt in options]
-            normalized_options = [opt for opt in normalized_options if opt["label"]]
-            sorted_options = _sort_recommended_first(normalized_options)
+            valid_options = []
+            for opt in options:
+                if not isinstance(opt, dict):
+                    continue
+                label = str(opt.get("label") or "").strip()
+                if not label:
+                    continue
+                desc = str(opt.get("description") or "").strip()
+                valid_options.append({"label": label, "description": desc})
+            sorted_options = _sort_recommended_first(valid_options)
             validated_questions.append({
                 "question": q_text,
                 "header": str(q.get("header") or "").strip(),
-                "is_multi_select": bool(q.get("is_multi_select") or q.get("multiSelect") or False),
+                "is_multi_select": bool(q.get("is_multi_select") or False),
                 "options": sorted_options,
             })
 
