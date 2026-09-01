@@ -109,6 +109,13 @@ class ChatInput(TextArea):
         self.focus()
         self.update_height()
 
+    def on_unmount(self) -> None:
+        if getattr(self, "_save_task", None) is not None and not self._save_task.done():
+            self._save_task.cancel()
+        if getattr(self, "_pending_prompt_history", None) is not None:
+            self._save_prompt_history_to_disk(self._pending_prompt_history)
+            self._pending_prompt_history = None
+
     def load_text(self, text: str) -> None:
         if text is None:
             text = ""

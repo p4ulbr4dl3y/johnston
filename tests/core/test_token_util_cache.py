@@ -11,6 +11,10 @@ from core.infrastructure.runtime.token_util import estimate_tokens
 
 
 class TestEstimateTokensCache(unittest.TestCase):
+    def setUp(self):
+        token_util._estimate_cache.clear()
+        token_util._msg_tokens_cache.clear()
+
     def tearDown(self):
         token_util._estimate_cache.clear()
         token_util._msg_tokens_cache.clear()

@@ -1021,15 +1021,10 @@ def test_lifecycle_on_unmount_tools_close_scheduling_failure():
     app = DummyLifecycleApp()
     app.is_app_active = True
 
-    mock_coro = MagicMock()
-    mock_coro.close = MagicMock()
-
-    # When asyncio.run raises exception
     with patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
-        with patch("tools.registry.aclose_tools", new=MagicMock(return_value=mock_coro)):
-            with patch("asyncio.run", side_effect=RuntimeError("loop closed")):
-                app.on_unmount()
-                mock_coro.close.assert_called_once()
+        with patch("widgets.mixins.lifecycle._close_tools_sync", side_effect=RuntimeError("close error")) as mock_close:
+            app.on_unmount()
+            mock_close.assert_called_once()
 
 
 def test_lifecycle_remaining_branches():

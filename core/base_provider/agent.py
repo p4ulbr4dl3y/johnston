@@ -469,7 +469,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             item = pending_list.pop(0)
                             msg_text = item if isinstance(item, str) else item[0]
                             messages.append({"role": "user", "content": msg_text})
-                            yield ("queued_user_message", msg_text, None, True)
+                            yield ("queued_user_message", msg_text, None, True, None)
                 else:
                     app = getattr(self, "app", None)
                     if app is not None:
@@ -537,10 +537,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             "tools": all_tools if all_tools else None,
                             "max_tokens": current_max_tokens,
                             "thinking_effort": getattr(self, "thinking_effort", None),
+                            "headers": getattr(self, "headers", None),
+                            "extra_body": getattr(self, "extra_body", None),
                         }
                         if self.api_type == "openai":
-                            stream_kwargs["headers"] = getattr(self, "headers", None)
-                            stream_kwargs["extra_body"] = getattr(self, "extra_body", None)
                             stream_kwargs["chunk_timeout"] = getattr(self, "chunk_timeout", 30.0)
                             stream_kwargs["provider_key"] = getattr(self, "provider_key", "openai")
                             if getattr(self, "_client", None) is not None:

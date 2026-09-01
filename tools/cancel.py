@@ -33,17 +33,23 @@ _LOCK = threading.Lock()
 
 def _accepts_cancel_event(func: Callable) -> bool:
     """Return True if ``func`` can receive a ``cancel_event`` keyword argument."""
-    key = (getattr(func, "__module__", ""), getattr(func, "__qualname__", ""))
-    with _LOCK:
-        cached = _SUPPORTS_CACHE.get(key)
-        if cached is not None:
-            return cached
+    qualname = getattr(func, "__qualname__", "")
+    module = getattr(func, "__module__", "")
+    should_cache = bool(module and qualname and "<locals>" not in qualname and "<lambda>" not in qualname)
+    key = (module, qualname) if should_cache else None
+
+    if key is not None:
+        with _LOCK:
+            cached = _SUPPORTS_CACHE.get(key)
+            if cached is not None:
+                return cached
     try:
         accepted = "cancel_event" in inspect.signature(func).parameters
     except (TypeError, ValueError):
         accepted = False
-    with _LOCK:
-        _SUPPORTS_CACHE[key] = accepted
+    if key is not None:
+        with _LOCK:
+            _SUPPORTS_CACHE[key] = accepted
     return accepted
 
 

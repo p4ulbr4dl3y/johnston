@@ -76,6 +76,17 @@ class TestSessionRolePersistence(unittest.TestCase):
         self.assertEqual(session.role, "explorer")
         app.save_current_session.assert_called_once()
 
+    def test_toggle_agent_role_empty_registry_returns_false(self):
+        app = DummyApp()
+        with patch("widgets.app.role_service.RoleRegistry.get_instance") as mock_reg_inst:
+            reg = MagicMock()
+            reg.list_roles.return_value = {}
+            mock_reg_inst.return_value = reg
+
+            res = toggle_agent_role(app)
+
+        self.assertFalse(res)
+
     def test_write_session_data_skips_save_and_touch_when_unchanged(self):
         app = DummyApp()
         orig_ts = 1000.0

@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from core.domain.defaults.errors import ToolResult
+from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from core.infrastructure.tasks.manage import (
     filter_to_session,
     find_any,
@@ -65,7 +65,7 @@ class ManageShellTool(BaseTool):
             input_text = args.get("input", "") or ""
             t = find_any(tasks, task_id)
             if t is None:
-                return ToolResult.done(not_found_message(task_id, tasks, "background"), display="")
+                return ToolResult(content=not_found_message(task_id, tasks, "background"), display="", status=ToolResultStatus.ERROR)
             if not getattr(t, "is_running", False):
                 return ToolResult.error("notrunning", name=task_id)
             if hasattr(t, "send_input"):
@@ -82,7 +82,7 @@ class ManageShellTool(BaseTool):
                 )
             t = find_any(tasks, task_id)
             if t is None:
-                return ToolResult.done(not_found_message(task_id, tasks, "background"), display="")
+                return ToolResult(content=not_found_message(task_id, tasks, "background"), display="", status=ToolResultStatus.ERROR)
             if getattr(t, "is_running", False):
                 try:
                     if hasattr(t, "kill"):

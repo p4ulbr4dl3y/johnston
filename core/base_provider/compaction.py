@@ -423,12 +423,12 @@ class CompactionMixin:
                     "messages": compact_messages,
                     "tools": tools_payload,
                     "max_tokens": getattr(self, "max_tokens", 4096),
+                    "headers": getattr(self, "headers", None),
+                    "extra_body": getattr(self, "extra_body", None),
                 }
                 if getattr(self, "api_type", "openai") == "openai":
                     if getattr(self, "_client", None) is not None:
                         stream_kwargs["client"] = self._client
-                    if getattr(self, "headers", None):
-                        stream_kwargs["headers"] = self.headers
 
                 async for tag, payload in adapter.stream_chat(**stream_kwargs):
                     if tag == "adapter_text" and payload:

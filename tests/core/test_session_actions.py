@@ -71,6 +71,31 @@ class TestNewSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent.history, [])
         self.assertEqual(calls, {"cancel_workers": 1, "kill_all": 1, "subagents": 1})
 
+    async def test_new_session_synchronous_kill_all_tasks_callback(self):
+        class Sm:
+            def generate_session_id(self):
+                return "new-sync-id"
+
+            def create_main(self, sid):
+                pass
+
+        sm = Sm()
+        agent = MockAgent()
+        calls = {"kill_all": 0}
+
+        def sync_kill_all():
+            calls["kill_all"] += 1
+
+        sid = await new_session(
+            sm,
+            agent,
+            cancel_workers=lambda: None,
+            kill_all_tasks=sync_kill_all,
+            cancel_subagents=lambda: None,
+        )
+        self.assertEqual(sid, "new-sync-id")
+        self.assertEqual(calls["kill_all"], 1)
+
 
 class TestCompactSession(unittest.IsolatedAsyncioTestCase):
     async def test_compact_success(self):

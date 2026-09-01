@@ -26,6 +26,16 @@ def _close_catalog_sync() -> None:
         logger.debug(f"Catalog close error: {err}")
 
 
+def _close_tools_sync() -> None:
+    """Run aclose_tools() on a private loop (used from the shutdown thread)."""
+    try:
+        from tools.registry import aclose_tools
+
+        asyncio.run(aclose_tools())
+    except Exception as err:
+        logger.debug(f"Tool instance close error: {err}")
+
+
 class LifecycleMixin:
     """Compose, mount, unmount and initial setup handling for JohnstonApp."""
 
@@ -177,19 +187,12 @@ class LifecycleMixin:
             logger.debug(f"Catalog cleanup error: {err}")
 
         try:
-            from tools.registry import aclose_tools
-
-            close_coro = aclose_tools()
-            try:
-                if loop is not None and loop.is_running():
-                    loop.create_task(close_coro)
-                else:
-                    asyncio.run(close_coro)
-            except Exception:
-                # Scheduling failed (e.g. loop closed): drop the coroutine so it
-                # never surfaces as an "never awaited" runtime warning.
-                close_coro.close()
-                raise
+            if loop is not None and loop.is_running():
+                threading.Thread(
+                    target=_close_tools_sync, name="johnston-tools-close", daemon=True
+                ).start()
+            else:
+                _close_tools_sync()
         except Exception as err:
             logger.debug(f"Tool instance cleanup error: {err}")
 

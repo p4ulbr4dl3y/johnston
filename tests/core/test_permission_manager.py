@@ -242,6 +242,20 @@ class TestPermissionManager(unittest.TestCase):
         finally:
             PermissionManager._instance = previous
 
+    def test_effective_cache_structure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"mode": "review"}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.pm.get_effective_permissions()
+                self.assertIsNotNone(self.pm._effective_cache)
+                self.assertEqual(len(self.pm._effective_cache), 3)
+                path, stamp, perms = self.pm._effective_cache
+                self.assertEqual(path, cfg_file)
+                self.assertIsInstance(stamp, float)
+                self.assertIsInstance(perms, dict)
+
 
 if __name__ == "__main__":
     unittest.main()

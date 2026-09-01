@@ -91,8 +91,15 @@ class InvokeSubagentTool(BaseTool):
         store = get_session_store(ctx.host)
         store.list(kind="subagent")  # ensure subagent sessions for project are loaded
 
+        def _is_active_subagent(s: Any) -> bool:
+            if getattr(s, "async_task", None) and not s.async_task.done():
+                return True
+            raw_st = getattr(s, "status", None)
+            st = raw_st.value.lower() if hasattr(raw_st, "value") else str(raw_st or "").lower()
+            return st in ("active", "running")
+
         active_sessions = store.children(parent_session_id) if parent_session_id else store.list(kind="subagent")
-        running_subagents = [s for s in active_sessions if s.status == "running"]
+        running_subagents = [s for s in active_sessions if _is_active_subagent(s)]
         max_subagents = get_settings().subagents.max_concurrent
         if len(running_subagents) >= max_subagents:
             return ToolResult.error(

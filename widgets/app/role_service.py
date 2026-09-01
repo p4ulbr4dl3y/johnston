@@ -18,6 +18,8 @@ def toggle_agent_role(app: Any) -> bool:
     """
     roles_dict = RoleRegistry.get_instance().list_roles(scope="main")
     available_roles = list(roles_dict.keys())
+    if not available_roles:
+        return False
     curr = getattr(app.agent, "role", "worker").lower()
     next_idx = (available_roles.index(curr) + 1) % len(available_roles) if curr in available_roles else 0
     new_role = available_roles[next_idx]

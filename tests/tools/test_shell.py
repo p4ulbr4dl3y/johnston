@@ -1004,3 +1004,13 @@ async def test_shell_sandbox_no_banner_when_supported(tool, make_tool_context):
 
         res = str(await tool.execute({"command": "echo ok"}, ctx=ctx))
         assert "unsandboxed" not in res
+
+
+async def test_shell_subagent_background_does_not_spawn_process(tool, make_tool_context):
+    ctx = _ctx(make_tool_context)
+    ctx.is_subagent = True
+    with patch.object(tool, "_create_std_process") as mock_create:
+        res = await tool.execute({"command": "echo hello", "background": True}, ctx=ctx)
+        assert res.is_error
+        assert "background" in res.content
+        mock_create.assert_not_called()

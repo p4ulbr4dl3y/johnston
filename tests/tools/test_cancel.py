@@ -74,6 +74,25 @@ class TestRunCancellable(unittest.IsolatedAsyncioTestCase):
         evt.set()
         self.assertTrue(evt.is_set())
 
+    async def test_nested_functions_with_same_qualname_do_not_collide(self):
+        from tools.cancel import _accepts_cancel_event
+
+        def factory_without():
+            def worker():
+                return 1
+            return worker
+
+        def factory_with():
+            def worker(cancel_event=None):
+                return 2
+            return worker
+
+        fn1 = factory_without()
+        fn2 = factory_with()
+        self.assertEqual(fn1.__qualname__, fn2.__qualname__)
+        self.assertFalse(_accepts_cancel_event(fn1))
+        self.assertTrue(_accepts_cancel_event(fn2))
+
 
 if __name__ == "__main__":
     unittest.main()

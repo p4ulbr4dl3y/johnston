@@ -871,3 +871,57 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         dividers = [s[1] for s in steps if s[0] == "event_divider"]
         self.assertTrue(any("Token limit reached during reasoning" in d for d in dividers))
 
+    async def test_stream_steps_forwards_headers_and_extra_body_for_anthropic(self):
+        agent = BaseAgent(
+            api_key="k",
+            model="claude-3-7-sonnet",
+            base_url="http://t",
+            provider_key="p",
+            api_type="anthropic",
+            headers={"X-Custom": "val"},
+            extra_body={"custom_field": 123},
+        )
+        self.addAsyncCleanup(agent.close)
+
+        passed_kwargs = {}
+
+        async def mock_stream_chat(**kwargs):
+            passed_kwargs.update(kwargs)
+            yield ("adapter_text", "Hello")
+
+        with unittest.mock.patch("core.adapters.get_adapter") as mock_get_adapter:
+            mock_adapter = unittest.mock.MagicMock()
+            mock_adapter.stream_chat = mock_stream_chat
+            mock_get_adapter.return_value = mock_adapter
+
+            _ = [s async for s in agent.stream_steps("Hi")]
+
+        self.assertEqual(passed_kwargs.get("headers"), {"X-Custom": "val"})
+        self.assertEqual(passed_kwargs.get("extra_body"), {"custom_field": 123})
+
+    async def test_subagent_queued_message_yields_5_tuple(self):
+        agent = BaseAgent(
+            api_key="k",
+            model="m",
+            base_url="http://t",
+            provider_key="p",
+            is_subagent=True,
+        )
+        self.addAsyncCleanup(agent.close)
+        agent.pending_messages = ["Follow-up message"]
+
+        async def mock_stream_chat(**kwargs):
+            yield ("adapter_text", "Done")
+
+        with unittest.mock.patch("core.adapters.get_adapter") as mock_get_adapter:
+            mock_adapter = unittest.mock.MagicMock()
+            mock_adapter.stream_chat = mock_stream_chat
+            mock_get_adapter.return_value = mock_adapter
+
+            steps = [s async for s in agent.stream_steps("Initial")]
+
+        q_steps = [s for s in steps if s[0] == "queued_user_message"]
+        self.assertEqual(len(q_steps), 1)
+        self.assertEqual(len(q_steps[0]), 5)
+        self.assertEqual(q_steps[0], ("queued_user_message", "Follow-up message", None, True, None))
+

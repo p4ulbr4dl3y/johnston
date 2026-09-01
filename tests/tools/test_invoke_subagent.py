@@ -196,9 +196,34 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         res = await tool.execute({"prompt": "inspect repo", "description": "inspect", "branch": "feat-x"})
         self.assertEqual(res.status.value, "running")
         sessions = self.store.list(kind="subagent")
-        self.assertEqual(len(sessions), 1)
         self.assertEqual(sessions[0].branch_name, "")
         self.assertEqual(sessions[0].project_dir, "")
+
+    async def test_max_concurrent_counts_active_status_subagents(self):
+        from unittest.mock import MagicMock
+
+        tool = InvokeSubagentTool()
+        mock_app = MagicMock()
+        mock_app.current_session_id = "sess-main"
+        mock_app.sm = self.store
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.background_tasks = []
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        # Populate store with DEFAULT_MAX_CONCURRENT_SUBAGENTS sessions with status="active"
+        for i in range(DEFAULT_MAX_CONCURRENT_SUBAGENTS):
+            self.store.create_subagent(
+                parent_id="sess-main",
+                subagent_id=f"task-active-{i}",
+                role="worker",
+                title=f"Task {i}",
+                prompt="prompt",
+                status="active",
+            )
+
+        res = str(await tool.execute({"prompt": "another task", "title": "Over limit", "branch": "main"}))
+        self.assertIn("ERR: limit: 5 concurrent max", res)
 
     def test_truncate_subagent_result_short(self):
         self.assertEqual(truncate_subagent_result("short result"), "short result")

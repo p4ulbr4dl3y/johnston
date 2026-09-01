@@ -149,8 +149,16 @@ async def test_kill_missing_task_id(tool, make_app_mock):
 
 async def test_kill_task_not_found(tool, make_app_mock):
     app = _app(make_app_mock, [])
-    res = str(await tool.execute({"action": "kill", "task_id": "ghost"}, ctx=app))
-    assert "ERR: notfound 'ghost'" in res
+    res = await tool.execute({"action": "kill", "task_id": "ghost"}, ctx=app)
+    assert res.is_error
+    assert "ERR: notfound 'ghost'" in str(res)
+
+
+async def test_send_input_task_not_found(tool, make_app_mock):
+    app = _app(make_app_mock, [])
+    res = await tool.execute({"action": "send_input", "task_id": "ghost", "input": "hi"}, ctx=app)
+    assert res.is_error
+    assert "ERR: notfound 'ghost'" in str(res)
 
 
 async def test_kill_running_task(tool, make_app_mock):

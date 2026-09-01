@@ -129,6 +129,10 @@ class ShellTool(BaseTool):
         except (ValueError, TypeError):
             timeout = default_timeout
 
+        run_in_bg = bool(args.get("background", False))
+        if run_in_bg and ctx.is_subagent:
+            return ToolResult.error("background", name="shell")
+
         env = shell_env()
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
         sandbox_enabled = bool(getattr(ctx, "sandbox_enabled", False))
@@ -140,11 +144,6 @@ class ShellTool(BaseTool):
             sandbox_enabled=sandbox_enabled,
             allow_workspace_writes=allow_workspace_writes,
         )
-
-        run_in_bg = bool(args.get("background", False))
-        if run_in_bg and ctx.is_subagent:
-            await terminate_process(p)
-            return ToolResult.error("background", name="shell")
 
         # Synchronous execution mode (default for main and subagents): stream
         # output into a bounded tail buffer and wait with a hard timeout. On

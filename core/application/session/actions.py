@@ -4,6 +4,7 @@ Functions: new_session, compact_session, rewind_session.
 Callers (commands.py) handle UI orchestration (push_screen, callback, focus, notify).
 """
 import asyncio
+import inspect
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
@@ -111,7 +112,9 @@ async def new_session(
     This function does NOT import Textual or any widget module.
     """
     cancel_workers()
-    await kill_all_tasks()
+    kill_res = kill_all_tasks()
+    if inspect.isawaitable(kill_res):
+        await kill_res
     cancel_subagents()
 
     new_id = sm.generate_session_id()

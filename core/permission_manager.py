@@ -17,8 +17,8 @@ from core.infrastructure.platform.paths import CONFIG_FILE
 from core.infrastructure.platform.platform_utils import cached_json_read
 from core.infrastructure.runtime.tool_name import normalize_tool_name
 
-# Effective-permissions cache entry: (config mtime or None, merged perms).
-_EffectiveCache = Tuple[Optional[float], Dict[str, Any]]
+# Effective-permissions cache entry: (config file path, config mtime or None, merged perms).
+_EffectiveCache = Tuple[str, Optional[float], Dict[str, Any]]
 
 
 def _file_mtime(path: str) -> Optional[float]:

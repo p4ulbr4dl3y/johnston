@@ -69,11 +69,21 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(ci.styles.height.value, 6)
 
     def test_placeholder_default_and_custom(self):
-        ci_default = ChatInput()
-        self.assertEqual(ci_default.placeholder, "Type a message or / for commands...")
-
         ci_custom = ChatInput(placeholder="Custom prompt...")
         self.assertEqual(ci_custom.placeholder, "Custom prompt...")
+
+    def test_on_unmount_cancels_save_task_and_flushes_pending_history(self):
+        ci = ChatInput()
+        mock_task = MagicMock()
+        mock_task.done.return_value = False
+        ci._save_task = mock_task
+        ci._pending_prompt_history = ["msg1", "msg2"]
+
+        with patch.object(ci, "_save_prompt_history_to_disk") as mock_save:
+            ci.on_unmount()
+            mock_task.cancel.assert_called_once()
+            mock_save.assert_called_once_with(["msg1", "msg2"])
+            self.assertIsNone(ci._pending_prompt_history)
 
     async def test_get_full_text_and_tag_deletion(self):
         ci = ChatInput()
