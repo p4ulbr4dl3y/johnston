@@ -373,6 +373,51 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
 
             self.assertIn("Approach A", str(app.dismiss_result))
 
+    async def test_wizard_screen_multi_select_pilot(self):
+        questions = [
+            {
+                "question": "Select modules:",
+                "header": "Setup",
+                "is_multi_select": True,
+                "options": [
+                    {"label": "Auth", "description": "JWT authentication"},
+                    {"label": "Metrics", "description": "Prometheus exporter"},
+                    {"label": "Tracing", "description": "OpenTelemetry"},
+                ],
+            }
+        ]
+        screen = AskUserWizardScreen(questions)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            screen._mount_time = 0
+            await pilot.pause()
+
+            title_md = screen.query_one("#wizard-title", Markdown)
+            self.assertIn("*(Select multiple)*", title_md._markdown)
+
+            # Toggle first option (Auth) with space
+            await pilot.press("space")
+            await pilot.pause()
+            self.assertEqual(screen._get_step_selections(0), ["Auth"])
+
+            # Move down to Tracing and toggle with space
+            await pilot.press("down")
+            await pilot.press("down")
+            await pilot.press("space")
+            await pilot.pause()
+            self.assertEqual(screen._get_step_selections(0), ["Auth", "Tracing"])
+
+            # Press Enter to proceed to summary confirm
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Confirm step
+            await pilot.press("enter")
+            await pilot.pause()
+
+            self.assertIn("Auth, Tracing", str(app.dismiss_result))
+
 
 if __name__ == "__main__":
     unittest.main()

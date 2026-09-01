@@ -230,6 +230,21 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
     def on_unmount(self) -> None:
         self.cancel_resize_timer()
 
+    def _get_step_selections(self, q_idx: int) -> list[str]:
+        info = self.answers.get(q_idx, {})
+        if isinstance(info, dict):
+            if "selected" in info and isinstance(info["selected"], list):
+                return [str(s).strip() for s in info["selected"] if str(s).strip()]
+            ans = str(info.get("answer") or "").strip()
+            if ans:
+                return [s.strip() for s in ans.split(", ") if s.strip()]
+            return []
+        elif isinstance(info, (list, set, tuple)):
+            return [str(s).strip() for s in info if str(s).strip()]
+        elif isinstance(info, str) and info.strip():
+            return [s.strip() for s in info.split(", ") if s.strip()]
+        return []
+
     def update_step(self, target_highlight: int | None = None) -> None:
         title_md = self.query_one("#wizard-title", Markdown)
         summary_static = self.query_one("#wizard-summary", Static)
@@ -248,7 +263,13 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             q = self.questions[self.q_idx]
             q_text = q.get("question", "")
             header = str(q.get("header") or "").strip()
-            header_badge = f" • `{header}`" if header else ""
+            is_multi = bool(q.get("is_multi_select", False))
+            header_parts = []
+            if header:
+                header_parts.append(f"`{header}`")
+            if is_multi:
+                header_parts.append("*(Select multiple)*")
+            header_badge = f" • {' '.join(header_parts)}" if header_parts else ""
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**{header_badge}\n{q_text}")
             hint.update("enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel")
 
@@ -256,6 +277,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             self.options = self.raw_options + [WRITE_IN_LABEL] if self.raw_options else []
             prev_answer = self.answers.get(self.q_idx, {}).get("answer", "")
             raw_labels = [_get_option_label(o) for o in self.raw_options]
+            selected_items = self._get_step_selections(self.q_idx)
 
             if self.raw_options:
                 opt_list.display = True
@@ -263,14 +285,17 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
 
                 if target_highlight is not None and target_highlight < len(self.options):
                     highlight_idx = target_highlight
-                    if highlight_idx == len(self.options) - 1 and prev_answer and prev_answer not in raw_labels:
+                    if highlight_idx == len(self.options) - 1 and prev_answer and not is_multi and prev_answer not in raw_labels:
                         input_field.value = prev_answer
                     elif highlight_idx < len(self.raw_options):
                         input_field.value = ""
                 elif prev_answer:
-                    if prev_answer in raw_labels:
+                    if not is_multi and prev_answer in raw_labels:
                         highlight_idx = raw_labels.index(prev_answer)
                         input_field.value = ""
+                    elif is_multi and selected_items:
+                        first_match = next((i for i, lbl in enumerate(raw_labels) if lbl in selected_items), 0)
+                        highlight_idx = first_match
                     else:
                         highlight_idx = len(self.options) - 1
                         input_field.value = prev_answer
@@ -292,13 +317,19 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 for idx, opt in enumerate(self.options):
                     opt_label = _get_option_label(opt)
                     opt_desc = _get_option_desc(opt)
-                    is_selected = bool(
-                        prev_answer
-                        and (
-                            (idx < len(self.raw_options) and prev_answer == opt_label)
-                            or (idx == len(self.options) - 1 and prev_answer not in raw_labels)
+                    if is_multi:
+                        if idx < len(self.raw_options):
+                            is_selected = opt_label in selected_items
+                        else:
+                            is_selected = any(s not in raw_labels for s in selected_items)
+                    else:
+                        is_selected = bool(
+                            prev_answer
+                            and (
+                                (idx < len(self.raw_options) and prev_answer == opt_label)
+                                or (idx == len(self.options) - 1 and prev_answer not in raw_labels)
+                            )
                         )
-                    )
                     tag = r"\[✓]" if is_selected else r"\[ ]"
                     add_gap = (has_multi or bool(opt_desc)) and idx < len(self.options) - 1
                     opt_list.add_option(
@@ -519,22 +550,40 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
 
     def submit_current_step(self) -> None:
         if self.q_idx < len(self.questions):
+            q = self.questions[self.q_idx]
+            is_multi = bool(q.get("is_multi_select", False))
             if not self.raw_options:
                 val = self.query_one(WRITE_IN_INPUT, Input).value.strip()
                 answer = val
+                selected = [val] if val else []
             else:
                 opt_list = self.query_one(OPTIONS_LIST, OptionList)
                 idx = opt_list.highlighted
                 if idx == len(self.options) - 1:
                     val = self.query_one(WRITE_IN_INPUT, Input).value.strip()
-                    answer = val
-                else:
-                    if idx is not None and idx < len(self.raw_options):
-                        answer = _get_option_label(self.raw_options[idx])
+                    if is_multi:
+                        selected = self._get_step_selections(self.q_idx)
+                        if val and val not in selected:
+                            selected.append(val)
+                        answer = ", ".join(selected)
                     else:
-                        answer = ""
+                        answer = val
+                        selected = [val] if val else []
+                else:
+                    if is_multi:
+                        selected = self._get_step_selections(self.q_idx)
+                        if not selected and idx is not None and idx < len(self.raw_options):
+                            chosen = _get_option_label(self.raw_options[idx])
+                            selected = [chosen]
+                        answer = ", ".join(selected)
+                    else:
+                        if idx is not None and idx < len(self.raw_options):
+                            answer = _get_option_label(self.raw_options[idx])
+                        else:
+                            answer = ""
+                        selected = [answer] if answer else []
 
-            self.answers[self.q_idx] = {"answer": answer}
+            self.answers[self.q_idx] = {"answer": answer, "selected": selected}
             self.q_idx += 1
             self.update_step()
         else:
@@ -557,12 +606,25 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 return
             idx = opt_list.highlighted
             if idx is not None and idx < len(self.raw_options):
+                q = self.questions[self.q_idx]
+                is_multi = bool(q.get("is_multi_select", False))
                 chosen = _get_option_label(self.raw_options[idx])
-                current_ans = self.answers.get(self.q_idx, {}).get("answer", "")
-                if current_ans == chosen:
-                    self.answers[self.q_idx] = {"answer": ""}
+                if is_multi:
+                    selected = self._get_step_selections(self.q_idx)
+                    if chosen in selected:
+                        selected.remove(chosen)
+                    else:
+                        selected.append(chosen)
+                    self.answers[self.q_idx] = {
+                        "answer": ", ".join(selected),
+                        "selected": selected,
+                    }
                 else:
-                    self.answers[self.q_idx] = {"answer": chosen}
+                    current_ans = self.answers.get(self.q_idx, {}).get("answer", "")
+                    if current_ans == chosen:
+                        self.answers[self.q_idx] = {"answer": "", "selected": []}
+                    else:
+                        self.answers[self.q_idx] = {"answer": chosen, "selected": [chosen]}
                 self.update_step(target_highlight=idx)
         except Exception:
             pass
