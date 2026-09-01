@@ -1,6 +1,8 @@
+import re
 import textwrap
 from typing import Any
 
+from rich.markup import escape
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
@@ -25,6 +27,7 @@ from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings, normalize_key_to_latin
 
 WRITE_IN_LABEL = "Other (custom answer)"
+_RECOMMENDED_RE = re.compile(r"(\(?\bRecommended\b\)?)", re.IGNORECASE)
 
 
 def _get_option_label(opt: Any) -> str:
@@ -41,7 +44,6 @@ def _get_option_desc(opt: Any) -> str:
     return ""
 
 
-
 def format_wizard_option(
     tag: str,
     text: str,
@@ -53,15 +55,21 @@ def format_wizard_option(
     wrap_width = max(20, width - 4)
     lines = textwrap.wrap(text, width=wrap_width)
     if not lines:
-        result_lines = [f"{tag} {text}"]
+        escaped_first = escape(text)
+        formatted_first = _RECOMMENDED_RE.sub(r"[dim italic]\1[/dim italic]", escaped_first)
+        result_lines = [f"{tag} {formatted_first}"]
     else:
-        result_lines = [f"{tag} {lines[0]}"]
+        escaped_first = escape(lines[0])
+        formatted_first = _RECOMMENDED_RE.sub(r"[dim italic]\1[/dim italic]", escaped_first)
+        result_lines = [f"{tag} {formatted_first}"]
         for line in lines[1:]:
-            result_lines.append(f"    {line}")
+            escaped_line = escape(line)
+            formatted_line = _RECOMMENDED_RE.sub(r"[dim italic]\1[/dim italic]", escaped_line)
+            result_lines.append(f"    {formatted_line}")
     if description:
         desc_lines = textwrap.wrap(description, width=wrap_width)
         for line in desc_lines:
-            result_lines.append(f"    {line}")
+            result_lines.append(f"    [dim]{escape(line)}[/dim]")
     if add_gap:
         result_lines.append("")
     return "\n".join(result_lines)
@@ -239,7 +247,9 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 pass
             q = self.questions[self.q_idx]
             q_text = q.get("question", "")
-            title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**\n{q_text}")
+            header = str(q.get("header") or "").strip()
+            header_badge = f" • `{header}`" if header else ""
+            title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**{header_badge}\n{q_text}")
             hint.update("enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel")
 
             self.raw_options = q.get("options") or []

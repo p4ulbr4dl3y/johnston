@@ -333,13 +333,20 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
     async def test_wizard_screen_with_dict_options_pilot(self):
         from widgets.presentation.screens.ask_user import format_wizard_option
 
-        formatted = format_wizard_option(r"\[ ]", "Clean Schema", description="Refactor BaseTool params", width=50)
+        formatted = format_wizard_option(
+            r"\[ ]",
+            "Clean Schema (Recommended)",
+            description="Refactor BaseTool params",
+            width=50,
+        )
         self.assertIn("Clean Schema", formatted)
-        self.assertIn("Refactor BaseTool params", formatted)
+        self.assertIn("[dim]Refactor BaseTool params[/dim]", formatted)
+        self.assertIn("[dim italic](Recommended)[/dim italic]", formatted)
 
         questions = [
             {
                 "question": "Which architecture?",
+                "header": "Architecture",
                 "options": [
                     {"label": "Approach A", "description": "Fast and light"},
                     {"label": "Approach B", "description": "Extensible and modular"},
@@ -352,6 +359,9 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             screen._mount_time = 0
             await pilot.pause()
+
+            title_md = screen.query_one("#wizard-title", Markdown)
+            self.assertIn("`Architecture`", title_md._markdown)
 
             # Select first option (Approach A)
             await pilot.press("enter")
