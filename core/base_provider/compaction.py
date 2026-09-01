@@ -2,6 +2,7 @@ import asyncio
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.domain.defaults.config import DEFAULT_MAX_TOKENS
 from core.domain.policies.messages import is_checkpoint_message, is_system_note
 from core.infrastructure.runtime.token_util import estimate_tokens
 from core.models_catalog import catalog, get_context_window
@@ -422,7 +423,7 @@ class CompactionMixin:
                     "model": getattr(self, "model", ""),
                     "messages": compact_messages,
                     "tools": tools_payload,
-                    "max_tokens": getattr(self, "max_tokens", 4096),
+                    "max_tokens": getattr(self, "max_tokens", DEFAULT_MAX_TOKENS) or DEFAULT_MAX_TOKENS,
                     "headers": getattr(self, "headers", None),
                     "extra_body": getattr(self, "extra_body", None),
                 }
