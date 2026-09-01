@@ -11,6 +11,14 @@ from typing import Any, Callable, Optional
 from core.domain.defaults.errors import ToolResult, parse_tool_result_step
 from core.domain.entities.session import AgentSession, SessionStatus
 
+logger = logging.getLogger(__name__)
+
+
+def _sync_subagent_metrics(session: AgentSession, subagent: Any) -> None:
+    """Copy token/cost metrics from the live subagent onto its session record."""
+    for attr in ("tokens_input", "tokens_output", "total_tokens", "cost_usd", "last_context_tokens"):
+        setattr(session, attr, getattr(subagent, attr, getattr(session, attr)))
+
 
 def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: list) -> None:
     """Records a subagent execution step into the session in canonical message format.
@@ -139,9 +147,6 @@ def merge_subagent_metrics(subagent: Any, context: Any) -> None:
         subagent._merged_cost_usd = cur_cost
 
 
-logger = logging.getLogger(__name__)
-
-
 async def _safe_save(store: Any, session: AgentSession) -> None:
     """Persist a session, logging and re-raising on storage failure.
 
@@ -177,11 +182,7 @@ async def _run_single_subagent_message(
             if step and step[0] == "event_divider" and len(step) > 1 and str(step[1]).startswith("API Error:"):
                 last_api_error[0] = str(step[1])
             record_subagent_step(step, session, acc)
-        session.tokens_input = getattr(subagent, "tokens_input", session.tokens_input)
-        session.tokens_output = getattr(subagent, "tokens_output", session.tokens_output)
-        session.total_tokens = getattr(subagent, "total_tokens", session.total_tokens)
-        session.cost_usd = getattr(subagent, "cost_usd", session.cost_usd)
-        session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
+        _sync_subagent_metrics(session, subagent)
         if last_api_error[0]:
             if not acc[0].strip():
                 acc[0] = f"[{last_api_error[0]}]"
@@ -193,11 +194,7 @@ async def _run_single_subagent_message(
         await _safe_save(store, session)
     except asyncio.CancelledError:
         acc[0] = "[Subagent cancelled]"
-        session.tokens_input = getattr(subagent, "tokens_input", session.tokens_input)
-        session.tokens_output = getattr(subagent, "tokens_output", session.tokens_output)
-        session.total_tokens = getattr(subagent, "total_tokens", session.total_tokens)
-        session.cost_usd = getattr(subagent, "cost_usd", session.cost_usd)
-        session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
+        _sync_subagent_metrics(session, subagent)
         if (
             hasattr(session, "messages")
             and session.messages
@@ -218,11 +215,7 @@ async def _run_single_subagent_message(
         # Covers stream errors AND a failed post-completion save (propagated by
         # _safe_save). A failure to persist must not leave a COMPLETED status.
         acc[0] = f"[{error_prefix}: {err}]"
-        session.tokens_input = getattr(subagent, "tokens_input", session.tokens_input)
-        session.tokens_output = getattr(subagent, "tokens_output", session.tokens_output)
-        session.total_tokens = getattr(subagent, "total_tokens", session.total_tokens)
-        session.cost_usd = getattr(subagent, "cost_usd", session.cost_usd)
-        session.last_context_tokens = getattr(subagent, "last_context_tokens", session.last_context_tokens)
+        _sync_subagent_metrics(session, subagent)
         session.finish(SessionStatus.ERROR, str(err))
         try:
             await _safe_save(store, session)

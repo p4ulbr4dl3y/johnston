@@ -13,7 +13,7 @@ from core.domain.defaults.config import (
     DEFAULT_AUTO_TITLE_TIMEOUT,
 )
 from core.domain.entities.session import AgentSession
-from core.domain.policies.session_naming import FORK_BASE_MAX_LEN, fork_marker
+from core.domain.policies.session_naming import FORK_BASE_MAX_LEN, cap_at_word, fork_marker
 from core.infrastructure.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -88,14 +88,7 @@ def sanitize_title_candidate(candidate: Any, max_len: int = DEFAULT_AUTO_TITLE_M
     if clean.startswith("{") or clean.startswith("[") or '"title":' in clean:
         return ""
 
-    if len(clean) > max_len:
-        cut = clean[:max_len]
-        r_space = cut.rfind(" ")
-        if r_space > 15:
-            cut = cut[:r_space]
-        clean = cut.strip(".,:;!?- ")
-
-    return clean
+    return cap_at_word(clean, max_len, strip=".,:;!?- ")
 
 
 
@@ -195,14 +188,9 @@ def clean_heuristic_title(text: str, max_len: int = DEFAULT_AUTO_TITLE_MAX_LEN) 
     clean = " ".join(clean.split())
     if not clean:
         return ""
-    if len(clean) <= max_len:
-        return clean.strip(".,:;!?- ")
-
-    cut = clean[:max_len]
-    r_space = cut.rfind(" ")
-    if r_space > 15:
-        cut = cut[:r_space]
-    return cut.strip(".,:;!?- ")
+    if len(clean) > max_len:
+        return cap_at_word(clean, max_len, strip=".,:;!?- ")
+    return clean.strip(".,:;!?- ")
 
 
 def extract_title_from_thought(thought_text: str, max_len: int = DEFAULT_AUTO_TITLE_MAX_LEN) -> str:
@@ -261,57 +249,48 @@ def extract_title_from_thought(thought_text: str, max_len: int = DEFAULT_AUTO_TI
     return ""
 
 
-def extract_first_user_text(session: AgentSession) -> str:
-    """Extract the first user prompt text from session messages or agent history.
+def _history_user_text(content: Any) -> str:
+    """User text from an SDK history entry content (plain string or text blocks)."""
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        return " ".join(
+            c.get("text", "")
+            for c in content
+            if isinstance(c, dict) and c.get("type") == "text"
+        ).strip()
+    return ""
 
-    For forked sessions, extracts the user prompt submitted after the fork point.
-    """
-    messages = getattr(session, "messages", None) or []
-    fork_count = getattr(session, "fork_msg_count", 0) or 0
-    if fork_count > 0 and len(messages) > fork_count:
-        for m in messages[fork_count:]:
-            if isinstance(m, dict) and m.get("type") == "user":
-                txt = str(m.get("display_text") or m.get("text", "")).strip()
-                if txt:
-                    return txt
-        history = getattr(session, "agent_history", None) or []
-        if history and len(history) > fork_count:
-            for m in history[fork_count:]:
-                if isinstance(m, dict) and m.get("role") == "user":
-                    content = m.get("content", "")
-                    if isinstance(content, str) and content.strip():
-                        return content.strip()
-                    if isinstance(content, list):
-                        parts = [
-                            c.get("text", "")
-                            for c in content
-                            if isinstance(c, dict) and c.get("type") == "text"
-                        ]
-                        txt = " ".join(parts).strip()
-                        if txt:
-                            return txt
 
-    for m in messages:
+def _scan_user_text(messages: Any, history: Any) -> str:
+    """First non-empty user text across a UI transcript, then its agent history."""
+    for m in messages or []:
         if isinstance(m, dict) and m.get("type") == "user":
             txt = str(m.get("display_text") or m.get("text", "")).strip()
             if txt:
                 return txt
-    if getattr(session, "agent_history", None):
-        for m in session.agent_history:
-            if isinstance(m, dict) and m.get("role") == "user":
-                content = m.get("content", "")
-                if isinstance(content, str) and content.strip():
-                    return content.strip()
-                if isinstance(content, list):
-                    parts = [
-                        c.get("text", "")
-                        for c in content
-                        if isinstance(c, dict) and c.get("type") == "text"
-                    ]
-                    txt = " ".join(parts).strip()
-                    if txt:
-                        return txt
+    for m in history or []:
+        if isinstance(m, dict) and m.get("role") == "user":
+            txt = _history_user_text(m.get("content", ""))
+            if txt:
+                return txt
     return ""
+
+
+def extract_first_user_text(session: AgentSession) -> str:
+    """Extract the first user prompt text from session messages or agent history.
+
+    For forked sessions, extracts the user prompt submitted after the fork point,
+    falling back to the full transcript when the post-fork part yields nothing.
+    """
+    messages = getattr(session, "messages", None) or []
+    history = getattr(session, "agent_history", None) or []
+    fork_count = getattr(session, "fork_msg_count", 0) or 0
+    if fork_count > 0:
+        fork_text = _scan_user_text(messages[fork_count:], history[fork_count:])
+        if fork_text:
+            return fork_text
+    return _scan_user_text(messages, history)
 
 
 async def auto_title_session(

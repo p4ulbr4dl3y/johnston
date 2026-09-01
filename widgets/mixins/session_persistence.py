@@ -228,45 +228,20 @@ class SessionPersistenceMixin:
                 session.role = new_role
                 changed = True
 
-            new_messages = session_data.get("messages", [])
-            if session.messages != new_messages:
-                session.messages = new_messages
-                changed = True
-
-            new_agent_history = session_data.get("agent_history", [])
-            if session.agent_history != new_agent_history:
-                session.agent_history = new_agent_history
-                changed = True
-
-            new_tok_in = session_data.get("tokens_input", 0)
-            if session.tokens_input != new_tok_in:
-                session.tokens_input = new_tok_in
-                changed = True
-
-            new_tok_out = session_data.get("tokens_output", 0)
-            if session.tokens_output != new_tok_out:
-                session.tokens_output = new_tok_out
-                changed = True
-
-            new_tot_tokens = session_data.get("total_tokens", 0)
-            if session.total_tokens != new_tot_tokens:
-                session.total_tokens = new_tot_tokens
-                changed = True
-
-            new_cost = session_data.get("cost_usd", 0.0)
-            if session.cost_usd != new_cost:
-                session.cost_usd = new_cost
-                changed = True
-
-            new_last_ctx = session_data.get("last_context_tokens", 0)
-            if session.last_context_tokens != new_last_ctx:
-                session.last_context_tokens = new_last_ctx
-                changed = True
-
-            new_cache_read = session_data.get("tokens_cache_read", 0)
-            if session.tokens_cache_read != new_cache_read:
-                session.tokens_cache_read = new_cache_read
-                changed = True
+            for attr, default in (
+                ("messages", []),
+                ("agent_history", []),
+                ("tokens_input", 0),
+                ("tokens_output", 0),
+                ("total_tokens", 0),
+                ("cost_usd", 0.0),
+                ("last_context_tokens", 0),
+                ("tokens_cache_read", 0),
+            ):
+                new_value = session_data.get(attr, default)
+                if getattr(session, attr) != new_value:
+                    setattr(session, attr, new_value)
+                    changed = True
 
             if changed:
                 session.touch()

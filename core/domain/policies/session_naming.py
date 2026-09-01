@@ -33,15 +33,20 @@ def fork_marker(title: str | None) -> str:
     return f" {match.group(0).strip()}" if match else ""
 
 
-def _cap_base(base: str) -> str:
-    """Word-boundary cap so ``base + " (fork N)"`` stays inside the row budget."""
-    if len(base) <= FORK_BASE_MAX_LEN:
-        return base
-    cut = base[:FORK_BASE_MAX_LEN]
+def cap_at_word(text: str, max_len: int, *, strip: str = "") -> str:
+    """``text`` capped to ``max_len`` at a word boundary (no-op when short enough).
+
+    ``strip`` removes surrounding junk (e.g. punctuation) from the cut; without
+    it the cut is only right-stripped of whitespace. The single word-boundary
+    cap rule for session titles so every caller clips identically.
+    """
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len]
     r_space = cut.rfind(" ")
     if r_space > 15:
         cut = cut[:r_space]
-    return cut.rstrip()
+    return cut.strip(strip) if strip else cut.rstrip()
 
 
 def build_fork_title(base: str | None, number: int) -> str:
@@ -52,5 +57,5 @@ def build_fork_title(base: str | None, number: int) -> str:
     matter which caller supplied the base (UI hint, store title fallback,
     auto-titling).
     """
-    clean = _cap_base(strip_fork_suffix(base) or "Untitled")
+    clean = cap_at_word(strip_fork_suffix(base) or "Untitled", FORK_BASE_MAX_LEN)
     return f"{clean} (fork)" if number <= 1 else f"{clean} (fork {number})"

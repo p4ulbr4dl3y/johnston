@@ -201,10 +201,13 @@ class AgentSession:
 
     # -- persistence -------------------------------------------------------
 
-    def to_dict(self) -> Dict[str, Any]:
+    def _history(self) -> List[Dict[str, Any]]:
+        """Agent history: prefer the live agent's history, fall back to the stored copy."""
         history = getattr(self.agent, "history", None)
-        if history is None:
-            history = self.agent_history
+        return history if history is not None else self.agent_history
+
+    def _persistent_fields(self) -> Dict[str, Any]:
+        """Scalar (non-message) fields shared by to_dict and to_jsonl_lines meta."""
         return {
             "id": self.id,
             "kind": self.kind.value,
@@ -216,8 +219,6 @@ class AgentSession:
             "prompt": self.prompt,
             "auto_titled": self.auto_titled,
             "fork_msg_count": self.fork_msg_count,
-            "messages": self.messages,
-            "agent_history": history,
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,
             "total_tokens": self.total_tokens,
@@ -230,37 +231,18 @@ class AgentSession:
             "branch_name": self.branch_name,
         }
 
+    def to_dict(self) -> Dict[str, Any]:
+        data = self._persistent_fields()
+        data["messages"] = self.messages
+        data["agent_history"] = self._history()
+        return data
+
     def to_jsonl_lines(self) -> List[Dict[str, Any]]:
-        history = getattr(self.agent, "history", None)
-        if history is None:
-            history = self.agent_history
-        meta = {
-            "_type": "meta",
-            "id": self.id,
-            "kind": self.kind.value,
-            "parent_id": self.parent_id,
-            "role": self.role,
-            "status": self.status,
-            "project_key": self.project_key,
-            "title": self._title,
-            "prompt": self.prompt,
-            "auto_titled": self.auto_titled,
-            "fork_msg_count": self.fork_msg_count,
-            "tokens_input": self.tokens_input,
-            "tokens_output": self.tokens_output,
-            "total_tokens": self.total_tokens,
-            "cost_usd": self.cost_usd,
-            "last_context_tokens": self.last_context_tokens,
-            "tokens_cache_read": self.tokens_cache_read,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "project_dir": self.project_dir,
-            "branch_name": self.branch_name,
-        }
+        meta = {"_type": "meta", **self._persistent_fields()}
         lines: List[Dict[str, Any]] = [meta]
         for m in self.messages:
             lines.append({"_type": "msg", "data": m})
-        for h in history:
+        for h in self._history():
             lines.append({"_type": "history", "data": h})
         return lines
 

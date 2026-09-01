@@ -233,14 +233,10 @@ async def get_rewind_git_stats(
 
         if session and getattr(session, "messages", None):
             user_events = [m for m in session.messages if is_ui_visible_user_message(m)]
-            has_tracking = any("touched_files" in u for u in user_events)
-            if has_tracking:
-                scoped_files_map = {}
-                for seq_idx in seq_indices:
-                    f_set = set()
-                    for j in range(seq_idx, len(user_events)):
-                        f_set.update(user_events[j].get("touched_files") or [])
-                    scoped_files_map[seq_idx] = sorted(f_set)
+            if _touched_files(user_events, 0) is not None:
+                scoped_files_map = {
+                    seq_idx: _touched_files(user_events, seq_idx) for seq_idx in seq_indices
+                }
 
         try:
             details_map = await asyncio.wait_for(
@@ -313,7 +309,7 @@ async def get_session_diff(
 
 
 # ---------------------------------------------------------------------------
-# rewind helpers (_reset_token_counters, _truncate_transcript)
+# rewind helpers (reset_token_counters, _truncate_transcript, _touched_files)
 # ---------------------------------------------------------------------------
 
 def reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
@@ -336,7 +332,18 @@ def reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
             setattr(agent, attr, value)
 
 
-_reset_token_counters = reset_token_counters
+def _touched_files(user_events: list[dict], seq_idx: int) -> Optional[list[str]]:
+    """Sorted files touched from turn ``seq_idx`` onward, or None when untracked.
+
+    Both rewind callers use the same UI-visible turn model, so the merge lives
+    in one place.
+    """
+    if not any("touched_files" in u for u in user_events):
+        return None
+    f_set: set[str] = set()
+    for u in user_events[seq_idx:]:
+        f_set.update(u.get("touched_files") or [])
+    return sorted(f_set)
 
 
 def _truncate_transcript(session: Any, seq_idx: int) -> None:
@@ -412,7 +419,7 @@ def rewind_session(
             agent.clear_history()
         elif hasattr(agent, "history"):
             agent.history = []
-        _reset_token_counters(agent)
+        reset_token_counters(agent)
     else:
         # Map UI sequence index to a history index: the last ``real_tail``
         # visible user turns map 1:1 to real (non-checkpoint, non-note) user
@@ -432,18 +439,13 @@ def rewind_session(
                 agent.clear_history()
             elif hasattr(agent, "history"):
                 agent.history = []
-        _reset_token_counters(agent, reset_context=False)
+        reset_token_counters(agent, reset_context=False)
 
     # Collect touched files to restore before truncating transcript
     files_to_restore: Optional[list[str]] = None
     if session and getattr(session, "messages", None):
         user_events = [m for m in session.messages if is_ui_visible_user_message(m)]
-        has_tracking = any("touched_files" in u for u in user_events)
-        if has_tracking:
-            f_set = set()
-            for j in range(seq_idx, len(user_events)):
-                f_set.update(user_events[j].get("touched_files") or [])
-            files_to_restore = sorted(f_set)
+        files_to_restore = _touched_files(user_events, seq_idx)
 
     # Store transcript: drop events from the selected turn onward so a later
     # /resume does not resurrect rolled-back turns.
