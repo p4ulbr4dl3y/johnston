@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 
-from rich.table import Table
 from textual.widgets import Static
 
 from core.infrastructure.runtime.thinking_effort import display_thinking_effort
@@ -17,7 +16,7 @@ from widgets.presentation.widgets.footer_layout import (
     get_theme_colors,
 )
 from widgets.utils.responsive import BREAKPOINT_COMPACT, is_compact_width, resolve_width
-from widgets.utils.row_format import ellipsize
+from widgets.utils.row_format import compose_rows, ellipsize
 
 
 class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Static):
@@ -88,14 +87,8 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
             self._render_footer()
 
     def _render_footer(self) -> None:
-        grid = Table.grid(expand=True)
-        grid.add_column(justify="left")
-        grid.add_column(justify="right")
         if not self.session:
-            grid.add_row("", "")
-            grid.add_row("", "")
-            self._last_grid_rows = [("", ""), ("", "")]
-            self.update(grid)
+            self.compose_footer_rows([("", ""), ("", "")])
             return
         session = self.session
         try:
@@ -192,7 +185,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
 
             agent_role = getattr(agent, "role", None) or getattr(session, "role", "worker")
             branch = getattr(session, "branch_name", "") or self._git_branch(cwd=directory)
-            grid, rows = _build_subagent_grid(
+            _grid, rows = _build_subagent_grid(
                 provider_display=provider_display,
                 clean_model=clean_model,
                 is_connected=is_connected,
@@ -216,8 +209,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
                 from_tasks=getattr(self, "from_tasks", False),
             )
 
-            self._last_grid_rows = rows
-            self.update(grid)
+            self.compose_footer_rows(rows)
         except Exception:
             pass
 
@@ -255,17 +247,13 @@ class SubagentHeader(ResizeDebounceMixin, Static):
         self._render_header()
 
     def _render_header(self) -> None:
-        grid = Table.grid(expand=True)
-        grid.add_column(justify="left")
-        grid.add_column(justify="right")
-
         t_primary, t_secondary, t_muted, _ = get_theme_colors()
 
         if not self.session:
             esc_label = "esc: back" if getattr(self, "from_tasks", False) else "esc: close"
-            grid.add_row("", f"[{t_muted}]{esc_label}[/{t_muted}]")
-            self._last_grid_rows = [("", f"[{t_muted}]{esc_label}[/{t_muted}]")]
-            self.update(grid)
+            row = ("", f"[{t_muted}]{esc_label}[/{t_muted}]")
+            self._last_grid_rows = [row]
+            self.update(compose_rows([row], max(10, resolve_width(self) - 2)))
             return
 
         try:
@@ -303,8 +291,8 @@ class SubagentHeader(ResizeDebounceMixin, Static):
             else:
                 row_right = format_modal_hint(esc_label)
 
-            grid.add_row(row_left, row_right)
-            self._last_grid_rows = [(row_left, row_right)]
-            self.update(grid)
+            row = (row_left, row_right)
+            self._last_grid_rows = [row]
+            self.update(compose_rows([row], max(10, resolve_width(self) - 2)))
         except Exception:
             pass

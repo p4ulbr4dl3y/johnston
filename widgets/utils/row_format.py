@@ -168,3 +168,57 @@ def format_badge_row(
         clean = ellipsize(clean, max_title)
     pad = max(min_gap, target_width - display_width(prefix) - display_width(clean) - display_width(badge))
     return f"{prefix}{escape(clean)}{' ' * pad}[dim]{badge}[/]"
+
+
+def fit_row(
+    left: str | Text,
+    right: str | Text = "",
+    width: int = 80,
+    gap: int = 2,
+    min_left: int = 8,
+) -> Text:
+    """Compose one ``left …spaces… right`` row guaranteed to fit ``width`` cells.
+
+    Rich's ``Table.grid(expand=True)`` splits the terminal equally between its
+    columns, so a long left cell wraps and is clipped by fixed-height footers
+    (losing the tail silently). Building the row as a single :class:`Text`
+    lets the left cell use the full width minus the right cell, and degrades
+    with an ellipsis instead of dropping content.
+    """
+    left_t = left.copy() if isinstance(left, Text) else Text.from_markup(str(left))
+    right_t = right.copy() if isinstance(right, Text) else Text.from_markup(str(right))
+    safe_width = max(gap + min_left, int(width))
+    left_w, right_w = cell_len(left_t.plain), cell_len(right_t.plain)
+
+    if left_w + right_w + gap > safe_width:
+        left_budget = safe_width - right_w - gap
+        if left_budget < min_left and right_w:
+            # Left would be squeezed to nothing: give back space from the right.
+            right_budget = safe_width - left_w - gap
+            if right_budget >= 1:
+                right_t.truncate(right_budget, overflow="ellipsis", pad=False)
+                right_w = cell_len(right_t.plain)
+            else:
+                right_t = Text("")
+                right_w = 0
+            left_budget = safe_width - right_w - gap
+        if left_w > max(1, left_budget):
+            left_t.truncate(max(1, left_budget), overflow="ellipsis", pad=False)
+            left_w = cell_len(left_t.plain)
+
+    pad = max(gap, safe_width - left_w - right_w)
+    row = left_t.copy()
+    row.append(" " * pad)
+    row.append_text(right_t)
+    return row
+
+
+def compose_rows(rows: list[tuple[str, str]] | list[tuple[str]], width: int, gap: int = 2) -> Text:
+    """Stack fitted rows into a single multi-line :class:`Text` renderable."""
+    out = Text()
+    for index, row in enumerate(rows):
+        if index:
+            out.append("\n")
+        right = row[1] if len(row) > 1 else ""
+        out.append_text(fit_row(row[0], right, width, gap=gap))
+    return out

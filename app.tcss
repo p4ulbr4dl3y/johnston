@@ -438,8 +438,8 @@ CommandSuggestions > .option-list--option {
 #command-suggestions > .option-list--option-blur-highlighted,
 CommandSuggestions > .option-list--option-highlighted,
 CommandSuggestions > .option-list--option-blur-highlighted {
-    background: $bg-surface;
-    color: $fg-primary;
+    background: $bg-inverted;
+    color: $fg-inverted;
     text-style: bold;
 }
 
@@ -857,8 +857,8 @@ DiffScreen {
 
 #diff-file-list > .option-list--option-highlighted,
 #diff-file-list > .option-list--option-blur-highlighted {
-    background: $bg-surface;
-    color: $fg-primary;
+    background: $bg-inverted;
+    color: $fg-inverted;
     text-style: bold;
 }
 
@@ -1042,12 +1042,14 @@ ModalScreen OptionList > .option-list--option-disabled {
     opacity: 100%;
 }
 
+/* Highlighted option: inverted block + bold so the cursor row is identifiable
+   without relying on colour alone (and stays visible on light themes). */
 #modal-dialog OptionList > .option-list--option-highlighted,
 #modal-dialog OptionList > .option-list--option-blur-highlighted,
 ModalScreen OptionList > .option-list--option-highlighted,
 ModalScreen OptionList > .option-list--option-blur-highlighted {
-    background: transparent;
-    color: $fg-primary;
+    background: $bg-inverted;
+    color: $fg-inverted;
     text-style: bold;
 }
 

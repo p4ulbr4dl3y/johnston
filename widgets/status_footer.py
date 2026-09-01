@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 
-from rich.table import Table
 from textual.widgets import Static
 
 from core.models_catalog import catalog, format_context_tokens
@@ -111,17 +110,14 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             self.refresh_footer()
 
     def _apply_two_row_grid(self, row1_left, row1_right, row2_left, row2_right) -> None:
-        """Render the two-line footer grid and cache its rows for spin re-draws."""
-        grid = Table.grid(expand=True)
-        grid.add_column(justify="left")
-        grid.add_column(justify="right")
-        grid.add_row(row1_left, row1_right)
-        grid.add_row(row2_left, row2_right)
-        self._last_grid_rows = [
-            (row1_left, row1_right),
-            (row2_left, row2_right),
-        ]
-        self.update(grid)
+        """Render the two-line footer and cache its rows for spin re-draws.
+
+        Rows are fitted to the widget width instead of relying on a Rich grid:
+        with ``Table.grid(expand=True)`` the left column only gets ~half the
+        terminal, so long second rows wrapped and were silently clipped by the
+        fixed 2-line footer (branch/mode disappeared on 75-99 column terminals).
+        """
+        self.compose_footer_rows([(row1_left, row1_right), (row2_left, row2_right)])
 
     def refresh_footer(self) -> None:
         if not self.app:
