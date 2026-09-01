@@ -419,6 +419,41 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Auth, Tracing", str(app.dismiss_result))
 
 
+class TestSplitAnswer(unittest.TestCase):
+    def _screen(self, labels: list[str]) -> AskUserWizardScreen:
+        screen = AskUserWizardScreen([])
+        screen.raw_options = [{"label": lbl, "description": ""} for lbl in labels]
+        return screen
+
+    def test_custom_answer_with_comma_stays_intact(self):
+        screen = self._screen(["Auth", "Tracing"])
+        self.assertEqual(screen._split_answer("yes, but only locally"), ["yes, but only locally"])
+
+    def test_known_labels_split(self):
+        screen = self._screen(["Auth", "Tracing"])
+        self.assertEqual(screen._split_answer("Auth, Tracing"), ["Auth", "Tracing"])
+
+    def test_label_containing_comma(self):
+        screen = self._screen(["Retry, with backoff", "Skip"])
+        self.assertEqual(screen._split_answer("Retry, with backoff, Skip"), ["Retry, with backoff", "Skip"])
+
+    def test_label_prefix_of_custom_text_does_not_match(self):
+        screen = self._screen(["Yes"])
+        self.assertEqual(screen._split_answer("Yes, maybe, and no"), ["Yes", "maybe, and no"])
+
+    def test_mixed_known_and_custom(self):
+        screen = self._screen(["Auth", "Tracing"])
+        self.assertEqual(screen._split_answer("Auth, custom thing, Tracing"), ["Auth", "custom thing", "Tracing"])
+
+    def test_free_text_step_never_splits(self):
+        screen = self._screen([])
+        self.assertEqual(screen._split_answer("a, b, c"), ["a, b, c"])
+
+    def test_exact_label_with_comma(self):
+        screen = self._screen(["Retry, with backoff"])
+        self.assertEqual(screen._split_answer("Retry, with backoff"), ["Retry, with backoff"])
+
+
 if __name__ == "__main__":
     unittest.main()
 

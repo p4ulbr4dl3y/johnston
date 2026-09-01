@@ -1,23 +1,31 @@
 import asyncio
+import re
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool
 
+# Matches a standalone "recommended" marker, optionally wrapped in () or [].
+_RECOMMENDED_MARK_RE = re.compile(r"\(recommended\)|\[recommended\]|\brecommended\b", re.IGNORECASE)
+# Negated forms ("Not recommended", "non-recommended") must not sort first.
+_RECOMMENDED_NEGATION_RE = re.compile(r"(?:\bnot\b|\bnever\b|\bnon-|n't)\s*[\(\[]?\s*$", re.IGNORECASE)
+
 
 def _is_recommended_option(opt: dict) -> bool:
-    """Detect a '(Recommended)' marker at the start or end of an option label."""
-    s = str(opt.get("label") or "").strip().lower()
-    return (
-        s.startswith("(recommended)")
-        or s.startswith("[recommended]")
-        or s.startswith("recommended")
-        or s.endswith("(recommended)")
-        or s.endswith("[recommended]")
-        or s.endswith("recommended)")
-        or s.endswith("recommended]")
-        or s.endswith("recommended")
-    )
+    """Detect a '(Recommended)' marker at the start or end of an option label.
+
+    Negated occurrences (e.g. "Not recommended") do not count.
+    """
+    s = str(opt.get("label") or "").strip()
+    for match in _RECOMMENDED_MARK_RE.finditer(s):
+        prefix = s[: match.start()]
+        suffix = s[match.end():]
+        if prefix.strip() and suffix.strip():
+            continue  # marker in the middle of the label, not a prefix/suffix marker
+        if _RECOMMENDED_NEGATION_RE.search(prefix):
+            continue
+        return True
+    return False
 
 
 def _sort_recommended_first(options: list[dict]) -> list[dict]:
@@ -109,12 +117,14 @@ class AskUserTool(BaseTool):
             if not q_text or not isinstance(options, list):
                 continue
             valid_options = []
+            seen_labels: set[str] = set()
             for opt in options:
                 if not isinstance(opt, dict):
                     continue
                 label = str(opt.get("label") or "").strip()
-                if not label:
+                if not label or label in seen_labels:
                     continue
+                seen_labels.add(label)
                 desc = str(opt.get("description") or "").strip()
                 valid_options.append({"label": label, "description": desc})
             sorted_options = _sort_recommended_first(valid_options)

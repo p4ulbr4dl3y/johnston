@@ -230,6 +230,58 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
     def on_unmount(self) -> None:
         self.cancel_resize_timer()
 
+    def _split_answer(self, ans: str) -> list[str]:
+        """Split a comma-joined answer back into items.
+
+        Known labels are matched first (handles labels containing ', ' and
+        negated-style fragments); remaining text stays as one custom item.
+        """
+        ans = ans.strip()
+        if not ans:
+            return []
+        labels = sorted(
+            (lbl for lbl in (_get_option_label(o) for o in self.raw_options) if lbl),
+            key=len,
+            reverse=True,
+        )
+        if not labels or ans in labels:
+            return [ans]
+        out: list[str] = []
+        i, n = 0, len(ans)
+        while i < n:
+            if ans[i] in ", ":
+                i += 1
+                continue
+            # Known label only counts when followed by ", " or end of string,
+            # so labels that are prefixes of longer custom text don't match.
+            match = next(
+                (
+                    lbl
+                    for lbl in labels
+                    if ans.startswith(lbl, i)
+                    and (i + len(lbl) == n or ans[i + len(lbl):].startswith(","))
+                ),
+                None,
+            )
+            if match:
+                out.append(match)
+                i += len(match)
+                continue
+            # Custom fragment: consume up to the next ', ' that starts a known label.
+            j = i
+            while j < n:
+                nxt = ans.find(", ", j)
+                if nxt == -1:
+                    j = n
+                    break
+                if any(ans.startswith(lbl, nxt + 2) for lbl in labels):
+                    j = nxt
+                    break
+                j = nxt + 2
+            out.append(ans[i:j].strip())
+            i = j
+        return out
+
     def _get_step_selections(self, q_idx: int) -> list[str]:
         info = self.answers.get(q_idx, {})
         if isinstance(info, dict):
@@ -237,12 +289,12 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 return [str(s).strip() for s in info["selected"] if str(s).strip()]
             ans = str(info.get("answer") or "").strip()
             if ans:
-                return [s.strip() for s in ans.split(", ") if s.strip()]
+                return self._split_answer(ans)
             return []
         elif isinstance(info, (list, set, tuple)):
             return [str(s).strip() for s in info if str(s).strip()]
         elif isinstance(info, str) and info.strip():
-            return [s.strip() for s in info.split(", ") if s.strip()]
+            return self._split_answer(info.strip())
         return []
 
     def update_step(self, target_highlight: int | None = None) -> None:

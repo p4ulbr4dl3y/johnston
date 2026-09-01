@@ -27,6 +27,20 @@ class TestRecommendedSorting(unittest.TestCase):
         for opt in [{"label": "Fix now"}, {"label": "Recommendation: do this"}, {"label": "Unrelated"}, {"label": ""}]:
             self.assertFalse(_is_recommended_option(opt), opt)
 
+    def test_negated_recommended_not_matched(self):
+        for opt in [
+            {"label": "Not recommended"},
+            {"label": "not recommended"},
+            {"label": "Never recommended"},
+            {"label": "non-recommended"},
+            {"label": "Fast but not recommended"},
+        ]:
+            self.assertFalse(_is_recommended_option(opt), opt)
+
+    def test_recommended_in_middle_not_matched(self):
+        for opt in [{"label": "Use recommended approach"}, {"label": "Recommendation engine"}]:
+            self.assertFalse(_is_recommended_option(opt), opt)
+
     def test_sort_recommended_first(self):
         options = [
             {"label": "plain"},
@@ -185,6 +199,40 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             ctx=mock_app,
         )
         self.assertIn("Answer: B (Recommended)", res.display)
+
+    async def test_execute_dedupes_duplicate_labels(self):
+        tool = AskUserTool()
+        mock_app = MagicMock()
+
+        async def fake_ask_user(questions):
+            opts = questions[0]["options"]
+            self.assertEqual(
+                opts,
+                [
+                    {"label": "Other", "description": ""},
+                    {"label": "Same", "description": "first wins"},
+                ],
+            )
+            return "Question: Q\nAnswer: Same"
+
+        mock_app.ask_user = fake_ask_user
+        res = await tool.execute(
+            {
+                "questions": [
+                    {
+                        "question": "Q",
+                        "options": [
+                            {"label": "Other"},
+                            {"label": "Same", "description": "first wins"},
+                            {"label": "Same", "description": "dup dropped"},
+                            {"label": "Same"},
+                        ],
+                    }
+                ]
+            },
+            ctx=mock_app,
+        )
+        self.assertIn("Answer: Same", res.display)
 
     async def test_minimized_flow_resumed_by_callback(self):
         tool = AskUserTool()
