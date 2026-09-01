@@ -464,7 +464,7 @@ class TestRewindExtraPaths(unittest.IsolatedAsyncioTestCase):
 
     def test_seq_below_tail_uses_history_fallback(self):
         agent = HistoryAgent()
-        agent.history = [{"role": "user", "content": "<conversation_checkpoint>compacted</conversation_checkpoint>"}]
+        agent.history = [{"role": "user", "content": "<compaction_checkpoint>compacted</compaction_checkpoint>"}]
         rewind_session(agent, None, None, [(0, "old"), (1, "recent")], 1, **_noop_cbs())
         self.assertEqual(agent.history, [])
 

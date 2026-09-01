@@ -84,7 +84,7 @@ def transcript_before_turn(messages: List[Any], seq_idx: int) -> List[Any]:
 # ---------------------------------------------------------------------------
 
 # Compaction embeds summaries into history as fake user messages.
-HISTORY_CHECKPOINT_MARKERS = ("<conversation_checkpoint>",)
+HISTORY_CHECKPOINT_MARKERS = ("<compaction_checkpoint>",)
 HISTORY_NOTE_PREFIX = (
     "<system_note",
     "<notification",

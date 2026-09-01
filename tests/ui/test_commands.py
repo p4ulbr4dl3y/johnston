@@ -448,7 +448,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.sm.get.return_value = session
         # Compacted history: checkpoint replaced A+B; only Tail 0 survived.
         app.agent.history = [
-            {"role": "user", "content": "<conversation_checkpoint>\nearly\n</conversation_checkpoint>"},
+            {"role": "user", "content": "<compaction_checkpoint>\nearly\n</compaction_checkpoint>"},
             {"role": "user", "content": "Tail 0"},
             {"role": "assistant", "content": "Resp"},
         ]

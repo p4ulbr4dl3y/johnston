@@ -160,7 +160,7 @@ async def test_compact_history_adapter_streaming_success():
 
     with patch("core.adapters.get_adapter", return_value=_FakeAdapter()):
         success, msg = await agent.compact_history()
-    assert any("<conversation_checkpoint>" in m.get("content", "") for m in agent.history)
+    assert any("<compaction_checkpoint>" in m.get("content", "") for m in agent.history)
 
 
 @pytest.mark.asyncio
@@ -204,7 +204,7 @@ async def test_compact_history_report_before_after_same_method():
 async def test_compact_history_previous_summary_from_tags():
     agent = _agent(
         [
-            {"role": "user", "content": "<conversation_checkpoint>\nearlier objective summary\n</conversation_checkpoint>"},
+            {"role": "user", "content": "<compaction_checkpoint>\nearlier objective summary\n</compaction_checkpoint>"},
             {"role": "assistant", "content": "a"},
             {"role": "user", "content": "b"},
             {"role": "assistant", "content": "c"},
@@ -225,6 +225,8 @@ async def test_compact_history_previous_summary_from_tags():
     with patch("core.adapters.get_adapter", return_value=_FakeAdapter()):
         success, _ = await agent.compact_history()
     assert success
+
+
 
 
 @pytest.mark.asyncio
