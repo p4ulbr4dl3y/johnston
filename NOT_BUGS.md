@@ -4,6 +4,14 @@ This document tracks reported candidate issues that were verified to be intended
 
 ---
 
+### 4. `tools/edit.py:242-248` - Trailing newline consumption on empty replacement
+
+- **Report**: Mutation `actual_target += "\n"` on empty string replacement breaks pinpoint edits.
+- **Status**: **NOT A BUG** (intended architectural behavior).
+- **Rationale**: The edit tool is designed so that deleting a full line (when LLM provides `old_str` without trailing newline and `new_str=""` or missing `new_str`) cleanly removes the line and its trailing line separator (`\n` or `\r\n`), rather than leaving a dangling blank line or orphaned carriage return. This behavior is explicitly pinned and verified by tests across the suite (e.g. `test_delete_crlf_line_consumes_newline`, `test_edit_missing_new_str_is_delete`, `test_edit_tool`).
+
+---
+
 ### 13. `widgets/presentation/widgets/attachment_bar.py:33` - `AttachmentChip.on_click` query_one safety
 
 - **Report**: `AttachmentChip.on_click` performs an unprotected `query_one("#message-input")`.

@@ -509,15 +509,11 @@ async def test_subagent_shell_execution_cancelled(tool, make_tool_context):
 async def test_subagent_explicit_run_in_background_rejected(tool, make_app_mock, make_tool_context):
     app = _app(make_app_mock, task_manager=TaskManager())
     ctx = make_tool_context(app=app, is_subagent=True)
-    p = _process()
 
-    with (
-        patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
-    ):
+    with patch.object(ShellTool, "_create_std_process") as mock_create:
         res = str(await tool.execute({"command": "tail -f log.txt", "background": True}, ctx=ctx))
         assert "ERR: background 'shell'" in res
-        mock_term.assert_called_once()
+        mock_create.assert_not_called()
         assert len([t for t in app.task_manager]) == 0
 
 

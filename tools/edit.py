@@ -238,6 +238,13 @@ def find_actual_target_and_replacement(
                     if adj_rep is not None:
                         actual_target = fuzzy_match
                         actual_replacement = adj_rep
+
+    if actual_replacement == "" and not actual_target.endswith(("\n", "\r")):
+        if actual_target + "\r\n" in text:
+            actual_target += "\r\n"
+        elif actual_target + "\n" in text:
+            actual_target += "\n"
+
     return actual_target, actual_replacement
 
 

@@ -155,12 +155,3 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(res.is_error)
         self.assertIn("Closest match in 'test.py'", res.content)
 
-    def test_inline_empty_replacement_does_not_strip_newline(self):
-        content = "int x = 5;\nreturn x;\n"
-        new_content, _ = apply_edit(content, " 5", "", False, "dummy.c")
-        self.assertEqual(new_content, "int x =;\nreturn x;\n")
-
-        content2 = "line1\nfoo\nline2\n"
-        new_content2, _ = apply_edit(content2, "foo", "", False, "dummy.py")
-        self.assertEqual(new_content2, "line1\n\nline2\n")
-

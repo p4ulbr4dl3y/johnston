@@ -905,8 +905,8 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
             model="m",
             base_url="http://t",
             provider_key="p",
-            is_subagent=True,
         )
+        agent.is_subagent = True
         self.addAsyncCleanup(agent.close)
         agent.pending_messages = ["Follow-up message"]
 

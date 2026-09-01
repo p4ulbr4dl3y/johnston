@@ -77,18 +77,18 @@ class TestRunCancellable(unittest.IsolatedAsyncioTestCase):
     async def test_nested_functions_with_same_qualname_do_not_collide(self):
         from tools.cancel import _accepts_cancel_event
 
-        def factory_without():
-            def worker():
-                return 1
-            return worker
+        def make_worker(accepts: bool):
+            if accepts:
+                def worker(cancel_event=None):
+                    return 2
+                return worker
+            else:
+                def worker():
+                    return 1
+                return worker
 
-        def factory_with():
-            def worker(cancel_event=None):
-                return 2
-            return worker
-
-        fn1 = factory_without()
-        fn2 = factory_with()
+        fn1 = make_worker(False)
+        fn2 = make_worker(True)
         self.assertEqual(fn1.__qualname__, fn2.__qualname__)
         self.assertFalse(_accepts_cancel_event(fn1))
         self.assertTrue(_accepts_cancel_event(fn2))
