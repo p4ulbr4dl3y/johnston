@@ -370,7 +370,12 @@ class TestAskUserEdgeCases(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute(
             {"questions": [{"question": "Q", "options": ["a", None, 5, ["b"]]}]}, ctx=app
         ))
-        self.assertEqual(seen["opts"], ["a", "None", "5", "['b']"])
+        self.assertEqual(seen["opts"], [
+            {"label": "a", "description": ""},
+            {"label": "None", "description": ""},
+            {"label": "5", "description": ""},
+            {"label": "['b']", "description": ""},
+        ])
         self.assertIn("x", res)
 
     async def test_single_question_form_rejected(self):

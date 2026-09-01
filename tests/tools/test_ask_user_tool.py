@@ -120,7 +120,11 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
 
         async def fake_ask_user(questions):
-            self.assertEqual(questions[0]["options"], ["Yes (Recommended)", "Maybe", "No"])
+            self.assertEqual(questions[0]["options"], [
+                {"label": "Yes (Recommended)", "description": ""},
+                {"label": "Maybe", "description": ""},
+                {"label": "No", "description": ""},
+            ])
             return "Question: Q\nAnswer: Yes"
 
         mock_app.ask_user = fake_ask_user
@@ -129,6 +133,36 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             ctx=mock_app,
         ))
         self.assertIn("Yes", res)
+
+    async def test_execute_normalizes_object_options_and_recommended(self):
+        tool = AskUserTool()
+        mock_app = MagicMock()
+
+        async def fake_ask_user(questions):
+            opts = questions[0]["options"]
+            self.assertEqual(len(opts), 3)
+            self.assertEqual(opts[0], {"label": "B (Recommended)", "description": "Desc B"})
+            self.assertEqual(opts[1], {"label": "A", "description": "Desc A"})
+            self.assertEqual(opts[2], {"label": "C", "description": ""})
+            return "Question: Q\nAnswer: B (Recommended)"
+
+        mock_app.ask_user = fake_ask_user
+        res = await tool.execute(
+            {
+                "questions": [
+                    {
+                        "question": "Q",
+                        "options": [
+                            {"label": "A", "description": "Desc A"},
+                            {"value": "B", "description": "Desc B", "recommended": True},
+                            "C",
+                        ],
+                    }
+                ]
+            },
+            ctx=mock_app,
+        )
+        self.assertIn("Answer: B (Recommended)", res.display)
 
     async def test_minimized_flow_resumed_by_callback(self):
         tool = AskUserTool()

@@ -1,4 +1,5 @@
 import textwrap
+from typing import Any
 
 from textual import events
 from textual.app import ComposeResult
@@ -26,15 +27,38 @@ from widgets.utils.key_aliases import expand_bindings, normalize_key_to_latin
 WRITE_IN_LABEL = "Other (custom answer)"
 
 
-def format_wizard_option(tag: str, text: str, width: int = 72, add_gap: bool = False) -> str:
-    """Format an ask_user wizard option with hanging indent for wrapped lines."""
+def _extract_option_info(opt: Any) -> tuple[str, str]:
+    """Extract (label, description) from option item (str or dict)."""
+    if isinstance(opt, dict):
+        label = str(opt.get("label") or opt.get("value") or opt.get("name") or opt.get("text") or "").strip()
+        description = str(opt.get("description") or opt.get("desc") or opt.get("details") or "").strip()
+        if not label and description:
+            label = description
+            description = ""
+        return label, description
+    return str(opt).strip(), ""
+
+
+def format_wizard_option(
+    tag: str,
+    text: str,
+    description: str = "",
+    width: int = 72,
+    add_gap: bool = False,
+) -> str:
+    """Format an ask_user wizard option with hanging indent for wrapped lines and optional description."""
     wrap_width = max(20, width - 4)
     lines = textwrap.wrap(text, width=wrap_width)
     if not lines:
-        return f"{tag} {text}"
-    result_lines = [f"{tag} {lines[0]}"]
-    for line in lines[1:]:
-        result_lines.append(f"    {line}")
+        result_lines = [f"{tag} {text}"]
+    else:
+        result_lines = [f"{tag} {lines[0]}"]
+        for line in lines[1:]:
+            result_lines.append(f"    {line}")
+    if description:
+        desc_lines = textwrap.wrap(description, width=wrap_width)
+        for line in desc_lines:
+            result_lines.append(f"    {line}")
     if add_gap:
         result_lines.append("")
     return "\n".join(result_lines)
@@ -218,6 +242,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             self.raw_options = q.get("options") or []
             self.options = self.raw_options + [WRITE_IN_LABEL] if self.raw_options else []
             prev_answer = self.answers.get(self.q_idx, {}).get("answer", "")
+            raw_labels = [_extract_option_info(o)[0] for o in self.raw_options]
 
             if self.raw_options:
                 opt_list.display = True
@@ -225,13 +250,13 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
 
                 if target_highlight is not None and target_highlight < len(self.options):
                     highlight_idx = target_highlight
-                    if highlight_idx == len(self.options) - 1 and prev_answer and prev_answer not in self.raw_options:
+                    if highlight_idx == len(self.options) - 1 and prev_answer and prev_answer not in raw_labels:
                         input_field.value = prev_answer
                     elif highlight_idx < len(self.raw_options):
                         input_field.value = ""
                 elif prev_answer:
-                    if prev_answer in self.raw_options:
-                        highlight_idx = self.raw_options.index(prev_answer)
+                    if prev_answer in raw_labels:
+                        highlight_idx = raw_labels.index(prev_answer)
                         input_field.value = ""
                     else:
                         highlight_idx = len(self.options) - 1
@@ -246,19 +271,25 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 screen_w = resolve_screen_width(self)
                 avail_w = int(screen_w * MODAL_WIDTH_RATIO) - MODAL_CONTENT_GUTTER
                 wrap_width = max(20, min(78, avail_w))
-                has_multi = any(len(o) + 4 > wrap_width for o in self.options)
+                has_multi = any(
+                    len(_extract_option_info(o)[0]) + 4 > wrap_width or bool(_extract_option_info(o)[1])
+                    for o in self.options
+                )
 
                 for idx, opt in enumerate(self.options):
+                    opt_label, opt_desc = _extract_option_info(opt)
                     is_selected = bool(
                         prev_answer
                         and (
-                            (idx < len(self.raw_options) and prev_answer == self.raw_options[idx])
-                            or (idx == len(self.options) - 1 and prev_answer not in self.raw_options)
+                            (idx < len(self.raw_options) and prev_answer == opt_label)
+                            or (idx == len(self.options) - 1 and prev_answer not in raw_labels)
                         )
                     )
                     tag = r"\[✓]" if is_selected else r"\[ ]"
-                    add_gap = has_multi and idx < len(self.options) - 1
-                    opt_list.add_option(format_wizard_option(tag, opt, width=wrap_width, add_gap=add_gap))
+                    add_gap = (has_multi or bool(opt_desc)) and idx < len(self.options) - 1
+                    opt_list.add_option(
+                        format_wizard_option(tag, opt_label, description=opt_desc, width=wrap_width, add_gap=add_gap)
+                    )
 
                 input_field.placeholder = "Type custom answer and press Enter..."
                 opt_list.highlighted = highlight_idx
@@ -307,7 +338,10 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 if len(q_text) > len(max_q_title):
                     max_q_title = q_text
                 for opt in q.get("options") or []:
-                    sample_items.append(f"[✓] {opt}")
+                    opt_label, opt_desc = _extract_option_info(opt)
+                    sample_items.append(f"[✓] {opt_label}")
+                    if opt_desc:
+                        sample_items.append(f"    {opt_desc}")
 
             if not sample_items:
                 sample_items = ["Type custom answer..."]
@@ -476,7 +510,10 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                     val = self.query_one(WRITE_IN_INPUT, Input).value.strip()
                     answer = val
                 else:
-                    answer = self.options[idx] if idx is not None and idx < len(self.options) else ""
+                    if idx is not None and idx < len(self.raw_options):
+                        answer = _extract_option_info(self.raw_options[idx])[0]
+                    else:
+                        answer = ""
 
             self.answers[self.q_idx] = {"answer": answer}
             self.q_idx += 1
@@ -501,7 +538,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 return
             idx = opt_list.highlighted
             if idx is not None and idx < len(self.raw_options):
-                chosen = self.raw_options[idx]
+                chosen = _extract_option_info(self.raw_options[idx])[0]
                 current_ans = self.answers.get(self.q_idx, {}).get("answer", "")
                 if current_ans == chosen:
                     self.answers[self.q_idx] = {"answer": ""}

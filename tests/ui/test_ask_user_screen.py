@@ -330,6 +330,40 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertEqual(screen.q_idx, 3)
 
+    async def test_wizard_screen_with_dict_options_pilot(self):
+        from widgets.presentation.screens.ask_user import format_wizard_option
+
+        formatted = format_wizard_option(r"\[ ]", "Clean Schema", description="Refactor BaseTool params", width=50)
+        self.assertIn("Clean Schema", formatted)
+        self.assertIn("Refactor BaseTool params", formatted)
+
+        questions = [
+            {
+                "question": "Which architecture?",
+                "options": [
+                    {"label": "Approach A", "description": "Fast and light"},
+                    {"label": "Approach B", "description": "Extensible and modular"},
+                ],
+            }
+        ]
+        screen = AskUserWizardScreen(questions)
+        app = DummyHostApp(screen)
+
+        async with app.run_test() as pilot:
+            screen._mount_time = 0
+            await pilot.pause()
+
+            # Select first option (Approach A)
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Confirm step
+            await pilot.press("enter")
+            await pilot.pause()
+
+            self.assertIn("Approach A", str(app.dismiss_result))
+
 
 if __name__ == "__main__":
     unittest.main()
+
