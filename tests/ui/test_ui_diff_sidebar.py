@@ -7,7 +7,6 @@ different folders rendered as the same row with no way to tell them apart.
 import os
 
 import pytest
-
 from rich.text import Text
 
 from widgets.presentation.screens.diff import DiffScreen
@@ -58,8 +57,9 @@ def test_middle_ellipsis_keeps_both_ends():
 
 @pytest.mark.asyncio
 async def test_sidebar_rows_render_distinctly():
-    from app import JohnstonApp
     from textual.widgets import OptionList
+
+    from app import JohnstonApp
 
     app = JohnstonApp()
     async with app.run_test(size=(110, 30)) as pilot:

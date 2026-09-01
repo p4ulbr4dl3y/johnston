@@ -161,6 +161,46 @@ def to_snake_case(name: str) -> str:
     return s.lower()
 
 
+# P1-7: comfortable prose line length is 60-100 cells with a hard ceiling around
+# 120; on a 200-column terminal a paragraph was rendering ~180 characters wide.
+# Prose is therefore capped, while code fences and tables keep the full width.
+PROSE_MAX_WIDTH = 110
+
+# Markdown block names (``MarkdownBlock`` sets ``name=token.type``, i.e. the
+# markdown-it *open* token: ``paragraph_open``) that hold running text. Fences
+# and tables are deliberately absent.
+PROSE_BLOCK_NAMES = frozenset(
+    {"paragraph", "heading", "bullet_list", "ordered_list", "list_item", "blockquote"}
+)
+
+
+def _prose_block_kind(widget: object) -> str:
+    """``paragraph_open`` -> ``paragraph``; anything else is returned as is."""
+    name = getattr(widget, "name", "") or ""
+    return name[: -len("_open")] if name.endswith("_open") else name
+
+
+class ProseWidthMixin:
+    """Caps running text at :data:`PROSE_MAX_WIDTH` cells on wide terminals."""
+
+    PROSE_MAX_WIDTH = PROSE_MAX_WIDTH
+
+    def apply_prose_width(self, width: int | None = None) -> None:
+        """Clamp prose blocks, leaving code fences and tables untouched."""
+        available = self.size.width if width is None else width
+        cap: int | None = self.PROSE_MAX_WIDTH if available > self.PROSE_MAX_WIDTH else None
+        for child in self.children:
+            if _prose_block_kind(child) in PROSE_BLOCK_NAMES:
+                child.styles.max_width = cap
+
+    def on_resize(self, event: object) -> None:  # noqa: ARG002 - Textual hook
+        self.apply_prose_width()
+
+
+class ProseMarkdown(ProseWidthMixin, Markdown):
+    """Markdown viewer that keeps prose at a readable line length (P1-7)."""
+
+
 class CustomMarkdownTableContent(MarkdownTableContent):
     """Custom Markdown table content without cell hover tooltips."""
 
