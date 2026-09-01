@@ -33,7 +33,24 @@ def fork_marker(title: str | None) -> str:
     return f" {match.group(0).strip()}" if match else ""
 
 
+def _cap_base(base: str) -> str:
+    """Word-boundary cap so ``base + " (fork N)"`` stays inside the row budget."""
+    if len(base) <= FORK_BASE_MAX_LEN:
+        return base
+    cut = base[:FORK_BASE_MAX_LEN]
+    r_space = cut.rfind(" ")
+    if r_space > 15:
+        cut = cut[:r_space]
+    return cut.rstrip()
+
+
 def build_fork_title(base: str | None, number: int) -> str:
-    """Title of the ``number``-th (1-based) fork taken from ``base``."""
-    clean = strip_fork_suffix(base) or "Untitled"
+    """Title of the ``number``-th (1-based) fork taken from ``base``.
+
+    The base is capped to :data:`FORK_BASE_MAX_LEN` here — the single place a
+    fork title is assembled — so the marker survives resume-row ellipsis no
+    matter which caller supplied the base (UI hint, store title fallback,
+    auto-titling).
+    """
+    clean = _cap_base(strip_fork_suffix(base) or "Untitled")
     return f"{clean} (fork)" if number <= 1 else f"{clean} (fork {number})"

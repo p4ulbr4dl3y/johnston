@@ -64,6 +64,22 @@ class TestBuildForkTitle(unittest.TestCase):
         self.assertLessEqual(len(title), FORK_BASE_MAX_LEN + len(" (fork 12)"))
         self.assertTrue(title.endswith("(fork 12)"))
 
+    def test_overlong_base_is_truncated_to_budget(self):
+        title = build_fork_title("b" * 500, 1)
+        self.assertLessEqual(len(title), FORK_BASE_MAX_LEN + len(" (fork)"))
+        self.assertTrue(title.endswith("(fork)"))
+
+    def test_overlong_base_cut_at_word_boundary(self):
+        base = "fix the parser crash " + "y" * 100
+        title = build_fork_title(base, 2)
+        base_part = title[: -len(" (fork 2)")]
+        self.assertLessEqual(len(base_part), FORK_BASE_MAX_LEN)
+        self.assertTrue(base_part.startswith("fix the parser crash"))
+
+    def test_overlong_base_without_spaces_keeps_full_cut(self):
+        title = build_fork_title("z" * 100, 3)
+        self.assertEqual(title, "z" * FORK_BASE_MAX_LEN + " (fork 3)")
+
 
 if __name__ == "__main__":
     unittest.main()

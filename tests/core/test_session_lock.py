@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
+from core.domain.policies.session_naming import FORK_BASE_MAX_LEN
 from core.infrastructure.platform.session_lock import SessionLock
 from core.infrastructure.storage.session_store import SessionStore
 from tools.context import ToolContext
@@ -178,6 +179,32 @@ class TestSessionStoreLockingAndFork(unittest.TestCase):
         nested = self.store.fork_session(first.id)
         self.assertEqual(nested.parent_id, first.id)
         self.assertEqual(nested.title, "Initial task (fork)")
+
+    def test_fork_base_capped_for_untitled_source(self):
+        # An untitled session's title getter falls back to the full first
+        # message text; the policy must cap it, not the caller.
+        sess = self.store.create_main()
+        sess.messages = [{"type": "user", "text": "x" * 500}]
+        self.store.save(sess)
+        forked = self.store.fork_session(sess.id)
+        self.assertLessEqual(len(forked.title), FORK_BASE_MAX_LEN + len(" (fork)"))
+        self.assertTrue(forked.title.endswith("(fork)"))
+
+    def test_fork_explicit_long_title_capped(self):
+        sess = self.store.create_main()
+        sess.title = "T"
+        sess.messages = [{"type": "user", "text": "hello"}]
+        self.store.save(sess)
+        forked = self.store.fork_session(sess.id, new_title="word " * 40)
+        self.assertLessEqual(len(forked.title), FORK_BASE_MAX_LEN + len(" (fork)"))
+
+    def test_fork_rejects_subagent_source(self):
+        # Forking is a user action on main sessions; subagent tasks are not forkable.
+        main = self.store.create_main()
+        self.store.save(main)
+        sub = self.store.create_subagent(parent_id=main.id, title="Worker")
+        self.store.save(sub)
+        self.assertIsNone(self.store.fork_session(sub.id))
 
     def test_store_fork_session_with_slicing(self):
         sess = self.store.create_main()

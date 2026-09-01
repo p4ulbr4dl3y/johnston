@@ -100,6 +100,6 @@ class SessionStorePort(Protocol):
         new_title: Optional[str] = None,
         up_to_msg_index: Optional[int] = None,
     ) -> Optional[AgentSession]:
-        """Forks a session."""
+        """Fork a MAIN session under a fresh session ID (subagents are not forkable)."""
         ...
 
