@@ -33,24 +33,18 @@ def test_builtin_themes_presence():
     themes = list_themes()
     names = {t.name for t in themes}
     assert "zinc" in names
-    assert "zinc-oled" in names
     assert "charcoal" in names
     assert "catppuccin-mocha" in names
-    assert "catppuccin-macchiato" in names
     assert "catppuccin-latte" in names
     assert "tokyo-night" in names
-    assert "tokyo-night-storm" in names
     assert "rose-pine" in names
-    assert "rose-pine-moon" in names
     assert "rose-pine-dawn" in names
     assert "github-dark" in names
     assert "github-dark-dimmed" in names
     assert "github-light" in names
     assert "kanagawa-wave" in names
-    assert "kanagawa-dragon" in names
     assert "everforest" in names
     assert "ayu-dark" in names
-    assert "ayu-mirage" in names
     assert "nord" in names
     assert "one-dark" in names
     assert "zinc-light" in names
@@ -59,7 +53,7 @@ def test_builtin_themes_presence():
     assert "vesper" in names
     assert "dracula" in names
     assert "native" in names
-    assert len(themes) == 27
+    assert len(themes) == 21
 
 
 def test_theme_manager_registration_and_switching():
@@ -216,7 +210,7 @@ def test_themes_loader_module():
     )
 
     themes = list_themes()
-    assert len(themes) == 27
+    assert len(themes) == 21
     assert DEFAULT_THEME_NAME == "zinc"
     assert get_theme("zinc") is not None
     assert get_theme("zinc").name == "zinc"
@@ -359,6 +353,65 @@ def test_chat_markdown_theme_sync():
 
     from core.domain.defaults.themes import ZINC_DARK
     sync_theme_styles(ZINC_DARK)
+
+
+def test_builtin_themes_wcag_contrast():
+    """Ensure all built-in static themes meet WCAG AA contrast guidelines."""
+    from core.domain.defaults.themes import list_themes
+
+    def srgb_to_linear(c: float) -> float:
+        c_val = c / 255.0
+        return c_val / 12.92 if c_val <= 0.04045 else ((c_val + 0.055) / 1.055) ** 2.4
+
+    def luminance(hex_str: str) -> float:
+        clean = hex_str.lstrip("#")
+        if len(clean) == 3:
+            clean = "".join(2 * c for c in clean)
+        r = int(clean[0:2], 16)
+        g = int(clean[2:4], 16)
+        b = int(clean[4:6], 16)
+        return 0.2126 * srgb_to_linear(r) + 0.7152 * srgb_to_linear(g) + 0.0722 * srgb_to_linear(b)
+
+    def contrast_ratio(hex1: str, hex2: str) -> float:
+        l1 = luminance(hex1)
+        l2 = luminance(hex2)
+        return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+
+    themes = list_themes()
+    for theme in themes:
+        bg = theme.tcss_vars.get("bg-app", "#000000")
+        if bg in ("ansi_default", "transparent") or theme.name == "native":
+            continue
+        surface = theme.tcss_vars.get("bg-surface", bg)
+
+        # 1. Primary and secondary text must meet WCAG AA normal text (>= 4.5:1)
+        fg_p = theme.tcss_vars.get("fg-primary")
+        if fg_p and fg_p.startswith("#"):
+            assert contrast_ratio(bg, fg_p) >= 4.5, f"[{theme.name}] fg-primary low vs bg: {fg_p}"
+            assert contrast_ratio(surface, fg_p) >= 4.5, f"[{theme.name}] fg-primary low vs surface: {fg_p}"
+
+        fg_s = theme.tcss_vars.get("fg-secondary")
+        if fg_s and fg_s.startswith("#"):
+            assert contrast_ratio(bg, fg_s) >= 4.5, f"[{theme.name}] fg-secondary low vs bg: {fg_s}"
+            assert contrast_ratio(surface, fg_s) >= 4.5, f"[{theme.name}] fg-secondary low vs surface: {fg_s}"
+
+        # 2. Muted text must meet WCAG AA UI / incidental text (>= 3.0:1)
+        fg_m = theme.tcss_vars.get("fg-muted")
+        if fg_m and fg_m.startswith("#"):
+            assert contrast_ratio(bg, fg_m) >= 3.0, f"[{theme.name}] fg-muted low vs bg: {fg_m}"
+            assert contrast_ratio(surface, fg_m) >= 3.0, f"[{theme.name}] fg-muted low vs surface: {fg_m}"
+
+        if theme.muted and theme.muted.startswith("#"):
+            assert contrast_ratio(bg, theme.muted) >= 3.0, f"[{theme.name}] root muted low vs bg: {theme.muted}"
+            assert contrast_ratio(surface, theme.muted) >= 3.0, f"[{theme.name}] root muted low vs surface: {theme.muted}"
+
+        # 3. Accents must meet WCAG AA graphical / UI contrast (>= 3.0:1)
+        for acc in ("accent-info", "accent-warning", "accent-error", "accent-success"):
+            acc_val = theme.tcss_vars.get(acc)
+            if acc_val and acc_val.startswith("#"):
+                assert contrast_ratio(bg, acc_val) >= 3.0, f"[{theme.name}] {acc} low vs bg: {acc_val}"
+                assert contrast_ratio(surface, acc_val) >= 3.0, f"[{theme.name}] {acc} low vs surface: {acc_val}"
+
 
 
 

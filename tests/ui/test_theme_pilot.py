@@ -30,8 +30,8 @@ async def test_theme_modal_search_live_preview_and_confirm():
         # 3. Live preview on down arrow
         await pilot.press("down")
         await pilot.pause()
-        assert app.theme == "zinc-oled"
-        assert theme_manager.current_theme.name == "zinc-oled"
+        assert app.theme == "charcoal"
+        assert theme_manager.current_theme.name == "charcoal"
 
         # 4. Search for "everforest"
         search_input = theme_screen.query_one("#modal-search-input", Input)
