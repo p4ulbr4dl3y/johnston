@@ -466,14 +466,20 @@ class SessionStore:
         new_title: Optional[str] = None,
         up_to_msg_index: Optional[int] = None,
     ) -> Optional[AgentSession]:
-        """Create a duplicate or branched copy of a session under a fresh session ID."""
+        """Create a user-facing fork of a MAIN session under a fresh session ID.
+
+        ``new_title`` is a base hint, not a verbatim title: it is normalized,
+        capped and numbered among the parent's existing fork siblings, which
+        get the ``(fork N)`` marker appended. Subagent sessions are not
+        forkable — forking is a user action on main sessions only.
+        """
         import copy
 
         source = self.get(session_id)
-        if not source:
+        if not source or source.kind != SessionKind.MAIN:
             return None
         new_id = self.generate_session_id()
-        parent_id = source.id if source.kind == SessionKind.MAIN else source.parent_id
+        parent_id = source.id
         siblings = sum(1 for s in self.list() if s.parent_id == parent_id and s.kind == source.kind)
         fork_title = build_fork_title(new_title or source.title, siblings + 1)
         new_sess = AgentSession(
