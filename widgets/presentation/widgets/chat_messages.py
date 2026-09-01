@@ -368,8 +368,8 @@ class BotMessage(Vertical):
         except Exception:
             pass
         # Blocks are mounted by now (update() awaits every batch), so clamp the
-        # prose ones to a readable line length (P1-7).
-        self.md_widget.apply_prose_width()
+        # prose ones to a readable line length and fix up task lists (P1-7/P2-12).
+        self.md_widget.post_update()
 
     def _scroll_if_needed(self) -> None:
         scroll_parent_if_needed(self)

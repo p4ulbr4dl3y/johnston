@@ -1267,7 +1267,9 @@ MarkdownHorizontalRule {
 
 /* Markdown Blockquote - Clean Monochrome Slate (Dark Card without extra vertical lines) */
 MarkdownBlockQuote {
-    border-left: none;
+    /* Quotes were marked by indentation alone; the bar makes them readable
+       when a quote is nested inside a list or follows a paragraph (P2-12). */
+    border-left: solid $border-subtle;
     background: $bg-surface;
     color: $fg-secondary;
     margin: 1 0;

@@ -21,7 +21,9 @@ from textual.style import Style
 from textual.widgets import Button, Label, Markdown, Static
 from textual.widgets._markdown import (
     MarkdownBlock,
+    MarkdownBullet,
     MarkdownFence,
+    MarkdownParagraph,
     MarkdownTable,
     MarkdownTableCellContents,
     MarkdownTableContent,
@@ -199,6 +201,40 @@ class ProseWidthMixin:
 
 class ProseMarkdown(ProseWidthMixin, Markdown):
     """Markdown viewer that keeps prose at a readable line length (P1-7)."""
+
+    # GFM task items (`- [x] done`) are not parsed by markdown-it here, so the
+    # literal marker ends up in the text *and* the list bullet is still drawn:
+    # `• [x] done`. The bullet becomes the checkbox instead (P2-12).
+    TASK_ITEM_RE = re.compile(r"^\[([ xX])\]\s+")
+    # Trailing space to match the built-in `"• "` bullet width.
+    TASK_CHECKED = "\u2611 "  # ☑
+    TASK_UNCHECKED = "\u2610 "  # ☐
+
+    def post_update(self) -> None:
+        """Re-apply everything that depends on the mounted block tree."""
+        self.normalize_task_lists()
+        self.apply_prose_width()
+
+    def normalize_task_lists(self) -> None:
+        """Turn `• [x] item` into `☑ item`."""
+        try:
+            for bullet in self.query(MarkdownBullet):
+                row = bullet.parent
+                if row is None:
+                    continue
+                for paragraph in row.query(MarkdownParagraph):
+                    content = paragraph.content
+                    text = content.plain if isinstance(content, Content) else str(content)
+                    match = self.TASK_ITEM_RE.match(text)
+                    if match is None:
+                        break
+                    bullet.symbol = self.TASK_CHECKED if match.group(1).lower() == "x" else self.TASK_UNCHECKED
+                    # Slice the marker off instead of re-parsing the text, so
+                    # inline styles (bold, code, links) survive.
+                    paragraph.update(content[match.end() :])
+                    break
+        except Exception:  # never break rendering over a decorative marker
+            pass
 
 
 class CustomMarkdownTableContent(MarkdownTableContent):

@@ -1,12 +1,11 @@
 """Empty-chat welcome block: version, connection state and first-run tips (P2-10)."""
 
 import pytest
-from textual.screen import Screen
 from textual.app import ComposeResult
+from textual.screen import Screen
 from textual.widgets import Static
 
 from app import JohnstonApp
-
 from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
 

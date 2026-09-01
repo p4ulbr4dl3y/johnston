@@ -184,21 +184,42 @@ def format_badge_row(
     prefix: str = "",
     min_gap: int = 2,
     min_title: int = 10,
+    hint: str = "",
 ) -> str:
-    """Format an option row as ``prefix title ...spaces... [dim]badge[/]``.
+    """Format an option row as ``prefix title [dim]hint[/] ...spaces... [dim]badge[/]``.
 
     Title is whitespace-collapsed and truncated (cell-aware) to reserve badge
     space; the title is markup-escaped while the badge is passed through so it
     can carry its own style. An empty badge yields a plain prefix+title row.
+
+    ``hint`` is a muted secondary value shown next to the title — e.g. the raw
+    model id behind a humanized name (`Claude Sonnet 4 5` / `claude-sonnet-4-5`)
+    which is otherwise lost, and which is what people search by (P2-12).
     """
     clean = " ".join(str(title).replace("\n", " ").replace("\r", " ").split())
-    if not badge:
+    hint_clean = " ".join(str(hint).split()) if hint else ""
+    if not badge and not hint_clean:
         return f"{prefix}{escape(clean)}"
-    max_title = max(min_title, target_width - display_width(prefix) - display_width(badge) - min_gap)
+
+    prefix_w = display_width(prefix)
+    badge_w = display_width(badge)
+    # Never let the hint squeeze the title out of the row.
+    hint_budget = max(0, target_width - prefix_w - badge_w - min_title - 2 * min_gap)
+    if hint_clean and display_width(hint_clean) > hint_budget:
+        hint_clean = middle_ellipsize(hint_clean, hint_budget) if hint_budget >= 4 else ""
+    hint_room = display_width(hint_clean) + min_gap if hint_clean else 0
+
+    max_title = max(min_title, target_width - prefix_w - badge_w - hint_room - min_gap)
     if display_width(clean) > max_title:
         clean = ellipsize(clean, max_title)
-    pad = max(min_gap, target_width - display_width(prefix) - display_width(clean) - display_width(badge))
-    return f"{prefix}{escape(clean)}{' ' * pad}[dim]{badge}[/]"
+    pad = max(min_gap, target_width - prefix_w - display_width(clean) - hint_room - badge_w)
+
+    row = f"{prefix}{escape(clean)}"
+    if hint_clean:
+        row += f"{' ' * min_gap}[dim]{escape(hint_clean)}[/]"
+    if badge:
+        row += f"{' ' * pad}[dim]{badge}[/]"
+    return row
 
 
 def fit_row(

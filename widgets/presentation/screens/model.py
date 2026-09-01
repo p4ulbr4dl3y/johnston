@@ -135,6 +135,19 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
             return True
         return False
 
+    @staticmethod
+    def _model_id_hint(display_name: str, model_id: str) -> str:
+        """Raw id when the humanized name hides it; empty when they already match.
+
+        `Claude Sonnet 4 5` says nothing about `claude-sonnet-4-5-20250929`, and
+        the id is what the search box is typed with (P2-12).
+        """
+        if not display_name or not model_id:
+            return ""
+        if display_name.lower().replace(" ", "-") == model_id.lower():
+            return ""
+        return model_id
+
     def _build_data(
         self,
     ) -> Tuple[List[Union[str, Option]], List[Union[Tuple[str, str, str], None]], Union[Tuple[str, str, str], None]]:
@@ -174,7 +187,9 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
                 has_vis = catalog.has_vision(p_key, m)
                 badge = "vision" if has_vis else ""
                 prefix = f"{status_tag('ACTIVE')} " if is_active else "  "
-                opt_label = format_badge_row(clean_m, badge=badge, target_width=target_w, prefix=prefix)
+                opt_label = format_badge_row(
+                    clean_m, badge=badge, target_width=target_w, prefix=prefix, hint=self._model_id_hint(clean_m, m)
+                )
                 item_val = (p_key, m, p_name)
                 options.append(opt_label)
                 items.append(item_val)
