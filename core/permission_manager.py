@@ -163,13 +163,17 @@ class PermissionManager:
 
     def check_permission(self, tool_name: str, args: Optional[Dict[str, Any]] = None) -> PermissionDecision:
         """
-        Evaluates permission for executing a tool against the resolution cascade:
+        Evaluates permission for executing a tool against the resolution cascade
+        (in order, first hit wins):
         1. Runtime session tool override
-        2. Runtime session pattern overrides
-        3. Config pattern rules (fail-closed DENY > ASK > ALLOW)
-        4. Explicit user tool config in config.json
-        5. Active Execution Mode baseline (review / edits / yolo)
+        2. Config pattern rules — an explicit config DENY always wins: a
+           session-scoped allow granted via the confirmation dialog must never
+           bypass an admin-configured DENY
+        3. Runtime session pattern overrides
+        4. Remaining config pattern rules (fail-closed DENY > ASK > ALLOW)
+        5. Explicit user tool config in config.json
         6. Global default fallback (configured 'deny' locks down; junk fails closed to ASK)
+        7. Active Execution Mode baseline (review / edits / yolo)
         """
         canonical_name = self._normalize_name(tool_name)
         # Fail-closed: an empty/absent tool name must never grant execution.
@@ -186,29 +190,23 @@ class PermissionManager:
 
         effective_perms = self.get_effective_permissions()
 
-        # Config deny patterns always win: a session-scoped allow granted via
-        # the confirmation dialog must never bypass an explicit admin-configured
-        # DENY. Session allows may only override config ASK/ALLOW rules.
-        config_patterns = effective_perms.get("patterns", {}).get(canonical_name, [])
-        config_decision = evaluate_pattern_rules(canonical_name, args, config_patterns)
-        if (
-            config_decision is not None
-            and config_decision.action == PermissionAction.DENY
-        ):
+        # 2. Config pattern rules: only an explicit DENY returns here, so a
+        # session allow (3) can override config ASK/ALLOW rules but never DENY.
+        config_decision = evaluate_pattern_rules(
+            canonical_name, args, effective_perms.get("patterns", {}).get(canonical_name, [])
+        )
+        if config_decision is not None and config_decision.action == PermissionAction.DENY:
             return config_decision
 
-        # 2. Runtime session pattern overrides
-        decision = evaluate_pattern_rules(
+        # 3./4. Session pattern overrides, then remaining config pattern rules.
+        session_decision = evaluate_pattern_rules(
             canonical_name, args, self.session_pattern_overrides.get(canonical_name, [])
         )
+        decision = session_decision if session_decision is not None else config_decision
         if decision is not None:
             return decision
 
-        # 3. Pattern rules from config
-        if config_decision is not None:
-            return config_decision
-
-        # 4. Explicit tool permission from user's config file (normalized during merge)
+        # 5. Explicit tool permission from user's config file (normalized during merge)
         explicit_action = effective_perms.get("tools", {}).get(canonical_name)
         if explicit_action is not None:
             return PermissionDecision(
@@ -216,7 +214,7 @@ class PermissionManager:
                 f"Explicit tool permission for '{canonical_name}'",
             )
 
-        # Configured global default: only tightens ('deny') or fails closed;
+        # 6. Configured global default: only tightens ('deny') or fails closed;
         # valid allow/ask fall through to the mode baseline.
         raw_default = effective_perms.get("default")
         if isinstance(raw_default, str):
@@ -232,7 +230,7 @@ class PermissionManager:
                     f"Invalid default configured; fails closed for '{canonical_name}'",
                 )
 
-        # 5. Active Execution Mode baseline
+        # 7. Active Execution Mode baseline
         active_mode = self.execution_mode
         is_mcp = canonical_name not in self.builtin_tool_names
         mode_action = get_mode_baseline_action(active_mode, canonical_name, is_mcp=is_mcp)

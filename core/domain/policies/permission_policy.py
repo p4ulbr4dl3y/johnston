@@ -26,32 +26,25 @@ class ExecutionMode(str, Enum):
     YOLO = "yolo"
 
 
-VALID_EXECUTION_MODES = frozenset(mode.value for mode in ExecutionMode)
-
+# Per-mode tool baselines; the fallback action lives under the 'default' key.
+# YOLO allows everything and needs no table (see get_mode_baseline_action).
+_REVIEW_BASELINE: Dict[str, PermissionAction] = {
+    "create": PermissionAction.ASK,
+    "edit": PermissionAction.ASK,
+    "shell": PermissionAction.ASK,
+    "web_fetch": PermissionAction.ASK,
+    "_mcp": PermissionAction.ASK,
+    "default": PermissionAction.ALLOW,
+}
 MODE_TOOL_BASELINES: Dict[ExecutionMode, Dict[str, PermissionAction]] = {
-    ExecutionMode.REVIEW: {
-        "create": PermissionAction.ASK,
-        "edit": PermissionAction.ASK,
-        "shell": PermissionAction.ASK,
-        "web_fetch": PermissionAction.ASK,
-        "_mcp": PermissionAction.ASK,
-        "default": PermissionAction.ALLOW,
-    },
-    ExecutionMode.EDITS: {
+    ExecutionMode.REVIEW: _REVIEW_BASELINE,
+    # EDITS == REVIEW plus auto-allow for everything except shell.
+    ExecutionMode.EDITS: _REVIEW_BASELINE
+    | {
         "create": PermissionAction.ALLOW,
         "edit": PermissionAction.ALLOW,
-        "shell": PermissionAction.ASK,
         "web_fetch": PermissionAction.ALLOW,
         "_mcp": PermissionAction.ALLOW,
-        "default": PermissionAction.ALLOW,
-    },
-    ExecutionMode.YOLO: {
-        "create": PermissionAction.ALLOW,
-        "edit": PermissionAction.ALLOW,
-        "shell": PermissionAction.ALLOW,
-        "web_fetch": PermissionAction.ALLOW,
-        "_mcp": PermissionAction.ALLOW,
-        "default": PermissionAction.ALLOW,
     },
 }
 
@@ -61,13 +54,10 @@ def normalize_execution_mode(mode: Any, default: ExecutionMode = ExecutionMode.R
     if isinstance(mode, ExecutionMode):
         return mode
     if isinstance(mode, str):
-        cleaned = mode.strip().lower()
-        if cleaned == "edits":
-            return ExecutionMode.EDITS
-        if cleaned == "yolo":
-            return ExecutionMode.YOLO
-        if cleaned == "review":
-            return ExecutionMode.REVIEW
+        try:
+            return ExecutionMode(mode.strip().lower())
+        except ValueError:
+            pass
     return default
 
 
@@ -77,13 +67,11 @@ def get_mode_baseline_action(
     is_mcp: bool = False,
 ) -> PermissionAction:
     """Returns the baseline action for a given tool under the specified execution mode."""
-    canonical = (tool_name or "").strip().lower()
+    if mode is ExecutionMode.YOLO:
+        return PermissionAction.ALLOW
     table = MODE_TOOL_BASELINES.get(mode, MODE_TOOL_BASELINES[ExecutionMode.REVIEW])
-    if is_mcp:
-        return table.get("_mcp", table.get("default", PermissionAction.ALLOW))
-    if canonical in table:
-        return table[canonical]
-    return table.get("default", PermissionAction.ALLOW)
+    key = "_mcp" if is_mcp else (tool_name or "").strip().lower()
+    return table.get(key, table["default"])
 
 
 @dataclass(frozen=True)
@@ -152,6 +140,14 @@ _UNSAFE_SHELL_REGEX = re.compile(
     re.IGNORECASE,
 )
 
+# Command splitter tokens: an escaped char, a quoted span (an unterminated
+# quote swallows the rest, mirroring shell semantics), an '&&' chain, or a
+# single split delimiter (; | & newline). Quoted/escaped tokens never split.
+_SHELL_SPLIT_RE = re.compile(
+    r"\\.|'(?:\\.|[^'\\])*'|'(?:\\.|[^'\\])*|\"(?:\\.|[^\"\\])*\"|\"(?:\\.|[^\"\\])*|&&|[;|&\n]",
+    re.S,
+)
+
 
 def normalize_action(action: str, default: str = "ask") -> str:
     """Normalizes an action to 'allow'/'ask'/'deny'. Invalid values fall back to default."""
@@ -163,77 +159,32 @@ def normalize_action(action: str, default: str = "ask") -> str:
 
 
 def extract_shell_subcommands(cmd: str) -> List[str]:
-    """Splits compound shell commands (&&, ||, ;, |, &) into individual subcommands.
+    """Splits compound shell commands (&&, ||, ;, |, &, newlines) into subcommands.
 
-    Quote-aware: delimiters inside single/double quotes (and backslash-escaped
-    characters) do not split, so ``git commit -m "fix; rm -rf tmp"`` stays a
-    single subcommand instead of producing false ASK/deny fragments.
+    Quote- and escape-aware: delimiters inside quotes (or backslash-escaped) do
+    not split, so ``git commit -m "fix; rm -rf tmp"`` stays a single
+    subcommand, and redirections like ``2>&1`` are kept intact.
     """
     if not cmd or not isinstance(cmd, str):
         return []
     parts: List[str] = []
     buf: List[str] = []
-    quote: Optional[str] = None
-    escaped = False
-    i, n = 0, len(cmd)
-    while i < n:
-        ch = cmd[i]
-        if escaped:
-            buf.append(ch)
-            escaped = False
-            i += 1
-            continue
-        if ch == "\\":
-            buf.append(ch)
-            escaped = True
-            i += 1
-            continue
-        if quote:
-            buf.append(ch)
-            if ch == quote:
-                quote = None
-            i += 1
-            continue
-        if ch in ("'", '"'):
-            quote = ch
-            buf.append(ch)
-            i += 1
-            continue
-        if ch == "\n":
+    pos = 0
+    for m in _SHELL_SPLIT_RE.finditer(cmd):
+        buf.append(cmd[pos : m.start()])
+        tok = m.group()
+        pos = m.end()
+        splits = tok in (";", "|", "\n", "&&")
+        if tok == "&":  # single '&' splits unless part of a redirection (2>&1, >&)
+            prev, nxt = cmd[m.start() - 1 : m.start()], cmd[m.end() : m.end() + 1]
+            splits = prev not in (">", "&") and nxt != ">"
+        if splits:
             parts.append("".join(buf))
             buf = []
-            i += 1
-            continue
-        if ch in (";", "|"):
-            parts.append("".join(buf))
-            buf = []
-            i += 1
-            continue
-        if ch == "&":
-            nxt = cmd[i + 1] if i + 1 < n else ""
-            prev = cmd[i - 1] if i > 0 else ""
-            if nxt == "&":  # '&&' chain delimiter
-                parts.append("".join(buf))
-                buf = []
-                i += 2
-                continue
-            if prev in (">", "&") or nxt == ">":  # keep redirections like 2>&1
-                buf.append(ch)
-                i += 1
-                continue
-            parts.append("".join(buf))
-            buf = []
-            i += 1
-            continue
-        buf.append(ch)
-        i += 1
-    parts.append("".join(buf))
-    cleaned = []
-    for part in parts:
-        stripped = part.strip()
-        if stripped:
-            cleaned.append(stripped)
-    return cleaned
+        else:
+            buf.append(tok)
+    parts.append("".join(buf) + cmd[pos:])
+    return [part for part in (p.strip() for p in parts) if part]
 
 
 def has_unsafe_shell_syntax(cmd: str) -> bool:
@@ -458,16 +409,15 @@ def merge_perms(base: Dict[str, Any], override: Dict[str, Any]) -> None:
     if "patterns" in override and isinstance(override["patterns"], dict):
         if "patterns" not in base or not isinstance(base["patterns"], dict):
             base["patterns"] = {}
-        for t, rule_list in override["patterns"].items():
-            if isinstance(rule_list, list):
-                norm_rules = [
-                    {"pattern": pat, "action": act}
-                    for pat, act in (
-                        (str(r["pattern"]).strip(), normalize_action(str(r.get("action", "ask"))))
-                        for r in rule_list
-                        if isinstance(r, dict) and "pattern" in r
-                    )
-                    if pat
-                ]
-                base["patterns"][t.lower()] = norm_rules
+        for tool, rule_list in override["patterns"].items():
+            if not isinstance(rule_list, list):
+                continue
+            rules = []
+            for r in rule_list:
+                if not isinstance(r, dict) or "pattern" not in r:
+                    continue
+                pat = str(r["pattern"]).strip()
+                if pat:
+                    rules.append({"pattern": pat, "action": normalize_action(str(r.get("action", "ask")))})
+            base["patterns"][tool.lower()] = rules
 
