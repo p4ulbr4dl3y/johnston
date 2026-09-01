@@ -764,6 +764,8 @@ class TestAdapterClientPooling(unittest.TestCase):
         adapter.close()
         self.assertEqual(len(adapter._clients), 0)
 
+
+class TestGeminiThoughtStreaming(unittest.IsolatedAsyncioTestCase):
     async def test_gemini_thought_streaming_order(self):
         import json
         adapter = GeminiAdapter()
