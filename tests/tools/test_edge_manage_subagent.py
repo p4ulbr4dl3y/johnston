@@ -116,7 +116,7 @@ async def test_send_message_to_completed_session_not_crash(sub_tool, store):
         {"action": "send_message", "session_id": "sfin", "message": "again"}, ctx=_ctx(app)
     ))
     assert isinstance(res, str)
-    assert "message sent to sfin" in res
+    assert "[message sent | id sfin]" in res
     assert sess.status in ("running",)
     # Now always async: drain completes the session once the bg stream finishes.
     assert sess.async_task is not None
@@ -134,7 +134,7 @@ async def test_send_message_background_nonblocking_does_not_complete(sub_tool, s
     res = str(await sub_tool.execute(
         {"action": "send_message", "session_id": "sbgn", "message": "bg hi", "background": True}, ctx=_ctx(app)
     ))
-    assert "message sent to sbgn" in res
+    assert "[message sent | id sbgn]" in res
     assert sess.status == "running"  # not finished synchronously
     assert sess.async_task is not None
     if sess.async_task:
@@ -150,7 +150,7 @@ async def test_send_message_default_background_dispatch(sub_tool, store):
     res = str(await sub_tool.execute(
         {"action": "send_message", "session_id": "sdflt", "message": "hi"}, ctx=_ctx(app)
     ))
-    assert "message sent to sdflt" in res
+    assert "[message sent | id sdflt]" in res
     assert sess.status == "running"
     if sess.async_task:
         pending = [t for t in asyncio.all_tasks() if t is sess.async_task]

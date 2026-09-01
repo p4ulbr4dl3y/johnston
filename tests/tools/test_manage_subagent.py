@@ -184,7 +184,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         mock_app.pm = MagicMock()
         mock_app.pm.create_active_agent.return_value = mock_agent
         res = str(await tool.execute({"action": "send_message", "session_id": "sub-sm3", "message": "hello"}, ctx=mock_app))
-        self.assertIn("message sent to sub-sm3", res)
+        self.assertIn("[message sent | id sub-sm3]", res)
         self.assertIsNotNone(sess.agent)
         self.assertEqual(sess.status, "running")
         self.assertIsNotNone(sess.async_task)
@@ -230,7 +230,7 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute(
             {"action": "send_message", "session_id": "sub-bg", "message": "hello bg"}, ctx=mock_app
         ))
-        self.assertIn("message sent to sub-bg", res)
+        self.assertIn("[message sent | id sub-bg]", res)
 
     async def test_kill_missing_session_id(self):
         tool = ManageSubagentTool()
@@ -368,7 +368,7 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
 
         tool = ManageSubagentTool()
         res = str(await tool.execute({"action": "send_message", "session_id": "sub-run", "message": "hi"}, ctx=app))
-        self.assertIn("message sent to sub-run", res)
+        self.assertIn("[message sent | id sub-run]", res)
         spy.mark_running.assert_called_once()
         self.assertIn("sub-run", spy.mark_running.call_args.kwargs.get("text", ""))
 
@@ -410,7 +410,7 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
 
         tool = ManageSubagentTool()
         res = str(await tool.execute({"action": "send_message", "session_id": "sub-noreg", "message": "hi"}, ctx=app))
-        self.assertIn("message sent to sub-noreg", res)
+        self.assertIn("[message sent | id sub-noreg]", res)
 
     async def test_send_message_with_worktree_and_host(self):
         sess = self.store.create_subagent(
@@ -441,7 +441,7 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
             mock_wt.return_value = "/tmp/worktree"
             tool = ManageSubagentTool()
             res = str(await tool.execute({"action": "send_message", "session_id": "sub-wt", "message": "give report"}, ctx=app))
-            self.assertIn("message sent to sub-wt", res)
+            self.assertIn("[message sent | id sub-wt]", res)
             mock_wt.assert_awaited_once_with(sess, parent_dir="/tmp/parent")
 
     async def test_manage_subagent_missing_session_id_self_healing(self):

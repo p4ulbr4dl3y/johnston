@@ -145,7 +145,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget.status, "running")
         widget.mark_cancelled()
         self.assertEqual(widget.status, "cancelled")
-        self.assertIn("interrupted or cancelled", widget.result_text)
+        self.assertIn("[interrupted | tool cancelled]", widget.result_text)
 
     def test_mark_cancelled_noop_when_not_running(self):
         widget = ToolCallWidget("shell", "cmd")

@@ -107,10 +107,10 @@ class TestBaseAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sanitized[1]["role"], "assistant")
         self.assertEqual(sanitized[2]["role"], "tool")
         self.assertEqual(sanitized[2]["tool_call_id"], "call_1")
-        self.assertIn("interrupted or cancelled", sanitized[2]["content"])
+        self.assertEqual(sanitized[2]["content"], "[interrupted | tool read]")
         self.assertEqual(sanitized[3]["role"], "tool")
         self.assertEqual(sanitized[3]["tool_call_id"], "call_2")
-        self.assertIn("interrupted or cancelled", sanitized[3]["content"])
+        self.assertEqual(sanitized[3]["content"], "[interrupted | tool shell]")
         self.assertEqual(sanitized[4]["role"], "user")
         self.assertEqual(sanitized[4]["content"], "Next question")
 

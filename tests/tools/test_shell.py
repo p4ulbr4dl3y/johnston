@@ -227,7 +227,7 @@ async def test_move_to_background_during_sync_execution(tool, make_app_mock, mak
 
         res = await exec_task
         assert "task backgrounded" in res.content
-        assert "Recent Output:\nserver started on port 8080" in res.content
+        assert "server started on port 8080" in res.content
         assert task.is_background
         assert len([t for t in app.task_manager]) == 1
 
@@ -257,7 +257,6 @@ async def test_move_to_background_no_output(tool, make_app_mock, make_tool_conte
         res = await exec_task
         assert "task backgrounded" in res.content
         assert "no output yet" in res.content
-        assert "Recent Output:" not in res.content
 
 
 async def test_move_to_background_truncated_output(tool, make_app_mock, make_tool_context):
@@ -284,7 +283,6 @@ async def test_move_to_background_truncated_output(tool, make_app_mock, make_too
 
         res = await exec_task
         assert "task backgrounded" in res.content
-        assert "Recent Output:" in res.content
         assert "last 2000 chars" in res.content
 
 
@@ -359,8 +357,8 @@ async def test_main_sync_timeout_with_output(tool, make_app_mock, make_tool_cont
     ):
         res = await tool.execute({"command": "tail -f x", "timeout": 1}, ctx=ctx)
         assert "ERR: timeout 'shell': timed out after 1s" in str(res)
-        assert "Partial Output:" in res.content
-        assert "Partial Output:" in res.display
+        assert "last 4000 chars" in res.content
+        assert "last 4000 chars" in res.display
         mock_term.assert_called_once()
 
 

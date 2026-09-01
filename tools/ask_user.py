@@ -143,7 +143,7 @@ class AskUserTool(BaseTool):
         try:
             res = await ctx.ask_user(validated_questions)
             if isinstance(res, str) and res.strip().lower() in ("cancelled", "cancelled by user", "cancelled by user."):
-                return ToolResult.cancelled(content="cancelled by user", display=res)
+                return ToolResult.cancelled(content="[cancelled by user]", display=res)
             return ToolResult.done(content=res or "", display=res or "")
         except asyncio.CancelledError:
             # A real task cancellation (e.g. the agent run being interrupted): clear

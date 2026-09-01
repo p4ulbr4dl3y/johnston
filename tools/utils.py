@@ -97,8 +97,8 @@ def format_line_pagination(
     window_start = window_start if window_start is not None else 1
     effective_window = min(len(lines), DEFAULT_LINE_WINDOW)
     if total_lines == 0:
-        p_info = f"{path}: " if path else ""
-        return ToolResult.done(content=f"[{p_info}empty file]", display="")
+        p_info = f" | {path}" if path else ""
+        return ToolResult.done(content=f"[empty file{p_info}]", display="")
 
     if start_line is not None:
         start_line_int = try_int(start_line)

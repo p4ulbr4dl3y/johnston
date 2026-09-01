@@ -232,7 +232,7 @@ class ShellTool(BaseTool):
                     ).strip()
                     plain_content = (
                         f"[task backgrounded by user | id {task_id} | log {task.log_path} | elapsed {elapsed}s]\n\n"
-                        f"Recent Output:\n{truncated}"
+                        f"{truncated}"
                     )
                 else:
                     plain_content = (
@@ -269,7 +269,7 @@ class ShellTool(BaseTool):
                 except (asyncio.CancelledError, Exception):
                     pass
             raw_out = _truncate_output(task.get_formatted_output()).strip()
-            partial_str = f"\n\nPartial Output:\n{raw_out}" if raw_out else ""
+            partial_str = f"\n\n{raw_out}" if raw_out else ""
             disp = f"ERR: timeout 'shell': timed out after {timeout}s{partial_str}"
             return ToolResult.error("timeout", f"timed out after {timeout}s{partial_str}", name="shell", display=disp)
         except asyncio.CancelledError:

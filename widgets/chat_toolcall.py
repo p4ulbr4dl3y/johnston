@@ -317,9 +317,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.status = "cancelled"
         clean = (self.result_text or "").strip()
         if not clean:
-            self.result_text = "[Tool call interrupted or cancelled]"
-        elif "[Command interrupted" not in clean and "[Tool call" not in clean:
-            self.result_text = f"{clean}\n[Command interrupted by user]"
+            self.result_text = "[interrupted | tool cancelled]"
+        elif "[interrupted" not in clean:
+            self.result_text = f"{clean}\n[interrupted | command cancelled]"
         if not self.is_clickable_header():
             self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
             self.header_label.add_class(TOOL_HEADER)

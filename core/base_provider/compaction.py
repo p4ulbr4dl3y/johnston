@@ -224,7 +224,7 @@ class CompactionMixin:
                                 "role": "tool",
                                 "tool_call_id": missing_id,
                                 "name": fn_name,
-                                "content": f"[Tool call '{fn_name}' execution was interrupted or cancelled]",
+                                "content": f"[interrupted | tool {fn_name}]",
                             }
                         )
                         known_tool_call_ids.add(missing_id)

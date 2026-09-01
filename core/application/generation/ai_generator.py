@@ -469,7 +469,7 @@ async def _handle_interruption(
                     try:
                         session.add_event({
                             "type": "tool",
-                            "result_text": "[Tool call interrupted or cancelled]",
+                            "result_text": "[interrupted | tool cancelled]",
                             "status": "cancelled",
                         })
                     except Exception:  # noqa: BLE001

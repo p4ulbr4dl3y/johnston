@@ -254,11 +254,11 @@ class TestCompactionAndSanitization:
 
         assert tool_res_1["role"] == "tool"
         assert tool_res_1["tool_call_id"] == "call_1"
-        assert "interrupted or cancelled" in tool_res_1["content"]
+        assert tool_res_1["content"] == "[interrupted | tool shell]"
 
         assert tool_res_2["role"] == "tool"
         assert tool_res_2["tool_call_id"] == "call_2"
-        assert "interrupted or cancelled" in tool_res_2["content"]
+        assert tool_res_2["content"] == "[interrupted | tool read_file]"
 
         assert sanitized[4]["content"] == "<system_note>Interrupted</system_note>"
 
@@ -286,7 +286,7 @@ class TestCompactionAndSanitization:
 
         # call_2 got synthetic cancellation
         assert sanitized[3]["tool_call_id"] == "call_2"
-        assert "interrupted or cancelled" in sanitized[3]["content"]
+        assert sanitized[3]["content"] == "[interrupted | tool shell]"
 
     def test_collect_user_messages_skips_interruption_notes(self):
         history = [
@@ -413,7 +413,7 @@ class TestChatToolCallCancellation:
         widget.mark_cancelled()
 
         assert widget.status == "cancelled"
-        assert "interrupted or cancelled" in widget.result_text
+        assert "[interrupted | tool cancelled]" in widget.result_text
         assert widget.is_expandable() is True
 
     def test_mark_cancelled_is_noop_if_not_running(self):
@@ -629,7 +629,7 @@ class TestGeneratorStreamInterruptionFlow:
         assert w.status == "cancelled"
         assert "PASSED test_1.py" in w.result_text
         assert "FAILED test_2.py" in w.result_text
-        assert "[Command interrupted by user]" in w.result_text
+        assert "[interrupted | command cancelled]" in w.result_text
         # Clickable / expandable if output is present
         assert w.is_clickable_header() is True
 
@@ -641,7 +641,7 @@ class TestGeneratorStreamInterruptionFlow:
         w.result_text = ""
         w.mark_cancelled()
         assert w.status == "cancelled"
-        assert w.result_text == "[Tool call interrupted or cancelled]"
+        assert w.result_text == "[interrupted | tool cancelled]"
 
     def test_shell_expand_loads_background_log_file(self, tmp_path):
         from widgets.chat_toolcall import ToolCallWidget

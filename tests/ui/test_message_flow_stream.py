@@ -598,7 +598,7 @@ class TestGenerateStreamEvents(unittest.IsolatedAsyncioTestCase):
                 await pilot.press("escape")
                 await self._wait_not_generating(pilot, app)
         self.assertEqual(app.current_tool_widget.status, "cancelled")
-        self.assertIn("interrupted or cancelled", app.current_tool_widget.result_text)
+        self.assertIn("[interrupted | tool cancelled]", app.current_tool_widget.result_text)
 
     async def test_bot_delta_existing_bot_msg(self):
         async def stream(prompt, attachments=None):

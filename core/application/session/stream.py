@@ -203,7 +203,7 @@ async def _run_single_subagent_message(
         ):
             session.add_event({
                 "type": "tool",
-                "result_text": "[Tool call interrupted or cancelled]",
+                "result_text": "[interrupted | tool cancelled]",
                 "status": "cancelled",
             })
         session.finish(SessionStatus.CANCELLED, "Cancelled by user")
@@ -439,7 +439,7 @@ async def send_subagent_followup(
         session.async_task = bg_task
 
         _mark_subagent_running(ctx.host, session.id, text=f"follow-up sent to {session.id}")
-        return ToolResult.done(f"message sent to {session.id}")
+        return ToolResult.done(f"[message sent | id {session.id}]")
     except Exception as err:
         session.finish(SessionStatus.ERROR, str(err))
         store.save(session)
