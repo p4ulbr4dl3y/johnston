@@ -529,14 +529,15 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                 attempt = 0
                 current_max_tokens = getattr(self, "max_tokens", DEFAULT_MAX_TOKENS)
+                thinking_started = False
+                thinking_t0 = time.time()
+                last_thought_parts = []
                 while True:
                     attempt += 1
                     full_assistant_parts = []
                     active_thought_parts = []
                     step_usage = None
                     tool_calls_dict = {}
-                    thinking_started = False
-                    thinking_t0 = time.time()
                     last_finish_reason = None
 
                     try:
@@ -564,7 +565,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             if tag == "adapter_text":
                                 if thinking_started:
                                     dt = time.time() - thinking_t0
-                                    yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
+                                    thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
+                                    yield ("thinking_end", f"{dt}", thoughts_str)
                                     thinking_started = False
                                 full_assistant_parts.append(payload)
                                 yield ("bot_delta", payload, "")
@@ -578,7 +580,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             elif tag == "adapter_tool_call":
                                 if thinking_started:
                                     dt = time.time() - thinking_t0
-                                    yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
+                                    thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
+                                    yield ("thinking_end", f"{dt}", thoughts_str)
                                     thinking_started = False
                                 idx = len(tool_calls_dict)
                                 tc_id = payload.get("id") or new_tool_call_id(idx)
@@ -592,6 +595,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             elif tag == "adapter_usage":
                                 step_usage = payload
 
+                        if active_thought_parts:
+                            last_thought_parts = active_thought_parts
+
                         # Check for empty response caused by max tokens cutoff
                         is_token_limit = (
                             last_finish_reason is not None
@@ -601,14 +607,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             if is_token_limit or active_thought_parts:
                                 if attempt < max_retries and current_max_tokens < ESCALATED_MAX_TOKENS:
                                     current_max_tokens = min(ESCALATED_MAX_TOKENS, max(current_max_tokens * 2, 65536))
-                                    if thinking_started:
-                                        dt = time.time() - thinking_t0
-                                        yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
-                                        thinking_started = False
-                                    yield (
-                                        "thinking",
-                                        f"Token limit reached during reasoning. Retrying with {current_max_tokens} tokens...",
-                                        "",
+                                    logger.info(
+                                        "Token limit reached during reasoning on attempt %d; escalating max_tokens to %d and retrying...",
+                                        attempt,
+                                        current_max_tokens,
                                     )
                                     continue
                                 raise RuntimeError(
@@ -621,7 +623,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     except asyncio.CancelledError:
                         output_est = (
                             estimate_tokens("".join(full_assistant_parts))
-                            + estimate_tokens("".join(active_thought_parts))
+                            + estimate_tokens("".join(active_thought_parts) or "".join(last_thought_parts))
                             + estimate_tokens(tool_calls_dict)
                         )
                         self._accumulate_usage(
@@ -662,7 +664,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                 output_tokens_est = (
                     estimate_tokens("".join(full_assistant_parts))
-                    + estimate_tokens("".join(active_thought_parts))
+                    + estimate_tokens("".join(active_thought_parts) or "".join(last_thought_parts))
                     + estimate_tokens(tool_calls_dict)
                 )
                 self._accumulate_usage(
@@ -671,7 +673,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                 if thinking_started:
                     dt = time.time() - thinking_t0
-                    yield ("thinking_end", f"{dt}", "".join(active_thought_parts))
+                    thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
+                    yield ("thinking_end", f"{dt}", thoughts_str)
                     thinking_started = False
 
                 if not tool_calls_dict:

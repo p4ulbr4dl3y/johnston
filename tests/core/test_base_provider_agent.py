@@ -850,6 +850,11 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
             steps = [s async for s in agent.stream_steps("Hello")]
 
         self.assertEqual(call_count, 2)
+        thinking_starts = [s for s in steps if s[0] == "thinking_start"]
+        self.assertEqual(len(thinking_starts), 1)
+        thinking_ends = [s for s in steps if s[0] == "thinking_end"]
+        self.assertEqual(len(thinking_ends), 1)
+        self.assertEqual(thinking_ends[0][2], "quick think")
         bot_texts = [s[1] for s in steps if s[0] == "bot_text"]
         self.assertEqual(bot_texts, ["Here is the final answer"])
 

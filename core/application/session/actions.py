@@ -332,6 +332,68 @@ def reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
             setattr(agent, attr, value)
 
 
+def find_selected_user_message(
+    user_msgs: list[tuple[int, str]],
+    selected_child_idx: int,
+) -> tuple[bool, str, int]:
+    """Locate the selected child index in the user-message list.
+
+    Returns ``(found, msg_text, seq_idx)`` where ``seq_idx`` is the position
+    in ``user_msgs`` (0-indexed) of the first message whose child index matches.
+    """
+    found = False
+    msg_text = ""
+    seq_idx = 0
+    for i, (child_idx, text) in enumerate(user_msgs):
+        if child_idx == selected_child_idx:
+            msg_text = text
+            seq_idx = i
+            found = True
+            break
+    return found, msg_text, seq_idx
+
+
+def truncate_agent_history(
+    agent: Any,
+    user_msgs: list[tuple[int, str]],
+    up_to_idx: int,
+) -> None:
+    """Clear or truncate the agent's history up to the selected user message.
+
+    ``up_to_idx == 0`` fully clears history and resets all token counters.
+    Otherwise the tail (the last ``real_tail`` UI-visible turns that map 1:1 to
+    real history messages) is truncated to the selected turn, falling back to a
+    clean slate when the selection falls inside the compacted region. Token
+    counters are reset keeping ``last_context_tokens``.
+    """
+    if up_to_idx == 0:
+        if hasattr(agent, "clear_history"):
+            agent.clear_history()
+        elif hasattr(agent, "history"):
+            agent.history = []
+        reset_token_counters(agent)
+    else:
+        # Map UI sequence index to a history index: the last ``real_tail``
+        # visible user turns map 1:1 to real (non-checkpoint, non-note) user
+        # messages in history, so only the tail can be truncated by index.
+        # A selection inside the compacted region cannot be restored from
+        # history and is rolled back to a clean slate.
+        real_tail = count_history_user_turns(agent.history) if (agent and hasattr(agent, "history")) else 0
+        tail_start = len(user_msgs) - real_tail
+        if up_to_idx >= tail_start:
+            truncate_idx = max(0, up_to_idx - tail_start)
+            if hasattr(agent, "truncate_history_to_user_message"):
+                agent.truncate_history_to_user_message(truncate_idx)
+            elif hasattr(agent, "history"):
+                agent.history = []
+        else:
+            if hasattr(agent, "clear_history"):
+                agent.clear_history()
+            elif hasattr(agent, "history"):
+                agent.history = []
+        reset_token_counters(agent, reset_context=False)
+
+
 def _touched_files(user_events: list[dict], seq_idx: int) -> Optional[list[str]]:
     """Sorted files touched from turn ``seq_idx`` onward, or None when untracked.
 
@@ -543,46 +605,13 @@ def rewind_session(
     * Reset token counters.
     * Restore Git checkpoints in background if ``restore_git=True``.
     """
-    found = False
-    msg_text = ""
-    seq_idx = 0
-    for i, (child_idx, text) in enumerate(user_msgs):
-        if child_idx == selected_child_idx:
-            msg_text = text
-            seq_idx = i
-            found = True
-            break
+    found, msg_text, seq_idx = find_selected_user_message(user_msgs, selected_child_idx)
     if not found and user_msgs:
         logger.warning("Selected child index %s not in user messages", selected_child_idx)
         return
 
     # Agent history: full clear or truncate
-    if seq_idx == 0:
-        if hasattr(agent, "clear_history"):
-            agent.clear_history()
-        elif hasattr(agent, "history"):
-            agent.history = []
-        reset_token_counters(agent)
-    else:
-        # Map UI sequence index to a history index: the last ``real_tail``
-        # visible user turns map 1:1 to real (non-checkpoint, non-note) user
-        # messages in history, so only the tail can be truncated by index.
-        # A selection inside the compacted region cannot be restored from
-        # history and is rolled back to a clean slate.
-        real_tail = count_history_user_turns(agent.history) if (agent and hasattr(agent, "history")) else 0
-        tail_start = len(user_msgs) - real_tail
-        if seq_idx >= tail_start:
-            truncate_idx = max(0, seq_idx - tail_start)
-            if hasattr(agent, "truncate_history_to_user_message"):
-                agent.truncate_history_to_user_message(truncate_idx)
-            elif hasattr(agent, "history"):
-                agent.history = []
-        else:
-            if hasattr(agent, "clear_history"):
-                agent.clear_history()
-            elif hasattr(agent, "history"):
-                agent.history = []
-        reset_token_counters(agent, reset_context=False)
+    truncate_agent_history(agent, user_msgs, seq_idx)
 
     # Collect touched files to restore before truncating transcript
     files_to_restore: Optional[list[str]] = None

@@ -7,13 +7,13 @@ from typing import Any
 
 from core.application.session.actions import (
     compact_session,
+    find_selected_user_message,
     get_rewind_git_stats,
     new_session,
-    reset_token_counters,
     rewind_session,
+    truncate_agent_history,
 )
 from core.application.session.auto_title import clean_heuristic_title
-from core.domain.policies.messages import count_history_user_turns
 from core.domain.policies.session_naming import FORK_BASE_MAX_LEN
 from widgets.chat_input import ChatInput
 from widgets.presentation.commands.base import BaseCommand
@@ -372,15 +372,7 @@ class ForkCommand(BaseCommand):
                 # No branch point: the store falls back to the parent title.
                 fork_base: str | None = None
             else:
-                found = False
-                msg_text = ""
-                seq_idx = 0
-                for i, (child_idx, text) in enumerate(user_msgs):
-                    if child_idx == selected_child_idx:
-                        msg_text = text
-                        seq_idx = i
-                        found = True
-                        break
+                found, msg_text, seq_idx = find_selected_user_message(user_msgs, selected_child_idx)
 
                 if not found:
                     app.query_one(MESSAGE_INPUT).focus()
@@ -446,27 +438,7 @@ class ForkCommand(BaseCommand):
 
                 agent = getattr(app, "agent", None)
                 if agent:
-                    if up_to_idx == 0:
-                        if hasattr(agent, "clear_history"):
-                            agent.clear_history()
-                        elif hasattr(agent, "history"):
-                            agent.history = []
-                        reset_token_counters(agent)
-                    else:
-                        real_tail = count_history_user_turns(agent.history) if hasattr(agent, "history") else 0
-                        tail_start = len(user_msgs) - real_tail
-                        if up_to_idx >= tail_start:
-                            truncate_idx = max(0, up_to_idx - tail_start)
-                            if hasattr(agent, "truncate_history_to_user_message"):
-                                agent.truncate_history_to_user_message(truncate_idx)
-                            elif hasattr(agent, "history"):
-                                agent.history = []
-                        else:
-                            if hasattr(agent, "clear_history"):
-                                agent.clear_history()
-                            elif hasattr(agent, "history"):
-                                agent.history = []
-                        reset_token_counters(agent, reset_context=False)
+                    truncate_agent_history(agent, user_msgs, up_to_idx)
 
             if hasattr(app, "refresh_status_footer"):
                 app.refresh_status_footer()
