@@ -37,6 +37,17 @@ def _parse_token(tok_key: Any) -> Any:
     return tok_key
 
 
+def _is_ansi(bg_app: str, name: str) -> bool:
+    """Return True when the theme uses ANSI/native terminal colors."""
+    return bg_app in ("ansi_default", "transparent") or name == "native"
+
+
+def is_ansi_theme(theme: Theme) -> bool:
+    """Return True if the theme is an ANSI/native theme (uses terminal colors)."""
+    bg_app = theme.tcss_vars.get("bg-app", "#09090b")
+    return _is_ansi(bg_app, theme.name)
+
+
 @dataclass(frozen=True)
 class Theme:
     """Canonical theme specification for UI and syntax rendering."""
@@ -121,9 +132,7 @@ class Theme:
                 tcss_vars[palette_key] = palette_val
         if "bg-overlay" not in tcss_vars:
             bg_app = tcss_vars.get("bg-app", "#09090b")
-            tcss_vars["bg-overlay"] = (
-                "transparent" if (bg_app in ("ansi_default", "transparent") or name == "native") else "#000000 45%"
-            )
+            tcss_vars["bg-overlay"] = "transparent" if _is_ansi(bg_app, name) else "#000000 45%"
 
         var_map: dict[str, str] = {
             "primary": primary,

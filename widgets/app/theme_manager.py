@@ -7,7 +7,7 @@ from typing import Optional
 from textual.theme import Theme as TextualTheme
 
 from core.domain.defaults.themes import ZINC_DARK
-from core.domain.entities.theme import Theme
+from core.domain.entities.theme import Theme, is_ansi_theme
 from core.theme_manager import ThemeManager as CoreThemeManager
 
 
@@ -26,8 +26,7 @@ class ThemeManager(CoreThemeManager):
         """Return theme adapted to runtime terminal environment if applicable."""
         theme = theme_or_name if isinstance(theme_or_name, Theme) else self._themes.get(theme_or_name, ZINC_DARK)
         tcss_vars = dict(theme.tcss_vars)
-        bg_app = tcss_vars.get("bg-app", "#09090b")
-        is_ansi = bg_app in ("ansi_default", "transparent") or theme.name == "native"
+        is_ansi = is_ansi_theme(theme)
         if not is_ansi:
             return theme
 
@@ -76,7 +75,7 @@ class ThemeManager(CoreThemeManager):
         adapted = self.get_adapted_theme(theme_or_name)
         tcss_vars = dict(adapted.tcss_vars)
         bg_app = tcss_vars.get("bg-app", "#09090b")
-        is_ansi = bg_app in ("ansi_default", "transparent") or adapted.name == "native"
+        is_ansi = is_ansi_theme(adapted)
         return TextualTheme(
             name=adapted.name,
             primary=adapted.primary,

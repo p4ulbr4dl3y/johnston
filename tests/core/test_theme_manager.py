@@ -4,7 +4,7 @@ import pytest
 from pygments.token import Token
 
 from core.domain.defaults.themes import list_themes
-from core.domain.entities.theme import Theme
+from core.domain.entities.theme import Theme, is_ansi_theme
 from widgets.app.theme_manager import ThemeManager
 
 
@@ -380,7 +380,7 @@ def test_builtin_themes_wcag_contrast():
     themes = list_themes()
     for theme in themes:
         bg = theme.tcss_vars.get("bg-app", "#000000")
-        if bg in ("ansi_default", "transparent") or theme.name == "native":
+        if is_ansi_theme(theme):
             continue
         surface = theme.tcss_vars.get("bg-surface", bg)
 
@@ -476,6 +476,29 @@ def test_dynamic_diff_and_tool_colors():
         assert curr.muted in sep_compact
     finally:
         tm.set_theme(prev_theme.name)
+
+
+def _make_theme(name: str = "custom", bg_app: str = "#09090b") -> Theme:
+    return Theme(
+        name=name,
+        label=name,
+        tcss_vars={"bg-app": bg_app},
+    )
+
+
+def test_is_ansi_theme_returns_true_for_ansi_bg():
+    assert is_ansi_theme(_make_theme(bg_app="ansi_default")) is True
+    assert is_ansi_theme(_make_theme(bg_app="transparent")) is True
+
+
+def test_is_ansi_theme_returns_true_for_native_name():
+    assert is_ansi_theme(_make_theme(name="native")) is True
+    assert is_ansi_theme(_make_theme(name="native", bg_app="#ffffff")) is True
+
+
+def test_is_ansi_theme_returns_false_for_regular_theme():
+    assert is_ansi_theme(_make_theme(name="zinc")) is False
+    assert is_ansi_theme(_make_theme(name="charcoal", bg_app="#18181b")) is False
 
 
 
