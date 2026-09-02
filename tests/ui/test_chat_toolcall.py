@@ -908,6 +908,17 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertNotIn("ctrl+b", label_bg)
         self.assertIn("ctrl+o", label_bg)
 
+        # 5. Shell running inside subagent screen -> no ctrl+b
+        w_sub = self._widget("shell", "pytest")
+        fake_screen = unittest.mock.MagicMock()
+        type(fake_screen).__name__ = "SubagentViewScreen"
+        with patch.object(type(w_sub), "screen", new_callable=unittest.mock.PropertyMock) as mock_screen:
+            mock_screen.return_value = fake_screen
+            w_sub.mark_running()
+            label_sub = str(w_sub.header_label.render())
+            self.assertNotIn("ctrl+b", label_sub)
+            self.assertIn("ctrl+o", label_sub)
+
     def test_thinking_widget_hints(self):
         from widgets.presentation.widgets.chat_messages import ThinkingWidget
 

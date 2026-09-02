@@ -8,7 +8,6 @@ from typing import Any, Callable
 from rich.text import Text
 
 from widgets.presentation.widgets.chat_diff import format_edit_diff
-from widgets.presentation.widgets.chat_markdown import TransparentSyntax, get_current_syntax_theme
 
 
 def clean_truncation_marker(match: re.Match) -> str:
@@ -256,43 +255,19 @@ def compute_tool_call_content(
                 "@@" in raw_text
                 or "--- a/" in raw_text
                 or "+++ b/" in raw_text
-                or " updated " in raw_text
-                or " updated (" in raw_text
             ):
                 diff_text = raw_text
-                if "@@" not in diff_text and "--- a/" not in diff_text:
-                    content = args.get("content") or ""
-                    diff_text = build_synthetic_create_diff(file_path, content)
-                formatted_diff = format_edit_diff(clean_hints(diff_text), file_path)
-                return "raw", formatted_diff
-            content = args.get("content")
-            if content is None:
-                from widgets.utils.file_reader import read_file_content
+            else:
+                content = args.get("content")
+                if content is None:
+                    from widgets.utils.file_reader import read_file_content
 
-                content = read_file_content(file_path)
-            if content is None and raw_text:
-                content = raw_text
-
-            if content is not None:
-                content = content.rstrip("\r\n")
-                lexer = guess_lexer(file_path)
-                try:
-                    from widgets.app.theme_manager import theme_manager
-
-                    curr_theme = getattr(theme_manager, "current_theme", None)
-                    is_dark = getattr(curr_theme, "dark", True) if curr_theme else True
-                    syntax_theme = get_current_syntax_theme(dark=is_dark)
-                    syntax = TransparentSyntax(
-                        content,
-                        lexer,
-                        theme=syntax_theme,
-                        line_numbers=True,
-                        word_wrap=True,
-                        background_color="default",
-                    )
-                    return "raw", syntax
-                except Exception:
-                    return "raw", format_code_with_line_numbers(content)
+                    content = read_file_content(file_path)
+                if content is None and raw_text and not raw_text.startswith(("Success:", "OK:", "created", "updated")):
+                    content = raw_text
+                diff_text = build_synthetic_create_diff(file_path, content or "")
+            if diff_text:
+                return "raw", format_edit_diff(clean_hints(diff_text), file_path)
             return "markup", clean_markup(result_text or "(No content)")
         elif tool_type == "edit":
             raw_text = (result_text or "").strip()

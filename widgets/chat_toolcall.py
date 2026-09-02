@@ -380,7 +380,25 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
         hints: list[str] = []
         if self.status == "running":
-            if self.canonical_tool == "shell" and not getattr(self, "background_task_id", None):
+            is_subagent = False
+            try:
+                if self.screen and type(self.screen).__name__ == "SubagentViewScreen":
+                    is_subagent = True
+            except Exception:
+                pass
+            if not is_subagent:
+                try:
+                    for node in getattr(self, "ancestors_with_self", []):
+                        if (
+                            getattr(node, "id", None) == "subagent-chat-view"
+                            or type(node).__name__ == "SubagentViewScreen"
+                        ):
+                            is_subagent = True
+                            break
+                except Exception:
+                    pass
+
+            if not is_subagent and self.canonical_tool == "shell" and not getattr(self, "background_task_id", None):
                 hints.append("ctrl+b to bg")
             if self.is_expandable():
                 action = "to collapse" if self.is_expanded else "to expand"

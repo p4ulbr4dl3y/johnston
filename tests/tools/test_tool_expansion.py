@@ -4,7 +4,6 @@ import unittest
 from unittest.mock import MagicMock
 
 from rich.console import Console
-from rich.syntax import Syntax
 from rich.text import Text
 from textual._context import active_app
 
@@ -45,8 +44,8 @@ class TestToolExpansion(unittest.TestCase):
         self.assertTrue(widget.is_expanded)
         self.assertIn("●", str(widget.header_label.render()))
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Syntax)
-        self.assertEqual(content.lexer.name, "Python")
+        self.assertIsInstance(content, DiffRenderable)
+        self.assertIn("def foo():", content._text.plain)
 
         widget.toggle_expanded()
         self.assertFalse(widget.is_expanded)
@@ -281,8 +280,8 @@ class TestToolExpansion(unittest.TestCase):
         )
         widget.toggle_expanded()
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Syntax)
-        self.assertEqual(content.code, "<html>\n<body>\n</body>\n</html>")
+        self.assertIsInstance(content, DiffRenderable)
+        self.assertIn("<html>", content._text.plain)
 
     def test_create_tool_content_from_disk_fallback(self):
         file_path = os.path.join(self.test_dir, "saved_file.py")
@@ -297,7 +296,8 @@ class TestToolExpansion(unittest.TestCase):
         widget.toggle_expanded()
         self.assertTrue(widget.is_expanded)
         content = getattr(widget.content_widget, "_Static__content")
-        self.assertIsInstance(content, Syntax)
+        self.assertIsInstance(content, DiffRenderable)
+        self.assertIn("print('from disk')", content._text.plain)
 
     def test_guess_lexer(self):
         widget = ToolCallWidget(tool_type="create", target="script.sh")
