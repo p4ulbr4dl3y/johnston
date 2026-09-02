@@ -421,7 +421,9 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
 
         hint = AttachmentHint()
         self.assertIn("ctrl+d", str(hint.render()))
-        self.assertIn("Detach", str(hint.render()))
+        self.assertIn("to detach", str(hint.render()))
+        self.assertIn("(", str(hint.render()))
+        self.assertIn(")", str(hint.render()))
 
         # Test single chip click calls remove_clipboard_attachment
         mock_ci = MagicMock()

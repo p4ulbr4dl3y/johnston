@@ -44,11 +44,10 @@ class AttachmentHint(Static):
     ALLOW_SELECT = False
 
     def __init__(self, *args, **kwargs) -> None:
-        from widgets.presentation.widgets.footer_layout import format_hint, get_theme_colors
+        from widgets.presentation.widgets.footer_layout import get_theme_colors
 
-        _, _, t_muted, _ = get_theme_colors()
-        hint = format_hint("ctrl+d Detach")
-        text = f"[{t_muted}]•[/] {hint}"
+        _, t_secondary, t_muted, _ = get_theme_colors()
+        text = f"[{t_muted}]([{t_secondary}]ctrl+d[/] [{t_muted}]to detach)[/]"
         super().__init__(text, *args, **kwargs)
 
 
