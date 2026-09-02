@@ -12,6 +12,7 @@ from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
 from core.infrastructure.config.settings import get_settings
+from core.infrastructure.tasks.output import strip_ansi
 from widgets.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 from widgets.presentation.tool_mixins import FormattingMixin, ParsingMixin
 from widgets.presentation.tool_renderers import compute_tool_call_content, format_truncation_for_ui
@@ -164,7 +165,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return ""
         clean = self._clean_hints_for_ui(text)
         if "\x1b" in clean:
-            clean = re.sub(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", clean)
+            clean = strip_ansi(clean)
         return clean
 
     def _is_parent_at_bottom(self) -> bool:

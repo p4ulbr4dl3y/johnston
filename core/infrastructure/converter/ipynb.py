@@ -1,10 +1,8 @@
 import json
-import re
 from typing import Any, Dict, List, Union
 
 from core.infrastructure.converter.utils import collapse_blank_lines, fenced_code_block
-
-_ANSI_ESCAPE_RE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+from core.infrastructure.tasks.output import strip_ansi
 
 
 def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
@@ -78,7 +76,7 @@ def ipynb_to_markdown(ipynb_input: Union[str, bytes, Dict[str, Any]]) -> str:
                 elif out_type == "error":
                     tb = out.get("traceback", [])
                     tb_str = "\n".join(str(line) for line in tb if line is not None) if isinstance(tb, list) else _as_text(tb)
-                    clean_tb = _ANSI_ESCAPE_RE.sub("", tb_str)
+                    clean_tb = strip_ansi(tb_str)
                     if clean_tb.strip():
                         out_texts.append(fenced_code_block(clean_tb.strip(), lang="output"))
                     elif out.get("evalue"):
