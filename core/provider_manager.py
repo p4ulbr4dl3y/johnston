@@ -315,6 +315,12 @@ class ProviderManager:
                 return None
         return None
 
+    def provider_needs_key(self, provider_key: str, pdef: ProviderDef) -> bool:
+        """True when the provider requires an API key (not local/keyless)."""
+        return pdef.requires_key is not False and not is_local_provider(
+            provider_key, pdef.api_type, pdef.base_url, pdef.requires_key
+        )
+
     def get_catalog_providers(self) -> Dict[str, Dict[str, Any]]:
         """Returns all providers discovered dynamically from models.dev catalog."""
         return catalog.get_discovered_providers()
@@ -511,9 +517,7 @@ class ProviderManager:
 
         base_url = pdef.base_url
         api_key = self.get_api_key(provider_key) or pdef.api_key
-        needs_key = pdef.requires_key is not False and not is_local_provider(
-            provider_key, pdef.api_type, pdef.base_url, pdef.requires_key
-        )
+        needs_key = self.provider_needs_key(provider_key, pdef)
 
         # If provider has explicit static models list, return it directly
         if pdef.models:

@@ -10,7 +10,7 @@ import logging
 from typing import Any, Dict, Tuple
 
 from core.infrastructure.runtime.background import spawn_background_task
-from core.provider_manager import ProviderManager, is_local_provider
+from core.provider_manager import ProviderManager
 
 logger = logging.getLogger(__name__)
 
@@ -88,9 +88,7 @@ def set_provider_credentials(
     pdef = pm.load_provider_def(provider_key)
     if pdef is None:
         return False
-    needs_key = pdef.requires_key is not False and not is_local_provider(
-        provider_key, pdef.api_type, pdef.base_url, pdef.requires_key
-    )
+    needs_key = pm.provider_needs_key(provider_key, pdef)
     if needs_key and not pm.get_api_key(provider_key):
         return False
     if not pdef.enabled:

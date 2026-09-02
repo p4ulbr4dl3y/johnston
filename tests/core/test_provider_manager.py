@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from core.domain.entities.provider import ProviderDef
 from core.models_catalog import catalog
 from core.provider_manager import ProviderManager
 
@@ -25,6 +26,22 @@ def pm(tmp_path, monkeypatch):
 def _write(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
+
+
+def test_provider_needs_key_requires_key_true(pm):
+    pdef = ProviderDef(key="anthropic", requires_key=True, api_type="anthropic", base_url="")
+    assert pm.provider_needs_key("anthropic", pdef) is True
+
+
+def test_provider_needs_key_requires_key_false(pm):
+    pdef = ProviderDef(key="local", requires_key=False, api_type="openai", base_url="http://localhost:8000")
+    assert pm.provider_needs_key("local", pdef) is False
+
+
+def test_provider_needs_key_local_provider(pm):
+    # requires_key=None but api_type/base_url indicate a local server -> no key needed
+    pdef = ProviderDef(key="ollama", requires_key=None, api_type="openai", base_url="http://localhost:11434")
+    assert pm.provider_needs_key("ollama", pdef) is False
 
 
 class TestProviderManager(unittest.TestCase):
