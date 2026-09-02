@@ -84,12 +84,23 @@ class LifecycleMixin:
 
         catalog.load_cache()
         self.refresh_status_footer()
+
+        async def _refresh_catalog_bg() -> None:
+            try:
+                await catalog.refresh(force=False)
+            except Exception:
+                pass
+
         if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
             self.create_tracked_task(get_mcp_manager().ensure_tools_ready_async())
             self.create_tracked_task(self._check_initial_setup())
+            if not os.environ.get("PYTEST_CURRENT_TEST"):
+                self.create_tracked_task(_refresh_catalog_bg())
         else:
             asyncio.create_task(get_mcp_manager().ensure_tools_ready_async())
             asyncio.create_task(self._check_initial_setup())
+            if not os.environ.get("PYTEST_CURRENT_TEST"):
+                asyncio.create_task(_refresh_catalog_bg())
 
     async def _check_initial_setup(self) -> None:
         """Auto-prompt for provider/model selection on first launch if unconfigured"""
