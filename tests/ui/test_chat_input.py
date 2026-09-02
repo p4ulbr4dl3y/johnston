@@ -970,6 +970,85 @@ class TestChatInputKeyboardScroll(unittest.IsolatedAsyncioTestCase):
             await ci._on_key(event)  # must not raise
 
 
+class TestChatInputHelpAndShellMode(unittest.IsolatedAsyncioTestCase):
+    async def test_typing_question_mark_opens_help_modal(self):
+        from widgets.presentation.screens.help import HelpScreen
+
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+
+        with patch.object(ci.app, "push_screen") as push_mock:
+            event = Key("?", "?")
+            event.character = "?"
+            event.prevent_default = MagicMock()
+            event.stop = MagicMock()
+            await ci._on_key(event)
+
+            push_mock.assert_called_once()
+            screen = push_mock.call_args[0][0]
+            self.assertIsInstance(screen, HelpScreen)
+            event.prevent_default.assert_called_once()
+            event.stop.assert_called_once()
+
+    async def test_typing_bang_enters_shell_mode(self):
+        from widgets.chat_input import DEFAULT_SHELL_PLACEHOLDER
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+
+        self.assertFalse(ci.is_shell_mode)
+        event = Key("!", "!")
+        event.character = "!"
+        event.prevent_default = MagicMock()
+        event.stop = MagicMock()
+        await ci._on_key(event)
+
+        self.assertTrue(ci.is_shell_mode)
+        self.assertEqual(ci.placeholder, DEFAULT_SHELL_PLACEHOLDER)
+        self.assertEqual(ci.text, "")
+        event.prevent_default.assert_called_once()
+        event.stop.assert_called_once()
+
+    async def test_backspace_on_empty_exits_shell_mode(self):
+        from widgets.chat_input import DEFAULT_PLACEHOLDER
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+
+        ci.set_shell_mode(True)
+        self.assertTrue(ci.is_shell_mode)
+
+        event = Key("backspace", "backspace")
+        event.prevent_default = MagicMock()
+        event.stop = MagicMock()
+        await ci._on_key(event)
+
+        self.assertFalse(ci.is_shell_mode)
+        self.assertEqual(ci.placeholder, DEFAULT_PLACEHOLDER)
+        event.prevent_default.assert_called_once()
+
+    async def test_enter_submits_with_bang_prefix_and_resets(self):
+        ci, ctx = _app_context()
+        await ctx.__aenter__()
+        self.addAsyncCleanup(ctx.__aexit__, None, None, None)
+
+        ci.set_shell_mode(True)
+        ci.load_text("git status")
+
+        posted = []
+        ci.post_message = posted.append
+
+        event = Key("enter", "enter")
+        event.prevent_default = MagicMock()
+        event.stop = MagicMock()
+        await ci._on_key(event)
+
+        self.assertFalse(ci.is_shell_mode)
+        self.assertEqual(len(posted), 1)
+        self.assertEqual(posted[0].value, "!git status")
+
+
 def _app_context():
     ci = ChatInput()
     ctx = DummyChatApp(ci).run_test()

@@ -138,6 +138,11 @@ WelcomeWidget {
     color: $primary;
 }
 
+.user-msg-prefix-shell {
+    color: $primary;
+    text-style: bold;
+}
+
 .user-msg-bubble {
     width: 1fr;
     height: auto;

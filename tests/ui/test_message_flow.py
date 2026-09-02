@@ -199,3 +199,65 @@ class TestTriggerAiResponse(unittest.IsolatedAsyncioTestCase):
             app.trigger_ai_response("hello")
             self.assertTrue(app.is_generating)
             app.generate_ai_response.assert_called_once_with("hello", show_in_ui=False)
+
+
+class TestShellModeFlow(unittest.IsolatedAsyncioTestCase):
+    async def test_shell_command_empty_notifies(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.notify = MagicMock()
+            event = MagicMock()
+            event.value = "!"
+            event.attachments = []
+            await app.on_chat_input_submitted(event)
+            app.notify.assert_called_once_with("No shell command specified", severity="warning")
+
+    async def test_shell_command_generating_queues(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = True
+            app._queue_message_ui = MagicMock()
+            event = MagicMock()
+            event.value = "!echo 123"
+            event.attachments = []
+            await app.on_chat_input_submitted(event)
+            app._queue_message_ui.assert_called_once_with("!echo 123", show_in_ui=True, attachments=[])
+
+    async def test_shell_command_dispatches_exec(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            app._exec_shell_command = unittest.mock.AsyncMock()
+            event = MagicMock()
+            event.value = "!ls -la"
+            event.attachments = []
+            await app.on_chat_input_submitted(event)
+            # Give the created task a tick
+            await asyncio.sleep(0.01)
+            app._exec_shell_command.assert_awaited_once_with("ls -la", user_text="!ls -la")
+
+    async def test_exec_shell_command_success(self):
+        from core.domain.defaults.errors import ToolResult
+        app = JohnstonApp()
+        async with app.run_test():
+            mock_res = ToolResult.done(content="file1\nfile2", display="file1\nfile2", returncode=0)
+            with patch("tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
+                mock_exec.return_value = mock_res
+                await app._exec_shell_command("ls", user_text="!ls")
+                mock_exec.assert_awaited_once()
+
+    async def test_exec_shell_command_error_handled(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            with patch("tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
+                mock_exec.side_effect = RuntimeError("command failure")
+                await app._exec_shell_command("badcmd", user_text="!badcmd")
+                mock_exec.assert_awaited_once()
+
+    async def test_process_queued_message_shell(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app._exec_shell_command = unittest.mock.AsyncMock()
+            await app._process_queued_message("!pytest")
+            await asyncio.sleep(0.01)
+            app._exec_shell_command.assert_awaited_once_with("pytest", user_text="!pytest")

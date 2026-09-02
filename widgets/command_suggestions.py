@@ -157,7 +157,16 @@ class CommandSuggestions(HeaderWrapOptionList):
         check_text = current_line[:cursor_col] if cursor_col is not None else current_line or full_text
 
         # 1. Check for slash command at any position (/command or /skill)
-        slash_idx = check_text.rfind("/")
+        is_shell = False
+        try:
+            if self.app:
+                from widgets.chat_input import ChatInput
+                ci = self.app.query_one(MESSAGE_INPUT, ChatInput)
+                is_shell = getattr(ci, "is_shell_mode", False)
+        except Exception:
+            pass
+
+        slash_idx = check_text.rfind("/") if not is_shell else -1
         if slash_idx != -1:
             if slash_idx == 0 or check_text[slash_idx - 1] in " \t\n":
                 query_part = check_text[slash_idx:]

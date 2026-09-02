@@ -37,10 +37,14 @@ class ClipboardAttachment:
         self.path = path
 
 
-DEFAULT_PLACEHOLDER = "Type a message, / for commands, @ for files, Ctrl+V for images..."
-COMPACT_PLACEHOLDER = "Type message, / cmds, @ files, Ctrl+V img..."
+DEFAULT_PLACEHOLDER = "Type a message (? help, / cmds)..."
+COMPACT_PLACEHOLDER = "Type message (? help, / cmds)..."
 NARROW_PLACEHOLDER = "Type a message..."
 FORK_PLACEHOLDER = "Type a message to fork & continue..."
+
+DEFAULT_SHELL_PLACEHOLDER = "! git status, pytest (esc to exit)..."
+COMPACT_SHELL_PLACEHOLDER = "! command (esc to exit)..."
+NARROW_SHELL_PLACEHOLDER = "! (esc to exit)..."
 
 
 def get_placeholder_for_width(width: int) -> str:
@@ -50,6 +54,15 @@ def get_placeholder_for_width(width: int) -> str:
     if width < BREAKPOINT_COMPACT:
         return COMPACT_PLACEHOLDER
     return DEFAULT_PLACEHOLDER
+
+
+def get_shell_placeholder_for_width(width: int) -> str:
+    """Return responsive shell mode placeholder text based on width."""
+    if width < BREAKPOINT_BANNER:
+        return NARROW_SHELL_PLACEHOLDER
+    if width < BREAKPOINT_COMPACT:
+        return COMPACT_SHELL_PLACEHOLDER
+    return DEFAULT_SHELL_PLACEHOLDER
 
 
 class ChatInput(TextArea):
@@ -87,6 +100,18 @@ class ChatInput(TextArea):
         self.prompt_history: list[str] = self.load_prompt_history()
         self.prompt_history_index: int = len(self.prompt_history)
         self.prompt_draft: str = ""
+        self.is_shell_mode: bool = False
+
+    def set_shell_mode(self, enabled: bool) -> None:
+        """Toggle shell mode state and update placeholder / styling."""
+        if self.is_shell_mode == enabled:
+            return
+        self.is_shell_mode = enabled
+        if enabled:
+            self.add_class("shell-mode")
+        else:
+            self.remove_class("shell-mode")
+        self.update_placeholder()
 
     def load_prompt_history(self) -> list[str]:
         """Load global prompt history from disk"""
@@ -120,13 +145,25 @@ class ChatInput(TextArea):
 
     def update_placeholder(self, width: int | None = None) -> None:
         """Update placeholder responsively unless a custom placeholder is set."""
+        if self.is_shell_mode:
+            w = width if width is not None else resolve_width(self)
+            self.placeholder = get_shell_placeholder_for_width(w)
+            return
         try:
             if getattr(self.app, "is_read_only", False):
                 self.placeholder = FORK_PLACEHOLDER
                 return
         except Exception:
             pass
-        if self.placeholder not in (DEFAULT_PLACEHOLDER, COMPACT_PLACEHOLDER, NARROW_PLACEHOLDER, ""):
+        if self.placeholder not in (
+            DEFAULT_PLACEHOLDER,
+            COMPACT_PLACEHOLDER,
+            NARROW_PLACEHOLDER,
+            DEFAULT_SHELL_PLACEHOLDER,
+            COMPACT_SHELL_PLACEHOLDER,
+            NARROW_SHELL_PLACEHOLDER,
+            "",
+        ):
             return
         w = width if width is not None else resolve_width(self)
         self.placeholder = get_placeholder_for_width(w)
@@ -623,6 +660,33 @@ class ChatInput(TextArea):
         except Exception:
             pass
 
+        # Open Help modal when typing ? into empty input
+        if not self.is_shell_mode and not self.text:
+            if getattr(event, "character", "") == "?" or event.key in ("?", "question_mark"):
+                if self.app and hasattr(self.app, "push_screen"):
+                    from widgets.presentation.screens.help import HelpScreen
+
+                    self.app.push_screen(HelpScreen())
+                event.prevent_default()
+                event.stop()
+                return
+
+        # Toggle Shell mode when typing ! into empty input
+        if not self.is_shell_mode and not self.text:
+            if getattr(event, "character", "") == "!" or event.key in ("!", "exclamation_mark"):
+                self.set_shell_mode(True)
+                event.prevent_default()
+                event.stop()
+                return
+
+        # Exit shell mode on backspace/delete/escape when input is empty
+        if self.is_shell_mode and not self.text:
+            if event.key in ("backspace", "delete", "escape"):
+                self.set_shell_mode(False)
+                event.prevent_default()
+                event.stop()
+                return
+
         # Looped navigation through query history
         if self._handle_history_navigation(event.key):
             event.prevent_default()
@@ -651,6 +715,12 @@ class ChatInput(TextArea):
                 pass
 
             text = self.get_full_text()
+            was_shell = self.is_shell_mode
+            if self.is_shell_mode:
+                self.set_shell_mode(False)
+            if was_shell and text and not text.startswith("!"):
+                text = f"!{text}"
+
             atts = list(self.clipboard_attachments)
             self.clipboard_attachments.clear()
             self.update_attachment_bar()

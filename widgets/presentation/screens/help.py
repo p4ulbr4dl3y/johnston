@@ -54,6 +54,8 @@ KEYBINDINGS_DATA: list[tuple[str, str]] = [
     ("↑ / ↓", "History navigation (looping)"),
     ("@", "Attach workspace file (autocompletion)"),
     ("/", "Slash command menu (autocompletion)"),
+    ("?", "Open help modal (on empty input)"),
+    ("!", "Toggle shell mode (on empty input)"),
     ("Esc", "Cancel response generation / Close modals"),
     ("Ctrl+C / Ctrl+Q", "Exit application"),
 ]

@@ -66,6 +66,117 @@ class MessageFlowMixin:
                 except Exception:
                     pass
 
+    async def _exec_shell_command(self, cmd: str, user_text: str = None) -> None:
+        """Execute a user shell command (!cmd) directly without calling LLM."""
+        try:
+            chat_input = self.query_one("#message-input", ChatInput)
+            chat_input.focus()
+        except Exception:
+            pass
+
+        self._apply_pending_fork_or_readonly()
+
+        full_prompt = user_text or f"!{cmd}"
+        from widgets.presentation.widgets.chat_container import ChatView
+
+        chat_view = self.query_one(ChatView)
+        if hasattr(chat_view, "clear_welcome"):
+            chat_view.clear_welcome()
+
+        # Mount user message in UI
+        await chat_view.add_user_message(full_prompt)
+
+        # Record user event to active session
+        session = None
+        if hasattr(self, "sm") and hasattr(self, "current_session_id") and self.current_session_id:
+            session = self.sm.get(self.current_session_id, reload=False) or self.sm.create_main(self.current_session_id)
+        elif hasattr(self, "session"):
+            session = self.session
+
+        if session is not None and hasattr(session, "add_event"):
+            session.add_event({"type": "user", "text": full_prompt})
+            if hasattr(self, "save_current_session_async"):
+                await self.save_current_session_async(force=True)
+            elif hasattr(self, "save_current_session"):
+                self.save_current_session()
+
+        # Mount running tool call widget
+        tool_widget = await chat_view.add_tool_call(
+            tool_type="shell",
+            target=cmd,
+            args={"command": cmd},
+            status="running",
+        )
+
+        from tools.context import ToolContext
+        from tools.shell import ShellTool
+
+        ctx = ToolContext(self)
+        tool = ShellTool()
+        self.current_tool_widget = tool_widget
+        try:
+            res = await tool.execute({"command": cmd}, ctx=ctx)
+            content = res.content or ""
+            returncode = getattr(res, "returncode", None)
+            is_error = getattr(res, "is_error", False) or (returncode is not None and returncode != 0)
+            res_status = getattr(res, "status", None)
+            if hasattr(res_status, "value"):
+                status = res_status.value
+            elif isinstance(res_status, str):
+                status = res_status
+            else:
+                status = "error" if is_error else "done"
+        except Exception as e:
+            content = f"ERR: {e}"
+            returncode = 1
+            is_error = True
+            status = "error"
+        finally:
+            self.current_tool_widget = None
+
+        if tool_widget is not None:
+            tool_widget.set_result(content, is_error=is_error, status=status, returncode=returncode)
+            if hasattr(tool_widget, "render_header"):
+                tool_widget.render_header()
+            if hasattr(tool_widget, "render_content"):
+                tool_widget.render_content()
+
+        if session is not None and hasattr(session, "add_event"):
+            session.add_event({
+                "type": "tool",
+                "tool_type": "shell",
+                "target": cmd,
+                "result_text": content,
+                "args": {"command": cmd},
+                "status": status,
+                "returncode": returncode,
+            })
+
+        agent = getattr(self, "agent", None)
+        if agent is not None and hasattr(agent, "history") and isinstance(agent.history, list):
+            history_text = f"! {cmd}\n\n{content}".rstrip() if content else f"! {cmd}"
+            agent.history.append({"role": "user", "content": history_text})
+
+        if hasattr(self, "save_current_session_async"):
+            await self.save_current_session_async(force=True)
+        elif hasattr(self, "save_current_session"):
+            self.save_current_session()
+
+        if getattr(self, "is_app_active", True) and not getattr(self, "is_generating", False):
+            next_item = self._pop_queued_for_current_session()
+            if next_item is not None:
+                kw = {}
+                if len(next_item) > 4 and next_item[4]:
+                    kw["display_text"] = next_item[4]
+                asyncio.create_task(
+                    self._process_queued_message(
+                        next_item[0],
+                        next_item[1],
+                        next_item[2],
+                        **kw,
+                    )
+                )
+
     def _queue_message_ui(
         self, prompt: str, show_in_ui: bool = True, attachments: list = None, display_text: str = None
     ) -> None:
@@ -149,6 +260,17 @@ class MessageFlowMixin:
 
         if user_text and user_text.startswith("/"):
             asyncio.create_task(self._exec_slash_command(user_text, attachments=attachments))
+            return
+
+        if user_text and user_text.startswith("!"):
+            cmd = user_text[1:].strip()
+            if not cmd:
+                self.notify("No shell command specified", severity="warning")
+                return
+            if self.is_generating:
+                self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
+            else:
+                asyncio.create_task(self._exec_shell_command(cmd, user_text=user_text))
             return
 
         chat_input = self.query_one("#message-input", ChatInput)
@@ -336,6 +458,12 @@ class MessageFlowMixin:
     async def _process_queued_message(self, prompt, show_in_ui=True, attachments=None, **kwargs) -> None:
         """Run a queued message on the next event-loop iteration after the @work task."""
         await asyncio.sleep(0)
+        user_text = (prompt or "").strip()
+        if user_text.startswith("!"):
+            cmd = user_text[1:].strip()
+            if cmd:
+                asyncio.create_task(self._exec_shell_command(cmd, user_text=user_text))
+                return
         self.trigger_ai_response(prompt, show_in_ui=show_in_ui, attachments=attachments, **kwargs)
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:

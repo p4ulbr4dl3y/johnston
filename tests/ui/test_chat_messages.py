@@ -375,6 +375,11 @@ class TestUserMessageCoverage(unittest.TestCase):
         msg = UserMessage(content="", attachment_text="att")
         self.assertEqual(msg.raw_text, "att")
 
+    def test_shell_prefix(self):
+        msg = UserMessage(content="!ls -la")
+        self.assertEqual(msg.raw_text, "!ls -la")
+        self.assertIn("user-msg-prefix-shell", msg.prefix_widget.classes)
+
 
 class TestBotMessageCoverage(unittest.TestCase):
     def test_on_mount_with_content_hides_stream(self):

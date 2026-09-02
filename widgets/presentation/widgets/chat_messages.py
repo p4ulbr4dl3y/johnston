@@ -99,18 +99,25 @@ class UserMessage(Horizontal):
         else:
             self.raw_text = user_str
 
-        prefix = UserMessagePrefix("❯ ", markup=False, classes="user-msg-prefix")
+        is_shell = user_str.startswith("!")
+        prefix_char = "! " if is_shell else "❯ "
+        prefix_cls = "user-msg-prefix user-msg-prefix-shell" if is_shell else "user-msg-prefix"
+        prefix = UserMessagePrefix(prefix_char, markup=False, classes=prefix_cls)
+
+        bubble_content = user_str[1:].lstrip() if (is_shell and not isinstance(content, Text)) else renderable_content
 
         if att_str:
             bubble = Vertical(
-                Static(renderable_content, markup=markup, classes="user-msg-text"),
+                Static(bubble_content, markup=markup, classes="user-msg-text"),
                 UserMessageAttachment(att_str, markup=False, classes="user-msg-att"),
                 classes="user-msg-bubble",
             )
         else:
-            bubble = Static(renderable_content, markup=markup, classes="user-msg-bubble")
+            bubble = Static(bubble_content, markup=markup, classes="user-msg-bubble")
 
         classes = "user-msg user-msg-first" if is_first else "user-msg"
+        self.prefix_widget = prefix
+        self.bubble_widget = bubble
         super().__init__(prefix, bubble, classes=classes)
 
 
