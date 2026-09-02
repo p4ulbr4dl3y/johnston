@@ -478,17 +478,13 @@ class ThinkingWidget(Vertical):
         self.render_collapsed()
 
     def render_header(self) -> None:
-        from widgets.presentation.widgets.footer_layout import get_theme_colors
-
-        _, t_secondary, t_muted, _ = get_theme_colors()
-        action = "to collapse" if self.is_expanded else "to expand"
-        hint_str = f"[{t_muted}]([{t_secondary}]ctrl+o[/] [{t_muted}]{action})[/]"
-
         if self.is_thinking:
+            from widgets.presentation.widgets.footer_layout import get_theme_colors
+
+            _, t_secondary, t_muted, _ = get_theme_colors()
+            action = "to collapse" if self.is_expanded else "to expand"
+            hint_str = f"[{t_muted}]([{t_secondary}]ctrl+o[/] [{t_muted}]{action})[/]"
             self.header_label.update(f"Thinking... {hint_str}")
-        elif self.is_expandable():
-            dur_str = "<0.1" if self.duration_seconds < 0.1 else f"{self.duration_seconds:.1f}"
-            self.header_label.update(f"Thought for {dur_str} sec {hint_str}")
         else:
             dur_str = "<0.1" if self.duration_seconds < 0.1 else f"{self.duration_seconds:.1f}"
             self.header_label.update(f"Thought for {dur_str} sec")

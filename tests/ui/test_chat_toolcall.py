@@ -852,12 +852,11 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("ctrl+o", label_text2)
         self.assertIn("to collapse", label_text2)
 
-        # 3. Finished shell -> ctrl+b removed, ctrl+o to collapse (since was expanded)
+        # 3. Finished shell -> hints removed (clean history)
         w_shell.set_result("Done", status="done")
         label_done = str(w_shell.header_label.render())
         self.assertNotIn("ctrl+b", label_done)
-        self.assertIn("ctrl+o", label_done)
-        self.assertIn("to collapse", label_done)
+        self.assertNotIn("ctrl+o", label_done)
 
         # 4. Background shell -> no ctrl+b
         w_bg = self._widget("shell", "pytest")
@@ -885,8 +884,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         tw.finish_thinking(duration=1.5, thinking_content="thoughts...")
         label_done = str(tw.header_label.render())
         self.assertIn("Thought for 1.5 sec", label_done)
-        self.assertIn("ctrl+o", label_done)
-        self.assertIn("to collapse", label_done)
+        self.assertNotIn("ctrl+o", label_done)
 
 
 if __name__ == "__main__":

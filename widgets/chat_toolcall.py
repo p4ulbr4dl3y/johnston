@@ -377,9 +377,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             if self.is_expandable():
                 action = "to collapse" if self.is_expanded else "to expand"
                 hints.append(f"ctrl+o {action}")
-        elif self.is_expandable():
-            action = "to collapse" if self.is_expanded else "to expand"
-            hints.append(f"ctrl+o {action}")
 
         if hints:
             from widgets.presentation.widgets.footer_layout import get_theme_colors
