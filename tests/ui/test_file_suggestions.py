@@ -34,6 +34,13 @@ class TestFileSuggestions(unittest.TestCase):
 
         _run_async(exercise())
 
+    def test_file_suggestions_over_limit_shows_more(self):
+        suggestions = CommandSuggestions()
+        files = [f"file_{i}.py" for i in range(75)]
+        res = suggestions._render_file_suggestions(files, "")
+        self.assertEqual(len(res), 50)
+        self.assertEqual(suggestions.option_count, 51)
+
     def test_pasted_file_path_formatting(self):
         chat_input = ChatInput()
         pasted_img_path = "/var/folders/lg/x662tzs55wj3rpcv4fry/T/test.png"

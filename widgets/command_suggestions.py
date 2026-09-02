@@ -4,6 +4,7 @@ import time
 
 from rich.markup import escape
 from textual.widgets import OptionList
+from textual.widgets.option_list import Option
 
 from widgets.app.command_provider import get_all_command_suggestions
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
@@ -117,21 +118,27 @@ class CommandSuggestions(HeaderWrapOptionList):
             seen.add(f)
             if not query_lower or query_lower in f.lower():
                 matched_files.append(f)
-                kind = "Dir" if f.endswith("/") else "File"
-                display_name = f if display_width(f) <= align_col else ellipsize(f, align_col)
-                pad = max(0, align_col - display_width(display_name))
-                padding_spaces = " " * pad
-                formatted_line = f"{escape(display_name)}{padding_spaces} [dim]{kind}[/dim]"
-                self.add_option(formatted_line)
-                if len(matched_files) >= 50:
-                    break
-        self.current_matched = matched_files
-        if matched_files:
+        display_limit = 50
+        displayed_files = matched_files[:display_limit]
+        for f in displayed_files:
+            kind = "Dir" if f.endswith("/") else "File"
+            display_name = f if display_width(f) <= align_col else ellipsize(f, align_col)
+            pad = max(0, align_col - display_width(display_name))
+            padding_spaces = " " * pad
+            formatted_line = f"{escape(display_name)}{padding_spaces} [dim]{kind}[/dim]"
+            self.add_option(formatted_line)
+
+        remaining = len(matched_files) - len(displayed_files)
+        if remaining > 0:
+            self.add_option(Option(f"[dim]... and {remaining} more[/dim]", disabled=True))
+
+        self.current_matched = displayed_files
+        if displayed_files:
             self._set_display(True)
             self.highlighted = 0
         else:
             self._set_display(False)
-        return matched_files
+        return displayed_files
 
     def _set_display(self, show: bool) -> None:
         self.display = show
@@ -178,12 +185,11 @@ class CommandSuggestions(HeaderWrapOptionList):
                             primary_matches.append((cmd, desc))
 
                     combined = primary_matches + alias_matches
-                    for cmd, desc in combined:
+                    display_limit = 50
+                    displayed_cmds = combined[:display_limit]
+                    for cmd, desc in displayed_cmds:
                         matched_cmds.append(cmd)
                         clean_desc = " ".join(desc.split())
-                        # Description budget: from the tag column to the right
-                        # edge; dynamically sizes to available row budget instead
-                        # of an arbitrary 60-char ceiling.
                         desc_start = max(display_width(cmd), padding) + 1
                         clean_desc = ellipsize(clean_desc, max(10, row_budget - desc_start))
                         escaped_cmd = escape(cmd)
@@ -192,6 +198,10 @@ class CommandSuggestions(HeaderWrapOptionList):
                         padding_spaces = " " * pad
                         formatted_line = f"{escaped_cmd}{padding_spaces} [dim]{escaped_desc}[/dim]"
                         self.add_option(formatted_line)
+
+                    remaining = len(combined) - len(displayed_cmds)
+                    if remaining > 0:
+                        self.add_option(Option(f"[dim]... and {remaining} more[/dim]", disabled=True))
 
                     self.current_matched = matched_cmds
                     if matched_cmds:
