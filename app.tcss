@@ -126,6 +126,11 @@ WelcomeWidget {
     border-top: none;
 }
 
+.user-msg-first .user-msg-prefix,
+.user-msg-first .user-msg-bubble {
+    padding-top: 0;
+}
+
 .user-msg-prefix {
     width: auto;
     height: auto;
