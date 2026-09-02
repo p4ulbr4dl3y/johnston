@@ -2,11 +2,13 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-DEFAULT_CHUNK_TIMEOUT = 30.0
-DEFAULT_MAX_RETRIES = 3
-DEFAULT_RETRY_DELAY = 1.0
-DEFAULT_RETRY_BACKOFF = 2.0
-DEFAULT_MAX_RETRY_DELAY = 10.0
+from core.domain.defaults.config import (
+    DEFAULT_CHUNK_TIMEOUT,
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_MAX_RETRY_DELAY,
+    DEFAULT_RETRY_BACKOFF,
+    DEFAULT_RETRY_DELAY,
+)
 
 
 @dataclass

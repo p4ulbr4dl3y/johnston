@@ -1,7 +1,12 @@
 import asyncio
 from typing import Any, Dict, List, Optional, Tuple
 
-from core.domain.defaults.config import DEFAULT_MAX_TOKENS
+from core.domain.defaults.config import (
+    DEFAULT_COMPACTION_SUMMARIZE_RATIO,
+    DEFAULT_COMPACTION_USER_BUDGET,
+    DEFAULT_CONTEXT_LIMIT,
+    DEFAULT_MAX_TOKENS,
+)
 from core.domain.policies.messages import is_checkpoint_message, is_system_note
 from core.infrastructure.adapters.base import build_stream_kwargs, normalize_tool_arguments_str
 from core.infrastructure.runtime.token_util import estimate_tokens
@@ -34,7 +39,7 @@ def collect_user_messages(
 
             max_tokens = get_settings().llm.compaction_user_budget
         except Exception:
-            max_tokens = 20_000
+            max_tokens = DEFAULT_COMPACTION_USER_BUDGET
 
     real_user_msgs = []
     for msg in history:
@@ -343,8 +348,8 @@ class CompactionMixin:
 
                 summarize_ratio = get_settings().llm.compaction_summarize_ratio
             except Exception:
-                summarize_ratio = 0.90
-            max_summarize_tokens = int(getattr(self, "context_limit", 128_000) * summarize_ratio)
+                summarize_ratio = DEFAULT_COMPACTION_SUMMARIZE_RATIO
+            max_summarize_tokens = int(getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT) * summarize_ratio)
             available_tokens = max(0, max_summarize_tokens - sys_tokens)
 
             # Estimate tokens on individual messages and slice in a single pass from the tail

@@ -8,6 +8,14 @@ from typing import Any
 
 from pygments.token import Token
 
+from core.domain.defaults.config import (
+    COLOR_STATUS_ERROR,
+    COLOR_STATUS_RUNNING,
+    COLOR_STATUS_SUCCESS,
+    THEME_MUTED,
+    THEME_PRIMARY,
+)
+
 
 def _resolve_style_vars(style_str: str, var_map: dict[str, str]) -> str:
     """Replace $var or $var-name references with their mapped hex values."""
@@ -55,9 +63,9 @@ class Theme:
     name: str
     label: str
     dark: bool = True
-    primary: str = "#ffffff"
+    primary: str = THEME_PRIMARY
     secondary: str = "#f4f4f5"
-    muted: str = "#71717a"
+    muted: str = THEME_MUTED
     subtle: str = "#e4e4e7"
     tcss_vars: dict[str, str] = field(default_factory=dict)
     markdown_styles: dict[str, str] = field(default_factory=dict)
@@ -77,17 +85,17 @@ class Theme:
     @property
     def accent_warning(self) -> str:
         """Accent color for warning/running state (yellow/orange)."""
-        return self.tcss_vars.get("accent-warning", "#d4a259" if self.dark else "#9a6700")
+        return self.tcss_vars.get("accent-warning", COLOR_STATUS_RUNNING if self.dark else "#9a6700")
 
     @property
     def accent_error(self) -> str:
         """Accent color for error/failed state (red)."""
-        return self.tcss_vars.get("accent-error", "#d15858" if self.dark else "#cf222e")
+        return self.tcss_vars.get("accent-error", COLOR_STATUS_ERROR if self.dark else "#cf222e")
 
     @property
     def accent_success(self) -> str:
         """Accent color for success/completed state (green)."""
-        return self.tcss_vars.get("accent-success", "#5ea876" if self.dark else "#1a7f37")
+        return self.tcss_vars.get("accent-success", COLOR_STATUS_SUCCESS if self.dark else "#1a7f37")
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize Theme to a JSON-serializable dictionary."""
@@ -116,9 +124,9 @@ class Theme:
         name = name.strip()
         label = str(data.get("label", name.replace("-", " ").title()))
         dark = bool(data.get("dark", True))
-        primary = str(data.get("primary", "#ffffff"))
+        primary = str(data.get("primary", THEME_PRIMARY))
         secondary = str(data.get("secondary", "#f4f4f5"))
-        muted = str(data.get("muted", "#71717a"))
+        muted = str(data.get("muted", THEME_MUTED))
         subtle = str(data.get("subtle", "#e4e4e7"))
 
         tcss_vars = {str(k): str(v) for k, v in data.get("tcss_vars", {}).items()}
