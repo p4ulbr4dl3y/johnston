@@ -29,7 +29,7 @@ class InvokeSubagentTool(BaseTool):
                         "type": "string",
                         "description": (
                             "Short task title as a noun phrase (3-5 words, "
-                            "e.g. 'Key handling refactor', 'Streaming core audit', not verbs)"
+                            "e.g. 'Auth token refactor', 'Query performance audit', not verbs)"
                         ),
                     },
                     "prompt": {
