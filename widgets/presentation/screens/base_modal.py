@@ -11,6 +11,7 @@ T = TypeVar("T")
 
 STATUS_TAG_MAP = {
     "ACTIVE": "●",
+    "RUNNING": "◐",
     "ON": "●",
     "OFF": "○",
     "AUTH": " ",

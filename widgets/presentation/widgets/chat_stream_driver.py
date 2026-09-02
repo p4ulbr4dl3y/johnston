@@ -213,6 +213,12 @@ class ChatStreamDriver:
         elif etype == "tool":
             # Check if this event is a completion event for an in-flight tool
             if "result_text" in evt and not evt.get("tool_type"):
+                while self.tool_handles:
+                    st = getattr(self.tool_handles[0], "status", None)
+                    if isinstance(st, str) and st not in ("running",):
+                        self.tool_handles.popleft()
+                    else:
+                        break
                 if self.tool_handles:
                     w = self.tool_handles.popleft()
                     w.set_result(

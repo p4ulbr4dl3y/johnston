@@ -71,9 +71,12 @@ class SubagentViewScreen(ModalScreen[None]):
     def current_tool_widget(self, val):
         self._last_tool_widget = val
         d = getattr(self, "driver", None)
-        if d and val:
-            if not d.tool_handles or d.tool_handles[-1] != val:
-                d.tool_handles.append(val)
+        if d:
+            if val:
+                if not d.tool_handles or d.tool_handles[-1] != val:
+                    d.tool_handles.append(val)
+            else:
+                d.tool_handles.clear()
 
     def compose(self) -> ComposeResult:
         yield PlanNotchContainer(id="plan-notch-container")
@@ -136,6 +139,10 @@ class SubagentViewScreen(ModalScreen[None]):
                 pass
             self._footer_refresh = None
 
+        if self.session:
+            self.session.remove_listener(self._on_live_event)
+            self.session.add_listener(self._on_live_event)
+
         self._history_worker = self.run_worker(self._load_history_session())
 
     def _refresh_chrome(self) -> None:
@@ -190,7 +197,6 @@ class SubagentViewScreen(ModalScreen[None]):
             on_plan_update=self._on_plan_update,
         )
 
-        rendered_count = 0
         is_running = bool(self.session and getattr(self.session, "status", "") == "running")
         app = self._get_app()
         expand_state = set()
@@ -198,8 +204,7 @@ class SubagentViewScreen(ModalScreen[None]):
             expand_state = app._subagent_expand_state.get(self.session.id, set())
 
         if self.session:
-            history_events = list(self.session.messages)
-            rendered_count = len(history_events)
+            history_events = [dict(m) for m in self.session.messages if isinstance(m, dict)]
             has_user_msg = any(
                 isinstance(e, dict) and e.get("type") == "user" and is_ui_visible_user_message(e)
                 for e in history_events
@@ -237,15 +242,8 @@ class SubagentViewScreen(ModalScreen[None]):
             self.queue_task = asyncio.create_task(self._process_queue())
 
         if self.session:
-            self.session.remove_listener(self._on_live_event)
-            self.session.add_listener(self._on_live_event)
-            current_msgs = list(self.session.messages)
-            if len(current_msgs) > rendered_count:
-                for evt in current_msgs[rendered_count:]:
-                    self.event_queue.put_nowait(evt)
-
             has_subsequent_user_msg = False
-            for evt in reversed(current_msgs or []):
+            for evt in reversed(self.session.messages or []):
                 if not isinstance(evt, dict):
                     continue
                 etype = evt.get("type")
@@ -345,6 +343,11 @@ class SubagentViewScreen(ModalScreen[None]):
                     pass
             if hasattr(self.session, "finish"):
                 self.session.finish("cancelled", "Terminated from subagent view")
+            if self.driver:
+                while self.driver.tool_handles:
+                    w = self.driver.tool_handles.popleft()
+                    if hasattr(w, "mark_cancelled"):
+                        w.mark_cancelled()
             self._refresh_chrome()
 
     def action_toggle_expand(self) -> None:

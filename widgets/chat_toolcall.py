@@ -202,6 +202,13 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             except Exception:
                 pass
             self._shell_update_handle = None
+        self._shell_update_scheduled = False
+        if getattr(self, "_render_gate", None) is not None:
+            try:
+                self._render_gate.cancel()
+            except Exception:
+                pass
+            self._render_gate = None
 
     def _update_next_sibling_spacing(self) -> None:
         if not self.parent:
@@ -329,6 +336,13 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.result_text = "[interrupted | tool cancelled]"
         elif "[interrupted" not in clean:
             self.result_text = f"{clean}\n[interrupted | command cancelled]"
+        if getattr(self, "_shell_update_handle", None) is not None:
+            try:
+                self._shell_update_handle.cancel()
+            except Exception:
+                pass
+            self._shell_update_handle = None
+        self._shell_update_scheduled = False
         if not self.is_clickable_header():
             self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
             self.header_label.add_class(TOOL_HEADER)

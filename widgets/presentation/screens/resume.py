@@ -118,17 +118,22 @@ class ResumeScreen(BaseSelectionScreen[str]):
 
     def _format_all_options(self, target_width: int) -> list[str]:
         options = []
-        has_indicator = self.has_active or any(s.get("is_locked") for s in self.sessions)
+        has_indicator = self.has_active or any(
+            s.get("is_locked") or s.get("is_running") or s.get("status") == "running" for s in self.sessions
+        )
         session_ids = {str(s.get("id")) for s in self.sessions}
         for s in self.sessions:
             sid = str(s.get("id"))
             is_active = self.has_active and sid == str(self.current_session_id)
-            is_locked = bool(s.get("is_locked")) and not is_active
+            is_running = bool(s.get("is_running") or s.get("status") == "running") and not is_active
+            is_locked = bool(s.get("is_locked")) and not is_active and not is_running
             is_fork = bool(s.get("parent_id") and str(s.get("parent_id")) in session_ids)
             depth = s.get("_depth", 1 if is_fork else 0)
 
             if is_active:
                 status_pfx = f"{status_tag('ACTIVE')} "
+            elif is_running:
+                status_pfx = f"{status_tag('RUNNING')} "
             elif is_locked:
                 status_pfx = f"{status_tag('LOCKED')} "
             else:
@@ -142,8 +147,16 @@ class ResumeScreen(BaseSelectionScreen[str]):
             prefix = f"{status_pfx}{branch_pfx}"
             title = str(s.get("title", ""))
             count = s.get("message_count", 0)
-            turn_str = "turn" if count == 1 else "turns"
+            turn_str = "step" if count == 1 else "steps"
             badge_parts = [f"{count} {turn_str}"]
+            sub_count = s.get("subagent_count", 0) or s.get("active_subagents", 0)
+            if sub_count > 0:
+                s_str = "subagent" if sub_count == 1 else "subagents"
+                badge_parts.append(f"{sub_count} {s_str}")
+            task_count = s.get("task_count", 0) or s.get("active_tasks", 0)
+            if task_count > 0:
+                t_str = "task" if task_count == 1 else "tasks"
+                badge_parts.append(f"{task_count} {t_str}")
             time_str = format_relative_time(s.get("updated_at") or s.get("created_at"))
             if time_str:
                 badge_parts.append(time_str)

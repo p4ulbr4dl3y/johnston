@@ -402,6 +402,28 @@ class TestResumeScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.resume_screen.sessions[0]["id"], "s1")
             app.sm.delete.assert_called_once_with("s2")
 
+    def test_resume_screen_running_and_subagent_badges(self):
+        sessions = [
+            {"id": "s1", "title": "Active Session", "message_count": 2},
+            {
+                "id": "s2",
+                "title": "Running Bg Session",
+                "message_count": 5,
+                "is_running": True,
+                "subagent_count": 2,
+                "task_count": 1,
+            },
+        ]
+        screen = ResumeScreen(sessions, current_session_id="s1")
+        # s1 has ACTIVE (●)
+        self.assertIn("●", screen.raw_options[0])
+        # s2 has RUNNING (◐)
+        self.assertIn("◐", screen.raw_options[1])
+        # s2 has subagent and task badges
+        self.assertIn("2 subagents", screen.raw_options[1])
+        self.assertIn("1 task", screen.raw_options[1])
+
+
 
 
 

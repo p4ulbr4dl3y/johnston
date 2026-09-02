@@ -84,6 +84,27 @@ class ResumeCommand(BaseCommand):
             app.notify("No saved sessions in this project", severity="warning")
             return
 
+        for s in sessions:
+            sid = str(s.get("id"))
+            if sid == getattr(app, "current_session_id", None) and getattr(app, "is_generating", False):
+                s["is_running"] = True
+            if hasattr(app, "active_subagents") and isinstance(app.active_subagents, dict):
+                sub_count = sum(
+                    1
+                    for sub in app.active_subagents.values()
+                    if getattr(sub, "parent_id", None) == sid and getattr(sub, "status", "") == "running"
+                )
+                if sub_count:
+                    s["subagent_count"] = sub_count
+            if hasattr(app, "task_manager") and hasattr(app.task_manager, "tasks"):
+                task_count = sum(
+                    1
+                    for t in app.task_manager.tasks.values()
+                    if getattr(t, "session_id", None) == sid and getattr(t, "status", "") == "running"
+                )
+                if task_count:
+                    s["task_count"] = task_count
+
         def _apply_selected(sid: str, read_only: bool = False) -> None:
             cancel_active_workers(app)
             reset_app_state(app, is_generating=False, clear_queue=True)

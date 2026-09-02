@@ -10,7 +10,6 @@ queue settling. Every interaction with the UI is funneled through a
 
 import asyncio
 import logging
-import math
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -18,8 +17,9 @@ from enum import Enum
 from typing import Any, Callable, Optional
 
 from core.application.session.stream import record_subagent_step
-from core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
+from core.domain.defaults.errors import parse_stream_step
 from core.domain.ports.checkpoint import get_checkpoint_manager
+from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
 
 logger = logging.getLogger(__name__)
 
@@ -227,10 +227,12 @@ async def generate_ai_response(
 
     active_user_event = user_event
     has_tool_calls = False
-    thinking_handle: Any = None
-    bot_handle: Any = None
-    tool_handles: deque[Any] = deque()
     start_time = time.time()
+    driver = ChatStreamDriver(
+        canvas,
+        on_tool_widget=canvas.register_tool_widget,
+        notify=canvas.notify,
+    )
 
     try:
         # Batch all per-step persistence into one debounced write per turn.
@@ -276,117 +278,16 @@ async def generate_ai_response(
             else:
                 record_subagent_step(step, session, transcript_acc)
 
-            if event_type == "thinking_start":
-                thinking_handle = await canvas.add_thinking_widget(val1)
-            elif event_type == "thinking_delta":
-                if thinking_handle:
-                    thinking_handle.update_thinking(val1)
-            elif event_type == "thinking_end":
-                if thinking_handle:
-                    try:
-                        duration = float(val1)
-                        if not math.isfinite(duration):
-                            duration = 0.0
-                    except Exception:  # noqa: BLE001
-                        duration = 0.0
-                    thinking_handle.finish_thinking(duration, val2)
-                thinking_handle = None
-            elif event_type == "tool":
+            await driver.consume_stream_step(step)
+
+            if event_type == "tool":
                 has_tool_calls = True
-                if bot_handle:
-                    bot_handle.flush_pending_stream()
-                    content_str = getattr(bot_handle, "content", "")
-                    if hasattr(bot_handle, "_stream_parts") and bot_handle._stream_parts:
-                        content_str = bot_handle._join_stream_content()
-                    if not (content_str or "").strip():
-                        bot_handle.remove()
-                    else:
-                        await bot_handle.finalize_stream()
-                bot_handle = None
-                targs = val3 if isinstance(val3, dict) else {}
-                tool_handle = await canvas.add_tool_call(val1, val2, targs)
-                tool_handles.append(tool_handle)
-                if canvas.register_tool_widget:
-                    canvas.register_tool_widget(tool_handle)
-            elif event_type == "tool_result":
-                if tool_handles:
-                    cur_tool_handle = tool_handles.popleft()
-                    parsed_tool_result = parse_tool_result_step(step)
-                    cur_tool_handle.set_result(
-                        val1,
-                        is_error=parsed_tool_result.is_error,
-                        status=parsed_tool_result.status.value
-                        if parsed_tool_result.status is not None
-                        else None,
-                        returncode=parsed_tool_result.returncode,
-                    )
+            elif event_type in ("tool_result", "bot_text", "outro"):
                 try:
                     save_db.schedule()
                 except Exception:  # noqa: BLE001
                     pass
-            elif event_type == "bot_delta":
-                if val1:
-                    if bot_handle is None:
-                        bot_handle = await canvas.add_bot_message()
-                    # Stream whitespace deltas too so trailing chars aren't dropped.
-                    bot_handle.append_stream_content(val1)
-            elif event_type == "bot_reset":
-                # Explicit stream reset: drop partial text.
-                if bot_handle is not None:
-                    try:
-                        await bot_handle.reset_stream()
-                    except Exception:  # noqa: BLE001
-                        pass
-            elif event_type == "retry":
-                # A retry restarts the reply from scratch: drop partial text.
-                if bot_handle is not None:
-                    try:
-                        await bot_handle.reset_stream()
-                    except Exception:  # noqa: BLE001
-                        pass
-                if canvas.notify:
-                    attempt = val1
-                    max_retries = val2
-                    delay = val3 or 0.0
-                    err = val4
-                    err_msg = str(err).lower() if err else ""
-                    is_rate_limit = (
-                        "rate limit" in err_msg
-                        or "429" in err_msg
-                        or getattr(err, "status_code", None) == 429
-                    )
-                    reason = "Rate limit reached" if is_rate_limit else "Provider error"
-                    try:
-                        canvas.notify(
-                            f"{reason}: retrying in {max(1, int(round(delay)))}s (attempt {attempt}/{max_retries})",
-                            severity="warning",
-                        )
-                    except Exception:  # noqa: BLE001
-                        pass
-            elif event_type in ("bot_text", "outro"):
-                if val1.strip():
-                    if bot_handle is None:
-                        bot_handle = await canvas.add_bot_message()
-                    await bot_handle.finalize_stream(val1)
-                    bot_handle = None
-                try:
-                    save_db.schedule()
-                except Exception:  # noqa: BLE001
-                    pass
-            elif event_type == "error":
-                err_text = val1 or "Error"
-                if canvas.add_error_message:
-                    await canvas.add_error_message(err_text)
-                elif canvas.add_event_divider:
-                    await canvas.add_event_divider(err_text)
-                canvas.refresh_status_footer()
-                try:
-                    save_db.schedule()
-                except Exception:  # noqa: BLE001
-                    pass
-            elif event_type == "event_divider":
-                div_text = val1 or "Session Compacted"
-                await canvas.add_event_divider(div_text)
+            elif event_type in ("error", "event_divider"):
                 canvas.refresh_status_footer()
                 try:
                     save_db.schedule()
@@ -397,25 +298,25 @@ async def generate_ai_response(
             agent,
             session,
             canvas,
-            thinking_handle,
-            bot_handle,
+            driver.thinking_handle,
+            driver.bot_handle,
             start_time=start_time,
-            tool_handles=tool_handles,
+            tool_handles=driver.tool_handles,
         )
         raise
     except Exception as e:  # noqa: BLE001
         logger.exception("AI generation failed: %s", e)
         canvas.notify(f"Generation failed: {e}", severity="error")
     finally:
-        if thinking_handle is not None and getattr(thinking_handle, "is_thinking", False):
+        if driver.thinking_handle is not None and getattr(driver.thinking_handle, "is_thinking", False):
             try:
                 duration = time.time() - start_time
-                thinking_handle.finish_thinking(duration)
+                driver.thinking_handle.finish_thinking(duration)
             except Exception:  # noqa: BLE001
                 pass
-        if bot_handle is not None and not getattr(bot_handle, "content", "").strip():
+        if driver.bot_handle is not None and not getattr(driver.bot_handle, "content", "").strip():
             try:
-                bot_handle.remove()
+                driver.bot_handle.remove()
             except Exception:  # noqa: BLE001
                 pass
         if has_tool_calls and session_id:
