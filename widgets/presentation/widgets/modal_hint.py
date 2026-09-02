@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Union
 
 from rich.console import RenderableType
+from rich.table import Table
 from textual.widgets import Label
 
 from widgets.presentation.screens.constants import MODAL_HINT_ID
@@ -63,39 +64,56 @@ class ModalHintConfig:
 
 
 class ModalHint(Label):
-    """Modal hotkey hint label rendering keys in secondary theme color and separators in muted."""
+    """Modal hotkey hint label rendering keys on the left and optional count/badge on the right."""
 
     DEFAULT_CSS = """
     ModalHint {
         width: 100%;
         height: auto;
-        text-align: left;
         margin-top: 1;
         margin-bottom: 0;
         padding: 0;
-        text-wrap: wrap;
     }
     """
 
     def __init__(
         self,
         text: Union[str, ModalHintConfig] = "",
+        right_text: str = "",
         *,
         id: Optional[str] = MODAL_HINT_ID,
         classes: Optional[str] = None,
         disabled: bool = False,
     ) -> None:
-        if isinstance(text, ModalHintConfig):
-            raw_str = text.to_hint_string()
-        else:
-            raw_str = text or ""
-        formatted = format_modal_hint(raw_str) if raw_str else ""
-        super().__init__(formatted, id=id, classes=classes, disabled=disabled)
+        super().__init__(id=id, classes=classes, disabled=disabled)
+        self.left_text = text
+        self.right_text = right_text
 
-    def update(self, renderable: Union[RenderableType, ModalHintConfig] = "") -> Self:
-        if isinstance(renderable, ModalHintConfig):
-            renderable = format_modal_hint(renderable.to_hint_string())
-        elif isinstance(renderable, str):
-            renderable = format_modal_hint(renderable)
-        return super().update(renderable)
+    def render(self) -> RenderableType:
+        if isinstance(self.left_text, ModalHintConfig):
+            left_raw = self.left_text.to_hint_string()
+        else:
+            left_raw = str(self.left_text or "")
+        left_formatted = format_modal_hint(left_raw) if left_raw else ""
+
+        if not self.right_text:
+            return left_formatted
+
+        table = Table.grid(expand=True)
+        table.add_column(ratio=1, justify="left")
+        table.add_column(justify="right")
+
+        right_formatted = format_modal_hint(self.right_text)
+        table.add_row(left_formatted, right_formatted)
+        return table
+
+    def update(
+        self,
+        renderable: Union[RenderableType, ModalHintConfig] = "",
+        right_text: str = "",
+    ) -> Self:
+        self.left_text = renderable
+        self.right_text = right_text
+        self.refresh()
+        return self
 

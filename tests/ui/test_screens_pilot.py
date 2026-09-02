@@ -430,8 +430,8 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             screen._mount_time = 0
 
-            # Step 1: Toggle "Red" with Space, then press Enter
-            await pilot.press("space")
+            # Step 1: Toggle "Red" with Tab, then press Enter
+            await pilot.press("tab")
             await pilot.pause()
             await pilot.press("enter")
             await pilot.pause()
@@ -466,14 +466,14 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertEqual(opt_list.highlighted, 1)
 
-            # Select Item 1 with Space
-            await pilot.press("space")
+            # Select Item 1 with Tab
+            await pilot.press("tab")
             await pilot.pause()
             self.assertEqual(screen.answers.get(0, {}).get("answer"), "Item 1")
             self.assertEqual(opt_list.highlighted, 1)
 
-            # Deselect Item 1 with Space
-            await pilot.press("space")
+            # Deselect Item 1 with Tab
+            await pilot.press("tab")
             await pilot.pause()
             self.assertEqual(screen.answers.get(0, {}).get("answer"), "")
             self.assertEqual(opt_list.highlighted, 1)

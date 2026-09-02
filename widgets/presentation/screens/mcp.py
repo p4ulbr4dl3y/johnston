@@ -5,7 +5,7 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, OptionList
+from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
 from core.domain.defaults.config import THEME_MUTED
@@ -66,7 +66,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield ModalHeader("Manage MCP Servers", esc_hint="")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id="mcp-option-list")
-            yield ModalHint("enter: select • space: toggle • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint("enter: select • tab: toggle • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -250,8 +250,11 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
 
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
-            hint_lbl = self.query_one(MODAL_HINT, Label)
-            hint_lbl.update("enter • space • esc" if is_compact else "enter: select • space: toggle • esc: close")
+            hint_lbl = self.query_one(MODAL_HINT, ModalHint)
+            total = len(self.servers_info)
+            shown = sum(1 for s in self.filtered_servers if s is not None)
+            base_hint = "enter • tab • esc" if is_compact else "enter: select • tab: toggle • esc: close"
+            hint_lbl.update(base_hint, right_text=f"{shown}/{total}")
         except Exception:
             pass
 
@@ -321,16 +324,6 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             event.prevent_default()
             event.stop()
             return
-        if event.key == "space":
-            try:
-                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
-            except Exception:
-                search_input = None
-            if not search_input or not search_input.has_focus or not search_input.value:
-                self._toggle_highlighted()
-                event.prevent_default()
-                event.stop()
-                return
         self._handle_search_navigation(event)
 
     def action_cancel(self) -> None:

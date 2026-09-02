@@ -396,15 +396,15 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
             title_md = screen.query_one("#wizard-title", Markdown)
             self.assertIn("*(Select multiple)*", title_md._markdown)
 
-            # Toggle first option (Auth) with space
-            await pilot.press("space")
+            # Toggle first option (Auth) with tab
+            await pilot.press("tab")
             await pilot.pause()
             self.assertEqual(screen._get_step_selections(0), ["Auth"])
 
-            # Move down to Tracing and toggle with space
+            # Move down to Tracing and toggle with tab
             await pilot.press("down")
             await pilot.press("down")
-            await pilot.press("space")
+            await pilot.press("tab")
             await pilot.pause()
             self.assertEqual(screen._get_step_selections(0), ["Auth", "Tracing"])
 

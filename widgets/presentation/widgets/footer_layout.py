@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 from rich.table import Table
 
@@ -24,6 +25,9 @@ def get_theme_colors() -> tuple[str, str, str, str]:
         return THEME_PRIMARY, THEME_SECONDARY, THEME_MUTED, THEME_SUBTLE
 
 
+_COUNTER_RE = re.compile(r"^(\d+/\d+|\(\d+/\d+\)|\d+)$")
+
+
 def format_modal_hint(raw_hint: str) -> str:
     """Format modal hotkey hint string with theme colors for keys, descriptions, and separators."""
     if not raw_hint:
@@ -43,6 +47,8 @@ def format_modal_hint(raw_hint: str) -> str:
             key = key.strip()
             desc = desc.strip()
             formatted_segments.append(f"[{t_secondary}]{key}[/][{t_muted}]: {desc}[/]")
+        elif _COUNTER_RE.match(seg):
+            formatted_segments.append(f"[{t_muted}]{seg}[/]")
         else:
             formatted_segments.append(f"[{t_secondary}]{seg}[/]")
 

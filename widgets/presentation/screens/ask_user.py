@@ -19,7 +19,7 @@ from widgets.presentation.screens.constants import (
     MODAL_MARKDOWN,
     OPTIONS_LIST,
     OPTIONS_LIST_ID,
-    SHIFT_TAB_KEYS,
+    TAB_KEYS,
     WRITE_IN_INPUT,
     WRITE_IN_INPUT_ID,
 )
@@ -145,11 +145,11 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
     AUTO_FOCUS = ""
     ALLOW_SELECT = False
     BINDINGS = expand_bindings([
-        ("tab", "minimize", "Minimize"),
+        ("ctrl+h", "minimize", "Minimize"),
         ("left", "go_back", "Back"),
         ("right", "go_next", "Next"),
         ("enter", "go_next", "Next / Confirm"),
-        ("space", "toggle_selection", "Toggle Selection"),
+        ("tab", "toggle_selection", "Toggle Selection"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ])
@@ -323,7 +323,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 header_parts.append("*(Select multiple)*")
             header_badge = f" • {' '.join(header_parts)}" if header_parts else ""
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**{header_badge}\n{q_text}")
-            hint.update("enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel")
+            hint.update("enter: confirm • tab: toggle • ←→: nav • ctrl+h: min • esc: cancel")
 
             self.raw_options = q.get("options") or []
             self.options = self.raw_options + [WRITE_IN_LABEL] if self.raw_options else []
@@ -448,7 +448,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             if not sample_items:
                 sample_items = ["Type custom answer..."]
 
-            hint = "enter: confirm • space: toggle • ←→: nav • tab: min • esc: cancel"
+            hint = "enter: confirm • tab: toggle • ←→: nav • ctrl+h: min • esc: cancel"
             content_w = modal_content_width(sample_items, max_q_title or "### **Confirm Your Answers**", hint)
             apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_MEDIUM_MAX_WIDTH)
 
@@ -512,7 +512,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 hint.update(
                     f"enter • {back_part_compact}esc"
                     if is_compact
-                    else f"enter: {action} • {back_part}tab: min • esc: cancel"
+                    else f"enter: {action} • {back_part}ctrl+h: min • esc: cancel"
                 )
                 return
 
@@ -520,15 +520,15 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 hint.update(
                     f"enter • ↑ • {back_part_compact}esc"
                     if is_compact
-                    else f"enter: {action} • ↑: list • {back_part}tab: min • esc: cancel"
+                    else f"enter: {action} • ↑: list • {back_part}ctrl+h: min • esc: cancel"
                 )
             else:
-                space_part = "space: toggle • " if is_multi else ""
-                space_part_compact = "space • " if is_multi else ""
+                tab_part = "tab: toggle • " if is_multi else ""
+                tab_part_compact = "tab • " if is_multi else ""
                 hint.update(
-                    f"enter • {space_part_compact}{back_part_compact}esc"
+                    f"enter • {tab_part_compact}{back_part_compact}esc"
                     if is_compact
-                    else f"enter: {action} • {space_part}{back_part}tab: min • esc: cancel"
+                    else f"enter: {action} • {tab_part}{back_part}ctrl+h: min • esc: cancel"
                 )
         except Exception:
             pass
@@ -723,7 +723,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                     return
                 except Exception:
                     pass
-        if event.key in SHIFT_TAB_KEYS:
+        if event.key in TAB_KEYS:
+            self.action_toggle_selection()
             event.prevent_default()
             event.stop()
             return

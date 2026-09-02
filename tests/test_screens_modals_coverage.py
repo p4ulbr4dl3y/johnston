@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from textual import events
 from textual.app import App, ComposeResult
-from textual.widgets import Input, Label, OptionList, Static
+from textual.widgets import Input, OptionList, Static
 
 from core.application.session.actions import RewindEntry
 from widgets.presentation.screens.api_key import ApiKeyScreen
@@ -22,6 +22,7 @@ from widgets.presentation.screens.rewind import (
     format_rewind_files,
 )
 from widgets.presentation.screens.rewind_action import RewindActionScreen
+from widgets.presentation.widgets.modal_hint import ModalHint
 
 
 class ModalTestApp(App):
@@ -300,8 +301,9 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
 
             with patch("widgets.utils.responsive.resolve_screen_width", return_value=30):
                 screen._refresh_options()
-                hint = screen.query_one(MODAL_HINT, Label)
-                self.assertIn("enter", str(hint.render()))
+                hint = screen.query_one(MODAL_HINT, ModalHint)
+                self.assertIn("enter", str(hint.left_text))
+                self.assertEqual(hint.right_text, "2/2")
 
     async def test_on_mount_default_value_selection(self):
         app = ModalTestApp()
@@ -704,22 +706,12 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(toggled), 1)
             self.assertTrue(tab_ev._stop_propagation)
 
-            # Space key when search input empty
+            # Space key does not toggle (space is for typing)
             space_ev = events.Key("space", " ")
-            await screen._on_key(space_ev)
-            self.assertEqual(len(toggled), 2)
-            self.assertTrue(space_ev._stop_propagation)
-
-            # Space key when search input has focus and value
-            inp = screen.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
-            inp.focus()
-            inp.value = "test search"
-            space_ev2 = events.Key("space", " ")
-            res = screen._on_key(space_ev2)
+            res = screen._on_key(space_ev)
             if asyncio.iscoroutine(res):
                 await res
-            # Not toggled again because search input has focus and value
-            self.assertEqual(len(toggled), 2)
+            self.assertEqual(len(toggled), 1)
 
     def test_action_cancel(self):
         screen = ProvidersScreen({}, "", {})

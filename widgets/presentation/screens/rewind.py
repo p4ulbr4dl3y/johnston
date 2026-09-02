@@ -6,7 +6,7 @@ from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, OptionList
+from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
 from core.application.session.actions import RewindEntry
@@ -143,6 +143,16 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
                 opt_list.highlighted = None
         except Exception:
             pass
+
+        try:
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            screen_w = resolve_screen_width(self)
+            hint_lbl = self.query_one(MODAL_HINT, ModalHint)
+            h_text = "enter • esc" if screen_w < BREAKPOINT_HINT else self.hint_text
+            total = len(self.user_messages) + 1
+            shown = len(self.filtered_options)
+            hint_lbl.update(h_text, right_text=f"{shown}/{total}")
         except Exception:
             pass
 
@@ -166,9 +176,11 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
 
             screen_w = resolve_screen_width(self)
-            hint_lbl = self.query_one(MODAL_HINT, Label)
+            hint_lbl = self.query_one(MODAL_HINT, ModalHint)
             h_text = "enter • esc" if screen_w < BREAKPOINT_HINT else self.hint_text
-            hint_lbl.update(h_text)
+            total = len(self.user_messages) + 1
+            shown = len(self.filtered_options)
+            hint_lbl.update(h_text, right_text=f"{shown}/{total}")
         except Exception:
             pass
 
@@ -177,7 +189,9 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             yield ModalHeader(self.title, esc_hint="")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
-            yield ModalHint(self.hint_text, id=MODAL_HINT_ID)
+            total = len(self.user_messages) + 1
+            shown = len(self.filtered_options)
+            yield ModalHint(self.hint_text, right_text=f"{shown}/{total}", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._refresh_options()

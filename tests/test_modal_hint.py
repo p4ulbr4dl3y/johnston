@@ -65,6 +65,19 @@ class TestModalHintFormatting(unittest.TestCase):
         self.assertIn("space", rendered_after)
         self.assertIn("pause", rendered_after)
 
+    def test_modal_hint_right_text(self):
+        from rich.table import Table
+
+        widget = ModalHint("enter: select • esc: close", right_text="5/42")
+        rendered = widget.render()
+        self.assertIsInstance(rendered, Table)
+        self.assertEqual(len(rendered.columns), 2)
+
+        widget.update("enter: select", right_text="10/100")
+        rendered2 = widget.render()
+        self.assertIsInstance(rendered2, Table)
+        self.assertEqual(widget.right_text, "10/100")
+
 
 if __name__ == "__main__":
     unittest.main()

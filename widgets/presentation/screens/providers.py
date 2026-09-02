@@ -47,7 +47,7 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             default_value=active_key if active_key in items else (items[0] if items else ""),
             show_search=True,
             search_placeholder="Search...",
-            hint_text="enter: connect • space: toggle • esc: close",
+            hint_text="enter: connect • tab: toggle • esc: close",
             dialog_classes="modal-dialog-medium",
         )
 
@@ -220,14 +220,4 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             event.prevent_default()
             event.stop()
             return
-        if event.key == "space":
-            try:
-                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
-            except Exception:
-                search_input = None
-            if not search_input or not search_input.has_focus or not search_input.value:
-                self.action_toggle_disabled()
-                event.prevent_default()
-                event.stop()
-                return
         await super()._on_key(event)

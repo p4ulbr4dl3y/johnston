@@ -190,11 +190,17 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
                 yield Input(placeholder=self.search_placeholder, id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             if self.hint_text:
-                yield ModalHint(self.hint_text, id=MODAL_HINT_ID)
+                right_text = ""
+                if self.show_search:
+                    total = sum(1 for it in self.raw_items if it is not None) if self.raw_items else len(self.raw_options)
+                    shown = sum(1 for it in self.filtered_items if it is not None) if self.filtered_items else len(self.filtered_options)
+                    right_text = f"{shown}/{total}"
+                yield ModalHint(self.hint_text, right_text=right_text, id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         super().on_mount()
         self._apply_dialog_fit()
+        self._update_hint()
         opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
         default_idx = None
         if self.default_value is not None and self.default_value in self.raw_items:
@@ -359,6 +365,29 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
                     pass
         except Exception:
             pass
+        self._update_hint()
+
+    def _update_hint(self) -> None:
+        if not self.hint_text:
+            return
+        try:
+            hint_lbl = self.query_one(f"#{MODAL_HINT_ID}", ModalHint)
+        except Exception:
+            return
+
+        if self.show_search:
+            total = sum(1 for it in self.raw_items if it is not None) if self.raw_items else len(self.raw_options)
+            shown = sum(1 for it in self.filtered_items if it is not None) if self.filtered_items else len(self.filtered_options)
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
+            base_hint = self.hint_text
+            if is_compact:
+                parts = [p.partition(":")[0].strip() for p in base_hint.split("•")]
+                base_hint = " • ".join(p for p in parts if p)
+            hint_lbl.update(base_hint, right_text=f"{shown}/{total}")
+        else:
+            hint_lbl.update(self.hint_text)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         self._filter_options(event.value)
