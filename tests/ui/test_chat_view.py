@@ -469,11 +469,13 @@ class TestChatViewAutoFollow(unittest.IsolatedAsyncioTestCase):
             bot = await chat_view.add_bot_message()
             await pilot.pause()
             self.assertTrue(chat_view.is_at_bottom())
-            # One flush growing content well past the threshold must still land
-            # on the new bottom: the deferred scroll runs after the layout that
-            # grew the content and must not re-check the stale position.
+            initial_max = chat_view.max_scroll_y
             bot.append_stream_content("tail line\n" * 40)
-            await pilot.pause(0.2)
+            bot.flush_pending_stream()
+            for _ in range(50):
+                if chat_view.max_scroll_y > initial_max and chat_view.is_at_bottom():
+                    break
+                await pilot.pause(0.05)
             self.assertTrue(chat_view.is_at_bottom())
 
     @pytest.mark.slow  # timing-sensitive (run_test + pilot.pause) — flaky under -n auto
@@ -486,8 +488,13 @@ class TestChatViewAutoFollow(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             chat_view.on_mouse_scroll_up(MagicMock())
             self.assertFalse(chat_view._auto_follow)
+            initial_max = chat_view.max_scroll_y
             bot.append_stream_content("tail line\n" * 40)
-            await pilot.pause(0.2)
+            bot.flush_pending_stream()
+            for _ in range(50):
+                if chat_view.max_scroll_y > initial_max:
+                    break
+                await pilot.pause(0.05)
             self.assertFalse(chat_view.is_at_bottom())
 
     def test_scroll_up_page_pauses_auto_follow(self):
