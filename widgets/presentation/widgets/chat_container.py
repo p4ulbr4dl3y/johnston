@@ -340,12 +340,13 @@ class ChatView(VerticalScroll):
         before: Any = None,
     ) -> UserMessage:
         att_count = attachments_count or (len(attachments) if attachments else 0)
+        is_first = not any(isinstance(c, UserMessage) for c in self.children)
         if att_count > 0:
             img_s = "s" if att_count > 1 else ""
             att_text = f"└─ {att_count} image{img_s} attached"
-            msg = UserMessage(text or "", attachment_text=att_text, markup=False)
+            msg = UserMessage(text or "", attachment_text=att_text, markup=False, is_first=is_first)
         else:
-            msg = UserMessage(text or "", markup=False)
+            msg = UserMessage(text or "", markup=False, is_first=is_first)
 
         # Sending a message returns attention to the live tail.
         if before is None:

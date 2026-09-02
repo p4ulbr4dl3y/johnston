@@ -117,34 +117,45 @@ WelcomeWidget {
 .user-msg {
     width: 100%;
     height: auto;
-    align: right top;
     margin-top: 1;
+    border-top: solid $border;
+}
+
+.user-msg-first {
+    margin-top: 0;
+    border-top: none;
+}
+
+.user-msg-prefix {
+    width: auto;
+    height: auto;
+    padding: 1 0 0 0;
+    color: $primary;
 }
 
 .user-msg-bubble {
-    width: auto;
-    max-width: 85%;
+    width: 1fr;
     height: auto;
-    padding: 1 2;
-    background: $bg-surface;
+    padding: 1 0 0 0;
+    background: $bg-app;
     color: $fg-primary;
     text-align: left;
 }
 
 .user-msg-text {
-    width: auto;
+    width: 100%;
     height: auto;
     color: $fg-primary;
 }
 
 .user-msg-att {
-    width: auto;
+    width: 100%;
     height: auto;
     color: $fg-muted;
 }
 
 #modal-dialog .user-msg-bubble {
-    background: $bg-surface;
+    background: $bg-app;
 }
 
 /* Bot Message Container - Primary Text */
@@ -232,7 +243,7 @@ WelcomeWidget {
     height: auto;
     margin: 1 0 0 0;
     padding: 0 1;
-    background: $bg-surface;
+    background: $bg-app;
     color: $fg-secondary;
     border-left: solid $border;
     text-wrap: wrap;

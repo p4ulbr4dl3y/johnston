@@ -48,6 +48,13 @@ class UserMessageAttachment(Static):
     ALLOW_SELECT = False
 
 
+class UserMessagePrefix(Static):
+    """Prompt chevron prefix for UserMessage, unselectable"""
+
+    can_focus = False
+    ALLOW_SELECT = False
+
+
 class UserMessage(Horizontal):
     """User message"""
 
@@ -58,6 +65,7 @@ class UserMessage(Horizontal):
         content: str | Text = "",
         attachment_text: str = "",
         markup: bool = False,
+        is_first: bool = False,
     ):
         if isinstance(content, Text):
             user_str = content.plain
@@ -74,6 +82,8 @@ class UserMessage(Horizontal):
         else:
             self.raw_text = user_str
 
+        prefix = UserMessagePrefix("❯ ", markup=False, classes="user-msg-prefix")
+
         if att_str:
             bubble = Vertical(
                 Static(renderable_content, markup=markup, classes="user-msg-text"),
@@ -83,7 +93,8 @@ class UserMessage(Horizontal):
         else:
             bubble = Static(renderable_content, markup=markup, classes="user-msg-bubble")
 
-        super().__init__(bubble, classes="user-msg")
+        classes = "user-msg user-msg-first" if is_first else "user-msg"
+        super().__init__(prefix, bubble, classes=classes)
 
 
 def scroll_parent_if_needed(widget, force: bool = False) -> None:
