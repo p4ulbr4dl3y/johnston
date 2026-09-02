@@ -176,10 +176,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
     def role_name(self) -> str:
         if getattr(self, "_role_name", None):
             return self._role_name
-        from core.role_registry import get_role_display_name
+        from core.role_registry import resolve_role_display_name
 
         pdir = getattr(getattr(self, "app", None), "project_dir", None)
-        return get_role_display_name(self.role or "worker", project_dir=pdir)
+        return resolve_role_display_name(self.role, project_dir=pdir)
 
     @role_name.setter
     def role_name(self, value: str) -> None:

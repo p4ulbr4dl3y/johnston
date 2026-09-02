@@ -183,3 +183,12 @@ def get_role_display_name(role_or_key: Any, project_dir: Optional[str] = None) -
             return registry.roles[key_lower].name
         return role_or_key.replace("_", " ").replace("-", " ").title()
     return "Worker"
+
+
+def resolve_role_display_name(role: Any, project_dir: Optional[str] = None) -> str:
+    """Resolve a human-readable role name, falling back to the default "worker" role.
+
+    Shared by session and agent ``role_name`` properties. An empty/None role
+    resolves to the worker display name ("Worker").
+    """
+    return get_role_display_name(role or "worker", project_dir=project_dir)

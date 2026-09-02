@@ -664,4 +664,31 @@ class TestRoleDisplayAndInjection:
         agent.role_name = "Lead QA"
         assert agent.role_name == "Lead QA"
 
+    def test_resolve_role_display_name_with_display(self):
+        from core.role_registry import resolve_role_display_name
+
+        assert resolve_role_display_name("code_reviewer") == "Code Reviewer"
+        assert resolve_role_display_name("qa_tester") == "Qa Tester"
+
+    def test_resolve_role_display_name_empty_defaults_to_worker(self):
+        from core.role_registry import resolve_role_display_name
+
+        assert resolve_role_display_name("") == "Worker"
+        assert resolve_role_display_name(None) == "Worker"
+        assert resolve_role_display_name("unknown_role") == "Unknown Role"
+
+    def test_resolve_role_display_name_caching_via_properties(self):
+        from core.base_provider.agent import BaseAgent
+        from core.domain.entities.session import AgentSession
+
+        # Cached value (set via the setter) is returned without re-resolving.
+        sess = AgentSession("s1", role="code_reviewer")
+        sess.role_name = "Cached Session Role"
+        assert sess.role_name == "Cached Session Role"
+
+        agent = BaseAgent()
+        agent.role = "qa_tester"
+        agent.role_name = "Cached Agent Role"
+        assert agent.role_name == "Cached Agent Role"
+
 
