@@ -15,34 +15,22 @@ import threading
 import time
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
-from core.domain.defaults.config import DEFAULT_MCP_CALL_TIMEOUT, DEFAULT_MCP_INIT_TIMEOUT
 from core.domain.defaults.errors import format_tool_error
+from core.infrastructure.mcp.base import (
+    CLIENT_NAME,
+    CLIENT_VERSION,
+    DEFAULT_TOOLS_CALL_TIMEOUT,
+    MCP_PROTOCOL_VERSION,
+    MCPClientBase,
+    _config_init_timeout,
+)
 
 logger = logging.getLogger(__name__)
 
-MCP_PROTOCOL_VERSION = "2024-11-05"
-CLIENT_NAME = "johnston"
-CLIENT_VERSION = "1.0.0"
-
-# Default upper bound for a tools/call round-trip. A hanging server must never
-# hold an agent turn forever; both the manager and direct callers get this
-# default when no explicit timeout is passed.
-DEFAULT_TOOLS_CALL_TIMEOUT = DEFAULT_MCP_CALL_TIMEOUT
-INIT_TIMEOUT = DEFAULT_MCP_INIT_TIMEOUT
 STDERR_TAIL_LINES = 200
 
 
-def _config_init_timeout() -> float:
-    """Return the configured MCP init timeout (tools.mcp_init_timeout)."""
-    try:
-        from core.infrastructure.config.settings import get_settings
-
-        return get_settings().tools.mcp_init_timeout
-    except Exception:
-        return INIT_TIMEOUT
-
-
-class MCPProcessClient:
+class MCPProcessClient(MCPClientBase):
     """Stdio JSON-RPC 2.0 client for MCP servers with Async Multiplexing support."""
 
     # Upper bound on cached responses kept for the sync read path. The async path
@@ -51,29 +39,22 @@ class MCPProcessClient:
     # unboundedly for long-running async-only sessions.
     MAX_PENDING_RESPONSES = 256
 
+    # Used to serialize _next_req_id in thread-safe sync paths.
+    _id_lock = threading.RLock()
+
     def __init__(
         self, name: str, command: str | List[str], cwd: Optional[str] = None, env: Optional[Dict[str, Any]] = None
     ):
-        self.name = name
+        super().__init__(name, cwd=cwd, env=env)
         if isinstance(command, str):
             self.cmd = [command]
         else:
             self.cmd = list(command)
-        self.cwd = cwd
-        self.env = env
         self.process: Optional[subprocess.Popen] = None
-        self.req_id = 0
-        self.tools: List[Dict[str, Any]] = []
-        self.resources: List[Dict[str, Any]] = []
-        self.prompts: List[Dict[str, Any]] = []
-        self.server_capabilities: Dict[str, Any] = {}
-        self.last_error: Optional[str] = None
-        self._stopped = False
         self._buffer = ""
         self._lock = threading.RLock()
         self._write_lock = threading.Lock()
         self._pending_responses: Dict[int, Dict[str, Any]] = {}
-        self._pending_futures: Dict[int, asyncio.Future] = {}
         self._read_task: Optional[asyncio.Task] = None
         self._reader_thread: Optional[threading.Thread] = None
         self._reader_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -82,23 +63,16 @@ class MCPProcessClient:
         # server can never deadlock on a full pipe; also available as diagnostics.
         self._stderr_tail: Deque[str] = collections.deque(maxlen=STDERR_TAIL_LINES)
         self._queue: Optional[asyncio.Queue] = None
-        # Guards the async request critical section (id generation, future
-        # registration and stdin write) so concurrent callers never pick a
-        # duplicate req_id or leave an unregistered future behind.
-        self._call_lock = asyncio.Lock()
-        self._start_lock = asyncio.Lock()
-        # Monotonic timestamp of the last successful tools/list fetch, used to
-        # rate-limit the per-call post-call refresh (avoids a duplicate fetch).
-        self._tools_fetch_time = 0.0
         self._response_event = threading.Event()
-        self.on_tools_changed: Optional[Any] = None
-        self.on_resources_changed: Optional[Any] = None
-        self.on_prompts_changed: Optional[Any] = None
+
+    # ── Request ID generation (thread-safe) ────────────────────────────────
 
     def _next_req_id(self) -> int:
-        with self._lock:
+        with self._id_lock:
             self.req_id += 1
             return self.req_id
+
+    # ── Stdio line parsing ─────────────────────────────────────────────────
 
     @staticmethod
     def _parse_line(line_str: str) -> Optional[Dict[str, Any]]:
@@ -110,6 +84,8 @@ class MCPProcessClient:
         except Exception:
             return None
         return data if isinstance(data, dict) else None
+
+    # ── Async reader lifecycle ─────────────────────────────────────────────
 
     def _start_async_reader(self):
         if self._read_task and not self._read_task.done():
@@ -221,6 +197,8 @@ class MCPProcessClient:
         if tail:
             self.last_error = f"{self.last_error}; server stderr: {tail[-300:]}"
 
+    # ── Async read loop (stdio transport) ──────────────────────────────────
+
     async def _async_read_loop(self):
         """Background async loop reading stdio JSON-RPC lines and fulfilling futures by request ID.
 
@@ -278,107 +256,7 @@ class MCPProcessClient:
         finally:
             self._fail_pending_futures()
 
-    async def _handle_server_request_async(self, data: Dict[str, Any]) -> None:
-        req_id = data.get("id")
-        method = data.get("method", "")
-        if method == "roots/list":
-            roots = []
-            if self.cwd:
-                real_cwd = os.path.realpath(self.cwd)
-                roots.append({
-                    "uri": f"file://{real_cwd}",
-                    "name": os.path.basename(real_cwd) or "workspace",
-                })
-            await self._send_async({"jsonrpc": "2.0", "id": req_id, "result": {"roots": roots}})
-        elif method == "ping":
-            await self._send_async({"jsonrpc": "2.0", "id": req_id, "result": {}})
-        else:
-            await self._send_async({
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {"code": -32601, "message": f"Method {method!r} not found"},
-            })
-
-    async def _handle_tools_list_changed_async(self) -> None:
-        try:
-            await self.fetch_tools_async()
-            if callable(self.on_tools_changed):
-                cb = self.on_tools_changed
-                if asyncio.iscoroutinefunction(cb):
-                    await cb()
-                else:
-                    cb()
-        except Exception:
-            logger.debug("Failed to refresh tools on list_changed notification for '%s'", self.name, exc_info=True)
-
-    async def _handle_resources_list_changed_async(self) -> None:
-        try:
-            await self.fetch_resources_async()
-            if callable(self.on_resources_changed):
-                cb = self.on_resources_changed
-                if asyncio.iscoroutinefunction(cb):
-                    await cb()
-                else:
-                    cb()
-        except Exception:
-            logger.debug("Failed to refresh resources on list_changed notification for '%s'", self.name, exc_info=True)
-
-    async def _handle_prompts_list_changed_async(self) -> None:
-        try:
-            await self.fetch_prompts_async()
-            if callable(self.on_prompts_changed):
-                cb = self.on_prompts_changed
-                if asyncio.iscoroutinefunction(cb):
-                    await cb()
-                else:
-                    cb()
-        except Exception:
-            logger.debug("Failed to refresh prompts on list_changed notification for '%s'", self.name, exc_info=True)
-
-    def _send_request_sync(
-        self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
-    ) -> Optional[Dict[str, Any]]:
-        current_id = self._next_req_id()
-        req = {"jsonrpc": "2.0", "id": current_id, "method": method}
-        if params is not None:
-            req["params"] = params
-        self._send(req)
-        return self._read_response(req_id=current_id, timeout=timeout)
-
-    async def _send_request_async(
-        self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
-    ) -> Optional[Dict[str, Any]]:
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return self._send_request_sync(method, params=params, timeout=timeout)
-
-        self._start_async_reader()
-        async with self._call_lock:
-            current_id = self._next_req_id()
-            req = {"jsonrpc": "2.0", "id": current_id, "method": method}
-            if params is not None:
-                req["params"] = params
-
-            fut = loop.create_future()
-            self._pending_futures[current_id] = fut
-
-            try:
-                await self._send_async(req)
-            except Exception:
-                logger.debug("Failed to write request to MCP server '%s'", self.name, exc_info=True)
-                self._pending_futures.pop(current_id, None)
-                return None
-
-        try:
-            if timeout is not None:
-                return await asyncio.wait_for(asyncio.shield(fut), timeout=timeout)
-            return await fut
-        except Exception:
-            logger.debug("MCP request '%s' failed for server '%s'", method, self.name, exc_info=True)
-            return None
-        finally:
-            self._pending_futures.pop(current_id, None)
+    # ── Process management ─────────────────────────────────────────────────
 
     def _build_popen_kwargs(self) -> Dict[str, Any]:
         """Helper to assemble standard Popen keyword arguments for MCP server process."""
@@ -589,6 +467,8 @@ class MCPProcessClient:
         """
         await asyncio.to_thread(self.stop)
 
+    # ── Transport: send messages over stdin ────────────────────────────────
+
     def _send(self, message: Dict[str, Any]) -> None:
         if not self.process or not self.process.stdin:
             return
@@ -606,6 +486,12 @@ class MCPProcessClient:
         if not self.process or not self.process.stdin:
             return
         await asyncio.to_thread(self._send, message)
+
+    async def _send_notification_async(self, message: Dict[str, Any]) -> None:
+        """Send a JSON-RPC notification or response over stdin."""
+        await self._send_async(message)
+
+    # ── Transport: read responses from stdout (sync fallback) ──────────────
 
     def _read_response(self, req_id: Optional[int] = None, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
         if not self.process or not self.process.stdout or self._stopped:
@@ -640,27 +526,7 @@ class MCPProcessClient:
                     continue
                 if "method" in data and "id" not in data:
                     method = data.get("method", "")
-                    if method in ("notifications/tools/list_changed", "tools/list_changed") or method.endswith("tools/list_changed"):
-                        try:
-                            self.fetch_tools()
-                            if callable(self.on_tools_changed):
-                                self.on_tools_changed()
-                        except Exception:
-                            logger.debug("Failed to refresh tools on list_changed notification", exc_info=True)
-                    elif method in ("notifications/resources/list_changed", "resources/list_changed") or method.endswith("resources/list_changed"):
-                        try:
-                            self.fetch_resources()
-                            if callable(self.on_resources_changed):
-                                self.on_resources_changed()
-                        except Exception:
-                            logger.debug("Failed to refresh resources on list_changed notification", exc_info=True)
-                    elif method in ("notifications/prompts/list_changed", "prompts/list_changed") or method.endswith("prompts/list_changed"):
-                        try:
-                            self.fetch_prompts()
-                            if callable(self.on_prompts_changed):
-                                self.on_prompts_changed()
-                        except Exception:
-                            logger.debug("Failed to refresh prompts on list_changed notification", exc_info=True)
+                    self._dispatch_notification_sync(method)
                     continue
 
                 if "method" in data and "id" in data:
@@ -739,6 +605,55 @@ class MCPProcessClient:
                 "error": {"code": -32601, "message": f"Method {method!r} not found"},
             })
 
+    # ── Transport: async request/response over stdin ───────────────────────
+
+    async def _send_request_async(
+        self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
+    ) -> Optional[Dict[str, Any]]:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return self._send_request_sync(method, params=params, timeout=timeout)
+
+        self._start_async_reader()
+        async with self._call_lock:
+            current_id = self._next_req_id()
+            req = {"jsonrpc": "2.0", "id": current_id, "method": method}
+            if params is not None:
+                req["params"] = params
+
+            fut = loop.create_future()
+            self._pending_futures[current_id] = fut
+
+            try:
+                await self._send_async(req)
+            except Exception:
+                logger.debug("Failed to write request to MCP server '%s'", self.name, exc_info=True)
+                self._pending_futures.pop(current_id, None)
+                return None
+
+        try:
+            if timeout is not None:
+                return await asyncio.wait_for(asyncio.shield(fut), timeout=timeout)
+            return await fut
+        except Exception:
+            logger.debug("MCP request '%s' failed for server '%s'", method, self.name, exc_info=True)
+            return None
+        finally:
+            self._pending_futures.pop(current_id, None)
+
+    def _send_request_sync(
+        self, method: str, params: Optional[Dict[str, Any]] = None, timeout: Optional[float] = None
+    ) -> Optional[Dict[str, Any]]:
+        current_id = self._next_req_id()
+        req = {"jsonrpc": "2.0", "id": current_id, "method": method}
+        if params is not None:
+            req["params"] = params
+        self._send(req)
+        return self._read_response(req_id=current_id, timeout=timeout)
+
+    # ── Sync tools/resources/prompts/init (stdio-only) ─────────────────────
+
     def _initialize(self) -> bool:
         current_id = self._next_req_id()
         init_req = {
@@ -774,37 +689,6 @@ class MCPProcessClient:
             self.fetch_prompts()
         return True
 
-    async def _initialize_async(self) -> bool:
-        res = await self._send_request_async(
-            "initialize",
-            params={
-                "protocolVersion": MCP_PROTOCOL_VERSION,
-                "capabilities": {
-                    "roots": {"listChanged": True},
-                },
-                "clientInfo": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
-            },
-            timeout=_config_init_timeout(),
-        )
-        if not res:
-            self.last_error = "Server did not respond to initialize request (timeout)"
-            return False
-        if "error" in res:
-            err_msg = (
-                res["error"].get("message", str(res["error"])) if isinstance(res["error"], dict) else str(res["error"])
-            )
-            self.last_error = f"MCP init error: {err_msg}"
-            return False
-
-        self.server_capabilities = res.get("result", {}).get("capabilities", {})
-        await self._send_async({"jsonrpc": "2.0", "method": "notifications/initialized"})
-        await self.fetch_tools_async()
-        if "resources" in self.server_capabilities:
-            await self.fetch_resources_async()
-        if "prompts" in self.server_capabilities:
-            await self.fetch_prompts_async()
-        return True
-
     def fetch_tools(self) -> List[Dict[str, Any]]:
         with self._lock:
             current_id = self._next_req_id()
@@ -816,13 +700,6 @@ class MCPProcessClient:
                 self._tools_fetch_time = time.monotonic()
             return self.tools
 
-    async def fetch_tools_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("tools/list", timeout=_config_init_timeout())
-        if res and "result" in res:
-            self.tools = res["result"].get("tools", [])
-            self._tools_fetch_time = time.monotonic()
-        return self.tools
-
     def fetch_resources(self) -> List[Dict[str, Any]]:
         with self._lock:
             current_id = self._next_req_id()
@@ -832,12 +709,6 @@ class MCPProcessClient:
             if res and "result" in res:
                 self.resources = res["result"].get("resources", [])
             return self.resources
-
-    async def fetch_resources_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("resources/list", timeout=_config_init_timeout())
-        if res and "result" in res:
-            self.resources = res["result"].get("resources", [])
-        return self.resources
 
     def read_resource(self, uri: str, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
         with self._lock:
@@ -854,16 +725,6 @@ class MCPProcessClient:
                 return res["result"]
             return None
 
-    async def read_resource_async(self, uri: str, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
-        res = await self._send_request_async(
-            "resources/read",
-            params={"uri": uri},
-            timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT,
-        )
-        if res and "result" in res:
-            return res["result"]
-        return None
-
     def fetch_prompts(self) -> List[Dict[str, Any]]:
         with self._lock:
             current_id = self._next_req_id()
@@ -873,12 +734,6 @@ class MCPProcessClient:
             if res and "result" in res:
                 self.prompts = res["result"].get("prompts", [])
             return self.prompts
-
-    async def fetch_prompts_async(self) -> List[Dict[str, Any]]:
-        res = await self._send_request_async("prompts/list", timeout=_config_init_timeout())
-        if res and "result" in res:
-            self.prompts = res["result"].get("prompts", [])
-        return self.prompts
 
     def get_prompt(
         self, name: str, arguments: Optional[Dict[str, str]] = None, timeout: Optional[float] = None
@@ -897,23 +752,7 @@ class MCPProcessClient:
                 return res["result"]
             return None
 
-    async def get_prompt_async(
-        self, name: str, arguments: Optional[Dict[str, str]] = None, timeout: Optional[float] = None
-    ) -> Optional[Dict[str, Any]]:
-        res = await self._send_request_async(
-            "prompts/get",
-            params={"name": name, "arguments": arguments or {}},
-            timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT,
-        )
-        if res and "result" in res:
-            return res["result"]
-        return None
-
-    def is_tools_stale(self, ttl: float = 300.0) -> bool:
-        """True if the cached tools list is stale (based on last fetch time)."""
-        if self._tools_fetch_time <= 0.0:
-            return True
-        return (time.monotonic() - self._tools_fetch_time) >= ttl
+    # ── Tool call (stdio transport) ────────────────────────────────────────
 
     def _build_call_payload(self, tool_name: str, arguments: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
         """Helper to create JSON-RPC tool call payload with incremented request id."""
@@ -928,45 +767,6 @@ class MCPProcessClient:
             },
         }
         return current_id, req
-
-    @staticmethod
-    def _format_content(result: Any) -> str:
-        """Serialize a tools/call result ``content`` list into one output string."""
-        content_items = result.get("content", []) if isinstance(result, dict) else []
-        output_parts = []
-        for item in content_items:
-            if isinstance(item, dict) and item.get("type") == "text":
-                output_parts.append(item.get("text", ""))
-            else:
-                output_parts.append(json.dumps(item, ensure_ascii=False))
-        return "\n".join(output_parts).strip()
-
-    def _parse_tool_response(self, tool_name: str, res: Optional[Dict[str, Any]]) -> str:
-        """Helper to parse MCP tool call JSON-RPC response or error dict into string output.
-
-        Every failure path returns an ``ERR:``-prefixed string so upper layers
-        (``normalize_tool_result`` in the registry and agent loop) classify it
-        as an error just like native-tool failures. Per the MCP spec, a result
-        with ``isError: true`` is a tool-level failure even though the JSON-RPC
-        round-trip itself succeeded.
-        """
-        if not res:
-            return format_tool_error("mcp", detail=f"No response from MCP server '{self.name}'", name=tool_name)
-        if "error" in res:
-            err_val = res["error"]
-            err_msg = err_val.get("message", str(err_val)) if isinstance(err_val, dict) else str(err_val)
-            return format_tool_error("mcp", detail=err_msg, name=tool_name)
-
-        result = res.get("result", {})
-        if isinstance(result, dict) and result.get("isError"):
-            detail = self._format_content(result) or "Tool reported isError without content"
-            return format_tool_error("mcp", detail=detail, name=tool_name)
-
-        output_text = self._format_content(result)
-        if output_text:
-            return output_text
-
-        return f"MCP tool '{tool_name}' from server '{self.name}' executed successfully."
 
     def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: Optional[float] = None) -> str:
         with self._lock:

@@ -1,5 +1,6 @@
 """MCP (Model Context Protocol) Manager for Johnston."""
 
+from core.infrastructure.mcp.base import MCPClientBase
 from core.infrastructure.mcp.manager import (
     GLOBAL_MCP_FILE,
     PROJECT_MCP_FILE,
@@ -11,6 +12,7 @@ from core.infrastructure.mcp.process_client import MCPProcessClient
 from core.infrastructure.mcp.sse_client import MCPSSEClient
 
 __all__ = [
+    "MCPClientBase",
     "MCPProcessClient",
     "MCPSSEClient",
     "MCPManager",
