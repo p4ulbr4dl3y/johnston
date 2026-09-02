@@ -86,7 +86,7 @@ Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, T
 #chat-view {
     height: 1fr;
     min-height: 3;
-    padding: 0 2 1 2;
+    padding: 1 2 1 2;
     background: $bg-app;
     scrollbar-size: 0 0;
 }
