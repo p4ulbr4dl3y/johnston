@@ -8,7 +8,13 @@ from app import JohnstonApp
 from widgets.chat_toolcall import ToolCallWidget
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.presentation.widgets.chat_markdown import clean_markdown_for_rendering, safe_update_markdown, to_snake_case
-from widgets.presentation.widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
+from widgets.presentation.widgets.chat_messages import (
+    BotMessage,
+    ErrorMessage,
+    EventDivider,
+    ThinkingWidget,
+    UserMessage,
+)
 from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
 
@@ -160,11 +166,16 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             chat_view = app.query_one(ChatView)
             thinking = await chat_view.add_thinking_widget("Thinking...", animate=False)
             divider = await chat_view.add_event_divider("Session Compacted", animate=False)
-            user_msg = await chat_view.add_user_message("after divider", animate=False)
+            user_msg1 = await chat_view.add_user_message("after divider", animate=False)
+            err_msg = await chat_view.add_error_message("API Error: rate limit", animate=False)
+            user_msg2 = await chat_view.add_user_message("after error", animate=False)
             await pilot.pause()
             self.assertIsInstance(thinking, ThinkingWidget)
             self.assertIsInstance(divider, EventDivider)
-            self.assertIn("user-msg-first", user_msg.classes)
+            self.assertIn("user-msg-first", user_msg1.classes)
+            self.assertIsInstance(err_msg, ErrorMessage)
+            self.assertEqual(err_msg.raw_text, "API Error: rate limit")
+            self.assertNotIn("user-msg-first", user_msg2.classes)
 
     async def test_add_tool_call_sequential_flag(self):
         app = JohnstonApp()
@@ -649,6 +660,11 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
         # event divider
         d = await chat_view.restore_message({"type": "event_divider", "text": "Compacted"})
         self.assertIsInstance(d, EventDivider)
+
+        # error
+        err = await chat_view.restore_message({"type": "error", "text": "API Error: failed"})
+        self.assertIsInstance(err, ErrorMessage)
+        self.assertEqual(err.raw_text, "API Error: failed")
 
         # invalid / hidden
         none_msg = await chat_view.restore_message("not-a-dict")

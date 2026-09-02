@@ -79,6 +79,8 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
         session.add_event({"type": "user", "text": val1})
     elif etype == "event_divider":
         session.add_event({"type": "event_divider", "text": val1 or "Session Compacted"})
+    elif etype == "error":
+        session.add_event({"type": "error", "text": val1 or "Error"})
 
 
 def configure_subagent_agent(
@@ -179,7 +181,10 @@ async def _run_single_subagent_message(
     last_api_error = [None]
     try:
         async for step in subagent.stream_steps(message):
-            if step and step[0] == "event_divider" and len(step) > 1 and str(step[1]).startswith("API Error:"):
+            if step and (
+                step[0] == "error"
+                or (step[0] == "event_divider" and len(step) > 1 and str(step[1]).startswith("API Error:"))
+            ):
                 last_api_error[0] = str(step[1])
             record_subagent_step(step, session, acc)
         _sync_subagent_metrics(session, subagent)

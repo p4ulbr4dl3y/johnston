@@ -57,6 +57,16 @@ class TestFormatApiError(unittest.TestCase):
         res = format_api_error(err)
         self.assertEqual(res, "**API Error:** `Connection timeout`")
 
+    def test_http_status_code_fallback_when_empty_message(self):
+        err = Exception("HTTP 429:")
+        res = format_api_error(err)
+        self.assertEqual(res, "**API Error (429):** `Rate limit exceeded`")
+
+    def test_redundant_status_prefix_stripped(self):
+        err = Exception("429 - Rate limit reached for default model")
+        res = format_api_error(err)
+        self.assertEqual(res, "**API Error (429):** `Rate limit reached for default model`")
+
 
 class TestFormatApiErrorBranches(unittest.TestCase):
     def test_none_error(self):

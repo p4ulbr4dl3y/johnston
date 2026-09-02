@@ -46,6 +46,7 @@ class MessageType(str, Enum):
     TOOL = "tool"
     STATUS_CHANGE = "status_change"
     EVENT_DIVIDER = "event_divider"
+    ERROR = "error"
 
 
 def _coerce_int(val: Any) -> int:

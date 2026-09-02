@@ -26,6 +26,20 @@ def _extract_error_fields(data: dict) -> tuple[str, str]:
     return "", ""
 
 
+_HTTP_STATUS_PHRASES: dict[int, str] = {
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    408: "Request Timeout",
+    429: "Rate limit exceeded",
+    500: "Internal Server Error",
+    502: "Bad Gateway",
+    503: "Service Unavailable",
+    504: "Gateway Timeout",
+}
+
+
 def format_api_error(err: Exception) -> str:
     """Formats API exceptions into a clean, unified Markdown string.
 
@@ -76,6 +90,18 @@ def format_api_error(err: Exception) -> str:
                 pass
 
     msg = msg.strip("'\" \n\r\t")
+    if status_code:
+        msg = re.sub(
+            rf"^(HTTP\s*{status_code}[:\s]*|Error code:\s*{status_code}\s*-\s*|{status_code}\s*[:\-]\s*)",
+            "",
+            msg,
+            flags=re.IGNORECASE,
+        ).strip()
+    msg = re.sub(r"^HTTP\s*\d+[:\s]*", "", msg, flags=re.IGNORECASE).strip()
+    msg = msg.rstrip(":").strip()
+
+    if not msg and status_code:
+        msg = _HTTP_STATUS_PHRASES.get(status_code, "HTTP error")
 
     tag_parts = []
     if status_code:

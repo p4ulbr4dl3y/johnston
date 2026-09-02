@@ -186,6 +186,14 @@ WelcomeWidget {
     color: $fg-muted;
 }
 
+/* Error Message Styling - Clean accent error text */
+.error-msg {
+    width: 100%;
+    height: auto;
+    margin-top: 1;
+    color: $accent-error;
+}
+
 /* ThinkingWidget Styling - Subtle Zinc */
 .thinking-widget {
     width: 100%;

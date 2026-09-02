@@ -315,6 +315,8 @@ class SubagentViewScreen(ModalScreen[None]):
                     await self.bot_msg.reset_stream()
                 except Exception:
                     pass
+        elif etype == "error":
+            await chat_view.add_error_message(evt.get("text", "Error"), animate=animate)
         elif etype == "event_divider":
             await chat_view.add_event_divider(evt.get("text", "Session Compacted"), animate=animate)
         elif etype == "status_change":

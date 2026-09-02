@@ -126,7 +126,7 @@ class TestRetryableErrors(unittest.IsolatedAsyncioTestCase):
                 events.append(evt)
 
         self.assertEqual(attempts, 1)
-        api_errors = [e for e in events if e[0] == "event_divider" and "API Error" in e[1]]
+        api_errors = [e for e in events if e[0] == "error" and "API Error" in e[1]]
         self.assertEqual(len(api_errors), 1)
         self.assertIn("Invalid API key", api_errors[0][1])
 
@@ -229,7 +229,7 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 events.append(evt)
 
         fake_cb.allow_request.assert_called_once_with("tprov")
-        self.assertEqual(events[-1][0], "event_divider")
+        self.assertEqual(events[-1][0], "error")
         self.assertIn("Circuit breaker for provider 'tprov' is OPEN", events[-1][1])
 
     async def test_create_retry_without_stream_options_and_reasoning_effort(self):
@@ -261,7 +261,7 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             async for evt in agent.stream_steps("hi"):
                 events.append(evt)
 
-        self.assertEqual(events[-1][0], "event_divider")
+        self.assertEqual(events[-1][0], "error")
         self.assertIn("Stream chunk timeout", events[-1][1])
         self.assertIn("tprov", events[-1][1])
 

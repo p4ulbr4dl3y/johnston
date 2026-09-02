@@ -10,7 +10,13 @@ from core.infrastructure.config.settings import get_settings
 from core.infrastructure.mcp import mcp_tool_is_known
 from widgets.chat_toolcall import ToolCallWidget
 from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
-from widgets.presentation.widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
+from widgets.presentation.widgets.chat_messages import (
+    BotMessage,
+    ErrorMessage,
+    EventDivider,
+    ThinkingWidget,
+    UserMessage,
+)
 from widgets.presentation.widgets.chat_welcome import WelcomeWidget
 
 logger = logging.getLogger(__name__)
@@ -90,6 +96,9 @@ async def restore_message_item(
     elif mtype == "event_divider":
         ctxt = msg.get("text", "Session Compacted")
         return await chat_view.add_event_divider(ctxt, animate=False, **kw)
+    elif mtype == "error":
+        ctxt = msg.get("text", "")
+        return await chat_view.add_error_message(ctxt, animate=False, **kw)
     return None
 
 
@@ -443,6 +452,16 @@ class ChatView(VerticalScroll):
         before: Any = None,
     ) -> EventDivider:
         widget = EventDivider(text)
+        should_scroll = not self._is_loading_session and self.is_at_bottom() if before is None else False
+        return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate, before=before)
+
+    async def add_error_message(
+        self,
+        text: str = "",
+        animate: bool = False,
+        before: Any = None,
+    ) -> ErrorMessage:
+        widget = ErrorMessage(text)
         should_scroll = not self._is_loading_session and self.is_at_bottom() if before is None else False
         return await self._mount_and_scroll(widget, should_scroll=should_scroll, animate=animate, before=before)
 

@@ -807,7 +807,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             error_msg = format_api_error(err)
             clean_msg = error_msg.replace("**API Error:**", "API Error:").replace("**", "").replace("`", "").strip()
             clean_msg = " ".join(clean_msg.split())
-            yield ("event_divider", clean_msg, "")
+            yield ("error", clean_msg, "")
         finally:
             if len(messages) > 1:
                 self.history = await sanitize_history_cached(self, messages[1:])

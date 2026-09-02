@@ -38,6 +38,7 @@ def _canvas(**overrides):
             )
         ),
         add_event_divider=AsyncMock(),
+        add_error_message=AsyncMock(),
         get_user_messages=MagicMock(return_value=[("0", "hi")]),
         refresh_status_footer=MagicMock(),
         notify=MagicMock(),
@@ -239,6 +240,23 @@ async def test_event_divider_refreshes_footer():
     canvas.refresh_status_footer.assert_called_once()
     assert len(sess.events) == 2
     assert sess.events[1] == {"type": "event_divider", "text": "Compacted"}
+
+
+@pytest.mark.asyncio
+async def test_error_event_renders_error_message_and_refreshes_footer():
+    canvas = _canvas()
+    sess = _fake_session()
+
+    async def stream(prompt, attachments=None):
+        yield ("error", "API Error: Invalid key", "")
+
+    await generate_ai_response(
+        _FakeAgent(stream), sess, canvas, session_id="s1", user_text="hi"
+    )
+    canvas.add_error_message.assert_awaited_once_with("API Error: Invalid key")
+    canvas.refresh_status_footer.assert_called_once()
+    assert len(sess.events) == 2
+    assert sess.events[1] == {"type": "error", "text": "API Error: Invalid key"}
 
 
 @pytest.mark.asyncio

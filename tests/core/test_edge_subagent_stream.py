@@ -724,3 +724,17 @@ class TestSubagentStepAndErrorHandling:
         assert f"[{error_msg}]" in result
         assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
 
+    @pytest.mark.asyncio
+    async def test_error_step_marks_status_error_and_returns_error_text(self):
+        error_msg = "API Error: Invalid API key"
+        sub = FakeSubagent(steps=[("error", error_msg, "")])
+        sess = make_session()
+        ctx = FakeCtx()
+        store = FakeStore()
+        result = await run_subagent_stream_bg(
+            sub, "initial prompt", sess, ctx, store, notification_template="Result: {result_text}"
+        )
+        assert sess.status == STATUS_ERROR
+        assert f"[{error_msg}]" in result
+        assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
+

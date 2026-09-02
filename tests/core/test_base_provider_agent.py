@@ -868,8 +868,8 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
 
             steps = [s async for s in agent.stream_steps("Hello")]
 
-        dividers = [s[1] for s in steps if s[0] == "event_divider"]
-        self.assertTrue(any("Token limit reached during reasoning" in d for d in dividers))
+        errors = [s[1] for s in steps if s[0] == "error"]
+        self.assertTrue(any("Token limit reached during reasoning" in d for d in errors))
 
     async def test_stream_steps_forwards_headers_and_extra_body_for_anthropic(self):
         agent = BaseAgent(

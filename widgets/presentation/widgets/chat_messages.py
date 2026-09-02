@@ -41,6 +41,23 @@ class EventDivider(Static):
         self.update(Rule(cleaned, style="dim"))
 
 
+class ErrorMessage(Static):
+    """Error callout message block with copy support"""
+
+    can_focus = False
+    ALLOW_SELECT = True
+
+    def __init__(self, content: str | Text = "", markup: bool = False):
+        if isinstance(content, Text):
+            self.raw_text = content.plain
+            renderable = content
+        else:
+            text_str = str(content or "")
+            self.raw_text = text_str
+            renderable = text_str
+        super().__init__(renderable, markup=markup, classes="error-msg")
+
+
 class UserMessageAttachment(Static):
     """Attachment footnote for UserMessage, unselectable so prompt copy stays clean"""
 

@@ -4,8 +4,25 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from rich.text import Text
 
-from widgets.presentation.widgets.chat_messages import BotMessage, EventDivider, ThinkingWidget, UserMessage
+from widgets.presentation.widgets.chat_messages import (
+    BotMessage,
+    ErrorMessage,
+    EventDivider,
+    ThinkingWidget,
+    UserMessage,
+)
 from widgets.presentation.widgets.chat_welcome import WelcomeWidget
+
+
+class TestErrorMessage(unittest.TestCase):
+    def test_error_message_init_str_and_text(self):
+        err1 = ErrorMessage("API Error: 400 bad request")
+        self.assertEqual(err1.raw_text, "API Error: 400 bad request")
+        self.assertIn("error-msg", err1.classes)
+        self.assertTrue(err1.ALLOW_SELECT)
+
+        err2 = ErrorMessage(Text("Rich error text"))
+        self.assertEqual(err2.raw_text, "Rich error text")
 
 
 class TestEventDivider(unittest.TestCase):

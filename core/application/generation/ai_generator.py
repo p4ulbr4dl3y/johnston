@@ -98,6 +98,7 @@ class GenCanvas:
     register_tool_widget: Callable[[Any], Any] = field(default=None)
     add_bot_message: Callable[[], Any] = field(default=None)
     add_event_divider: Callable[[str], Any] = field(default=None)
+    add_error_message: Callable[[str], Any] = field(default=None)
     get_user_messages: Callable[[], Any] = field(default=None)
     get_user_messages_count: Optional[Callable[[], int]] = field(default=None)
     refresh_status_footer: Callable[[], Any] = field(default=None)
@@ -367,6 +368,17 @@ async def generate_ai_response(
                         bot_handle = await canvas.add_bot_message()
                     await bot_handle.finalize_stream(val1)
                     bot_handle = None
+                try:
+                    save_db.schedule()
+                except Exception:  # noqa: BLE001
+                    pass
+            elif event_type == "error":
+                err_text = val1 or "Error"
+                if canvas.add_error_message:
+                    await canvas.add_error_message(err_text)
+                elif canvas.add_event_divider:
+                    await canvas.add_event_divider(err_text)
+                canvas.refresh_status_footer()
                 try:
                     save_db.schedule()
                 except Exception:  # noqa: BLE001
