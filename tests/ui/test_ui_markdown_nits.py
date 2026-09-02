@@ -3,10 +3,10 @@
 import re
 
 import pytest
-from textual.screen import Screen
 from textual.app import ComposeResult
-from app import JohnstonApp
+from textual.screen import Screen
 
+from app import JohnstonApp
 from widgets.presentation.screens.model import ModelScreen
 from widgets.presentation.widgets.chat_markdown import ProseMarkdown
 from widgets.utils.row_format import display_width, format_badge_row

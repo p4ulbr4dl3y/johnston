@@ -178,6 +178,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         yield self.scroll_box
 
     def on_mount(self) -> None:
+        # The status dot is baked into the header markup (P1-5 reads the accent
+        # from the active theme), so a `/theme` switch used to leave every
+        # already rendered card on the old colour. Repaint on change.
+        self.watch(self.app, "theme", self._on_app_theme_change, init=False)
         if self.is_expanded and self.is_expandable():
             self.scroll_box.display = True
             self._should_scroll_on_render = self._is_parent_at_bottom()
@@ -188,6 +192,13 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.md_widget.display = False
         self.render_header()
         self._sync_sequential_with_prev()
+
+    def _on_app_theme_change(self, old_theme: str, new_theme: str) -> None:  # noqa: ARG002
+        """Re-render the status dot in the new theme (P1-5 follow-up)."""
+        try:
+            self.render_header()
+        except Exception:
+            pass
 
     def on_unmount(self) -> None:
         if getattr(self, "_shell_update_handle", None) is not None:

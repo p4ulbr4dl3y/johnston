@@ -11,7 +11,6 @@ import re
 import pytest
 
 from app import JohnstonApp
-
 from widgets.presentation.screens.theme import ThemeScreen
 
 APP_TCSS = "app.tcss"
