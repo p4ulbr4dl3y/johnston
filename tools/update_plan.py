@@ -84,22 +84,23 @@ class UpdatePlanTool(BaseTool):
         if not validated_plan:
             return ToolResult.error("params", name="plan", detail="items need 'step'/'status'")
 
-        # Store active plan in app state if app exists
-        host = ctx.host
-        if host:
-            app_target = getattr(host, "app", None) or host
-            setattr(host, "current_plan", validated_plan)
-            setattr(host, "current_plan_explanation", explanation)
-            if app_target is not host:
-                setattr(app_target, "current_plan", validated_plan)
-                setattr(app_target, "current_plan_explanation", explanation)
+        # Store active plan in app state if app exists and caller is not a subagent
+        if not getattr(ctx, "is_subagent", False):
+            host = ctx.host
+            if host:
+                app_target = getattr(host, "app", None) or host
+                setattr(host, "current_plan", validated_plan)
+                setattr(host, "current_plan_explanation", explanation)
+                if app_target is not host:
+                    setattr(app_target, "current_plan", validated_plan)
+                    setattr(app_target, "current_plan_explanation", explanation)
 
-            on_plan_update = getattr(app_target, "on_plan_update", None) or getattr(host, "on_plan_update", None)
-            if callable(on_plan_update):
-                try:
-                    on_plan_update(validated_plan, explanation)
-                except Exception:
-                    pass
+                on_plan_update = getattr(app_target, "on_plan_update", None) or getattr(host, "on_plan_update", None)
+                if callable(on_plan_update):
+                    try:
+                        on_plan_update(validated_plan, explanation)
+                    except Exception:
+                        pass
 
         completed_count = sum(1 for p in validated_plan if p["status"] == "completed")
         total_count = len(validated_plan)

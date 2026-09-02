@@ -141,7 +141,40 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.current_plan_explanation, "Nested test")
         self.assertEqual(agent.current_plan_explanation, "Nested test")
 
+    async def test_update_plan_subagent_isolation(self):
+        class MockApp:
+            def __init__(self):
+                self.updated = False
+                self.current_plan = [{"step": "Main task", "status": "in_progress"}]
+                self.current_plan_explanation = "Main plan"
+
+            def on_plan_update(self, plan, explanation):
+                self.updated = True
+
+        class MockSubagent:
+            def __init__(self, host_app):
+                self.app = host_app
+                self.is_subagent = True
+                self.role = "subagent"
+
+        app = MockApp()
+        subagent = MockSubagent(app)
+        tool = UpdatePlanTool()
+
+        res = await tool.execute(
+            {
+                "explanation": "Subagent internal plan",
+                "plan": [{"step": "Sub step", "status": "completed"}],
+            },
+            ctx=subagent,
+        )
+        self.assertIn("[plan updated | 1/1 done | Subagent internal plan]", res.content)
+        self.assertFalse(app.updated)
+        self.assertEqual(app.current_plan_explanation, "Main plan")
+        self.assertEqual(app.current_plan, [{"step": "Main task", "status": "in_progress"}])
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
