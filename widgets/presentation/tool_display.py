@@ -368,8 +368,8 @@ def is_subagent_running(session: Any) -> bool:
     return st_str in ("running", "active") or getattr(session, "is_running", None) is True
 
 
-def _count_session_steps(session: Any) -> int:
-    """Count agent loop iterations / steps for a session."""
+def _count_session_turns(session: Any) -> int:
+    """Count agent loop iterations / turns for a session."""
     if session is None:
         return 0
     step_cnt = session.get("step_count") if isinstance(session, dict) else getattr(session, "step_count", None)
@@ -386,6 +386,9 @@ def _count_session_steps(session: Any) -> int:
         if cnt > 0:
             return cnt
     return 0
+
+
+_count_session_steps = _count_session_turns
 
 
 def extract_subagent_plan_status(session: Any) -> Optional[Tuple[int, int]]:
@@ -440,10 +443,10 @@ def extract_subagent_progress(session: Any) -> str:
         else:
             parts.append(st_str or "done")
 
-        steps = _count_session_steps(session)
-        if steps > 0 and not plan_prefix:
-            step_str = "step" if steps == 1 else "steps"
-            parts.append(f"{steps} {step_str}")
+        turns = _count_session_turns(session)
+        if turns > 0:
+            turn_str = "turn" if turns == 1 else "turns"
+            parts.append(f"{turns} {turn_str}")
 
         created_at = session.get("created_at") if isinstance(session, dict) else getattr(session, "created_at", None)
         updated_at = session.get("updated_at") if isinstance(session, dict) else getattr(session, "updated_at", None)

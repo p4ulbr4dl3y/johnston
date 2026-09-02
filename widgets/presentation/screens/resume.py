@@ -142,8 +142,8 @@ class ResumeScreen(BaseSelectionScreen[str]):
             prefix = f"{status_pfx}{branch_pfx}"
             title = str(s.get("title", ""))
             count = s.get("message_count", 0)
-            step_str = "step" if count == 1 else "steps"
-            badge_parts = [f"{count} {step_str}"]
+            turn_str = "turn" if count == 1 else "turns"
+            badge_parts = [f"{count} {turn_str}"]
             time_str = format_relative_time(s.get("updated_at") or s.get("created_at"))
             if time_str:
                 badge_parts.append(time_str)
