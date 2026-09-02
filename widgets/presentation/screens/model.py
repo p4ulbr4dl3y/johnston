@@ -44,7 +44,7 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
-            hint_text="enter: select • ctrl+r: refresh • esc: close",
+            hint_text="enter Select • ctrl+r Refresh • esc Close",
             dialog_classes="modal-dialog-medium",
         )
 

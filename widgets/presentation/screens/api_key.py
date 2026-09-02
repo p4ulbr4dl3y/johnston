@@ -45,7 +45,7 @@ class ApiKeyScreen(BaseModalScreen[str | None]):
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-compact"):
             yield ModalHeader(f"Connect {self.provider_name}", esc_hint="")
             yield Input(placeholder=placeholder, password=True, id="providers-key-input", classes="modal-input")
-            yield ModalHint("enter: save • esc: cancel", id=MODAL_HINT_ID)
+            yield ModalHint("enter Save • esc Cancel", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:

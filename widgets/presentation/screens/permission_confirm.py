@@ -462,7 +462,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
     def _build_hint_text(self, width: Optional[int] = None) -> str:
         if isinstance(width, int) and is_compact_width(width, breakpoint=BREAKPOINT_HINT):
             return "enter • r • esc"
-        return "enter: select • r: feedback • esc: deny"
+        return "enter Select • r Feedback • esc Deny"
 
     def on_resize(self, event) -> None:
         self._apply_dialog_fit()

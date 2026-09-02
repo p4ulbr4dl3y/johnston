@@ -45,7 +45,7 @@ class DiffHeader(ResizeDebounceMixin, Static):
         table.add_column(justify="right")
 
         width = resolve_width(self)
-        esc_label = "esc: back" if self.from_rewind else "esc: close"
+        esc_label = "esc Back" if self.from_rewind else "esc Close"
         t_primary, t_secondary, t_muted, _ = get_theme_colors()
         sep = f" [{t_muted}]•[/] "
 
@@ -138,15 +138,15 @@ class DiffFooter(ResizeDebounceMixin, Static):
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             if width < 52:
-                raw_hint = "esc: back" if self.compact_view == "diff" else "enter • esc"
+                raw_hint = "esc Back" if self.compact_view == "diff" else "enter • esc"
             elif self.compact_view == "diff":
-                raw_hint = "esc: files • pgup/dn"
+                raw_hint = "esc Files • pgup/dn"
             else:
-                raw_hint = "enter: view • esc: close"
+                raw_hint = "enter View • esc Close"
         elif width >= BREAKPOINT_HINT:
-            raw_hint = "tab: toggle sidebar • pgup/dn: scroll"
+            raw_hint = "tab Toggle Sidebar • pgup/dn Scroll"
         else:
-            raw_hint = "tab: sidebar"
+            raw_hint = "tab Sidebar"
 
         right_text = format_hint(raw_hint)
         table.add_row(left_text, right_text)

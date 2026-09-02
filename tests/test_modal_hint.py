@@ -9,6 +9,20 @@ class TestModalHintFormatting(unittest.TestCase):
         self.assertEqual(format_hint(""), "")
         self.assertEqual(format_hint(None), "")
 
+    def test_format_space_separated_hints(self):
+        _, t_sec, t_mut, _ = get_theme_colors()
+        raw = "↑/↓ Navigate • enter Select • tab Complete • esc Close"
+        formatted = format_hint(raw)
+        self.assertIn(f"[{t_sec}]↑/↓[/]", formatted)
+        self.assertIn(f"[{t_mut}]Navigate[/]", formatted)
+        self.assertIn(f"[{t_sec}]enter[/]", formatted)
+        self.assertIn(f"[{t_mut}]Select[/]", formatted)
+        self.assertIn(f"[{t_sec}]tab[/]", formatted)
+        self.assertIn(f"[{t_mut}]Complete[/]", formatted)
+        self.assertIn(f"[{t_sec}]esc[/]", formatted)
+        self.assertIn(f"[{t_mut}]Close[/]", formatted)
+        self.assertIn(f"[{t_mut}]•[/]", formatted)
+
     def test_format_colon_hints(self):
         _, t_sec, t_mut, _ = get_theme_colors()
         raw = "enter: select • esc: close"
@@ -34,46 +48,46 @@ class TestModalHintFormatting(unittest.TestCase):
 
     def test_modal_hint_config_methods(self):
         cfg = ModalHintConfig(
-            actions=[("enter", "select"), ("tab", "toggle")],
+            actions=[("enter", "Select"), ("tab", "Toggle")],
             close_key="esc",
-            close_label="close",
+            close_label="Close",
         )
-        self.assertEqual(cfg.actions_text(), "enter: select • tab: toggle")
-        self.assertEqual(cfg.close_text(), "esc: close")
-        self.assertEqual(cfg.to_hint_string(), "enter: select • tab: toggle • esc: close")
+        self.assertEqual(cfg.actions_text(), "enter Select • tab Toggle")
+        self.assertEqual(cfg.close_text(), "esc Close")
+        self.assertEqual(cfg.to_hint_string(), "enter Select • tab Toggle • esc Close")
 
         formatted_actions = cfg.format_actions()
         self.assertIn("enter", formatted_actions)
-        self.assertIn("select", formatted_actions)
+        self.assertIn("Select", formatted_actions)
 
         formatted_close = cfg.format_close()
         self.assertIn("esc", formatted_close)
-        self.assertIn("close", formatted_close)
+        self.assertIn("Close", formatted_close)
 
     def test_modal_hint_config_widget(self):
-        cfg = ModalHintConfig(actions=[("enter", "confirm")], close_key="esc", close_label="cancel")
+        cfg = ModalHintConfig(actions=[("enter", "Confirm")], close_key="esc", close_label="Cancel")
         widget = ModalHint(cfg)
         rendered = str(widget.render())
         self.assertIn("enter", rendered)
-        self.assertIn("confirm", rendered)
+        self.assertIn("Confirm", rendered)
         self.assertIn("esc", rendered)
-        self.assertIn("cancel", rendered)
+        self.assertIn("Cancel", rendered)
 
-        new_cfg = ModalHintConfig(actions=[("space", "pause")])
+        new_cfg = ModalHintConfig(actions=[("space", "Pause")])
         widget.update(new_cfg)
         rendered_after = str(widget.render())
         self.assertIn("space", rendered_after)
-        self.assertIn("pause", rendered_after)
+        self.assertIn("Pause", rendered_after)
 
     def test_modal_hint_right_text(self):
         from rich.table import Table
 
-        widget = ModalHint("enter: select • esc: close", right_text="5/42")
+        widget = ModalHint("enter Select • esc Close", right_text="5/42")
         rendered = widget.render()
         self.assertIsInstance(rendered, Table)
         self.assertEqual(len(rendered.columns), 2)
 
-        widget.update("enter: select", right_text="10/100")
+        widget.update("enter Select", right_text="10/100")
         rendered2 = widget.render()
         self.assertIsInstance(rendered2, Table)
         self.assertEqual(widget.right_text, "10/100")

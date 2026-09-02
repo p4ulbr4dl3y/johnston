@@ -323,7 +323,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 header_parts.append("*(Select multiple)*")
             header_badge = f" • {' '.join(header_parts)}" if header_parts else ""
             title_md.update(f"### **Question {self.q_idx + 1}/{len(self.questions)}**{header_badge}\n{q_text}")
-            hint.update("enter: confirm • tab: toggle • ←→: nav • ctrl+h: min • esc: cancel")
+            hint.update("enter Confirm • tab Toggle • ←→ Nav • ctrl+h Min • esc Cancel")
 
             self.raw_options = q.get("options") or []
             self.options = self.raw_options + [WRITE_IN_LABEL] if self.raw_options else []
@@ -448,7 +448,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             if not sample_items:
                 sample_items = ["Type custom answer..."]
 
-            hint = "enter: confirm • tab: toggle • ←→: nav • ctrl+h: min • esc: cancel"
+            hint = "enter Confirm • tab Toggle • ←→ Nav • ctrl+h Min • esc Cancel"
             content_w = modal_content_width(sample_items, max_q_title or "### **Confirm Your Answers**", hint)
             apply_modal_fit(dialog, content_w, min_width=MODAL_MIN_WIDTH, max_width=MODAL_MEDIUM_MAX_WIDTH)
 
@@ -493,26 +493,26 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             hint = self.query_one(MODAL_HINT, Label)
             if self.q_idx >= len(self.questions):
                 hint.update(
-                    "enter • ← • ↑↓ • esc" if is_compact else "enter: confirm • ←: back • ↑↓/pgup: scroll • esc: cancel"
+                    "enter • ← • ↑↓ • esc" if is_compact else "enter Confirm • ← Back • ↑↓/pgup Scroll • esc Cancel"
                 )
                 return
 
             q = self.questions[self.q_idx] if 0 <= self.q_idx < len(self.questions) else {}
             is_multi = bool(q.get("is_multi_select", False))
             is_last = self.q_idx == len(self.questions) - 1
-            action = "confirm" if is_last else "next"
+            action = "Confirm" if is_last else "Next"
 
             input_field = self.query_one(WRITE_IN_INPUT, Input)
             is_write_in = input_field.display and input_field.has_focus
 
-            back_part = "←: back • " if self.q_idx > 0 else ""
+            back_part = "← Back • " if self.q_idx > 0 else ""
             back_part_compact = "← • " if self.q_idx > 0 else ""
 
             if not self.raw_options:
                 hint.update(
                     f"enter • {back_part_compact}esc"
                     if is_compact
-                    else f"enter: {action} • {back_part}ctrl+h: min • esc: cancel"
+                    else f"enter {action} • {back_part}ctrl+h Min • esc Cancel"
                 )
                 return
 
@@ -520,15 +520,15 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 hint.update(
                     f"enter • ↑ • {back_part_compact}esc"
                     if is_compact
-                    else f"enter: {action} • ↑: list • {back_part}ctrl+h: min • esc: cancel"
+                    else f"enter {action} • ↑ List • {back_part}ctrl+h Min • esc Cancel"
                 )
             else:
-                tab_part = "tab: toggle • " if is_multi else ""
+                tab_part = "tab Toggle • " if is_multi else ""
                 tab_part_compact = "tab • " if is_multi else ""
                 hint.update(
                     f"enter • {tab_part_compact}{back_part_compact}esc"
                     if is_compact
-                    else f"enter: {action} • {tab_part}{back_part}ctrl+h: min • esc: cancel"
+                    else f"enter {action} • {tab_part}{back_part}ctrl+h Min • esc Cancel"
                 )
         except Exception:
             pass

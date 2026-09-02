@@ -459,7 +459,7 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
             # Test hint text compact width
             self.assertIn("enter", screen._build_hint_text(width=50))
-            self.assertIn("enter: select", screen._build_hint_text(width=80))
+            self.assertIn("enter Select", screen._build_hint_text(width=80))
 
             # Test resize
             screen.on_resize(MagicMock())

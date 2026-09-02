@@ -241,7 +241,7 @@ class TestRefactoredWidgets:
         assert "Diff Viewer" not in _table_text(narrow.rendered)
         assert _table_text(narrow.rendered).rstrip().endswith("esc")
         assert "Diff Viewer" in _table_text(wide.rendered)
-        assert "esc: close" in _table_text(wide.rendered)
+        assert "esc Close" in _table_text(wide.rendered)
 
     def test_diff_footer_hint_collapses_below_hint_breakpoint(self):
         class _Sized(DiffFooter):
@@ -399,8 +399,8 @@ class TestModalFitHelpers:
         assert fit_modal_width(-5, 0) == MODAL_MIN_WIDTH
 
     def test_content_width_strips_markdown_and_uses_widest_line(self):
-        width = modal_content_width(["● Auto", "  Medium"], "### **Select Thinking Effort**", "enter: select • esc: close")
-        assert width == len("enter: select • esc: close") + MODAL_CONTENT_GUTTER
+        width = modal_content_width(["● Auto", "  Medium"], "### **Select Thinking Effort**", "enter Select • esc Close")
+        assert width == len("enter Select • esc Close") + MODAL_CONTENT_GUTTER
 
     def test_content_width_duck_types_option_prompt(self):
         assert modal_content_width([Option("abcdefgh"), "ab"]) == 8 + MODAL_CONTENT_GUTTER

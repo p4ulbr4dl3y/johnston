@@ -26,7 +26,7 @@ class SessionConflictScreen(BaseSelectionScreen[str]):
             items=items,
             default_value="readonly",
             show_search=False,
-            hint_text="enter: select • esc: back",
+            hint_text="enter Select • esc Back",
             dialog_classes=dialog_classes,
             fit_content=True,
             min_dialog_width=min_dialog_width,

@@ -26,14 +26,14 @@ class ModalHintConfig:
 
     actions: list[Union[tuple[str, str], str]] = field(default_factory=list)
     close_key: str = "esc"
-    close_label: str = "close"
+    close_label: str = "Close"
 
     def actions_text(self) -> str:
         parts: list[str] = []
         for item in self.actions:
             if isinstance(item, tuple) and len(item) == 2:
                 k, v = item
-                parts.append(f"{k}: {v}" if v else k)
+                parts.append(f"{k} {v}" if v else k)
             elif isinstance(item, str) and item:
                 parts.append(item)
         return " • ".join(parts)
@@ -41,7 +41,7 @@ class ModalHintConfig:
     def close_text(self) -> str:
         if not self.close_key:
             return ""
-        return f"{self.close_key}: {self.close_label}" if self.close_label else self.close_key
+        return f"{self.close_key} {self.close_label}" if self.close_label else self.close_key
 
     def format_actions(self) -> str:
         """Format action hotkeys with theme colors."""

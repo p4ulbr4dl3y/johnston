@@ -29,7 +29,7 @@ class RenameSessionScreen(BaseModalScreen[str | None]):
                 id="session-rename-input",
                 classes="modal-input",
             )
-            yield ModalHint("enter: save • esc: cancel", id=MODAL_HINT_ID)
+            yield ModalHint("enter Save • esc Cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         inp = self.query_one("#session-rename-input", Input)

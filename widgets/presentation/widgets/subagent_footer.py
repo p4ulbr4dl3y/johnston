@@ -262,7 +262,7 @@ class SubagentHeader(ResizeDebounceMixin, Static):
         t_primary, t_secondary, t_muted, _ = get_theme_colors()
 
         if not self.session:
-            esc_label = "esc: back" if getattr(self, "from_tasks", False) else "esc: close"
+            esc_label = "esc Back" if getattr(self, "from_tasks", False) else "esc Close"
             grid.add_row("", f"[{t_muted}]{esc_label}[/{t_muted}]")
             self._last_grid_rows = [("", f"[{t_muted}]{esc_label}[/{t_muted}]")]
             self.update(grid)
@@ -294,12 +294,12 @@ class SubagentHeader(ResizeDebounceMixin, Static):
 
             is_running = getattr(session, "status", "") == "running"
             esc_label = (
-                "esc: back"
+                "esc Back"
                 if getattr(self, "from_tasks", False)
-                else ("esc" if is_compact else "esc: close")
+                else ("esc" if is_compact else "esc Close")
             )
             if is_running and not is_compact:
-                row_right = format_hint(f"{esc_label} • ctrl+k: kill")
+                row_right = format_hint(f"{esc_label} • ctrl+k Kill")
             else:
                 row_right = format_hint(esc_label)
 

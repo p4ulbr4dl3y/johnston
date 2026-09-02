@@ -66,7 +66,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield ModalHeader("Manage MCP Servers", esc_hint="")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id="mcp-option-list")
-            yield ModalHint("enter: select • tab: toggle • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint("enter Select • tab Toggle • esc Close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -254,7 +254,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             hint_lbl = self.query_one(MODAL_HINT, ModalHint)
             total = len(self.servers_info)
             shown = sum(1 for s in self.filtered_servers if s is not None)
-            base_hint = "enter • tab • esc" if is_compact else "enter: select • tab: toggle • esc: close"
+            base_hint = "enter • tab • esc" if is_compact else "enter Select • tab Toggle • esc Close"
             hint_lbl.update(base_hint, right_text=f"{shown}/{total}")
         except Exception:
             pass

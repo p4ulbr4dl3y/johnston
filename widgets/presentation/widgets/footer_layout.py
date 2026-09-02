@@ -55,6 +55,11 @@ def format_hint(raw_hint: str) -> str:
             formatted_segments.append(f"[{t_secondary}]{key}[/][{t_muted}]: {desc}[/]")
         elif _COUNTER_RE.match(seg):
             formatted_segments.append(f"[{t_muted}]{seg}[/]")
+        elif " " in seg:
+            key, _, desc = seg.partition(" ")
+            key = key.strip()
+            desc = desc.strip()
+            formatted_segments.append(f"[{t_secondary}]{key}[/] [{t_muted}]{desc}[/]")
         else:
             formatted_segments.append(f"[{t_secondary}]{seg}[/]")
 
@@ -176,11 +181,11 @@ def _build_subagent_grid(
     else:
         role_formatted = role_str
 
-    esc_label = "esc: back" if from_tasks else "esc: close"
+    esc_label = "esc Back" if from_tasks else "esc Close"
     if is_compact:
-        raw_hints = f"{esc_label} • ctrl+k" if is_running else esc_label
+        raw_hints = f"{esc_label.split(' ')[0]} • ctrl+k" if is_running else esc_label.split(' ')[0]
     else:
-        raw_hints = f"{esc_label} • ctrl+k: kill" if is_running else esc_label
+        raw_hints = f"{esc_label} • ctrl+k Kill" if is_running else esc_label
     row2_right = format_hint(raw_hints)
 
     if is_compact:

@@ -53,7 +53,7 @@ class RewindActionScreen(BaseModalScreen[Optional[RewindSelection]]):
             yield ModalHeader("Rollback Action", esc_hint="")
             yield Static("", id="rewind-files", classes=MODAL_MARKDOWN, markup=False)
             yield HeaderWrapOptionList(*self.options, id=MODAL_OPTION_LIST_ID)
-            yield ModalHint("enter: select • esc: back", id=MODAL_HINT_ID)
+            yield ModalHint("enter Select • esc Back", id=MODAL_HINT_ID)
 
     def _row_width(self) -> int:
         try:

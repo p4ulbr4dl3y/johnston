@@ -29,7 +29,7 @@ class ModalHeader(Static):
     def __init__(
         self,
         title: str = "",
-        esc_hint: str = "esc: close",
+        esc_hint: str = "esc Close",
         *,
         id: Optional[str] = None,
         classes: Optional[str] = None,

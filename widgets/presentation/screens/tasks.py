@@ -193,9 +193,9 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
             yield TaskStdinInput(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input", classes="modal-input")
             yield ModalHint(
-                "enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • esc: back"
+                "enter Stdin • pgup/dn Scroll • ctrl+k Kill • esc Back"
                 if is_running
-                else "pgup/pgdn: scroll • esc: back",
+                else "pgup/dn Scroll • esc Back",
                 id=MODAL_HINT_ID,
             )
 
@@ -253,12 +253,12 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             is_running = getattr(self.bg_task, "is_running", False)
             if is_running:
                 hint_str = (
-                    "enter: stdin • c-k: kill • esc"
+                    "enter Stdin • ctrl+k Kill • esc"
                     if is_compact
-                    else "enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • esc: back"
+                    else "enter Stdin • pgup/dn Scroll • ctrl+k Kill • esc Back"
                 )
             else:
-                hint_str = "pgup/pgdn • esc" if is_compact else "pgup/pgdn: scroll • esc: back"
+                hint_str = "pgup/dn • esc" if is_compact else "pgup/dn Scroll • esc Back"
             hint.update(hint_str)
         except Exception:
             pass
@@ -396,7 +396,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     title_id: str = "tasks-title"
     option_list_id: str = "tasks-option-list"
-    hint_action_name: str = "enter: select"
+    hint_action_name: str = "enter Select"
     search_nav_filtered_attr: str = "filtered_tasks"
 
     def __init__(self):
@@ -437,7 +437,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield ModalHeader(self._get_header_md(), esc_hint="", id=self.title_id)
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id=self.option_list_id)
-            yield ModalHint(f"{self.hint_action_name} • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint(f"{self.hint_action_name} • esc Close", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:
@@ -516,18 +516,22 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 if item and item.get("is_running"):
                     is_running = True
 
-            action_short = self.hint_action_name.split(":")[0]
+            action_short = (
+                self.hint_action_name.partition(":")[0]
+                if ":" in self.hint_action_name
+                else self.hint_action_name.partition(" ")[0]
+            ).strip()
             if is_compact:
                 hint_str = (
-                    f"{action_short} • c-k: kill • esc"
+                    f"{action_short} • ctrl+k Kill • esc"
                     if is_running
                     else f"{action_short} • esc"
                 )
             else:
                 hint_str = (
-                    f"{self.hint_action_name} • ctrl+k: kill • esc: close"
+                    f"{self.hint_action_name} • ctrl+k Kill • esc Close"
                     if is_running
-                    else f"{self.hint_action_name} • esc: close"
+                    else f"{self.hint_action_name} • esc Close"
                 )
             hint.update(hint_str)
         except Exception:
@@ -629,7 +633,7 @@ class ShellTasksScreen(BaseTasksListScreen):
 
     title_id = "shell-title"
     option_list_id = "shell-option-list"
-    hint_action_name = "enter: console"
+    hint_action_name = "enter Console"
 
     def __init__(self):
         super().__init__()
@@ -728,7 +732,7 @@ class SubagentsScreen(BaseTasksListScreen):
 
     title_id = "subagents-title"
     option_list_id = "subagents-option-list"
-    hint_action_name = "enter: details"
+    hint_action_name = "enter Details"
 
     def __init__(self):
         super().__init__()

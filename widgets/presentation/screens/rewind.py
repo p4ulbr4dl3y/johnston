@@ -89,7 +89,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         options = self._format_step1_options(MODAL_WIDE_ROW_WIDTH, self.filtered_entries)
 
         self.title = "Select Message to Rollback To"
-        self.hint_text = "enter: select • esc: cancel"
+        self.hint_text = "enter Select • esc Cancel"
         self.raw_options = list(options)
         self.raw_items = [m.index for m in user_messages]
         self.raw_items.append(REWIND_CURRENT_STATE)

@@ -27,8 +27,8 @@ class ConfirmScreen(BaseModalScreen[bool]):
         self,
         title: str = "Confirm Action",
         message: str = "Are you sure?",
-        confirm_label: str = "confirm",
-        cancel_label: str = "cancel",
+        confirm_label: str = "Confirm",
+        cancel_label: str = "Cancel",
     ):
         super().__init__()
         self.confirm_title = title
@@ -41,7 +41,7 @@ class ConfirmScreen(BaseModalScreen[bool]):
             yield ModalHeader(self.confirm_title, esc_hint="")
             if self.message:
                 yield Markdown(self.message, classes=MODAL_MARKDOWN)
-            yield ModalHint(f"enter: {self.confirm_label} • esc: {self.cancel_label}", id=MODAL_HINT_ID)
+            yield ModalHint(f"enter {self.confirm_label} • esc {self.cancel_label}", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:

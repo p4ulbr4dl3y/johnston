@@ -373,17 +373,24 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         hints: list[str] = []
         if self.status == "running":
             if self.canonical_tool == "shell" and not getattr(self, "background_task_id", None):
-                hints.append("ctrl+b: bg")
+                hints.append("ctrl+b to bg")
             if self.is_expandable():
-                action = "collapse" if self.is_expanded else "expand"
-                hints.append(f"ctrl+o: {action}")
+                action = "to collapse" if self.is_expanded else "to expand"
+                hints.append(f"ctrl+o {action}")
+        elif self.is_expandable():
+            action = "to collapse" if self.is_expanded else "to expand"
+            hints.append(f"ctrl+o {action}")
 
         if hints:
-            from widgets.presentation.widgets.footer_layout import format_hint, get_theme_colors
+            from widgets.presentation.widgets.footer_layout import get_theme_colors
 
-            _, _, t_muted, _ = get_theme_colors()
-            hint_text = format_hint(" • ".join(hints))
-            self.header_label.update(f"{base_header} [{t_muted}]•[/] {hint_text}")
+            _, t_secondary, t_muted, _ = get_theme_colors()
+            formatted_parts = []
+            for h in hints:
+                key, _, act = h.partition(" ")
+                formatted_parts.append(f"[{t_secondary}]{key}[/] [{t_muted}]{act}[/]")
+            hints_str = f"[{t_muted}], [/]".join(formatted_parts)
+            self.header_label.update(f"{base_header} [{t_muted}]({hints_str}[{t_muted}])[/]")
         else:
             self.header_label.update(base_header)
 

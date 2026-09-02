@@ -271,7 +271,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         self.assertIn("sandboxed", footer._last_grid_rows[1][0])
         self.assertIn("review", footer._last_grid_rows[1][0])
         self.assertIn("esc", footer._last_grid_rows[1][1])
-        self.assertIn("close", footer._last_grid_rows[1][1])
+        self.assertIn("Close", footer._last_grid_rows[1][1])
 
     def test_render_footer_reflects_execution_mode_and_sandbox_off(self):
         from core.permission_manager import PermissionManager
@@ -393,14 +393,14 @@ class TestSubagentHeaderCoverage(unittest.TestCase):
         with patch.object(header, "update") as upd:
             header.update_session(None)
         upd.assert_called_once()
-        self.assertIn("esc: back", header._last_grid_rows[0][1])
+        self.assertIn("esc Back", header._last_grid_rows[0][1])
 
         header_close = SubagentHeader(from_tasks=False)
         header_close._harness_app = MagicMock()
         with patch.object(header_close, "update") as upd:
             header_close.update_session(None)
         upd.assert_called_once()
-        self.assertIn("esc: close", header_close._last_grid_rows[0][1])
+        self.assertIn("esc Close", header_close._last_grid_rows[0][1])
 
     def test_update_session_renders_title_only(self):
         header = SubagentHeader()

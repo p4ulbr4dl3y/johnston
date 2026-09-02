@@ -145,7 +145,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         default_value: T,
         show_search: bool = False,
         search_placeholder: str = "Search...",
-        hint_text: str | ModalHintConfig = "enter: select • esc: close",
+        hint_text: str | ModalHintConfig = "enter Select • esc Close",
         option_list_id: str = MODAL_OPTION_LIST_ID,
         dialog_classes: str = "",
         fit_content: bool = False,
@@ -383,7 +383,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
             base_hint = self.hint_text
             if is_compact:
-                parts = [p.partition(":")[0].strip() for p in base_hint.split("•")]
+                parts = [(p.partition(":")[0] if ":" in p else p.partition(" ")[0]).strip() for p in base_hint.split("•")]
                 base_hint = " • ".join(p for p in parts if p)
             hint_lbl.update(base_hint, right_text=f"{shown}/{total}")
         else:

@@ -105,7 +105,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
-            hint_text="enter: select • ctrl+r: rename • ctrl+d: delete • esc: close",
+            hint_text="enter Select • ctrl+r Rename • ctrl+d Delete • esc Close",
             dialog_classes="modal-dialog-wide",
         )
 
