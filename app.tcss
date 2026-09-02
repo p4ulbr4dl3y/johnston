@@ -842,7 +842,7 @@ DiffScreen {
 #diff-search-input:focus {
     width: 100%;
     height: 1;
-    margin: 1 0 1 0;
+    margin: 0 0 1 0;
     padding: 0 1;
     border: none;
     background: transparent !important;
