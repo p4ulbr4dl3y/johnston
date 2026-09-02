@@ -232,11 +232,28 @@ def build_adapter_usage_event(
 
 
 def normalize_tool_arguments_str(raw: Any) -> str:
-    """Converts dict or string arguments into clean JSON string format."""
-    if isinstance(raw, str):
-        return raw or "{}"
+    """Converts tool-call ``arguments`` into a clean, valid JSON string.
+
+    Unified normalization used by every provider path that builds a tool call
+    payload, so the ``arguments`` field is always a well-formed JSON string:
+
+    - ``None`` (or a missing value) -> ``"{}"``
+    - non-string (dict/list/etc.)   -> ``json.dumps(raw)``
+    - string ``"{}"``               -> returned unchanged
+    - any other string              -> validated via ``json.loads``; if the
+      string is not valid JSON (including empty/whitespace) it is replaced
+      with ``"{}"``
+    """
     if raw is None:
         return "{}"
+    if isinstance(raw, str):
+        if raw == "{}":
+            return raw
+        try:
+            json.loads(raw)
+        except Exception:
+            return "{}"
+        return raw
     return json.dumps(raw, ensure_ascii=False)
 
 

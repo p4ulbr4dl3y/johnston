@@ -17,6 +17,7 @@ from core.infrastructure.adapters.base import (
     extract_image_payload,
     image_url_block,
     new_tool_call_id,
+    normalize_tool_arguments_str,
     parse_tool_call_args,
 )
 from core.infrastructure.runtime.lru import LruCache
@@ -694,9 +695,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                 cleaned_tool_calls = []
                 for tc in ordered_calls:
-                    raw_args = tc.get("arguments", "{}")
-                    if not isinstance(raw_args, str):
-                        raw_args = json.dumps(raw_args)
+                    raw_args = normalize_tool_arguments_str(tc.get("arguments", "{}"))
                     cleaned_tool_calls.append(
                         {
                             "id": tc["id"],

@@ -1,9 +1,9 @@
 import asyncio
-import json
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.domain.defaults.config import DEFAULT_MAX_TOKENS
 from core.domain.policies.messages import is_checkpoint_message, is_system_note
+from core.infrastructure.adapters.base import normalize_tool_arguments_str
 from core.infrastructure.runtime.token_util import estimate_tokens
 from core.models_catalog import catalog, get_context_window
 
@@ -183,14 +183,7 @@ class CompactionMixin:
                                 tc_clean = dict(tc)
                                 fn_obj = tc.get("function")
                                 if isinstance(fn_obj, dict):
-                                    raw_args = fn_obj.get("arguments", "{}")
-                                    if not isinstance(raw_args, str):
-                                        raw_args = json.dumps(raw_args)
-                                    else:
-                                        try:
-                                            json.loads(raw_args)
-                                        except Exception:
-                                            raw_args = "{}"
+                                    raw_args = normalize_tool_arguments_str(fn_obj.get("arguments", "{}"))
                                     fn_clean = dict(fn_obj)
                                     fn_clean["arguments"] = raw_args
                                     tc_clean["function"] = fn_clean

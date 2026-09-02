@@ -11,6 +11,7 @@ from core.infrastructure.adapters.base import (
     extract_image_details,
     image_url_block,
     new_tool_call_id,
+    normalize_tool_arguments_str,
     parse_sse_line,
     resolve_stream_timeout,
 )
@@ -73,15 +74,7 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
                         fn = tc.get("function")
                         if isinstance(fn, dict):
                             fn_copy = dict(fn)
-                            raw_args = fn.get("arguments", "{}")
-                            if not isinstance(raw_args, str):
-                                raw_args = json.dumps(raw_args)
-                            elif raw_args != "{}":
-                                try:
-                                    json.loads(raw_args)
-                                except Exception:
-                                    raw_args = "{}"
-                            fn_copy["arguments"] = raw_args
+                            fn_copy["arguments"] = normalize_tool_arguments_str(fn.get("arguments", "{}"))
                             tc_copy["function"] = fn_copy
                         cleaned_calls.append(tc_copy)
                     else:

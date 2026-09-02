@@ -196,6 +196,15 @@ class TestNormalizeToolArgumentsStr:
     def test_passthrough_string(self):
         assert normalize_tool_arguments_str('{"a": 1}') == '{"a": 1}'
 
+    def test_empty_json_object_passthrough(self):
+        assert normalize_tool_arguments_str("{}") == "{}"
+
+    def test_invalid_string_to_empty_json(self):
+        assert normalize_tool_arguments_str("not-json") == "{}"
+
+    def test_whitespace_string_to_empty_json(self):
+        assert normalize_tool_arguments_str("   ") == "{}"
+
     def test_empty_string(self):
         assert normalize_tool_arguments_str("") == "{}"
 
