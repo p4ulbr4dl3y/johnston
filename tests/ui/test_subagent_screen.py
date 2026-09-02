@@ -449,6 +449,76 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(notch.plan_explanation, "Subagent step")
 
 
+    async def test_subagent_screen_preserves_expand_state(self):
+        sess = self._mk("task-expand-persist", "Expand Agent", "Subagent Prompt")
+        sess.add_event({"type": "thinking", "text": "Thought text", "duration": 1.5})
+        sess.add_event({
+            "type": "tool",
+            "tool_type": "shell",
+            "target": "echo hi",
+            "result_text": "hi\n",
+        })
+        screen = SubagentViewScreen("task-expand-persist")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            screen.action_toggle_expand()
+            await pilot.pause(0.1)
+            self.assertIn("task-expand-persist", getattr(app, "_subagent_expand_state", {}))
+            expanded_set = app._subagent_expand_state["task-expand-persist"]
+            self.assertTrue(len(expanded_set) > 0)
+
+        # Reopen screen and check widgets are expanded
+        screen2 = SubagentViewScreen("task-expand-persist")
+        app2 = DummyHostApp(screen2, store=self.store)
+        app2._subagent_expand_state = {"task-expand-persist": expanded_set}
+
+        async with app2.run_test() as pilot:
+            await pilot.pause(0.2)
+            from widgets.chat_toolcall import ToolCallWidget
+            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+
+            tw = screen2.query_one(ThinkingWidget)
+            self.assertTrue(tw.is_expanded)
+            tc = screen2.query_one(ToolCallWidget)
+            self.assertTrue(tc.is_expanded)
+
+    async def test_subagent_screen_active_streaming_not_finalized(self):
+        sess = self._mk("task-active-stream", "Stream Agent", "Subagent Prompt")
+        sess.status = "running"
+        sess.add_event({"type": "bot", "text": "Partial stream content"})
+
+        screen = SubagentViewScreen("task-active-stream")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            self.assertIsNotNone(screen.bot_msg)
+            self.assertTrue(screen.bot_msg._streaming)
+
+            # Live event should continue streaming into the same bot_msg
+            sess.add_event({"type": "bot", "text": "Partial stream content and more"})
+            await pilot.pause(0.2)
+            self.assertIn("and more", screen.bot_msg.content or screen.bot_msg._join_stream_content())
+
+    async def test_subagent_screen_active_thinking_auto_expanded(self):
+        sess = self._mk("task-active-think", "Think Agent", "Subagent Prompt")
+        sess.status = "running"
+        sess.add_event({"type": "thinking", "text": "Currently thinking"})
+
+        screen = SubagentViewScreen("task-active-think")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+
+            tw = screen.query_one(ThinkingWidget)
+            self.assertIsNotNone(tw)
+            self.assertTrue(tw.is_expanded)
+
+
 if __name__ == "__main__":
     unittest.main()
 

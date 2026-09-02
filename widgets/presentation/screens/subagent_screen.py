@@ -106,6 +106,28 @@ class SubagentViewScreen(ModalScreen[None]):
         except Exception:
             pass
 
+    def _get_app(self):
+        try:
+            return self.app
+        except Exception:
+            return None
+
+    def _save_expand_state(self) -> None:
+        app = self._get_app()
+        if not self.session or not app:
+            return
+        if not hasattr(app, "_subagent_expand_state") or not isinstance(app._subagent_expand_state, dict):
+            app._subagent_expand_state = {}
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            expanded_indices = set()
+            for idx, child in enumerate(chat_view.children):
+                if getattr(child, "is_expanded", False):
+                    expanded_indices.add(idx)
+            app._subagent_expand_state[self.session.id] = expanded_indices
+        except Exception:
+            pass
+
     async def _load_history_session(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
         chat_view.loading = True
@@ -124,6 +146,12 @@ class SubagentViewScreen(ModalScreen[None]):
         self.bot_msg = None
 
         rendered_count = 0
+        is_running = bool(self.session and getattr(self.session, "status", "") == "running")
+        app = self._get_app()
+        expand_state = set()
+        if app and self.session and hasattr(app, "_subagent_expand_state") and isinstance(app._subagent_expand_state, dict):
+            expand_state = app._subagent_expand_state.get(self.session.id, set())
+
         if self.session:
             history_events = list(self.session.messages)
             rendered_count = len(history_events)
@@ -131,13 +159,23 @@ class SubagentViewScreen(ModalScreen[None]):
                 isinstance(e, dict) and e.get("type") == "user" and is_ui_visible_user_message(e)
                 for e in history_events
             )
+            child_offset = 0
             if not has_user_msg and getattr(self.session, "prompt", None):
                 await chat_view.add_user_message(self.session.prompt, animate=False)
+                child_offset = 1
 
-            for evt in history_events:
-                await self._render_event(evt, animate=False)
+            for idx, evt in enumerate(history_events):
+                is_last_running = is_running and (idx == len(history_events) - 1)
+                ui_idx = idx + child_offset
+                is_expanded = (ui_idx in expand_state) or (is_last_running and evt.get("type") in ("thinking", "tool"))
+                await self._render_event(
+                    evt,
+                    animate=is_last_running,
+                    is_expanded=is_expanded,
+                    is_active=is_last_running,
+                )
 
-        if self.bot_msg:
+        if not is_running and self.bot_msg:
             try:
                 await self.bot_msg.finalize_stream()
             except Exception:
@@ -187,6 +225,7 @@ class SubagentViewScreen(ModalScreen[None]):
             self._refresh_chrome()
 
     def on_unmount(self) -> None:
+        self._save_expand_state()
         if getattr(self, "_footer_refresh", None) is not None:
             try:
                 self._footer_refresh.stop()
@@ -222,7 +261,13 @@ class SubagentViewScreen(ModalScreen[None]):
             except Exception:
                 pass
 
-    async def _render_event(self, evt: dict, animate: bool = True) -> None:
+    async def _render_event(
+        self,
+        evt: dict,
+        animate: bool = True,
+        is_expanded: bool = False,
+        is_active: bool = False,
+    ) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
         etype = evt.get("type")
 
@@ -241,6 +286,8 @@ class SubagentViewScreen(ModalScreen[None]):
             txt = evt.get("text", "")
             if self.thinking_widget is None:
                 self.thinking_widget = await chat_view.add_thinking_widget(txt, animate=animate)
+                if is_expanded and hasattr(self.thinking_widget, "is_expandable") and self.thinking_widget.is_expandable():
+                    self.thinking_widget.is_expanded = True
             else:
                 self.thinking_widget.update_thinking(txt)
             if evt.get("duration") is not None:
@@ -283,6 +330,8 @@ class SubagentViewScreen(ModalScreen[None]):
                     returncode=evt.get("returncode"),
                     animate=animate,
                 )
+                if is_expanded and hasattr(widget, "is_expandable") and widget.is_expandable():
+                    widget.is_expanded = True
                 self.current_tool_widget = widget
                 if animate and evt.get("tool_type") == "update_plan":
                     args = evt.get("args") or {}
@@ -297,14 +346,12 @@ class SubagentViewScreen(ModalScreen[None]):
                     self.pending_tool_widgets.append(widget)
         elif etype == "bot":
             txt = evt.get("text", "")
-            if not animate and not txt.strip():
+            if not animate and not is_active and not txt.strip():
                 return
             if txt:
                 if self.bot_msg is None:
-                    if not animate and not txt.strip():
-                        return
-                    self.bot_msg = await chat_view.add_bot_message(animate=animate)
-                if evt.get("final") or not animate:
+                    self.bot_msg = await chat_view.add_bot_message(animate=animate or is_active)
+                if evt.get("final") or (not animate and not is_active):
                     await self.bot_msg.set_final_content(txt)
                     self.bot_msg = None
                 else:
@@ -342,6 +389,7 @@ class SubagentViewScreen(ModalScreen[None]):
         try:
             chat_view = self.query_one("#subagent-chat-view", ChatView)
             chat_view.toggle_expand("all")
+            self._save_expand_state()
         except Exception:
             pass
 
