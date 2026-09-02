@@ -160,9 +160,11 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             chat_view = app.query_one(ChatView)
             thinking = await chat_view.add_thinking_widget("Thinking...", animate=False)
             divider = await chat_view.add_event_divider("Session Compacted", animate=False)
+            user_msg = await chat_view.add_user_message("after divider", animate=False)
             await pilot.pause()
             self.assertIsInstance(thinking, ThinkingWidget)
             self.assertIsInstance(divider, EventDivider)
+            self.assertIn("user-msg-first", user_msg.classes)
 
     async def test_add_tool_call_sequential_flag(self):
         app = JohnstonApp()

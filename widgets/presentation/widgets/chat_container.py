@@ -340,7 +340,19 @@ class ChatView(VerticalScroll):
         before: Any = None,
     ) -> UserMessage:
         att_count = attachments_count or (len(attachments) if attachments else 0)
-        is_first = not any(isinstance(c, UserMessage) for c in self.children)
+        prev_child = None
+        if before is not None and before in self.children:
+            idx = list(self.children).index(before)
+            if idx > 0:
+                prev_child = list(self.children)[idx - 1]
+        elif self.children:
+            prev_child = self.children[-1]
+
+        is_first = (
+            not any(isinstance(c, UserMessage) for c in self.children)
+            or prev_child is None
+            or isinstance(prev_child, (EventDivider, WelcomeWidget))
+        )
         if att_count > 0:
             img_s = "s" if att_count > 1 else ""
             att_text = f"└─ {att_count} image{img_s} attached"
