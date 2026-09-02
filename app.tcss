@@ -774,14 +774,14 @@ DiffScreen {
     width: 100%;
     height: 100%;
     layout: vertical;
-    background: $bg-surface;
+    background: $bg-app;
 }
 
 #diff-header {
     width: 100%;
     height: 3;
     padding: 1 2 0 2;
-    background: $bg-surface;
+    background: $bg-app;
     border-bottom: solid $border;
     color: $fg-muted;
 }
@@ -790,7 +790,7 @@ DiffScreen {
     width: 100%;
     height: 1fr;
     layout: horizontal;
-    background: $bg-surface;
+    background: $bg-app;
 }
 
 #diff-sidebar {
@@ -798,7 +798,7 @@ DiffScreen {
     max-width: 40%;
     min-width: 22;
     height: 100%;
-    background: $bg-surface;
+    background: $bg-app;
     border-right: solid $border;
     padding: 0;
 }
@@ -877,7 +877,7 @@ DiffScreen {
     width: 1fr;
     height: 100%;
     padding: 0 2 0 2;
-    background: $bg-surface;
+    background: $bg-app;
 }
 
 #diff-scroll-box,
@@ -915,7 +915,7 @@ DiffScreen {
     width: 100%;
     height: 3;
     padding: 0 2 1 2;
-    background: $bg-surface;
+    background: $bg-app;
     border-top: solid $border;
     color: $fg-muted;
 }
