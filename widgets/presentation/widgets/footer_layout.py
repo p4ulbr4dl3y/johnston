@@ -28,8 +28,8 @@ def get_theme_colors() -> tuple[str, str, str, str]:
 _COUNTER_RE = re.compile(r"^(\d+/\d+|\(\d+/\d+\)|\d+)$")
 
 
-def format_modal_hint(raw_hint: str) -> str:
-    """Format modal hotkey hint string with theme colors for keys, descriptions, and separators."""
+def format_hint(raw_hint: str) -> str:
+    """Format hotkey hint string with theme colors for keys, descriptions, and separators."""
     if not raw_hint:
         return ""
     if "[" in raw_hint and "]" in raw_hint and ("[/]" in raw_hint or "[/" in raw_hint):
@@ -175,7 +175,7 @@ def _build_subagent_grid(
         raw_hints = f"{esc_label} • ctrl+k" if is_running else esc_label
     else:
         raw_hints = f"{esc_label} • ctrl+k: kill" if is_running else esc_label
-    row2_right = format_modal_hint(raw_hints)
+    row2_right = format_hint(raw_hints)
 
     if is_compact:
         # Row 1 (Compact): Left [Role • Model] | Right [pct% ctx • $0.02 / tok]

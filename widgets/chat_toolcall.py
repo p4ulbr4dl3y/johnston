@@ -379,10 +379,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 hints.append(f"ctrl+o: {action}")
 
         if hints:
-            from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
+            from widgets.presentation.widgets.footer_layout import format_hint, get_theme_colors
 
             _, _, t_muted, _ = get_theme_colors()
-            hint_text = format_modal_hint(" • ".join(hints))
+            hint_text = format_hint(" • ".join(hints))
             self.header_label.update(f"{base_header} [{t_muted}]•[/] {hint_text}")
         else:
             self.header_label.update(base_header)

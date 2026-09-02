@@ -9,7 +9,7 @@ from rich.markup import escape
 from rich.table import Table
 from textual.widgets import Static
 
-from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
+from widgets.presentation.widgets.footer_layout import format_hint, get_theme_colors
 
 __all__ = ["ModalHeader"]
 
@@ -47,6 +47,6 @@ class ModalHeader(Static):
         t_primary, _, _, _ = get_theme_colors()
         clean_title = re.sub(r"^[#\s*]+|[#\s*]+$", "", self.title_text).strip()
         left_text = f"[bold {t_primary}]{escape(clean_title)}[/]"
-        right_text = format_modal_hint(self.esc_hint) if self.esc_hint else ""
+        right_text = format_hint(self.esc_hint) if self.esc_hint else ""
         table.add_row(left_text, right_text)
         return table

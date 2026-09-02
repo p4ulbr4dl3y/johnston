@@ -10,7 +10,7 @@ from rich.table import Table
 from textual.widgets import Label
 
 from widgets.presentation.screens.constants import MODAL_HINT_ID
-from widgets.presentation.widgets.footer_layout import format_modal_hint
+from widgets.presentation.widgets.footer_layout import format_hint
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -45,11 +45,11 @@ class ModalHintConfig:
 
     def format_actions(self) -> str:
         """Format action hotkeys with theme colors."""
-        return format_modal_hint(self.actions_text())
+        return format_hint(self.actions_text())
 
     def format_close(self) -> str:
         """Format close hotkey with theme colors."""
-        return format_modal_hint(self.close_text())
+        return format_hint(self.close_text())
 
     def to_hint_string(self) -> str:
         """Format full combined hotkey hint string."""
@@ -94,7 +94,7 @@ class ModalHint(Label):
             left_raw = self.left_text.to_hint_string()
         else:
             left_raw = str(self.left_text or "")
-        left_formatted = format_modal_hint(left_raw) if left_raw else ""
+        left_formatted = format_hint(left_raw) if left_raw else ""
 
         if not self.right_text:
             return left_formatted
@@ -103,7 +103,7 @@ class ModalHint(Label):
         table.add_column(ratio=1, justify="left")
         table.add_column(justify="right")
 
-        right_formatted = format_modal_hint(self.right_text)
+        right_formatted = format_hint(self.right_text)
         table.add_row(left_formatted, right_formatted)
         return table
 

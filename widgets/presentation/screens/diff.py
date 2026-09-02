@@ -14,7 +14,7 @@ from widgets.chat_toolcall import ToolScrollBox
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_selection import ModalSearchNavMixin
 from widgets.presentation.widgets.chat_diff import format_edit_diff, get_diff_colors
-from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
+from widgets.presentation.widgets.footer_layout import format_hint, get_theme_colors
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import BREAKPOINT_COMPACT, BREAKPOINT_HINT, is_compact_width, resolve_width
 from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width, ellipsize
@@ -62,14 +62,14 @@ class DiffHeader(ResizeDebounceMixin, Static):
                     f"[{t_secondary}]{title_short}[/] "
                     f"[{t_muted}]({escape(stat)})[/]"
                 )
-            right_text = format_modal_hint("esc")
+            right_text = format_hint("esc")
         else:
             left_text = (
                 f"[bold {t_primary}]Diff Viewer[/]{sep}"
                 f"[{t_secondary}]{escape(self.title_text)}[/]{sep}"
                 f"[{t_muted}]({escape(self.stats_summary)})[/]"
             )
-            right_text = format_modal_hint(esc_label)
+            right_text = format_hint(esc_label)
 
         table.add_row(left_text, right_text)
         self.update(table)
@@ -148,7 +148,7 @@ class DiffFooter(ResizeDebounceMixin, Static):
         else:
             raw_hint = "tab: sidebar"
 
-        right_text = format_modal_hint(raw_hint)
+        right_text = format_hint(raw_hint)
         table.add_row(left_text, right_text)
         self.update(table)
 

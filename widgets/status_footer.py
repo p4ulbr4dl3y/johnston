@@ -12,7 +12,7 @@ from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 from widgets.presentation.widgets.footer_layout import (
     format_display_path,
-    format_modal_hint,
+    format_hint,
     get_theme_colors,
 )
 from widgets.utils.responsive import is_compact_width, resolve_width
@@ -210,7 +210,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             # Row 1 (LLM): ⠋ Action • claude-3.7  <left> | <right> 45% ctx • $0.02
             row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
             if self.is_generating and width >= 45:
-                row1_left_parts.append(format_modal_hint("esc: interrupt"))
+                row1_left_parts.append(format_hint("esc: interrupt"))
             if is_connected and clean_model and clean_model != "[Select model: /models]":
                 role_len = display_width(role_formatted) + 3
                 hint_len = 18 if (self.is_generating and width >= 45) else 0
@@ -255,7 +255,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             # Row 1 (LLM): ⠋ Action • esc: interrupt • OpenRouter › claude-3.7 (high)  <left> | <right> [████░░░░] 45% (58k/128k) • 12.3k tok • $0.02
             row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
             if self.is_generating:
-                row1_left_parts.append(format_modal_hint("esc: interrupt"))
+                row1_left_parts.append(format_hint("esc: interrupt"))
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 model_part = f"[{txt}]{provider_display}[/]{arrow_sep}[{txt}]{clean_model}[/]"
                 if thinking_effort and thinking_effort != "auto":

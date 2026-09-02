@@ -9,7 +9,7 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
-from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
+from widgets.presentation.widgets.footer_layout import format_hint, get_theme_colors
 from widgets.utils.row_format import display_width, ellipsize
 
 
@@ -89,7 +89,7 @@ class PlanNotch(Static):
 
         total = len(self.plan_items)
         target_width = 64
-        badge = format_modal_hint("ctrl+p: plan • ctrl+h: hide")
+        badge = format_hint("ctrl+p: plan • ctrl+h: hide")
         badge_plain = "ctrl+p: plan • ctrl+h: hide"
 
         if total == 0:
@@ -133,7 +133,7 @@ class PlanNotch(Static):
 
         target_width = 64
         header_title = f"Plan ({done}/{total})" if total > 0 else "Plan"
-        badge = format_modal_hint("ctrl+p: close • ctrl+h: hide")
+        badge = format_hint("ctrl+p: close • ctrl+h: hide")
         badge_plain = "ctrl+p: close • ctrl+h: hide"
         pad = max(2, target_width - display_width(header_title) - display_width(badge_plain))
 
