@@ -6,6 +6,7 @@ from textual.screen import ModalScreen
 
 from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.presentation.widgets.chat_container import ChatView
+from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
 from widgets.presentation.widgets.plan_notch import PlanNotch, PlanNotchContainer
 from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 from widgets.utils.key_aliases import expand_bindings
@@ -30,12 +31,49 @@ class SubagentViewScreen(ModalScreen[None]):
         self.session_id_or_desc = session_id_or_desc
         self.from_tasks = from_tasks
         self.session = None
-        self.thinking_widget = None
-        self.current_tool_widget = None
-        self.pending_tool_widgets = []
-        self.bot_msg = None
+        self.driver: ChatStreamDriver | None = None
+        self._last_tool_widget = None
         self.event_queue = asyncio.Queue()
         self.queue_task = None
+
+    @property
+    def thinking_widget(self):
+        d = getattr(self, "driver", None)
+        return d.thinking_handle if d else getattr(self, "_legacy_thinking_widget", None)
+
+    @thinking_widget.setter
+    def thinking_widget(self, val):
+        d = getattr(self, "driver", None)
+        if d:
+            d.thinking_handle = val
+        self._legacy_thinking_widget = val
+
+    @property
+    def bot_msg(self):
+        d = getattr(self, "driver", None)
+        return d.bot_handle if d else getattr(self, "_legacy_bot_msg", None)
+
+    @bot_msg.setter
+    def bot_msg(self, val):
+        d = getattr(self, "driver", None)
+        if d:
+            d.bot_handle = val
+        self._legacy_bot_msg = val
+
+    @property
+    def current_tool_widget(self):
+        d = getattr(self, "driver", None)
+        if d and d.tool_handles:
+            return d.tool_handles[-1]
+        return getattr(self, "_last_tool_widget", None)
+
+    @current_tool_widget.setter
+    def current_tool_widget(self, val):
+        self._last_tool_widget = val
+        d = getattr(self, "driver", None)
+        if d and val:
+            if not d.tool_handles or d.tool_handles[-1] != val:
+                d.tool_handles.append(val)
 
     def compose(self) -> ComposeResult:
         yield PlanNotchContainer(id="plan-notch-container")
@@ -128,22 +166,29 @@ class SubagentViewScreen(ModalScreen[None]):
         except Exception:
             pass
 
+    def _on_plan_update(self, plan: list, explanation: str) -> None:
+        try:
+            self.query_one(PlanNotch).set_plan(plan, explanation)
+        except Exception:
+            pass
+
     async def _load_history_session(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
         chat_view.loading = True
         chat_view._is_loading_session = True
         try:
-            from widgets.presentation.widgets.plan_notch import PlanNotch
-
             self.query_one(PlanNotch).clear_plan()
         except Exception:
             pass
 
         for child in list(chat_view.children):
             child.remove()
-        self.thinking_widget = None
-        self.current_tool_widget = None
-        self.bot_msg = None
+
+        self.driver = ChatStreamDriver(
+            chat_view,
+            on_tool_widget=lambda w: setattr(self, "_last_tool_widget", w),
+            on_plan_update=self._on_plan_update,
+        )
 
         rendered_count = 0
         is_running = bool(self.session and getattr(self.session, "status", "") == "running")
@@ -159,14 +204,12 @@ class SubagentViewScreen(ModalScreen[None]):
                 isinstance(e, dict) and e.get("type") == "user" and is_ui_visible_user_message(e)
                 for e in history_events
             )
-            child_offset = 0
             if not has_user_msg and getattr(self.session, "prompt", None):
                 await chat_view.add_user_message(self.session.prompt, animate=False)
-                child_offset = 1
 
             for idx, evt in enumerate(history_events):
                 is_last_running = is_running and (idx == len(history_events) - 1)
-                await self._render_event(
+                await self.driver.consume_session_event(
                     evt,
                     animate=is_last_running,
                     is_active=is_last_running,
@@ -182,12 +225,8 @@ class SubagentViewScreen(ModalScreen[None]):
             elif self.current_tool_widget and hasattr(self.current_tool_widget, "set_expanded"):
                 self.current_tool_widget.set_expanded(True)
 
-        if not is_running and self.bot_msg:
-            try:
-                await self.bot_msg.finalize_stream()
-            except Exception:
-                pass
-            self.bot_msg = None
+        if not is_running and self.driver:
+            await self.driver.finalize_bot_stream()
 
         await asyncio.sleep(0.1)
         chat_view._is_loading_session = False
@@ -275,106 +314,29 @@ class SubagentViewScreen(ModalScreen[None]):
         is_expanded: bool = False,
         is_active: bool = False,
     ) -> None:
-        chat_view = self.query_one("#subagent-chat-view", ChatView)
-        etype = evt.get("type")
-
-        if etype == "user":
-            if not is_ui_visible_user_message(evt):
-                return
-            att_count = evt.get("attachments_count", 0)
-            if not att_count and evt.get("attachments"):
-                att_count = len(evt.get("attachments"))
-            await chat_view.add_user_message(
-                evt.get("display_text") or evt.get("text", ""),
-                animate=animate,
-                attachments_count=att_count,
+        if getattr(self, "driver", None) is None:
+            try:
+                chat_view = self.query_one("#subagent-chat-view", ChatView)
+            except Exception:
+                chat_view = getattr(self, "chat_view", None)
+            self.driver = ChatStreamDriver(
+                chat_view,
+                on_tool_widget=lambda w: setattr(self, "_last_tool_widget", w),
+                on_plan_update=self._on_plan_update,
             )
-        elif etype == "thinking":
-            txt = evt.get("text", "")
-            if self.thinking_widget is None:
-                self.thinking_widget = await chat_view.add_thinking_widget(txt, animate=animate)
-                if is_expanded and hasattr(self.thinking_widget, "is_expandable") and self.thinking_widget.is_expandable():
-                    self.thinking_widget.is_expanded = True
-            else:
-                self.thinking_widget.update_thinking(txt)
-            if evt.get("duration") is not None:
-                self.thinking_widget.finish_thinking(evt.get("duration", 0.0), txt)
-                self.thinking_widget = None
-        elif etype == "tool":
-            if "result_text" in evt and not evt.get("tool_type"):
-                if getattr(self, "pending_tool_widgets", None):
-                    w = self.pending_tool_widgets.pop(0)
-                    w.set_result(
-                        evt.get("result_text", ""),
-                        is_error=bool(evt.get("is_error", False)),
-                        status=evt.get("status"),
-                        returncode=evt.get("returncode"),
-                    )
-                elif self.current_tool_widget:
-                    self.current_tool_widget.set_result(
-                        evt.get("result_text", ""),
-                        is_error=bool(evt.get("is_error", False)),
-                        status=evt.get("status"),
-                        returncode=evt.get("returncode"),
-                    )
-            else:
-                if self.bot_msg:
-                    if not self.bot_msg.content.strip():
-                        try:
-                            self.bot_msg.remove()
-                        except Exception:
-                            pass
-                    else:
-                        self.bot_msg.flush_pending_stream()
-                        await self.bot_msg.finalize_stream()
-                    self.bot_msg = None
-                widget = await chat_view.add_tool_call(
-                    evt.get("tool_type", ""),
-                    evt.get("target", ""),
-                    result_text=evt.get("result_text", ""),
-                    args=evt.get("args", {}),
-                    status=evt.get("status"),
-                    returncode=evt.get("returncode"),
-                    animate=animate,
-                )
-                if is_expanded and hasattr(widget, "is_expandable") and widget.is_expandable():
-                    widget.is_expanded = True
-                self.current_tool_widget = widget
-                if animate and evt.get("tool_type") == "update_plan":
-                    args = evt.get("args") or {}
-                    if isinstance(args, dict) and isinstance(args.get("plan"), list):
-                        try:
-                            self.query_one(PlanNotch).set_plan(args.get("plan", []), args.get("explanation", ""))
-                        except Exception:
-                            pass
-                if not evt.get("result_text"):
-                    if not hasattr(self, "pending_tool_widgets") or self.pending_tool_widgets is None:
-                        self.pending_tool_widgets = []
-                    self.pending_tool_widgets.append(widget)
-        elif etype == "bot":
-            txt = evt.get("text", "")
-            if not animate and not is_active and not txt.strip():
-                return
-            if txt:
-                if self.bot_msg is None:
-                    self.bot_msg = await chat_view.add_bot_message(animate=animate or is_active)
-                if evt.get("final") or (not animate and not is_active):
-                    await self.bot_msg.set_final_content(txt)
-                    self.bot_msg = None
-                else:
-                    self.bot_msg.set_stream_content(txt)
-        elif etype == "bot_reset":
-            if self.bot_msg:
-                try:
-                    await self.bot_msg.reset_stream()
-                except Exception:
-                    pass
-        elif etype == "error":
-            await chat_view.add_error_message(evt.get("text", "Error"), animate=animate)
-        elif etype == "event_divider":
-            await chat_view.add_event_divider(evt.get("text", "Session Compacted"), animate=animate)
-        elif etype == "status_change":
-            pass
+            if getattr(self, "_legacy_bot_msg", None):
+                self.driver.bot_handle = self._legacy_bot_msg
+            if getattr(self, "_legacy_thinking_widget", None):
+                self.driver.thinking_handle = self._legacy_thinking_widget
+            if getattr(self, "_last_tool_widget", None):
+                self.driver.tool_handles.append(self._last_tool_widget)
+
+        await self.driver.consume_session_event(
+            evt,
+            animate=animate,
+            is_expanded=is_expanded,
+            is_active=is_active,
+        )
 
     def action_close(self) -> None:
         self.dismiss()
