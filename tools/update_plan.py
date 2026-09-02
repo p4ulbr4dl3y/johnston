@@ -101,6 +101,15 @@ class UpdatePlanTool(BaseTool):
                         on_plan_update(validated_plan, explanation)
                     except Exception:
                         pass
+        else:
+            host = ctx.host
+            if host:
+                setattr(host, "current_plan", validated_plan)
+                setattr(host, "current_plan_explanation", explanation)
+                target_sess = getattr(host, "session", None)
+                if target_sess:
+                    setattr(target_sess, "current_plan", validated_plan)
+                    setattr(target_sess, "current_plan_explanation", explanation)
 
         completed_count = sum(1 for p in validated_plan if p["status"] == "completed")
         total_count = len(validated_plan)

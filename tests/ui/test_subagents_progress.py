@@ -411,6 +411,44 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         self.assertEqual(tasks[1]["id"], "s-2")
         self.assertIn("Execute command", tasks[1]["command"])
 
+    def test_extract_progress_with_session_current_plan(self):
+        sess = MagicMock()
+        sess.is_running = True
+        sess.status = "running"
+        sess.current_plan = [
+            {"step": "Step 1", "status": "completed"},
+            {"step": "Step 2", "status": "in_progress"},
+            {"step": "Step 3", "status": "pending"},
+        ]
+        sess.messages = [
+            {"type": "tool", "tool_type": "view_file", "args": {"path": "a.py"}},
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "[1/3] reading file")
+
+        # When completed with plan
+        sess.is_running = False
+        sess.status = "completed"
+        sess.created_at = 100.0
+        sess.updated_at = 115.0
+        self.assertEqual(extract_subagent_progress(sess), "[1/3] done • 15s")
+
+    def test_extract_progress_with_messages_plan_restoration(self):
+        sess = MagicMock(spec=["status", "messages", "created_at", "updated_at"])
+        sess.status = "running"
+        sess.messages = [
+            {
+                "type": "tool",
+                "tool_type": "update_plan",
+                "args": {"plan": [{"status": "completed"}, {"status": "completed"}]},
+            },
+            {
+                "type": "tool",
+                "tool_type": "shell",
+                "args": {"command": "npm test"},
+            },
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "[2/2] running command")
+
 
 if __name__ == "__main__":
     unittest.main()

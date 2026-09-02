@@ -172,6 +172,8 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.updated)
         self.assertEqual(app.current_plan_explanation, "Main plan")
         self.assertEqual(app.current_plan, [{"step": "Main task", "status": "in_progress"}])
+        self.assertEqual(subagent.current_plan, [{"step": "Sub step", "status": "completed"}])
+        self.assertEqual(subagent.current_plan_explanation, "Subagent internal plan")
 
 
 if __name__ == "__main__":

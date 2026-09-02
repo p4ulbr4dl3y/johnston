@@ -7,7 +7,7 @@ presentation area consumed by core widgets and UI tests.
 """
 import json
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.infrastructure.runtime.lru import LruCache
 from widgets.utils.row_format import format_duration
@@ -388,6 +388,33 @@ def _count_session_steps(session: Any) -> int:
     return 0
 
 
+def extract_subagent_plan_status(session: Any) -> Optional[Tuple[int, int]]:
+    """Return (done_count, total_count) if session has an active/completed plan."""
+    if session is None:
+        return None
+    plan = getattr(session, "current_plan", None) if not isinstance(session, dict) else session.get("current_plan")
+    if not plan:
+        agent = getattr(session, "agent", None)
+        if agent:
+            plan = getattr(agent, "current_plan", None)
+    if not plan:
+        messages = session.get("messages") if isinstance(session, dict) else getattr(session, "messages", None)
+        if messages and isinstance(messages, (list, tuple)):
+            for msg in reversed(messages):
+                if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "update_plan":
+                    args = msg.get("args") or {}
+                    if isinstance(args, dict) and isinstance(args.get("plan"), list):
+                        p = [it for it in args.get("plan") if isinstance(it, dict)]
+                        if p:
+                            plan = p
+                            break
+    if plan and isinstance(plan, list) and len(plan) > 0:
+        done = sum(1 for item in plan if isinstance(item, dict) and item.get("status") == "completed")
+        total = len(plan)
+        return done, total
+    return None
+
+
 def extract_subagent_progress(session: Any) -> str:
     """Extract a short, human-like activity/status badge for a subagent session.
 
@@ -395,6 +422,9 @@ def extract_subagent_progress(session: Any) -> str:
     """
     if session is None:
         return ""
+
+    plan_status = extract_subagent_plan_status(session)
+    plan_prefix = f"[{plan_status[0]}/{plan_status[1]}] " if plan_status is not None else ""
 
     st_str = (
         (session.get("status") if isinstance(session, dict) else getattr(session, "status", "")) or "unknown"
@@ -411,7 +441,7 @@ def extract_subagent_progress(session: Any) -> str:
             parts.append(st_str or "done")
 
         steps = _count_session_steps(session)
-        if steps > 0:
+        if steps > 0 and not plan_prefix:
             step_str = "step" if steps == 1 else "steps"
             parts.append(f"{steps} {step_str}")
 
@@ -429,11 +459,11 @@ def extract_subagent_progress(session: Any) -> str:
             if dur:
                 parts.append(dur)
 
-        return " • ".join(parts)
+        return f"{plan_prefix}{' • '.join(parts)}"
 
     messages = getattr(session, "messages", [])
     if not isinstance(messages, (list, tuple)) or not messages:
-        return "starting..."
+        return f"{plan_prefix}starting..." if plan_prefix else "starting..."
 
     # Slice events belonging to the current step / batch
     batch_events: List[Dict[str, Any]] = []
@@ -461,17 +491,22 @@ def extract_subagent_progress(session: Any) -> str:
             args = evt.get("args") or {}
             target = evt.get("target") or ""
             if tool_type:
-                return _format_active_tool_progress(tool_type, args, target, turn_events=batch_events)
+                raw_badge = _format_active_tool_progress(tool_type, args, target, turn_events=batch_events)
+                if plan_prefix:
+                    if raw_badge.startswith("plan ["):
+                        return raw_badge
+                    return f"{plan_prefix}{raw_badge}"
+                return raw_badge
             continue
         elif etype == "thinking":
             if evt.get("duration") is None or evt.get("duration") == 0:
-                return "thinking..."
+                return f"{plan_prefix}thinking..." if plan_prefix else "thinking..."
             continue
         elif etype == "bot":
             txt = evt.get("text", "")
             if isinstance(txt, str) and txt.strip():
-                return "generating..."
+                return f"{plan_prefix}generating..." if plan_prefix else "generating..."
         elif etype == "user":
-            return "starting..."
+            return f"{plan_prefix}starting..." if plan_prefix else "starting..."
 
-    return "running..."
+    return f"{plan_prefix}running..." if plan_prefix else "running..."
