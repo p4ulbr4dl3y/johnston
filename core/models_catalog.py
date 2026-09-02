@@ -157,6 +157,8 @@ class ModelsCatalog:
         providers: Dict[str, Dict[str, Any]] = None,
     ):
         try:
+            if not self._limits and not self._names:
+                self.load_cache()
             now = time.time()
             self._updated_at = now
             payload = {
