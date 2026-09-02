@@ -105,9 +105,6 @@ class ThemeManager(CoreThemeManager):
         tcss_vars = dict(adapted.tcss_vars)
         bg_app = tcss_vars.get("bg-app", "#09090b")
         is_ansi = bg_app in ("ansi_default", "transparent") or adapted.name == "native"
-        # `subtle` lives on the Theme entity (not in tcss_vars) but is referenced
-        # by app.tcss ($subtle) — expose it so the token is not dead.
-        tcss_vars.setdefault("subtle", adapted.subtle)
         return TextualTheme(
             name=adapted.name,
             primary=adapted.primary,

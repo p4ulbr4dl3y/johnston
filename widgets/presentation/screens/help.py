@@ -6,7 +6,6 @@ from textual.widgets import Label, Static
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
-    ESC_HINT_CLOSE,
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
@@ -119,7 +118,7 @@ class HelpScreen(BaseModalScreen[None]):
             max_kb_w = max(len(k) for k, _ in KEYBINDINGS_DATA) + 2 + max(len(d) for _, d in KEYBINDINGS_DATA)
             sample_items = ["x" * max(max_cmd_w, max_kb_w)]
             content_w = modal_content_width(
-                sample_items, "Johnston Help", f"tab/←→: switch • {ESC_HINT_CLOSE}"
+                sample_items, "Johnston Help", "tab/←→: switch • esc: close"
             )
             apply_modal_fit(dialog, content_w, min_width=76, max_width=96)
 
@@ -154,7 +153,7 @@ class HelpScreen(BaseModalScreen[None]):
                 yield Static("Keybindings", id="help-tab-keybindings", classes="help-tab")
             with ToolScrollBox(id="help-scroll-box"):
                 yield Static(self._get_active_table(), id="help-body", classes=MODAL_MARKDOWN)
-            yield ModalHint(f"tab/←→: switch • {ESC_HINT_CLOSE}", id=MODAL_HINT_ID)
+            yield ModalHint("tab/←→: switch • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self._apply_dialog_fit()
@@ -182,7 +181,7 @@ class HelpScreen(BaseModalScreen[None]):
 
             hint_lbl = self.query_one(f"#{MODAL_HINT_ID}", Label)
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
-            hint_lbl.update("tab/←→ • esc" if is_compact else f"tab/←→: switch • {ESC_HINT_CLOSE}")
+            hint_lbl.update("tab/←→ • esc" if is_compact else "tab/←→: switch • esc: close")
         except Exception:
             pass
 

@@ -14,12 +14,6 @@ LIFT_DAMPING = 3.0
 CHROMA_NUDGE = 0.003
 LIGHT_THEME_THRESHOLD = 0.5
 RULE_BASE_LIFT = 0.20
-RULE_SUBTLE_LIFT = 0.10
-MUTED_BLEND = 0.48
-# Decorative rules (markdown tables, `---`) are intentionally *not* UI
-# components: 1.4.11 does not apply, and a 3:1 rule inside prose reads as
-# noise. They only have to be visible.
-DECORATIVE_CONTRAST_MIN = 1.35
 
 _HEX6_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _CACHED_TERMINAL_COLORS: Optional[Tuple[Optional[str], Optional[str]]] = None
@@ -128,43 +122,6 @@ def compute_adaptive_border(terminal_bg: str | None = None) -> str:
     return lifted_from_terminal_bg(terminal_bg, RULE_BASE_LIFT, 0.0, 0.0)
 
 
-def _contrast_safe_lerp(
-    foreground: str,
-    background: str,
-    surface: str,
-    start_t: float,
-    target: float,
-    *,
-    step: float = 0.02,
-    reverse: bool = False,
-) -> str:
-    """Pick the blend closest to ``start_t`` that still reaches ``target``.
-
-    Blends run from ``foreground`` to ``background`` by default (``reverse``
-    flips the direction, used for borders which start near the terminal
-    background and move toward the foreground). The search walks away from
-    ``start_t`` in ``step`` increments, so the returned colour is the smallest
-    perceptual deviation from the design intent that satisfies WCAG on both the
-    terminal background and the computed surface.
-    """
-    from core.domain.policies.theme_contrast import contrast_ratio
-
-    def blend(t: float) -> str:
-        t = max(0.0, min(1.0, t))
-        return lerp_oklab(background, foreground, t) if reverse else lerp_oklab(foreground, background, t)
-
-    steps = int(1.0 / step) + 2
-    for i in range(steps):
-        offset = i * step
-        t = (start_t + offset) if reverse else (start_t - offset)
-        if not 0.0 <= t <= 1.0:
-            continue
-        candidate = blend(t)
-        if contrast_ratio(candidate, background) >= target and contrast_ratio(candidate, surface) >= target:
-            return candidate
-    return blend(start_t)
-
-
 def clear_palette_cache() -> None:
     """Clear cached terminal colors to allow re-querying."""
     global _CACHED_TERMINAL_COLORS
@@ -249,19 +206,11 @@ def compute_adaptive_palette(
     if norm_fg is None:
         norm_fg = "#e4e4e7" if is_dark else "#18181b"
 
-    from core.domain.policies.theme_contrast import TEXT_CONTRAST_AA, UI_CONTRAST_AA
-
     surface = compute_adaptive_surface(norm_bg, mode=mode)
+    border = compute_adaptive_border(norm_bg)
     fg_secondary = lerp_oklab(norm_fg, norm_bg, 0.25)
+    fg_muted = lerp_oklab(norm_fg, norm_bg, 0.48)
     subtle = lerp_oklab(norm_fg, norm_bg, 0.30)
-    # Muted text and panel borders must stay legible on both the terminal
-    # background and the lifted surface, so pick the closest blend that clears
-    # the WCAG thresholds instead of hard-coded lerp factors.
-    fg_muted = _contrast_safe_lerp(norm_fg, norm_bg, surface, MUTED_BLEND, TEXT_CONTRAST_AA)
-    border = _contrast_safe_lerp(norm_fg, norm_bg, surface, RULE_BASE_LIFT, UI_CONTRAST_AA, reverse=True)
-    border_subtle = _contrast_safe_lerp(
-        norm_fg, norm_bg, surface, RULE_SUBTLE_LIFT, DECORATIVE_CONTRAST_MIN, reverse=True
-    )
 
     tcss_vars = {
         "bg-app": "ansi_default",
@@ -273,7 +222,6 @@ def compute_adaptive_palette(
         "fg-muted": fg_muted,
         "fg-inverted": norm_bg,
         "border": border,
-        "border-subtle": border_subtle,
         "accent-info": "#61afef",
         "accent-warning": "#d4a259",
         "accent-error": "#d15858",
@@ -289,7 +237,6 @@ def compute_adaptive_palette(
         "subtle": subtle,
         "bg_surface": surface,
         "border": border,
-        "border_subtle": border_subtle,
         "fg_primary": norm_fg,
         "fg_secondary": fg_secondary,
         "fg_muted": fg_muted,

@@ -5,7 +5,6 @@ from textual.widgets import OptionList
 from widgets.app.theme_manager import theme_manager
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
-from widgets.presentation.screens.constants import ESC_HINT_CLOSE
 
 
 class ThemeScreen(BaseSelectionScreen[str]):
@@ -29,7 +28,7 @@ class ThemeScreen(BaseSelectionScreen[str]):
             default_value=current,
             show_search=True,
             search_placeholder="Search themes...",
-            hint_text=f"enter: select • {ESC_HINT_CLOSE}",
+            hint_text="enter: select • esc: cancel",
             fit_content=True,
         )
 

@@ -59,8 +59,19 @@ class SubagentsCommand(BaseCommand):
     description = "Manage subagents"
 
     async def execute(self, app) -> None:
-        # P1-9: an empty list opens the screen with an empty state instead of a
-        # toast — the screen then also explains how to get a subagent going.
+        store = getattr(app, "sm", None)
+        curr_sid = getattr(app, "current_session_id", None)
+
+        def _has_subagents() -> bool:
+            if not store:
+                return False
+            return bool(store.children(curr_sid) if curr_sid else store.list(kind="subagent"))
+
+        has_sessions = await asyncio.to_thread(_has_subagents)
+
+        if not has_sessions:
+            app.notify("No active subagents", severity="warning")
+            return
         app.push_screen(SubagentsScreen())
 
 
@@ -70,7 +81,20 @@ class ShellTasksCommand(BaseCommand):
     description = "Manage background shell tasks"
 
     async def execute(self, app) -> None:
-        # See SubagentsCommand: the screen carries its own empty state (P1-9).
+        all_tasks = getattr(app, "task_manager", [])
+        curr_sid = getattr(app, "current_session_id", None)
+        has_tasks = bool(
+            any(
+                getattr(t, "kind", "") == "shell"
+                and getattr(t, "is_background", False)
+                and (getattr(t, "session_id", None) == curr_sid if curr_sid else True)
+                for t in all_tasks
+            )
+        )
+
+        if not has_tasks:
+            app.notify("No active shell tasks", severity="warning")
+            return
         app.push_screen(ShellTasksScreen())
 
 

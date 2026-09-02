@@ -13,7 +13,6 @@ from core.infrastructure.platform.paths import CONFIG_DIR
 from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
-    ESC_HINT_CLOSE,
     MODAL_DIALOG_ID,
     MODAL_HINT,
     MODAL_HINT_ID,
@@ -32,12 +31,9 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
     search_nav_option_list_id = "skills-option-list"
     search_nav_filtered_attr = "filtered_skills"
 
-    space_actions = ("toggle_hidden",)
-
     BINDINGS = expand_bindings([
         ("escape", "cancel", "Cancel"),
         ("tab", "toggle_hidden", "Toggle Hidden"),
-        ("space", "toggle_hidden", "Toggle Hidden"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ])
@@ -69,7 +65,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             yield ModalHeader("Available Skills", esc_hint="")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id="skills-option-list")
-            yield ModalHint(f"enter: select • space: toggle • {ESC_HINT_CLOSE}", id=MODAL_HINT_ID)
+            yield ModalHint("enter: select • space: toggle • esc: close", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)
@@ -140,7 +136,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
 
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
             hint_lbl = self.query_one(MODAL_HINT, Label)
-            hint_lbl.update("enter • space • esc" if is_compact else f"enter: select • space: toggle • {ESC_HINT_CLOSE}")
+            hint_lbl.update("enter • space • esc" if is_compact else "enter: select • space: toggle • esc: close")
         except Exception:
             pass
 
@@ -168,8 +164,16 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             event.prevent_default()
             event.stop()
             return
-        # `space` is a real binding now (see space_actions/check_action), so it
-        # is advertised in the hint and /help instead of being invisible.
+        if event.key == "space":
+            try:
+                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+            except Exception:
+                search_input = None
+            if not search_input or not search_input.has_focus or not search_input.value:
+                self.action_toggle_hidden()
+                event.prevent_default()
+                event.stop()
+                return
         self._handle_search_navigation(event)
 
     def action_toggle_hidden(self) -> None:

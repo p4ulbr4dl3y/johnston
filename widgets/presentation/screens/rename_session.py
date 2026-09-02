@@ -5,7 +5,6 @@ from textual.widgets import Input
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
-    ESC_HINT_CANCEL,
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     TAB_KEYS,
@@ -30,7 +29,7 @@ class RenameSessionScreen(BaseModalScreen[str | None]):
                 id="session-rename-input",
                 classes="modal-input",
             )
-            yield ModalHint(f"enter: save • {ESC_HINT_CANCEL}", id=MODAL_HINT_ID)
+            yield ModalHint("enter: save • esc: cancel", id=MODAL_HINT_ID)
 
     def on_mount(self) -> None:
         inp = self.query_one("#session-rename-input", Input)

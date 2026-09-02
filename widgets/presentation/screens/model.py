@@ -7,7 +7,7 @@ from textual.widgets.option_list import Option
 from core.models_catalog import catalog
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
-from widgets.presentation.screens.constants import ESC_HINT_CLOSE, MODAL_SEARCH_INPUT_ID
+from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT_ID
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, option_list_row_width
 
@@ -44,7 +44,7 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
-            hint_text=f"enter: select • ctrl+r: refresh • {ESC_HINT_CLOSE}",
+            hint_text="enter: select • ctrl+r: refresh • esc: close",
             dialog_classes="modal-dialog-medium",
         )
 
@@ -135,19 +135,6 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
             return True
         return False
 
-    @staticmethod
-    def _model_id_hint(display_name: str, model_id: str) -> str:
-        """Raw id when the humanized name hides it; empty when they already match.
-
-        `Claude Sonnet 4 5` says nothing about `claude-sonnet-4-5-20250929`, and
-        the id is what the search box is typed with (P2-12).
-        """
-        if not display_name or not model_id:
-            return ""
-        if display_name.lower().replace(" ", "-") == model_id.lower():
-            return ""
-        return model_id
-
     def _build_data(
         self,
     ) -> Tuple[List[Union[str, Option]], List[Union[Tuple[str, str, str], None]], Union[Tuple[str, str, str], None]]:
@@ -187,9 +174,7 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
                 has_vis = catalog.has_vision(p_key, m)
                 badge = "vision" if has_vis else ""
                 prefix = f"{status_tag('ACTIVE')} " if is_active else "  "
-                opt_label = format_badge_row(
-                    clean_m, badge=badge, target_width=target_w, prefix=prefix, hint=self._model_id_hint(clean_m, m)
-                )
+                opt_label = format_badge_row(clean_m, badge=badge, target_width=target_w, prefix=prefix)
                 item_val = (p_key, m, p_name)
                 options.append(opt_label)
                 items.append(item_val)

@@ -3,7 +3,7 @@ from textual import events
 from textual.widgets import Input
 
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
-from widgets.presentation.screens.constants import ESC_HINT_CANCEL, MODAL_SEARCH_INPUT
+from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT
 from widgets.utils.row_format import MODAL_DEFAULT_ROW_WIDTH, ellipsize, option_list_row_width
 
 FORK_CURRENT_STATE = -1
@@ -27,7 +27,7 @@ class ForkScreen(BaseSelectionScreen[int]):
             default_value=default_val,
             show_search=True,
             search_placeholder="Search...",
-            hint_text=f"enter: fork • {ESC_HINT_CANCEL}",
+            hint_text="enter: fork • esc: cancel",
         )
 
     def _row_width(self) -> int:

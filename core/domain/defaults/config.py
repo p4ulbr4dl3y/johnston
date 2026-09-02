@@ -82,7 +82,7 @@ DEFAULT_DISK_CACHE_TTL = 2.0
 # Theme Palette Constants (Monochrome Slate)
 THEME_PRIMARY = "#ffffff"
 THEME_SECONDARY = "#a1a1aa"
-THEME_MUTED = "#8d8d94"
+THEME_MUTED = "#71717a"
 THEME_SUBTLE = "#52525b"
 
 # Status Dot Colors

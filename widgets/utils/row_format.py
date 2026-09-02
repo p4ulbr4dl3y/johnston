@@ -146,37 +146,6 @@ def ellipsize(text: str, max_width: int) -> str:
     return "".join(out) + "..."
 
 
-def middle_ellipsize(text: str, max_width: int) -> str:
-    """Clip text to ``max_width`` cells keeping both ends: ``widgets/…/diff.py``.
-
-    Paths are told apart by their last segment, so a trailing ``...`` (see
-    :func:`ellipsize`) makes ``tests/ui/test_a.py`` and ``tests/ui/test_b.py``
-    look identical — hence the middle ellipsis.
-    """
-    if display_width(text) <= max_width:
-        return text
-    if max_width <= 1:
-        return "…"[:max_width]
-
-    sep = "/" if "/" in text else ("\\" if "\\" in text else "")
-    tail = text.rsplit(sep, 1)[-1] if sep else text[-max(1, max_width // 3) :]
-    if display_width(tail) > max_width - 1:
-        # Even the tail does not fit: fall back to clipping its start.
-        tail = tail[-(max_width - 1) :]
-        return "…" + tail
-
-    head_budget = max_width - 1 - display_width(tail)
-    head: list[str] = []
-    used = 0
-    for ch in text[: len(text) - len(tail)]:
-        width = display_width(ch)
-        if used + width > head_budget:
-            break
-        head.append(ch)
-        used += width
-    return "".join(head) + "…" + tail
-
-
 def format_badge_row(
     title: str,
     badge: str = "",
@@ -184,93 +153,18 @@ def format_badge_row(
     prefix: str = "",
     min_gap: int = 2,
     min_title: int = 10,
-    hint: str = "",
 ) -> str:
-    """Format an option row as ``prefix title [dim]hint[/] ...spaces... [dim]badge[/]``.
+    """Format an option row as ``prefix title ...spaces... [dim]badge[/]``.
 
     Title is whitespace-collapsed and truncated (cell-aware) to reserve badge
     space; the title is markup-escaped while the badge is passed through so it
     can carry its own style. An empty badge yields a plain prefix+title row.
-
-    ``hint`` is a muted secondary value shown next to the title — e.g. the raw
-    model id behind a humanized name (`Claude Sonnet 4 5` / `claude-sonnet-4-5`)
-    which is otherwise lost, and which is what people search by (P2-12).
     """
     clean = " ".join(str(title).replace("\n", " ").replace("\r", " ").split())
-    hint_clean = " ".join(str(hint).split()) if hint else ""
-    if not badge and not hint_clean:
+    if not badge:
         return f"{prefix}{escape(clean)}"
-
-    prefix_w = display_width(prefix)
-    badge_w = display_width(badge)
-    # Never let the hint squeeze the title out of the row.
-    hint_budget = max(0, target_width - prefix_w - badge_w - min_title - 2 * min_gap)
-    if hint_clean and display_width(hint_clean) > hint_budget:
-        hint_clean = middle_ellipsize(hint_clean, hint_budget) if hint_budget >= 4 else ""
-    hint_room = display_width(hint_clean) + min_gap if hint_clean else 0
-
-    max_title = max(min_title, target_width - prefix_w - badge_w - hint_room - min_gap)
+    max_title = max(min_title, target_width - display_width(prefix) - display_width(badge) - min_gap)
     if display_width(clean) > max_title:
         clean = ellipsize(clean, max_title)
-    pad = max(min_gap, target_width - prefix_w - display_width(clean) - hint_room - badge_w)
-
-    row = f"{prefix}{escape(clean)}"
-    if hint_clean:
-        row += f"{' ' * min_gap}[dim]{escape(hint_clean)}[/]"
-    if badge:
-        row += f"{' ' * pad}[dim]{badge}[/]"
-    return row
-
-
-def fit_row(
-    left: str | Text,
-    right: str | Text = "",
-    width: int = 80,
-    gap: int = 2,
-    min_left: int = 8,
-) -> Text:
-    """Compose one ``left …spaces… right`` row guaranteed to fit ``width`` cells.
-
-    Rich's ``Table.grid(expand=True)`` splits the terminal equally between its
-    columns, so a long left cell wraps and is clipped by fixed-height footers
-    (losing the tail silently). Building the row as a single :class:`Text`
-    lets the left cell use the full width minus the right cell, and degrades
-    with an ellipsis instead of dropping content.
-    """
-    left_t = left.copy() if isinstance(left, Text) else Text.from_markup(str(left))
-    right_t = right.copy() if isinstance(right, Text) else Text.from_markup(str(right))
-    safe_width = max(gap + min_left, int(width))
-    left_w, right_w = cell_len(left_t.plain), cell_len(right_t.plain)
-
-    if left_w + right_w + gap > safe_width:
-        left_budget = safe_width - right_w - gap
-        if left_budget < min_left and right_w:
-            # Left would be squeezed to nothing: give back space from the right.
-            right_budget = safe_width - left_w - gap
-            if right_budget >= 1:
-                right_t.truncate(right_budget, overflow="ellipsis", pad=False)
-                right_w = cell_len(right_t.plain)
-            else:
-                right_t = Text("")
-                right_w = 0
-            left_budget = safe_width - right_w - gap
-        if left_w > max(1, left_budget):
-            left_t.truncate(max(1, left_budget), overflow="ellipsis", pad=False)
-            left_w = cell_len(left_t.plain)
-
-    pad = max(gap, safe_width - left_w - right_w)
-    row = left_t.copy()
-    row.append(" " * pad)
-    row.append_text(right_t)
-    return row
-
-
-def compose_rows(rows: list[tuple[str, str]] | list[tuple[str]], width: int, gap: int = 2) -> Text:
-    """Stack fitted rows into a single multi-line :class:`Text` renderable."""
-    out = Text()
-    for index, row in enumerate(rows):
-        if index:
-            out.append("\n")
-        right = row[1] if len(row) > 1 else ""
-        out.append_text(fit_row(row[0], right, width, gap=gap))
-    return out
+    pad = max(min_gap, target_width - display_width(prefix) - display_width(clean) - display_width(badge))
+    return f"{prefix}{escape(clean)}{' ' * pad}[dim]{badge}[/]"

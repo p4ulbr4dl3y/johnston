@@ -9,7 +9,6 @@ from rich.markup import escape
 from rich.table import Table
 from textual.widgets import Static
 
-from widgets.presentation.screens.constants import ESC_HINT_CLOSE
 from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
 
 __all__ = ["ModalHeader"]
@@ -30,7 +29,7 @@ class ModalHeader(Static):
     def __init__(
         self,
         title: str = "",
-        esc_hint: str = ESC_HINT_CLOSE,
+        esc_hint: str = "esc: close",
         *,
         id: Optional[str] = None,
         classes: Optional[str] = None,

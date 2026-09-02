@@ -704,19 +704,21 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(toggled), 1)
             self.assertTrue(tab_ev._stop_propagation)
 
-            # Space is a declared binding now (P2-11), so the hint and /help
-            # can advertise it; _on_key no longer handles it directly.
-            self.assertIn("space", {binding[0] for binding in ProvidersScreen.BINDINGS})
+            # Space key when search input empty
             space_ev = events.Key("space", " ")
-            res = screen._on_key(space_ev)
+            await screen._on_key(space_ev)
+            self.assertEqual(len(toggled), 2)
+            self.assertTrue(space_ev._stop_propagation)
+
+            # Space key when search input has focus and value
+            inp = screen.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+            inp.focus()
+            inp.value = "test search"
+            space_ev2 = events.Key("space", " ")
+            res = screen._on_key(space_ev2)
             if asyncio.iscoroutine(res):
                 await res
-            self.assertEqual(len(toggled), 1)
-
-            # A real space keystroke still toggles once focus is on the list.
-            screen.query_one(MODAL_OPTION_LIST, OptionList).focus()
-            await pilot.press("space")
-            await pilot.pause()
+            # Not toggled again because search input has focus and value
             self.assertEqual(len(toggled), 2)
 
     def test_action_cancel(self):

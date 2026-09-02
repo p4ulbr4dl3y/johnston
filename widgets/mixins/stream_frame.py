@@ -1,9 +1,6 @@
-from widgets.utils.row_format import compose_rows
+from rich.table import Table
 
 SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-
-# Both footers render with 1 cell of horizontal padding on each side.
-FOOTER_GUTTER = 2
 
 
 class StreamFrameMixin:
@@ -13,37 +10,7 @@ class StreamFrameMixin:
     rows (no git/table rebuild) on each tick; ``_swap_frame`` swaps the old
     spinner char in the first row. Used by both ``StatusFooter`` (1- or
     2-column cached rows) and ``SubagentStatusFooter`` (2-column rows).
-
-    Rows are laid out as fitted ``Text`` lines (see
-    :func:`widgets.utils.row_format.compose_rows`) so a long left cell
-    degrades with an ellipsis instead of being clipped by the fixed footer
-    height.
     """
-
-    def row_width(self) -> int:
-        """Usable cell width for footer rows (terminal width minus gutter)."""
-        from widgets.utils.responsive import resolve_width
-
-        return max(10, resolve_width(self) - FOOTER_GUTTER)
-
-    def compose_footer_rows(self, rows) -> None:
-        """Render ``rows`` (1- or 2-tuples of markup) into the footer widget."""
-        self._last_grid_rows = list(rows)
-        self.update(compose_rows([tuple(row) for row in rows], self.row_width()))
-
-    def _timed_cell(self) -> str | None:
-        """Live text for the last row's right cell, if the footer has one.
-
-        The spinner tick only swaps glyphs, so a footer that renders an elapsed
-        time has to rebuild that one cell per frame (see P1-9).
-        """
-        builder = getattr(self, "render_timed_cell", None)
-        if not callable(builder):
-            return None
-        try:
-            return builder()
-        except Exception:
-            return None
 
     def _render_stream_frame(self) -> None:
         """Redraw only the animated frame from cached status rows (no git/rebuild)."""
@@ -54,18 +21,22 @@ class StreamFrameMixin:
             return
         try:
             frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
-            redrawn = []
-            for i, row in enumerate(rows):
-                left = row[0]
-                if i == 0:
-                    left = self._swap_frame(left, frame)
-                redrawn.append((left, row[1]) if len(row) > 1 else (left,))
-            timed = self._timed_cell()
-            if timed is not None and redrawn and len(redrawn[-1]) > 1:
-                last = list(redrawn[-1])
-                last[1] = timed
-                redrawn[-1] = tuple(last)
-            self.update(compose_rows(redrawn, self.row_width()))
+            grid = Table.grid(expand=True)
+            if rows and len(rows[0]) == 1:
+                grid.add_column(justify="left")
+                for i, row in enumerate(rows):
+                    cell = row[0]
+                    if i == 0:
+                        cell = self._swap_frame(cell, frame)
+                    grid.add_row(cell)
+            else:
+                grid.add_column(justify="left")
+                grid.add_column(justify="right")
+                for i, (left, right) in enumerate(rows):
+                    if i == 0:
+                        left = self._swap_frame(left, frame)
+                    grid.add_row(left, right)
+            self.update(grid)
         except Exception:
             pass
 

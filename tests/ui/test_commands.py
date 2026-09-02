@@ -796,11 +796,9 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.role, "worker")
 
     async def test_subagents_command_no_subagents(self):
-        """Empty list opens the screen with an empty state, not a toast (P1-9)."""
         from unittest.mock import MagicMock
 
         from widgets.presentation.commands import SubagentsCommand
-        from widgets.presentation.screens.tasks import SubagentsScreen
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -812,9 +810,9 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         cmd = SubagentsCommand()
         await cmd.execute(app)
 
-        app.notify.assert_not_called()
-        app.push_screen.assert_called_once()
-        self.assertIsInstance(app.push_screen.call_args[0][0], SubagentsScreen)
+        # No subagents for current session -> toast, no screen
+        app.notify.assert_called_once_with("No active subagents", severity="warning")
+        app.push_screen.assert_not_called()
 
     async def test_subagents_command_with_subagents(self):
         from unittest.mock import MagicMock
@@ -833,11 +831,9 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.push_screen.assert_called_once()
 
     async def test_shell_command_no_tasks(self):
-        """Empty list opens the screen with an empty state, not a toast (P1-9)."""
         from unittest.mock import MagicMock
 
         from widgets.presentation.commands import ShellTasksCommand
-        from widgets.presentation.screens.tasks import ShellTasksScreen
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -846,8 +842,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         cmd = ShellTasksCommand()
         await cmd.execute(app)
-        app.notify.assert_not_called()
-        self.assertIsInstance(app.push_screen.call_args[0][0], ShellTasksScreen)
+        app.notify.assert_called_once_with("No active shell tasks", severity="warning")
+        app.push_screen.assert_not_called()
 
     async def test_shell_command_with_tasks(self):
         from unittest.mock import MagicMock
@@ -1309,10 +1305,9 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_subagents_no_store(self):
         app = SimpleApp()
+        # no app.sm -> _has_subagents returns False
         await SubagentsCommand().execute(app)
-        # no session store -> still opens the screen (it shows the empty state)
-        self.assertEqual(app.notified, [])
-        self.assertTrue(app.pushed)
+        self.assertEqual(app.notified, [("No active subagents", "warning")])
 
     async def test_skills_no_skills(self):
         app = SimpleApp()

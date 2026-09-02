@@ -1,5 +1,4 @@
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
-from widgets.presentation.screens.constants import ESC_HINT_BACK
 from widgets.utils.responsive import MODAL_COMPACT_MAX_WIDTH, MODAL_MIN_WIDTH
 
 
@@ -27,7 +26,7 @@ class SessionConflictScreen(BaseSelectionScreen[str]):
             items=items,
             default_value="readonly",
             show_search=False,
-            hint_text=f"enter: select • {ESC_HINT_BACK}",
+            hint_text="enter: select • esc: back",
             dialog_classes=dialog_classes,
             fit_content=True,
             min_dialog_width=min_dialog_width,

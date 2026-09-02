@@ -130,29 +130,15 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertFalse(widget._is_error(""))
 
     def test_get_status_color(self):
-        """Status colors come from the active theme (P1-5), not module constants."""
-        from widgets.utils.theme_colors import status_color
-
         widget = ToolCallWidget("shell", "cmd")
         widget.status = "running"
-        self.assertEqual(widget._get_status_color(), status_color("running"))
+        self.assertEqual(widget._get_status_color(), "#d4a259")
         widget.status = "error"
-        self.assertEqual(widget._get_status_color(), status_color("error"))
+        self.assertEqual(widget._get_status_color(), "#d15858")
         widget.status = "cancelled"
-        self.assertEqual(widget._get_status_color(), status_color("error"))
+        self.assertEqual(widget._get_status_color(), "#d15858")
         widget.status = "done"
-        self.assertEqual(widget._get_status_color(), status_color("success"))
-        widget.returncode = 1
-        widget.status = "done"
-        self.assertEqual(widget._get_status_color(), status_color("error"))
-
-    def test_get_status_color_is_a_hex_code(self):
-        """The value is interpolated into Rich markup (`[#d15858]● ...`)."""
-        widget = ToolCallWidget("shell", "cmd")
-        for state in ("running", "error", "cancelled", "done"):
-            widget.status = state
-            color = widget._get_status_color()
-            self.assertTrue(color.startswith("#") and len(color) == 7, color)
+        self.assertEqual(widget._get_status_color(), "#5ea876")
 
     def test_mark_cancelled_only_running(self):
         widget = ToolCallWidget("shell", "cmd")
