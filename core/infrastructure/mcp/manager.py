@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from core.domain.defaults.config import DEFAULT_MCP_CALL_TIMEOUT
 from core.infrastructure.mcp.process_client import MCPProcessClient
 from core.infrastructure.platform.paths import CONFIG_DIR
-from core.infrastructure.platform.platform_utils import atomic_write_json
+from core.infrastructure.platform.platform_utils import update_json_config
 
 logger = logging.getLogger(__name__)
 
@@ -349,33 +349,27 @@ class MCPManager:
         )
 
         try:
-            cfg = {"mcpServers": {}}
-            if os.path.exists(file_to_update):
-                with open(file_to_update, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
+            def _mutate(cfg: Dict[str, Any]) -> None:
+                cfg.setdefault("mcpServers", {})
+                if name in cfg["mcpServers"]:
+                    entry = cfg["mcpServers"][name]
+                    entry.update(key_updates)
+                else:
+                    entry = {
+                        "command": target.get("command"),
+                        "args": target.get("args"),
+                        "env": target.get("env"),
+                        "url": target.get("url"),
+                    }
+                    entry.update(key_updates)
+                    cfg["mcpServers"][name] = entry
 
-            if "mcpServers" not in cfg:
-                cfg["mcpServers"] = {}
+                # A missing "enabled" means enabled, so only "enabled": false is
+                # stored; (re-)enabling drops the key.
+                if entry.get("enabled", True) is not False:
+                    entry.pop("enabled", None)
 
-            if name in cfg["mcpServers"]:
-                entry = cfg["mcpServers"][name]
-                entry.update(key_updates)
-            else:
-                entry = {
-                    "command": target.get("command"),
-                    "args": target.get("args"),
-                    "env": target.get("env"),
-                    "url": target.get("url"),
-                }
-                entry.update(key_updates)
-                cfg["mcpServers"][name] = entry
-
-            # A missing "enabled" means enabled, so only "enabled": false is
-            # stored; (re-)enabling drops the key.
-            if entry.get("enabled", True) is not False:
-                entry.pop("enabled", None)
-
-            atomic_write_json(file_to_update, cfg, indent=2)
+            update_json_config(file_to_update, _mutate, indent=2)
         except Exception as e:
             logger.warning("Failed to update config for MCP server %s: %s", name, e)
 

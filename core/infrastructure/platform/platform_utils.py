@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Set, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Set, Union
 
 _FSYNC_EXECUTOR = None
 _FSYNC_EXECUTOR_LOCK = threading.Lock()
@@ -146,6 +146,26 @@ def invalidate_json_read_cache(path: Optional[str] = None) -> None:
         _json_read_cache.clear()
     else:
         _json_read_cache.pop(path, None)
+
+
+def update_json_config(
+    path: str,
+    mutator: Callable[[Dict[str, Any]], None],
+    indent: int = 2,
+) -> Dict[str, Any]:
+    """Read a JSON dict, apply ``mutator``, and atomically write it back.
+
+    Missing, invalid, or non-dict content is treated as an empty dict. Writes via
+    ``atomic_write_json`` and invalidates the shared read cache. Returns the
+    updated dict so callers can use the result without re-reading.
+    """
+    data = read_json(path, {})
+    if not isinstance(data, dict):
+        data = {}
+    mutator(data)
+    atomic_write_json(path, data, indent=indent)
+    invalidate_json_read_cache(path)
+    return data
 
 
 def cached_json_read(path: str, default: Any = None) -> Any:

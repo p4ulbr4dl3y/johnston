@@ -172,7 +172,7 @@ async def test_update_server_config_creates_new_entry_and_adds_key(tmp_path):
 async def test_update_server_config_write_error_is_swallowed(tmp_path):
     m = make_manager(str(tmp_path))
     m.load_servers = lambda: [{"name": "x", "command": "p", "scope": "global"}]
-    with patch("core.infrastructure.mcp.manager.atomic_write_json", side_effect=OSError("disk")):
+    with patch("core.infrastructure.platform.platform_utils.atomic_write_json", side_effect=OSError("disk")):
         res = m._update_server_config("x", {"enabled": False})
     assert res is not None  # target still returned despite write failure
 

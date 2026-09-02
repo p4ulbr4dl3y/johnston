@@ -16,6 +16,7 @@ from core.infrastructure.platform.platform_utils import (
     cached_json_read,
     invalidate_json_read_cache,
     read_json,
+    update_json_config,
 )
 from core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 from core.infrastructure.secrets import (
@@ -198,12 +199,10 @@ class ProviderManager:
         return data if isinstance(data, dict) else {}
 
     def _save_config(self, data: Dict[str, Any]) -> None:
-        atomic_write_json(CONFIG_FILE, data, indent=2)
-        invalidate_json_read_cache(CONFIG_FILE)
+        update_json_config(CONFIG_FILE, lambda cfg: (cfg.clear(), cfg.update(data)), indent=2)
 
     def _save_providers_json(self, data: Dict[str, Any]) -> None:
-        atomic_write_json(PROVIDERS_JSON_FILE, data, indent=2)
-        invalidate_json_read_cache(PROVIDERS_JSON_FILE)
+        update_json_config(PROVIDERS_JSON_FILE, lambda cfg: (cfg.clear(), cfg.update(data)), indent=2)
 
     def ensure_config_dir(self):
         os.makedirs(CONFIG_DIR, exist_ok=True)

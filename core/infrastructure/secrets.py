@@ -10,7 +10,7 @@ import re
 from typing import Any, Dict
 
 from core.infrastructure.platform.paths import CONFIG_DIR, SECRETS_FILE
-from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from core.infrastructure.platform.platform_utils import read_json, update_json_config
 
 _ENV_VAR_PATTERN = re.compile(r"\$\{([A-Za-z0-9_]+)\}|\$([A-Za-z0-9_]+)")
 
@@ -28,9 +28,7 @@ def load_secrets() -> Dict[str, str]:
 def save_secret(key: str, value: str) -> None:
     """Save or update a secret in ~/.johnston/secrets.json."""
     os.makedirs(CONFIG_DIR, exist_ok=True)
-    data = load_secrets()
-    data[key] = value
-    atomic_write_json(SECRETS_FILE, data, indent=2)
+    update_json_config(SECRETS_FILE, lambda data: data.__setitem__(key, value), indent=2)
 
 
 def get_secret(key: str, default: str = "") -> str:

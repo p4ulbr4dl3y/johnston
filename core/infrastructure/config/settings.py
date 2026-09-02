@@ -67,7 +67,7 @@ from core.domain.defaults.config import (
     DEFAULT_WEB_USER_AGENT,
 )
 from core.infrastructure.platform import paths
-from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from core.infrastructure.platform.platform_utils import read_json, update_json_config
 
 logger = logging.getLogger(__name__)
 
@@ -649,44 +649,43 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
     improvements to take effect seamlessly on existing configurations.
     """
     target_file = os.path.abspath(config_file or paths.CONFIG_FILE)
-    existing = read_json(target_file, default={})
-    data = existing if isinstance(existing, dict) else {}
 
-    if settings.model is not None:
-        data["model"] = settings.model
-    else:
-        data.pop("model", None)
-
-    if settings.theme is not None:
-        data["theme"] = settings.theme
-    else:
-        data.pop("theme", None)
-
-    sb_diff = _diff_dataclass(settings.sandbox, SandboxSettings())
-    if sb_diff:
-        data["sandbox"] = sb_diff
-    else:
-        data.pop("sandbox", None)
-
-    if settings.permissions != DEFAULT_PERMISSIONS:
-        data["permissions"] = settings.permissions
-    else:
-        data.pop("permissions", None)
-
-    for sec_name, cur_obj, def_obj in [
-        ("subagents", settings.subagents, SubagentsSettings()),
-        ("llm", settings.llm, LLMSettings()),
-        ("tools", settings.tools, ToolsSettings()),
-        ("ui", settings.ui, UISettings()),
-        ("storage", settings.storage, StorageSettings()),
-    ]:
-        diff = _diff_dataclass(cur_obj, def_obj)
-        if diff:
-            data[sec_name] = diff
+    def _mutate(data: Dict[str, Any]) -> None:
+        if settings.model is not None:
+            data["model"] = settings.model
         else:
-            data.pop(sec_name, None)
+            data.pop("model", None)
 
-    atomic_write_json(target_file, data, indent=2)
+        if settings.theme is not None:
+            data["theme"] = settings.theme
+        else:
+            data.pop("theme", None)
+
+        sb_diff = _diff_dataclass(settings.sandbox, SandboxSettings())
+        if sb_diff:
+            data["sandbox"] = sb_diff
+        else:
+            data.pop("sandbox", None)
+
+        if settings.permissions != DEFAULT_PERMISSIONS:
+            data["permissions"] = settings.permissions
+        else:
+            data.pop("permissions", None)
+
+        for sec_name, cur_obj, def_obj in [
+            ("subagents", settings.subagents, SubagentsSettings()),
+            ("llm", settings.llm, LLMSettings()),
+            ("tools", settings.tools, ToolsSettings()),
+            ("ui", settings.ui, UISettings()),
+            ("storage", settings.storage, StorageSettings()),
+        ]:
+            diff = _diff_dataclass(cur_obj, def_obj)
+            if diff:
+                data[sec_name] = diff
+            else:
+                data.pop(sec_name, None)
+
+    update_json_config(target_file, _mutate, indent=2)
     reload_settings(target_file)
 
 

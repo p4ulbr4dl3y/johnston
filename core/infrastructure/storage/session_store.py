@@ -18,7 +18,7 @@ from core.domain.policies.messages import (
 from core.domain.policies.session_naming import build_fork_title
 from core.infrastructure.config.settings import get_settings
 from core.infrastructure.platform.paths import PROJECTS_DIR
-from core.infrastructure.platform.platform_utils import atomic_write_json, atomic_write_jsonl, read_json
+from core.infrastructure.platform.platform_utils import atomic_write_jsonl, update_json_config
 from core.infrastructure.platform.session_lock import SessionLock
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_hash
 
@@ -349,9 +349,7 @@ class SessionStore:
         # Skip the config rewrite when unchanged: saves call this on every write.
         if session_id == self._written_active_session_id:
             return
-        cfg = read_json(self.config_file, {})
-        cfg["active_session_id"] = session_id
-        atomic_write_json(self.config_file, cfg)
+        update_json_config(self.config_file, lambda cfg: cfg.__setitem__("active_session_id", session_id))
         self._written_active_session_id = session_id
 
     # -- search ---------------------------------------------------------------
