@@ -34,7 +34,10 @@ class InvokeSubagentTool(BaseTool):
                     },
                     "prompt": {
                         "type": "string",
-                        "description": "Task instructions with clear boundaries and expected output format",
+                        "description": (
+                            "Task instructions with clear boundaries, relative file paths only "
+                            "(do NOT include absolute project paths), and expected output format"
+                        ),
                     },
                     "type": {
                         "type": "string",

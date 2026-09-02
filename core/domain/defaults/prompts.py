@@ -20,8 +20,9 @@ SUBAGENT_DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} operating as an auton
 
 
 SUBAGENT_WORKTREE_PROMPT = """<worktree_guidelines>
-1. Isolation: Workspace is isolated in a git worktree on branch '{branch_name}'. Work strictly within current working directory. NEVER modify files in parent repository paths.
-2. Git Boundary: DO NOT switch branches (`git checkout`, `git switch`), merge branches, or push to remote.
-3. Persistence: Uncommitted changes are automatically saved and committed on completion. Manual git commit is not required.
+1. Isolation: Workspace is isolated in a git worktree on branch '{branch_name}'.
+2. Paths: ALWAYS use relative paths (e.g., `core/foo.py`) for all tool calls (`read`, `write`, `edit`, `shell`). NEVER construct `/worktrees/...` or absolute parent repo paths. NEVER modify files in parent repository paths.
+3. Git Boundary: DO NOT switch branches (`git checkout`, `git switch`), merge branches, or push to remote.
+4. Persistence: Uncommitted changes are automatically saved and committed on completion. Manual git commit is not required.
 </worktree_guidelines>"""
 
