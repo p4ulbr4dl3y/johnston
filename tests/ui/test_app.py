@@ -48,17 +48,30 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             chat_view = app.query_one(ChatView)
             for msg in ["First message", "Second message", "Third message"]:
                 await chat_view.add_user_message(msg)
+            sess = app.sm.create_main("test_session_flow")
+            app.current_session_id = sess.id
+            sess.messages = [
+                {"type": "user", "text": "First message"},
+                {"type": "user", "text": "Second message"},
+                {"type": "user", "text": "Third message"},
+            ]
+            app.agent.messages = [
+                {"role": "user", "content": "First message"},
+                {"role": "user", "content": "Second message"},
+                {"role": "user", "content": "Third message"},
+            ]
 
             # 3. Test /rewind
             await handle_slash_command(app, "/rewind")
             await pilot.pause(0.2)
             self.assertIsInstance(app.screen, RewindScreen)
 
-            # Select message (Step 1) and confirm (Step 2 if checkpoints active)
+            # Select message (Step 1) and confirm in RewindActionScreen
             await pilot.press("up")
             await pilot.press("enter")
             await pilot.pause(0.3)
-            if isinstance(app.screen, RewindScreen) and getattr(app.screen, "step", 1) == 2:
+            from widgets.presentation.screens.rewind_action import RewindActionScreen
+            if isinstance(app.screen, RewindActionScreen):
                 await pilot.press("enter")
                 await pilot.pause(0.5)
 

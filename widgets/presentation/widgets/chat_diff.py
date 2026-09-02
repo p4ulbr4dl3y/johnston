@@ -123,15 +123,20 @@ def get_diff_colors(theme: Any = None) -> tuple[str, str, str, str, str]:
     is_dark = getattr(theme, "dark", True) if theme else True
     gutter = getattr(theme, "muted", COLOR_DIFF_GUTTER) if theme else COLOR_DIFF_GUTTER
 
+    if theme is not None:
+        raw_add = getattr(theme, "accent_success", None)
+        add_fg = raw_add if isinstance(raw_add, str) else (COLOR_DIFF_ADD_FG if is_dark else "#1a7f37")
+        raw_remove = getattr(theme, "accent_error", None)
+        remove_fg = raw_remove if isinstance(raw_remove, str) else (COLOR_DIFF_REMOVE_FG if is_dark else "#cf222e")
+    else:
+        add_fg = COLOR_DIFF_ADD_FG if is_dark else "#1a7f37"
+        remove_fg = COLOR_DIFF_REMOVE_FG if is_dark else "#cf222e"
+
     if is_dark:
-        add_fg = COLOR_DIFF_ADD_FG
         add_bg = COLOR_DIFF_ADD_BG
-        remove_fg = COLOR_DIFF_REMOVE_FG
         remove_bg = COLOR_DIFF_REMOVE_BG
     else:
-        add_fg = "#1a7f37"
         add_bg = "on #dafbe1"
-        remove_fg = "#cf222e"
         remove_bg = "on #ffebe9"
 
     if theme and getattr(theme, "syntax_tokens", None):

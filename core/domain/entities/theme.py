@@ -58,6 +58,26 @@ class Theme:
         if not self.label or not isinstance(self.label, str):
             raise ValueError("Theme label must be a non-empty string")
 
+    @property
+    def accent_info(self) -> str:
+        """Accent color for info/active state (blue)."""
+        return self.tcss_vars.get("accent-info", "#61afef" if self.dark else "#0969da")
+
+    @property
+    def accent_warning(self) -> str:
+        """Accent color for warning/running state (yellow/orange)."""
+        return self.tcss_vars.get("accent-warning", "#d4a259" if self.dark else "#9a6700")
+
+    @property
+    def accent_error(self) -> str:
+        """Accent color for error/failed state (red)."""
+        return self.tcss_vars.get("accent-error", "#d15858" if self.dark else "#cf222e")
+
+    @property
+    def accent_success(self) -> str:
+        """Accent color for success/completed state (green)."""
+        return self.tcss_vars.get("accent-success", "#5ea876" if self.dark else "#1a7f37")
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize Theme to a JSON-serializable dictionary."""
         syntax = {str(k): str(v) for k, v in self.syntax_tokens.items()}

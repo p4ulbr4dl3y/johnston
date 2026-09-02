@@ -8,7 +8,6 @@ from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
 from core.application.skills.manager import get_skill_manager
-from core.domain.defaults.config import THEME_MUTED
 from core.infrastructure.platform.paths import CONFIG_DIR
 from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
@@ -20,6 +19,7 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
 )
+from widgets.presentation.widgets.footer_layout import get_theme_colors
 from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
@@ -118,8 +118,9 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             opt_list = self.query_one("#skills-option-list", OptionList)
             opt_list.clear_options()
             if not self.skills:
+                _, _, t_muted, _ = get_theme_colors()
                 opt_list.add_option(
-                    Text(f"No skills found in {CONFIG_DIR}/skills/ or .johnston/skills/.", style=THEME_MUTED)
+                    Text(f"No skills found in {CONFIG_DIR}/skills/ or .johnston/skills/.", style=t_muted)
                 )
                 return
             if not any(s is not None for s in self.filtered_skills):

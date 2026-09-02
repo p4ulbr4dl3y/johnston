@@ -413,6 +413,71 @@ def test_builtin_themes_wcag_contrast():
                 assert contrast_ratio(surface, acc_val) >= 3.0, f"[{theme.name}] {acc} low vs surface: {acc_val}"
 
 
+def test_theme_accent_properties():
+    t_dark = Theme(
+        name="test-dark",
+        label="Test Dark",
+        dark=True,
+        tcss_vars={
+            "accent-info": "#112233",
+            "accent-warning": "#223344",
+            "accent-error": "#334455",
+            "accent-success": "#445566",
+        },
+    )
+    assert t_dark.accent_info == "#112233"
+    assert t_dark.accent_warning == "#223344"
+    assert t_dark.accent_error == "#334455"
+    assert t_dark.accent_success == "#445566"
+
+    t_empty_dark = Theme(name="empty-dark", label="Empty Dark", dark=True)
+    assert t_empty_dark.accent_info == "#61afef"
+    assert t_empty_dark.accent_warning == "#d4a259"
+    assert t_empty_dark.accent_error == "#d15858"
+    assert t_empty_dark.accent_success == "#5ea876"
+
+    t_empty_light = Theme(name="empty-light", label="Empty Light", dark=False)
+    assert t_empty_light.accent_info == "#0969da"
+    assert t_empty_light.accent_warning == "#9a6700"
+    assert t_empty_light.accent_error == "#cf222e"
+    assert t_empty_light.accent_success == "#1a7f37"
+
+
+def test_dynamic_diff_and_tool_colors():
+    from widgets.presentation.tool_mixins import ParsingMixin
+    from widgets.presentation.widgets.chat_diff import get_diff_colors
+    from widgets.presentation.widgets.footer_layout import get_status_separators
+
+    class DummyTool(ParsingMixin):
+        def __init__(self, status="running", returncode=None):
+            self.status = status
+            self.returncode = returncode
+
+    tm = ThemeManager.get_instance()
+    prev_theme = tm.current_theme
+    try:
+        tm.set_theme("catppuccin-mocha")
+        curr = tm.current_theme
+
+        running_tool = DummyTool(status="running")
+        error_tool = DummyTool(status="error")
+        success_tool = DummyTool(status="completed", returncode=0)
+
+        assert running_tool._get_status_color() == curr.accent_warning
+        assert error_tool._get_status_color() == curr.accent_error
+        assert success_tool._get_status_color() == curr.accent_success
+
+        add_fg, _, remove_fg, _, gutter = get_diff_colors(curr)
+        assert add_fg == curr.accent_success
+        assert remove_fg == curr.accent_error
+
+        sep, sep_compact = get_status_separators()
+        assert curr.muted in sep
+        assert curr.muted in sep_compact
+    finally:
+        tm.set_theme(prev_theme.name)
+
+
 
 
 

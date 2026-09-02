@@ -147,9 +147,20 @@ class ParsingMixin:
         return self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0)
 
     def _get_status_color(self) -> str:
+        theme = None
+        try:
+            from widgets.app.theme_manager import ThemeManager
+
+            theme = ThemeManager.get_instance().current_theme
+        except Exception:
+            theme = None
+
         if self.status == "running":
-            return COLOR_STATUS_RUNNING
+            val = getattr(theme, "accent_warning", None) if theme else None
+            return val if isinstance(val, str) else COLOR_STATUS_RUNNING
         elif self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0):
-            return COLOR_STATUS_ERROR
+            val = getattr(theme, "accent_error", None) if theme else None
+            return val if isinstance(val, str) else COLOR_STATUS_ERROR
         else:
-            return COLOR_STATUS_SUCCESS
+            val = getattr(theme, "accent_success", None) if theme else None
+            return val if isinstance(val, str) else COLOR_STATUS_SUCCESS

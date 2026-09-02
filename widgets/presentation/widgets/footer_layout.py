@@ -25,6 +25,12 @@ def get_theme_colors() -> tuple[str, str, str, str]:
         return THEME_PRIMARY, THEME_SECONDARY, THEME_MUTED, THEME_SUBTLE
 
 
+def get_status_separators() -> tuple[str, str]:
+    """Return dynamic (sep, sep_compact) based on active theme muted color."""
+    _, _, t_muted, _ = get_theme_colors()
+    return f"  [{t_muted}]•[/]  ", f" [{t_muted}]•[/] "
+
+
 _COUNTER_RE = re.compile(r"^(\d+/\d+|\(\d+/\d+\)|\d+)$")
 
 
