@@ -635,7 +635,7 @@ class TestTasksScreensCoverage(unittest.IsolatedAsyncioTestCase):
         task_fin.created_at = None
         self.assertEqual(extract_shell_task_progress(task_fin), "exit 0")
 
-        # Terminal state: other status
+        # Terminal state: unknown status unified to canonical "finished"
         task_other = MagicMock()
         task_other.is_running = False
         task_other.was_killed = False
@@ -643,7 +643,7 @@ class TestTasksScreensCoverage(unittest.IsolatedAsyncioTestCase):
         task_other.process = None
         task_other.status = "paused"
         task_other.created_at = None
-        self.assertEqual(extract_shell_task_progress(task_other), "paused")
+        self.assertEqual(extract_shell_task_progress(task_other), "finished")
 
     def test_format_shell_task_row(self):
         row_running = format_shell_task_row("uv run pytest", task=None, is_running=True, target_width=40)

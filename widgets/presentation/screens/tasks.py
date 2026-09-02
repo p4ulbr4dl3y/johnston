@@ -10,6 +10,7 @@ from textual.widgets import Input, Label, Markdown, OptionList, RichLog
 from textual.widgets.option_list import Option
 
 from core.infrastructure.platform.platform_utils import is_windows
+from core.infrastructure.tasks.manage import extract_task_status_details
 from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
 from widgets.chat_toolcall import ToolScrollBox
 from widgets.presentation.screens.base_modal import BaseModalScreen
@@ -31,56 +32,37 @@ from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.row_format import (
     MODAL_WIDE_ROW_WIDTH,
     format_badge_row,
-    format_duration,
     option_list_row_width,
 )
 
-_format_duration = format_duration
-
 
 def extract_shell_task_progress(task: Any) -> str:
-    """Extract a short, human-like activity/status badge for a background shell task."""
+    """Extract a short, human-like activity/status badge for a background shell task.
+
+    Thin wrapper over :func:`core.infrastructure.tasks.manage.extract_task_status_details`
+    (single source of truth for status/duration), converting the canonical
+    ``(status, duration)`` pair into the row badge format.
+    """
     if task is None:
         return ""
 
-    is_running = getattr(task, "is_running", False)
-    now = time.time()
-    created_at = getattr(task, "created_at", None)
+    status, dur = extract_task_status_details(task)
 
-    if is_running:
-        if created_at and isinstance(created_at, (int, float)) and created_at > 0:
-            dur = _format_duration(max(0.0, now - created_at))
-            return dur or "running..."
-        return "running..."
+    if status == "running":
+        return dur if dur and dur != "-" else "running..."
 
-    # Terminal state
-    status = getattr(task, "status", None)
-    st_str = (status.value if hasattr(status, "value") else str(status or "")).lower()
-    was_killed = getattr(task, "was_killed", False) or st_str == "killed"
-
-    if was_killed:
+    if status == "killed":
         return "killed"
-    if st_str == "timeout":
+    if status == "timeout":
         return "timeout"
 
-    completed_at = getattr(task, "completed_at", None)
-    dur_str = ""
-    if created_at and completed_at and isinstance(created_at, (int, float)) and isinstance(completed_at, (int, float)):
-        dur_str = f" • {_format_duration(max(0.0, completed_at - created_at))}"
+    if status.startswith("exit:"):
+        code = status.split(":", 1)[1]
+        dur_suffix = f" • {dur}" if dur and dur != "-" else ""
+        return f"exit {code}{dur_suffix}"
 
-    exit_code = getattr(task, "exit_code", None)
-    if exit_code is None and getattr(task, "process", None) is not None:
-        exit_code = getattr(task.process, "returncode", None)
-
-    if exit_code is not None:
-        return f"exit {exit_code}{dur_str}"
-
-    if st_str in ("completed", "finished", "done"):
-        return f"exit 0{dur_str}"
-    if st_str == "error":
-        return f"exit 1{dur_str}"
-
-    return st_str or "done"
+    # Terminal fallback (e.g. canonical "finished" for unknown statuses).
+    return status or "done"
 
 
 def format_shell_task_row(
