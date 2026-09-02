@@ -794,8 +794,7 @@ DiffScreen {
     width: 100%;
     height: 3;
     padding: 1 2 0 2;
-    background: $bg-app;
-    border-bottom: solid $border;
+    background: $bg-surface;
     color: $fg-muted;
 }
 
@@ -927,9 +926,8 @@ DiffScreen {
 #diff-footer {
     width: 100%;
     height: 3;
-    padding: 0 2 1 2;
-    background: $bg-app;
-    border-top: solid $border;
+    padding: 1 2 0 2;
+    background: $bg-surface;
     color: $fg-muted;
 }
 
