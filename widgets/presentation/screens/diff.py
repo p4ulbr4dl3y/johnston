@@ -94,6 +94,30 @@ def format_relative_path(path: str, max_length: int = 40) -> str:
     return path[: max_length - 3] + "..."
 
 
+def disambiguate_file_paths(paths: list[str]) -> list[str]:
+    """Disambiguate list of paths by showing shortest unique suffix for colliding basenames."""
+    if not paths:
+        return []
+    split_paths = [p.replace("\\", "/").rstrip("/").split("/") for p in paths]
+    depths = [1] * len(paths)
+    while True:
+        candidates = [
+            "/".join(parts[-d:]) if d <= len(parts) else "/".join(parts)
+            for parts, d in zip(split_paths, depths)
+        ]
+        counts: dict[str, int] = {}
+        for c in candidates:
+            counts[c] = counts.get(c, 0) + 1
+
+        collided = False
+        for i, c in enumerate(candidates):
+            if counts[c] > 1 and depths[i] < len(split_paths[i]):
+                depths[i] += 1
+                collided = True
+        if not collided:
+            return candidates
+
+
 class DiffFooter(ResizeDebounceMixin, Static):
     """Footer widget for the full-screen diff viewer with responsive width adaptation."""
 
@@ -216,8 +240,9 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         options = []
         add_fg, _, remove_fg, _, _ = get_diff_colors()
         _, _, t_muted, _ = get_theme_colors()
-        for file_path, _, added, deleted in self.diff_items:
-            short_name = os.path.basename(file_path) or file_path
+        short_names = disambiguate_file_paths([item[0] for item in self.diff_items])
+        for idx, (_, _, added, deleted) in enumerate(self.diff_items):
+            short_name = short_names[idx] if idx < len(short_names) else ""
             stat_markup = f"[{add_fg}]+{added}[/][{t_muted}]/[/][{remove_fg}]-{deleted}[/]"
             options.append(
                 format_badge_row(

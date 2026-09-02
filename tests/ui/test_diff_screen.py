@@ -4,7 +4,38 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from textual.widgets import OptionList
 
 from widgets.presentation.commands import DiffCommand
-from widgets.presentation.screens.diff import DiffFooter, DiffHeader, DiffScreen
+from widgets.presentation.screens.diff import DiffFooter, DiffHeader, DiffScreen, disambiguate_file_paths
+
+
+class TestDisambiguateFilePaths(unittest.TestCase):
+    def test_empty_and_single(self):
+        self.assertEqual(disambiguate_file_paths([]), [])
+        self.assertEqual(disambiguate_file_paths(["app.py"]), ["app.py"])
+
+    def test_unique_basenames(self):
+        paths = ["core/app.py", "widgets/view.py", "tools/run.py"]
+        self.assertEqual(disambiguate_file_paths(paths), ["app.py", "view.py", "run.py"])
+
+    def test_duplicate_basenames_disambiguated(self):
+        paths = [
+            "core/application/actions.py",
+            "widgets/mixins/actions.py",
+            "core/prompt_builder.py",
+        ]
+        self.assertEqual(
+            disambiguate_file_paths(paths),
+            ["application/actions.py", "mixins/actions.py", "prompt_builder.py"],
+        )
+
+    def test_nested_duplicate_basenames(self):
+        paths = [
+            "a/sub/util.py",
+            "b/sub/util.py",
+        ]
+        self.assertEqual(
+            disambiguate_file_paths(paths),
+            ["a/sub/util.py", "b/sub/util.py"],
+        )
 
 
 class TestDiffScreen(unittest.TestCase):

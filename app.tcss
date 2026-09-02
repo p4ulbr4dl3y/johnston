@@ -812,7 +812,7 @@ DiffScreen {
     height: 100%;
     background: $bg-app;
     border-right: solid $border;
-    padding: 1 0 0 0;
+    padding: 1 0 1 0;
 }
 
 #diff-sidebar.-hidden {
@@ -828,13 +828,14 @@ DiffScreen {
     max-width: 100%;
     min-width: 100%;
     border-right: none;
+    padding: 1 0 1 0;
 }
 
 #diff-content-container.-full-width {
     width: 100%;
     max-width: 100%;
     min-width: 100%;
-    padding: 1 1 0 1;
+    padding: 1 1 1 1;
 }
 
 #diff-search-input,
@@ -889,7 +890,7 @@ DiffScreen {
 #diff-content-container {
     width: 1fr;
     height: 100%;
-    padding: 1 2 0 2;
+    padding: 1 2 1 2;
     background: $bg-app;
 }
 
