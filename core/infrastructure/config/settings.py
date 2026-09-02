@@ -66,6 +66,7 @@ from core.domain.defaults.config import (
     DEFAULT_WEB_FETCH_TIMEOUT,
     DEFAULT_WEB_USER_AGENT,
 )
+from core.domain.policies.provider import split_provider_model
 from core.infrastructure.platform import paths
 from core.infrastructure.platform.platform_utils import read_json, update_json_config
 
@@ -553,11 +554,8 @@ class JohnstonSettings:
         Returns ``None`` when no model is set or the model is a bare name that
         cannot be decoded to a provider here (no catalog context).
         """
-        if not self.model:
-            return None
-        if "/" in self.model:
-            return self.model.split("/", 1)[0].strip().lower()
-        return None
+        provider, model = split_provider_model(self.model)
+        return provider if model is not None else None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> JohnstonSettings:

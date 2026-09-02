@@ -5,6 +5,7 @@ from typing import Any, Callable, List, Optional, Tuple
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus, format_tool_error
 from core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
+from core.domain.policies.provider import split_provider_model
 
 
 def _canonical_tool_name(name: str) -> str:
@@ -55,9 +56,7 @@ class AgentRole:
         raw_model = (model or "").strip()
         raw_provider = (provider or "").strip().lower()
         if not raw_provider and "/" in raw_model:
-            p_part, m_part = raw_model.split("/", 1)
-            self.provider = p_part.strip().lower()
-            self.model = m_part.strip()
+            self.provider, self.model = split_provider_model(raw_model)
         else:
             self.provider = raw_provider
             self.model = raw_model

@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
 from core.domain.entities.provider import ProviderDef
+from core.domain.policies.provider import split_provider_model
 from core.domain.ports.tool_registry import ToolRegistryPort, get_default_tool_registry
 from core.infrastructure.adapters.models_source import extract_context_length
 from core.infrastructure.config.settings import get_settings
@@ -334,12 +335,8 @@ class ProviderManager:
         or written.
         """
         cfg_model = self._get_config_data().get("model", "")
-        if isinstance(cfg_model, str) and cfg_model.strip():
-            raw = cfg_model.strip()
-            if "/" in raw:
-                return raw.split("/", 1)[0].strip().lower()
-            return raw.strip().lower()
-        return ""
+        provider, _ = split_provider_model(cfg_model)
+        return provider or ""
 
     def set_active_provider_key(self, key: str):
         data = self._read_config()
@@ -421,17 +418,14 @@ class ProviderManager:
         default_model = target_provider.get("model") if target_provider else (p_def.model if p_def else "")
 
         cfg_model = self._get_config_data().get("model", "")
-        if isinstance(cfg_model, str) and cfg_model.strip():
-            raw = cfg_model.strip()
-            if "/" in raw:
-                p_key, m_name = raw.split("/", 1)
-                if p_key.strip().lower() == provider_key.strip().lower():
-                    return m_name.strip()
-            elif raw.strip().lower() == provider_key.strip().lower():
-                # ``model`` is the bare provider key: fall back to its default model.
-                if default_model:
-                    return default_model
-                return ""
+        p_key, m_name = split_provider_model(cfg_model)
+        if p_key == provider_key.strip().lower():
+            if m_name is not None:
+                return m_name
+            # ``model`` is the bare provider key: fall back to its default model.
+            if default_model:
+                return default_model
+            return ""
 
         if default_model:
             return default_model

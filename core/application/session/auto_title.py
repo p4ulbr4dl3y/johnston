@@ -13,6 +13,7 @@ from core.domain.defaults.config import (
     DEFAULT_AUTO_TITLE_TIMEOUT,
 )
 from core.domain.entities.session import AgentSession
+from core.domain.policies.provider import split_provider_model
 from core.domain.policies.session_naming import FORK_BASE_MAX_LEN, cap_at_word, fork_marker
 from core.infrastructure.adapters.base import build_stream_kwargs
 from core.infrastructure.config.settings import get_settings
@@ -340,9 +341,7 @@ async def auto_title_session(
     if auto_title_model:
         raw_atm = str(auto_title_model).strip()
         if "/" in raw_atm:
-            p_key, m_name = raw_atm.split("/", 1)
-            p_key = p_key.strip().lower()
-            m_name = m_name.strip()
+            p_key, m_name = split_provider_model(raw_atm)
             try:
                 from core.provider_manager import ProviderManager
 
