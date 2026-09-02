@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from typing import Any, BinaryIO, Dict, List, Tuple, Union
 
+from core.infrastructure.converter.markdown_table import render_markdown_table
 from core.infrastructure.converter.utils import safe_read_zip_member
 
 P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
@@ -210,20 +211,7 @@ def _parse_pptx_table(tbl_elem: ET.Element) -> str:
         if row_cells:
             rows.append(row_cells)
 
-    if not rows:
-        return ""
-
-    col_count = max(len(r) for r in rows)
-    if col_count == 0:
-        return ""
-
-    normalized = [r + [""] * (col_count - len(r)) for r in rows]
-    header = normalized[0]
-    out = ["| " + " | ".join(header) + " |", "| " + " | ".join(["---"] * col_count) + " |"]
-    for row in normalized[1:]:
-        out.append("| " + " | ".join(row) + " |")
-
-    return "\n".join(out)
+    return render_markdown_table(rows)
 
 
 def _extract_notes_text(notes_tree: ET.Element) -> str:

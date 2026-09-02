@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple, Union
 
+from core.infrastructure.converter.markdown_table import render_markdown_table
 from core.infrastructure.converter.utils import clean_url, safe_read_zip_member
 
 W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
@@ -386,18 +387,4 @@ def _parse_table(tbl_elem: ET.Element, rels: Dict[str, str]) -> str:
         if row_cells:
             rows.append(row_cells)
 
-    if not rows:
-        return ""
-
-    col_count = max(len(r) for r in rows)
-    if col_count == 0:
-        return ""
-
-    normalized_rows = [r + [""] * (col_count - len(r)) for r in rows]
-    header = normalized_rows[0]
-    out = ["| " + " | ".join(header) + " |", "| " + " | ".join(["---"] * col_count) + " |"]
-
-    for row in normalized_rows[1:]:
-        out.append("| " + " | ".join(row) + " |")
-
-    return "\n".join(out)
+    return render_markdown_table(rows)
