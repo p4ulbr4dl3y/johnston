@@ -9,9 +9,11 @@ __all__ = [
     "ToolResult",
     "ToolResultStatus",
     "ToolResultEvent",
+    "StreamStep",
     "FormattedToolError",
     "format_tool_error",
     "parse_tool_result_step",
+    "parse_stream_step",
     "normalize_tool_result",
 ]
 
@@ -63,6 +65,43 @@ def format_tool_error(kind: str, detail: str = "", name: str = "") -> str:
     if detail:
         base += f": {detail}"
     return base
+
+
+@dataclass
+class StreamStep:
+    """Structured unpacking of the common prefix of a raw stream tuple.
+
+    ``stream_steps`` yields heterogeneous positional tuples. Only ``tool_result``
+    carries extra fields at positions 3..5 (parsed separately by
+    :func:`parse_tool_result_step`); every other event is fully described by the
+    ``event_type`` plus up to four positional values. This decodes that common
+    prefix once so consumers stop hand-writing ``step[0..4]`` / ``len(step)``
+    index arithmetic.
+    """
+
+    event_type: str = ""
+    val1: str = ""
+    val2: str = ""
+    val3: Any = None
+    val4: Any = None
+
+
+def parse_stream_step(step: Sequence) -> Optional[StreamStep]:
+    """Parse a raw stream tuple into a :class:`StreamStep`.
+
+    Returns ``None`` for an empty/falsy step so callers can short-circuit
+    instead of checking ``if not step`` themselves. Tolerant of short tuples:
+    missing positions fall back to ``""`` (val1/val2) or ``None`` (val3/val4).
+    """
+    if not step:
+        return None
+    return StreamStep(
+        event_type=step[0],
+        val1=step[1] if len(step) > 1 else "",
+        val2=step[2] if len(step) > 2 else "",
+        val3=step[3] if len(step) > 3 else None,
+        val4=step[4] if len(step) > 4 else None,
+    )
 
 
 def parse_tool_result_step(step: Sequence) -> ToolResultEvent:

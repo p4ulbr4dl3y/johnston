@@ -18,7 +18,7 @@ from enum import Enum
 from typing import Any, Callable, Optional
 
 from core.application.session.stream import record_subagent_step
-from core.domain.defaults.errors import parse_tool_result_step
+from core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
 from core.domain.ports.checkpoint import get_checkpoint_manager
 
 logger = logging.getLogger(__name__)
@@ -236,13 +236,14 @@ async def generate_ai_response(
         # Batch all per-step persistence into one debounced write per turn.
         save_db = _SessionSaveDebounce(canvas.save_session)
         async for step in agent.stream_steps(user_text, attachments=attachments):
-            if not step:
+            parsed = parse_stream_step(step)
+            if parsed is None:
                 continue
-            event_type = step[0]
-            val1 = step[1] if len(step) > 1 else ""
-            val2 = step[2] if len(step) > 2 else ""
-            val3 = step[3] if len(step) > 3 else None
-            val4 = step[4] if len(step) > 4 else None
+            event_type = parsed.event_type
+            val1 = parsed.val1
+            val2 = parsed.val2
+            val3 = parsed.val3
+            val4 = parsed.val4
 
             if event_type == "queued_user_message":
                 if has_tool_calls and session_id:
@@ -347,7 +348,7 @@ async def generate_ai_response(
                     attempt = val1
                     max_retries = val2
                     delay = val3 or 0.0
-                    err = step[4] if len(step) > 4 else None
+                    err = val4
                     err_msg = str(err).lower() if err else ""
                     is_rate_limit = (
                         "rate limit" in err_msg

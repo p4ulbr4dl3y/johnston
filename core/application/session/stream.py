@@ -8,7 +8,7 @@ import asyncio
 import logging
 from typing import Any, Callable, Optional
 
-from core.domain.defaults.errors import ToolResult, parse_tool_result_step
+from core.domain.defaults.errors import ToolResult, parse_stream_step, parse_tool_result_step
 from core.domain.entities.session import AgentSession, SessionStatus
 
 logger = logging.getLogger(__name__)
@@ -29,12 +29,13 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
     """
     import math
 
-    if not step:
+    parsed = parse_stream_step(step)
+    if parsed is None:
         return
-    etype = step[0]
-    val1 = step[1] if len(step) > 1 else ""
-    val2 = step[2] if len(step) > 2 else ""
-    val3 = step[3] if len(step) > 3 else None
+    etype = parsed.event_type
+    val1 = parsed.val1
+    val2 = parsed.val2
+    val3 = parsed.val3
 
     if etype == "thinking_start":
         session.add_event({"type": "thinking", "text": val1})
