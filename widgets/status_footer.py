@@ -218,10 +218,10 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 disp_model = ellipsize(clean_model, max_model_len)
                 model_str = f"[{txt}]{disp_model}[/]"
                 if self.is_generating and width >= 45:
-                    model_str += f" [{t_muted}]([{t_secondary}]esc[/] [{t_muted}]to interrupt)[/]"
+                    model_str += f" [{t_muted}](esc to interrupt)[/]"
                 row1_left_parts.append(model_str)
             elif self.is_generating and width >= 45:
-                row1_left_parts.append(f"[{t_muted}]([{t_secondary}]esc[/] [{t_muted}]to interrupt)[/]")
+                row1_left_parts.append(f"[{t_muted}](esc to interrupt)[/]")
             row1_left = sep_compact.join(row1_left_parts)
 
             # Row 2 (Env): johnston • main (+3/-1) • sb:on • mode  <left> | <right> ⚡ 2a • 1s
@@ -263,10 +263,10 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 if thinking_effort and thinking_effort != "auto":
                     model_part += f" [{txt}]({thinking_effort})[/]"
                 if self.is_generating:
-                    model_part += f" [{t_muted}]([{t_secondary}]esc[/] [{t_muted}]to interrupt)[/]"
+                    model_part += f" [{t_muted}](esc to interrupt)[/]"
                 row1_left_parts.append(model_part)
             elif self.is_generating:
-                row1_left_parts.append(f"[{t_muted}]([{t_secondary}]esc[/] [{t_muted}]to interrupt)[/]")
+                row1_left_parts.append(f"[{t_muted}](esc to interrupt)[/]")
             row1_left = sep.join(row1_left_parts)
 
             if is_connected and bool(model_name):

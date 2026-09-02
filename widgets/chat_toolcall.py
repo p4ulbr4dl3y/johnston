@@ -381,13 +381,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if hints:
             from widgets.presentation.widgets.footer_layout import get_theme_colors
 
-            _, t_secondary, t_muted, _ = get_theme_colors()
-            formatted_parts = []
-            for h in hints:
-                key, _, act = h.partition(" ")
-                formatted_parts.append(f"[{t_secondary}]{key}[/] [{t_muted}]{act}[/]")
-            hints_str = f"[{t_muted}], [/]".join(formatted_parts)
-            self.header_label.update(f"{base_header} [{t_muted}]({hints_str}[{t_muted}])[/]")
+            _, _, t_muted, _ = get_theme_colors()
+            hints_str = ", ".join(hints)
+            self.header_label.update(f"{base_header} [{t_muted}]({hints_str})[/]")
         else:
             self.header_label.update(base_header)
 
