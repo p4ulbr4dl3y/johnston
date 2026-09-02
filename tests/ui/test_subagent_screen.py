@@ -502,7 +502,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.2)
             self.assertIn("and more", screen.bot_msg.content or screen.bot_msg._join_stream_content())
 
-    async def test_subagent_screen_active_thinking_auto_expanded(self):
+    async def test_subagent_screen_active_thinking_default_collapsed(self):
         sess = self._mk("task-active-think", "Think Agent", "Subagent Prompt")
         sess.status = "running"
         sess.add_event({"type": "thinking", "text": "Currently thinking"})
@@ -516,7 +516,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
             tw = screen.query_one(ThinkingWidget)
             self.assertIsNotNone(tw)
-            self.assertTrue(tw.is_expanded)
+            self.assertFalse(tw.is_expanded)
 
 
 if __name__ == "__main__":

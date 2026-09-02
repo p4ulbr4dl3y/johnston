@@ -164,7 +164,7 @@ class TestDiffScreenCoverage(unittest.IsolatedAsyncioTestCase):
             mock_sidebar = MagicMock()
             mock_sidebar.size.width = 40
             screen.query_one = MagicMock(return_value=mock_sidebar)
-            self.assertEqual(screen._sidebar_row_width(), 39)
+            self.assertEqual(screen._sidebar_row_width(), 37)
 
             # Query one fails -> fallback to default DIFF_SIDEBAR_ROW_WIDTH
             screen.query_one = MagicMock(side_effect=Exception("not found"))

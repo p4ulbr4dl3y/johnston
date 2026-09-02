@@ -39,6 +39,12 @@ class ChatStreamDriver:
         self.thinking_handle: Optional[ThinkingWidget] = None
         self.tool_handles: collections.deque[ToolCallWidget] = collections.deque()
 
+    def reset(self) -> None:
+        """Reset internal handles and queue state."""
+        self.bot_handle = None
+        self.thinking_handle = None
+        self.tool_handles.clear()
+
     async def finalize_bot_stream(self) -> None:
         """Finalize or clean up in-flight bot streaming content."""
         if self.bot_handle is not None:
@@ -236,8 +242,8 @@ class ChatStreamDriver:
                     args = evt.get("args") or {}
                     if isinstance(args, dict) and isinstance(args.get("plan"), list):
                         self.on_plan_update(args.get("plan", []), args.get("explanation", ""))
-                # If tool started without result_text, track in tool_handles for subsequent result
-                if not evt.get("result_text"):
+                # Track in tool_handles only if the tool is actively in-flight (uncompleted)
+                if "result_text" not in evt and evt.get("status") not in ("done", "error", "cancelled"):
                     self.tool_handles.append(widget)
         elif etype == "bot":
             txt = evt.get("text", "")

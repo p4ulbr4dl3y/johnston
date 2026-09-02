@@ -276,7 +276,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.status = "done"
 
-        if self.tool_type == "shell":
+        if self.canonical_tool == "shell":
             if status == "running":
                 bg_m = re.search(r"(?:Background Task ID:|id:)\s*([^\s\]\|]+)", cleaned, re.IGNORECASE)
                 if bg_m and not self.background_task_id:

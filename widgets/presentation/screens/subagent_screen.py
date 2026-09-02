@@ -219,12 +219,6 @@ class SubagentViewScreen(ModalScreen[None]):
             if idx in expand_state and hasattr(child, "set_expanded"):
                 child.set_expanded(True)
 
-        if is_running:
-            if self.thinking_widget and hasattr(self.thinking_widget, "set_expanded"):
-                self.thinking_widget.set_expanded(True)
-            elif self.current_tool_widget and hasattr(self.current_tool_widget, "set_expanded"):
-                self.current_tool_widget.set_expanded(True)
-
         if not is_running and self.driver:
             await self.driver.finalize_bot_stream()
 

@@ -162,6 +162,36 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         # Completed history event must NOT be queued in tool_handles
         self.assertEqual(len(self.driver.tool_handles), 0)
 
+    async def test_session_event_completed_tool_empty_output_from_history(self):
+        # Historical tool event with empty output (result_text="") must NOT be queued in tool_handles
+        await self.driver.consume_session_event({
+            "type": "tool",
+            "tool_type": "shell",
+            "target": "touch foo.txt",
+            "result_text": "",
+            "status": "done",
+        })
+        self.chat_view.add_tool_call.assert_awaited_once_with(
+            "shell",
+            "touch foo.txt",
+            result_text="",
+            args={},
+            status="done",
+            returncode=None,
+            animate=True,
+        )
+        self.assertEqual(len(self.driver.tool_handles), 0)
+
+    async def test_reset_clears_all_handles(self):
+        self.driver.bot_handle = MagicMock()
+        self.driver.thinking_handle = MagicMock()
+        self.driver.tool_handles.append(MagicMock())
+
+        self.driver.reset()
+        self.assertIsNone(self.driver.bot_handle)
+        self.assertIsNone(self.driver.thinking_handle)
+        self.assertEqual(len(self.driver.tool_handles), 0)
+
     async def test_session_event_plan_update_callback(self):
         plans = []
         self.driver.on_plan_update = lambda p, exp: plans.append((p, exp))
