@@ -870,7 +870,7 @@ DiffScreen {
 
 #diff-file-list > .option-list--option {
     background: transparent;
-    padding: 0;
+    padding: 0 1;
     text-wrap: nowrap;
 }
 

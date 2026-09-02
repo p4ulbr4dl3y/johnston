@@ -243,10 +243,10 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
             sidebar = self.query_one("#diff-sidebar", Vertical)
             width = sidebar.size.width
             if isinstance(width, int) and width > 15:
-                return max(15, width - 1)
+                return max(15, width - 3)
         except Exception:
             pass
-        return DIFF_SIDEBAR_ROW_WIDTH
+        return max(15, DIFF_SIDEBAR_ROW_WIDTH - 2)
 
     def _refresh_sidebar_options(self) -> None:
         target_w = self._sidebar_row_width()
