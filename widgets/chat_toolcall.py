@@ -360,7 +360,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 if (self.args or self.canonical_tool == "update_plan")
                 else self.target
             )
-            self.header_label.update(f"[{c}]● [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})")
+            base_header = f"[{c}]● [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})"
         else:
             from widgets.presentation.tool_display import format_compact_dict
 
@@ -368,7 +368,26 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             is_mcp = (self.tool_type or "").startswith("mcp_") or self.is_mcp
             tool_name_display = to_snake_case(self.tool_type) if is_mcp else (self.tool_type or "Tool")
             escaped_compact = escape(compact)
-            self.header_label.update(f"[{c}]● [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})")
+            base_header = f"[{c}]● [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})"
+
+        hints: list[str] = []
+        if self.status == "running":
+            if self.canonical_tool == "shell" and not getattr(self, "background_task_id", None):
+                hints.append("ctrl+b: bg")
+            if self.is_expandable():
+                action = "collapse" if self.is_expanded else "expand"
+                hints.append(f"ctrl+o: {action}")
+
+        if hints:
+            from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
+
+            _, _, t_muted, _ = get_theme_colors()
+            hint_text = format_modal_hint(" • ".join(hints))
+            self.header_label.update(f"{base_header} [{t_muted}]•[/] {hint_text}")
+        else:
+            self.header_label.update(base_header)
+
+
 
     def on_click(self, event) -> None:
         if not self.is_clickable_header():

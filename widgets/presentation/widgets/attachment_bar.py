@@ -37,6 +37,22 @@ class AttachmentChip(Static):
             pass
 
 
+class AttachmentHint(Static):
+    """Hint label showing hotkey for detaching last attachment."""
+
+    can_focus = False
+    ALLOW_SELECT = False
+
+    def __init__(self, *args, **kwargs) -> None:
+        from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
+
+        _, _, t_muted, _ = get_theme_colors()
+        hint = format_modal_hint("ctrl+d: detach")
+        text = f"[{t_muted}]•[/] {hint}"
+        super().__init__(text, *args, **kwargs)
+
+
+
 class AttachmentBar(HorizontalScroll):
     """1-line horizontal scroll container for AttachmentChip widgets."""
 
@@ -65,6 +81,11 @@ class AttachmentBar(HorizontalScroll):
                     self.mount(chip)
                 except Exception:
                     pass
+            try:
+                hint = AttachmentHint()
+                self.mount(hint)
+            except Exception:
+                pass
 
         try:
             if self.app:
@@ -73,3 +94,4 @@ class AttachmentBar(HorizontalScroll):
                     ci.update_height()
         except Exception:
             pass
+

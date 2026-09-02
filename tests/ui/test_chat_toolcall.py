@@ -834,6 +834,55 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         text_obj = upd.call_args[0][0]
         self.assertIn("s1", text_obj.plain)
 
+    def test_toolcall_running_hints(self):
+        # 1. Foreground shell running -> has ctrl+b and ctrl+o
+        w_shell = self._widget("shell", "pytest")
+        w_shell.mark_running()
+        label_text = str(w_shell.header_label.render())
+        self.assertIn("ctrl+b", label_text)
+        self.assertIn("bg", label_text)
+        self.assertIn("ctrl+o", label_text)
+        self.assertIn("expand", label_text)
+
+        # 2. Toggle expand while running -> ctrl+o changes to collapse
+        w_shell.toggle_expanded()
+        label_text2 = str(w_shell.header_label.render())
+        self.assertIn("ctrl+o", label_text2)
+        self.assertIn("collapse", label_text2)
+
+        # 3. Finished shell -> hints removed
+        w_shell.set_result("Done", status="done")
+        label_done = str(w_shell.header_label.render())
+        self.assertNotIn("ctrl+b", label_done)
+        self.assertNotIn("ctrl+o", label_done)
+
+        # 4. Background shell -> no ctrl+b
+        w_bg = self._widget("shell", "pytest")
+        w_bg.background_task_id = "task-99"
+        w_bg.mark_running()
+        label_bg = str(w_bg.header_label.render())
+        self.assertNotIn("ctrl+b", label_bg)
+        self.assertIn("ctrl+o", label_bg)
+
+    def test_thinking_widget_hints(self):
+        from widgets.presentation.widgets.chat_messages import ThinkingWidget
+
+        tw = ThinkingWidget()
+        label_running = str(tw.header_label.render())
+        self.assertIn("ctrl+o", label_running)
+        self.assertIn("expand", label_running)
+
+        tw.toggle_expanded()
+        label_exp = str(tw.header_label.render())
+        self.assertIn("ctrl+o", label_exp)
+        self.assertIn("collapse", label_exp)
+
+        tw.finish_thinking(duration=1.5, thinking_content="thoughts...")
+        label_done = str(tw.header_label.render())
+        self.assertIn("Thought for 1.5 sec", label_done)
+        self.assertNotIn("ctrl+o", label_done)
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -402,7 +402,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(rows[1][1], "")
 
     async def test_attachment_bar_updates(self):
-        from widgets.presentation.widgets.attachment_bar import AttachmentBar, AttachmentChip
+        from widgets.presentation.widgets.attachment_bar import AttachmentBar, AttachmentChip, AttachmentHint
 
         bar = AttachmentBar()
         bar.update_attachments([])
@@ -419,6 +419,10 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         chip2 = AttachmentChip(mock_att, index=2)
         self.assertIn("Image #2", str(chip2.render()))
 
+        hint = AttachmentHint()
+        self.assertIn("ctrl+d", str(hint.render()))
+        self.assertIn("detach", str(hint.render()))
+
         # Test single chip click calls remove_clipboard_attachment
         mock_ci = MagicMock()
         mock_app = MagicMock()
@@ -426,6 +430,26 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         with patch.object(AttachmentChip, "app", new=mock_app):
             chip.on_click()
         mock_ci.remove_clipboard_attachment.assert_called_once_with(mock_att)
+
+    async def test_generating_interrupt_hint(self):
+        app = FooterTestApp()
+        async with app.run_test():
+            footer = app.query_one(StatusFooter)
+
+            # Not generating -> no interrupt hint
+            footer.is_generating = False
+            footer.update_status(provider_key="openai", model_name="gpt-4o")
+            rows = footer._last_grid_rows
+            self.assertNotIn("interrupt", rows[0][0])
+
+            # Generating -> interrupt hint present
+            footer.is_generating = True
+            footer.update_status(provider_key="openai", model_name="gpt-4o")
+            rows = footer._last_grid_rows
+            self.assertIn("esc", rows[0][0])
+            self.assertIn("interrupt", rows[0][0])
+
+
 
 
 

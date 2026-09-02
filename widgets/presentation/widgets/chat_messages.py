@@ -396,8 +396,10 @@ class ThinkingWidget(Vertical):
         self._update_scheduled = False
         self._update_handle: asyncio.TimerHandle | None = None
 
-        self.header_label = Label("Thinking...", classes="thinking-header")
+        self.header_label = Label("", classes="thinking-header")
         self.content_widget = Static("", markup=False, classes="thinking-content")
+        self.render_header()
+
 
     @property
     def thinking_text(self) -> str:
@@ -475,9 +477,21 @@ class ThinkingWidget(Vertical):
             self._scroll_if_needed()
         self.render_collapsed()
 
+    def render_header(self) -> None:
+        if self.is_thinking:
+            from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
+
+            _, _, t_muted, _ = get_theme_colors()
+            action = "collapse" if self.is_expanded else "expand"
+            hint = format_modal_hint(f"ctrl+o: {action}")
+            self.header_label.update(f"Thinking... [{t_muted}]•[/] {hint}")
+        else:
+            dur_str = "<0.1" if self.duration_seconds < 0.1 else f"{self.duration_seconds:.1f}"
+            self.header_label.update(f"Thought for {dur_str} sec")
+
+
     def render_collapsed(self) -> None:
-        dur_str = "<0.1" if self.duration_seconds < 0.1 else f"{self.duration_seconds:.1f}"
-        self.header_label.update(f"Thought for {dur_str} sec")
+        self.render_header()
         if not self.is_expanded:
             self.content_widget.display = False
 
@@ -494,6 +508,7 @@ class ThinkingWidget(Vertical):
         if not self.is_expandable():
             return
         self.is_expanded = not self.is_expanded
+        self.render_header()
         if self.is_expanded:
             if self.thinking_text:
                 self.content_widget.update(self.thinking_text)

@@ -1148,6 +1148,13 @@ AttachmentChip {
     color: $fg-muted;
 }
 
+AttachmentHint {
+    width: auto;
+    height: 1;
+    color: $fg-muted;
+}
+
+
 /* Status Footer - Matching dark grey background with muted zinc text */
 #status-footer {
     width: 100%;
