@@ -442,14 +442,16 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             footer.is_generating = False
             footer.update_status(provider_key="openai", model_name="gpt-4o")
             rows = footer._last_grid_rows
-            self.assertNotIn("Interrupt", rows[0][0])
+            self.assertNotIn("to interrupt", rows[0][0])
 
             # Generating -> interrupt hint present
             footer.is_generating = True
             footer.update_status(provider_key="openai", model_name="gpt-4o")
             rows = footer._last_grid_rows
             self.assertIn("esc", rows[0][0])
-            self.assertIn("Interrupt", rows[0][0])
+            self.assertIn("to interrupt", rows[0][0])
+            self.assertIn("(", rows[0][0])
+            self.assertIn(")", rows[0][0])
 
 
 

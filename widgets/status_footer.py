@@ -12,7 +12,6 @@ from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 from widgets.presentation.widgets.footer_layout import (
     format_display_path,
-    format_hint,
     get_theme_colors,
 )
 from widgets.utils.responsive import is_compact_width, resolve_width
@@ -207,17 +206,20 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             else:
                 row1_right = f"[{txt}]Run /connect[/]"
 
-            # Row 1 (LLM): ⠋ Action • claude-3.7  <left> | <right> 45% ctx • $0.02
+            # Row 1 (LLM): ⠋ Action • claude-3.7 (esc to interrupt)  <left> | <right> 45% ctx • $0.02
             row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
-            if self.is_generating and width >= 45:
-                row1_left_parts.append(format_hint("esc Interrupt"))
             if is_connected and clean_model and clean_model != "[Select model: /models]":
                 role_len = display_width(role_formatted) + 3
-                hint_len = 18 if (self.is_generating and width >= 45) else 0
+                hint_len = 20 if (self.is_generating and width >= 45) else 0
                 right_len = 16
                 max_model_len = max(10, width - role_len - hint_len - right_len - 3)
                 disp_model = ellipsize(clean_model, max_model_len)
-                row1_left_parts.append(f"[{txt}]{disp_model}[/]")
+                model_str = f"[{txt}]{disp_model}[/]"
+                if self.is_generating and width >= 45:
+                    model_str += f" [{t_muted}]([{t_secondary}]esc[/] [{t_muted}]to interrupt)[/]"
+                row1_left_parts.append(model_str)
+            elif self.is_generating and width >= 45:
+                row1_left_parts.append(f"[{t_muted}]([{t_secondary}]esc[/] [{t_muted}]to interrupt)[/]")
             row1_left = sep_compact.join(row1_left_parts)
 
             # Row 2 (Env): johnston • main (+3/-1) • sb:on • mode  <left> | <right> ⚡ 2a • 1s
@@ -252,15 +254,17 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             branch = self._git_branch(cwd=directory)
             diff_text = self._git_diff_stats(cwd=directory)
 
-            # Row 1 (LLM): ⠋ Action • esc Interrupt • OpenRouter › claude-3.7 (high)  <left> | <right> [████░░░░] 45% (58k/128k) • 12.3k tok • $0.02
+            # Row 1 (LLM): ⠋ Action • OpenRouter › claude-3.7 (high) (esc to interrupt)  <left> | <right> [████░░░░] 45% (58k/128k) • 12.3k tok • $0.02
             row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
-            if self.is_generating:
-                row1_left_parts.append(format_hint("esc Interrupt"))
             if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
                 model_part = f"[{txt}]{provider_display}[/]{arrow_sep}[{txt}]{clean_model}[/]"
                 if thinking_effort and thinking_effort != "auto":
                     model_part += f" [{txt}]({thinking_effort})[/]"
+                if self.is_generating:
+                    model_part += f" [{t_muted}]([{t_secondary}]esc[/] [{t_muted}]to interrupt)[/]"
                 row1_left_parts.append(model_part)
+            elif self.is_generating:
+                row1_left_parts.append(f"[{t_muted}]([{t_secondary}]esc[/] [{t_muted}]to interrupt)[/]")
             row1_left = sep.join(row1_left_parts)
 
             if is_connected and bool(model_name):
