@@ -66,6 +66,9 @@ class TestTranscriptPolicy(unittest.TestCase):
         self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "hi", "show_in_ui": False}))
         self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "<system_note>x</system_note>"}))
         self.assertFalse(is_ui_visible_user_message({"type": "user", "text": '<notification type="shell">y</notification>'}))
+        self.assertFalse(is_ui_visible_user_message({"type": "bot", "text": "reply"}))
+        self.assertFalse(is_ui_visible_user_message({"type": "tool", "tool_type": "read"}))
+        self.assertFalse(is_ui_visible_user_message({"type": "thinking", "text": "..."}))
         self.assertFalse(is_ui_visible_user_message("not a dict"))
         self.assertFalse(is_ui_visible_user_message(None))
 

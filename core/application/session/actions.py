@@ -400,10 +400,13 @@ def _touched_files(user_events: list[dict], seq_idx: int) -> Optional[list[str]]
     Both rewind callers use the same UI-visible turn model, so the merge lives
     in one place.
     """
-    if not any("touched_files" in u for u in user_events):
+    turns = user_events[seq_idx:]
+    if not turns:
+        return []
+    if any(u.get("touched_files") is None for u in turns):
         return None
     f_set: set[str] = set()
-    for u in user_events[seq_idx:]:
+    for u in turns:
         f_set.update(u.get("touched_files") or [])
     return sorted(f_set)
 

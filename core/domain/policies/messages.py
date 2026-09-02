@@ -31,6 +31,8 @@ def is_ui_visible_user_message(msg: Any) -> bool:
     """True if a transcript event should be rendered/counted as a user turn."""
     if not isinstance(msg, dict):
         return False
+    if msg.get("type") != USER_EVENT_TYPE:
+        return False
     if msg.get("show_in_ui") is False:
         return False
     text = str(msg.get("text", ""))

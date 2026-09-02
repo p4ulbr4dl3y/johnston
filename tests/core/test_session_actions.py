@@ -607,6 +607,27 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
         mock_store.delete.assert_called_once_with("sub-child-1")
         mock_tm.drop.assert_called_once_with("task-123")
 
+    def test_touched_files_untracked_turn_returns_none(self):
+        from core.application.session.actions import _touched_files
+
+        # When all turns have tracked lists, returns sorted union
+        events_tracked = [
+            {"touched_files": ["b.py"]},
+            {"touched_files": ["a.py"]},
+        ]
+        self.assertEqual(_touched_files(events_tracked, 0), ["a.py", "b.py"])
+        self.assertEqual(_touched_files(events_tracked, 1), ["a.py"])
+        self.assertEqual(_touched_files(events_tracked, 2), [])
+
+        # When any turn in the slice is untracked (None), returns None
+        events_with_untracked = [
+            {"touched_files": ["b.py"]},
+            {"touched_files": None},
+        ]
+        self.assertIsNone(_touched_files(events_with_untracked, 0))
+        self.assertIsNone(_touched_files(events_with_untracked, 1))
+        self.assertEqual(_touched_files(events_with_untracked, 2), [])
+
 
 if __name__ == "__main__":
     unittest.main()
