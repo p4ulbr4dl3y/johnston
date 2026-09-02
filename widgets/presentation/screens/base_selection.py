@@ -11,6 +11,7 @@ from textual.widgets.option_list import Option
 
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.constants import (
+    ESC_HINT_CLOSE,
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_OPTION_LIST_ID,
@@ -104,6 +105,34 @@ class ModalSearchNavMixin:
     search_nav_input_id: str = MODAL_SEARCH_INPUT
     search_nav_option_list_id: str = ""
     search_nav_filtered_attr: str = ""
+    #: actions bound to `space`; they must not fire while a query is being typed
+    space_actions: tuple[str, ...] = ()
+
+    def _search_input_is_typing(self) -> bool:
+        """True when the search box has focus with text in it.
+
+        Screens that toggle something on `space` (skills, MCP, providers) also
+        have a search box, so the key has to stay a space while the user types.
+        """
+        try:
+            selector = self.search_nav_input_id
+            if not selector.startswith("#"):
+                selector = f"#{selector}"
+            search_input = self.query_one(selector, Input)
+        except Exception:
+            return False
+        return bool(search_input.has_focus and search_input.value)
+
+    def check_action(self, action: str, parameters) -> bool | None:
+        """Block space-bound actions while typing so the space reaches the input.
+
+        The `space` key is declared in ``BINDINGS`` so the footer and /help can
+        advertise it, but Textual would otherwise consume it before the search
+        Input sees it.
+        """
+        if action in self.space_actions and self._search_input_is_typing():
+            return False
+        return super().check_action(action, parameters)
 
     def _handle_search_navigation(self, event: events.Key) -> bool:
         """Handle up/down keys while the search Input has focus.
@@ -145,7 +174,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         default_value: T,
         show_search: bool = False,
         search_placeholder: str = "Search...",
-        hint_text: str | ModalHintConfig = "enter: select • esc: close",
+        hint_text: str | ModalHintConfig = f"enter: select • {ESC_HINT_CLOSE}",
         option_list_id: str = MODAL_OPTION_LIST_ID,
         dialog_classes: str = "",
         fit_content: bool = False,
@@ -182,6 +211,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
         self.filtered_items = list(items)
         self.filtered_options = list(options)
         self._norm_targets: dict[int, str] = {}
+        self._hint_cache: str = self.raw_hint_text
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes=self.dialog_classes or None):
@@ -191,6 +221,58 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             yield HeaderWrapOptionList(*self.filtered_options, id=self.option_list_id)
             if self.hint_text:
                 yield ModalHint(self.hint_text, id=MODAL_HINT_ID)
+
+    # -- position feedback (P1-6) -------------------------------------------
+    def _selectable_indices(self) -> list[int]:
+        return [i for i, item in enumerate(self.filtered_items) if item is not None]
+
+    @staticmethod
+    def _list_overflows(opt_list) -> bool:
+        """True when the list scrolls, i.e. not every option is on screen."""
+        try:
+            content = getattr(opt_list, "virtual_size", None)
+            content_height = getattr(content, "height", 0) or getattr(
+                opt_list, "scrollable_content_region"
+            ).height
+            return bool(content_height > opt_list.size.height)
+        except Exception:
+            return False
+
+    def _compose_hint_text(self) -> str:
+        """Base hint plus `• position/total` while the list is scrollable.
+
+        A 21-entry theme list in a 12-row viewport gives no other clue that
+        there is anything below the fold (and no scrollbar on terminals that
+        hide them), so the hint row carries the count.
+        """
+        base = self.raw_hint_text or ""
+        try:
+            opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
+        except Exception:
+            return base
+        if not self._list_overflows(opt_list):
+            return base
+        selectable = self._selectable_indices()
+        if not selectable:
+            return base
+        idx = opt_list.highlighted
+        total = len(selectable)
+        if idx in selectable:
+            return f"{base} • {selectable.index(idx) + 1}/{total}"
+        return f"{base} • {total} total"
+
+    def _refresh_hint(self) -> None:
+        try:
+            hint = self.query_one(f"#{MODAL_HINT_ID}", ModalHint)
+        except Exception:
+            return
+        text = self._compose_hint_text()
+        if text != self._hint_cache:
+            self._hint_cache = text
+            hint.update(text)
+
+    def on_option_list_option_highlighted(self, event) -> None:
+        self._refresh_hint()
 
     def on_mount(self) -> None:
         super().on_mount()
@@ -214,6 +296,8 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             self.query_one(MODAL_SEARCH_INPUT, Input).focus()
         else:
             opt_list.focus()
+
+        self._refresh_hint()
 
     def _apply_dialog_fit(self) -> None:
         """Hug dialog to content and budget height (mount + resize)."""
@@ -271,6 +355,7 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
 
     def on_resize(self, event: events.Resize) -> None:
         self._apply_dialog_fit()
+        self._refresh_hint()
 
     def _filter_options(self, query_raw: str = "") -> None:
         """Filter options by query and update the OptionList, preserving highlight."""
@@ -359,6 +444,8 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
                     pass
         except Exception:
             pass
+
+        self._refresh_hint()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         self._filter_options(event.value)

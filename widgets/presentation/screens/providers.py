@@ -11,6 +11,7 @@ from widgets.presentation.screens.api_key import ApiKeyScreen
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.constants import (
+    ESC_HINT_CLOSE,
     MODAL_OPTION_LIST,
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
@@ -22,10 +23,13 @@ from widgets.utils.row_format import MODAL_MEDIUM_ROW_WIDTH, format_badge_row, o
 class ProvidersScreen(BaseSelectionScreen[Any]):
     """Modal provider selection screen for /providers command with separate ApiKeyScreen modal."""
 
+    space_actions = ("toggle_disabled",)
+
     BINDINGS = expand_bindings([
         ("escape", "cancel", "Cancel"),
         ("tab", "toggle_disabled", "Toggle Disabled"),
         ("ctrl+t", "toggle_disabled", "Toggle Disabled"),
+        ("space", "toggle_disabled", "Toggle Disabled"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ])
@@ -47,7 +51,7 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             default_value=active_key if active_key in items else (items[0] if items else ""),
             show_search=True,
             search_placeholder="Search...",
-            hint_text="enter: connect • space: toggle • esc: close",
+            hint_text=f"enter: connect • space: toggle • {ESC_HINT_CLOSE}",
             dialog_classes="modal-dialog-medium",
         )
 
@@ -220,14 +224,5 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             event.prevent_default()
             event.stop()
             return
-        if event.key == "space":
-            try:
-                search_input = self.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
-            except Exception:
-                search_input = None
-            if not search_input or not search_input.has_focus or not search_input.value:
-                self.action_toggle_disabled()
-                event.prevent_default()
-                event.stop()
-                return
+        # `space` is a declared binding now (see space_actions/check_action).
         await super()._on_key(event)

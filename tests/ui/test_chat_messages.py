@@ -323,15 +323,24 @@ class TestWelcomeWidget(unittest.TestCase):
     def test_welcome_widget_compose_and_banner_sizes(self):
         widget = WelcomeWidget()
         composed = list(widget.compose())
-        self.assertEqual(len(composed), 1)
+        # logo + tagline (version/connection) + first-run tips (P2-10)
+        self.assertEqual([child.id for child in composed], ["welcome-logo", "welcome-tagline", "welcome-tips"])
 
         with patch.object(widget, "query_one") as query_mock:
-            logo = MagicMock()
-            query_mock.return_value = logo
+            logo, tagline, tips = MagicMock(), MagicMock(), MagicMock()
+            query_mock.side_effect = lambda selector, _type=None: {
+                "#welcome-logo": logo,
+                "#welcome-tagline": tagline,
+                "#welcome-tips": tips,
+            }.get(selector, logo)
             widget._update_banner_for_size(30)
-            logo.update.assert_called_once()
+            logo.update.assert_called_once_with("[bold]johnston[/bold]")
+            tagline.update.assert_called_once()
+            tips.update.assert_not_called()  # no room for tips when compact
+
             widget._update_banner_for_size(80)
             self.assertEqual(logo.update.call_count, 2)
+            tips.update.assert_called_once()  # tips come back on wide terminals
 
         widget2 = WelcomeWidget()
         with patch.object(widget2, "query_one", side_effect=Exception("no logo")):

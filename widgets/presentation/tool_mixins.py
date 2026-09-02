@@ -6,11 +6,6 @@ from typing import Any
 
 from rich.text import Text
 
-from core.domain.defaults.config import (
-    COLOR_STATUS_ERROR,
-    COLOR_STATUS_RUNNING,
-    COLOR_STATUS_SUCCESS,
-)
 from widgets.presentation.tool_renderers import (
     format_code_with_line_numbers,
     format_manage_shell_display,
@@ -147,9 +142,17 @@ class ParsingMixin:
         return self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0)
 
     def _get_status_color(self) -> str:
+        """Status dot colour, taken from the active theme (P1-5).
+
+        The old module-level constants were tuned for one dark theme and went
+        through no contrast check, so on light themes the dot and the tool name
+        beside it dropped to ~2.3:1.
+        """
+        from widgets.utils.theme_colors import status_color
+
         if self.status == "running":
-            return COLOR_STATUS_RUNNING
+            return status_color("running")
         elif self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0):
-            return COLOR_STATUS_ERROR
+            return status_color("error")
         else:
-            return COLOR_STATUS_SUCCESS
+            return status_color("success")

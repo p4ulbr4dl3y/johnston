@@ -6,10 +6,11 @@ from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
-from textual.widgets import Label, Markdown, Static
+from textual.widgets import Label, Static
 
 from core.infrastructure.config.settings import get_settings
 from widgets.presentation.widgets.chat_markdown import (
+    ProseMarkdown,
     _handle_markdown_task_done,
     prepare_markdown_text,
     safe_update_markdown,
@@ -170,7 +171,7 @@ class BotMessage(Vertical):
     def __init__(self):
         super().__init__(classes="bot-msg")
         self.stream_widget = Static("", markup=False, classes="bot-msg-stream")
-        self.md_widget = Markdown("", classes="bot-msg-md")
+        self.md_widget = ProseMarkdown("", classes="bot-msg-md")
         self._streaming = False
         self._stream_update_scheduled = False
         self._stream_update_handle: asyncio.TimerHandle | None = None
@@ -366,6 +367,9 @@ class BotMessage(Vertical):
             raise
         except Exception:
             pass
+        # Blocks are mounted by now (update() awaits every batch), so clamp the
+        # prose ones to a readable line length and fix up task lists (P1-7/P2-12).
+        self.md_widget.post_update()
 
     def _scroll_if_needed(self) -> None:
         scroll_parent_if_needed(self)

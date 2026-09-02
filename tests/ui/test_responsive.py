@@ -321,14 +321,15 @@ class TestCommandSuggestionsViewportAwareness:
         cs._render_file_suggestions([long_path], "")
         assert cs.added, "expected one suggestion row"
         row = cs.added[0]
-        assert row.endswith("File[/dim]")
+        # Hierarchy comes from bold, not from `[dim]` (dim failed AA at 3.35:1).
+        assert row.endswith("File")
         assert "..." in row
 
     def test_short_paths_align_at_legacy_column_when_wide(self):
         cs = self._Sized(width=200)
         cs._render_file_suggestions(["a.txt"], "")
         row = cs.added[0]
-        plain_prefix = row.split(" [dim")[0]
+        plain_prefix = row.replace("[bold]", "").replace("[/]", "").rsplit("File", 1)[0]
         assert plain_prefix.startswith("a.txt")
         assert len(plain_prefix) >= 46 - len(" Dir") - 1
 

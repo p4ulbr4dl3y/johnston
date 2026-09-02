@@ -10,7 +10,13 @@ Each widget id has two forms:
 
 from widgets.utils.key_aliases import SHIFT_TAB_KEYS, TAB_KEYS
 
-__all__ = ["SHIFT_TAB_KEYS", "TAB_KEYS"]
+__all__ = [
+    "ESC_HINT_BACK",
+    "ESC_HINT_CANCEL",
+    "ESC_HINT_CLOSE",
+    "SHIFT_TAB_KEYS",
+    "TAB_KEYS",
+]
 
 # Modal dialog container / common widgets
 MODAL_DIALOG_ID = "modal-dialog"
@@ -27,6 +33,17 @@ MODAL_OPTION_LIST = "#modal-option-list"
 # Modal CSS classes
 MODAL_MARKDOWN = "modal-markdown"
 MODAL_MARKDOWN_CENTERED = "modal-markdown-centered"
+
+# Esc wording in hints (P2-11).
+#
+# "cancel" = the screen discards something: text the user typed, or an action
+# they started that has side effects (saving a key, renaming, forking a
+# session, answering a question). "close" = the screen is a viewer or a
+# selector and esc only dismisses it.
+ESC_HINT_CLOSE = "esc: close"
+ESC_HINT_CANCEL = "esc: cancel"
+# "back" = pushed on top of another screen and returns to it.
+ESC_HINT_BACK = "esc: back"
 
 # Tool / diff display
 TOOL_SCROLL_BOX = "tool-scroll-box"

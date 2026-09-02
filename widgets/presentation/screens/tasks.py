@@ -15,6 +15,8 @@ from widgets.chat_toolcall import ToolScrollBox
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
+    ESC_HINT_BACK,
+    ESC_HINT_CLOSE,
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_SEARCH_INPUT,
@@ -193,9 +195,9 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
             yield TaskStdinInput(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input", classes="modal-input")
             yield ModalHint(
-                "enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • esc: back"
+                f"enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • {ESC_HINT_BACK}"
                 if is_running
-                else "pgup/pgdn: scroll • esc: back",
+                else f"pgup/pgdn: scroll • {ESC_HINT_BACK}",
                 id=MODAL_HINT_ID,
             )
 
@@ -255,10 +257,10 @@ class TaskConsoleScreen(BaseModalScreen[None]):
                 hint_str = (
                     "enter: stdin • c-k: kill • esc"
                     if is_compact
-                    else "enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • esc: back"
+                    else f"enter: send stdin • pgup/pgdn: scroll • ctrl+k: kill • {ESC_HINT_BACK}"
                 )
             else:
-                hint_str = "pgup/pgdn • esc" if is_compact else "pgup/pgdn: scroll • esc: back"
+                hint_str = "pgup/pgdn • esc" if is_compact else f"pgup/pgdn: scroll • {ESC_HINT_BACK}"
             hint.update(hint_str)
         except Exception:
             pass
@@ -399,6 +401,11 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     hint_action_name: str = "enter: select"
     search_nav_filtered_attr: str = "filtered_tasks"
 
+    # Empty state (P1-9): an empty list used to close the screen silently (or
+    # never open at all, with the command firing a toast instead).
+    empty_title: str = "Nothing running."
+    empty_hint: str = ""
+
     def __init__(self):
         super().__init__()
         self.search_query = ""
@@ -437,7 +444,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield ModalHeader(self._get_header_md(), esc_hint="", id=self.title_id)
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id=self.option_list_id)
-            yield ModalHint(f"{self.hint_action_name} • esc: close", id=MODAL_HINT_ID)
+            yield ModalHint(f"{self.hint_action_name} • {ESC_HINT_CLOSE}", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:
@@ -525,9 +532,9 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 )
             else:
                 hint_str = (
-                    f"{self.hint_action_name} • ctrl+k: kill • esc: close"
+                    f"{self.hint_action_name} • ctrl+k: kill • {ESC_HINT_CLOSE}"
                     if is_running
-                    else f"{self.hint_action_name} • esc: close"
+                    else f"{self.hint_action_name} • {ESC_HINT_CLOSE}"
                 )
             hint.update(hint_str)
         except Exception:
@@ -555,16 +562,14 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         self._last_signatures = new_signatures
 
         if not tasks:
-            if not self.search_query:
-                self.filtered_tasks = []
-                self.dismiss()
-                return
-            try:
-                opt_list = self._get_option_list()
-                opt_list.clear_options()
-            except Exception:
-                pass
             self.filtered_tasks = []
+            if self.search_query:
+                try:
+                    self._get_option_list().clear_options()
+                except Exception:
+                    pass
+            else:
+                self._show_empty_state()
             return
 
         try:
@@ -601,6 +606,24 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                     break
         self._update_hint()
 
+    def _show_empty_state(self) -> None:
+        """Render "nothing here" plus what to do about it (P1-9)."""
+        try:
+            from widgets.presentation.widgets.footer_layout import get_theme_colors
+
+            _primary, _secondary, muted, _subtle = get_theme_colors()
+            opt_list = self._get_option_list()
+            opt_list.clear_options()
+            opt_list.add_option(Option(f"[{muted}]{self.empty_title}[/]", disabled=True))
+            if self.empty_hint:
+                opt_list.add_option(Option(f"[{muted}]{self.empty_hint}[/]", disabled=True))
+            try:
+                self.query_one(f"#{MODAL_HINT_ID}", Label).update(ESC_HINT_CLOSE)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_tasks):
             item = self.filtered_tasks[event.option_index]
@@ -630,6 +653,8 @@ class ShellTasksScreen(BaseTasksListScreen):
     title_id = "shell-title"
     option_list_id = "shell-option-list"
     hint_action_name = "enter: console"
+    empty_title = "No background shell tasks."
+    empty_hint = "Commands ending in & run in the background."
 
     def __init__(self):
         super().__init__()
@@ -729,6 +754,8 @@ class SubagentsScreen(BaseTasksListScreen):
     title_id = "subagents-title"
     option_list_id = "subagents-option-list"
     hint_action_name = "enter: details"
+    empty_title = "No subagents yet."
+    empty_hint = "Ask Johnston to delegate a task and they show up here."
 
     def __init__(self):
         super().__init__()

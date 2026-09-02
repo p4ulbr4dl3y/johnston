@@ -13,11 +13,12 @@ from textual.widgets import Input, OptionList, Static
 from widgets.chat_toolcall import ToolScrollBox
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.presentation.screens.base_selection import ModalSearchNavMixin
+from widgets.presentation.screens.constants import ESC_HINT_BACK, ESC_HINT_CLOSE
 from widgets.presentation.widgets.chat_diff import format_edit_diff, get_diff_colors
 from widgets.presentation.widgets.footer_layout import format_modal_hint, get_theme_colors
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import BREAKPOINT_COMPACT, BREAKPOINT_HINT, is_compact_width, resolve_width
-from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width, ellipsize
+from widgets.utils.row_format import DIFF_SIDEBAR_ROW_WIDTH, display_width, ellipsize, middle_ellipsize
 
 
 class DiffHeader(ResizeDebounceMixin, Static):
@@ -45,7 +46,7 @@ class DiffHeader(ResizeDebounceMixin, Static):
         table.add_column(justify="right")
 
         width = resolve_width(self)
-        esc_label = "esc: back" if self.from_rewind else "esc: close"
+        esc_label = ESC_HINT_BACK if self.from_rewind else ESC_HINT_CLOSE
         t_primary, t_secondary, t_muted, _ = get_theme_colors()
         sep = f" [{t_muted}]•[/] "
 
@@ -138,11 +139,11 @@ class DiffFooter(ResizeDebounceMixin, Static):
 
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             if width < 52:
-                raw_hint = "esc: back" if self.compact_view == "diff" else "enter • esc"
+                raw_hint = ESC_HINT_BACK if self.compact_view == "diff" else "enter • esc"
             elif self.compact_view == "diff":
                 raw_hint = "esc: files • pgup/dn"
             else:
-                raw_hint = "enter: view • esc: close"
+                raw_hint = f"enter: view • {ESC_HINT_CLOSE}"
         elif width >= BREAKPOINT_HINT:
             raw_hint = "tab: toggle sidebar • pgup/dn: scroll"
         else:
@@ -199,27 +200,57 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         self.filtered_indices: list[int] = list(range(len(self.diff_items)))
         self.sidebar_options: list[str] = self._format_sidebar_options(DIFF_SIDEBAR_ROW_WIDTH)
 
+    def _apply_selection_policy(self) -> None:
+        """Selection is opt-in per branch (P1-8).
+
+        `widgets/patch.py` walks the ancestor chain, so the diff body only
+        becomes selectable if the screen allows it too — hence the screen is
+        enabled and the chrome (header, footer, search box, file list) is
+        switched back off, which keeps click-to-select-file working.
+        """
+        self.ALLOW_SELECT = True
+        for widget in self.query("#diff-container, #diff-body, #diff-content-container"):
+            widget.ALLOW_SELECT = True
+        for widget in self.query(
+            "#diff-scroll-box, #diff-content-view, #diff-empty-container, #diff-empty-label"
+        ):
+            widget.ALLOW_SELECT = True
+        for widget in self.query(
+            "#diff-header, #diff-footer, #diff-sidebar, #diff-file-list, #diff-search-input"
+        ):
+            widget.ALLOW_SELECT = False
+
     def _format_sidebar_options(self, target_width: int = DIFF_SIDEBAR_ROW_WIDTH) -> list[str]:
         options = []
         add_fg, _, remove_fg, _, _ = get_diff_colors()
         _, _, t_muted, _ = get_theme_colors()
         for file_path, _, added, deleted in self.diff_items:
-            short_name = os.path.basename(file_path) or file_path
+            short_name = self._display_file_path(file_path)
             stat_plain = f"+{added}/-{deleted}"
             if display_width(short_name) + display_width(stat_plain) + 1 > target_width:
                 max_name_len = max(4, target_width - display_width(stat_plain) - 1)
-                dot_idx = short_name.rfind(".")
-                if dot_idx > 3 and len(short_name) - dot_idx <= 5:
-                    ext = short_name[dot_idx:]
-                    base = short_name[:dot_idx]
-                    short_name = base[: max_name_len - display_width(ext) - 1] + "…" + ext
-                else:
-                    short_name = short_name[: max_name_len - 1] + "…"
+                # Middle ellipsis: two files in different folders must not
+                # collapse to the same label (P2-13).
+                short_name = middle_ellipsize(short_name, max_name_len)
 
             spaces = " " * max(1, target_width - display_width(short_name) - display_width(stat_plain))
             stat_markup = f"[{add_fg}]+{added}[/][{t_muted}]/[/][{remove_fg}]-{deleted}[/]"
             options.append(f"{escape(short_name)}{spaces}{stat_markup}")
         return options
+
+    @staticmethod
+    def _display_file_path(file_path: str) -> str:
+        """Path relative to the workspace, so `ui/test_a.py` and `tests/test_a.py`
+        are distinguishable in a narrow sidebar (P2-13)."""
+        if not file_path:
+            return file_path
+        try:
+            rel = os.path.relpath(os.path.abspath(file_path), os.getcwd())
+        except Exception:
+            return file_path
+        if rel.startswith(".."):
+            return file_path
+        return rel
 
     def _sidebar_row_width(self) -> int:
         screen_w = resolve_width(self)
@@ -303,6 +334,7 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
 
     def on_mount(self) -> None:
         self._update_layout()
+        self._apply_selection_policy()
         if self.diff_items:
             try:
                 search_input = self.query_one("#diff-search-input", Input)

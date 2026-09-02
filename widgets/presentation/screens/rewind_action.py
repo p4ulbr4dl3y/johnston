@@ -9,6 +9,7 @@ from core.application.session.actions import RewindEntry
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.constants import (
+    ESC_HINT_BACK,
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
     MODAL_MARKDOWN,
@@ -53,7 +54,7 @@ class RewindActionScreen(BaseModalScreen[Optional[RewindSelection]]):
             yield ModalHeader("Rollback Action", esc_hint="")
             yield Static("", id="rewind-files", classes=MODAL_MARKDOWN, markup=False)
             yield HeaderWrapOptionList(*self.options, id=MODAL_OPTION_LIST_ID)
-            yield ModalHint("enter: select • esc: back", id=MODAL_HINT_ID)
+            yield ModalHint(f"enter: select • {ESC_HINT_BACK}", id=MODAL_HINT_ID)
 
     def _row_width(self) -> int:
         try:

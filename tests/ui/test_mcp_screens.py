@@ -833,6 +833,16 @@ class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
         event.option_index = 0
         screen.on_option_list_option_selected(event)  # header row -> return
 
+    def test_space_toggle_is_a_declared_binding(self):
+        """`space: toggle` is advertised in the hint, so it must exist as a
+        binding (P2-11) rather than only as a branch inside _on_key."""
+        screen = MCPScreen.__new__(MCPScreen)
+        screen._toggle_highlighted = MagicMock()
+        self.assertIn("space", {binding[0] for binding in MCPScreen.BINDINGS})
+        self.assertIn("toggle_highlighted", MCPScreen.space_actions)
+        screen.action_toggle_highlighted()
+        screen._toggle_highlighted.assert_called_once()
+
     def test_on_key_space_query_one_does_not_crash(self):
         screen = MCPScreen.__new__(MCPScreen)
         screen._toggle_highlighted = MagicMock()
@@ -843,7 +853,8 @@ class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
         event = MagicMock()
         event.key = "space"
         screen._on_key(event)
-        screen._toggle_highlighted.assert_called_once()
+        # Space no longer toggles from _on_key: it is a binding now.
+        screen._toggle_highlighted.assert_not_called()
 
 
 if __name__ == "__main__":

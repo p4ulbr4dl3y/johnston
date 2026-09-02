@@ -1,3 +1,9 @@
+/* `!important` is deliberate only here: Textual styles the caret and the
+   selection per theme (`TextArea:dark .text-area--cursor` and friends), and
+   Johnston forces a true-colour caret instead of inverting the theme. See
+   §"P2-14" in docs/ui-audit/UI_AUDIT.md — everything else in this file wins by
+   specificity so themes and future CSS can still override it. */
+
 /* Text Selection for all Screens, Input fields and TextAreas */
 .screen--selection,
 .text-area--selection,
@@ -34,24 +40,58 @@ Screen {
     layers: default overlay;
 }
 
-* {
-    scrollbar-size: 0 0 !important;
-    scrollbar-size-vertical: 0 !important;
-    scrollbar-size-horizontal: 0 !important;
+/* Scrollbars are off by default (P2-14). `Widget` matches every node —
+   including `Screen` — so this is as blanket as the old `* { ... !important }`,
+   but it wins by cascade order over Textual's own
+   `Widget { scrollbar-size-vertical: 2 }` instead of by force, so any more
+   specific rule below can switch a bar back on without another `!important`. */
+Widget {
+    scrollbar-size: 0 0;
+    scrollbar-size-vertical: 0;
+    scrollbar-size-horizontal: 0;
 }
 
 ScrollBar, ScrollBarCorner, ScrollBar > *, ScrollBarCorner > * {
-    display: none !important;
-    visibility: hidden !important;
-    width: 0 !important;
-    height: 0 !important;
+    display: none;
+    visibility: hidden;
+    width: 0;
+    height: 0;
 }
 
-Screen, ModalScreen, VerticalScroll, HorizontalScroll, ScrollView, OptionList, TextArea, Markdown, MarkdownViewer, DataTable, Tree, ListView, DirectoryTree, ScrollBar, ScrollBarCorner {
-    scrollbar-size: 0 0 !important;
-    scrollbar-size-vertical: 0 !important;
-    scrollbar-size-horizontal: 0 !important;
+/* Scroll position feedback (P1-6). Prose and the chat stay clean, but a list
+   that is longer than its viewport must not hide that fact: 21 themes in 12
+   rows and 57 slash commands in the popup gave no hint that anything was
+   below the fold. Lists get a one-column bar plus a "n/m" counter in the hint
+   row; see `widgets/presentation/widgets/modal_hint.py`. */
+ModalScreen OptionList,
+#modal-dialog OptionList,
+CommandSuggestions OptionList,
+#diff-file-list,
+ModalScreen ListView,
+#modal-dialog ListView,
+ModalScreen Tree,
+#modal-dialog Tree,
+ModalScreen DataTable,
+#modal-dialog DataTable {
+    scrollbar-size: 0 1;
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 0;
+    scrollbar-color: $fg-muted;
+    scrollbar-color-hover: $fg-primary;
+    scrollbar-background: $bg-surface;
+    scrollbar-background-hover: $bg-surface;
 }
+
+ModalScreen ScrollBar,
+#modal-dialog ScrollBar,
+CommandSuggestions ScrollBar,
+#diff-file-list ScrollBar {
+    display: block;
+    visibility: visible;
+    width: 1;
+    height: auto;
+}
+
 
 #app-container {
     width: 100%;
@@ -112,6 +152,20 @@ WelcomeWidget {
     text-align: center;
     color: $fg-muted;
     text-style: bold;
+}
+
+#welcome-tagline {
+    width: 100%;
+    height: auto;
+    text-align: center;
+    color: $fg-muted;
+}
+
+#welcome-tips {
+    width: 100%;
+    height: auto;
+    text-align: center;
+    color: $fg-muted;
 }
 
 .user-msg {
@@ -205,7 +259,7 @@ WelcomeWidget {
 .tool-scroll-box {
     width: 100%;
     height: auto;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 .tool-sequential {
@@ -291,7 +345,7 @@ MarkdownOrderedList MarkdownParagraph {
 MarkdownBlockQuote MarkdownBlockQuote {
     margin: 0 0 0 2;
     padding: 0 0 0 1;
-    border-left: solid $border;
+    border-left: solid $border-subtle;
     background: transparent;
 }
 
@@ -365,7 +419,7 @@ CustomMarkdownFence .fence-scroll-box,
 MarkdownFence .fence-scroll-box {
     width: 100%;
     height: auto;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 CustomMarkdownFence #code-content,
@@ -403,7 +457,7 @@ OptionList > .option-list--option-hover {
     margin-bottom: 5;
     width: 100%;
     height: auto;
-    max-height: 5;
+    max-height: 9;
     padding: 0;
     border: solid $border;
     background: $bg-surface;
@@ -438,8 +492,8 @@ CommandSuggestions > .option-list--option {
 #command-suggestions > .option-list--option-blur-highlighted,
 CommandSuggestions > .option-list--option-highlighted,
 CommandSuggestions > .option-list--option-blur-highlighted {
-    background: $bg-surface;
-    color: $fg-primary;
+    background: $bg-inverted;
+    color: $fg-inverted;
     text-style: bold;
 }
 
@@ -489,7 +543,7 @@ TextArea > .text-area--matching-bracket,
 
 /* Suppress hover tooltips globally */
 Tooltip {
-    display: none !important;
+    display: none;
 }
 
 /* Notifications (Toast) Docked Top Right - Monochrome Slate */
@@ -530,7 +584,7 @@ ModalScreen {
     align: center middle;
     background: $bg-overlay;
     overflow: hidden;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog {
@@ -642,7 +696,7 @@ ModalScreen {
     max-height: 20;
     overflow-y: auto;
     overflow-x: hidden;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #help-body {
@@ -680,16 +734,16 @@ ModalScreen {
 #wizard-title MarkdownH1,
 #wizard-title MarkdownH2,
 #wizard-title MarkdownH3 {
-    content-align: left top !important;
-    text-align: left !important;
+    content-align: left top;
+    text-align: left;
     color: $fg-primary;
     margin: 0 0 1 0;
 }
 
 .modal-markdown-centered MarkdownParagraph,
 #modal-dialog .modal-markdown-centered MarkdownParagraph {
-    content-align: left top !important;
-    text-align: left !important;
+    content-align: left top;
+    text-align: left;
     color: $fg-secondary;
     margin: 0 0 1 0;
 }
@@ -748,7 +802,7 @@ ModalScreen {
     background: transparent;
     border: none;
     padding: 0;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog.wizard-dialog #wizard-summary-scroll {
@@ -821,7 +875,7 @@ DiffScreen {
     margin: 1 0 1 0;
     padding: 0 1;
     border: none;
-    background: transparent !important;
+    background: transparent;
     color: $fg-primary;
 }
 
@@ -833,8 +887,8 @@ DiffScreen {
 #diff-file-list:focus,
 #diff-file-list:hover {
     height: 1fr;
-    background: transparent !important;
-    border: none !important;
+    background: transparent;
+    border: none;
     margin: 0;
     padding: 0;
     overflow-y: auto;
@@ -857,8 +911,8 @@ DiffScreen {
 
 #diff-file-list > .option-list--option-highlighted,
 #diff-file-list > .option-list--option-blur-highlighted {
-    background: $bg-surface;
-    color: $fg-primary;
+    background: $bg-inverted;
+    color: $fg-inverted;
     text-style: bold;
 }
 
@@ -878,7 +932,7 @@ DiffScreen {
     background: transparent;
     border: none;
     padding: 0 1;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #diff-content-view {
@@ -963,7 +1017,7 @@ DiffScreen {
     background: transparent;
     border-left: solid $border;
     padding: 0 1;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog.task-console-dialog .tool-scroll-box {
@@ -991,7 +1045,7 @@ ModalScreen #console-log {
     padding: 0 1;
     background: transparent;
     color: $fg-secondary;
-    scrollbar-size: 0 0 !important;
+    scrollbar-size: 0 0;
 }
 
 #modal-dialog OptionList,
@@ -1007,8 +1061,7 @@ ModalScreen OptionList:hover {
     max-height: 12;
     margin: 0;
     border: none;
-    background: transparent !important;
-    scrollbar-size: 0 0;
+    background: transparent;
     text-wrap: nowrap;
     text-overflow: ellipsis;
 }
@@ -1042,12 +1095,14 @@ ModalScreen OptionList > .option-list--option-disabled {
     opacity: 100%;
 }
 
+/* Highlighted option: inverted block + bold so the cursor row is identifiable
+   without relying on colour alone (and stays visible on light themes). */
 #modal-dialog OptionList > .option-list--option-highlighted,
 #modal-dialog OptionList > .option-list--option-blur-highlighted,
 ModalScreen OptionList > .option-list--option-highlighted,
 ModalScreen OptionList > .option-list--option-blur-highlighted {
-    background: transparent;
-    color: $fg-primary;
+    background: $bg-inverted;
+    color: $fg-inverted;
     text-style: bold;
 }
 
@@ -1065,7 +1120,7 @@ ModalScreen OptionList > .option-list--option-hover {
     margin: 0 0 1 0;
     padding: 0 1;
     border: none;
-    background: transparent !important;
+    background: transparent;
     color: $fg-primary;
 }
 
@@ -1178,9 +1233,12 @@ MarkdownHeader {
     padding: 0;
 }
 
-/* Markdown Table Styling - Clean Monochrome Slate header and borders */
+/* Markdown Table Styling - Clean Monochrome Slate header and borders.
+   Table rules live *inside* prose: they are decoration, not a component
+   boundary, so they use $border-subtle and leave $border (>=3:1) for panels,
+   dialogs and other edges the user has to identify. */
 MarkdownTableContent {
-    keyline: thin $border;
+    keyline: thin $border-subtle;
 }
 
 MarkdownTableContent > .header {
@@ -1206,7 +1264,7 @@ MarkdownBullet {
 
 /* Markdown Horizontal Rule (---) - Subtle Divider */
 MarkdownHorizontalRule {
-    border-bottom: solid $border;
+    border-bottom: solid $border-subtle;
     height: 1;
     padding-top: 1;
     margin-bottom: 1;
@@ -1214,7 +1272,9 @@ MarkdownHorizontalRule {
 
 /* Markdown Blockquote - Clean Monochrome Slate (Dark Card without extra vertical lines) */
 MarkdownBlockQuote {
-    border-left: none;
+    /* Quotes were marked by indentation alone; the bar makes them readable
+       when a quote is nested inside a list or follows a paragraph (P2-12). */
+    border-left: solid $border-subtle;
     background: $bg-surface;
     color: $fg-secondary;
     margin: 1 0;

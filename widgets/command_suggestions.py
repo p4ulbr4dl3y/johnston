@@ -121,7 +121,10 @@ class CommandSuggestions(HeaderWrapOptionList):
                 display_name = f if display_width(f) <= align_col else ellipsize(f, align_col)
                 pad = max(0, align_col - display_width(display_name))
                 padding_spaces = " " * pad
-                formatted_line = f"{escape(display_name)}{padding_spaces} [dim]{kind}[/dim]"
+                # Hierarchy by weight, not by dimming: `[dim]` dropped the tag
+                # to 3.35:1 on the surface (AA is 4.5:1), and a fixed muted
+                # colour would then fail on the inverted highlight row.
+                formatted_line = f"[bold]{escape(display_name)}[/]{padding_spaces} {kind}"
                 self.add_option(formatted_line)
                 if len(matched_files) >= 50:
                     break
@@ -190,7 +193,11 @@ class CommandSuggestions(HeaderWrapOptionList):
                         escaped_desc = escape(clean_desc)
                         pad = max(0, padding - display_width(cmd))
                         padding_spaces = " " * pad
-                        formatted_line = f"{escaped_cmd}{padding_spaces} [dim]{escaped_desc}[/dim]"
+                        # See the file rows above: `[dim]` measured 3.35:1
+                        # (zinc) / 3.33:1 (github-light) against the popup
+                        # surface, so the description keeps the row colour and
+                        # the command name carries the emphasis instead.
+                        formatted_line = f"[bold]{escaped_cmd}[/]{padding_spaces} {escaped_desc}"
                         self.add_option(formatted_line)
 
                     self.current_matched = matched_cmds

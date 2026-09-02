@@ -215,7 +215,9 @@ class TestTaskScreens(unittest.TestCase):
         self.assertIn("escape", keys)
         self.assertIn("ctrl+k", keys)
 
-    def test_shell_tasks_screen_empty_dismisses(self):
+    def test_shell_tasks_screen_empty_shows_empty_state(self):
+        """An empty list keeps the screen open with a hint, not a silent close
+        (P1-9)."""
         s = ShellTasksScreen()
         s.dismiss = MagicMock()
         mock_opt = MagicMock()
@@ -223,10 +225,12 @@ class TestTaskScreens(unittest.TestCase):
              patch.object(s, "_get_filtered_tasks", return_value=[]), \
              patch.object(s, "query_one", return_value=mock_opt):
             s.update_tasks_list()
-            s.dismiss.assert_called_once()
+            s.dismiss.assert_not_called()
             self.assertEqual(s.filtered_tasks, [])
+            prompts = [c.args[0] for c in mock_opt.add_option.call_args_list]
+            self.assertTrue(any("No background shell tasks." in str(p) for p in prompts), prompts)
 
-    def test_subagents_screen_empty_dismisses(self):
+    def test_subagents_screen_empty_shows_empty_state(self):
         s = SubagentsScreen()
         s.dismiss = MagicMock()
         mock_opt = MagicMock()
@@ -234,8 +238,10 @@ class TestTaskScreens(unittest.TestCase):
              patch.object(s, "_get_filtered_tasks", return_value=[]), \
              patch.object(s, "_get_option_list", return_value=mock_opt):
             s.update_tasks_list()
-            s.dismiss.assert_called_once()
+            s.dismiss.assert_not_called()
             self.assertEqual(s.filtered_tasks, [])
+            prompts = [c.args[0] for c in mock_opt.add_option.call_args_list]
+            self.assertTrue(any("No subagents yet." in str(p) for p in prompts), prompts)
 
     def test_subagents_screen_sync_listeners_and_unmount(self):
         s = SubagentsScreen()
