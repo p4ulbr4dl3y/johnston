@@ -428,6 +428,7 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
                 MODAL_MEDIUM_MAX_WIDTH,
                 MODAL_MIN_WIDTH,
                 apply_modal_fit,
+                fit_modal_dialog,
                 modal_content_width,
             )
 
@@ -456,16 +457,8 @@ class AskUserWizardScreen(ResizeDebounceMixin, BaseModalScreen[str]):
             if not isinstance(screen_h, int) or screen_h <= 0:
                 screen_h = 24
 
-            if screen_h < 18:
-                dialog.styles.padding = (0, 1)
-                dialog.styles.max_height = max(7, screen_h - 1)
-                usable_h = screen_h - 1
-                overhead = 9
-            else:
-                dialog.styles.padding = (1, 2)
-                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
-                usable_h = screen_h - 2
-                overhead = 11
+            usable_h = fit_modal_dialog(dialog, screen_h)
+            overhead = 9 if screen_h < 18 else 11
 
             try:
                 opt_list = self.query_one(OPTIONS_LIST, OptionList)

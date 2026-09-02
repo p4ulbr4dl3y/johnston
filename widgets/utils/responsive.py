@@ -189,3 +189,37 @@ def apply_modal_fit(
         return width
     except Exception:
         return 0
+
+
+def fit_modal_dialog(
+    dialog: Any,
+    screen_h: int,
+    *,
+    height_factor: float = 0.95,
+) -> int:
+    """Fit a modal dialog's vertical geometry to the terminal height.
+
+    Short screens (``screen_h < 18``) collapse the dialog to a thin strip with
+    tight ``padding=(0, 1)`` and a small ``max_height``; taller screens keep
+    roomier ``padding=(1, 2)`` and cap the height just under the terminal
+    (``max(8, min(screen_h - 2, int(screen_h * height_factor)))``). Applies the
+    values to ``dialog`` and returns the usable inner height (rows available
+    for body content), for callers to size their scroll/list widgets.
+
+    ``height_factor`` lets a caller preserve a slightly different cap (e.g.
+    ``0.92``) without duplicating the whole formula. Never raises.
+    """
+    if screen_h < 18:
+        padding = (0, 1)
+        max_height = max(7, screen_h - 1)
+        usable_h = screen_h - 1
+    else:
+        padding = (1, 2)
+        max_height = max(8, min(screen_h - 2, int(screen_h * height_factor)))
+        usable_h = screen_h - 2
+    try:
+        dialog.styles.padding = padding
+        dialog.styles.max_height = max_height
+    except Exception:
+        pass
+    return usable_h

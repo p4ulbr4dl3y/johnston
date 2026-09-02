@@ -28,6 +28,7 @@ from widgets.utils.responsive import (
     MODAL_MIN_WIDTH,
     MODAL_WIDTH_RATIO,
     apply_modal_fit,
+    fit_modal_dialog,
     fit_modal_width,
     is_compact_width,
     modal_content_width,
@@ -421,6 +422,62 @@ class TestModalFitHelpers:
 
     def test_apply_modal_fit_swallows_style_errors(self):
         assert apply_modal_fit(_ExplodingStylesStub(screen_width=120), 45) == 0
+
+
+class _FitDialogStub:
+    """Dialog stand-in recording applied padding/max_height."""
+
+    def __init__(self):
+        self.styles = SimpleNamespace(padding=None, max_height=None)
+
+
+class TestFitModalDialog:
+    def test_short_screen_collapses_padding(self):
+        dialog = _FitDialogStub()
+        usable = fit_modal_dialog(dialog, 10)
+        assert dialog.styles.padding == (0, 1)
+        assert dialog.styles.max_height == max(7, 10 - 1) == 9
+        assert usable == 9
+
+    def test_below_threshold_boundary(self):
+        dialog = _FitDialogStub()
+        usable = fit_modal_dialog(dialog, 17)
+        assert dialog.styles.padding == (0, 1)
+        assert dialog.styles.max_height == 16
+        assert usable == 16
+
+    def test_threshold_boundary_uses_roomier_padding(self):
+        dialog = _FitDialogStub()
+        usable = fit_modal_dialog(dialog, 18)
+        assert dialog.styles.padding == (1, 2)
+        assert dialog.styles.max_height == max(8, min(16, int(18 * 0.95))) == 16
+        assert usable == 16
+
+    def test_tall_screen_caps_below_terminal(self):
+        dialog = _FitDialogStub()
+        usable = fit_modal_dialog(dialog, 50)
+        assert dialog.styles.padding == (1, 2)
+        assert dialog.styles.max_height == max(8, min(48, int(50 * 0.95))) == 47
+        assert usable == 48
+
+    def test_height_factor_preserves_different_cap(self):
+        dialog = _FitDialogStub()
+        usable = fit_modal_dialog(dialog, 50, height_factor=0.92)
+        assert dialog.styles.padding == (1, 2)
+        assert dialog.styles.max_height == max(8, min(48, int(50 * 0.92))) == 46
+        assert usable == 48
+
+    def test_applies_tight_values_below_threshold_regardless_of_factor(self):
+        dialog = _FitDialogStub()
+        fit_modal_dialog(dialog, 10, height_factor=0.5)
+        assert dialog.styles.padding == (0, 1)
+        assert dialog.styles.max_height == max(7, 10 - 1) == 9
+
+    def test_swallows_style_assignment_errors(self):
+        class _Boom:
+            styles = None
+
+        assert fit_modal_dialog(_Boom(), 50) == 48
 
 
 _APP_CSS_PATH = str(Path(__file__).resolve().parents[2] / "app.tcss")

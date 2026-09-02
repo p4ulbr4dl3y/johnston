@@ -113,7 +113,7 @@ class HelpScreen(BaseModalScreen[None]):
 
     def _apply_dialog_fit(self) -> None:
         try:
-            from widgets.utils.responsive import apply_modal_fit, modal_content_width
+            from widgets.utils.responsive import apply_modal_fit, fit_modal_dialog, modal_content_width
 
             dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
             max_cmd_w = max(len(k) for k, _ in COMMANDS_DATA) + 2 + max(len(d) for _, d in COMMANDS_DATA)
@@ -128,14 +128,11 @@ class HelpScreen(BaseModalScreen[None]):
             if not isinstance(screen_h, int) or screen_h <= 0:
                 screen_h = 24
 
+            fit_modal_dialog(dialog, screen_h)
             if screen_h < 18:
-                dialog.styles.padding = (0, 1)
-                dialog.styles.max_height = max(7, screen_h - 1)
                 usable_h = screen_h - 1
                 overhead = 7
             else:
-                dialog.styles.padding = (1, 2)
-                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
                 usable_h = int(dialog.styles.max_height.value) if dialog.styles.max_height else screen_h - 2
                 overhead = 10
 

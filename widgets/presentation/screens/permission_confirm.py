@@ -23,6 +23,7 @@ from widgets.utils.responsive import (
     MODAL_MIN_WIDTH,
     MODAL_WIDE_MAX_WIDTH,
     apply_modal_fit,
+    fit_modal_dialog,
     is_compact_width,
     modal_content_width,
     resolve_width,
@@ -418,19 +419,14 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             except Exception:
                 pass
 
+            usable_h = fit_modal_dialog(dialog, screen_h, height_factor=0.92)
             if screen_h < 18:
-                dialog.styles.padding = (0, 1)
-                dialog.styles.max_height = max(7, screen_h - 1)
                 opt_h = min(num_opts, max(2, screen_h - 10 - input_overhead))
                 overhead = 8 + opt_h + input_overhead
                 opt_list_h = opt_h
-                usable_h = screen_h - 1
             else:
-                dialog.styles.padding = (1, 2)
-                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.92)))
                 overhead = 12 + num_opts + input_overhead
                 opt_list_h = None
-                usable_h = screen_h - 2
 
             scroll_box_h = max(1, min(18, usable_h - overhead))
 

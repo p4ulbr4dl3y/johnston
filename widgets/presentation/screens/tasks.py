@@ -29,6 +29,7 @@ from widgets.presentation.tool_display import (
 from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
+from widgets.utils.responsive import fit_modal_dialog
 from widgets.utils.row_format import (
     MODAL_WIDE_ROW_WIDTH,
     format_badge_row,
@@ -211,17 +212,10 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         except Exception:
             pass
 
+        usable_h = fit_modal_dialog(dialog, screen_h)
         if screen_h < 18:
-            if dialog:
-                dialog.styles.padding = (0, 1)
-                dialog.styles.max_height = max(7, screen_h - 1)
-            usable_h = screen_h - 1
             overhead = 8 + cmd_h + (2 if is_running else 0)
         else:
-            if dialog:
-                dialog.styles.padding = (1, 2)
-                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
-            usable_h = screen_h - 2
             overhead = 11 + cmd_h + (2 if is_running else 0)
 
         target_h = max(2, min(14, usable_h - overhead))
@@ -434,16 +428,8 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             if not isinstance(screen_h, int) or screen_h <= 0:
                 screen_h = 24
 
-            if screen_h < 18:
-                dialog.styles.padding = (0, 1)
-                dialog.styles.max_height = max(7, screen_h - 1)
-                usable_h = screen_h - 1
-                overhead = 8
-            else:
-                dialog.styles.padding = (1, 2)
-                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
-                usable_h = screen_h - 2
-                overhead = 10
+            usable_h = fit_modal_dialog(dialog, screen_h)
+            overhead = 8 if screen_h < 18 else 10
 
             opt_list = self._get_option_list()
             opt_list.styles.max_height = max(2, min(12, usable_h - overhead))

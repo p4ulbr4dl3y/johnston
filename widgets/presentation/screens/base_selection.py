@@ -27,6 +27,7 @@ from widgets.utils.responsive import (
     MODAL_MIN_WIDTH,
     MODAL_WIDE_MAX_WIDTH,
     apply_modal_fit,
+    fit_modal_dialog,
     modal_content_width,
 )
 
@@ -258,15 +259,10 @@ class BaseSelectionScreen(ModalSearchNavMixin, BaseModalScreen[T], Generic[T]):
             if not isinstance(screen_h, int) or screen_h <= 0:
                 screen_h = 24
 
+            usable_h = fit_modal_dialog(dialog, screen_h)
             if screen_h < 18:
-                dialog.styles.padding = (0, 1)
-                dialog.styles.max_height = max(7, screen_h - 1)
-                usable_h = screen_h - 1
                 overhead = 6 if not self.show_search else 8
             else:
-                dialog.styles.padding = (1, 2)
-                dialog.styles.max_height = max(8, min(screen_h - 2, int(screen_h * 0.95)))
-                usable_h = screen_h - 2
                 overhead = 8 if not self.show_search else 10
 
             opt_list = self.query_one(f"#{self.option_list_id}", OptionList)
