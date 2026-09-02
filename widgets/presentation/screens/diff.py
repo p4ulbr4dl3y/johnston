@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Any, Optional
 
 from rich.markup import escape
 from rich.table import Table
@@ -103,6 +103,7 @@ class DiffFooter(ResizeDebounceMixin, Static):
         self.current_stats = ""
         self.is_compact = False
         self.compact_view = "files"
+        self.diff_mode = "unified"
 
     def on_mount(self) -> None:
         self.render_footer()
@@ -110,6 +111,10 @@ class DiffFooter(ResizeDebounceMixin, Static):
     def set_view_context(self, is_compact: bool, compact_view: str) -> None:
         self.is_compact = is_compact
         self.compact_view = compact_view
+        self.render_footer()
+
+    def set_diff_mode(self, diff_mode: str) -> None:
+        self.diff_mode = diff_mode
         self.render_footer()
 
     def update_info(self, file_path: str, stats: str) -> None:
@@ -136,6 +141,7 @@ class DiffFooter(ResizeDebounceMixin, Static):
         else:
             left_text = f"[{t_muted}]No file selected[/]"
 
+        mode_toggle_hint = "s Split" if self.diff_mode == "unified" else "s Unified"
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
             if width < 52:
                 raw_hint = "esc Back" if self.compact_view == "diff" else "enter • esc"
@@ -143,10 +149,12 @@ class DiffFooter(ResizeDebounceMixin, Static):
                 raw_hint = "esc Files • pgup/dn"
             else:
                 raw_hint = "enter View • esc Close"
+        elif width >= BREAKPOINT_HINT + 15:
+            raw_hint = f"tab Sidebar • {mode_toggle_hint} • n/p Hunk • pgup/dn Scroll"
         elif width >= BREAKPOINT_HINT:
-            raw_hint = "tab Toggle Sidebar • pgup/dn Scroll"
+            raw_hint = f"tab Sidebar • {mode_toggle_hint} • n/p Hunk"
         else:
-            raw_hint = "tab Sidebar"
+            raw_hint = f"tab Sidebar • {mode_toggle_hint}"
 
         right_text = format_hint(raw_hint)
         table.add_row(left_text, right_text)
@@ -166,6 +174,9 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         ("escape", "close", "Close"),
         ("tab", "toggle_sidebar", "Toggle Sidebar"),
         ("b", "toggle_sidebar", "Toggle Sidebar"),
+        ("s", "toggle_diff_mode", "Toggle Split/Unified Diff"),
+        ("n", "next_hunk", "Next Hunk"),
+        ("p", "prev_hunk", "Previous Hunk"),
         ("pageup", "page_up", "Page Up"),
         ("pagedown", "page_down", "Page Down"),
         ("ctrl+c", "quit_app", "Quit"),
@@ -185,6 +196,8 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         self.selected_index = 0
         self.sidebar_visible = True
         self.compact_view = "files"
+        self.diff_mode = "unified"
+        self._current_renderable: Any = None
 
         total_added = sum(item[2] for item in diff_items)
         total_deleted = sum(item[3] for item in diff_items)
@@ -370,11 +383,13 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         file_path, diff_text, added, deleted = self.diff_items[index]
 
         try:
-            formatted = format_edit_diff(diff_text, file_path)
+            formatted = format_edit_diff(diff_text, file_path, view_mode=self.diff_mode)
+            self._current_renderable = formatted
             content_view = self.query_one("#diff-content-view", Static)
             content_view.update(formatted)
         except Exception:
             try:
+                self._current_renderable = None
                 content_view = self.query_one("#diff-content-view", Static)
                 content_view.update(Text(diff_text))
             except Exception:
@@ -388,6 +403,7 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
 
         try:
             footer = self.query_one("#diff-footer", DiffFooter)
+            footer.set_diff_mode(self.diff_mode)
             footer.update_info(file_path, f"+{added} / -{deleted}")
         except Exception:
             pass
@@ -405,6 +421,43 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
             if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT):
                 self.compact_view = "diff"
                 self._update_layout()
+
+    def action_toggle_diff_mode(self) -> None:
+        self.diff_mode = "split" if self.diff_mode == "unified" else "unified"
+        self._render_current_diff(self.selected_index)
+        try:
+            footer = self.query_one("#diff-footer", DiffFooter)
+            footer.set_diff_mode(self.diff_mode)
+        except Exception:
+            pass
+
+    def action_next_hunk(self) -> None:
+        if not self._current_renderable or not getattr(self._current_renderable, "hunk_lines", None):
+            return
+        hunks = self._current_renderable.hunk_lines
+        try:
+            scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
+            current_y = scroll_box.scroll_offset.y
+            for h in hunks:
+                if h > current_y:
+                    scroll_box.scroll_to(y=h, animate=False)
+                    return
+        except Exception:
+            pass
+
+    def action_prev_hunk(self) -> None:
+        if not self._current_renderable or not getattr(self._current_renderable, "hunk_lines", None):
+            return
+        hunks = self._current_renderable.hunk_lines
+        try:
+            scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
+            current_y = scroll_box.scroll_offset.y
+            for h in reversed(hunks):
+                if h < current_y:
+                    scroll_box.scroll_to(y=h, animate=False)
+                    return
+        except Exception:
+            pass
 
     def action_toggle_sidebar(self) -> None:
         width = resolve_width(self)
@@ -461,6 +514,59 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
         is_compact = is_compact_width(resolve_width(self), breakpoint=BREAKPOINT_COMPACT)
         sidebar_active = self.sidebar_visible and not (is_compact and self.compact_view == "diff")
 
+        if not sidebar_active:
+            if event.key in ("s", "S"):
+                self.action_toggle_diff_mode()
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key in ("n", "N"):
+                self.action_next_hunk()
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key in ("p", "P"):
+                self.action_prev_hunk()
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key in ("j", "J"):
+                try:
+                    scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
+                    scroll_box.scroll_down(animate=False)
+                except Exception:
+                    pass
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key in ("k", "K"):
+                try:
+                    scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
+                    scroll_box.scroll_up(animate=False)
+                except Exception:
+                    pass
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key in ("g", "home"):
+                try:
+                    scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
+                    scroll_box.scroll_home(animate=False)
+                except Exception:
+                    pass
+                event.prevent_default()
+                event.stop()
+                return
+            if event.key in ("G", "end"):
+                try:
+                    scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
+                    scroll_box.scroll_end(animate=False)
+                except Exception:
+                    pass
+                event.prevent_default()
+                event.stop()
+                return
+
         if event.key in ("up", "down"):
             if sidebar_active:
                 try:
@@ -487,19 +593,6 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
             event.stop()
             return
 
-        if not sidebar_active and event.key in ("home", "end"):
-            try:
-                scroll_box = self.query_one("#diff-scroll-box", ToolScrollBox)
-                if event.key == "home":
-                    scroll_box.scroll_home(animate=False)
-                else:
-                    scroll_box.scroll_end(animate=False)
-                event.prevent_default()
-                event.stop()
-                return
-            except Exception:
-                pass
-
     def action_close(self) -> None:
         width = resolve_width(self)
         if is_compact_width(width, breakpoint=BREAKPOINT_COMPACT) and self.compact_view == "diff":
@@ -518,3 +611,4 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
                 self.app.exit()
         except Exception:
             pass
+

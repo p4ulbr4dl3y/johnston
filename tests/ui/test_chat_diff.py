@@ -218,7 +218,7 @@ class TestFormatEditDiff(unittest.TestCase):
     def test_get_diff_colors_dark_and_light(self):
         from unittest.mock import MagicMock
 
-        from widgets.presentation.widgets.chat_diff import get_diff_colors
+        from widgets.presentation.widgets.chat_diff import get_diff_colors, get_diff_word_colors
 
         # Dark theme mock
         dark_theme = MagicMock()
@@ -232,6 +232,10 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertEqual(rem_bg, "on #382427")
         self.assertEqual(gutter, "#71717a")
 
+        w_add, w_rem = get_diff_word_colors(dark_theme)
+        self.assertEqual(w_add, "on #1c5230")
+        self.assertEqual(w_rem, "on #5e2129")
+
         # Light theme mock
         light_theme = MagicMock()
         light_theme.dark = False
@@ -243,5 +247,51 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertEqual(l_rem_fg, "#cf222e")
         self.assertEqual(l_rem_bg, "on #ffebe9")
         self.assertEqual(l_gutter, "#8c8fa1")
+
+        lw_add, lw_rem = get_diff_word_colors(light_theme)
+        self.assertEqual(lw_add, "on #acf2bd")
+        self.assertEqual(lw_rem, "on #ffb3ba")
+
+    def test_format_edit_diff_word_level_highlighting(self):
+        diff = (
+            "--- a/test.py\n"
+            "+++ b/test.py\n"
+            "@@ -1,1 +1,1 @@\n"
+            "-if user_count > 10:\n"
+            "+if user_count <= 10:\n"
+        )
+        result = format_edit_diff(diff, "test.py")
+        self.assertIsInstance(result, DiffRenderable)
+        self.assertIn("user_count > 10", result.plain)
+        self.assertIn("user_count <= 10", result.plain)
+        # Check that spans were stylized with word diff backgrounds
+        dl_old = result.formatted_lines[0]
+        self.assertTrue(any("on #5e2129" in s.style for s in dl_old.code._spans))
+        dl_new = result.formatted_lines[1]
+        self.assertTrue(any("on #1c5230" in s.style for s in dl_new.code._spans))
+
+    def test_format_edit_diff_split_mode(self):
+        from rich.console import Console
+
+        diff = (
+            "--- a/test.py\n"
+            "+++ b/test.py\n"
+            "@@ -1,3 +1,3 @@\n"
+            " ctx\n"
+            "-old_value = 1\n"
+            "+new_value = 2\n"
+            " end\n"
+        )
+        result = format_edit_diff(diff, "test.py", view_mode="split")
+        self.assertIsInstance(result, DiffRenderable)
+        self.assertGreater(len(result.hunk_lines), 0)
+
+        console = Console(width=80, record=True, _environ={})
+        console.print(result)
+        exported = console.export_text()
+        self.assertIn("old_value", exported)
+        self.assertIn("new_value", exported)
+        self.assertIn("│", exported)
+
 
 

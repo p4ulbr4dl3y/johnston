@@ -223,6 +223,75 @@ class TestDiffScreen(unittest.TestCase):
         screen._on_key(down_event)
         opt_list.action_cursor_down.assert_called()
 
+    def test_toggle_diff_mode_and_hunk_navigation(self):
+        items = [
+            (
+                "file1.py",
+                "--- a/file1.py\n+++ b/file1.py\n@@ -1,2 +1,2 @@\n-a\n+b\n@@ -10,2 +10,2 @@\n-c\n+d\n",
+                2,
+                2,
+            )
+        ]
+        screen = DiffScreen(items)
+        scroll_box = MagicMock()
+        scroll_box.scroll_offset = MagicMock(y=0)
+        footer = MagicMock()
+        content_view = MagicMock()
+
+        def fake_qo(selector, *args, **kwargs):
+            if "diff-scroll-box" in str(selector):
+                return scroll_box
+            if "diff-footer" in str(selector):
+                return footer
+            if "diff-content-view" in str(selector):
+                return content_view
+            return MagicMock()
+
+        screen.query_one = MagicMock(side_effect=fake_qo)
+        screen._render_current_diff(0)
+
+        # Toggle mode
+        self.assertEqual(screen.diff_mode, "unified")
+        screen.action_toggle_diff_mode()
+        self.assertEqual(screen.diff_mode, "split")
+        screen.action_toggle_diff_mode()
+        self.assertEqual(screen.diff_mode, "unified")
+
+        # Next hunk
+        screen.action_next_hunk()
+        scroll_box.scroll_to.assert_called()
+
+        # Prev hunk
+        scroll_box.scroll_offset.y = 10
+        screen.action_prev_hunk()
+        scroll_box.scroll_to.assert_called()
+
+    def test_vim_key_navigation_when_sidebar_hidden(self):
+        items = [("file1.py", "diff", 1, 0)]
+        screen = DiffScreen(items)
+        screen.sidebar_visible = False
+        scroll_box = MagicMock()
+        screen.query_one = MagicMock(return_value=scroll_box)
+
+        # j / k
+        j_event = MagicMock(key="j")
+        screen._on_key(j_event)
+        scroll_box.scroll_down.assert_called_with(animate=False)
+
+        k_event = MagicMock(key="k")
+        screen._on_key(k_event)
+        scroll_box.scroll_up.assert_called_with(animate=False)
+
+        # g / G
+        g_event = MagicMock(key="g")
+        screen._on_key(g_event)
+        scroll_box.scroll_home.assert_called_with(animate=False)
+
+        cap_g_event = MagicMock(key="G")
+        screen._on_key(cap_g_event)
+        scroll_box.scroll_end.assert_called_with(animate=False)
+
+
 
 
 

@@ -1,3 +1,4 @@
+import difflib
 import re
 from typing import Any
 
@@ -38,11 +39,57 @@ class DiffLine:
         return line
 
 
-class DiffRenderable:
-    """Custom Rich renderable for diff views with full-width background and line wrapping."""
+class SplitDiffLine:
+    """Represents a side-by-side diff row with left and right columns."""
 
-    def __init__(self, formatted_lines: list[Any]):
+    def __init__(
+        self,
+        left_prefix: Text,
+        left_code: Text,
+        left_bg: str | None,
+        right_prefix: Text,
+        right_code: Text,
+        right_bg: str | None,
+        sep: Text | None = None,
+    ):
+        self.left_prefix = left_prefix
+        self.left_code = left_code
+        self.left_bg = left_bg
+        self.right_prefix = right_prefix
+        self.right_code = right_code
+        self.right_bg = right_bg
+        self.sep = sep if sep is not None else Text(" │ ", style="dim #71717a")
+
+    @property
+    def plain(self) -> str:
+        return self.to_text(half_width=40).plain
+
+    def to_text(self, half_width: int = 40) -> Text:
+        left = Text.assemble(self.left_prefix, self.left_code)
+        if left.cell_len < half_width:
+            left.pad_right(half_width - left.cell_len)
+        elif left.cell_len > half_width:
+            left.truncate(half_width)
+        if self.left_bg:
+            left.stylize(self.left_bg)
+
+        right = Text.assemble(self.right_prefix, self.right_code)
+        if right.cell_len < half_width:
+            right.pad_right(half_width - right.cell_len)
+        elif right.cell_len > half_width:
+            right.truncate(half_width)
+        if self.right_bg:
+            right.stylize(self.right_bg)
+
+        return Text.assemble(left, self.sep, right)
+
+
+class DiffRenderable:
+    """Custom Rich renderable for diff views with full-width background, word diff, and split mode."""
+
+    def __init__(self, formatted_lines: list[Any], hunk_lines: list[int] | None = None):
         self.formatted_lines = formatted_lines
+        self.hunk_lines = hunk_lines or []
         plain_texts = [line.to_text() if hasattr(line, "to_text") else line for line in formatted_lines]
         self._text = Text("\n").join(plain_texts)
         self._text.overflow = "fold"
@@ -52,7 +99,30 @@ class DiffRenderable:
         new_opts = options.update(no_wrap=False, overflow="fold")
         target_width = options.max_width
         for line in self.formatted_lines:
-            if hasattr(line, "prefix") and hasattr(line, "code"):
+            if isinstance(line, SplitDiffLine):
+                sep_len = line.sep.cell_len
+                left_w = max(10, (target_width - sep_len) // 2)
+                right_w = max(10, target_width - sep_len - left_w)
+
+                left = Text.assemble(line.left_prefix, line.left_code)
+                if left.cell_len < left_w:
+                    left.pad_right(left_w - left.cell_len)
+                elif left.cell_len > left_w:
+                    left.truncate(left_w)
+                if line.left_bg and left.plain.strip():
+                    left.stylize(line.left_bg)
+
+                right = Text.assemble(line.right_prefix, line.right_code)
+                if right.cell_len < right_w:
+                    right.pad_right(right_w - right.cell_len)
+                elif right.cell_len > right_w:
+                    right.truncate(right_w)
+                if line.right_bg and right.plain.strip():
+                    right.stylize(line.right_bg)
+
+                full_line = Text.assemble(left, line.sep, right)
+                yield from console.render(full_line, new_opts)
+            elif hasattr(line, "prefix") and hasattr(line, "code"):
                 prefix = line.prefix
                 code = line.code
                 style_bg = line.style_bg
@@ -150,7 +220,44 @@ def get_diff_colors(theme: Any = None) -> tuple[str, str, str, str, str]:
     return add_fg, add_bg, remove_fg, remove_bg, gutter
 
 
-def format_edit_diff(diff_text: str, file_path: str) -> Any:
+def get_diff_word_colors(theme: Any = None) -> tuple[str, str]:
+    """Return (add_word_bg, remove_word_bg) for intra-line word diffs."""
+    if theme is None:
+        try:
+            from widgets.app.theme_manager import theme_manager
+
+            theme = theme_manager.current_theme
+        except Exception:
+            theme = None
+
+    is_dark = getattr(theme, "dark", True) if theme else True
+    if is_dark:
+        return "on #1c5230", "on #5e2129"
+    return "on #acf2bd", "on #ffb3ba"
+
+
+def apply_word_diff(
+    old_text: Text,
+    new_text: Text,
+    old_str: str,
+    new_str: str,
+    remove_word_bg: str,
+    add_word_bg: str,
+) -> None:
+    """Apply intra-line difference highlighting using difflib sequence matching."""
+    if not old_str and not new_str:
+        return
+    matcher = difflib.SequenceMatcher(None, old_str, new_str, autojunk=False)
+    if matcher.ratio() < 0.2:
+        return
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag in ("replace", "delete") and i2 > i1:
+            old_text.stylize(f"bold {remove_word_bg}", i1, i2)
+        if tag in ("replace", "insert") and j2 > j1:
+            new_text.stylize(f"bold {add_word_bg}", j1, j2)
+
+
+def format_edit_diff(diff_text: str, file_path: str, view_mode: str = "unified") -> Any:
     diff_text = re.sub(
         r"^(?:Success|OK):\s*file\s+'[^']+'\s*(?:updated|created|saved)[^\n]*\n?", "", diff_text, flags=re.MULTILINE
     ).strip()
@@ -162,10 +269,8 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
         lexer = None
 
     lines = diff_text.splitlines()
-    formatted_lines = []
-
-    old_code_lines = []
-    new_code_lines = []
+    old_code_lines: list[str] = []
+    new_code_lines: list[str] = []
     in_hunk = False
     max_num = 1
     current_old = 0
@@ -249,43 +354,122 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
     old_texts = lex_block_to_line_texts(old_code_lines, lexer)
     new_texts = lex_block_to_line_texts(new_code_lines, lexer)
 
-    formatted_lines = []
-    old_line = 0
-    new_line = 0
-    old_idx = 0
-    new_idx = 0
-
     diff_add_fg, diff_add_bg, diff_remove_fg, diff_remove_bg, diff_gutter = get_diff_colors()
+    diff_add_word_bg, diff_remove_word_bg = get_diff_word_colors()
 
-    def append_diff_line(
-        num_str: str,
-        symbol: str,
-        code_text: Text,
-        style_bg: str | None = None,
-        style_fg: str | None = None,
-    ) -> None:
+    formatted_lines: list[Any] = []
+    hunk_lines: list[int] = []
+
+    def make_prefix(num_val: int | None, symbol: str, is_removed: bool | None) -> Text:
         prefix = Text()
-        if style_fg:
-            prefix.append(f"{num_str} ", style=style_fg)
-            prefix.append(f"{symbol} ", style=f"bold {style_fg}")
+        if num_val is None:
+            prefix.append(" " * max_num_digits, style=diff_gutter)
+            prefix.append("   ")
+            return prefix
+        num_str = str(num_val).rjust(max_num_digits)
+        if is_removed is True:
+            prefix.append(f"{num_str} ", style=diff_remove_fg)
+            prefix.append(f"{symbol} ", style=f"bold {diff_remove_fg}")
+        elif is_removed is False:
+            prefix.append(f"{num_str} ", style=diff_add_fg)
+            prefix.append(f"{symbol} ", style=f"bold {diff_add_fg}")
         else:
             prefix.append(f"{num_str} ", style=diff_gutter)
             prefix.append("  ")
-        formatted_lines.append(DiffLine(prefix, code_text, style_bg=style_bg))
+        return prefix
 
+    # Pre-parse hunks to allow pair word diffing
+    old_cursor = 0
+    new_cursor = 0
     in_hunk = False
     hunk_count = 0
+
+    pending_old: list[tuple[int, int, str]] = []  # (old_line_num, old_idx, content)
+    pending_new: list[tuple[int, int, str]] = []  # (new_line_num, new_idx, content)
+
+    def flush_pending() -> None:
+        nonlocal pending_old, pending_new
+        if not pending_old and not pending_new:
+            return
+
+        # Perform intra-line word diff on paired lines
+        pair_count = min(len(pending_old), len(pending_new))
+        for i in range(pair_count):
+            _, o_idx, o_str = pending_old[i]
+            _, n_idx, n_str = pending_new[i]
+            if o_idx < len(old_texts) and n_idx < len(new_texts):
+                apply_word_diff(
+                    old_texts[o_idx],
+                    new_texts[n_idx],
+                    o_str,
+                    n_str,
+                    diff_remove_word_bg,
+                    diff_add_word_bg,
+                )
+
+        if view_mode == "split":
+            max_len = max(len(pending_old), len(pending_new))
+            for i in range(max_len):
+                if i < len(pending_old):
+                    o_num, o_idx, _ = pending_old[i]
+                    l_pfx = make_prefix(o_num, "-", is_removed=True)
+                    l_code = old_texts[o_idx] if o_idx < len(old_texts) else Text("")
+                    l_bg = diff_remove_bg
+                else:
+                    l_pfx = make_prefix(None, " ", None)
+                    l_code = Text("")
+                    l_bg = None
+
+                if i < len(pending_new):
+                    n_num, n_idx, _ = pending_new[i]
+                    r_pfx = make_prefix(n_num, "+", is_removed=False)
+                    r_code = new_texts[n_idx] if n_idx < len(new_texts) else Text("")
+                    r_bg = diff_add_bg
+                else:
+                    r_pfx = make_prefix(None, " ", None)
+                    r_code = Text("")
+                    r_bg = None
+
+                formatted_lines.append(SplitDiffLine(l_pfx, l_code, l_bg, r_pfx, r_code, r_bg))
+        else:
+            for o_num, o_idx, _ in pending_old:
+                pfx = make_prefix(o_num, "-", is_removed=True)
+                code = old_texts[o_idx] if o_idx < len(old_texts) else Text("")
+                formatted_lines.append(DiffLine(pfx, code, style_bg=diff_remove_bg))
+            for n_num, n_idx, _ in pending_new:
+                pfx = make_prefix(n_num, "+", is_removed=False)
+                code = new_texts[n_idx] if n_idx < len(new_texts) else Text("")
+                formatted_lines.append(DiffLine(pfx, code, style_bg=diff_add_bg))
+
+        pending_old = []
+        pending_new = []
+
     for line in lines:
         if line.startswith(GIT_HEADER_PREFIXES):
             continue
 
         hunk_match = HUNK_HEADER_RE.match(line)
         if hunk_match:
+            flush_pending()
             old_line = int(hunk_match.group(1))
             new_line = int(hunk_match.group(3))
             if hunk_count > 0 and formatted_lines:
                 sep_prefix = Text(f"{'···'.rjust(max_num_digits)}   ", style=f"dim {diff_gutter}")
-                formatted_lines.append(DiffLine(sep_prefix, Text(""), style_bg=None))
+                if view_mode == "split":
+                    formatted_lines.append(
+                        SplitDiffLine(
+                            sep_prefix,
+                            Text(""),
+                            None,
+                            sep_prefix,
+                            Text(""),
+                            None,
+                            sep=Text(" │ ", style=f"dim {diff_gutter}"),
+                        )
+                    )
+                else:
+                    formatted_lines.append(DiffLine(sep_prefix, Text(""), style_bg=None))
+            hunk_lines.append(len(formatted_lines))
             hunk_count += 1
             in_hunk = True
             continue
@@ -298,27 +482,33 @@ def format_edit_diff(diff_text: str, file_path: str) -> Any:
             continue
 
         if line.startswith("-"):
-            num_str = str(old_line).rjust(max_num_digits)
-            code_text = old_texts[old_idx] if old_idx < len(old_texts) else Text(line[1:].expandtabs(4))
-            old_idx += 1
-            append_diff_line(num_str, "-", code_text, style_bg=diff_remove_bg, style_fg=diff_remove_fg)
+            content = line[1:].expandtabs(4)
+            pending_old.append((old_line, old_cursor, content))
+            old_cursor += 1
             old_line += 1
         elif line.startswith("+"):
-            num_str = str(new_line).rjust(max_num_digits)
-            code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(line[1:].expandtabs(4))
-            new_idx += 1
-            append_diff_line(num_str, "+", code_text, style_bg=diff_add_bg, style_fg=diff_add_fg)
+            content = line[1:].expandtabs(4)
+            pending_new.append((new_line, new_cursor, content))
+            new_cursor += 1
             new_line += 1
         elif line.startswith("\\"):
             continue
         else:
-            num_str = str(new_line).rjust(max_num_digits)
-            content = line[1:] if line.startswith(" ") else line
-            code_text = new_texts[new_idx] if new_idx < len(new_texts) else Text(content.expandtabs(4))
-            old_idx += 1
-            new_idx += 1
-            append_diff_line(num_str, " ", code_text, style_bg=None, style_fg=None)
+            flush_pending()
+            content = line[1:].expandtabs(4) if line.startswith(" ") else line.expandtabs(4)
+            c_code = new_texts[new_cursor] if new_cursor < len(new_texts) else Text(content)
+            if view_mode == "split":
+                l_pfx = make_prefix(old_line, " ", None)
+                r_pfx = make_prefix(new_line, " ", None)
+                formatted_lines.append(SplitDiffLine(l_pfx, c_code.copy(), None, r_pfx, c_code.copy(), None))
+            else:
+                pfx = make_prefix(new_line, " ", None)
+                formatted_lines.append(DiffLine(pfx, c_code, style_bg=None))
+            old_cursor += 1
+            new_cursor += 1
             old_line += 1
             new_line += 1
 
-    return DiffRenderable(formatted_lines)
+    flush_pending()
+    return DiffRenderable(formatted_lines, hunk_lines=hunk_lines)
+
