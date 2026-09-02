@@ -60,7 +60,7 @@ class TestEstimateTokensCache(unittest.TestCase):
         self.assertEqual(1, len(token_util._estimate_cache))
 
     def test_cache_stays_bounded(self):
-        token_util._ESTIMATE_CACHE_MAXSIZE = 5
+        token_util._estimate_cache.maxsize = 5
         for i in range(100):
             estimate_tokens([{"role": "user", "content": f"unique message number {i}"}])
         self.assertLessEqual(len(token_util._estimate_cache), 5)

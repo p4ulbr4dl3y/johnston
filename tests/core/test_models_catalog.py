@@ -955,11 +955,10 @@ def test_models_catalog_internal_caches_and_invalidation():
 
 
 def test_models_catalog_set_match_lru_bounding():
-    from collections import OrderedDict
-
+    from core.infrastructure.runtime.lru import LruCache
     from core.models_catalog import _MATCH_CACHE_MAX, _set_match
 
-    cache = OrderedDict()
+    cache = LruCache(_MATCH_CACHE_MAX)
     for i in range(_MATCH_CACHE_MAX + 50):
         _set_match(cache, f"key_{i}", f"val_{i}")
 

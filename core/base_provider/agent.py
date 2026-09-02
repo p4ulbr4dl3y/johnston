@@ -5,7 +5,6 @@ import logging
 import os
 import random
 import time
-from collections import OrderedDict
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from core.base_provider.compaction import CompactionMixin, should_compact
@@ -20,6 +19,7 @@ from core.infrastructure.adapters.base import (
     new_tool_call_id,
     parse_tool_call_args,
 )
+from core.infrastructure.runtime.lru import LruCache
 from core.infrastructure.runtime.thinking_effort import normalize_thinking_effort
 from core.infrastructure.runtime.token_util import estimate_tokens
 from core.models_catalog import catalog
@@ -74,21 +74,16 @@ def serialize_messages_key(msgs: List[Dict[str, Any]]) -> bytes:
 # input). Multi-tool turns call sanitize once per step with only a couple of
 # messages appended per step, so the cached tail is reused and the O(history)
 # pass runs once per turn instead of once per tool_result.
-_SANITIZE_CACHE: "OrderedDict[bytes, List[Dict[str, Any]]]" = OrderedDict()
 _SANITIZE_CACHE_MAX = 64
+_SANITIZE_CACHE: "LruCache[bytes, List[Dict[str, Any]]]" = LruCache(_SANITIZE_CACHE_MAX)
 
 
 def _cache_sanitize_get(encoded_history: bytes) -> Optional[List[Dict[str, Any]]]:
-    val = _SANITIZE_CACHE.get(encoded_history)
-    if val is not None:
-        _SANITIZE_CACHE.move_to_end(encoded_history)
-    return val
+    return _SANITIZE_CACHE.get(encoded_history)
 
 
 def _cache_sanitize_put(encoded_history: bytes, sanitized: List[Dict[str, Any]]) -> None:
-    _SANITIZE_CACHE[encoded_history] = sanitized
-    while len(_SANITIZE_CACHE) > _SANITIZE_CACHE_MAX:
-        _SANITIZE_CACHE.popitem(last=False)
+    _SANITIZE_CACHE.put(encoded_history, sanitized)
 
 
 async def sanitize_history_cached(agent: Any, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

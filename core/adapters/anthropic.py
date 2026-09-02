@@ -1,5 +1,4 @@
 import json
-from collections import OrderedDict
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
@@ -15,6 +14,7 @@ from core.infrastructure.adapters.base import (
     resolve_stream_timeout,
     sort_keys_recursive,
 )
+from core.infrastructure.runtime.lru import LruCache
 from core.infrastructure.runtime.thinking_effort import build_anthropic_thinking_payload
 
 # Bounded LRU cache for deterministic tool-schema sorting. `sort_keys_recursive`
@@ -22,20 +22,17 @@ from core.infrastructure.runtime.thinking_effort import build_anthropic_thinking
 # are stable across requests, so cache the sorted result keyed by a cheap repr
 # fingerprint of the freshly converted tools (re-computed only when schemas change).
 _SORT_CACHE_MAX = 64
-_sort_cache: "OrderedDict" = OrderedDict()
+_sort_cache: "LruCache[str, List[Dict[str, Any]]]" = LruCache(_SORT_CACHE_MAX)
 
 
 def _get_sorted_tools(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Return the deep-sorted copy of a tool list, caching by content fingerprint."""
     key = repr(tools)
-    cached = _sort_cache.pop(key, None)
+    cached = _sort_cache.get(key)
     if cached is not None:
-        _sort_cache[key] = cached  # LRU promote
         return cached
     sorted_tools = sort_keys_recursive(tools)
-    _sort_cache[key] = sorted_tools
-    if len(_sort_cache) > _SORT_CACHE_MAX:
-        _sort_cache.popitem(last=False)
+    _sort_cache.put(key, sorted_tools)
     return sorted_tools
 
 

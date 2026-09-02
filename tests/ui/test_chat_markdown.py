@@ -389,12 +389,12 @@ class TestFenceHighlightCache(unittest.TestCase):
         from widgets.presentation.widgets.chat_markdown import _highlight_cache, prewarm_fences_from_markdown
 
         self.assertEqual(prewarm_fences_from_markdown("no fences here", dark=True), 0)
-        self.assertEqual(_highlight_cache, {})
+        self.assertEqual(len(_highlight_cache), 0)
         # Unclosed fence at EOF is not pre-warmed.
         self.assertEqual(prewarm_fences_from_markdown("```python\ncode without closer\n", dark=True), 0)
         # An immediately-closed empty fence is not pre-warmed.
         self.assertEqual(prewarm_fences_from_markdown("```\n```\n", dark=True), 0)
-        self.assertEqual(_highlight_cache, {})
+        self.assertEqual(len(_highlight_cache), 0)
 
     def test_prewarm_matches_indented_fence_like_clean_markdown(self):
         from widgets.presentation.widgets.chat_markdown import prewarm_fences_from_markdown

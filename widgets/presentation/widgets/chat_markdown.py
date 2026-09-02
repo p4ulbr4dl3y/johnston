@@ -1,8 +1,6 @@
 import asyncio
 import inspect
 import re
-import threading
-from collections import OrderedDict
 from typing import Any
 
 from markdown_it import MarkdownIt
@@ -28,6 +26,7 @@ from textual.widgets._markdown import (
 )
 
 from core.domain.defaults.themes import ZINC_DARK
+from core.infrastructure.runtime.lru import LruCache
 
 
 class TransparentSyntax(Syntax):
@@ -61,11 +60,10 @@ def get_current_syntax_theme(dark: bool = True) -> PygmentsSyntaxTheme | str:
 # Content lets compose() mount instantly; the cache also survives stream →
 # final re-renders of the same code. Keyed by the code string, lexer name,
 # syntax-theme object (identity) and dark flag, so entries can never outlive
-# the theme they were rendered for. LRU-bounded + lock-guarded (pre-warm runs
+# the theme they were rendered for. LRU-bounded and thread-safe (pre-warm runs
 # in worker threads while compose() may read from the UI thread).
 _HIGHLIGHT_CACHE_MAX = 256
-_highlight_cache: "OrderedDict[tuple, Content]" = OrderedDict()
-_highlight_cache_lock = threading.Lock()
+_highlight_cache: "LruCache[tuple, Content]" = LruCache(_HIGHLIGHT_CACHE_MAX)
 
 # Shared truecolor console for syntax rendering: creating a fresh Console per
 # highlight call is measurable overhead when a message mounts many fences.
@@ -250,11 +248,9 @@ class CustomMarkdownFence(MarkdownFence):
 
         syntax_theme = _CURRENT_SYNTAX_THEME or (CODE_THEME if dark else "github-light")
         key = (clean_code, target_lexer, syntax_theme, dark)
-        with _highlight_cache_lock:
-            cached = _highlight_cache.get(key)
-            if cached is not None:
-                _highlight_cache.move_to_end(key)
-                return cached
+        cached = _highlight_cache.get(key)
+        if cached is not None:
+            return cached
 
         try:
             syntax = Syntax(clean_code, target_lexer, theme=syntax_theme, word_wrap=True)
@@ -270,10 +266,7 @@ class CustomMarkdownFence(MarkdownFence):
         except Exception:
             content = MarkdownFence.highlight(clean_code, language=target_lexer, ansi=ansi, dark=dark)
 
-        with _highlight_cache_lock:
-            _highlight_cache[key] = content
-            while len(_highlight_cache) > _HIGHLIGHT_CACHE_MAX:
-                _highlight_cache.popitem(last=False)
+        _highlight_cache.put(key, content)
         return content
 
     def compose(self) -> ComposeResult:

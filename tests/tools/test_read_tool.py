@@ -37,14 +37,14 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         fake_path = "/tmp/fake.pdf"
         now = time.monotonic()
         with patch("os.path.getmtime", return_value=12345.0):
-            _DOC_CACHE[fake_path] = (12345.0, now, "valid cached content")
+            _DOC_CACHE.put(fake_path, (12345.0, now, "valid cached content"))
             res = get_cached_doc_markdown(fake_path)
             self.assertEqual(res, "valid cached content")
 
     def test_get_cached_doc_markdown_expired(self):
         fake_path = "/tmp/fake.pdf"
         with patch("os.path.getmtime", return_value=12345.0):
-            _DOC_CACHE[fake_path] = (12345.0, time.monotonic() - 1000.0, "old content")
+            _DOC_CACHE.put(fake_path, (12345.0, time.monotonic() - 1000.0, "old content"))
             res = get_cached_doc_markdown(fake_path)
             self.assertIsNone(res)
             self.assertNotIn(fake_path, _DOC_CACHE)
@@ -59,7 +59,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with patch("os.path.getmtime", return_value=100.0):
             for i in range(MAX_DOC_CACHE):
                 p = f"/tmp/doc_{i}.pdf"
-                _DOC_CACHE[p] = (100.0, time.monotonic() - (100 - i), f"content {i}")
+                _DOC_CACHE.put(p, (100.0, time.monotonic() - (100 - i), f"content {i}"))
 
             oldest_path = "/tmp/doc_0.pdf"
             self.assertIn(oldest_path, _DOC_CACHE)
@@ -97,7 +97,8 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
 
     def test_empty_conversion_result_not_cached(self):
         fake_path = "/tmp/empty_not_cached.pdf"
-        _DOC_CACHE.pop(fake_path, None)
+        if fake_path in _DOC_CACHE:
+            del _DOC_CACHE[fake_path]
         try:
             with (
                 patch("tools.read.get_cached_doc_markdown", return_value=None),
@@ -107,7 +108,8 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(res, "")
                 self.assertNotIn(fake_path, _DOC_CACHE)
         finally:
-            _DOC_CACHE.pop(fake_path, None)
+            if fake_path in _DOC_CACHE:
+                del _DOC_CACHE[fake_path]
 
     def test_convert_doc_to_markdown_sync_cooperative_cancel(self):
         import threading

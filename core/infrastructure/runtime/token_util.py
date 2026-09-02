@@ -3,8 +3,9 @@ Token estimation and usage calculation utilities
 """
 
 import json
-from collections import OrderedDict
 from typing import Any, Dict
+
+from core.infrastructure.runtime.lru import LruCache
 
 # ~4 chars/token BPE density for ASCII text.
 _CHARS_PER_TOKEN = 4
@@ -74,15 +75,13 @@ def _estimate_text_tokens(text: str) -> int:
 # history on each call is pure waste. The key is a cheap (<len,  type-id, content>
 # derived) signature and the memoized value is the already-computed token int, so
 # the cache never holds the (potentially large) input object itself in memory.
-# OrderedDict + maxsize evicts the least-recently-used entry, keeping the cache
-# bounded. Entries where two distinct objects have identical serialized content are
-# safe to alias because token estimation is a pure, deterministic function of the
-# serialized text.
+# A shared bounded LRU cache evicts the least-recently-used entry. Entries where
+# two distinct objects have identical serialized content are safe to alias because
+# token estimation is a pure, deterministic function of the serialized text.
 _CACHE_STR_KEY_MAX = 20000
 _ESTIMATE_CACHE_MAXSIZE = 256
-_estimate_cache: "OrderedDict[tuple, int]" = OrderedDict()
-_msg_tokens_cache: "OrderedDict[tuple, int]" = OrderedDict()
-_MSG_CACHE_MAXSIZE = 1024
+_estimate_cache: "LruCache[tuple, int]" = LruCache(_ESTIMATE_CACHE_MAXSIZE)
+_msg_tokens_cache: "LruCache[tuple, int]" = LruCache(1024)
 
 
 def _estimate_message_tokens(msg: Any) -> int:
@@ -101,7 +100,6 @@ def _estimate_message_tokens(msg: Any) -> int:
     if key[0] != "big":
         cached = _msg_tokens_cache.get(key)
         if cached is not None:
-            _msg_tokens_cache.move_to_end(key)
             return cached
     try:
         text = json.dumps(msg, ensure_ascii=False)
@@ -109,9 +107,7 @@ def _estimate_message_tokens(msg: Any) -> int:
         text = str(msg)
     val = _estimate_text_tokens(text)
     if key[0] != "big":
-        _msg_tokens_cache[key] = val
-        while len(_msg_tokens_cache) > _MSG_CACHE_MAXSIZE:
-            _msg_tokens_cache.popitem(last=False)
+        _msg_tokens_cache.put(key, val)
     return val
 
 
@@ -192,10 +188,9 @@ def estimate_tokens(input_val: Any) -> int:
             key = _estimate_cache_key(input_val)
             cached = _estimate_cache.get(key)
             if cached is not None:
-                _estimate_cache.move_to_end(key)
                 return cached
             val = _estimate_text_tokens(input_val)
-            _estimate_cache[key] = val
+            _estimate_cache.put(key, val)
         else:
             val = _estimate_text_tokens(input_val)
         return val
@@ -206,7 +201,6 @@ def estimate_tokens(input_val: Any) -> int:
     key = _estimate_cache_key(input_val)
     cached = _estimate_cache.get(key)
     if cached is not None:
-        _estimate_cache.move_to_end(key)
         return cached
 
     if isinstance(input_val, (list, tuple)):
@@ -218,14 +212,8 @@ def estimate_tokens(input_val: Any) -> int:
             text = str(input_val)
         val = _estimate_text_tokens(text)
     if key[0] != "big":
-        _estimate_cache[key] = val
-    _trim_cache()
+        _estimate_cache.put(key, val)
     return val
-
-
-def _trim_cache() -> None:
-    while len(_estimate_cache) > _ESTIMATE_CACHE_MAXSIZE:
-        _estimate_cache.popitem(last=False)
 
 
 def parse_usage(usage: Any) -> Dict[str, Any]:

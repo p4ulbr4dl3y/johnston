@@ -2,25 +2,24 @@ import logging
 import os
 import threading
 import time
-from collections import OrderedDict
 from typing import Any, Dict, Tuple
 
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.converter import DOC_EXTENSIONS
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
+from core.infrastructure.runtime.lru import LruCache
 from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
 from tools.cancel import run_cancellable
 from tools.utils import DEFAULT_LINE_WINDOW, get_max_tool_payload_bytes
 
 logger = logging.getLogger(__name__)
 
-_DOC_CACHE: "OrderedDict[str, Tuple[float, float, str]]" = OrderedDict()  # key: path, val: (mtime, timestamp, md_text)
 MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes
-
-_LINE_COUNT_CACHE: "OrderedDict[Tuple[str, float, int], int]" = OrderedDict()
 MAX_LINE_COUNT_CACHE = 500
-_CACHE_LOCK = threading.Lock()
+
+_DOC_CACHE: "LruCache[str, Tuple[float, float, str]]" = LruCache(MAX_DOC_CACHE)  # key: path, val: (mtime, timestamp, md_text)
+_LINE_COUNT_CACHE: "LruCache[Tuple[str, float, int], int]" = LruCache(MAX_LINE_COUNT_CACHE)
 
 
 def _tools_settings():
@@ -35,10 +34,9 @@ def _tools_settings():
 
 def _get_file_line_count(file_path: str, mtime: float, size: int) -> int:
     key = (file_path, mtime, size)
-    with _CACHE_LOCK:
-        if key in _LINE_COUNT_CACHE:
-            _LINE_COUNT_CACHE.move_to_end(key)
-            return _LINE_COUNT_CACHE[key]
+    cached = _LINE_COUNT_CACHE.get(key)
+    if cached is not None:
+        return cached
 
     total = 0
     last_byte = b""
@@ -54,11 +52,8 @@ def _get_file_line_count(file_path: str, mtime: float, size: int) -> int:
 
     tools = _tools_settings()
     line_cap = tools.line_count_cache_max if tools else MAX_LINE_COUNT_CACHE
-    with _CACHE_LOCK:
-        _LINE_COUNT_CACHE[key] = total
-        _LINE_COUNT_CACHE.move_to_end(key)
-        while len(_LINE_COUNT_CACHE) > line_cap:
-            _LINE_COUNT_CACHE.popitem(last=False)
+    _LINE_COUNT_CACHE.maxsize = line_cap
+    _LINE_COUNT_CACHE.put(key, total)
     return total
 
 
@@ -70,13 +65,12 @@ def get_cached_doc_markdown(path: str) -> str | None:
 
     tools = _tools_settings()
     doc_ttl = tools.doc_cache_ttl if tools else DOC_CACHE_TTL
-    with _CACHE_LOCK:
-        if path in _DOC_CACHE:
-            cached_mtime, cached_ts, text = _DOC_CACHE[path]
-            if cached_mtime == mtime and (time.monotonic() - cached_ts < doc_ttl):
-                _DOC_CACHE.move_to_end(path)
-                return text
-            del _DOC_CACHE[path]
+    cached = _DOC_CACHE.get(path)
+    if cached is not None:
+        cached_mtime, cached_ts, text = cached
+        if cached_mtime == mtime and (time.monotonic() - cached_ts < doc_ttl):
+            return text
+        del _DOC_CACHE[path]
     return None
 
 
@@ -88,11 +82,8 @@ def set_cached_doc_markdown(path: str, text: str) -> None:
 
     tools = _tools_settings()
     doc_cap = tools.max_doc_cache if tools else MAX_DOC_CACHE
-    with _CACHE_LOCK:
-        _DOC_CACHE[path] = (mtime, time.monotonic(), text)
-        _DOC_CACHE.move_to_end(path)
-        while len(_DOC_CACHE) > doc_cap:
-            _DOC_CACHE.popitem(last=False)
+    _DOC_CACHE.maxsize = doc_cap
+    _DOC_CACHE.put(path, (mtime, time.monotonic(), text))
 
 
 

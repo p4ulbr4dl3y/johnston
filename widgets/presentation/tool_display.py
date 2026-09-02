@@ -7,9 +7,9 @@ presentation area consumed by core widgets and UI tests.
 """
 import json
 import re
-from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
+from core.infrastructure.runtime.lru import LruCache
 from widgets.utils.row_format import format_duration
 
 # Textual markup-aware escaping: literal [ and ] would otherwise be swallowed as
@@ -21,8 +21,8 @@ _ESCAPE_RE = re.compile(r"([\[\]\\])")
 # with repeated argument signatures hit the cache instead of re-running the
 # label logic. Keys are limited to a small canonical representation so two
 # distinct arg dicts can't alias an entry.
-_DISPLAY_CACHE: "OrderedDict[tuple, str]" = OrderedDict()
 _DISPLAY_CACHE_MAX = 128
+_DISPLAY_CACHE: "LruCache[tuple, str]" = LruCache(_DISPLAY_CACHE_MAX)
 
 
 def escape_markup(target: str) -> str:
@@ -113,15 +113,11 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
     key = _display_cache_key(tool_name, args)
     hit = _DISPLAY_CACHE.get(key)
     if hit is not None:
-        _DISPLAY_CACHE.move_to_end(key)
         return hit
 
-    # Ensure OrderedDict imported for the cache annotation (no runtime dep).
     result = _extract_tool_display_inner(tool_name, args)
 
-    _DISPLAY_CACHE[key] = result
-    while len(_DISPLAY_CACHE) > _DISPLAY_CACHE_MAX:
-        _DISPLAY_CACHE.popitem(last=False)
+    _DISPLAY_CACHE.put(key, result)
     return result
 
 

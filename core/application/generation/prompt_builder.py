@@ -3,7 +3,6 @@ import datetime
 import os
 import platform
 import time
-from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.application.skills.manager import get_skill_manager
@@ -13,6 +12,7 @@ from core.domain.defaults.prompts import (
     SUBAGENT_DEFAULT_SYSTEM_PROMPT,
     SUBAGENT_WORKTREE_PROMPT,
 )
+from core.infrastructure.runtime.lru import LruCache
 
 INSTRUCTION_FILES = [
     "AGENTS.md",
@@ -42,12 +42,12 @@ _TOOLS_CACHE_MAX = 32
 
 # (realpath cwd) -> (mtime/size signature, rules). Invalidates when any
 # instruction file appears/disappears or its mtime changes.
-_PROJECT_INSTRUCTION_CACHE: "OrderedDict[str, Tuple[tuple, List[Any]]]" = OrderedDict()
+_PROJECT_INSTRUCTION_CACHE: "LruCache[str, Tuple[tuple, List[Any]]]" = LruCache(_PROJECT_INSTR_CACHE_MAX)
 
 # Semantic cache for the stable (non-volatile) prefix of the system prompt.
 # Keyed by the assembled stable parts so it only rebuilds when roles / rules /
 # skills / instructions / mcp tool map actually change.
-_STABLE_CORE_CACHE: "OrderedDict[tuple, str]" = OrderedDict()
+_STABLE_CORE_CACHE: "LruCache[tuple, str]" = LruCache(_STABLE_CORE_CACHE_MAX)
 
 # Reused SkillManager instances live in the manager module registry
 # (get_skill_manager), keyed by project dir, so the agent loop does not
@@ -55,14 +55,7 @@ _STABLE_CORE_CACHE: "OrderedDict[tuple, str]" = OrderedDict()
 
 # Pre-sorted tool schema cache keyed by a content identity (tool object ids +
 # role flags). build_tools deepcopy+sorts only on cache miss.
-_TOOLS_CACHE: "OrderedDict[tuple, List[Dict[str, Any]]]" = OrderedDict()
-
-
-def _cache_set(cache, key, value, max_size: int) -> None:
-    cache[key] = value
-    cache.move_to_end(key)
-    while len(cache) > max_size:
-        cache.popitem(last=False)
+_TOOLS_CACHE: "LruCache[tuple, List[Dict[str, Any]]]" = LruCache(_TOOLS_CACHE_MAX)
 
 
 def _cached_git_info(cwd: Optional[str] = None) -> Optional[str]:
@@ -217,7 +210,7 @@ def get_project_instruction_rules(cwd: str = None) -> List[Any]:
         except Exception:
             pass
 
-    _cache_set(_PROJECT_INSTRUCTION_CACHE, cwd, (sig, found_rules), _PROJECT_INSTR_CACHE_MAX)
+    _PROJECT_INSTRUCTION_CACHE.put(cwd, (sig, found_rules))
     return found_rules
 
 
@@ -455,7 +448,7 @@ class PromptBuilder:
         if mcp_snippet:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
 
-        _cache_set(_STABLE_CORE_CACHE, key, sys_prompt, _STABLE_CORE_CACHE_MAX)
+        _STABLE_CORE_CACHE.put(key, sys_prompt)
         return sys_prompt
 
     async def _build_stable_core_async(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
@@ -534,5 +527,5 @@ class PromptBuilder:
 
         sorted_tools = [_sort_tool_schema(t) for t in allowed_tools]
         sorted_tools.sort(key=lambda t: (t.get("function", {}) or {}).get("name", ""))
-        _cache_set(_TOOLS_CACHE, key, sorted_tools, _TOOLS_CACHE_MAX)
+        _TOOLS_CACHE.put(key, sorted_tools)
         return list(sorted_tools)

@@ -8,7 +8,6 @@ import asyncio
 import logging
 import os
 import time
-from collections import OrderedDict
 from typing import Any, Dict, FrozenSet, Optional, Set
 
 import httpx
@@ -27,6 +26,7 @@ from core.infrastructure.platform.platform_utils import (
     cached_json_read,
     read_json,
 )
+from core.infrastructure.runtime.lru import LruCache
 
 logger = logging.getLogger(__name__)
 
@@ -69,19 +69,13 @@ _IGNORED_TOKENS: FrozenSet[str] = frozenset({
 })
 
 
-def _get_match(cache: "OrderedDict", key: tuple):
+def _get_match(cache: "LruCache", key: tuple):
     """Fetch a (key)->value match from an LRU cache without storing misses."""
-    if key in cache:
-        cache.move_to_end(key)
-        return cache[key]
-    return None
+    return cache.get(key)
 
 
-def _set_match(cache: "OrderedDict", key: tuple, value: str) -> None:
-    cache[key] = value
-    cache.move_to_end(key)
-    while len(cache) > _MATCH_CACHE_MAX:
-        cache.popitem(last=False)
+def _set_match(cache: "LruCache", key: tuple, value: str) -> None:
+    cache.put(key, value)
 
 
 class ModelsCatalog:
@@ -91,9 +85,9 @@ class ModelsCatalog:
         self._pricing: Dict[str, Dict[str, float]] = {}
         self._modalities: Dict[str, list[str]] = {}
         self._providers: Dict[str, Dict[str, Any]] = {}
-        self._match_cache: "OrderedDict" = OrderedDict()
-        self._display_name_cache: "OrderedDict" = OrderedDict()
-        self._vision_cache: "OrderedDict" = OrderedDict()
+        self._match_cache: "LruCache" = LruCache(_MATCH_CACHE_MAX)
+        self._display_name_cache: "LruCache" = LruCache(_MATCH_CACHE_MAX)
+        self._vision_cache: "LruCache" = LruCache(_MATCH_CACHE_MAX)
         self._updated_at: float = 0.0
         self._client: Optional[httpx.AsyncClient] = None
 

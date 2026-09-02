@@ -329,7 +329,8 @@ def test_project_snippet_cached_until_mtime_change(tmp_path):
 
     (tmp_path / "AGENTS.md").write_text("v1")
     key = os.path.realpath(str(tmp_path))
-    pb._PROJECT_INSTRUCTION_CACHE.pop(key, None)
+    if key in pb._PROJECT_INSTRUCTION_CACHE:
+        del pb._PROJECT_INSTRUCTION_CACHE[key]
 
     out1 = pb.get_project_instructions_snippet(str(tmp_path))
     out2 = pb.get_project_instructions_snippet(str(tmp_path))
@@ -348,6 +349,7 @@ def test_project_instruction_cache_eviction(tmp_path, monkeypatch):
     import core.application.generation.prompt_builder as pb
 
     monkeypatch.setattr(pb, "_PROJECT_INSTR_CACHE_MAX", 2)
+    pb._PROJECT_INSTRUCTION_CACHE.maxsize = 2
     pb._PROJECT_INSTRUCTION_CACHE.clear()
 
     d1 = tmp_path / "d1"
