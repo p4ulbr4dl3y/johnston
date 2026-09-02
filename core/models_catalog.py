@@ -509,24 +509,6 @@ class ModelsCatalog:
                 _set_match(self._vision_cache, cache_key, res)
                 return res
 
-        # Heuristic fallback for common multimodal model naming conventions
-        m_low = model_id.lower()
-        if any(
-            kw in m_low
-            for kw in (
-                "vision",
-                "-vl",
-                "_vl",
-                "omni",
-                "4o",
-                "gemini",
-                "claude-3",
-                "claude-opus",
-                "claude-sonnet",
-            )
-        ):
-            _set_match(self._vision_cache, cache_key, True)
-            return True
         _set_match(self._vision_cache, cache_key, False)
         return False
 

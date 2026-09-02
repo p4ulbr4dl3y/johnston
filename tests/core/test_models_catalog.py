@@ -879,15 +879,11 @@ def test_has_vision_and_modalities_catalog():
     assert cat.get_model_modalities("openai", "gpt-3.5-turbo") == ["text"]
 
 
-def test_has_vision_heuristic_fallback():
+def test_has_vision_unlisted_is_false():
     cat = ModelsCatalog()
-    # Unlisted in catalog, fallback by name
+    # Unlisted in catalog returns False (no heuristic guess)
     assert cat.has_vision("custom", "llava-v1.6-7b") is False
-    assert cat.has_vision("custom", "qwen2-vl-7b-instruct") is True
-    assert cat.has_vision("custom", "claude-3-5-sonnet-20241022") is True
-    assert cat.has_vision("custom", "gemini-2.0-flash") is True
-    assert cat.has_vision("custom", "gpt-4o-mini") is True
-    assert cat.has_vision("custom", "deepseek-coder-v2") is False
+    assert cat.has_vision("custom", "unknown-model") is False
     assert cat.has_vision("custom", "") is False
 
 
