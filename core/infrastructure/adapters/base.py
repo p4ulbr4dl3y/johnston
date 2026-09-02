@@ -7,6 +7,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
+from core.domain.defaults.config import DEFAULT_MAX_TOKENS
+
 
 class BaseApiAdapter:
     """Base API Adapter interface for LLM formats.
@@ -97,6 +99,48 @@ class BaseApiAdapter:
         **kwargs: Any,
     ) -> AsyncGenerator[Tuple[str, Any], None]:
         raise NotImplementedError
+
+
+def build_stream_kwargs(
+    agent: Any,
+    *,
+    messages: List[Dict[str, Any]],
+    tools: Optional[List[Dict[str, Any]]] = None,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
+    model: Optional[str] = None,
+    openai_client: bool = True,
+    **overrides: Any,
+) -> Dict[str, Any]:
+    """Build the kwargs dict for ``adapter.stream_chat(**kwargs)``.
+
+    Collects the fields shared by every provider (``base_url``, ``api_key``,
+    ``model``, ``messages``, ``max_tokens``) plus ``headers``/``extra_body``
+    when set on the agent and ``tools`` when provided. The ``client`` is
+    forwarded only for ``api_type == "openai"`` (or any non-None ``_client``
+    when ``openai_client`` is False). Extra provider keys (``thinking_effort``,
+    ``chunk_timeout``, ``provider_key``, ...) can be injected via ``overrides``.
+    """
+    kwargs: Dict[str, Any] = {
+        "base_url": getattr(agent, "base_url", ""),
+        "api_key": getattr(agent, "api_key", ""),
+        "model": model if model is not None else getattr(agent, "model", ""),
+        "messages": messages,
+        "max_tokens": max_tokens,
+    }
+    if tools is not None:
+        kwargs["tools"] = tools
+    headers = getattr(agent, "headers", None)
+    if headers:
+        kwargs["headers"] = headers
+    extra_body = getattr(agent, "extra_body", None)
+    if extra_body:
+        kwargs["extra_body"] = extra_body
+    client = getattr(agent, "_client", None)
+    api_type = getattr(agent, "api_type", "openai")
+    if client is not None and (not openai_client or api_type == "openai"):
+        kwargs["client"] = client
+    kwargs.update(overrides)
+    return kwargs
 
 
 def resolve_stream_timeout(stream_timeout: Optional[float] = None) -> float:

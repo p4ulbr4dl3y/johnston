@@ -14,6 +14,7 @@ from core.domain.defaults.config import DEFAULT_MAX_TOKENS, ESCALATED_MAX_TOKENS
 from core.domain.defaults.errors import ToolResult
 from core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT
 from core.infrastructure.adapters.base import (
+    build_stream_kwargs,
     extract_image_payload,
     image_url_block,
     new_tool_call_id,
@@ -540,22 +541,16 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         from core.adapters import get_adapter
 
                         adapter = get_adapter(self.api_type)
-                        stream_kwargs: Dict[str, Any] = {
-                            "base_url": self.base_url,
-                            "api_key": self.api_key,
-                            "model": self.model,
-                            "messages": messages,
-                            "tools": all_tools if all_tools else None,
-                            "max_tokens": current_max_tokens,
-                            "thinking_effort": getattr(self, "thinking_effort", None),
-                            "headers": getattr(self, "headers", None),
-                            "extra_body": getattr(self, "extra_body", None),
-                        }
+                        stream_kwargs = build_stream_kwargs(
+                            self,
+                            messages=messages,
+                            tools=all_tools if all_tools else None,
+                            max_tokens=current_max_tokens,
+                            thinking_effort=getattr(self, "thinking_effort", None),
+                        )
                         if self.api_type == "openai":
                             stream_kwargs["chunk_timeout"] = getattr(self, "chunk_timeout", 30.0)
                             stream_kwargs["provider_key"] = getattr(self, "provider_key", "openai")
-                            if getattr(self, "_client", None) is not None:
-                                stream_kwargs["client"] = self._client
 
                         async for tag, payload in adapter.stream_chat(**stream_kwargs):
                             if tag == "adapter_text":

@@ -14,6 +14,7 @@ from core.domain.defaults.config import (
 )
 from core.domain.entities.session import AgentSession
 from core.domain.policies.session_naming import FORK_BASE_MAX_LEN, cap_at_word, fork_marker
+from core.infrastructure.adapters.base import build_stream_kwargs
 from core.infrastructure.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -365,19 +366,14 @@ async def auto_title_session(
                 {"role": "system", "content": TITLE_PROMPT},
                 {"role": "user", "content": f"Generate a title for this conversation:\n{first_text[:800]}"},
             ]
-            stream_kwargs: dict[str, Any] = {
-                "base_url": getattr(target_agent, "base_url", ""),
-                "api_key": getattr(target_agent, "api_key", ""),
-                "model": target_model,
-                "messages": messages,
-                "max_tokens": SESSION_TITLE_MAX_TOKENS,
-                "thinking_effort": "none",
-            }
-            client = getattr(target_agent, "_client", None)
-            if client is not None:
-                stream_kwargs["client"] = client
-            if getattr(target_agent, "headers", None):
-                stream_kwargs["headers"] = target_agent.headers
+            stream_kwargs = build_stream_kwargs(
+                target_agent,
+                messages=messages,
+                max_tokens=SESSION_TITLE_MAX_TOKENS,
+                model=target_model,
+                openai_client=False,
+                thinking_effort="none",
+            )
 
             async def _call_stream() -> tuple[str, str]:
                 text_chunks = []

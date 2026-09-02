@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.domain.defaults.config import DEFAULT_MAX_TOKENS
 from core.domain.policies.messages import is_checkpoint_message, is_system_note
-from core.infrastructure.adapters.base import normalize_tool_arguments_str
+from core.infrastructure.adapters.base import build_stream_kwargs, normalize_tool_arguments_str
 from core.infrastructure.runtime.token_util import estimate_tokens
 from core.models_catalog import catalog, get_context_window
 
@@ -410,19 +410,12 @@ class CompactionMixin:
 
                 adapter = get_adapter(getattr(self, "api_type", "openai"))
                 chunks = []
-                stream_kwargs: Dict[str, Any] = {
-                    "base_url": getattr(self, "base_url", ""),
-                    "api_key": getattr(self, "api_key", ""),
-                    "model": getattr(self, "model", ""),
-                    "messages": compact_messages,
-                    "tools": tools_payload,
-                    "max_tokens": getattr(self, "max_tokens", DEFAULT_MAX_TOKENS) or DEFAULT_MAX_TOKENS,
-                    "headers": getattr(self, "headers", None),
-                    "extra_body": getattr(self, "extra_body", None),
-                }
-                if getattr(self, "api_type", "openai") == "openai":
-                    if getattr(self, "_client", None) is not None:
-                        stream_kwargs["client"] = self._client
+                stream_kwargs = build_stream_kwargs(
+                    self,
+                    messages=compact_messages,
+                    tools=tools_payload,
+                    max_tokens=getattr(self, "max_tokens", DEFAULT_MAX_TOKENS) or DEFAULT_MAX_TOKENS,
+                )
 
                 async for tag, payload in adapter.stream_chat(**stream_kwargs):
                     if tag == "adapter_text" and payload:
