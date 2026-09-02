@@ -279,6 +279,23 @@ class RewindCommand(BaseCommand):
                                     pass
                         else:
                             cv.rollback_to(target_idx)
+                        try:
+                            from core.application.session.actions import restore_plan_from_messages
+                            from widgets.presentation.widgets.plan_notch import PlanNotch
+
+                            restored_plan, restored_explanation = restore_plan_from_messages(target_msgs)
+                            app.current_plan = restored_plan
+                            app.current_plan_explanation = restored_explanation
+                            notches = list(app.query(PlanNotch))
+                            if not notches and hasattr(app, "screen") and app.screen:
+                                notches = list(app.screen.query(PlanNotch))
+                            for notch in notches:
+                                if restored_plan:
+                                    notch.set_plan(restored_plan, restored_explanation)
+                                else:
+                                    notch.clear_plan()
+                        except Exception:
+                            pass
                     except Exception:
                         pass
 
@@ -309,6 +326,8 @@ class RewindCommand(BaseCommand):
                     load_text_into_input=load_text_into_input,
                     save_session_cb=save_cb,
                     refresh_footer_cb=lambda: app.refresh_status_footer(),
+                    store=sm,
+                    task_manager=getattr(app, "task_manager", None),
                 )
             app.query_one(MESSAGE_INPUT).focus()
 
@@ -405,6 +424,23 @@ class ForkCommand(BaseCommand):
                                 pass
                     else:
                         cv.rollback_to(-1 if up_to_idx == 0 else selected_child_idx - 1)
+                    try:
+                        from core.application.session.actions import restore_plan_from_messages
+                        from widgets.presentation.widgets.plan_notch import PlanNotch
+
+                        restored_plan, restored_explanation = restore_plan_from_messages(target_msgs)
+                        app.current_plan = restored_plan
+                        app.current_plan_explanation = restored_explanation
+                        notches = list(app.query(PlanNotch))
+                        if not notches and hasattr(app, "screen") and app.screen:
+                            notches = list(app.screen.query(PlanNotch))
+                        for notch in notches:
+                            if restored_plan:
+                                notch.set_plan(restored_plan, restored_explanation)
+                            else:
+                                notch.clear_plan()
+                    except Exception:
+                        pass
                 except Exception:
                     pass
 

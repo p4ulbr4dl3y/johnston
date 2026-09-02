@@ -544,6 +544,69 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(parent_reloaded.messages), 6)
             self.assertEqual(parent_reloaded.messages[4]["text"], "prompt 2")
 
+    async def test_rewind_session_cleans_up_subagents_and_tasks(self):
+        from unittest.mock import MagicMock
+
+        from core.application.session.actions import restore_plan_from_messages
+
+        # Test restore_plan_from_messages
+        plan_msgs = [
+            {"type": "user", "text": "build feature"},
+            {"type": "tool", "tool_type": "update_plan", "args": {"plan": [{"title": "step 1", "status": "in_progress"}], "explanation": "doing 1"}},
+            {"type": "bot", "text": "working on step 1"},
+        ]
+        plan, exp = restore_plan_from_messages(plan_msgs)
+        self.assertEqual(len(plan), 1)
+        self.assertEqual(exp, "doing 1")
+
+        # Test subagent and task cleanup on rewind
+        mock_store = MagicMock()
+        mock_child_sub = MagicMock(id="sub-child-1")
+        mock_child_sub.async_task = MagicMock(done=lambda: False)
+        mock_store.children.return_value = [mock_child_sub]
+
+        mock_tm = MagicMock()
+        mock_task = MagicMock(id="task-123", is_running=True)
+        mock_tm._tasks = {"task-123": mock_task}
+
+        sess = MagicMock(id="parent-1")
+        sess.messages = [
+            {"type": "user", "text": "turn 0", "show_in_ui": True},
+            {"type": "bot", "text": "ans 0"},
+            {"type": "user", "text": "turn 1", "show_in_ui": True},
+            {"type": "tool", "tool_type": "invoke_subagent", "args": {"session_id": "sub-child-1"}},
+            {"type": "tool", "tool_type": "shell", "background_task_id": "task-123"},
+            {"type": "bot", "text": "ans 1"},
+        ]
+
+        agent = MockAgent()
+        agent.history = [
+            {"role": "user", "content": "turn 0"},
+            {"role": "assistant", "content": "ans 0"},
+            {"role": "user", "content": "turn 1"},
+            {"role": "assistant", "content": "ans 1"},
+        ]
+
+        rewind_session(
+            agent,
+            "parent-1",
+            "/tmp",
+            [(0, "turn 0"), (2, "turn 1")],
+            2,
+            restore_git=False,
+            session=sess,
+            rollback_ui=lambda i: None,
+            load_text_into_input=lambda t: None,
+            save_session_cb=lambda: None,
+            refresh_footer_cb=lambda: None,
+            store=mock_store,
+            task_manager=mock_tm,
+        )
+
+        mock_child_sub.async_task.cancel.assert_called_once()
+        mock_store.delete.assert_called_once_with("sub-child-1")
+        mock_tm.drop.assert_called_once_with("task-123")
+
 
 if __name__ == "__main__":
     unittest.main()

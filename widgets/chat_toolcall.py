@@ -135,14 +135,22 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return True
         return self.tool_type in self.EXPANDABLE_TOOLS
 
+    def has_subagent_session(self) -> bool:
+        """Check whether this toolcall is associated with an existing subagent session."""
+        return bool(getattr(self, "subagent_session_id", None) or self.args.get("session_id"))
+
     def is_clickable_header(self) -> bool:
+        if self.canonical_tool in ("invoke_subagent", "manage_subagent"):
+            if self.has_subagent_session():
+                return True
+            if self.status in ("error", "cancelled"):
+                return False
+            return self.canonical_tool == "invoke_subagent"
+
         if self.status in ("error", "cancelled"):
             return (
                 self.canonical_tool == "shell" and bool((self.result_text or "").strip())
             )
-        if self.canonical_tool == "manage_subagent":
-            args = self.args
-            return bool(getattr(self, "subagent_session_id", None) or args.get("session_id"))
         return (
             self.is_expandable()
             or self.canonical_tool in ("invoke_subagent", "ask_user")
@@ -402,7 +410,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.canonical_tool == "invoke_subagent":
             args = self.args
             session_id = getattr(self, "subagent_session_id", None)
-            identifier = session_id or args.get("title") or args.get("prompt") or self.target
+            identifier = session_id or args.get("session_id") or args.get("title") or args.get("prompt") or self.target
             store = getattr(app, "sm", None) if app else None
             if store is None:
                 from core.infrastructure.storage.session_store import SessionStore

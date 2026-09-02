@@ -211,6 +211,10 @@ async def _run_single_subagent_message(
                 "result_text": "[interrupted | tool cancelled]",
                 "status": "cancelled",
             })
+        try:
+            session.add_event({"type": "event_divider", "text": "Response Interrupted"})
+        except Exception:
+            pass
         session.finish(SessionStatus.CANCELLED, "Cancelled by user")
         try:
             await _safe_save(store, session)

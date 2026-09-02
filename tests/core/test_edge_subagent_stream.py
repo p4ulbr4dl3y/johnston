@@ -510,6 +510,18 @@ class TestSafeSaves:
         assert sess.status == STATUS_CANCELLED
         assert "failed to save cancelled session" in result
 
+    @pytest.mark.asyncio
+    async def test_cancelled_subagent_adds_interrupted_event_divider(self):
+        sub = FakeSubagent(exc=asyncio.CancelledError())
+        sess = make_session()
+        ctx = FakeCtx()
+        await run_subagent_stream_bg(sub, "p", sess, ctx, FakeStore())
+        assert sess.status == STATUS_CANCELLED
+        assert any(
+            m.get("type") == "event_divider" and m.get("text") == "Response Interrupted"
+            for m in sess.messages
+        )
+
 
 # ---------------------------------------------------------------------------
 # configure_subagent_agent

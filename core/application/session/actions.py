@@ -346,7 +346,142 @@ def _touched_files(user_events: list[dict], seq_idx: int) -> Optional[list[str]]
     return sorted(f_set)
 
 
-def _truncate_transcript(session: Any, seq_idx: int) -> None:
+def restore_plan_from_messages(messages: list[dict] | None) -> tuple[list[dict] | None, str]:
+    """Extract the latest active plan and explanation from a list of messages."""
+    restored_plan = None
+    restored_explanation = ""
+    if not messages:
+        return None, ""
+    has_subsequent_user_msg = False
+    for msg in reversed(messages):
+        if not isinstance(msg, dict):
+            continue
+        m_type = msg.get("type")
+        if m_type == "user":
+            has_subsequent_user_msg = True
+        elif m_type == "tool" and msg.get("tool_type") == "update_plan":
+            args = msg.get("args") or {}
+            if isinstance(args, dict) and isinstance(args.get("plan"), list):
+                candidate_plan = [p for p in args.get("plan") if isinstance(p, dict)]
+                candidate_explanation = str(args.get("explanation") or "").strip()
+                if (
+                    candidate_plan
+                    and all(p.get("status") == "completed" for p in candidate_plan)
+                    and has_subsequent_user_msg
+                ):
+                    restored_plan = None
+                    restored_explanation = ""
+                else:
+                    restored_plan = candidate_plan
+                    restored_explanation = candidate_explanation
+                break
+    return restored_plan, restored_explanation
+
+
+def _cleanup_rewound_subagents(session: Any, dropped_msgs: list[dict], store: Any = None) -> None:
+    """Cancel and remove orphaned subagents that were spawned in dropped turns."""
+    if not session:
+        return
+    curr_sid = getattr(session, "id", None)
+    if not curr_sid:
+        return
+    if store is None:
+        try:
+            from core.infrastructure.storage.session_store import SessionStore
+
+            store = SessionStore.get_instance()
+        except Exception:
+            return
+
+    dropped_sub_ids: set[str] = set()
+    for msg in dropped_msgs:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in (
+            "invoke_subagent",
+            "manage_subagent",
+        ):
+            args = msg.get("args") or {}
+            if isinstance(args, dict):
+                sid = args.get("session_id")
+                if sid:
+                    dropped_sub_ids.add(str(sid))
+            sub_id = msg.get("subagent_session_id")
+            if sub_id:
+                dropped_sub_ids.add(str(sub_id))
+
+    remaining_sub_ids: set[str] = set()
+    for msg in getattr(session, "messages", []):
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in (
+            "invoke_subagent",
+            "manage_subagent",
+        ):
+            args = msg.get("args") or {}
+            if isinstance(args, dict):
+                sid = args.get("session_id")
+                if sid:
+                    remaining_sub_ids.add(str(sid))
+            sub_id = msg.get("subagent_session_id")
+            if sub_id:
+                remaining_sub_ids.add(str(sub_id))
+
+    try:
+        children = store.children(curr_sid)
+    except Exception:
+        children = []
+
+    for child in children:
+        c_id = str(child.id)
+        if c_id in dropped_sub_ids or (c_id not in remaining_sub_ids and dropped_msgs):
+            async_task = getattr(child, "async_task", None)
+            if async_task and not async_task.done():
+                try:
+                    async_task.cancel()
+                except Exception:
+                    pass
+            try:
+                store.delete(c_id)
+            except Exception as e:
+                logger.warning("Failed to delete rewound subagent session %s: %s", c_id, e)
+
+
+def _cleanup_rewound_shell_tasks(dropped_msgs: list[dict], task_manager: Any = None) -> None:
+    """Kill and drop shell background tasks created in dropped turns."""
+    if not task_manager:
+        return
+    dropped_task_ids: set[str] = set()
+    for msg in dropped_msgs:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in ("shell", "manage_shell"):
+            bg_id = msg.get("background_task_id") or msg.get("task_id")
+            if bg_id:
+                dropped_task_ids.add(str(bg_id))
+            args = msg.get("args") or {}
+            if isinstance(args, dict) and args.get("task_id"):
+                dropped_task_ids.add(str(args.get("task_id")))
+
+    tasks_dict = getattr(task_manager, "_tasks", {})
+    for task_id in dropped_task_ids:
+        task = tasks_dict.get(task_id)
+        if task:
+            if getattr(task, "is_running", False):
+                try:
+                    asyncio.create_task(task.kill())
+                except Exception:
+                    pass
+            if hasattr(task_manager, "drop"):
+                task_manager.drop(task_id)
+
+
+def _truncate_transcript(
+    session: Any,
+    seq_idx: int,
+    store: Any = None,
+    task_manager: Any = None,
+) -> None:
     """Drop stored transcript events from the selected UI-visible user turn onward.
 
     ``seq_idx`` is the UI position of the selected user message (0-indexed over
@@ -358,11 +493,17 @@ def _truncate_transcript(session: Any, seq_idx: int) -> None:
     if session is None or not getattr(session, "messages", None):
         return
     if seq_idx == 0:
+        dropped = list(session.messages)
         session.messages = []
+        _cleanup_rewound_subagents(session, dropped, store=store)
+        _cleanup_rewound_shell_tasks(dropped, task_manager=task_manager)
         return
     cutoff = find_visible_user_cutoff(session.messages, seq_idx)
     if cutoff is not None:
+        dropped = session.messages[cutoff:]
         session.messages = drop_stale_system_notes(session.messages[:cutoff])
+        _cleanup_rewound_subagents(session, dropped, store=store)
+        _cleanup_rewound_shell_tasks(dropped, task_manager=task_manager)
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +524,8 @@ def rewind_session(
     save_session_cb: Callable[[], None],
     refresh_footer_cb: Callable[[], None],
     checkpoint_manager: Optional[Any] = None,
+    store: Optional[Any] = None,
+    task_manager: Optional[Any] = None,
 ) -> None:
     """Execute a rewind/rollback for a selected user message.
 
@@ -449,7 +592,7 @@ def rewind_session(
 
     # Store transcript: drop events from the selected turn onward so a later
     # /resume does not resurrect rolled-back turns.
-    _truncate_transcript(session, seq_idx)
+    _truncate_transcript(session, seq_idx, store=store, task_manager=task_manager)
 
     target_idx = -1 if seq_idx == 0 else selected_child_idx - 1
     rollback_ui(target_idx)

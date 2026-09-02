@@ -405,8 +405,50 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         app.notify.assert_called_once_with("Subagent session not found", severity="warning")
         event.stop.assert_called_once()
 
-    def test_on_click_invoke_subagent_error_not_clickable(self):
+    def test_on_click_invoke_subagent_error_with_session_is_clickable(self):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
+        widget.set_result("Error: failed midway", status="error")
+        self.assertTrue(widget.is_clickable_header())
+        self.assertIn("tool-header-expandable", widget.header_label.classes)
+        event = MagicMock()
+        mock_store = MagicMock()
+        mock_store.find_session_by_title_or_id.return_value = MagicMock(status="error")
+        with (
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.sm = mock_store
+            app.current_session_id = None
+            app_prop.return_value = app
+            widget.on_click(event)
+        screen_cls.assert_called_once_with("abc")
+        app.push_screen.assert_called_once()
+        event.stop.assert_called_once()
+
+    def test_on_click_invoke_subagent_cancelled_with_session_is_clickable(self):
+        widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
+        widget.mark_cancelled()
+        self.assertTrue(widget.is_clickable_header())
+        self.assertIn("tool-header-expandable", widget.header_label.classes)
+        event = MagicMock()
+        mock_store = MagicMock()
+        mock_store.find_session_by_title_or_id.return_value = MagicMock(status="cancelled")
+        with (
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.sm = mock_store
+            app.current_session_id = None
+            app_prop.return_value = app
+            widget.on_click(event)
+        screen_cls.assert_called_once_with("abc")
+        app.push_screen.assert_called_once()
+        event.stop.assert_called_once()
+
+    def test_on_click_invoke_subagent_error_no_session_not_clickable(self):
+        widget = self._widget("invoke_subagent", "prompt", args={})
         widget.set_result("Error: launch failed", status="error")
         self.assertFalse(widget.is_clickable_header())
         self.assertNotIn("tool-header-expandable", widget.header_label.classes)
@@ -420,8 +462,8 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         screen_cls.assert_not_called()
         event.stop.assert_not_called()
 
-    def test_on_click_invoke_subagent_cancelled_not_clickable(self):
-        widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
+    def test_on_click_invoke_subagent_cancelled_no_session_not_clickable(self):
+        widget = self._widget("invoke_subagent", "prompt", args={})
         widget.mark_cancelled()
         self.assertFalse(widget.is_clickable_header())
         self.assertNotIn("tool-header-expandable", widget.header_label.classes)

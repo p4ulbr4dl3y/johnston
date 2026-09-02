@@ -371,8 +371,9 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         await cmd.execute(app)
 
         self.assertFalse(bg_task.is_running)
-        subagent.async_task.cancel.assert_called_once()
+        self.assertTrue(subagent.async_task.cancel.called)
         subagent.finish.assert_called_once()
+        app.sm.delete.assert_called()
 
     async def test_rewind_awaits_generation_worker_before_rollback(self):
         from widgets.presentation.commands import RewindCommand
