@@ -25,6 +25,7 @@ from widgets.utils.key_aliases import (
     KEY_TOGGLE_MODE,
     KEY_TOGGLE_ROLE,
 )
+from widgets.utils.responsive import BREAKPOINT_BANNER, BREAKPOINT_COMPACT, resolve_width
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
 
@@ -36,7 +37,19 @@ class ClipboardAttachment:
         self.path = path
 
 
-DEFAULT_PLACEHOLDER = "Type a message or / for commands..."
+DEFAULT_PLACEHOLDER = "Type a message, / for commands, @ for files, Ctrl+V for images..."
+COMPACT_PLACEHOLDER = "Type message, / cmds, @ files, Ctrl+V img..."
+NARROW_PLACEHOLDER = "Type a message..."
+FORK_PLACEHOLDER = "Type a message to fork & continue..."
+
+
+def get_placeholder_for_width(width: int) -> str:
+    """Return responsive placeholder text based on width."""
+    if width < BREAKPOINT_BANNER:
+        return NARROW_PLACEHOLDER
+    if width < BREAKPOINT_COMPACT:
+        return COMPACT_PLACEHOLDER
+    return DEFAULT_PLACEHOLDER
 
 
 class ChatInput(TextArea):
@@ -105,9 +118,26 @@ class ChatInput(TextArea):
         except RuntimeError:
             self._save_prompt_history_to_disk(history_copy)
 
+    def update_placeholder(self, width: int | None = None) -> None:
+        """Update placeholder responsively unless a custom placeholder is set."""
+        try:
+            if getattr(self.app, "is_read_only", False):
+                self.placeholder = FORK_PLACEHOLDER
+                return
+        except Exception:
+            pass
+        if self.placeholder not in (DEFAULT_PLACEHOLDER, COMPACT_PLACEHOLDER, NARROW_PLACEHOLDER, ""):
+            return
+        w = width if width is not None else resolve_width(self)
+        self.placeholder = get_placeholder_for_width(w)
+
     def on_mount(self) -> None:
         self.focus()
         self.update_height()
+        self.update_placeholder()
+
+    def on_resize(self, event: events.Resize) -> None:
+        self.update_placeholder(event.size.width)
 
     def on_unmount(self) -> None:
         if getattr(self, "_save_task", None) is not None and not self._save_task.done():

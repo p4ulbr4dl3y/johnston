@@ -5,7 +5,7 @@ from typing import Any
 from textual import events, work
 
 from widgets.app.dispatch import handle_slash_command
-from widgets.chat_input import ChatInput
+from widgets.chat_input import DEFAULT_PLACEHOLDER, ChatInput
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.status_footer import StatusFooter
 
@@ -87,7 +87,9 @@ class MessageFlowMixin:
                 self.is_read_only = False
                 try:
                     chat_input = self.query_one("#message-input", ChatInput)
-                    chat_input.placeholder = "Type a message or / for commands..."
+                    chat_input.placeholder = DEFAULT_PLACEHOLDER
+                    if hasattr(chat_input, "update_placeholder"):
+                        chat_input.update_placeholder()
                 except Exception:
                     pass
                 if hasattr(self, "notify"):
@@ -110,7 +112,9 @@ class MessageFlowMixin:
                     self.is_read_only = False
                     try:
                         chat_input = self.query_one("#message-input", ChatInput)
-                        chat_input.placeholder = "Type a message or / for commands..."
+                        chat_input.placeholder = DEFAULT_PLACEHOLDER
+                        if hasattr(chat_input, "update_placeholder"):
+                            chat_input.update_placeholder()
                     except Exception:
                         pass
                     if hasattr(self, "notify"):

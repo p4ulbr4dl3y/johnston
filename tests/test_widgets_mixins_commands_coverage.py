@@ -9,6 +9,7 @@ import pytest
 from textual.app import App
 
 from core.infrastructure.tasks.manager import TaskManager
+from widgets.chat_input import DEFAULT_PLACEHOLDER
 from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.lifecycle import LifecycleMixin
 from widgets.mixins.session_persistence import SessionPersistenceMixin
@@ -267,7 +268,7 @@ async def test_session_persistence_load_ui_full_flow():
         app.sm.release_session_lock.assert_called_once_with("old_session")
         app.sm.acquire_session_lock.assert_called_once_with("new_session")
         app.sm.set_active_session_id.assert_called_once_with("new_session")
-        assert chat_input.placeholder == "Type a message or / for commands..."
+        assert chat_input.placeholder == DEFAULT_PLACEHOLDER
         assert app.current_session_id == "new_session"
 
         # Agent was created

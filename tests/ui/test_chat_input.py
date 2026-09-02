@@ -72,6 +72,40 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         ci_custom = ChatInput(placeholder="Custom prompt...")
         self.assertEqual(ci_custom.placeholder, "Custom prompt...")
 
+    def test_placeholder_responsiveness(self):
+        from widgets.chat_input import (
+            COMPACT_PLACEHOLDER,
+            DEFAULT_PLACEHOLDER,
+            FORK_PLACEHOLDER,
+            NARROW_PLACEHOLDER,
+            get_placeholder_for_width,
+        )
+
+        self.assertEqual(get_placeholder_for_width(100), DEFAULT_PLACEHOLDER)
+        self.assertEqual(get_placeholder_for_width(60), COMPACT_PLACEHOLDER)
+        self.assertEqual(get_placeholder_for_width(40), NARROW_PLACEHOLDER)
+
+        ci = ChatInput()
+        ci.update_placeholder(100)
+        self.assertEqual(ci.placeholder, DEFAULT_PLACEHOLDER)
+        ci.update_placeholder(60)
+        self.assertEqual(ci.placeholder, COMPACT_PLACEHOLDER)
+        ci.update_placeholder(40)
+        self.assertEqual(ci.placeholder, NARROW_PLACEHOLDER)
+
+        # Custom placeholder should not be overridden
+        ci_custom = ChatInput(placeholder="Custom prompt...")
+        ci_custom.update_placeholder(50)
+        self.assertEqual(ci_custom.placeholder, "Custom prompt...")
+
+        # Read-only app placeholder
+        ci_app = ChatInput()
+        mock_app = MagicMock()
+        mock_app.is_read_only = True
+        with patch.object(ChatInput, "app", new_callable=PropertyMock, return_value=mock_app):
+            ci_app.update_placeholder(100)
+            self.assertEqual(ci_app.placeholder, FORK_PLACEHOLDER)
+
     def test_on_unmount_cancels_save_task_and_flushes_pending_history(self):
         ci = ChatInput()
         mock_task = MagicMock()

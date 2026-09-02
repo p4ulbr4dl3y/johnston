@@ -29,12 +29,14 @@ class SessionPersistenceMixin:
         self.pending_fork = None
 
         try:
-            from widgets.chat_input import ChatInput
+            from widgets.chat_input import DEFAULT_PLACEHOLDER, FORK_PLACEHOLDER, ChatInput
             chat_input = self.query_one("#message-input", ChatInput)
             if read_only:
-                chat_input.placeholder = "Type a message to fork & continue..."
+                chat_input.placeholder = FORK_PLACEHOLDER
             else:
-                chat_input.placeholder = "Type a message or / for commands..."
+                chat_input.placeholder = DEFAULT_PLACEHOLDER
+                if hasattr(chat_input, "update_placeholder"):
+                    chat_input.update_placeholder()
         except Exception:
             pass
 
