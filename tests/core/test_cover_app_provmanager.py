@@ -22,10 +22,12 @@ from core.provider_manager import ProviderManager
 
 @pytest.fixture
 def pm(tmp_path, monkeypatch):
+    cache_dir = os.path.join(str(tmp_path), "cache")
     monkeypatch.setattr(pm_mod, "CONFIG_DIR", str(tmp_path))
     monkeypatch.setattr(pm_mod, "CONFIG_FILE", os.path.join(str(tmp_path), "config.json"))
     monkeypatch.setattr(pm_mod, "PROVIDERS_JSON_FILE", os.path.join(str(tmp_path), "providers.json"))
-    monkeypatch.setattr(pm_mod, "CACHE_DIR", os.path.join(str(tmp_path), "cache"))
+    monkeypatch.setattr(pm_mod, "CACHE_DIR", cache_dir)
+    monkeypatch.setattr("core.infrastructure.platform.paths.CACHE_DIR", cache_dir)
     from core.models_catalog import catalog
 
     catalog._client = None

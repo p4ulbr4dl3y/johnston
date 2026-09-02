@@ -10,7 +10,13 @@ from core.domain.entities.provider import ProviderDef
 from core.domain.ports.tool_registry import ToolRegistryPort, get_default_tool_registry
 from core.infrastructure.adapters.models_source import extract_context_length
 from core.infrastructure.config.settings import get_settings
-from core.infrastructure.platform.paths import CACHE_DIR, CONFIG_DIR, CONFIG_FILE, PROVIDERS_JSON_FILE
+from core.infrastructure.platform.paths import (
+    CACHE_DIR,
+    CONFIG_DIR,
+    CONFIG_FILE,
+    PROVIDERS_JSON_FILE,
+    provider_models_cache_path,
+)
 from core.infrastructure.platform.platform_utils import (
     atomic_write_json,
     cached_json_read,
@@ -514,7 +520,7 @@ class ProviderManager:
             return list(pdef.models)
 
         os.makedirs(CACHE_DIR, exist_ok=True)
-        cache_path = os.path.join(CACHE_DIR, f"models_{provider_key}.json")
+        cache_path = str(provider_models_cache_path(provider_key))
 
         # If no API key set and not local/built-in provider, return configured models list for UI display
         if needs_key and not api_key and not force_refresh:

@@ -20,7 +20,7 @@ from core.domain.policies.model_catalog_policy import (
     format_context_tokens,
 )
 from core.infrastructure.adapters.models_fetcher import fetch_catalog_endpoints
-from core.infrastructure.platform.paths import CONFIG_DIR
+from core.infrastructure.platform.paths import CONFIG_DIR, provider_models_cache_path
 from core.infrastructure.platform.platform_utils import (
     atomic_write_json,
     cached_json_read,
@@ -351,7 +351,7 @@ class ModelsCatalog:
                 return val
 
         if provider_id:
-            prov_cache = os.path.join(CONFIG_DIR, "cache", f"models_{provider_id}.json")
+            prov_cache = str(provider_models_cache_path(provider_id))
             if os.path.exists(prov_cache):
                 cdata = cached_json_read(prov_cache, {})
                 if isinstance(cdata, dict):

@@ -68,7 +68,7 @@ class TestModelsCatalog(unittest.TestCase):
             os.makedirs(cache_dir)
             with open(os.path.join(cache_dir, "models_acme.json"), "w", encoding="utf-8") as f:
                 json.dump({"model_limits": {"acme/warp-1": 64000}}, f)
-            with patch("core.models_catalog.CONFIG_DIR", tmpdir):
+            with patch("core.infrastructure.platform.paths.CACHE_DIR", cache_dir):
                 catalog = ModelsCatalog()
                 self.assertEqual(catalog.get_context_limit("acme", "warp-1"), 64000)
                 self.assertEqual(catalog.get_context_limit("acme", "missing"), 128000)
