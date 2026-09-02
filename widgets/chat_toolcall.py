@@ -509,10 +509,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
         scroll_parent_to_widget(self, top=top)
 
-    def toggle_expanded(self, scroll: bool = True) -> None:
+    def set_expanded(self, expanded: bool, scroll: bool = False) -> None:
         if not self.is_expandable():
             return
-        self.is_expanded = not self.is_expanded
+        if self.is_expanded == expanded:
+            return
+        self.is_expanded = expanded
         self.render_header()
         if self.is_expanded:
             self.scroll_box.display = True
@@ -526,6 +528,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.content_widget.display = False
             self.md_widget.display = False
         self._update_next_sibling_spacing()
+
+    def toggle_expanded(self, scroll: bool = True) -> None:
+        self.set_expanded(not self.is_expanded, scroll=scroll)
 
     def append_shell_output(self, text: str) -> None:
         if not hasattr(self, "_raw_bash_buffer"):

@@ -532,10 +532,12 @@ class ThinkingWidget(Vertical):
     def is_expandable(self) -> bool:
         return True
 
-    def toggle_expanded(self, scroll: bool = True) -> None:
+    def set_expanded(self, expanded: bool, scroll: bool = False) -> None:
         if not self.is_expandable():
             return
-        self.is_expanded = not self.is_expanded
+        if self.is_expanded == expanded:
+            return
+        self.is_expanded = expanded
         self.render_header()
         if self.is_expanded:
             if self.thinking_text:
@@ -549,6 +551,9 @@ class ThinkingWidget(Vertical):
                 self._update_handle = None
             self._update_scheduled = False
             self.content_widget.display = False
+
+    def toggle_expanded(self, scroll: bool = True) -> None:
+        self.set_expanded(not self.is_expanded, scroll=scroll)
 
     def on_unmount(self) -> None:
         if self._update_handle is not None:

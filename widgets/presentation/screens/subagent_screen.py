@@ -166,14 +166,21 @@ class SubagentViewScreen(ModalScreen[None]):
 
             for idx, evt in enumerate(history_events):
                 is_last_running = is_running and (idx == len(history_events) - 1)
-                ui_idx = idx + child_offset
-                is_expanded = (ui_idx in expand_state) or (is_last_running and evt.get("type") in ("thinking", "tool"))
                 await self._render_event(
                     evt,
                     animate=is_last_running,
-                    is_expanded=is_expanded,
                     is_active=is_last_running,
                 )
+
+        for idx, child in enumerate(chat_view.children):
+            if idx in expand_state and hasattr(child, "set_expanded"):
+                child.set_expanded(True)
+
+        if is_running:
+            if self.thinking_widget and hasattr(self.thinking_widget, "set_expanded"):
+                self.thinking_widget.set_expanded(True)
+            elif self.current_tool_widget and hasattr(self.current_tool_widget, "set_expanded"):
+                self.current_tool_widget.set_expanded(True)
 
         if not is_running and self.bot_msg:
             try:
