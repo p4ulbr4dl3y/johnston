@@ -403,7 +403,7 @@ OptionList > .option-list--option-hover {
     margin-bottom: 5;
     width: 100%;
     height: auto;
-    max-height: 5;
+    max-height: 8;
     padding: 0;
     border: solid $border;
     background: $bg-surface;
