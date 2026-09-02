@@ -108,12 +108,26 @@ def format_subagent_task_row(
     return format_badge_row(clean, badge_plain, target_width=target_width)
 
 
+def _safe_timestamp(val: Any) -> float:
+    if isinstance(val, (int, float)):
+        return float(val)
+    if isinstance(val, str):
+        try:
+            return float(val)
+        except Exception:
+            pass
+    return 0.0
+
+
 def _filter_and_sort_tasks(items: list, search_query: str) -> list:
-    """Apply text search filter and running-first ordering to task rows."""
+    """Apply text search filter and running-first, newest-first ordering to task rows."""
     q = search_query.strip().lower()
     if q:
         items = [it for it in items if q in it["command"].lower() or q in it["id"].lower()]
-    return sorted(items, key=lambda item: not item["is_running"])
+    return sorted(
+        items,
+        key=lambda item: (not item.get("is_running", False), -_safe_timestamp(item.get("created_at"))),
+    )
 
 
 class TaskStdinInput(Input):
@@ -385,6 +399,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         super().__init__()
         self.search_query = ""
         self.filtered_tasks = []
+        self.total_tasks_count = 0
         self._last_signatures = None
         self.search_nav_option_list_id = self.option_list_id
 
@@ -453,6 +468,8 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def on_input_changed(self, event: Input.Changed) -> None:
         self.search_query = event.value
         self._last_signatures = None
+        if hasattr(self, "_invalidate_tasks_cache"):
+            self._invalidate_tasks_cache()
         self.update_tasks_list()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -482,7 +499,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
             opt_list = self._get_option_list()
-            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
+            hint = self.query_one(f"#{MODAL_HINT_ID}", ModalHint)
             idx = opt_list.highlighted
             is_running = False
             if idx is not None and 0 <= idx < len(self.filtered_tasks):
@@ -507,7 +524,9 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                     if is_running
                     else f"{self.hint_action_name} • esc Close"
                 )
-            hint.update(hint_str)
+            shown = sum(1 for it in self.filtered_tasks if it is not None)
+            total = getattr(self, "total_tasks_count", shown)
+            hint.update(hint_str, right_text=f"{shown}/{total}")
         except Exception:
             pass
 
@@ -543,6 +562,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             except Exception:
                 pass
             self.filtered_tasks = []
+            self._update_hint()
             return
 
         try:
@@ -670,9 +690,11 @@ class ShellTasksScreen(BaseTasksListScreen):
                     "status_str": "RUNNING" if running else "FINISHED",
                     "progress_badge": badge,
                     "raw_obj": t,
+                    "created_at": getattr(t, "created_at", 0.0),
                 }
             )
 
+        self.total_tasks_count = len(items)
         return _filter_and_sort_tasks(items, self.search_query)
 
     def _format_task_row(self, item: dict, target_width: int) -> str:
@@ -804,9 +826,11 @@ class SubagentsScreen(BaseTasksListScreen):
                     "status_str": st_str,
                     "progress_badge": badge,
                     "raw_obj": s,
+                    "created_at": getattr(s, "created_at", 0.0),
                 }
             )
 
+        self.total_tasks_count = len(items)
         result = _filter_and_sort_tasks(items, self.search_query)
         self._cached_tasks = result
         self._tasks_cache_ts = time.monotonic()

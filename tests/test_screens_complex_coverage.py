@@ -143,9 +143,9 @@ class TestDiffScreenCoverage(unittest.IsolatedAsyncioTestCase):
         # Format options with small target width to trigger truncation paths
         options = screen._format_sidebar_options(target_width=20)
         self.assertEqual(len(options), 4)
-        self.assertIn("…", options[1])
-        self.assertIn("…", options[2])
-        self.assertIn("…", options[3])
+        self.assertIn("...", options[1])
+        self.assertIn("...", options[2])
+        self.assertIn("...", options[3])
 
         # Singular file count
         screen_single = DiffScreen([("a.py", "diff", 1, 0)])

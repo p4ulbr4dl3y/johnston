@@ -137,6 +137,7 @@ def format_badge_row(
     prefix: str = "",
     min_gap: int = 2,
     min_title: int = 10,
+    dim_badge: bool = True,
 ) -> str:
     """Format an option row as ``prefix title ...spaces... [dim]badge[/]``.
 
@@ -151,7 +152,8 @@ def format_badge_row(
     if display_width(clean) > max_title:
         clean = ellipsize(clean, max_title)
     pad = max(min_gap, target_width - display_width(prefix) - display_width(clean) - display_width(badge))
-    return f"{prefix}{escape(clean)}{' ' * pad}[dim]{badge}[/]"
+    badge_str = f"[dim]{badge}[/]" if dim_badge else badge
+    return f"{prefix}{escape(clean)}{' ' * pad}{badge_str}"
 
 
 def build_status_right_text(

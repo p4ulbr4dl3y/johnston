@@ -869,13 +869,14 @@ DiffScreen {
 
 #diff-file-list > .option-list--option {
     background: transparent;
+    color: $fg-secondary;
     padding: 0 1;
     text-wrap: nowrap;
 }
 
 #diff-file-list > .option-list--option-hover {
     background: $bg-surface;
-    color: $fg-secondary;
+    color: $fg-primary;
 }
 
 #diff-file-list > .option-list--option-highlighted,

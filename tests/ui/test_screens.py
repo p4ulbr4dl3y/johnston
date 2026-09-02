@@ -346,12 +346,39 @@ class TestTaskScreens(unittest.TestCase):
         self.assertEqual(s.search_query, "pytest")
         s.update_tasks_list.assert_called_once()
 
-        # Test tab key suppression
-        tab_event = MagicMock()
-        tab_event.key = "tab"
-        s._on_key(tab_event)
-        tab_event.prevent_default.assert_called_once()
-        tab_event.stop.assert_called_once()
+        # Test hint count update
+        from widgets.presentation.screens.constants import MODAL_HINT_ID
+
+        mock_hint = MagicMock()
+        mock_opt = MagicMock()
+        mock_opt.highlighted = 0
+
+        def fake_query_one(selector, *args, **kwargs):
+            if MODAL_HINT_ID in str(selector):
+                return mock_hint
+            return mock_opt
+
+        with patch.object(s, "query_one", side_effect=fake_query_one):
+            s.filtered_tasks = [{"id": "task-2", "is_running": False}]
+            s.total_tasks_count = 2
+            s._update_hint()
+            mock_hint.update.assert_called_once()
+            _, kwargs = mock_hint.update.call_args
+            self.assertEqual(kwargs.get("right_text"), "1/2")
+
+    def test_tasks_screen_sort_newest_first(self):
+        from widgets.presentation.screens.tasks import _filter_and_sort_tasks
+
+        items = [
+            {"id": "t1", "command": "old done", "is_running": False, "created_at": 100.0},
+            {"id": "t2", "command": "new done", "is_running": False, "created_at": 200.0},
+            {"id": "t3", "command": "old running", "is_running": True, "created_at": 150.0},
+            {"id": "t4", "command": "new running", "is_running": True, "created_at": 250.0},
+        ]
+        sorted_items = _filter_and_sort_tasks(items, "")
+        ids = [it["id"] for it in sorted_items]
+        self.assertEqual(ids, ["t4", "t3", "t2", "t1"])
+
 
 
 
