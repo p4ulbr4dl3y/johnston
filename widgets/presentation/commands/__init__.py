@@ -30,8 +30,10 @@ from widgets.presentation.commands.tool_commands import (
     SubagentsCommand,
 )
 from widgets.presentation.commands.ui_commands import (
+    CommandsCommand,
     CopyCommand,
     HelpCommand,
+    KeybindsCommand,
     ThemeCommand,
 )
 
@@ -55,6 +57,8 @@ COMMAND_CLASSES = [
     CopyCommand,
     ThemeCommand,
     HelpCommand,
+    CommandsCommand,
+    KeybindsCommand,
 ]
 
 __all__ = [
@@ -82,4 +86,6 @@ __all__ = [
     "CopyCommand",
     "ThemeCommand",
     "HelpCommand",
+    "CommandsCommand",
+    "KeybindsCommand",
 ]

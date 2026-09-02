@@ -12,7 +12,13 @@ from core.infrastructure.tasks.manager import TaskManager
 from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.lifecycle import LifecycleMixin
 from widgets.mixins.session_persistence import SessionPersistenceMixin
-from widgets.presentation.commands.ui_commands import CopyCommand, HelpCommand, ThemeCommand
+from widgets.presentation.commands.ui_commands import (
+    CommandsCommand,
+    CopyCommand,
+    HelpCommand,
+    KeybindsCommand,
+    ThemeCommand,
+)
 from widgets.presentation.screens.help import HelpScreen
 from widgets.presentation.screens.theme import ThemeScreen
 
@@ -33,6 +39,37 @@ async def test_help_command():
     app.push_screen.assert_called_once()
     screen = app.push_screen.call_args[0][0]
     assert isinstance(screen, HelpScreen)
+    assert screen.active_tab == 0
+
+
+@pytest.mark.asyncio
+async def test_commands_command():
+    cmd = CommandsCommand()
+    assert cmd.name == "/commands"
+    assert "/cmds" in cmd.aliases
+
+    app = MagicMock()
+    await cmd.execute(app)
+    app.push_screen.assert_called_once()
+    screen = app.push_screen.call_args[0][0]
+    assert isinstance(screen, HelpScreen)
+    assert screen.active_tab == 0
+
+
+@pytest.mark.asyncio
+async def test_keybinds_command():
+    cmd = KeybindsCommand()
+    assert cmd.name == "/keybinds"
+    assert "/keys" in cmd.aliases
+    assert "/keybindings" in cmd.aliases
+    assert "/shortcuts" in cmd.aliases
+
+    app = MagicMock()
+    await cmd.execute(app)
+    app.push_screen.assert_called_once()
+    screen = app.push_screen.call_args[0][0]
+    assert isinstance(screen, HelpScreen)
+    assert screen.active_tab == 1
 
 
 @pytest.mark.asyncio

@@ -17,6 +17,24 @@ class HelpCommand(BaseCommand):
         app.push_screen(HelpScreen())
 
 
+class CommandsCommand(BaseCommand):
+    name = "/commands"
+    aliases = ["/cmds"]
+    description = "List all slash commands"
+
+    async def execute(self, app) -> None:
+        app.push_screen(HelpScreen(active_tab=0))
+
+
+class KeybindsCommand(BaseCommand):
+    name = "/keybinds"
+    aliases = ["/keys", "/keybindings", "/shortcuts"]
+    description = "List all hotkeys & keybindings"
+
+    async def execute(self, app) -> None:
+        app.push_screen(HelpScreen(active_tab=1))
+
+
 class CopyCommand(BaseCommand):
     name = "/copy"
     aliases = ["/cp", "/yank"]

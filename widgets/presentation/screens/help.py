@@ -32,6 +32,8 @@ COMMANDS_DATA: list[tuple[str, str]] = [
     ("/fork", "Fork session from a selected message"),
     ("/rename", "Rename the active chat session"),
     ("/resume", "Switch and resume saved session dialogs"),
+    ("/commands", "List all slash commands"),
+    ("/keybinds", "List all hotkeys & keybindings"),
     ("/help", "Open this help screen"),
 ]
 
@@ -97,9 +99,9 @@ class HelpScreen(BaseModalScreen[None]):
         ("ctrl+q", "quit_app", "Quit"),
     ])
 
-    def __init__(self):
+    def __init__(self, active_tab: int = 0):
         super().__init__()
-        self.active_tab = 0  # 0: Commands, 1: Keybindings
+        self.active_tab = active_tab  # 0: Commands, 1: Keybindings
 
     def _get_active_table(self) -> Table:
         from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
