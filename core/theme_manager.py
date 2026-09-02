@@ -91,10 +91,14 @@ class ThemeManager:
         """List all registered themes."""
         return list(self._themes.values())
 
+    def _adapt_theme(self, theme: Theme) -> Theme:
+        """Extensible hook for subclasses to adapt a theme before it is returned/notified."""
+        return theme
+
     @property
     def current_theme(self) -> Theme:
         """Get the currently active theme."""
-        return self._current_theme
+        return self._adapt_theme(self._current_theme)
 
     def set_theme(self, name: str, persist: bool = True) -> Theme:
         """Set active theme by name, optionally persisting to config and notifying listeners."""
@@ -109,12 +113,13 @@ class ThemeManager:
             except Exception as e:
                 logger.warning("Failed to persist theme config: %s", e)
 
+        active_theme = self._adapt_theme(theme)
         for listener in list(self._listeners):
             try:
-                listener(theme)
+                listener(active_theme)
             except Exception as e:
                 logger.warning("Theme listener error: %s", e)
-        return theme
+        return active_theme
 
     def add_listener(self, listener: Callable[[Theme], None]) -> None:
         """Subscribe listener callback to theme changes."""

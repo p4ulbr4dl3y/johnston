@@ -9,7 +9,7 @@ from rich.table import Table
 from core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import format_context_tokens
 from widgets.mixins.stream_frame import SPINNER_FRAMES
-from widgets.utils.row_format import ellipsize, format_cost
+from widgets.utils.row_format import build_env_left_parts, build_status_right_text, ellipsize, format_cost
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
 STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
@@ -197,15 +197,9 @@ def _build_subagent_grid(
             row1_left_parts.append(f"[{txt}]{clean_model}[/]")
         row1_left = sep_compact.join(row1_left_parts)
 
-        if is_connected and bool(model_name):
-            pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
-            pct = min(100.0, max(0.0, pct))
-            pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
-            cost_str = format_cost(cost_usd)
-            right_val = cost_str if cost_usd > 0 else f"{format_context_tokens(total_tokens)}t"
-            row1_right = f"[{txt}]{pct_str} ctx[/]{sep_compact}[{txt}]{right_val}[/]"
-        else:
-            row1_right = f"[{txt}]Run /connect[/]"
+        row1_right = build_status_right_text(
+            is_connected, model_name, context_used, context_limit, cost_usd, total_tokens, txt, sep_compact
+        )
 
         # Row 2 (Compact): Left [dir • branch (+N/-M) • sb:on • mode] | Right [esc • ctrl+k]
         dir_basename = os.path.basename(os.path.abspath(directory)) or directory
@@ -264,19 +258,8 @@ def _build_subagent_grid(
 
     # Row 2: Left [directory • branch (+N/-M) • sandbox: on • mode] | Right [esc: close • ctrl+k: kill]
     dir_text = format_display_path(directory)
-    row2_left_parts = [f"[{txt}]{dir_text}[/]"]
     diff_text = git_diff_stats()
-    if branch and diff_text:
-        row2_left_parts.append(f"[{txt}]{branch} ({diff_text})[/]")
-    elif branch:
-        row2_left_parts.append(f"[{txt}]{branch}[/]")
-    elif diff_text:
-        row2_left_parts.append(f"[{txt}]({diff_text})[/]")
-    if sandbox_enabled:
-        row2_left_parts.append(f"[{txt}]sandboxed[/]")
-    if execution_mode:
-        row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
-    row2_left = sep.join(row2_left_parts)
+    row2_left = build_env_left_parts(dir_text, branch, diff_text, sandbox_enabled, execution_mode, txt, sep)
 
     grid.add_row(row2_left, row2_right)
 

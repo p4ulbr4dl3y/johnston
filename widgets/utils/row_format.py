@@ -19,6 +19,8 @@ from rich.cells import cell_len
 from rich.markup import escape
 from rich.text import Text
 
+from core.models_catalog import format_context_tokens
+
 MODAL_WIDE_ROW_WIDTH = 98
 MODAL_MEDIUM_ROW_WIDTH = 80
 MODAL_DEFAULT_ROW_WIDTH = 72
@@ -55,27 +57,9 @@ def format_relative_time(ts: float | int | None, now: float | int | None = None)
 
 def format_duration(seconds: float | int | None) -> str:
     """Format duration in seconds as concise string ('<0.1s', '4.2s', '14s', '1m 20s', '2h 15m')."""
-    if seconds is None:
-        return ""
-    try:
-        sec = float(seconds)
-    except (ValueError, TypeError):
-        return ""
-    if sec < 0:
-        sec = 0.0
-    if sec < 60:
-        if sec < 0.1:
-            return "<0.1s" if sec > 0 else "0s"
-        if sec < 10:
-            return f"{sec:.1f}s"
-        return f"{int(sec)}s"
-    if sec < 3600:
-        minutes = int(sec // 60)
-        secs = int(sec % 60)
-        return f"{minutes}m {secs:02d}s"
-    hours = int(sec // 3600)
-    mins = int((sec % 3600) // 60)
-    return f"{hours}h {mins:02d}m"
+    from core.infrastructure.tasks.manage import format_duration as _canonical
+
+    return _canonical(seconds)
 
 
 def format_cost(cost_usd: float | int | None) -> str:
@@ -168,3 +152,54 @@ def format_badge_row(
         clean = ellipsize(clean, max_title)
     pad = max(min_gap, target_width - display_width(prefix) - display_width(clean) - display_width(badge))
     return f"{prefix}{escape(clean)}{' ' * pad}[dim]{badge}[/]"
+
+
+def build_status_right_text(
+    is_connected: bool,
+    model_name: str,
+    context_used: int,
+    context_limit: int,
+    cost_usd: float,
+    total_tokens: int,
+    txt: str,
+    sep_compact: str,
+) -> str:
+    """Status-footer right cell: clamped context % beside cost (tokens when free).
+
+    Shared by the status footer and subagent footer layouts.
+    """
+    if is_connected and bool(model_name):
+        pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
+        pct = min(100.0, max(0.0, pct))
+        pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
+        cost_str = format_cost(cost_usd)
+        right_val = cost_str if cost_usd > 0 else f"{format_context_tokens(total_tokens)}t"
+        return f"[{txt}]{pct_str} ctx[/]{sep_compact}[{txt}]{right_val}[/]"
+    return f"[{txt}]Run /connect[/]"
+
+
+def build_env_left_parts(
+    dir_text: str,
+    branch: str | None,
+    diff_text: str | None,
+    sandbox_enabled: bool,
+    execution_mode: str,
+    txt: str,
+    sep: str,
+) -> str:
+    """Status-footer left cell: ``dir • branch (+N/-M) • sandboxed • mode`` joined by sep.
+
+    Shared by the status footer and subagent footer layouts.
+    """
+    row2_left_parts = [f"[{txt}]{dir_text}[/]"]
+    if branch and diff_text:
+        row2_left_parts.append(f"[{txt}]{branch} ({diff_text})[/]")
+    elif branch:
+        row2_left_parts.append(f"[{txt}]{branch}[/]")
+    elif diff_text:
+        row2_left_parts.append(f"[{txt}]({diff_text})[/]")
+    if sandbox_enabled:
+        row2_left_parts.append(f"[{txt}]sandboxed[/]")
+    if execution_mode:
+        row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
+    return sep.join(row2_left_parts)

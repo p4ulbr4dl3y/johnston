@@ -15,7 +15,13 @@ from widgets.presentation.widgets.footer_layout import (
     get_theme_colors,
 )
 from widgets.utils.responsive import is_compact_width, resolve_width
-from widgets.utils.row_format import display_width, ellipsize, format_cost
+from widgets.utils.row_format import (
+    build_env_left_parts,
+    build_status_right_text,
+    display_width,
+    ellipsize,
+    format_cost,
+)
 
 __all__ = [
     "StatusFooter",
@@ -198,15 +204,9 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             branch = self._git_branch(cwd=directory)
             diff_text = self._git_diff_stats(cwd=directory)
 
-            if is_connected and bool(model_name):
-                pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
-                pct = min(100.0, max(0.0, pct))
-                pct_str = "0%" if pct == 0 else f"{pct:.0f}%"
-                cost_str = format_cost(cost_usd)
-                right_val = cost_str if cost_usd > 0 else f"{format_context_tokens(total_tokens)}t"
-                row1_right = f"[{txt}]{pct_str} ctx[/]{sep_compact}[{txt}]{right_val}[/]"
-            else:
-                row1_right = f"[{txt}]Run /connect[/]"
+            row1_right = build_status_right_text(
+                is_connected, model_name, context_used, context_limit, cost_usd, total_tokens, txt, sep_compact
+            )
 
             # Row 1 (LLM): ⠋ Action • claude-3.7 (esc to interrupt)  <left> | <right> 45% ctx • $0.02
             row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
@@ -292,18 +292,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             # Row 2 (Env): ~/repo/johnston • main (+12/-3) • sandbox: on • mode  <left> | <right> ⚡ 2 agents • 1 shell • 4 MCP
             max_path_len = min(50, max(25, width // 3))
             dir_text = format_display_path(directory, max_length=max_path_len)
-            row2_left_parts = [f"[{txt}]{dir_text}[/]"]
-            if branch and diff_text:
-                row2_left_parts.append(f"[{txt}]{branch} ({diff_text})[/]")
-            elif branch:
-                row2_left_parts.append(f"[{txt}]{branch}[/]")
-            elif diff_text:
-                row2_left_parts.append(f"[{txt}]({diff_text})[/]")
-            if sandbox_enabled:
-                row2_left_parts.append(f"[{txt}]sandboxed[/]")
-            if execution_mode:
-                row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
-            row2_left = sep.join(row2_left_parts)
+            row2_left = build_env_left_parts(dir_text, branch, diff_text, sandbox_enabled, execution_mode, txt, sep)
 
             service_parts = []
             if subagents_active > 0:

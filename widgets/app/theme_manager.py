@@ -16,6 +16,12 @@ class ThemeManager(CoreThemeManager):
 
     _instance: Optional[ThemeManager] = None
 
+    def _adapt_theme(self, theme: Theme) -> Theme:
+        """Adapt a native theme to the runtime terminal environment before use."""
+        if theme.name == "native":
+            return self.get_adapted_theme(theme)
+        return theme
+
     def get_adapted_theme(self, theme_or_name: str | Theme) -> Theme:
         """Return theme adapted to runtime terminal environment if applicable."""
         theme = theme_or_name if isinstance(theme_or_name, Theme) else self._themes.get(theme_or_name, ZINC_DARK)
@@ -64,40 +70,6 @@ class ThemeManager(CoreThemeManager):
             markdown_styles=md_styles,
             syntax_tokens=syntax_tokens,
         )
-
-    @property
-    def current_theme(self) -> Theme:
-        """Get the currently active theme (adapted if native)."""
-        if self._current_theme.name == "native":
-            return self.get_adapted_theme(self._current_theme)
-        return self._current_theme
-
-    def set_theme(self, name: str, persist: bool = True) -> Theme:
-        """Set active theme, adapting if native and notifying listeners with adapted theme."""
-        theme = self._themes.get(name)
-        if not theme:
-            raise ValueError(f"Unknown theme: {name}. Available: {list(self._themes.keys())}")
-        self._current_theme = theme
-
-        if persist:
-            from core.infrastructure.config.config_helpers import save_theme_config
-
-            try:
-                save_theme_config(theme.name)
-            except Exception as e:
-                import logging
-
-                logging.getLogger(__name__).warning("Failed to persist theme config: %s", e)
-
-        active_theme = self.get_adapted_theme(theme) if theme.name == "native" else theme
-        for listener in list(self._listeners):
-            try:
-                listener(active_theme)
-            except Exception as e:
-                import logging
-
-                logging.getLogger(__name__).warning("Theme listener error: %s", e)
-        return active_theme
 
     def get_textual_theme(self, theme_or_name: str | Theme) -> TextualTheme:
         """Convert Johnston Theme to TextualTheme instance."""
