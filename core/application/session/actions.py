@@ -400,6 +400,8 @@ def _touched_files(user_events: list[dict], seq_idx: int) -> Optional[list[str]]
     Both rewind callers use the same UI-visible turn model, so the merge lives
     in one place.
     """
+    if not user_events:
+        return None
     turns = user_events[seq_idx:]
     if not turns:
         return []

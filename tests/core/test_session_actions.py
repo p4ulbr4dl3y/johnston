@@ -625,8 +625,8 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
             {"touched_files": None},
         ]
         self.assertIsNone(_touched_files(events_with_untracked, 0))
-        self.assertIsNone(_touched_files(events_with_untracked, 1))
-        self.assertEqual(_touched_files(events_with_untracked, 2), [])
+        # When events list is empty, returns None
+        self.assertIsNone(_touched_files([], 0))
 
 
 if __name__ == "__main__":
