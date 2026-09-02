@@ -34,19 +34,37 @@ class MessageFlowMixin:
         except Exception:
             pass
 
-    async def _exec_slash_command(self, user_text: str) -> None:
+    async def _exec_slash_command(self, user_text: str, attachments: list = None) -> None:
         try:
-            processed = await handle_slash_command(self, user_text)
+            if attachments:
+                processed = await handle_slash_command(self, user_text, attachments=attachments)
+            else:
+                processed = await handle_slash_command(self, user_text)
             if not processed:
                 if user_text.startswith("/") and len(user_text.split()) == 1:
                     self.notify("Unknown command", severity="warning")
+                    if attachments:
+                        try:
+                            ci = self.query_one("#message-input", ChatInput)
+                            ci.clipboard_attachments = list(attachments)
+                            ci.update_attachment_bar()
+                        except Exception:
+                            pass
                 else:
                     if self.is_generating:
-                        self._queue_message_ui(user_text, show_in_ui=True)
+                        self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
                     else:
-                        self.trigger_ai_response(user_text, show_in_ui=True)
+                        kwargs = {"attachments": attachments} if attachments else {}
+                        self.trigger_ai_response(user_text, show_in_ui=True, **kwargs)
         except Exception as e:
             self.notify(f"Command execution failed: {e}", severity="error")
+            if attachments:
+                try:
+                    ci = self.query_one("#message-input", ChatInput)
+                    ci.clipboard_attachments = list(attachments)
+                    ci.update_attachment_bar()
+                except Exception:
+                    pass
 
     def _queue_message_ui(
         self, prompt: str, show_in_ui: bool = True, attachments: list = None, display_text: str = None
@@ -130,7 +148,7 @@ class MessageFlowMixin:
             return
 
         if user_text and user_text.startswith("/"):
-            asyncio.create_task(self._exec_slash_command(user_text))
+            asyncio.create_task(self._exec_slash_command(user_text, attachments=attachments))
             return
 
         chat_input = self.query_one("#message-input", ChatInput)

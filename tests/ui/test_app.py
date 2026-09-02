@@ -139,7 +139,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             chat_input.load_text("")
             chat_input.insert("line1\nline2\nline3\nline4")
             await pilot.pause(0.1)
-            self.assertEqual(chat_input.styles.height.value, 5)
+            self.assertEqual(chat_input.styles.height.value, 6)
 
             # 11. Test long text folding on paste (> 10 lines)
             chat_input.load_text("")

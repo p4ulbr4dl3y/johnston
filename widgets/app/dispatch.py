@@ -68,7 +68,7 @@ def build_command_registry() -> dict:
 COMMAND_REGISTRY = build_command_registry()
 
 
-async def handle_slash_command(app, command_text: str) -> bool:
+async def handle_slash_command(app, command_text: str, attachments: list | None = None) -> bool:
     """Executes command if registered or skill found. Returns True if handled."""
     registry = COMMAND_REGISTRY
 
@@ -100,6 +100,13 @@ async def handle_slash_command(app, command_text: str) -> bool:
     if command_text.strip().startswith("/") and normalized_name in registry:
         cmd_instance = registry[normalized_name]()
         await cmd_instance.execute(app)
+        if attachments:
+            try:
+                chat_input = app.query_one("#message-input")
+                chat_input.clipboard_attachments = list(attachments)
+                chat_input.update_attachment_bar()
+            except Exception:
+                pass
         return True
 
     # Multi-skill & single-skill slash command execution (e.g. /johnston-guide /caveman request)
@@ -125,7 +132,11 @@ async def handle_slash_command(app, command_text: str) -> bool:
         else:
             prompt = skills_content
 
-        app.trigger_ai_response(prompt, show_in_ui=True, display_text=command_text)
+        if getattr(app, "is_generating", False) is True and hasattr(app, "_queue_message_ui"):
+            app._queue_message_ui(prompt, show_in_ui=True, attachments=attachments, display_text=command_text)
+        else:
+            kwargs = {"attachments": attachments} if attachments else {}
+            app.trigger_ai_response(prompt, show_in_ui=True, display_text=command_text, **kwargs)
         return True
 
     # MCP prompt execution fallback (e.g. /simple-prompt or /args-prompt topic=Python)
@@ -175,7 +186,11 @@ async def handle_slash_command(app, command_text: str) -> bool:
                     out_parts.append(" ".join(extra_text))
                 final_prompt = "\n\n".join(p for p in out_parts if p).strip()
                 if final_prompt:
-                    app.trigger_ai_response(final_prompt, show_in_ui=True, display_text=command_text)
+                    if getattr(app, "is_generating", False) is True and hasattr(app, "_queue_message_ui"):
+                        app._queue_message_ui(final_prompt, show_in_ui=True, attachments=attachments, display_text=command_text)
+                    else:
+                        kwargs = {"attachments": attachments} if attachments else {}
+                        app.trigger_ai_response(final_prompt, show_in_ui=True, display_text=command_text, **kwargs)
                     return True
         except Exception:
             pass

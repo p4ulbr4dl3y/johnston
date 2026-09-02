@@ -57,12 +57,21 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             ci.load_text("Line 1\nLine 2\nLine 3")
             ci.update_height()
-            self.assertEqual(ci.styles.height.value, 4)
+            self.assertEqual(ci.styles.height.value, 5)
 
-            # Test height capping at min 2 and max 6
+            # Test height capping at min 3 and max 6
             ci.load_text("Single line")
             ci.update_height()
+            self.assertEqual(ci.styles.height.value, 3)
+            self.assertEqual(ci.styles.padding, (1, 1, 1, 1))
+
+            # With attachment: height shrinks to 2, padding-top drops to 0
+            ci.clipboard_attachments = [ClipboardAttachment("/tmp/img.png")]
+            ci.update_height()
             self.assertEqual(ci.styles.height.value, 2)
+            self.assertEqual(ci.styles.padding, (0, 1, 1, 1))
+            ci.clipboard_attachments = []
+            ci.update_height()
 
             ci.load_text("1\n2\n3\n4\n5\n6\n7\n8")
             ci.update_height()

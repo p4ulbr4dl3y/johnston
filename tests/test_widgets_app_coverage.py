@@ -397,17 +397,20 @@ class TestDispatchCoverage:
 
     @pytest.mark.asyncio
     async def test_handle_slash_command_registered_command(self):
-        app = SimpleNamespace()
+        mock_ci = MagicMock()
+        app = SimpleNamespace(query_one=MagicMock(return_value=mock_ci))
         mock_cmd_cls = MagicMock()
         mock_cmd_instance = MagicMock()
         mock_cmd_instance.execute = AsyncMock()
         mock_cmd_cls.return_value = mock_cmd_instance
 
         with patch.dict("widgets.app.dispatch.COMMAND_REGISTRY", {"/mock": mock_cmd_cls}, clear=False):
-            res = await handle_slash_command(app, "/mock arg1 arg2")
+            res = await handle_slash_command(app, "/mock arg1 arg2", attachments=["img.png"])
             assert res is True
             mock_cmd_cls.assert_called_once()
             mock_cmd_instance.execute.assert_awaited_once_with(app)
+            assert mock_ci.clipboard_attachments == ["img.png"]
+            mock_ci.update_attachment_bar.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_handle_slash_command_registered_with_cyrillic_homoglyphs(self):

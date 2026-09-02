@@ -162,12 +162,21 @@ class ChatInput(TextArea):
         return text
 
     def update_height(self) -> None:
-        """Dynamic height calculation from 2 to 6 lines, taking wrapped lines into account"""
+        """Dynamic height calculation from 2/3 to 6 lines, taking wrapped lines into account"""
         raw_lines = len(self.text.split("\n"))
         wrapped_lines = getattr(self.wrapped_document, "height", 1) if hasattr(self, "wrapped_document") else 1
         lines = max(raw_lines, wrapped_lines)
         max_lines = get_settings().ui.max_chat_input_lines
-        target_height = max(2, min(lines + 1, max_lines))
+        has_attachments = bool(getattr(self, "clipboard_attachments", None))
+
+        pad_lines = 1 if has_attachments else 2
+        min_h = 2 if has_attachments else 3
+        target_height = max(min_h, min(lines + pad_lines, max_lines))
+
+        expected_padding = (0, 1, 1, 1) if has_attachments else (1, 1, 1, 1)
+        if self.styles.padding != expected_padding:
+            self.styles.padding = expected_padding
+
         h = self.styles.height
         if h is None or h.value != target_height or str(getattr(h, "unit", "")) != "Unit.CELLS":
             self.styles.height = target_height
@@ -176,10 +185,9 @@ class ChatInput(TextArea):
             if self.is_mounted and self.app:
                 from widgets.command_suggestions import CommandSuggestions
 
-                has_attachments = bool(getattr(self, "clipboard_attachments", None))
-                att_offset = 1 if has_attachments else 0
+                att_offset = 2 if has_attachments else 0
                 footer_offset = 3
-                margin_b = target_height + footer_offset + att_offset
+                margin_b = target_height + footer_offset + att_offset - 1
 
                 sugg = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 new_margin = (0, 0, margin_b, 0)
