@@ -93,7 +93,7 @@ class SessionPersistenceMixin:
 
             if hasattr(chat_view, "check_welcome") and callable(chat_view.check_welcome):
                 chat_view.check_welcome()
-            await asyncio.sleep(0.15)
+            await asyncio.sleep(0)
 
             def _finish_session_load():
                 try:

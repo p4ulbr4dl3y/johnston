@@ -256,7 +256,10 @@ async def test_session_persistence_restores_plan():
         assert app.current_plan_explanation == "Research phase"
 
         # 2. After load finishes, notch becomes visible
-        await pilot.pause(0.3)
+        for _ in range(50):
+            if notch.display:
+                break
+            await pilot.pause(0.05)
         assert notch.display
         assert len(notch.plan_items) == 1
 
@@ -264,6 +267,7 @@ async def test_session_persistence_restores_plan():
 @pytest.mark.asyncio
 async def test_session_persistence_does_not_restore_completed_plan_if_subsequent_user_message():
     from core.domain.entities.session import AgentSession
+    from widgets.presentation.widgets.chat_container import ChatView
 
     app = JohnstonApp()
     sess = AgentSession("test-completed-plan-sess")
@@ -288,7 +292,11 @@ async def test_session_persistence_does_not_restore_completed_plan_if_subsequent
         notch = app.query_one(PlanNotch)
         assert app.current_plan is None
         assert app.current_plan_explanation == ""
-        await pilot.pause(0.3)
+        chat_view = app.query_one(ChatView)
+        for _ in range(50):
+            if not chat_view.loading:
+                break
+            await pilot.pause(0.05)
         assert not notch.display
         assert notch.plan_items == []
 
@@ -318,7 +326,10 @@ async def test_session_persistence_restores_completed_plan_if_no_subsequent_user
         notch = app.query_one(PlanNotch)
         assert app.current_plan == [{"step": "Analyze codebase", "status": "completed"}]
         assert app.current_plan_explanation == "Research done"
-        await pilot.pause(0.3)
+        for _ in range(50):
+            if notch.display:
+                break
+            await pilot.pause(0.05)
         assert notch.display
         assert len(notch.plan_items) == 1
 
