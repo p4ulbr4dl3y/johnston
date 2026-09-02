@@ -616,3 +616,52 @@ class TestRoleToolWildcards:
         assert role_tool_error(role, "ext_tool") is None
         assert role_tool_error(role, "other_tool") is not None
 
+
+class TestRoleDisplayAndInjection:
+    def test_get_role_display_name_builtin(self):
+        from core.role_registry import get_role_display_name
+
+        assert get_role_display_name("worker") == "Worker"
+        assert get_role_display_name("explorer") == "Explorer"
+        assert get_role_display_name("") == "Worker"
+        assert get_role_display_name(None) == "Worker"
+
+    def test_get_role_display_name_fallback_title_case(self):
+        from core.role_registry import get_role_display_name
+
+        assert get_role_display_name("code_reviewer") == "Code Reviewer"
+        assert get_role_display_name("qa-tester") == "Qa Tester"
+        assert get_role_display_name("custom_dev_ops_role") == "Custom Dev Ops Role"
+
+    def test_get_role_display_name_from_object_attributes(self):
+        from core.role_registry import get_role_display_name
+
+        class DummyEntityWithName:
+            name = "Custom Name"
+
+        class DummyEntityWithRoleName:
+            role_name = "Injected Role"
+
+        assert get_role_display_name(DummyEntityWithName()) == "Custom Name"
+        assert get_role_display_name(DummyEntityWithRoleName()) == "Injected Role"
+
+    def test_session_role_name_property(self):
+        from core.domain.entities.session import AgentSession
+
+        sess = AgentSession("s1", role="code_reviewer")
+        assert sess.role_name == "Code Reviewer"
+
+        sess.role_name = "Custom QA Lead"
+        assert sess.role_name == "Custom QA Lead"
+
+    def test_agent_role_name_property(self):
+        from core.base_provider.agent import BaseAgent
+
+        agent = BaseAgent()
+        agent.role = "qa_tester"
+        assert agent.role_name == "Qa Tester"
+
+        agent.role_name = "Lead QA"
+        assert agent.role_name == "Lead QA"
+
+
