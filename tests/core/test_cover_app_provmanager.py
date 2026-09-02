@@ -344,3 +344,37 @@ async def test_fetch_models_requires_key_false_with_custom_headers(pm):
     assert called_url[0] == "https://opencode.ai/zen/v1/models"
     assert called_kwargs["headers"].get("User-Agent") == "opencode-cli"
 
+
+@pytest.mark.asyncio
+async def test_fetch_models_preserves_stale_cache_on_network_error(pm):
+    manager, tmp_path = pm
+    _write_providers(
+        tmp_path,
+        {
+            "opencode": {
+                "key": "opencode",
+                "name": "OpenCode Zen",
+                "base_url": "https://opencode.ai/zen/v1",
+                "requires_key": False,
+                "model": "fallback-model",
+            }
+        },
+    )
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / "models_opencode.json"
+    cache_file.write_text(json.dumps({"updated_at": 1000.0, "models": ["cached-model-1", "cached-model-2"]}))
+
+    mock_client = MagicMock()
+    mock_client.get = AsyncMock(side_effect=Exception("network timeout"))
+    mock_client.__aenter__.return_value = mock_client
+
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        result = await manager.fetch_models_for_provider("opencode", force_refresh=True)
+
+    # Stale cache must be preserved and returned instead of falling back to 1 model
+    assert result == ["cached-model-1", "cached-model-2"]
+    saved_data = json.loads(cache_file.read_text())
+    assert saved_data["models"] == ["cached-model-1", "cached-model-2"]
+
+

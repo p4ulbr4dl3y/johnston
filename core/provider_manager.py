@@ -555,20 +555,22 @@ class ProviderManager:
         models = []
         model_limits = {}
         should_fetch = pdef.fetch_models
+        fetch_succeeded = False
         if base_url and should_fetch:
             models_url = f"{base_url.rstrip('/')}/models"
             headers = dict(pdef.headers) if pdef.headers else {}
             if api_key and "Authorization" not in headers:
                 headers["Authorization"] = f"Bearer {api_key}"
             timeout_sec = (
-                0.8
+                1.5
                 if is_local_provider(provider_key, pdef.api_type, pdef.base_url, pdef.requires_key)
-                else 3.0
+                else 8.0
             )
             try:
                 client = catalog.get_client()
                 resp = await client.get(models_url, headers=headers, timeout=timeout_sec)
                 if resp.status_code == 200:
+                    fetch_succeeded = True
                     data = resp.json()
                     for m in data.get("data", []):
                         if isinstance(m, dict) and "id" in m:
@@ -586,29 +588,34 @@ class ProviderManager:
                 else:
                     logger.warning("Error fetching models for %s: %s", provider_key, e)
 
-        if models:
+        if fetch_succeeded:
+            if models:
+                try:
+                    await asyncio.to_thread(catalog.save_cache)
+                except Exception:
+                    pass
             try:
-                await asyncio.to_thread(catalog.save_cache)
-            except Exception:
-                pass
+                await asyncio.to_thread(
+                    atomic_write_json,
+                    cache_path,
+                    {"updated_at": time.time(), "models": models, "model_limits": model_limits},
+                    indent=2,
+                )
+            except Exception as e:
+                logger.warning("Error writing models cache: %s", e)
+            return models
+
+        # If network fetch failed (exception/timeout/non-200), preserve existing cache if present
+        if os.path.exists(cache_path):
+            cdata = await asyncio.to_thread(read_json, cache_path, {})
+            if isinstance(cdata, dict):
+                cached_models = [m for m in cdata.get("models", []) if isinstance(m, str)]
+                if cached_models:
+                    logger.info("Using stale cached models for %s after fetch failure", provider_key)
+                    return cached_models
 
         # Universal fallback to configured models list or default model
-        if not models:
-            models = pdef.models_fallback()
-
-        # Save to cache: non-empty lists live MODELS_CACHE_TTL, empty/fallback
-        # ones only MODELS_CACHE_EMPTY_TTL (see fast path above).
-        try:
-            await asyncio.to_thread(
-                atomic_write_json,
-                cache_path,
-                {"updated_at": time.time(), "models": models, "model_limits": model_limits},
-                indent=2,
-            )
-        except Exception as e:
-            logger.warning("Error writing models cache: %s", e)
-
-        return models
+        return pdef.models_fallback()
 
     def is_provider_connected(self, provider_key: str, pdata: Optional[Dict[str, Any]] = None) -> bool:
         """Returns True if the provider is connected and not disabled."""
