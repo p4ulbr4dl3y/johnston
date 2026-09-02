@@ -103,16 +103,32 @@ class ChatStreamDriver:
             if self.on_tool_widget:
                 self.on_tool_widget(tool_handle)
         elif event_type == "tool_result":
+            parsed_tool_result = parse_tool_result_step(step)
+            res_status = parsed_tool_result.status.value if parsed_tool_result.status is not None else None
+            while self.tool_handles:
+                st = getattr(self.tool_handles[0], "status", None)
+                if isinstance(st, str) and st not in ("running",):
+                    self.tool_handles.popleft()
+                else:
+                    break
             if self.tool_handles:
                 cur_tool_handle = self.tool_handles.popleft()
-                parsed_tool_result = parse_tool_result_step(step)
                 cur_tool_handle.set_result(
                     val1,
                     is_error=parsed_tool_result.is_error,
-                    status=parsed_tool_result.status.value if parsed_tool_result.status is not None else None,
+                    status=res_status,
                     returncode=parsed_tool_result.returncode,
                 )
             else:
+                for child in reversed(list(getattr(self.chat_view, "children", []))):
+                    if isinstance(child, ToolCallWidget) and getattr(child, "status", None) == "running":
+                        child.set_result(
+                            val1,
+                            is_error=parsed_tool_result.is_error,
+                            status=res_status,
+                            returncode=parsed_tool_result.returncode,
+                        )
+                        break
                 logger.debug("Received tool_result step with empty tool_handles queue: %s", val1)
         elif event_type == "bot_delta":
             if val1:
@@ -228,6 +244,15 @@ class ChatStreamDriver:
                         returncode=evt.get("returncode"),
                     )
                 else:
+                    for child in reversed(list(getattr(self.chat_view, "children", []))):
+                        if isinstance(child, ToolCallWidget) and getattr(child, "status", None) == "running":
+                            child.set_result(
+                                evt.get("result_text", ""),
+                                is_error=bool(evt.get("is_error", False)),
+                                status=evt.get("status"),
+                                returncode=evt.get("returncode"),
+                            )
+                            break
                     logger.debug("Received session tool_result event with empty tool_handles queue: %s", evt)
             else:
                 await self.finalize_bot_stream()

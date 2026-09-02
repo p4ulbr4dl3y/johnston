@@ -139,10 +139,6 @@ class SubagentViewScreen(ModalScreen[None]):
                 pass
             self._footer_refresh = None
 
-        if self.session:
-            self.session.remove_listener(self._on_live_event)
-            self.session.add_listener(self._on_live_event)
-
         self._history_worker = self.run_worker(self._load_history_session())
 
     def _refresh_chrome(self) -> None:
@@ -203,8 +199,20 @@ class SubagentViewScreen(ModalScreen[None]):
         if app and self.session and hasattr(app, "_subagent_expand_state") and isinstance(app._subagent_expand_state, dict):
             expand_state = app._subagent_expand_state.get(self.session.id, set())
 
+        # Drain any stale items from queue
+        while not self.event_queue.empty():
+            try:
+                self.event_queue.get_nowait()
+                self.event_queue.task_done()
+            except Exception:
+                break
+
         if self.session:
             history_events = [dict(m) for m in self.session.messages if isinstance(m, dict)]
+            self.session.remove_listener(self._on_live_event)
+            self.session.add_listener(self._on_live_event)
+            if not self.queue_task or self.queue_task.done():
+                self.queue_task = asyncio.create_task(self._process_queue())
             has_user_msg = any(
                 isinstance(e, dict) and e.get("type") == "user" and is_ui_visible_user_message(e)
                 for e in history_events
@@ -237,9 +245,6 @@ class SubagentViewScreen(ModalScreen[None]):
 
         if not self.is_mounted:
             return
-
-        if not self.queue_task or self.queue_task.done():
-            self.queue_task = asyncio.create_task(self._process_queue())
 
         if self.session:
             has_subsequent_user_msg = False
