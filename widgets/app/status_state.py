@@ -168,7 +168,7 @@ def build_status_kwargs(app, widget=None) -> dict:
     subagents_active = len([s for s in sessions if getattr(s, "status", "") == "running"])
     subagents_total = len(sessions)
 
-    agent_role = getattr(agent, "role", "worker")
+    agent_role = getattr(agent, "role_name", None) or getattr(app, "role_name", None) or getattr(agent, "role", "worker")
 
     attachments_count = 0
     try:

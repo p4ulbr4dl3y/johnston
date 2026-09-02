@@ -25,6 +25,11 @@ def apply_role(
 
     registry = RoleRegistry.get_instance()
     definition = resolve_role(registry, role_key, project_dir=project_dir)
+    try:
+        subagent.role = definition.key
+        subagent.role_name = definition.name
+    except Exception:
+        pass
     apply_provider(subagent, definition)
     apply_role_tools(subagent, definition)
     apply_prompt(subagent, definition, worktree_branch=worktree_branch)

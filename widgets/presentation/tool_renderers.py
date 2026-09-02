@@ -187,7 +187,9 @@ def format_manage_subagent_display(result_text: str) -> Text:
                 m.group(3).strip(),
                 m.group(4).strip(),
             )
-            role_cap = role.capitalize() if role else "Worker"
+            from core.role_registry import get_role_display_name
+
+            role_cap = get_role_display_name(role) if role else "Worker"
             desc = f"{role_cap}: {title}" if title else (role_cap or "(no description)")
             if status == "RUNNING":
                 item_t = (

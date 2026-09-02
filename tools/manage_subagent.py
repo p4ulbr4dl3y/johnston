@@ -81,7 +81,7 @@ class ManageSubagentTool(BaseTool):
                 else:
                     s_status = st or "unknown"
 
-                s_role = str(sess.role or "worker")
+                s_role = str(getattr(sess, "role", "worker") or "worker")
                 raw_title = getattr(sess, "title", "") or ""
                 if (not raw_title or raw_title.lower() == "untitled") and getattr(sess, "prompt", ""):
                     raw_title = getattr(sess, "prompt", "")

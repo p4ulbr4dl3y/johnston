@@ -177,7 +177,9 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             clean_model = catalog.get_model_display_name(provider_key, model_name)
             if not clean_model:
                 clean_model = "[Select model: /models]"
-        role_str = agent_role.capitalize()
+        from core.role_registry import get_role_display_name
+
+        role_str = get_role_display_name(agent_role)
         if self.is_generating:
             frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
             role_formatted = f"{frame} {role_str}"

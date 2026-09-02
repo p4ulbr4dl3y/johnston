@@ -153,7 +153,9 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
     if name == "invoke_subagent":
         title = str(args.get("title") or "").strip()
         role = str(args.get("type") or args.get("role") or "worker").strip()
-        role_cap = role.capitalize() if role else "Worker"
+        from core.role_registry import get_role_display_name
+
+        role_cap = get_role_display_name(role)
         if title:
             return truncate(f'{role_cap}: "{title}"')
         return truncate(role_cap)

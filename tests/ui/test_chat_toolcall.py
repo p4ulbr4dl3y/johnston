@@ -820,7 +820,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("Explore: search files", t.plain)
         self.assertIn("[✓]", t.plain)
         self.assertIn("sess_456", t.plain)
-        self.assertIn("Code_editor: refactor auth", t.plain)
+        self.assertIn("Code Editor: refactor auth", t.plain)
 
     def test_render_content_manage_subagent_list(self):
         w = self._widget(

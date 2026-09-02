@@ -98,6 +98,7 @@ class AgentSession:
         self.kind = kind
         self.parent_id = parent_id
         self.role = role
+        self._role_name: Optional[str] = None
         self.status = status
         self.project_key = project_key
         self._title = title
@@ -123,6 +124,17 @@ class AgentSession:
         self.project_dir: str = ""
         self.branch_name: str = ""
         self.background: bool = True
+
+    @property
+    def role_name(self) -> str:
+        if getattr(self, "_role_name", None):
+            return self._role_name
+        from core.role_registry import get_role_display_name
+        return get_role_display_name(self.role or "worker", project_dir=self.project_dir or None)
+
+    @role_name.setter
+    def role_name(self, value: str) -> None:
+        self._role_name = value
 
     # -- live event streaming (subagents) ---------------------------------
 

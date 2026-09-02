@@ -104,9 +104,15 @@ def format_subagent_task_row(
     role_str = "Worker"
     if session is not None:
         agent = getattr(session, "agent", None)
-        role = getattr(agent, "role", None) if agent else getattr(session, "role", None)
-        if role and isinstance(role, str) and role.strip():
-            role_str = role.strip().capitalize()
+        raw_rn = getattr(agent, "role_name", None) or getattr(session, "role_name", None)
+        if isinstance(raw_rn, str) and raw_rn.strip():
+            role_str = raw_rn
+        else:
+            role = getattr(agent, "role", None) if agent else getattr(session, "role", None)
+            if isinstance(role, str) and role.strip():
+                from core.role_registry import get_role_display_name
+
+                role_str = get_role_display_name(role)
     if not clean.lower().startswith(f"{role_str.lower()}:"):
         clean = f"{role_str}: {clean}"
     else:
@@ -806,16 +812,17 @@ class SubagentsScreen(BaseTasksListScreen):
             ).strip()
             clean_title = " ".join(title_text.split()) or "(subagent task)"
             agent = getattr(s, "agent", None)
-            role = getattr(agent, "role", None) if agent else getattr(s, "role", None)
-            if (
-                role
-                and isinstance(role, str)
-                and role.strip()
-                and role.strip().lower() not in ("worker", "subagent", "default")
-            ):
-                role_clean = role.strip()
-                if not clean_title.lower().startswith(role_clean.lower()):
-                    display_cmd = f"{role_clean}: {clean_title}"
+            raw_rn = getattr(agent, "role_name", None) or getattr(s, "role_name", None)
+            role_display = raw_rn if (isinstance(raw_rn, str) and raw_rn.strip()) else None
+            if not role_display:
+                role = getattr(agent, "role", None) if agent else getattr(s, "role", None)
+                if role and isinstance(role, str) and role.strip() and role.strip().lower() not in ("worker", "subagent", "default"):
+                    from core.role_registry import get_role_display_name
+
+                    role_display = get_role_display_name(role)
+            if role_display and isinstance(role_display, str) and role_display.lower() not in ("worker", "subagent", "default"):
+                if not clean_title.lower().startswith(role_display.lower()):
+                    display_cmd = f"{role_display}: {clean_title}"
                 else:
                     display_cmd = clean_title
             else:

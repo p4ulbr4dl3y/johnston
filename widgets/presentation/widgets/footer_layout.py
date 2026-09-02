@@ -174,7 +174,9 @@ def _build_subagent_grid(
     sep_compact = f" [{t_muted}]•[/] "
     arrow_sep = f" [{t_muted}]›[/] "
 
-    role_str = (agent_role or "worker").capitalize()
+    from core.role_registry import get_role_display_name
+
+    role_str = get_role_display_name(agent_role)
     if is_generating:
         frame = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
         role_formatted = f"{frame} {role_str}"

@@ -1,7 +1,7 @@
 import copy
 import logging
 import os
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from core.domain.policies.role_policy import (
     AgentRole,
@@ -123,6 +123,7 @@ class RoleRegistry:
 
         return format_subagents_markdown(list(subagent_roles.values()))
 
+
     def _parse_md_role(self, fpath: str, source: str) -> Optional[AgentRole]:
         try:
             with open(fpath, "r", encoding="utf-8") as f:
@@ -135,7 +136,7 @@ class RoleRegistry:
             prompt = prompt.strip()
 
             key = meta.get("key") or base_key
-            name = meta.get("name") or key.capitalize()
+            name = meta.get("name") or key.replace("_", " ").replace("-", " ").title()
             desc = meta.get("description", "")
             model = meta.get("model", "")
             scope = meta.get("scope", "any")
@@ -164,3 +165,21 @@ class RoleRegistry:
         except Exception as exc:
             logger.warning("Skipping invalid role file %s: %s", fpath, exc)
             return None
+
+
+def get_role_display_name(role_or_key: Any, project_dir: Optional[str] = None) -> str:
+    """Return human-readable role name for a key, entity, or role definition."""
+    if not role_or_key:
+        return "Worker"
+    if hasattr(role_or_key, "role_name") and role_or_key.role_name:
+        return str(role_or_key.role_name)
+    if hasattr(role_or_key, "name") and role_or_key.name:
+        return str(role_or_key.name)
+    if isinstance(role_or_key, str):
+        registry = RoleRegistry.get_instance()
+        registry.load_roles(project_dir=project_dir)
+        key_lower = role_or_key.lower().strip()
+        if key_lower in registry.roles:
+            return registry.roles[key_lower].name
+        return role_or_key.replace("_", " ").replace("-", " ").title()
+    return "Worker"

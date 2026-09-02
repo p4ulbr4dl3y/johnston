@@ -165,6 +165,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self.total_tokens = 0
         self.cost_usd = 0.0
         self.role = "worker"
+        self._role_name: Optional[str] = None
         self.tool_executor = tool_executor
         self.default_tools_provider = default_tools_provider
         self.image_processor = image_processor
@@ -173,6 +174,17 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         # The stream loop calls it once per tool call; without the memo the role
         # resolution + membership checks rerun for every tool_result.
         self._tool_policy_cache: Dict[tuple, Any] = {}
+
+    @property
+    def role_name(self) -> str:
+        if getattr(self, "_role_name", None):
+            return self._role_name
+        from core.role_registry import get_role_display_name
+        return get_role_display_name(self.role or "worker")
+
+    @role_name.setter
+    def role_name(self, value: str) -> None:
+        self._role_name = value
 
     @property
     def client(self) -> Any:
