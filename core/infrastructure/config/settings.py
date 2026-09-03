@@ -59,6 +59,7 @@ from core.domain.defaults.config import (
     DEFAULT_SNAPSHOT_LOG_BYTES,
     DEFAULT_STREAM_FLUSH_INTERVAL,
     DEFAULT_STREAM_TIMEOUT,
+    DEFAULT_SUBAGENT_AUTO_COMPACT_TOKEN_LIMIT,
     DEFAULT_SUBAGENT_RESULT_MAX_CHARS,
     DEFAULT_SUBAGENT_WORKTREE_TIMEOUT,
     DEFAULT_TOOL_OUTPUT_CHARS,
@@ -74,6 +75,18 @@ logger = logging.getLogger(__name__)
 
 
 def _safe_int(val: Any, default: int, min_val: Optional[int] = None) -> int:
+    if val is None or isinstance(val, bool):
+        return default
+    try:
+        parsed = int(val)
+        if min_val is not None and parsed < min_val:
+            return default
+        return parsed
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_opt_int(val: Any, default: Optional[int] = None, min_val: Optional[int] = None) -> Optional[int]:
     if val is None or isinstance(val, bool):
         return default
     try:
@@ -106,6 +119,13 @@ def _env_int(key: str, default: int, min_val: Optional[int] = None) -> int:
     return default
 
 
+def _env_opt_int(key: str, default: Optional[int] = None, min_val: Optional[int] = None) -> Optional[int]:
+    val = os.getenv(key)
+    if val is not None and val.strip():
+        return _safe_opt_int(val.strip(), default, min_val=min_val)
+    return default
+
+
 def _env_float(key: str, default: float, min_val: Optional[float] = None) -> float:
     val = os.getenv(key)
     if val is not None and val.strip():
@@ -134,6 +154,7 @@ def _env_str(key: str, default: str) -> str:
 @dataclass
 class LLMSettings:
     context_limit: int = DEFAULT_CONTEXT_LIMIT
+    auto_compact_token_limit: Optional[int] = None
     compaction_threshold_ratio: float = DEFAULT_COMPACTION_THRESHOLD_RATIO
     compaction_summarize_ratio: float = DEFAULT_COMPACTION_SUMMARIZE_RATIO
     compaction_user_budget: int = DEFAULT_COMPACTION_USER_BUDGET
@@ -163,6 +184,11 @@ class LLMSettings:
             context_limit=_env_int(
                 "JOHNSTON_CONTEXT_LIMIT",
                 _safe_int(sec.get("context_limit"), DEFAULT_CONTEXT_LIMIT, min_val=1000),
+                min_val=1000,
+            ),
+            auto_compact_token_limit=_env_opt_int(
+                "JOHNSTON_AUTO_COMPACT_TOKEN_LIMIT",
+                _safe_opt_int(sec.get("auto_compact_token_limit"), None, min_val=1000),
                 min_val=1000,
             ),
             compaction_threshold_ratio=_env_float(
@@ -421,12 +447,20 @@ class SubagentsSettings:
     max_concurrent: int = DEFAULT_MAX_CONCURRENT_SUBAGENTS
     max_result_chars: int = DEFAULT_SUBAGENT_RESULT_MAX_CHARS
     worktree_timeout: float = DEFAULT_SUBAGENT_WORKTREE_TIMEOUT
+    auto_compact_token_limit: Optional[int] = DEFAULT_SUBAGENT_AUTO_COMPACT_TOKEN_LIMIT
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> SubagentsSettings:
         sec = data.get("subagents") if isinstance(data.get("subagents"), dict) else {}
         max_sub = _safe_int(sec.get("max_concurrent"), DEFAULT_MAX_CONCURRENT_SUBAGENTS, min_val=1)
         raw_chars = sec.get("max_result_chars")
+        if "auto_compact_token_limit" in sec and sec.get("auto_compact_token_limit") is None:
+            parsed_sub_compact = None
+        else:
+            raw_sub_compact = sec.get("auto_compact_token_limit")
+            parsed_sub_compact = _safe_opt_int(
+                raw_sub_compact, DEFAULT_SUBAGENT_AUTO_COMPACT_TOKEN_LIMIT, min_val=1000
+            )
         return cls(
             max_concurrent=_env_int("JOHNSTON_MAX_CONCURRENT_SUBAGENTS", max_sub, min_val=1),
             max_result_chars=_env_int(
@@ -438,6 +472,11 @@ class SubagentsSettings:
                 "JOHNSTON_SUBAGENT_WORKTREE_TIMEOUT",
                 _safe_float(sec.get("worktree_timeout"), DEFAULT_SUBAGENT_WORKTREE_TIMEOUT, min_val=0.1),
                 min_val=0.1,
+            ),
+            auto_compact_token_limit=_env_opt_int(
+                "JOHNSTON_SUBAGENT_AUTO_COMPACT_TOKEN_LIMIT",
+                parsed_sub_compact,
+                min_val=1000,
             ),
         )
 

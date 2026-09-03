@@ -105,6 +105,9 @@ def configure_subagent_agent(
     """
     subagent.app = app
     subagent.is_subagent = True
+    from core.infrastructure.config.settings import get_settings
+
+    subagent.auto_compact_token_limit = get_settings().subagents.auto_compact_token_limit
     if worktree_branch:
         subagent.worktree_branch = worktree_branch
     if app and hasattr(app, "sandbox_enabled"):

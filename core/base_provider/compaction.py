@@ -513,7 +513,22 @@ class CompactionMixin:
                 summarize_ratio = get_settings().llm.compaction_summarize_ratio
             except Exception:
                 summarize_ratio = DEFAULT_COMPACTION_SUMMARIZE_RATIO
-            max_summarize_tokens = int(getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT) * summarize_ratio)
+            limit_for_compaction = getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT)
+            compact_limit = getattr(self, "auto_compact_token_limit", None)
+            if compact_limit is None:
+                try:
+                    from core.infrastructure.config.settings import get_settings
+
+                    settings = get_settings()
+                    if getattr(self, "is_subagent", False):
+                        compact_limit = settings.subagents.auto_compact_token_limit
+                    else:
+                        compact_limit = settings.llm.auto_compact_token_limit
+                except Exception:
+                    pass
+            if compact_limit is not None and compact_limit > 0:
+                limit_for_compaction = min(limit_for_compaction, compact_limit)
+            max_summarize_tokens = int(limit_for_compaction * summarize_ratio)
             available_tokens = max(0, max_summarize_tokens - sys_tokens)
 
             # Estimate tokens on individual messages and slice in a single pass from the tail

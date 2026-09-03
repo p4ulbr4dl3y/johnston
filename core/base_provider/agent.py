@@ -131,6 +131,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         default_tools_provider: Optional[Callable[[], List[Dict]]] = None,
         image_processor: Optional[Callable] = None,
         tool_name_normalizer: Optional[Callable[[str], str]] = None,
+        auto_compact_token_limit: Optional[int] = None,
     ):
         if tools is None:
             tools = default_tools_provider() if default_tools_provider else []
@@ -138,6 +139,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         self.model = model
         self.base_url = base_url
         self.system_prompt = system_prompt if system_prompt is not None else DEFAULT_SYSTEM_PROMPT
+        self.auto_compact_token_limit = auto_compact_token_limit
         self.tools = tools
         self.provider_key = provider_key
         self.api_type = api_type
@@ -407,8 +409,17 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         from core.infrastructure.config.settings import get_settings
 
         cur_limit = getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT)
-        compaction_ratio = get_settings().llm.compaction_threshold_ratio
+        settings = get_settings()
+        compaction_ratio = settings.llm.compaction_threshold_ratio
         threshold = int(cur_limit * compaction_ratio)
+        compact_limit = getattr(self, "auto_compact_token_limit", None)
+        if compact_limit is None:
+            if getattr(self, "is_subagent", False):
+                compact_limit = settings.subagents.auto_compact_token_limit
+            else:
+                compact_limit = settings.llm.auto_compact_token_limit
+        if compact_limit is not None and compact_limit > 0:
+            threshold = min(threshold, compact_limit)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
         history_tokens = self._current_history_tokens() if self.history else 0
         total_tokens = sys_overhead + history_tokens

@@ -527,3 +527,64 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         dividers = [e for e in events if e[0] == "event_divider" and "Session Compacted" in e[1]]
         self.assertEqual(len(dividers), 2)
         self.assertEqual(events[-1], ("bot_text", "done everything", ""))
+
+    async def test_auto_compact_token_limit_clips_threshold(self):
+        agent = self._make_agent()
+        agent.auto_compact_token_limit = 50_000
+        captured_threshold = None
+
+        async def fake_compact(messages, sys_overhead, threshold):
+            nonlocal captured_threshold
+            captured_threshold = threshold
+            return (messages, False, "")
+
+        stream_resp = _MockStream([_tool_call_chunk(0, "tc_1", "read", '{"path": "a.txt"}')])
+        text_resp = _MockStream([_text_chunk("done")])
+
+        with unittest.mock.patch.object(
+            BaseAgent, "context_limit", new_callable=unittest.mock.PropertyMock, return_value=200_000
+        ):
+            with unittest.mock.patch.object(agent, "_compact_messages_if_needed", side_effect=fake_compact):
+                with unittest.mock.patch.object(
+                    agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                ) as mock_create:
+                    mock_create.side_effect = [stream_resp, text_resp]
+                    agent.tool_executor = unittest.mock.AsyncMock(return_value="read result")
+                    async for _ in agent.stream_steps("test prompt"):
+                        pass
+
+        # 200_000 * 0.75 = 150_000, but clipped to auto_compact_token_limit (50_000)
+        self.assertEqual(captured_threshold, 50_000)
+
+    async def test_subagent_inherits_subagents_auto_compact_token_limit(self):
+        from core.application.session.stream import configure_subagent_agent
+
+        subagent = self._make_agent()
+        configure_subagent_agent(subagent, "worker")
+        self.assertTrue(getattr(subagent, "is_subagent", False))
+        self.assertEqual(subagent.auto_compact_token_limit, 100_000)
+
+        captured_threshold = None
+
+        async def fake_compact(messages, sys_overhead, threshold):
+            nonlocal captured_threshold
+            captured_threshold = threshold
+            return (messages, False, "")
+
+        stream_resp = _MockStream([_tool_call_chunk(0, "tc_1", "read", '{"path": "a.txt"}')])
+        text_resp = _MockStream([_text_chunk("done")])
+
+        with unittest.mock.patch.object(
+            BaseAgent, "context_limit", new_callable=unittest.mock.PropertyMock, return_value=1_000_000
+        ):
+            with unittest.mock.patch.object(subagent, "_compact_messages_if_needed", side_effect=fake_compact):
+                with unittest.mock.patch.object(
+                    subagent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                ) as mock_create:
+                    mock_create.side_effect = [stream_resp, text_resp]
+                    subagent.tool_executor = unittest.mock.AsyncMock(return_value="read result")
+                    async for _ in subagent.stream_steps("subagent prompt"):
+                        pass
+
+        # 1_000_000 * 0.75 = 750_000, but clipped to subagent default 100_000
+        self.assertEqual(captured_threshold, 100_000)
