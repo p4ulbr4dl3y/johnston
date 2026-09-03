@@ -1,6 +1,7 @@
 import copy
 import logging
 import os
+import threading
 from typing import Any, Callable, Dict, Optional
 
 from core.domain.policies.role_policy import (
@@ -12,6 +13,14 @@ from core.infrastructure.runtime.frontmatter import parse_csv_list, parse_frontm
 from core.infrastructure.runtime.markdown_scanner import MarkdownScannerCache
 
 logger = logging.getLogger(__name__)
+
+# RoleRegistry is a process-wide singleton shared by the sync UI path, the
+# async agent loop and prompt-builder worker threads (asyncio.to_thread).
+# load_roles mutates current_project_dir / roles / the scanner cache, so all
+# state-mutating entry points serialize on this lock; the reentrant form lets
+# get_role / get_system_prompt_snippet hold it across load_roles + read so a
+# concurrent call for a different project dir cannot clobber in-flight state.
+_registry_lock = threading.RLock()
 
 BUILTIN_ROLES: Dict[str, AgentRole] = {
     "worker": AgentRole(
@@ -95,36 +104,38 @@ class RoleRegistry:
         return cls._instance
 
     def load_roles(self, project_dir: Optional[str] = None, include_global: bool = True) -> Dict[str, AgentRole]:
-        if project_dir is not None:
-            self.current_project_dir = project_dir
-        p_dir = self.current_project_dir or os.getcwd()
+        with _registry_lock:
+            if project_dir is not None:
+                self.current_project_dir = project_dir
+            p_dir = self.current_project_dir or os.getcwd()
 
-        def _build(_dirs, files):
-            roles: Dict[str, AgentRole] = _fresh_builtins()
-            for fpath, source in files:
-                role = self._parse_md_role(fpath, source)
-                if role:
-                    roles[role.key] = role
-            return roles
+            def _build(_dirs, files):
+                roles: Dict[str, AgentRole] = _fresh_builtins()
+                for fpath, source in files:
+                    role = self._parse_md_role(fpath, source)
+                    if role:
+                        roles[role.key] = role
+                return roles
 
-        self.roles = self._cache.get(
-            project_dir=p_dir,
-            include_global=include_global,
-            build=_build,
-        )
-        self._apply_normalizer(self.roles)
-        return self.roles
+            self.roles = self._cache.get(
+                project_dir=p_dir,
+                include_global=include_global,
+                build=_build,
+            )
+            self._apply_normalizer(self.roles)
+            return self.roles
 
     def invalidate_cache(self) -> None:
         """Force the next load_roles/get_role/get_system_prompt_snippet to re-scan from disk."""
         self._cache.invalidate()
 
     def get_role(self, key: str, project_dir: Optional[str] = None) -> AgentRole:
-        self.load_roles(project_dir=project_dir)
-        key_lower = (key or "").lower().strip()
-        if key_lower in self.roles:
-            return self.roles[key_lower]
-        return self.roles.get("worker") or BUILTIN_ROLES["worker"]
+        with _registry_lock:
+            self.load_roles(project_dir=project_dir)
+            key_lower = (key or "").lower().strip()
+            if key_lower in self.roles:
+                return self.roles[key_lower]
+            return self.roles.get("worker") or BUILTIN_ROLES["worker"]
 
     def list_roles(self, scope: Optional[str] = None) -> Dict[str, AgentRole]:
         if not scope:
@@ -136,27 +147,27 @@ class RoleRegistry:
         return {k: v for k, v in self.roles.items() if v.scope in (RoleScope.BOTH, RoleScope.SUBAGENT)}
 
     def get_system_prompt_snippet(self, project_dir: Optional[str] = None) -> str:
-        self.load_roles(project_dir=project_dir)
-        subagent_roles = self.list_subagent_roles()
-        if not subagent_roles:
-            return ""
+        with _registry_lock:
+            self.load_roles(project_dir=project_dir)
+            subagent_roles = self.list_subagent_roles()
+            if not subagent_roles:
+                return ""
 
-        # Pull max_concurrent from config so the subagent block carries the
-        # real budget; fall back to the documented default if config is
-        # unavailable (headless / early-init paths).
-        try:
-            from core.infrastructure.config.settings import get_settings
+            # Pull max_concurrent from config so the subagent block carries the
+            # real budget; fall back to the documented default if config is
+            # unavailable (headless / early-init paths).
+            try:
+                from core.infrastructure.config.settings import get_settings
 
-            max_concurrent = get_settings().subagents.max_concurrent
-        except Exception:
-            from core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
+                max_concurrent = get_settings().subagents.max_concurrent
+            except Exception:
+                from core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
 
-            max_concurrent = DEFAULT_MAX_CONCURRENT_SUBAGENTS
+                max_concurrent = DEFAULT_MAX_CONCURRENT_SUBAGENTS
 
-        from core.infrastructure.runtime.prompt_markdown import format_subagents_markdown
+            from core.infrastructure.runtime.prompt_markdown import format_subagents_markdown
 
-        return format_subagents_markdown(list(subagent_roles.values()), max_concurrent=max_concurrent)
-
+            return format_subagents_markdown(list(subagent_roles.values()), max_concurrent=max_concurrent)
 
     def _parse_md_role(self, fpath: str, source: str) -> Optional[AgentRole]:
         try:

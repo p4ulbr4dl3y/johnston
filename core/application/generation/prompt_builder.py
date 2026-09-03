@@ -248,6 +248,19 @@ async def get_rules_snippet_async(role: str = "worker", cwd: str = None) -> str:
     return await asyncio.to_thread(get_rules_snippet, role, cwd)
 
 
+def _role_ident(obj: Any) -> Optional[tuple]:
+    """Content identity of a role definition: object id, key and prompt text.
+
+    The prompt text is the role's only influence on the assembled prompt (via
+    ``format_role_prompt``), so a role edit on disk produces a new identity
+    and invalidates the stable-core cache even if the registry internals were
+    refreshed in place.
+    """
+    if obj is None:
+        return None
+    return (id(obj), getattr(obj, "key", None), getattr(obj, "prompt", None))
+
+
 class PromptBuilder:
     """Builds composite system prompt and tool definitions accounting for MCP, Skills, and agent role (worker/explorer)"""
 
@@ -318,21 +331,24 @@ class PromptBuilder:
         """Async variant of ``build_system_prompt`` for the async agent loop.
 
         On cache miss, file/system-prompt-part reads (project instructions, rules,
-        skills tree scan) run on a worker thread instead of blocking the event loop.
+        skills tree scan, role registry scan, MCP config parse) run on a worker
+        thread instead of blocking the event loop.
         """
         cwd = self.cwd or os.getcwd()
         from core.infrastructure.mcp import get_mcp_manager
         from core.role_registry import RoleRegistry
 
         mcp_mgr = get_mcp_manager()
-        mcp_snippet = mcp_mgr.get_system_prompt_snippet()
+        mcp_snippet = await asyncio.to_thread(mcp_mgr.get_system_prompt_snippet)
         from core.infrastructure.runtime.prompt_markdown import format_skills_markdown
 
         skills_snippet = format_skills_markdown(
-            await asyncio.to_thread(get_skill_manager(self.cwd).get_system_prompt_skills)
+            await asyncio.to_thread(lambda: get_skill_manager(self.cwd).get_system_prompt_skills())
         )
         subagents_snippet = (
-            "" if self.is_subagent else RoleRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
+            ""
+            if self.is_subagent
+            else await asyncio.to_thread(RoleRegistry.get_instance().get_system_prompt_snippet, project_dir=cwd)
         )
 
         now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
@@ -394,11 +410,100 @@ class PromptBuilder:
             rules_snippet, mcp_snippet, skills_snippet, subagents_snippet
         )
 
-    def _assemble_stable_core(self, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet) -> str:
+    def _base_sys_prompt(self) -> str:
+        """Identity/contract prefix of the stable core: base prompt, model-name
+        substitution and (for subagents) the worktree-guidelines block.
+
+        The role block is intentionally NOT included: it is represented in the
+        stable-core cache key by the role-definition identity (``_role_ident``)
+        instead, so the key can be computed before the disk-backed role
+        definition is loaded.
+        """
+        sys_prompt = self.base_system_prompt if self.base_system_prompt else ""
+        if "{model_name}" in sys_prompt:
+            model_label = (
+                self.model_name.strip()
+                if self.model_name and self.model_name.strip()
+                else "an expert AI assistant"
+            )
+            # Model names normally don't contain XML special chars, but a
+            # provider's model list is user-editable, so escape defensively.
+            sys_prompt = sys_prompt.replace("{model_name}", escape_xml(model_label))
+
+        if self.is_subagent and self.worktree_branch and "<worktree_guidelines>" not in sys_prompt:
+            # Branch name is user-controlled and gets interpolated into the
+            # system prompt. Escape it so a name containing literal
+            # `</worktree>` cannot truncate the wrapper and inject
+            # arbitrary content.
+            safe_branch = escape_xml(self.worktree_branch)
+            sys_prompt += f"\n\n{SUBAGENT_WORKTREE_PROMPT.format(branch_name=safe_branch)}"
+        return sys_prompt
+
+    def _stable_core_key(
+        self,
+        base_sys_prompt: str,
+        rules_snippet,
+        mcp_snippet,
+        skills_snippet,
+        subagents_snippet,
+        role_ident: Optional[tuple],
+    ) -> tuple:
+        """Stable-core cache key.
+
+        ``role_ident`` carries the role definition (object id, key plus prompt
+        text via ``_role_ident``) so a role change invalidates the cache;
+        ``base_sys_prompt`` carries the base prompt, model label and worktree
+        block. The role's prompt is represented here (not in
+        ``base_sys_prompt``) because the role is only resolved from disk after
+        the cache is consulted.
+        """
+        return (
+            base_sys_prompt,
+            rules_snippet,
+            skills_snippet,
+            subagents_snippet,
+            mcp_snippet,
+            self.role,
+            self.worktree_branch,
+            role_ident,
+            TOOL_OUTPUT_FORMAT_SNIPPET,
+        )
+
+    def _stable_core_cached(self, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet) -> Optional[str]:
+        """Cheap stable-core lookup using the registry's in-memory role state.
+
+        No disk read: the registered roles are refreshed this turn on the main
+        path by the subagents-snippet read and on every turn by
+        ``build_tools`` -> ``get_role``, so the in-memory identity changes
+        exactly when the on-disk role set changes.
+        """
+        from core.role_registry import BUILTIN_ROLES, RoleRegistry
+
+        registry = RoleRegistry.get_instance()
+        role_key = (self.role or "").strip().lower()
+        in_memory = registry.roles.get(role_key) or registry.roles.get("worker") or BUILTIN_ROLES["worker"]
+        key = self._stable_core_key(
+            self._base_sys_prompt(),
+            rules_snippet,
+            mcp_snippet,
+            skills_snippet,
+            subagents_snippet,
+            _role_ident(in_memory),
+        )
+        return _STABLE_CORE_CACHE.get(key)
+
+    def _assemble_stable_core(self, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet, role_def=None) -> str:
         """Shared stable-prefix assembly for the sync and async builders.
 
         Takes the already-fetched rules snippet so the sync and async
         variants only differ in how those are read (direct vs worker thread).
+
+        The stable-core cache is consulted BEFORE the disk-backed role
+        definition is loaded: the role participates in the key via the
+        registry's in-memory state (``_stable_core_cached``), so cache-hit
+        turns never touch disk for roles. On a miss the role definition is
+        resolved here (sync builder) or passed in as ``role_def`` by the async
+        builder, which fetched it on a worker thread.
 
         Block order is designed for prompt-cache stability AND model attention:
         - identity+contract first (most-cacheable, most-anchoring)
@@ -413,32 +518,28 @@ class PromptBuilder:
         """
         from core.role_registry import RoleRegistry
 
-        sys_prompt = self.base_system_prompt if self.base_system_prompt else ""
-        if "{model_name}" in sys_prompt:
-            model_label = (
-                self.model_name.strip()
-                if self.model_name and self.model_name.strip()
-                else "an expert AI assistant"
-            )
-            # Model names normally don't contain XML special chars, but a
-            # provider's model list is user-editable, so escape defensively.
-            sys_prompt = sys_prompt.replace("{model_name}", escape_xml(model_label))
+        base = self._base_sys_prompt()
 
-        # Append role prompt for the MAIN agent too. Previously this was
-        # subagent-only, so a main-agent role defined in ~/.johnston/roles/
-        # had no effect on the prompt. The tool list filtering in
-        # build_tools() was already main-aware; this makes the prompt side
-        # symmetric and lets user roles customize main-agent behavior.
-        role_def = RoleRegistry.get_instance().get_role(
-            self.role, project_dir=self.cwd or os.getcwd()
-        )
+        cached = self._stable_core_cached(rules_snippet, mcp_snippet, skills_snippet, subagents_snippet)
+        if cached is not None:
+            return cached
+
+        # Cache miss: resolve the authoritative role definition. The sync
+        # builder reads it here (sync by design); the async builder passes it
+        # in, already fetched on a worker thread, so this never blocks the
+        # event loop.
+        if role_def is None:
+            role_def = RoleRegistry.get_instance().get_role(
+                self.role, project_dir=self.cwd or os.getcwd()
+            )
         # Read-only role: explicit "read-only" hint so the model is aware
         # the tool set has been filtered (the filter itself is enforced
         # in build_tools via role_policy).
-        if getattr(role_def, "read_only", False) and "<role" in sys_prompt and "mode=" not in sys_prompt:
+        if getattr(role_def, "read_only", False) and "<role" in base and "mode=" not in base:
             # Cheap indicator; the full tool filter is the actual enforcement.
             pass  # marker is added via the role block below if applicable
 
+        role_block = ""
         if getattr(role_def, "prompt", None) and not self.is_subagent:
             from core.roles.prompt import format_role_prompt
 
@@ -446,49 +547,24 @@ class PromptBuilder:
             if formatted_role:
                 # If role is read-only, the formatted block already lives
                 # in role_def.prompt; no extra annotation needed.
-                sys_prompt += f"\n\n{formatted_role}"
+                role_block = f"\n\n{formatted_role}"
 
-        if self.is_subagent and self.worktree_branch and "<worktree_guidelines>" not in sys_prompt:
-            # Branch name is user-controlled and gets interpolated into the
-            # system prompt. Escape it so a name containing literal
-            # `</worktree>` cannot truncate the wrapper and inject
-            # arbitrary content.
-            safe_branch = escape_xml(self.worktree_branch)
-            sys_prompt += f"\n\n{SUBAGENT_WORKTREE_PROMPT.format(branch_name=safe_branch)}"
-
-        # Cache key from the stable components. role_def is represented by its
-        # content so the cache invalidates when the role definition changes even
-        # if registry internals were refreshed in place.
-        def _ident(obj):
-            if obj is None:
-                return None
-            return (id(obj), getattr(obj, "key", None), getattr(obj, "prompt", None))
-
-        # Tool-IO reference: included in the stable cache slot so every turn
-        # reuses the same wire-format doc (saves the ~250 tokens of having to
-        # re-parse it from scratch on every cache miss).
-        tool_io_ref = TOOL_OUTPUT_FORMAT_SNIPPET
-
-        key = (
-            sys_prompt,
-            rules_snippet,
-            skills_snippet,
-            subagents_snippet,
-            mcp_snippet,
-            self.role,
-            self.worktree_branch,
-            _ident(role_def),
-            tool_io_ref,
+        # Re-key with the authoritative role identity and double-check: the
+        # registry may have refreshed while resolving the role, and another
+        # caller may have populated this slot since the fast miss above.
+        key = self._stable_core_key(
+            base, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet, _role_ident(role_def)
         )
-
         cached = _STABLE_CORE_CACHE.get(key)
         if cached is not None:
             return cached
 
+        sys_prompt = f"{base}{role_block}"
+
         # Insert tool_io_ref RIGHT AFTER identity/contract/role so the model
         # sees the wire-format conventions before reading the first tool output.
-        if tool_io_ref:
-            sys_prompt = f"{sys_prompt}\n\n{tool_io_ref}"
+        if TOOL_OUTPUT_FORMAT_SNIPPET:
+            sys_prompt = f"{sys_prompt}\n\n{TOOL_OUTPUT_FORMAT_SNIPPET}"
         if rules_snippet:
             sys_prompt = f"{sys_prompt}\n\n{rules_snippet}"
         if skills_snippet:
@@ -502,11 +578,18 @@ class PromptBuilder:
         return sys_prompt
 
     async def _build_stable_core_async(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
-        """Async variant: same stable-prefix assembly, but file reads (rules)
-        happen on a worker thread on cache miss."""
+        """Async variant: same stable-prefix assembly, but file reads (rules,
+        and the role definition on cache miss) happen on a worker thread."""
+        from core.role_registry import RoleRegistry
+
         rules_snippet = await get_rules_snippet_async(role=self.role, cwd=self.cwd)
+        role_def = None
+        if self._stable_core_cached(rules_snippet, mcp_snippet, skills_snippet, subagents_snippet) is None:
+            role_def = await asyncio.to_thread(
+                RoleRegistry.get_instance().get_role, self.role, self.cwd or os.getcwd()
+            )
         return self._assemble_stable_core(
-            rules_snippet, mcp_snippet, skills_snippet, subagents_snippet
+            rules_snippet, mcp_snippet, skills_snippet, subagents_snippet, role_def
         )
 
     def build_tools(self) -> List[Dict[str, Any]]:
