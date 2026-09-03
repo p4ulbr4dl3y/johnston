@@ -31,7 +31,8 @@ DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} in Johnston CLI. Resolve tasks
 <tool_io>
 - **Execution**: independent tools in one step run in parallel when safe; emit batches without waiting. Long tools cancel cooperatively.
 - **Plan**: use `update_plan` for ≥3-step work. Exactly one `in_progress` at a time. Update BEFORE step, not after.
-- **Background & Reactive Wakeup**: background shell tasks (`shell(background=true)`) and subagents (`invoke_subagent`) are fully reactive. When you stop calling tools, runtime pauses and automatically resumes with `<notification type="shell|subagent">` on completion. NEVER poll `manage_shell(list)` or `manage_subagent(list)` to wait for completion.
+- **Background & Reactive Wakeup**: shell tasks (`shell(background=true)` or user `Ctrl+B`) and subagents (`invoke_subagent`) are fully reactive. If output is `[task backgrounded by user]`, DO NOT re-execute — it is actively running. When you stop calling tools, runtime pauses and automatically resumes with `<notification type="shell|subagent">` on completion. NEVER poll `manage_shell(list)` or `manage_subagent(list)` to wait for completion.
+- **Buffering**: pipes and non-Python CLI tools block-buffer stdout in 4KB chunks. For live background logs, use line-buffering flags (e.g. `stdbuf -oL`, `grep --line-buffered`). Python is automatically unbuffered (`PYTHONUNBUFFERED=1`).
 - **Subagents & MCP**: `invoke_subagent` for bounded tasks (see <subagents>). MCP tools namespaced `server__tool` on collision.
 - **Paths & Sandbox**: `cwd` from <environment> is canonical; use relative paths. Sandbox restricts writes to cwd/tmp; reads unrestricted. Banner `[sandbox unavailable]` indicates unsandboxed fallback.
 - **Wire format**: see <tool_io_reference> for status tables, pagination headers, and error diagnostics.
@@ -189,13 +190,13 @@ COMPACTION_CREATE_HEADER = """Create a new anchored handoff summary from the con
 TOOL_OUTPUT_FORMAT_SNIPPET = """<tool_io_reference>
 Wire format conventions for ALL tool outputs (apply consistently):
 
-| Status    | Prefix                             | Meaning                          |
-|-----------|------------------------------------|----------------------------------|
-| DONE      | `[<key> | <key>]` then content     | Tool succeeded                   |
-| SHELL     | `[exit N]` then stdout/stderr      | Process exit code (N!=0 is fail) |
-| ERROR     | `ERR: <kind> '<name>': <detail>`   | Tool failed; diagnose from kind  |
-| RUNNING   | `[task started | id X | log Y]`    | Async; do not poll               |
-| CANCELLED | `[cancelled by user]`              | User/timeout aborted             |
+| Status    | Prefix                                                   | Meaning                           |
+|-----------|----------------------------------------------------------|-----------------------------------|
+| DONE      | `[<key> | <key>]` then content                           | Tool succeeded                    |
+| SHELL     | `[exit N]` then stdout/stderr                            | Process exit code (N!=0 is fail)  |
+| ERROR     | `ERR: <kind> '<name>': <detail>`                         | Tool failed; diagnose from kind   |
+| RUNNING   | `[task started ...]` / `[task backgrounded by user ...]` | Async; running; do not re-run     |
+| CANCELLED | `[cancelled by user]`                                    | User/timeout aborted              |
 
 Errors: prefix `ERR: <kind> '<name>': <detail>`. Common kinds: `not_found`, `params`, `permission`, `match`, `timeout`, `execute`, `unavailable`. Diagnose from `detail`, never retry unchanged.
 
@@ -204,6 +205,8 @@ Truncation footer: `[truncated | log <p> | next read(path=<log>, start_line=N)]`
 Pagination: `[<p> | lines N..M of T]` then `N|line content`. Use `read(path, start_line=N, end_line=M)` (window ≤800 lines) or `read(path, content_offset=N)` for binary.
 
 Plan progress: `[plan updated | N/M done | <explanation>]`. Plan persists; do not re-emit.
+
+Backgrounded: `[task backgrounded by user | id X | log Y]` means process actively runs in background. DO NOT re-execute the command. System wakes you with `<notification type="shell">` on finish.
 
 Subagent notify: `result_text` is parent view of subagent report. session_id is correlation key.
 </tool_io_reference>"""

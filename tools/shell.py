@@ -92,6 +92,8 @@ class ShellTool(BaseTool):
                 "- Interactive REPLs: `python -i`, `node`, `irb`, `psql` without `-c`, etc.\n"
                 "- Pagers: `less`, `more`, `vim`, `nano`. Use `cat` or pipe to `head`/`tail`.\n"
                 "- Commands that read stdin without explicit input: `fzf`, `ssh` without `-o BatchMode=yes`.\n"
+                "- Stdout buffering: pipes and non-Python tools buffer output in 4KB blocks. "
+                "Use unbuffered flags (e.g. `stdbuf -oL`, `grep --line-buffered`) for live logs. Python is auto-unbuffered.\n"
                 "Always pass non-interactive flags: `-y` (apt), `--non-interactive`, `--batch`, `-c '<query>'`.\n\n"
                 "Environment:\n"
                 "- Runs in cwd (from <environment>); subagent cwd is its worktree root.\n"
@@ -119,9 +121,10 @@ class ShellTool(BaseTool):
                         "type": "boolean",
                         "default": False,
                         "description": (
-                            "Run as background task. Returns task_id + log path. Runtime automatically "
-                            "resumes turn with <notification type='shell'> on finish — NEVER poll "
-                            "manage_shell(list) to wait. Main agent only."
+                            "Run as background task (also triggered when user presses Ctrl+B). "
+                            "Returns task_id + log path. Process continues in background. "
+                            "Runtime automatically resumes turn with <notification type='shell'> on finish — "
+                            "NEVER re-run the command, NEVER poll manage_shell(list) to wait. Main agent only."
                         ),
                     },
                 },
