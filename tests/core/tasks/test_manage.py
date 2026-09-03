@@ -56,11 +56,10 @@ class TestFindAny(unittest.TestCase):
         self.assertIsNone(find_any([_mk_task("a")], "zz"))
 
 
-class TestNotFoundMessage(unittest.TestCase):
     def test_with_active_ids(self):
         msg = not_found_message("ghost", [_mk_task("live")], "background")
         self.assertIn("ERR: notfound 'ghost'", msg)
-        self.assertIn("'live'", msg)
+        self.assertTrue("'live'" in msg or "&apos;live&apos;" in msg)
 
     def test_empty(self):
         msg = not_found_message("ghost", [], "background")

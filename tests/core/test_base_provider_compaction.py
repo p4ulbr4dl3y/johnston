@@ -10,6 +10,36 @@ import unittest.mock
 from core.base_provider import BaseAgent
 from tests.core._base_provider_helpers import _MockStream, _text_chunk, _tool_call_chunk, make_agent
 
+SAMPLE_VALID_SUMMARY = """\
+### Objective
+Fix auth.py
+
+### User Decisions & Preferences
+(none)
+
+### Constraints
+(none)
+
+### State
+- Completed: Updated login
+- Active: (none)
+- Pending: (none)
+- Blocked: (none)
+- Failed approaches: (none)
+
+### Tool Output Anchors
+auth.py
+
+### Next Steps
+1. Run tests
+
+### Open Questions
+(none)
+
+### Key Files
+- auth.py
+"""
+
 
 class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
     def test_compact_command_registered(self):
@@ -44,7 +74,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
         # Mock OpenAI chat completion call
         mock_response = unittest.mock.MagicMock()
         mock_choice = unittest.mock.MagicMock()
-        mock_choice.message.content = "<objective>Fix auth.py</objective><state><completed>Updated login</completed></state><next_steps>Run tests</next_steps><context_files><file path='auth.py'/></context_files>"
+        mock_choice.message.content = SAMPLE_VALID_SUMMARY
         mock_response.choices = [mock_choice]
 
         with unittest.mock.patch.object(
@@ -58,7 +88,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(agent.history), 5)  # preserved user turn + 1 summary checkpoint + 3 tail messages
             self.assertEqual(agent.history[0]["content"], "Fix bug in auth.py")
             self.assertIn('<compaction_checkpoint>', agent.history[1]["content"])
-            self.assertIn("<objective>", agent.history[1]["content"])
+            self.assertIn("### Objective", agent.history[1]["content"])
             self.assertIn("auth.py", agent.history[1]["content"])
 
     async def test_compact_history_subagent_root_prompt_anchoring(self):
@@ -75,7 +105,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
 
         mock_response = unittest.mock.MagicMock()
         mock_choice = unittest.mock.MagicMock()
-        mock_choice.message.content = "<objective>Refactor db/schema.py</objective><context_files><file path='db/schema.py'/></context_files>"
+        mock_choice.message.content = SAMPLE_VALID_SUMMARY
         mock_response.choices = [mock_choice]
 
         with unittest.mock.patch.object(
@@ -101,7 +131,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
 
         mock_response = unittest.mock.MagicMock()
         mock_choice = unittest.mock.MagicMock()
-        mock_choice.message.content = "<objective>Test</objective><context_files><file path='none'/></context_files>"
+        mock_choice.message.content = SAMPLE_VALID_SUMMARY
         mock_response.choices = [mock_choice]
 
         with (
@@ -127,7 +157,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
 
         mock_response = unittest.mock.MagicMock()
         mock_choice = unittest.mock.MagicMock()
-        mock_choice.message.content = "<objective>Tasks</objective><next_steps>Next</next_steps>"
+        mock_choice.message.content = SAMPLE_VALID_SUMMARY
         mock_response.choices = [mock_choice]
 
         with unittest.mock.patch.object(
@@ -161,7 +191,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
 
         mock_response = unittest.mock.MagicMock()
         mock_choice = unittest.mock.MagicMock()
-        mock_choice.message.content = "<objective>Build</objective><next_steps>Continue</next_steps>"
+        mock_choice.message.content = SAMPLE_VALID_SUMMARY
         mock_response.choices = [mock_choice]
 
         with unittest.mock.patch.object(
@@ -200,13 +230,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
 
         mock_response = unittest.mock.MagicMock()
         mock_choice = unittest.mock.MagicMock()
-        mock_choice.message.content = (
-            "<objective>Fix 50 issues</objective>\n"
-            "<constraints>(none)</constraints>\n"
-            "<state>\n<completed>Fixed 25 files</completed>\n</state>\n"
-            "<next_steps>Run pytest</next_steps>\n"
-            "<context_files>\n<file path='all'/>\n</context_files>"
-        )
+        mock_choice.message.content = SAMPLE_VALID_SUMMARY
         mock_response.choices = [mock_choice]
 
         with unittest.mock.patch.object(
@@ -220,8 +244,8 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             # The 50-step cascade must be compacted down to preserved user prompt + checkpoint + bounded recent tail (<= 6 messages)
             self.assertLessEqual(len(agent.history), 6)
             self.assertEqual(agent.history[0]["content"], "Fix all 50 issues")
-            self.assertIn("<constraints>(none)</constraints>", agent.history[1]["content"])
-            self.assertIn("<context_files>", agent.history[1]["content"])
+            self.assertIn("### Constraints", agent.history[1]["content"])
+            self.assertIn("### Key Files", agent.history[1]["content"])
 
     async def test_auto_compaction_trigger(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])

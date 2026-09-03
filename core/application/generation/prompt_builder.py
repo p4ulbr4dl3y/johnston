@@ -439,7 +439,7 @@ class PromptBuilder:
             # Cheap indicator; the full tool filter is the actual enforcement.
             pass  # marker is added via the role block below if applicable
 
-        if getattr(role_def, "prompt", None):
+        if getattr(role_def, "prompt", None) and not self.is_subagent:
             from core.roles.prompt import format_role_prompt
 
             formatted_role = format_role_prompt(self.role, role_def.prompt)

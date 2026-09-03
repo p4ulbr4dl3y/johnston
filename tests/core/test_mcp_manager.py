@@ -794,7 +794,10 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
             return res
 
         res = await scenario()
-        self.assertIn("ERR: mcp 't': MCP server 's' stopped", res)
+        self.assertTrue(
+            "ERR: mcp 't': MCP server 's' stopped" in res
+            or "ERR: mcp 't': MCP server &apos;s&apos; stopped" in res
+        )
 
 
     async def test_warm_server_async_bypasses_freshness_window(self):

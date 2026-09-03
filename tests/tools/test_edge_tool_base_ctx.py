@@ -75,7 +75,7 @@ class TestFormatEdge(unittest.TestCase):
 
     def test_background_no_result(self):
         res = format_background_notification("kind", "name", "id", "")
-        self.assertIn('<notification type="kind" id="id" title="name" status="completed">\n\n</notification>', res)
+        self.assertEqual('<notification type="kind" id="id" title="name" status="completed"></notification>', res)
 
     def test_background_unicode(self):
         res = format_background_notification("к", "имя", "1", "résultat")

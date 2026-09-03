@@ -142,7 +142,7 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("Subagent base prompt", [], role="orchestrator", is_subagent=True)
         prompt = builder.build_system_prompt()
         self.assertIn("Subagent base prompt", prompt)
-        self.assertIn('<role name="orchestrator"', prompt)
+        self.assertNotIn('<role name="orchestrator"', prompt)
         self.assertNotIn("<subagents>", prompt)
         self.assertIn("<environment", prompt)
 

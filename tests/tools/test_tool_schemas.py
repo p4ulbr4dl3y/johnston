@@ -57,7 +57,7 @@ class TestToolSchemas(unittest.TestCase):
         props = ReadTool.schema["function"]["parameters"]["properties"]
         self.assertIn("content_offset", props)
         self.assertIn("offset", props["content_offset"]["description"].lower())
-        self.assertNotIn("detail", props)
+        self.assertIn("detail", props)
 
     def test_manage_shell_schema(self):
         from tools.manage_shell import ManageShellTool
@@ -106,7 +106,7 @@ class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):
 
     async def test_execute_tool_unknown_tool_is_reported(self):
         res = await execute_tool("xyz_unknown_tool_123", {})
-        self.assertEqual(res.content, "ERR: unknown 'xyz_unknown_tool_123'")
+        self.assertEqual(res.content, "ERR: unknown_tool 'xyz_unknown_tool_123'")
         self.assertTrue(res.is_error)
 
 

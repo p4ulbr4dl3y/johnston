@@ -152,7 +152,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         # Create file over existing directory error
         res_dir_err = str(await tool.execute({"path": self.test_dir, "content": "Hello World"}))
-        self.assertIn("is a directory", res_dir_err)
+        self.assertIn("ERR: is_directory", res_dir_err)
 
     async def test_edit_tool(self):
         tool = EditTool()
@@ -166,7 +166,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res_edit_dir = str(await tool.execute(
             {"path": self.test_dir, "old_str": "a", "new_str": "b"}
         ))
-        self.assertIn("is a directory", res_edit_dir)
+        self.assertIn("ERR: is_directory", res_edit_dir)
 
         # Successful edit
         res = str(await tool.execute(
@@ -240,12 +240,12 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         # Aliases are no longer resolved: 'write' is unknown, only 'create' works.
         file_path2 = os.path.join(self.test_dir, "case_test2.txt")
         res_write = await execute_tool("write", {"path": file_path2, "content": "Write Content"})
-        self.assertIn("ERR: unknown 'write'", res_write.content)
+        self.assertIn("ERR: unknown_tool 'write'", res_write.content)
         self.assertFalse(os.path.exists(file_path2))
 
         # Similar alias 'cat' is also unknown; canonical 'read' returns content.
         res_cat = await execute_tool("cat", {"path": file_path})
-        self.assertIn("ERR: unknown 'cat'", res_cat.content)
+        self.assertIn("ERR: unknown_tool 'cat'", res_cat.content)
         res_read = await execute_tool("Read", {"path": file_path})
         self.assertIn("Case Content", res_read.content)
 
@@ -337,7 +337,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
                 "new_str": "target_line = 99",
             }
         ))
-        self.assertIn("ERR: match: target matches 2 occurrences", res)
+        self.assertIn("ERR: match_ambiguous: target matches 2 occurrences", res)
         self.assertIn("Include 2-4 lines of surrounding context", res)
 
     async def test_edit_tool_unique_target(self):

@@ -681,7 +681,7 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
         client.process = None
         with patch.object(client, "start_async", new=AsyncMock(return_value=False)):
             out = await client.call_tool_async("foo", {})
-        self.assertIn("ERR: mcp 'foo': MCP server 't' process is not running", out)
+        self.assertIn("ERR: mcp 'foo': MCP server &apos;t&apos; process is not running", out)
 
     async def test_call_tool_async_success(self):
         client = await self._client_with_process()
@@ -700,14 +700,14 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
     async def test_call_tool_async_timeout(self):
         client = await self._client_with_process()
         out = await client.call_tool_async("foo", {}, timeout=0.01)
-        self.assertIn("ERR: mcp 'foo': No response from MCP server 't'", out)
+        self.assertIn("ERR: mcp 'foo': No response from MCP server &apos;t&apos;", out)
         self.assertNotIn(1, client._pending_futures)
 
     async def test_call_tool_async_write_error(self):
         client = await self._client_with_process()
         client.process.stdin.write.side_effect = OSError("pipe closed")
         out = await client.call_tool_async("foo", {})
-        self.assertIn("ERR: mcp 'foo': failed to write to MCP server 't': pipe closed", out)
+        self.assertIn("ERR: mcp 'foo': failed to write to MCP server &apos;t&apos;: pipe closed", out)
 
     async def test_call_tool_async_no_response(self):
         client = await self._client_with_process()
@@ -720,7 +720,7 @@ class TestCallToolAsync(unittest.IsolatedAsyncioTestCase):
 
         client.process.stdin.write.side_effect = on_write
         out = await client.call_tool_async("foo", {})
-        self.assertIn("ERR: mcp 'foo': No response from MCP server 't'", out)
+        self.assertIn("ERR: mcp 'foo': No response from MCP server &apos;t&apos;", out)
 
     async def test_call_tool_async_error_response(self):
         client = await self._client_with_process()

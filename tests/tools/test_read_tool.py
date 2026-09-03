@@ -250,7 +250,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         # File read exception inside _read_file_lines
         with patch("builtins.open", side_effect=IOError("Read error")):
             res_err = str(await tool.execute({"path": file_path}))
-            self.assertIn("ERR: file", res_err)
+            self.assertIn("ERR: execute", res_err)
 
     async def test_read_start_line_offsets_window(self):
         tool = ReadTool()

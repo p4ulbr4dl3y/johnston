@@ -65,7 +65,7 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
             self._mode(),
         ):
             res = await execute_tool("recent_tool", {"arg": 1})
-        self.assertIn("ERR: mcp 'recent_tool'", res.content)
+        self.assertIn("ERR: unavailable 'recent_tool'", res.content)
         self.assertIn("failed to list active tools", res.content)
         self.assertIn("broken transport", res.content)
         self.assertTrue(res.is_error)
@@ -83,7 +83,7 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
             self._mode(),
         ):
             res = await execute_tool("gh__search", {"q": "x"})
-        self.assertIn("ERR: mcp 'gh__search'", res.content)
+        self.assertIn("ERR: unavailable 'gh__search'", res.content)
         self.assertIn("failed to resolve capabilities", res.content)
         self.assertIn("policy crash", res.content)
 

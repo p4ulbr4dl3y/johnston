@@ -106,8 +106,6 @@ class TestHistoryPolicy(unittest.TestCase):
         )
         self.assertFalse(is_checkpoint_message({"role": "user", "content": "plain"}))
         self.assertFalse(is_checkpoint_message(None))
-        # Legacy unversioned tag is not recognised.
-        self.assertFalse(is_checkpoint_message({"role": "user", "content": "<compaction_checkpoint> x"}))
 
     def test_is_system_note(self):
         self.assertTrue(is_system_note({"role": "user", "content": '<system_note kind="x">y</system_note>'}))

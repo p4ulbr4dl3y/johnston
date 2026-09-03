@@ -47,12 +47,12 @@ class TestApplyChunks(_Base):
     def test_chunk_without_old_str_raises(self):
         res = apply_edit("abc\n", None, "x", False, "dummy.txt")
         self.assertTrue(res.is_error)
-        self.assertIn("missing 'old_str'", res.content)
+        self.assertIn("missing &apos;old_str&apos;", res.content)
 
     def test_chunk_without_new_str_raises(self):
         res = apply_edit("abc\n", "abc", None, False, "dummy.txt")
         self.assertTrue(res.is_error)
-        self.assertIn("missing 'new_str'", res.content)
+        self.assertIn("missing &apos;new_str&apos;", res.content)
 
     def test_multiple_replace_all_replaces_all(self):
         new, _ = apply_edit(

@@ -136,7 +136,35 @@ async def test_compact_if_needed_preserves_api_context_when_not_compacting():
 
 # --- compact_history summarizer paths --------------------------------------
 
-_SUMMARY = "<objective>done</objective><next_steps>proceed</next_steps>"
+_SUMMARY = """\
+### Objective
+done
+
+### User Decisions & Preferences
+(none)
+
+### Constraints
+(none)
+
+### State
+- Completed: (none)
+- Active: (none)
+- Pending: (none)
+- Blocked: (none)
+- Failed approaches: (none)
+
+### Tool Output Anchors
+(none)
+
+### Next Steps
+1. proceed
+
+### Open Questions
+(none)
+
+### Key Files
+(none)
+"""
 
 
 @pytest.mark.asyncio

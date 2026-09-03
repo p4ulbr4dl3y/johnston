@@ -31,7 +31,7 @@ class TestSubagentRoles(unittest.TestCase):
         )
         self.assertEqual(
             format_role_prompt("", "No key role."),
-            '<role name="">\nNo key role.\n</role>',
+            '<role>\nNo key role.\n</role>',
         )
 
 

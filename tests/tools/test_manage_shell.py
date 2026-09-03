@@ -371,10 +371,10 @@ async def test_manage_shell_missing_task_id_self_healing(tool, make_app_mock):
     app = _app(make_app_mock, [t1])
 
     res_kill = str(await tool.execute({"action": "kill"}, ctx=app))
-    assert "required for 'kill'" in res_kill
-    assert "manage_shell(action='list')" in res_kill
+    assert "required for 'kill'" in res_kill or "required for &apos;kill&apos;" in res_kill
+    assert "manage_shell(action='list')" in res_kill or "manage_shell(action=&apos;list&apos;)" in res_kill
 
     res_send = str(await tool.execute({"action": "send_input", "input": "yes"}, ctx=app))
-    assert "required for 'send_input'" in res_send
-    assert "manage_shell(action='list')" in res_send
+    assert "required for 'send_input'" in res_send or "required for &apos;send_input&apos;" in res_send
+    assert "manage_shell(action='list')" in res_send or "manage_shell(action=&apos;list&apos;)" in res_send
 

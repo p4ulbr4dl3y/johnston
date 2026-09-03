@@ -134,7 +134,7 @@ class TestWebFetchNetworkEdgeCases(unittest.IsolatedAsyncioTestCase):
         mock_cls.return_value = client
         tool = WebFetchTool()
         res = str(await tool.execute({"url": "https://example.com"}))
-        self.assertIn("ERR: fetch", res)
+        self.assertIn("ERR: network", res)
 
     @patch("httpx.AsyncClient")
     async def test_dns_resolution_error(self, mock_cls):

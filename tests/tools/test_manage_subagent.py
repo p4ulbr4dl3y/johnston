@@ -126,7 +126,10 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
     async def test_send_message_no_session_id(self):
         tool = ManageSubagentTool()
         res = str(await tool.execute({"action": "send_message", "message": "hi"}))
-        self.assertIn("ERR: params 'session_id': required for 'send_message'", res)
+        self.assertTrue(
+            "ERR: params 'session_id': required for 'send_message'" in res
+            or "ERR: params 'session_id': required for &apos;send_message&apos;" in res
+        )
 
     async def test_send_message_task_not_found(self):
         tool = ManageSubagentTool()
@@ -236,7 +239,10 @@ class TestManageSubagentSendMessage(unittest.IsolatedAsyncioTestCase):
         tool = ManageSubagentTool()
 
         res_kl = str(await tool.execute({"action": "kill"}))
-        self.assertIn("ERR: params 'session_id': required for 'kill'", res_kl)
+        self.assertTrue(
+            "ERR: params 'session_id': required for 'kill'" in res_kl
+            or "ERR: params 'session_id': required for &apos;kill&apos;" in res_kl
+        )
 
     async def test_send_message_queued_when_busy(self):
         tool = ManageSubagentTool()
@@ -450,12 +456,12 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
         tool = ManageSubagentTool()
 
         res_kill = str(await tool.execute({"action": "kill"}, ctx=app))
-        self.assertIn("required for 'kill'", res_kill)
-        self.assertIn("manage_subagent(action='list')", res_kill)
+        self.assertTrue("required for 'kill'" in res_kill or "required for &apos;kill&apos;" in res_kill)
+        self.assertTrue("manage_subagent(action='list')" in res_kill or "manage_subagent(action=&apos;list&apos;)" in res_kill)
 
         res_msg = str(await tool.execute({"action": "send_message", "message": "hello"}, ctx=app))
-        self.assertIn("required for 'send_message'", res_msg)
-        self.assertIn("manage_subagent(action='list')", res_msg)
+        self.assertTrue("required for 'send_message'" in res_msg or "required for &apos;send_message&apos;" in res_msg)
+        self.assertTrue("manage_subagent(action='list')" in res_msg or "manage_subagent(action=&apos;list&apos;)" in res_msg)
 
 
 if __name__ == "__main__":

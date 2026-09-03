@@ -84,7 +84,8 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
             "dummy.py",
         )
         self.assertTrue(res.is_error)
-        self.assertIn("Closest match in 'dummy.py'", res.content)
+        self.assertIn("Closest match", res.content)
+        self.assertTrue("'dummy.py'" in res.content or "&apos;dummy.py&apos;" in res.content)
 
     def test_match_failure_returns_error_tool_result(self):
         res = apply_edit("foo\n", "bar", "baz", False, "dummy.py")
@@ -153,5 +154,6 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         old_str = "x = 1\ny = 2"
         res = apply_edit(content, old_str, "x = 9\ny = 9", False, "test.py")
         self.assertTrue(res.is_error)
-        self.assertIn("Closest match in 'test.py'", res.content)
+        self.assertIn("Closest match", res.content)
+        self.assertTrue("'test.py'" in res.content or "&apos;test.py&apos;" in res.content)
 

@@ -1037,7 +1037,15 @@ class TestChatInputHelpAndShellMode(unittest.IsolatedAsyncioTestCase):
         ci.load_text("git status")
 
         posted = []
-        ci.post_message = posted.append
+        # Capture only the Submitted message for assertions, but forward it to
+        # the real message pump. Replacing post_message with a bare list-append
+        # breaks Textual's pump and deadlocks run_test.__aexit__ on teardown.
+        _real_post = ci.post_message
+        def _capture(m):
+            if isinstance(m, ci.Submitted):
+                posted.append(m)
+            return _real_post(m)
+        ci.post_message = _capture
 
         event = Key("enter", "enter")
         event.prevent_default = MagicMock()

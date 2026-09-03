@@ -46,7 +46,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         # Aliases are no longer resolved: 'cat' is an unknown tool name.
         res_alias = await execute_tool("cat", {"path": "nonexistent_abc_123.txt"})
-        self.assertIn("ERR: unknown 'cat'", res_alias.content)
+        self.assertIn("ERR: unknown_tool 'cat'", res_alias.content)
 
     async def test_execute_tool_edit_routes_to_edit_tool(self):
         from tools.edit import EditTool
@@ -75,19 +75,19 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
     async def test_execute_tool_unknown_with_direct_hint(self):
         # Match that maps directly to a registry tool name
         res = await execute_tool("creats", None)
-        self.assertIn("ERR: unknown 'creats'", res.content)
-        self.assertIn("Did you mean 'create'?", res.content)
+        self.assertIn("ERR: unknown_tool 'creats'", res.content)
+        self.assertTrue("Did you mean 'create'?" in res.content or "Did you mean &apos;create&apos;?" in res.content)
 
     async def test_execute_tool_unknown_without_alias_hint(self):
         # 'cat' used to be an alias for 'read'; without aliases it no longer
         # produces an alias-target hint.
         res = await execute_tool("cat", None)
-        self.assertIn("ERR: unknown 'cat'", res.content)
+        self.assertIn("ERR: unknown_tool 'cat'", res.content)
         self.assertNotIn("target: read", res.content)
 
     async def test_execute_tool_unknown_no_hint(self):
         res = await execute_tool("zzzzzzzzz_unknown", None)
-        self.assertEqual(res.content, "ERR: unknown 'zzzzzzzzz_unknown'")
+        self.assertEqual(res.content, "ERR: unknown_tool 'zzzzzzzzz_unknown'")
 
     def _mock_mcp_mgr(self, active_tools=None, capabilities=None, call_result=None, call_side_effect=None):
         mock_mcp_mgr = MagicMock()
@@ -163,7 +163,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             self.assertLogs("tools.registry", level="WARNING") as cm,
         ):
             res = await execute_tool("faulty_mcp", {})
-        self.assertIn("ERR: mcp 'faulty_mcp': MCP connection failed", res.content)
+        self.assertIn("ERR: unavailable 'faulty_mcp': [mcp] MCP connection failed", res.content)
         self.assertTrue(any("MCP tool 'faulty_mcp' execution failed" in line for line in cm.output))
 
     async def test_execute_tool_mcp_returns_none(self):
@@ -184,7 +184,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             res = await execute_tool("none_mcp", {})
-            self.assertEqual(res.content, "ERR: unknown 'none_mcp'")
+            self.assertEqual(res.content, "ERR: unknown_tool 'none_mcp'")
 
     def _mock_mode(self, name="action"):
         mock_mode_def = MagicMock()

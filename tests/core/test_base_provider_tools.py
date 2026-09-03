@@ -54,7 +54,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_read_missing_file(self):
         file_path = os.path.join(self.test_dir, "missing.txt")
         res_read = await execute_tool("read", {"path": file_path})
-        self.assertIn("ERR: file", res_read.content)
+        self.assertIn("ERR: not_found", res_read.content)
         self.assertTrue(res_read.is_error)
 
     async def test_edit_tool(self):
@@ -88,7 +88,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res_edit = await execute_tool(
             "edit", {"path": file_path, "old_str": "missing_line", "new_str": "replacement"}
         )
-        self.assertIn("ERR: match: exact block not found", res_edit.content)
+        self.assertIn("ERR: match_not_found: exact block not found", res_edit.content)
 
     async def test_edit_ambiguous_occurrences(self):
         file_path = os.path.join(self.test_dir, "ambiguous_test.txt")

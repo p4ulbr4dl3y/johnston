@@ -90,7 +90,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
             tool = WebFetchTool()
             res = str(await tool.execute({"url": "https://example.com/404"}))
 
-        self.assertIn("ERR: http 'https://example.com/404': 404 Not Found", res)
+        self.assertIn("ERR: http_status 'https://example.com/404': 404 Not Found", res)
 
     @patch("httpx.AsyncClient")
     async def test_fetch_oversize_content_length_rejected(self, mock_client_cls):
@@ -115,7 +115,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = str(await tool.execute({"url": "https://example.com/big"}))
-        self.assertIn("ERR: file 'https://example.com/big': exceeds 10MB", res)
+        self.assertIn("ERR: size_exceeded 'https://example.com/big': exceeds 10MB", res)
 
     @patch("httpx.AsyncClient")
     async def test_truncation_behavior(self, mock_client_cls):
@@ -180,7 +180,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = str(await tool.execute({"url": "https://example.com/big"}))
-        self.assertIn("ERR: file 'https://example.com/big': exceeds 10MB", res)
+        self.assertIn("ERR: size_exceeded 'https://example.com/big': exceeds 10MB", res)
 
     @patch("httpx.AsyncClient")
     async def test_fetch_timeout_exception(self, mock_client_cls):
@@ -204,7 +204,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
         tool = WebFetchTool()
         res = str(await tool.execute({"url": "https://example.com"}))
-        self.assertIn("ERR: fetch 'https://example.com': connection refused", res)
+        self.assertIn("ERR: network 'https://example.com': connection refused", res)
 
     @patch("httpx.AsyncClient")
     async def test_client_timeout_uses_configured_value(self, mock_client_cls):

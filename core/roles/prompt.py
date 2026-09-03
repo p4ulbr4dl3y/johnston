@@ -56,7 +56,9 @@ def format_role_prompt(role_key: str, prompt_text: str) -> str:
     # escape_xml_attr escapes quotes in addition to & < >; required for
     # safe interpolation into a double-quoted attribute value.
     key_attr = escape_xml_attr(key) if key else ""
-    return f'<role name="{key_attr}">\n{body}\n</role>'
+    if key_attr:
+        return f'<role name="{key_attr}">\n{body}\n</role>'
+    return f'<role>\n{body}\n</role>'
 
 
 def apply_prompt(

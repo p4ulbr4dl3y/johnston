@@ -10,47 +10,13 @@ These pin the security fixes:
 The module is imported in isolation (without pulling agent.py, which has heavy
 runtime deps) by stubbing the `core.models_catalog` namespace.
 """
-import os
-import sys
-import types
 import unittest
-import importlib.util
 
-
-# Stub core.models_catalog before any other imports so compaction.py can be
-# loaded in this test without dragging in the full agent stack (httpx, textual,
-# etc.). The functions we exercise (catalog.get_context_limit,
-# get_context_window, format_context_tokens) are only touched by the
-# CompactionMixin properties, never by the wire-format helpers under test.
-def _stub_models_catalog():
-    mc = types.ModuleType("core.models_catalog")
-    catalog_stub = types.SimpleNamespace()
-    catalog_stub.get_context_limit = lambda *a, **k: 128_000
-    catalog_stub.get_model_pricing = lambda *a, **k: {"prompt": 0.0, "completion": 0.0}
-    catalog_stub.is_free_model = lambda *a, **k: True
-    catalog_stub.get_context_window = lambda *a, **k: "test"
-    catalog_stub.format_context_tokens = lambda n: str(n)
-    mc.catalog = catalog_stub
-    mc.get_context_window = lambda *a, **k: "test"
-    mc.get_model_pricing = lambda *a, **k: {"prompt": 0.0, "completion": 0.0}
-    mc.is_free_model = lambda *a, **k: True
-    mc.format_context_tokens = lambda n: str(n)
-    sys.modules["core.models_catalog"] = mc
-
-
-_stub_models_catalog()
-
-# Load only the wire-format helpers — not CompactionMixin.
-_compaction_path = os.path.join(
-    os.path.dirname(__file__), "..", "..", "core", "base_provider", "compaction.py"
+from core.base_provider import compaction as mod
+from core.base_provider.compaction import (
+    CHECKPOINT_CLOSE_TAG,
+    CHECKPOINT_OPEN_TAG,
 )
-_spec = importlib.util.spec_from_file_location("compaction_isolated", _compaction_path)
-mod = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(mod)
-
-CHECKPOINT_OPEN_TAG = mod.CHECKPOINT_OPEN_TAG
-CHECKPOINT_CLOSE_TAG = mod.CHECKPOINT_CLOSE_TAG
-
 
 SAMPLE_VALID_SUMMARY = """\
 ### Objective

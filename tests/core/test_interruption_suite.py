@@ -671,7 +671,10 @@ class TestGeneratorStreamInterruptionFlow:
     async def test_cancellation_after_completed_tool_does_not_create_orphan_cancelled_tool(self):
         mock_tool_widget = MagicMock()
         mock_tool_widget.result_text = "file1\nfile2"
-        mock_tool_widget.status = "done"
+        # The widget is still "running" until the tool_result step is delivered;
+        # the driver treats a non-"running" status as already-finalized and pops
+        # it from its queue without calling set_result.
+        mock_tool_widget.status = "running"
 
         async def mock_stream(prompt, attachments=None):
             yield ("tool", "shell", "run", {"cmd": "ls"})
