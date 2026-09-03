@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import logging
 import os
 import time
@@ -18,11 +19,45 @@ from core.domain.policies.messages import (
 from core.domain.policies.session_naming import build_fork_title
 from core.infrastructure.config.settings import get_settings
 from core.infrastructure.platform.paths import PROJECTS_DIR
-from core.infrastructure.platform.platform_utils import atomic_write_jsonl, update_json_config
+from core.infrastructure.platform.platform_utils import atomic_write_text, update_json_config
 from core.infrastructure.platform.session_lock import SessionLock
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_hash
 
 logger = logging.getLogger(__name__)
+
+
+def _session_change_signature(sess: AgentSession) -> tuple:
+    """O(1) signature of a session's persistent state (save-optimization).
+
+    Saves are debounced and coalesced, so the same session is frequently
+    re-saved with NO persistent change; this signature detects that without
+    re-serializing the whole session. It covers:
+
+    - ``len(messages)`` / ``len(history)`` — appends, truncations, rewinds;
+    - the JSONL last message/history entries — in-place coalescing of the
+      trailing message (bot text, thinking duration, tool result merge);
+    - every scalar in ``_persistent_fields()`` (tokens, cost, title, role,
+      status, timestamps...), so new fields are covered automatically.
+
+    The last entries are serialized exactly like ``atomic_write_jsonl`` does
+    (``json.dumps(..., ensure_ascii=False)``), so a value that could not be
+    persisted raises here too and ``save`` keeps today's failure semantics.
+    """
+    msgs = sess.messages
+    hist = sess._history()
+    last_msg = json.dumps(msgs[-1], ensure_ascii=False) if msgs else None
+    last_hist = json.dumps(hist[-1], ensure_ascii=False) if hist else None
+    meta = tuple(sorted(sess._persistent_fields().items()))
+    return (len(msgs), len(hist), last_msg, last_hist, meta)
+
+
+def _serialize_session_jsonl(sess: AgentSession) -> str:
+    """Serialize a session to the exact JSONL bytes ``atomic_write_jsonl`` writes.
+
+    One line per entry: meta first, then one ``{"_type": "msg", ...}`` per
+    message and one ``{"_type": "history", ...}`` per agent-history entry.
+    """
+    return "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in sess.to_jsonl_lines())
 
 
 def get_session_store(ctx_or_app: Any) -> "SessionStore":
@@ -82,6 +117,9 @@ class SessionStore:
         self._disk_cache_signature: Optional[int] = None
         self._disk_cache: Optional[Dict[str, AgentSession]] = None
         self._disk_cache_ts: float = 0.0
+        # Last-written state per session file (``{fpath: {"sig": ..., "content_hash":
+        # ...}}``), used to skip no-op re-serializations/rewrites in save().
+        self._session_write_state: Dict[str, Dict[str, Any]] = {}
         self.ensure_dirs()
 
     @classmethod
@@ -309,8 +347,34 @@ class SessionStore:
                 fpath = self._subagent_path(sess.parent_id, sess.id)
             else:
                 fpath = self._main_path(sess.id)
-            atomic_write_jsonl(fpath, sess.to_jsonl_lines())
+
+            # Perf (M3): saves are debounced (~1.5s + per-turn coalescing), so the
+            # same session is frequently re-saved with NO persistent change. The
+            # cheap signature (lengths + metadata + last entries) detects common
+            # changes (appends, truncations, touches, coalescing) in O(1); when it
+            # matches, the full serialized content is compared against the last
+            # written bytes — this catches in-place mutation of an EARLIER message
+            # (e.g. tool result_text/status merged by the widget layer). When both
+            # match, the atomic rewrite is skipped entirely; the file on disk is
+            # byte-identical to what the rewrite would have produced, so readers
+            # (AgentSession.from_file) observe the exact same state as before.
+            state = self._session_write_state.get(fpath)
+            sig = _session_change_signature(sess)
+            content: Optional[str] = None
+            if state is not None and state["sig"] == sig:
+                content = _serialize_session_jsonl(sess)
+                if state["content_hash"] == hashlib.md5(content.encode("utf-8")).hexdigest():
+                    self._sessions[sess.id] = sess
+                    return
+
+            if content is None:
+                content = _serialize_session_jsonl(sess)
+            atomic_write_text(fpath, content)
             self._sessions[sess.id] = sess
+            self._session_write_state[fpath] = {
+                "sig": sig,
+                "content_hash": hashlib.md5(content.encode("utf-8")).hexdigest(),
+            }
             if self._disk_cache is not None:
                 self._disk_cache[sess.id] = sess
                 self._disk_cache_signature = self._disk_signature()
@@ -332,16 +396,26 @@ class SessionStore:
                 os.remove(self._main_path(session_id))
             except OSError:
                 pass
+            # Drop saved-state for the removed file and any cascaded subagents so
+            # a future save with identical content still (re)creates the file.
+            self._session_write_state.pop(self._main_path(session_id), None)
+            subdir_prefix = self._subagent_dir(session_id) + os.sep
+            for fpath in [p for p in self._session_write_state if p.startswith(subdir_prefix)]:
+                del self._session_write_state[fpath]
         elif sess:
+            fpath = self._subagent_path(sess.parent_id, session_id)
             try:
-                os.remove(self._subagent_path(sess.parent_id, session_id))
+                os.remove(fpath)
             except OSError:
                 pass
+            self._session_write_state.pop(fpath, None)
         else:
+            fpath = self._main_path(session_id)
             try:
-                os.remove(self._main_path(session_id))
+                os.remove(fpath)
             except OSError:
                 pass
+            self._session_write_state.pop(fpath, None)
         self._sessions.pop(session_id, None)
         self._invalidate_disk_cache()
 
