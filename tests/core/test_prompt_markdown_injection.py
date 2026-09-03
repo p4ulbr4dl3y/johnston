@@ -24,7 +24,7 @@ def _stub_runtime_deps():
 
 _stub_runtime_deps()
 
-from core.infrastructure.runtime.prompt_markdown import (
+from core.infrastructure.runtime.prompt_markdown import (  # noqa: E402
     format_mcp_servers_markdown,
     format_rules_markdown,
     format_skills_markdown,

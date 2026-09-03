@@ -28,9 +28,9 @@ class TestResumeScreenAdaptivity(unittest.TestCase):
     def test_init_formats_options(self):
         screen = ResumeScreen(self.sessions, current_session_id="sess-1")
         self.assertEqual(len(screen.raw_options), 3)
-        self.assertIn("62 steps", screen.raw_options[0])
-        self.assertIn("1 step", screen.raw_options[1])
-        self.assertIn("0 steps", screen.raw_options[2])
+        self.assertIn("62 turns", screen.raw_options[0])
+        self.assertIn("1 turn", screen.raw_options[1])
+        self.assertIn("0 turns", screen.raw_options[2])
 
     def test_refresh_options_adapts_to_narrow_width(self):
         screen = ResumeScreen(self.sessions, current_session_id="sess-1")
@@ -45,7 +45,7 @@ class TestResumeScreenAdaptivity(unittest.TestCase):
         self.assertEqual(len(screen.raw_options), 3)
         row0 = screen.raw_options[0]
         # Must contain badge and not exceed 44 visible width
-        self.assertIn("62 steps", row0)
+        self.assertIn("62 turns", row0)
         from rich.text import Text
         plain = Text.from_markup(row0).plain
         self.assertEqual(display_width(plain), 44)

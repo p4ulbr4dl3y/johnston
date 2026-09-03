@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional
 
 from core.domain.policies.messages import (
     SYSTEM_NOTICE_KIND_IMAGES_OMITTED,
-    SYSTEM_NOTICE_KIND_VISION_UNSUPPORTED,
     _xml_escape,
     format_system_note,
 )

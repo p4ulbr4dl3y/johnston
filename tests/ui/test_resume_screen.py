@@ -104,8 +104,8 @@ class TestResumeScreen(unittest.TestCase):
         len_p = cell_len(Text.from_markup(screen.raw_options[0]).plain)
         len_c = cell_len(Text.from_markup(screen.raw_options[1]).plain)
         self.assertEqual(len_p, len_c)
-        self.assertIn("55 steps", screen.raw_options[0])
-        self.assertIn("14 steps", screen.raw_options[1])
+        self.assertIn("55 turns", screen.raw_options[0])
+        self.assertIn("14 turns", screen.raw_options[1])
 
     def test_resume_screen_initial_selected_id(self):
         sessions = [
@@ -127,8 +127,8 @@ class TestResumeScreen(unittest.TestCase):
             {"id": "s2", "title": "Older Session", "message_count": 4, "created_at": now - 7200},
         ]
         screen = ResumeScreen(sessions)
-        self.assertIn("1 step • 2m ago", screen.raw_options[0])
-        self.assertIn("4 steps • 2h ago", screen.raw_options[1])
+        self.assertIn("1 turn • 2m ago", screen.raw_options[0])
+        self.assertIn("4 turns • 2h ago", screen.raw_options[1])
 
 
     def test_resume_screen_locked_pushes_conflict_modal(self):

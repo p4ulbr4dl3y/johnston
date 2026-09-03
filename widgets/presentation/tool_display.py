@@ -375,14 +375,21 @@ def _count_session_turns(session: Any) -> int:
     step_cnt = session.get("step_count") if isinstance(session, dict) else getattr(session, "step_count", None)
     if isinstance(step_cnt, int) and step_cnt > 0:
         return step_cnt
+    turn_cnt = session.get("turn_count") if isinstance(session, dict) else getattr(session, "turn_count", None)
+    if isinstance(turn_cnt, int) and turn_cnt > 0:
+        return turn_cnt
+    messages = session.get("messages") if isinstance(session, dict) else getattr(session, "messages", None)
+    if isinstance(messages, list) and messages:
+        cnt = sum(
+            1
+            for m in messages
+            if isinstance(m, dict) and (m.get("type") == "bot" or (m.get("type") == "tool" and m.get("tool_type")))
+        )
+        if cnt > 0:
+            return cnt
     history = session.get("agent_history") if isinstance(session, dict) else getattr(session, "agent_history", None)
     if isinstance(history, list) and history:
         cnt = sum(1 for m in history if isinstance(m, dict) and m.get("role") == "assistant")
-        if cnt > 0:
-            return cnt
-    messages = session.get("messages") if isinstance(session, dict) else getattr(session, "messages", None)
-    if isinstance(messages, list) and messages:
-        cnt = sum(1 for m in messages if isinstance(m, dict) and m.get("type") in ("bot", "tool"))
         if cnt > 0:
             return cnt
     return 0

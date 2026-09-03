@@ -147,7 +147,7 @@ class ResumeScreen(BaseSelectionScreen[str]):
             prefix = f"{status_pfx}{branch_pfx}"
             title = str(s.get("title", ""))
             count = s.get("message_count", 0)
-            turn_str = "step" if count == 1 else "steps"
+            turn_str = "turn" if count == 1 else "turns"
             badge_parts = [f"{count} {turn_str}"]
             sub_count = s.get("subagent_count", 0) or s.get("active_subagents", 0)
             if sub_count > 0:

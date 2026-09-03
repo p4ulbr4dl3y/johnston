@@ -17,7 +17,6 @@ from typing import Any, Dict, List
 
 from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
 
-
 # ---- Skills ----------------------------------------------------------------
 
 def format_skills_markdown(skills: List[Any]) -> str:

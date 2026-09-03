@@ -62,7 +62,7 @@ class TestResumeScreen(unittest.TestCase):
         self.assertEqual(len(s.raw_options), 2)
         self.assertNotIn("\n", s.raw_options[1])
         self.assertIn("Second multiline session", s.raw_options[1])
-        self.assertIn("5 steps", s.raw_options[0])
+        self.assertIn("5 turns", s.raw_options[0])
         self.assertEqual(s.raw_items, ["s1", "s2"])
         self.assertEqual(s.default_value, "s1")
 

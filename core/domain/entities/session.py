@@ -312,14 +312,27 @@ class AgentSession:
         self._title = str(value) if value is not None else ""
 
     @property
-    def message_count(self) -> int:
-        """Count assistant iterations in history or UI messages."""
+    def turn_count(self) -> int:
+        """Count agent loop iterations / turns (bot responses and tool calls) across full session history."""
+        if self.messages:
+            agent_msgs = [
+                m
+                for m in self.messages
+                if isinstance(m, dict)
+                and (m.get("type") == "bot" or (m.get("type") == "tool" and m.get("tool_type")))
+            ]
+            if agent_msgs:
+                return len(agent_msgs)
         if self.agent_history:
             assistant_msgs = [m for m in self.agent_history if isinstance(m, dict) and m.get("role") == "assistant"]
             if assistant_msgs:
                 return len(assistant_msgs)
-        bot_msgs = [m for m in self.messages if isinstance(m, dict) and m.get("type") == "bot"]
-        return len(bot_msgs)
+        return 0
+
+    @property
+    def message_count(self) -> int:
+        """Count assistant iterations in history or UI messages."""
+        return self.turn_count
 
     def to_summary_dict(self) -> Dict[str, Any]:
         return {
@@ -329,6 +342,7 @@ class AgentSession:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "message_count": self.message_count,
+            "turn_count": self.turn_count,
         }
 
     @classmethod

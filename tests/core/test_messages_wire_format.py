@@ -13,6 +13,7 @@ import sys
 import types
 import unittest
 
+
 # Sandbox may not have httpx/pygments installed; stub the heavy modules
 # before the core.base_provider package init runs.
 def _stub_runtime_deps():
@@ -33,7 +34,7 @@ def _stub_runtime_deps():
 
 _stub_runtime_deps()
 
-from core.domain.policies.messages import (
+from core.domain.policies.messages import (  # noqa: E402
     NOTIFICATION_KIND_SHELL,
     NOTIFICATION_KIND_SUBAGENT,
     SYSTEM_NOTICE_KIND_CONTEXT_TRIMMED,
