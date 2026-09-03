@@ -21,10 +21,9 @@
 Active rules are rendered into the system prompt inside the `<user_rules>` block with project priority overriding global rules:
 ```xml
 <user_rules>
+User rules. Higher-priority rules appear FIRST and override lower-priority rules on conflict. Order: project > global > defaults.
 <rule id="project:python-style">
-<![CDATA[
 Always use `uv` instead of `pip`.
-]]>
 </rule>
 </user_rules>
 ```

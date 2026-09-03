@@ -4,7 +4,7 @@
 Johnston equips the primary agent and subagents with a suite of 10 builtin tools for codebase navigation, file manipulation, execution, subagent orchestration, and external research.
 
 ## Core Filesystem & Execution Tools
-1. **`read`**: Read file contents, inspect directory listings, view archive contents (ZIP/TAR), and inspect line slices (`offset`, `limit`).
+1. **`read`**: Read file contents, inspect directory listings, view archive contents (ZIP/TAR), and inspect line slices (`path`, `start_line`, `end_line`, `content_offset`, `detail`).
    - Rich documents (PDF, DOCX, XLSX, PPTX, EPUB, IPYNB) automatically convert to clean markdown.
    - Images are processed into base64 JSON payloads with configurable `detail` (`"low"`, `"high"`, `"original"`).
    - MCP resources can be read via `read(path="resource://...")`.
@@ -17,12 +17,12 @@ Johnston equips the primary agent and subagents with a suite of 10 builtin tools
 ## Delegation & Subagents
 6. **`invoke_subagent`**: Spawn a specialized background subagent (`title`, `prompt`, `type`, `branch`).
    - Passing `branch` creates an isolated git worktree; auto-commits on completion for parent review.
-7. **`manage_subagent`**: Manage active subagents (`action` in `["list", "send_message", "kill"]`, `subagent_id`, `message`).
+7. **`manage_subagent`**: Manage active subagents (`action` in `["list", "send_message", "kill"]`, `session_id`, `message`).
 
 ## Workflow & Research
 8. **`ask_user`**: Prompt the user with interactive single-choice or multi-choice questions (`questions`).
-9. **`update_plan`**: Maintain and update structured multi-step task execution plans (`plan`, `current_step`).
-10. **`web_fetch`**: Fetch and extract web page content and documents as clean markdown via HTTP requests (`url`).
+9. **`update_plan`**: Maintain and update structured multi-step task execution plans (`plan`: `[{"step": "...", "status": "pending|in_progress|completed"}]`, `explanation`).
+10. **`web_fetch`**: Fetch and extract web page content and documents as clean markdown via HTTP requests (`url`, `raw`).
 
 ## Subagent Tool Exclusions
 To prevent recursive spawning, interactive stalls, and process collisions, the following tools/options are strictly disabled inside subagents:
