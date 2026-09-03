@@ -83,7 +83,11 @@ class InvokeSubagentTool(BaseTool):
         if not prompt:
             return ToolResult.error("params", name="prompt", detail="required")
 
-        session_id = f"subagent-{uuid.uuid4().hex[:6]}"
+        from core.infrastructure.storage.session_store import get_session_store
+
+        store = get_session_store(ctx.host)
+        gen_sub_id = getattr(store, "generate_subagent_id", None)
+        session_id = gen_sub_id() if callable(gen_sub_id) else uuid.uuid4().hex[:8]
         args = {**args, "session_id": session_id}
 
         _record_subagent_session(ctx.host, session_id)
@@ -91,9 +95,6 @@ class InvokeSubagentTool(BaseTool):
         parent_session_id = ctx.session_id
         if not isinstance(parent_session_id, str) or not parent_session_id:
             parent_session_id = getattr(getattr(ctx, "host", None), "current_session_id", None)
-        from core.infrastructure.storage.session_store import get_session_store
-
-        store = get_session_store(ctx.host)
         store.list(kind="subagent")  # ensure subagent sessions for project are loaded
 
         def _is_active_subagent(s: Any) -> bool:

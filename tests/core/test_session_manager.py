@@ -30,7 +30,13 @@ class TestSessionManager(unittest.TestCase):
 
     def test_generate_session_id(self):
         sid = self.store.generate_session_id()
-        self.assertTrue(sid.startswith("session_"))
+        self.assertEqual(len(sid), 8)
+        self.assertTrue(all(c in "0123456789abcdef" for c in sid))
+
+    def test_generate_subagent_id(self):
+        sub_id = self.store.generate_subagent_id()
+        self.assertEqual(len(sub_id), 8)
+        self.assertTrue(all(c in "0123456789abcdef" for c in sub_id))
 
     def test_save_and_load_session(self):
         sid = self.store.generate_session_id()

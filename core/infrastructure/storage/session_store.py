@@ -132,10 +132,13 @@ class SessionStore:
         os.makedirs(self.sessions_dir, exist_ok=True)
 
     def generate_session_id(self) -> str:
-        return f"session_{int(time.time())}_{uuid.uuid4().hex[:4]}"
+        while True:
+            sid = uuid.uuid4().hex[:8]
+            if not os.path.exists(self._main_path(sid)):
+                return sid
 
     def generate_subagent_id(self) -> str:
-        return f"subagent-{uuid.uuid4().hex[:6]}"
+        return uuid.uuid4().hex[:8]
 
     # -- paths -------------------------------------------------------------
 
