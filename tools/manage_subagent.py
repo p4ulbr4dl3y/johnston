@@ -21,7 +21,12 @@ class ManageSubagentTool(BaseTool):
                     "action": {
                         "type": "string",
                         "enum": ["list", "kill", "send_message"],
-                        "description": "Action to perform",
+                        "description": (
+                            "Action to perform: 'list' (active subagents), 'send_message', 'kill'. "
+                            "NEVER poll 'list' in a loop to wait for completion — the runtime "
+                            "automatically wakes you with <notification type='subagent'> on finish. "
+                            "Use 'list' ONLY to recover lost session IDs."
+                        ),
                     },
                     "session_id": {
                         "type": "string",

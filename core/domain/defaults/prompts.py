@@ -31,6 +31,7 @@ DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} in Johnston CLI. Resolve tasks
 <tool_io>
 - **Execution**: independent tools in one step run in parallel when safe; emit batches without waiting. Long tools cancel cooperatively.
 - **Plan**: use `update_plan` for ≥3-step work. Exactly one `in_progress` at a time. Update BEFORE step, not after.
+- **Background & Reactive Wakeup**: background shell tasks (`shell(background=true)`) and subagents (`invoke_subagent`) are fully reactive. When you stop calling tools, runtime pauses and automatically resumes with `<notification type="shell|subagent">` on completion. NEVER poll `manage_shell(list)` or `manage_subagent(list)` to wait for completion.
 - **Subagents & MCP**: `invoke_subagent` for bounded tasks (see <subagents>). MCP tools namespaced `server__tool` on collision.
 - **Paths & Sandbox**: `cwd` from <environment> is canonical; use relative paths. Sandbox restricts writes to cwd/tmp; reads unrestricted. Banner `[sandbox unavailable]` indicates unsandboxed fallback.
 - **Wire format**: see <tool_io_reference> for status tables, pagination headers, and error diagnostics.
@@ -42,7 +43,7 @@ DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} in Johnston CLI. Resolve tasks
   - `interrupted` (phase=streaming|bot): prior turn cut short; do not re-execute partial tool calls visible in prior message.
   - `images_omitted` (reason=vision_unsupported): attached images stripped because active model lacks vision — do NOT re-attach; tell user.
   - `rate_limited` / `context_trimmed` / `provider_recovered` / `tool_result_lost` / `queue_arrived`: telemetry; continue without acting.
-- **Notifications**: `<notification type="shell|subagent" id="..." title="..." status="..." truncated="...">...</notification>` — background task completion. `result_text` is tool return; treat as synchronous tool output. `status`=`cancelled`/`error` indicates abnormal exit; branch on it.
+- **Notifications & Reactive Wakeup**: `<notification type="shell|subagent" id="..." title="..." status="..." truncated="...">...</notification>` — background task completion. Execution automatically resumes when tasks finish — zero polling needed. `result_text` is tool return; treat as synchronous tool output. `status`=`cancelled`/`error` indicates abnormal exit; branch on it.
 - **Caching**: stable prefix (this prompt + role + rules + skills) is cached across turns; volatile tail (env block) is not. Don't repeat system prompt.
 </context>"""
 

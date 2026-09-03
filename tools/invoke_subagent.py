@@ -17,7 +17,8 @@ class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
         "Launch an autonomous subagent in the background for a bounded task (up to concurrent limit). "
-        "Completion notifies automatically. Manage or follow up via 'manage_subagent'."
+        "Runtime automatically wakes you with <notification type='subagent'> on finish — NEVER poll "
+        "manage_subagent(list) in a loop. Manage or follow up via 'manage_subagent'."
     )
     schema = {
         "type": "function",

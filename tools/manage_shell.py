@@ -23,7 +23,12 @@ class ManageShellTool(BaseTool):
                     "action": {
                         "type": "string",
                         "enum": ["list", "send_input", "kill"],
-                        "description": "Action to perform",
+                        "description": (
+                            "Action to perform: 'list' (check active tasks), 'send_input', 'kill'. "
+                            "NEVER poll 'list' in a loop to wait for task completion — the runtime "
+                            "automatically wakes you with <notification type='shell'> on exit. "
+                            "Use 'list' ONLY if you lost track of tasks."
+                        ),
                     },
                     "task_id": {
                         "type": "string",

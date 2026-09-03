@@ -118,7 +118,11 @@ class ShellTool(BaseTool):
                     "background": {
                         "type": "boolean",
                         "default": False,
-                        "description": "Run as background task. Returns task_id + log path. Main agent only — subagents get an error.",
+                        "description": (
+                            "Run as background task. Returns task_id + log path. Runtime automatically "
+                            "resumes turn with <notification type='shell'> on finish — NEVER poll "
+                            "manage_shell(list) to wait. Main agent only."
+                        ),
                     },
                 },
                 "required": ["command"],
