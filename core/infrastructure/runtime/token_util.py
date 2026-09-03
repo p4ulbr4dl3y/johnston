@@ -168,6 +168,18 @@ def _estimate_cache_key(input_val: Any) -> tuple:
     return _structural_key(input_val)
 
 
+def estimate_message_tokens(msg: Any) -> int:
+    """Estimate tokens for a single message.
+
+    Delegates to the same per-message path ``estimate_tokens`` uses when summing
+    a message *list* (which strips ``reasoning_content``), so per-message
+    estimates can be accumulated to equal ``estimate_tokens(history)`` exactly.
+    Note this differs from ``estimate_tokens(msg)`` on a bare dict, which would
+    include ``reasoning_content`` and thus over-count vs. the list sum.
+    """
+    return _estimate_message_tokens(msg)
+
+
 def estimate_tokens(input_val: Any) -> int:
     """
     Estimate token count using a character-class-aware heuristic.

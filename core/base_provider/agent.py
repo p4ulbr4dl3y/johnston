@@ -23,7 +23,7 @@ from core.infrastructure.adapters.base import (
 )
 from core.infrastructure.runtime.lru import LruCache
 from core.infrastructure.runtime.thinking_effort import normalize_thinking_effort
-from core.infrastructure.runtime.token_util import estimate_tokens
+from core.infrastructure.runtime.token_util import estimate_message_tokens, estimate_tokens
 from core.models_catalog import catalog
 from core.provider_manager import is_local_provider
 
@@ -154,6 +154,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
         self._client: Optional[Any] = None
         self.history = []
+        # Running token accumulator for self.history. Always equals
+        # estimate_tokens(self.history); kept fresh via _set_history /
+        # _append_history and self-healing against direct external mutation
+        # through the identity+length guard in _current_history_tokens().
+        self._history_tokens = 0
+        self._history_ident = id(self.history)
+        self._history_len = 0
         self.app = None
         self.tokens_input = 0
         self.tokens_output = 0
@@ -206,6 +213,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
     def clear_history(self):
         self.history.clear()
+        self._history_tokens = 0
+        self._history_ident = id(self.history)
+        self._history_len = 0
         self.tokens_input = 0
         self.tokens_output = 0
         self.tokens_cache_read = 0
@@ -226,7 +236,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             # status-footer refresh: reuse the cached system+tools token count from
             # the last stream and add the current history estimate.
             sys_tok = getattr(self, "_last_sys_tokens", 0)
-            hist_tok = estimate_tokens(self.history) if getattr(self, "history", None) else 0
+            hist_tok = self._current_history_tokens() if getattr(self, "history", None) else 0
             ctx_used = sys_tok + hist_tok
         return {
             "total_tokens": self.total_tokens,
@@ -400,10 +410,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         compaction_ratio = get_settings().llm.compaction_threshold_ratio
         threshold = int(cur_limit * compaction_ratio)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
-        if self.history and len(self.history) > 10:
-            history_tokens = await asyncio.to_thread(estimate_tokens, self.history)
-        else:
-            history_tokens = estimate_tokens(self.history) if self.history else 0
+        history_tokens = self._current_history_tokens() if self.history else 0
         total_tokens = sys_overhead + history_tokens
 
         # 1. Model Downshift detection
@@ -464,6 +471,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                 + [{"role": "user", "content": user_text}]
             )
 
+        # Sync self.history to messages[1:] (history sans the system prefix) once
+        # per turn so the incremental token accumulator and in-place appends below
+        # keep self.history == messages[1:] through the multi-step loop.
+        self._set_history(messages[1:])
+
         try:
             while True:
                 # Drain queued user messages between agent steps.
@@ -480,6 +492,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             item = pending_list.pop(0)
                             msg_text = item if isinstance(item, str) else item[0]
                             messages.append({"role": "user", "content": msg_text})
+                            self._append_history(messages[-1])
                             yield ("queued_user_message", msg_text, None, True, None)
                 else:
                     app = getattr(self, "app", None)
@@ -498,6 +511,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     kept.append(item)
                                     continue
                                 messages.append({"role": "user", "content": item[0]})
+                                self._append_history(messages[-1])
                                 # Carry the queued item's display_text (item[4]) so the UI
                                 # can render the short command instead of the full prompt text
                                 # (e.g. "/skill-name" vs the expanded <skill ...> block).
@@ -511,7 +525,14 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             mq[:] = kept
 
                 step_usage = None
-                prompt_tokens_est = estimate_tokens(messages)
+                # messages = [system] + self.history (invariant maintained below), so
+                # estimate_tokens(messages) == estimate_message_tokens(messages[0]) +
+                # self._history_tokens. Only the single system message is walked here;
+                # the full-history O(n) walk is avoided on every step. Guard for an
+                # empty messages list (defensive; e.g. a mocked no-op compaction).
+                prompt_tokens_est = (
+                    estimate_message_tokens(messages[0]) + self._current_history_tokens() if messages else 0
+                )
                 max_retries = getattr(self, "max_retries", 3)
                 retry_delay = getattr(self, "retry_delay", 1.0)
                 retry_backoff = getattr(self, "retry_backoff", 2.0)
@@ -626,6 +647,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             sanitized = self._sanitize_vision_error_messages(messages)
                             if len(sanitized) != len(messages) or any(s != m for s, m in zip(sanitized, messages)):
                                 messages = sanitized
+                                # Sanitize re-allocates message dicts; resync the
+                                # accumulator to the new messages[1:] prefix.
+                                self._set_history(messages[1:])
                                 yield (
                                     "thinking",
                                     "Model does not support vision; converted image tool result to hint.",
@@ -676,6 +700,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         "reasoning_content": "".join(active_thought_parts),
                     }
                     messages.append(final_msg)
+                    self._append_history(final_msg)
                     yield ("bot_text", full_assistant_text_final, "")
                     # If user messages were queued during this turn, keep going
                     # so the next while-iteration drains them as new steps.
@@ -706,6 +731,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     "reasoning_content": "".join(active_thought_parts),
                 }
                 messages.append(assistant_tool_msg)
+                self._append_history(assistant_tool_msg)
 
                 from core.role_registry import RoleRegistry
 
@@ -749,6 +775,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 resolved.returncode,
                             )
                             messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
+                            self._append_history(messages[-1])
                     else:
                         # Sequential execution (single tool or mutating barrier)
                         for tc, args in batch:
@@ -772,12 +799,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                             messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
 
 
-                # Per-step copy of the transcript for the next provider request.
-                # Recomputing the full ``messages[1:]`` slice on every tool_result
-                # was a repeated O(history) allocation on the UI thread; build it
-                # once here and reuse the latest slice on the next iteration.
-                history_snapshot = await asyncio.to_thread(list, messages[1:])
-                self.history = history_snapshot
+                # self.history was maintained incrementally via _append_history
+                # throughout this iteration (queued users, assistant msg, tool
+                # results), so no full messages[1:] copy is needed here. Only a
+                # mid-loop compaction (below) replaces the prefix and forces a
+                # wholesale resync.
                 compacted_count = getattr(self, "_compacted_count_this_turn", 0)
                 if compacted_count < 10:
                     messages, compacted_in_loop, compact_msg = await self._compact_messages_if_needed(
@@ -788,6 +814,11 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                 if compacted_in_loop:
                     self._compacted_count_this_turn = compacted_count + 1
+                    # Compaction replaced the messages prefix (self.history is now
+                    # the compacted history but messages[1:] is a re-sanitization of
+                    # it); resync the accumulator so self.history == messages[1:]
+                    # holds for the next step's estimate.
+                    self._set_history(messages[1:])
                     divider_text = "Session Compacted"
                     if "(" in compact_msg and ")" in compact_msg:
                         divider_text = f"Session Compacted ({compact_msg[compact_msg.find('(') + 1: compact_msg.rfind(')')]})"
@@ -802,4 +833,5 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             yield ("error", clean_msg, "")
         finally:
             if len(messages) > 1:
-                self.history = await sanitize_history_cached(self, messages[1:])
+                sanitized = await sanitize_history_cached(self, messages[1:])
+                self._set_history(sanitized)

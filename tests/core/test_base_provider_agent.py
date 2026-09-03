@@ -55,6 +55,54 @@ class TestBaseAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(metrics["context_used"], 0)
         self.assertEqual(agent._last_sys_tokens, 0)
 
+    def test_history_token_accumulator_tracks_estimate(self):
+        """The incremental accumulator always equals estimate_tokens(self.history).
+
+        Covers append (including reasoning_content, which the list-sum path
+        strips), wholesale replacement, clear, and self-healing on direct
+        external mutation (identity/length guard).
+        """
+        from core.infrastructure.runtime.token_util import estimate_tokens
+
+        agent = BaseAgent(
+            api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
+        )
+        self.addAsyncCleanup(agent.close)
+
+        # Empty history.
+        self.assertEqual(agent._current_history_tokens(), 0)
+        self.assertEqual(agent._current_history_tokens(), estimate_tokens([]))
+
+        # Incremental append of a message that carries reasoning_content: the
+        # accumulator must match the list-sum (which strips reasoning_content).
+        agent._append_history({"role": "user", "content": "hello world"})
+        agent._append_history({"role": "assistant", "content": "reply", "reasoning_content": "chain of thought"})
+        agent._append_history({"role": "tool", "tool_call_id": "tc_1", "content": "result"})
+        self.assertEqual(agent._current_history_tokens(), estimate_tokens(agent.history))
+
+        # get_metrics reuses the accumulator for context_used.
+        metrics = agent.get_metrics()
+        self.assertEqual(metrics["context_used"], estimate_tokens(agent.history))
+
+        # Wholesale replacement recomputes exactly.
+        new_history = [
+            {"role": "user", "content": "question"},
+            {"role": "assistant", "content": "answer", "reasoning_content": "hidden"},
+        ]
+        agent._set_history(new_history)
+        self.assertEqual(agent._current_history_tokens(), estimate_tokens(agent.history))
+
+        # Direct external mutation (not via helpers) is caught by the guard.
+        agent.history.append({"role": "user", "content": "external append"})
+        self.assertEqual(agent._current_history_tokens(), estimate_tokens(agent.history))
+        agent.history = [{"role": "user", "content": "external replace"}]
+        self.assertEqual(agent._current_history_tokens(), estimate_tokens(agent.history))
+
+        # Clear resets the accumulator to zero.
+        agent.clear_history()
+        self.assertEqual(agent._history_tokens, 0)
+        self.assertEqual(agent._current_history_tokens(), 0)
+
     def test_default_max_tokens_is_32768(self):
         agent = BaseAgent(api_key="t", model="m", base_url="http://t", system_prompt="t", provider_key="p")
         self.addAsyncCleanup(agent.close)
@@ -389,6 +437,12 @@ class TestBaseAgent(unittest.IsolatedAsyncioTestCase):
         assistant_msgs = [m for m in agent.history if m.get("role") == "assistant"]
         self.assertTrue(len(assistant_msgs) >= 1)
         self.assertEqual(assistant_msgs[0].get("reasoning_content"), "Thinking about file...")
+
+        # The incremental token accumulator must match the full re-estimate after
+        # a multi-step (tool) turn.
+        from core.infrastructure.runtime.token_util import estimate_tokens
+
+        self.assertEqual(agent._current_history_tokens(), estimate_tokens(agent.history))
 
     async def test_duplicate_tool_calls_are_all_executed(self):
         """Identical tool calls (same name+args) must all run, not be dropped by dedup."""

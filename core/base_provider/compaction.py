@@ -16,7 +16,7 @@ from core.domain.defaults.prompts import (
 )
 from core.domain.policies.messages import is_checkpoint_message, is_system_note
 from core.infrastructure.adapters.base import build_stream_kwargs, normalize_tool_arguments_str
-from core.infrastructure.runtime.token_util import estimate_tokens
+from core.infrastructure.runtime.token_util import estimate_message_tokens, estimate_tokens
 from core.models_catalog import catalog, get_context_window
 
 # Checkpoint wire-format constants. There is exactly one canonical form.
@@ -211,6 +211,46 @@ class CompactionMixin:
     def context_window(self) -> str:
         return get_context_window(self.provider_key, self.model)
 
+    def _set_history(self, history: List[Dict[str, Any]]) -> None:
+        """Replace self.history wholesale and recompute the token accumulator.
+
+        Used on every full-history replacement (sanitize, compaction, truncate,
+        turn start) so the accumulator never drifts. The O(history) recompute is
+        paid once per replacement instead of once per tool step.
+        """
+        self.history = history
+        self._history_tokens = estimate_tokens(history)
+        self._history_ident = id(self.history)
+        self._history_len = len(self.history)
+
+    def _append_history(self, msg: Dict[str, Any]) -> None:
+        """Append one message to self.history, adding only its token estimate.
+
+        The single-message estimate is cheap and cache-friendly, avoiding a full
+        O(history) re-walk per tool step.
+        """
+        self.history.append(msg)
+        self._history_tokens = getattr(self, "_history_tokens", 0) + estimate_message_tokens(msg)
+        self._history_len = getattr(self, "_history_len", 0) + 1
+
+    def _current_history_tokens(self) -> int:
+        """Return the accumulator, self-healing if history was mutated directly.
+
+        Direct external mutations (e.g. ``agent.history.append(...)`` or a
+        wholesale assignment outside this module) change the list identity or
+        length; the guard catches those and recomputes once so callers always
+        observe an exact ``estimate_tokens(self.history)``. Falls back to a full
+        recompute when the accumulator was never initialized (e.g. a bare mixin).
+        """
+        if (
+            getattr(self, "_history_ident", None) != id(self.history)
+            or getattr(self, "_history_len", None) != len(self.history)
+        ):
+            self._history_tokens = estimate_tokens(self.history)
+            self._history_ident = id(self.history)
+            self._history_len = len(self.history)
+        return getattr(self, "_history_tokens", 0)
+
     def truncate_history_to_user_message(self, user_msg_index: int) -> None:
         """Truncates conversation history to immediately before the specified user message index (0-indexed).
 
@@ -239,19 +279,21 @@ class CompactionMixin:
 
         if user_count >= user_msg_index:
             kept = self.history[:cutoff_idx]
-            self.history = [
-                m
-                for m in kept
-                if not (
-                    m.get("role") == "user"
-                    and is_system_note(m)
-                )
-            ]
+            self._set_history(
+                [
+                    m
+                    for m in kept
+                    if not (
+                        m.get("role") == "user"
+                        and is_system_note(m)
+                    )
+                ]
+            )
         else:
             self.clear_history()
 
         sys_tok = getattr(self, "_last_sys_tokens", 0)
-        hist_tok = estimate_tokens(self.history) if self.history else 0
+        hist_tok = self._current_history_tokens() if self.history else 0
         self.last_context_tokens = sys_tok + hist_tok
 
     def sanitize_history_for_model(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -382,7 +424,9 @@ class CompactionMixin:
         threshold: int,
     ) -> Tuple[List[Dict[str, Any]], bool, str]:
         if len(messages) > 1:
-            history_tokens = await asyncio.to_thread(estimate_tokens, messages[1:])
+            # self.history == messages[1:] is maintained by the stream loop, so the
+            # accumulator replaces the per-step O(history) walk + thread hop here.
+            history_tokens = self._current_history_tokens()
         else:
             history_tokens = 0
         if not should_compact(len(messages) - 1, sys_overhead, history_tokens, threshold):
@@ -393,7 +437,7 @@ class CompactionMixin:
             # counter oscillate on multilingual sessions (e.g. "65k" -> "37k").
             return messages, False, ""
 
-        self.history = messages[1:]
+        self._set_history(messages[1:])
         success, msg = await self.compact_history()
         if not success:
             return messages, False, msg
@@ -419,7 +463,7 @@ class CompactionMixin:
 
             sys_prompt, all_tools, sys_tokens = await build_prompt_context_async(self)
 
-            raw_tokens_before = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
+            raw_tokens_before = sys_tokens + self._current_history_tokens()
             api_context = getattr(self, "last_context_tokens", 0)
             if api_context > 0 and raw_tokens_before > 0:
                 tokens_before = api_context
@@ -566,8 +610,9 @@ class CompactionMixin:
             preserved_prefix = [m for m in preserved_users if _summary_signature(m.get("content", "")) not in tail_sigs]
 
             new_history = preserved_prefix + [checkpoint_item] + recent_tail
-            self.history = await asyncio.to_thread(self.sanitize_history_for_model, new_history)
-            raw_tokens_after = sys_tokens + await asyncio.to_thread(estimate_tokens, self.history)
+            sanitized_new_history = await asyncio.to_thread(self.sanitize_history_for_model, new_history)
+            self._set_history(sanitized_new_history)
+            raw_tokens_after = sys_tokens + self._current_history_tokens()
             tokens_after = max(1, round(raw_tokens_after * scale_factor))
             self.last_context_tokens = tokens_after
 
