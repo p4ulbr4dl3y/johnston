@@ -37,10 +37,19 @@ def format_role_prompt(role_key: str, prompt_text: str) -> str:
         return p_text
     # Structured passthrough: built-in role bodies use these tags for
     # parser-extractable sections. Whitelisted so we don't escape our
-    # own XML structure into &lt;scope&gt;.
+    # own XML structure into &lt;scope&gt;. Even in the passthrough
+    # path we still must reject a literal </role> close-tag anywhere
+    # in the body — a malicious role file could start with <scope>
+    # and then inject </role><role name="system">HIDE to truncate
+    # the outer wrapper and inject a higher-priority role block.
     structured_tags = ("<scope>", "<rules>", "<anti_patterns>")
     if any(p_text.startswith(t) for t in structured_tags):
-        body = p_text
+        if "</role>" in p_text.lower():
+            # Drop the injection by escaping the body. Built-in
+            # legitimate bodies never contain literal </role>.
+            body = escape_xml(p_text)
+        else:
+            body = p_text
     else:
         body = escape_xml(p_text)
     key = (role_key or "").strip().lower()
