@@ -153,9 +153,11 @@ def format_subagents_markdown(roles: List[Any], max_concurrent: int = 5) -> str:
     header = (
         "Delegate bounded tasks via `invoke_subagent` (background; auto-notify on completion).\n"
         "Rules:\n"
+        "- threshold: do atomic/routine tasks directly. Delegate to subagents ONLY when work is: parallelizable, requires isolation, or large (≥3-5 steps).\n"
         "- title: noun phrase, 3-5 words (e.g. 'Auth token refactor'), not verbs.\n"
         "- prompt: include acceptance criteria, relative file paths, expected output format.\n"
-        "- branch: pass `branch='<feature>'` for code edits (isolated worktree, auto-commit on finish; parent inspects diff then `git merge <feature>`). Skip branch for read-only tasks.\n"
+        "- branch: pass `branch='<feature>'` for code edits (isolated worktree, auto-commit on finish). Skip branch for read-only tasks.\n"
+        "- merge: after successful worktree subagent completion, parent MUST verify diff and merge branch (`git merge <branch>`).\n"
         f"- concurrency: ≤{max_concurrent} parallel. Hit limit → wait for completion notifications before spawning more; do NOT poll list.\n"
         "- follow-up: `manage_subagent(send_message, session_id=...)` resumes prior session (history restored). Prefer this over spawning duplicates.\n"
         "- reactive: execution automatically pauses and resumes with <notification> when subagents finish. NEVER poll `list` in a loop; stop calling tools to wait.\n"
