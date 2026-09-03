@@ -308,11 +308,13 @@ async def run_subagent_stream_bg(
             else:
                 result_text = base_text or "Completed with no text output."
 
+            from core.domain.policies.messages import _xml_escape
+
             msg = notification_template.format(
-                session_id=sid,
-                result_text=result_text,
-                title=session.title,
-                description=session.title,
+                session_id=_xml_escape(sid),
+                result_text=_xml_escape(result_text),
+                title=_xml_escape(session.title or ""),
+                description=_xml_escape(session.title or ""),
             )
             ctx.trigger_ai_response(msg)
 
