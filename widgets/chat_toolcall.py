@@ -37,6 +37,41 @@ DISPLAY_NAMES: dict[str, str] = {
 
 SYSTEM_TOOLS: frozenset[str] = frozenset(DISPLAY_NAMES.keys())
 
+# Start of a truncation banner like "[Output truncated: ...]" — the same
+# pattern ``clean_truncation_for_ui`` rewrites. Used to keep an unterminated
+# banner out of the committed tail so it is only rewritten once complete.
+_TRUNC_BANNER_START = re.compile(r"(?:\.\.\.\s*)?\[(?:Output\s+truncated|Truncated)", re.IGNORECASE)
+
+
+def _bash_safe_boundary(examine: str) -> int:
+    """Byte offset in ``examine`` up to which the flush can commit safely.
+
+    The committed prefix must end at a ``\\n`` line boundary (a carriage-return
+    sequence may span the boundary, so the trailing partial line is carried into
+    the next flush) and must not stop inside an unterminated truncation banner
+    (``[Output truncated ...`` without a closing ``]``), which is only rewritten
+    once complete. Returns the offset of the carry region start.
+    """
+    boundary = examine.rfind("\n") + 1
+    committed = examine[:boundary]
+    last_close = committed.rfind("]")
+    for m in _TRUNC_BANNER_START.finditer(committed):
+        if m.start() > last_close:
+            # Banner is unterminated inside the committed prefix: carry from it
+            # (plus any mid-line text before it back to the previous newline).
+            boundary = examine.rfind("\n", 0, m.start()) + 1
+            break
+    return boundary
+
+
+def _bash_ends_with_spinner(text: str) -> bool:
+    """True when the last line of ``text`` is a single spinner character."""
+    from core.infrastructure.tasks.output import is_spinner_line
+
+    if not text:
+        return False
+    return is_spinner_line(text.rsplit("\n", 1)[-1])
+
 
 class ToolScrollBox(Vertical):
     """Horizontal scroll box for tool code/diff view."""
@@ -99,6 +134,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.subagent_session_id: str | None = None
         self._shell_update_scheduled = False
         self._shell_update_handle: asyncio.TimerHandle | None = None
+        # Incremental shell-stream flush state (see _flush_shell_update).
+        self._bash_processed_len = 0
+        self._bash_needs_resync = False
+        self._rendered_bash_tail = ""
+        self._bash_tail_line_is_spinner = False
+        self._bash_leading_stripped = False
         if status is not None:
             self.status = status
         else:
@@ -553,6 +594,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self._raw_bash_buffer += text
         if len(self._raw_bash_buffer) > self._RAW_BASH_LIMIT:
             self._raw_bash_buffer = self._RAW_BASH_TRUNC + self._raw_bash_buffer[-self._RAW_BASH_LIMIT :]
+            # The front of the buffer was cut: the processed offset and the
+            # rendered tail are stale, so the next flush must re-sync.
+            self._bash_needs_resync = True
         self._schedule_shell_update()
 
     def _schedule_shell_update(self) -> None:
@@ -566,16 +610,117 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self._flush_shell_update()
 
     def _flush_shell_update(self) -> None:
+        """Incrementally fold the shell stream delta into the rendered tail.
+
+        Only the bytes appended since the previous flush are re-processed
+        (truncation-banner cleanup + carriage-return collapsing), so a growing
+        ``_RAW_BASH_LIMIT`` buffer is no longer fully re-processed on every
+        flush. ``result_text`` stays byte-identical to the legacy full-buffer
+        computation ``process_carriage_returns(clean_bash_output(buf))``: the
+        trailing partial line (and any unterminated truncation banner) is carried
+        raw across flushes and only committed once complete, so ``\\r`` sequences
+        split across flushes are never corrupted. Collapsed cards only pay the
+        delta processing; the widget is re-rendered only when the result changed.
+        """
         self._shell_update_scheduled = False
         self._shell_update_handle = None
-        from core.infrastructure.tasks.output import process_carriage_returns
+        from core.infrastructure.tasks.output import process_carriage_returns, process_carriage_returns_lines
 
         buf = getattr(self, "_raw_bash_buffer", "")
-        cleaned = self._clean_bash_output(buf)
-        self.result_text = process_carriage_returns(cleaned)
-        if self.is_expanded:
-            self.render_content()
-            self._scroll_if_needed()
+        if getattr(self, "_bash_needs_resync", False):
+            # The raw buffer front was cut to respect _RAW_BASH_LIMIT: the
+            # offset and rendered tail are stale, so fall back to reprocessing
+            # the buffer from scratch (rare, amortized O(limit) per eviction).
+            self._bash_needs_resync = False
+            self._bash_processed_len = 0
+            self._rendered_bash_tail = ""
+            self._bash_tail_line_is_spinner = False
+            self._bash_leading_stripped = False
+
+        processed = getattr(self, "_bash_processed_len", 0)
+        carry_raw = ""
+        if len(buf) > processed:
+            examine = buf[processed:]
+            boundary = _bash_safe_boundary(examine)
+            commit_raw = examine[:boundary]
+            carry_raw = examine[boundary:]
+            if commit_raw:
+                cleaned = format_truncation_for_ui(commit_raw, strip_edges=False)
+                if cleaned and not cleaned.endswith("\n"):
+                    # A truncation banner swallowed the trailing newline (never
+                    # seen with real tool output): reprocess the whole buffer
+                    # exactly like the legacy path to stay byte-identical.
+                    self.result_text = process_carriage_returns(self._clean_bash_output(buf))
+                    self._bash_processed_len = len(buf)
+                    self._rendered_bash_tail = self.result_text
+                    self._bash_tail_line_is_spinner = _bash_ends_with_spinner(self.result_text)
+                    self._bash_leading_stripped = True
+                    if self.is_expanded:
+                        self.render_content()
+                        self._scroll_if_needed()
+                    return
+                lines = cleaned.split("\n")[:-1]
+                leading_stripped = getattr(self, "_bash_leading_stripped", False)
+                if not leading_stripped:
+                    # The leading-whitespace run (which legacy strip() removes)
+                    # may span several flushes and lines: drop whitespace-only
+                    # lines and trim the first line that holds real content.
+                    for i, ln in enumerate(lines):
+                        lstripped = ln.lstrip()
+                        if lstripped:
+                            lines = [lstripped] + lines[i + 1 :]
+                            leading_stripped = True
+                            break
+                    else:
+                        lines = []
+                tail, is_spinner = process_carriage_returns_lines(
+                    lines,
+                    tail=getattr(self, "_rendered_bash_tail", ""),
+                    tail_is_spinner=getattr(self, "_bash_tail_line_is_spinner", False),
+                )
+                self._bash_processed_len = processed + boundary
+                self._rendered_bash_tail = tail
+                self._bash_tail_line_is_spinner = is_spinner
+                self._bash_leading_stripped = leading_stripped
+
+        result_text = self._bash_compose_result(carry_raw)
+        if result_text != self.result_text:
+            self.result_text = result_text
+            if self.is_expanded:
+                self.render_content()
+                self._scroll_if_needed()
+
+    def _bash_compose_result(self, carry_raw: str) -> str:
+        """Reconstruct ``result_text`` from the committed tail + carried remainder.
+
+        The carried remainder (an unterminated line or a truncation banner
+        awaiting its closing ``]``) starts at a line boundary and is only
+        collapsed for display, never committed — so a ``\\r`` sequence split
+        across flushes is not corrupted. Edge whitespace is trimmed exactly like
+        the legacy ``clean_bash_output`` did for the whole buffer (leading once,
+        trailing at the current buffer end only).
+        """
+        from core.infrastructure.tasks.output import is_spinner_line, process_carriage_returns
+
+        tail = getattr(self, "_rendered_bash_tail", "")
+        if carry_raw:
+            # Legacy order: clean (banner regex) -> strip buffer edges -> collapse.
+            part = process_carriage_returns(
+                format_truncation_for_ui(carry_raw, strip_edges=False).rstrip()
+            )
+            if (
+                tail
+                and getattr(self, "_bash_tail_line_is_spinner", False)
+                and "\n" not in part
+                and is_spinner_line(part)
+            ):
+                nl = tail.rfind("\n")
+                tail = (tail[: nl + 1] if nl != -1 else "") + part
+            else:
+                tail = f"{tail}\n{part}" if tail else part
+        if getattr(self, "_bash_leading_stripped", False):
+            return tail.rstrip()
+        return tail.strip()
 
     def _compute_content(self) -> tuple[str, Any]:
         """Pure content computation (safe to run in a thread); returns (kind, value)."""

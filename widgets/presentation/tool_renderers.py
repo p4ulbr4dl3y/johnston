@@ -45,16 +45,22 @@ def clean_truncation_marker(match: re.Match) -> str:
     return match.group(0)
 
 
-def format_truncation_for_ui(text: str) -> str:
-    """Format truncation banners for UI display."""
+def format_truncation_for_ui(text: str, *, strip_edges: bool = True) -> str:
+    """Format truncation banners for UI display.
+
+    ``strip_edges=False`` skips the leading/trailing whitespace trim so callers
+    can clean a single flushed chunk without eating whitespace that the full
+    buffer keeps (streaming flush only trims the actual buffer edges).
+    """
     if not text:
         return ""
-    return re.sub(
+    cleaned = re.sub(
         r"(\.\.\.\s*)?\[(Output\s+truncated|Truncated):?\s*([^\]]*)\]",
         clean_truncation_marker,
         text,
         flags=re.IGNORECASE,
-    ).strip()
+    )
+    return cleaned.strip() if strip_edges else cleaned
 
 
 def build_synthetic_create_diff(file_path: str, content: str) -> str:

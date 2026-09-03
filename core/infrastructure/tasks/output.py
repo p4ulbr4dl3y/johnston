@@ -12,7 +12,7 @@ import queue
 import re
 import threading
 import uuid
-from typing import List, Optional
+from typing import Iterable, List, Optional
 
 from core.domain.defaults.config import DEFAULT_SUBAGENT_RESULT_MAX_CHARS
 from core.infrastructure.platform.paths import LOGS_DIR
@@ -20,14 +20,18 @@ from core.infrastructure.platform.paths import LOGS_DIR
 __all__ = [
     "OutputBuffer",
     "OutputLog",
+    "is_spinner_line",
     "make_log_path",
-    "strip_ansi",
     "process_carriage_returns",
+    "process_carriage_returns_lines",
+    "strip_ansi",
     "tail_output",
     "truncate_subagent_result",
 ]
 
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+_SPINNER_CHARS = frozenset({"-", "\\", "|", "/", "—"})
 
 # Cap on retained raw output bytes for a task. Old chunks are dropped from the
 # front (tail preserved) past this limit so `"".join` stays bounded.
@@ -51,14 +55,53 @@ def process_carriage_returns(text: str) -> str:
         processed.append(line)
 
     filtered = []
-    spinner_chars = {"-", "\\", "|", "/", "—"}
     for line in processed:
-        stripped = line.strip()
-        if stripped in spinner_chars and filtered and filtered[-1].strip() in spinner_chars:
+        if is_spinner_line(line) and filtered and is_spinner_line(filtered[-1]):
             filtered[-1] = line
         else:
             filtered.append(line)
     return "\n".join(filtered)
+
+
+def is_spinner_line(line: str) -> bool:
+    """True when ``line`` is a standalone spinner character after stripping."""
+    return line.strip() in _SPINNER_CHARS
+
+
+def process_carriage_returns_lines(
+    lines: Iterable[str],
+    tail: str = "",
+    tail_is_spinner: bool = False,
+) -> tuple[str, bool]:
+    """Incremental variant of ``process_carriage_returns`` for streamed chunks.
+
+    Consumes a batch of *complete* lines (each ``\\n``-terminated in the source)
+    and folds them into a previously built ``tail``, returning ``(new_tail,
+    new_tail_is_spinner)`` so the caller can resume with the next batch. This
+    keeps the per-flush work bounded by the delta instead of re-processing the
+    whole buffer every time, while reproducing the exact output of
+    ``process_carriage_returns`` for the same line sequence.
+
+    ``tail`` is the rendered output joined with ``"\\n"`` (no trailing newline);
+    ``tail_is_spinner`` records whether the last tail line is a single spinner
+    character, which is needed to apply the cross-batch spinner replacement rule.
+    """
+    out = tail
+    last_is_spinner = tail_is_spinner
+    for raw_line in lines:
+        if "\r" in raw_line:
+            parts = [p for p in raw_line.split("\r") if p]
+            line = parts[-1] if parts else ""
+        else:
+            line = raw_line
+        is_spinner = is_spinner_line(line)
+        if is_spinner and last_is_spinner:
+            nl = out.rfind("\n")
+            out = (out[: nl + 1] if nl != -1 else "") + line
+        else:
+            out = f"{out}\n{line}" if out else line
+        last_is_spinner = is_spinner
+    return out, last_is_spinner
 
 
 class OutputBuffer:
