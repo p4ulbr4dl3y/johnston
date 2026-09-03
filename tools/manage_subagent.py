@@ -35,7 +35,8 @@ class ManageSubagentTool(BaseTool):
                     "message": {
                         "type": "string",
                         "description": (
-                            "Follow-up text for 'send_message' (queues if running, resumes if completed)"
+                            "Follow-up instruction for 'send_message' (queues if running, resumes session and worktree if done). "
+                            "Use for refinements, fixes on partial/blocked tasks, or next steps in same scope."
                         ),
                     },
                 },
