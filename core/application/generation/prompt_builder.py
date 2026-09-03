@@ -420,7 +420,9 @@ class PromptBuilder:
                 if self.model_name and self.model_name.strip()
                 else "an expert AI assistant"
             )
-            sys_prompt = sys_prompt.replace("{model_name}", model_label)
+            # Model names normally don't contain XML special chars, but a
+            # provider's model list is user-editable, so escape defensively.
+            sys_prompt = sys_prompt.replace("{model_name}", escape_xml(model_label))
 
         # Append role prompt for the MAIN agent too. Previously this was
         # subagent-only, so a main-agent role defined in ~/.johnston/roles/
