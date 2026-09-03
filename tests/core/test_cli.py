@@ -34,7 +34,8 @@ class TestCLI(unittest.TestCase):
         output = f.getvalue()
         self.assertIn("Available Johnston Skills:", output)
 
-    def test_print_mcp(self):
+    @patch("core.infrastructure.mcp.MCPManager.load_servers", return_value=[])
+    def test_print_mcp(self, mock_load):
         f = io.StringIO()
         with redirect_stdout(f):
             print_mcp()
@@ -42,7 +43,8 @@ class TestCLI(unittest.TestCase):
         self.assertIn("Configured MCP Servers:", output)
 
     @patch("core.infrastructure.mcp.MCPManager.load_servers")
-    def test_print_mcp_url_error(self, mock_load):
+    @patch("core.infrastructure.mcp.MCPManager.get_active_tools", return_value=[])
+    def test_print_mcp_url_error(self, mock_tools, mock_load):
         mock_load.return_value = [
             {"name": "hf_server", "url": "https://hf.co/mcp", "scope": "global"}
         ]

@@ -441,7 +441,7 @@ class TestCancelEdgeCases(unittest.IsolatedAsyncioTestCase):
 
         def stubborn():
             started.set()
-            time.sleep(5.0)
+            time.sleep(0.3)
             return "late"
 
         task = asyncio.create_task(run_cancellable(stubborn))
@@ -450,7 +450,7 @@ class TestCancelEdgeCases(unittest.IsolatedAsyncioTestCase):
         task.cancel()
         with self.assertRaises(asyncio.CancelledError):
             await task
-        self.assertLess(time.monotonic() - start, 2.0)
+        self.assertLess(time.monotonic() - start, 0.2)
         # The caller is not blocked, but the orphaned thread keeps running; we
         # must not join it — so we just assert the caller returned promptly.
 

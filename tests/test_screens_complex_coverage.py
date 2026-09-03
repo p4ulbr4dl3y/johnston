@@ -333,9 +333,14 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
                 ("custom_empty", {}),
             ]
 
-            for t_name, t_args in tools:
-                screen = PermissionConfirmScreen(t_name, t_args)
-                async with HostModalApp(screen).run_test(size=(85, 24)) as pilot:
+            first_screen = PermissionConfirmScreen(tools[0][0], tools[0][1])
+            async with HostModalApp(first_screen).run_test(size=(85, 24)) as pilot:
+                await pilot.pause()
+                for t_name, t_args in tools[1:]:
+                    screen = PermissionConfirmScreen(t_name, t_args)
+                    await pilot.app.push_screen(screen)
+                    await pilot.pause()
+                    pilot.app.pop_screen()
                     await pilot.pause()
         finally:
             os.unlink(temp_file)
