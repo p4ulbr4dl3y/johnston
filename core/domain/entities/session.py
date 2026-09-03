@@ -122,6 +122,7 @@ class AgentSession:
         self.listeners: List[Any] = []
         self.async_task: Any = None
         self.pending_messages: List[Any] = []  # follow-up queue (live, not persisted)
+        self._next_unmatched_tool_idx: int = 0  # first index with a possibly-unmatched TOOL msg (live)
         self.project_dir: str = ""
         self.branch_name: str = ""
         self.background: bool = True
@@ -164,11 +165,21 @@ class AgentSession:
                 last["duration"] = event["duration"]
         elif etype == MessageType.TOOL and "result_text" in event:
             target_msg = None
-            if self.messages:
-                for msg in self.messages:
-                    if isinstance(msg, dict) and msg.get("type") == MessageType.TOOL and "result_text" not in msg:
-                        target_msg = msg
-                        break
+            # Tool results always land on the FIRST unmatched TOOL message (no
+            # tool-id correlation upstream), so everything before the pointer is
+            # already matched or non-matchable and must not be rescanned: O(1)
+            # amortized per result. Clamp on truncation/rewind, which may replace
+            # self.messages with a shorter prefix (re-exposed messages keep their
+            # result_text, so skipping them matches the old from-0 scan).
+            idx = min(self._next_unmatched_tool_idx, len(self.messages))
+            for i in range(idx, len(self.messages)):
+                msg = self.messages[i]
+                if isinstance(msg, dict) and msg.get("type") == MessageType.TOOL and "result_text" not in msg:
+                    target_msg = msg
+                    self._next_unmatched_tool_idx = i + 1
+                    break
+            else:
+                self._next_unmatched_tool_idx = len(self.messages)
             if target_msg is not None:
                 target_msg["result_text"] = event["result_text"]
                 for key in ("status", "is_error", "returncode"):
