@@ -485,6 +485,33 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
         res4 = await tool.execute({"action": "list"}, ctx=app)
         self.assertFalse(res4.is_error)
 
+    async def test_send_message_persists_immediately_and_registers_in_store(self):
+        sess = self._mk_subagent("sub-imm-save")
+        app, _ = self._app_with_widget(sess)
+
+        class MockSubagent:
+            async def stream_steps(self, message):
+                yield ("bot_text", "done reply")
+
+        app.pm.create_active_agent.return_value = MockSubagent()
+
+        tool = ManageSubagentTool()
+        with patch.object(self.store, "save", wraps=self.store.save) as spy_save:
+            res = str(await tool.execute(
+                {"action": "send_message", "session_id": "sub-imm-save", "message": "followup msg"},
+                ctx=app,
+            ))
+            self.assertIn("[message sent | id sub-imm-save]", res)
+            self.assertTrue(spy_save.called)
+
+        # Re-querying store resolves to same live session with user message present
+        resolved = self.store.find_session_by_title_or_id("sub-imm-save")
+        self.assertIs(resolved, sess)
+        self.assertTrue(any(
+            isinstance(m, dict) and m.get("type") == "user" and m.get("text") == "followup msg"
+            for m in resolved.messages
+        ))
+
 
 if __name__ == "__main__":
     unittest.main()

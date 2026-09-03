@@ -424,6 +424,10 @@ async def send_subagent_followup(
         subagent.session = session
         session.add_event({"type": "user", "text": message})
         session.add_event({"type": "status_change", "status": SessionStatus.RUNNING})
+        if store:
+            if hasattr(store, "_sessions") and isinstance(store._sessions, dict):
+                store._sessions[session.id] = session
+            await _safe_save(store, session)
 
         from core.domain.policies.messages import format_background_notification
         from core.infrastructure.runtime.subagent_tracker import _mark_subagent_running

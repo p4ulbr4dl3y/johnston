@@ -236,7 +236,7 @@ class SessionStore:
         sessions = self._load_disk_sessions()
         for sid, sess in self._sessions.items():
             if sess.project_key == self.project_key:
-                sessions.setdefault(sid, sess)
+                sessions[sid] = sess
         result = list(sessions.values())
         if kind:
             result = [s for s in result if s.kind == SessionKind(kind)]
@@ -435,15 +435,22 @@ class SessionStore:
             return None
         clean_id = identifier.strip("\"' `")
 
+        if clean_id in self._sessions:
+            sess = self._sessions[clean_id]
+            if not parent_id or sess.parent_id == parent_id:
+                return sess
+
         candidates = self.children(parent_id) if parent_id else self.list()
         res = self._search_in_list(candidates, identifier, clean_id)
         if res:
+            self._sessions[res.id] = res
             return res
 
         # Fallback: full project-wide search
         if parent_id:
             res = self._search_in_list(self.list(), identifier, clean_id)
             if res:
+                self._sessions[res.id] = res
                 return res
         return None
 

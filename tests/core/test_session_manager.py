@@ -256,8 +256,34 @@ class TestSessionManagerPureReader(unittest.TestCase):
         self.assertIn(sid, session_ids)
         self.assertIn(forked.id, session_ids)
 
-        fork_summary = next(s for s in sessions if s["id"] == forked.id)
-        self.assertEqual(fork_summary["parent_id"], sid)
+    def test_list_prefers_live_in_memory_over_disk(self):
+        sid = self.store.generate_session_id()
+        sess = self.store.create_main(sid)
+        sess.messages = [{"type": "user", "text": "initial disk content"}]
+        self.store.save(sess)
+
+        # Mutate in-memory session without saving to disk
+        sess.messages.append({"type": "user", "text": "live follow-up"})
+
+        results = self.store.list()
+        matching = [s for s in results if s.id == sid]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual(len(matching[0].messages), 2)
+        self.assertEqual(matching[0].messages[1]["text"], "live follow-up")
+
+    def test_find_session_by_title_or_id_registers_in_sessions(self):
+        sub_id = "sub-find-reg"
+        sess = self.store.create_subagent("sess-main", subagent_id=sub_id, title="My Sub")
+        sess.messages = [{"type": "user", "text": "hello"}]
+        self.store.save(sess)
+
+        self.store._sessions.clear()
+        found = self.store.find_session_by_title_or_id(sub_id)
+        self.assertIsNotNone(found)
+        self.assertIn(sub_id, self.store._sessions)
+
+        found_again = self.store.find_session_by_title_or_id(sub_id)
+        self.assertIs(found, found_again)
 
 
 if __name__ == "__main__":

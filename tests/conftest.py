@@ -83,6 +83,15 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     monkeypatch.setattr("core.application.skills.manager.GLOBAL_SKILLS_DIR", skills_dir)
     monkeypatch.setattr("core.infrastructure.mcp.manager.CONFIG_DIR", cfg_dir_str)
     monkeypatch.setattr("core.infrastructure.mcp.manager.GLOBAL_MCP_FILE", mcp_file)
+
+    from core.infrastructure.mcp.manager import MCPManager
+
+    orig_mcp_init = MCPManager.__init__
+    def fake_mcp_init(self, project_dir=None, *args, **kwargs):
+        if not project_dir:
+            project_dir = cfg_dir_str
+        orig_mcp_init(self, project_dir, *args, **kwargs)
+    monkeypatch.setattr("core.infrastructure.mcp.manager.MCPManager.__init__", fake_mcp_init)
     monkeypatch.setattr("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", cfg_dir_str)
     monkeypatch.setattr("core.infrastructure.runtime.subagent_worktree.WORKTREES_DIR", worktrees_dir)
     monkeypatch.setattr("core.infrastructure.storage.git_checkpoint.SHADOW_REPOS_DIR", shadow_repos_dir)
