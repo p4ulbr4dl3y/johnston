@@ -324,16 +324,20 @@ def apply_edit(
 class EditTool(BaseTool):
     name = "edit"
     description = (
-        "Replace text in a file. 'old_str' must be unique in the file (include 2-4 lines of surrounding "
-        "context if needed). Set 'replace_all=true' to replace all occurrences."
+        "Replace text in a file via exact-match. Use for surgical/localized changes. "
+        "For wholesale rewrites (>40% of file changed), prefer 'create'. "
+        "For mass repetitive transforms across files, prefer python script via 'shell'."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "edit",
             "description": (
-                "Replace text in an EXISTING file via exact-match. For NEW files, use `create`. "
-                "Always `read` the file first to see current content.\n\n"
+                "Replace text in an EXISTING file via exact-match. Use for surgical/localized changes.\n"
+                "Tradeoffs:\n"
+                "- Localized edits (1-5 targets): use `edit` (smallest diff).\n"
+                "- Complete rewrites (>40% changed, mass translations): use `create`.\n"
+                "- Mass repetitive transforms across files: run python script via `shell`.\n\n"
                 "`old_str` rules:\n"
                 "- Must be unique in the file. Include 2-4 lines of surrounding context if needed.\n"
                 "- Whitespace-agnostic at line starts (tabs/spaces normalized). CRLF/LF handled.\n"

@@ -13,8 +13,8 @@ DEFAULT_MAX_PAYLOAD_MB = DEFAULT_TOOL_PAYLOAD_BYTES // (1024 * 1024)
 class CreateTool(BaseTool):
     name = "create"
     description = (
-        "Create a new file or OVERWRITE an existing file. Automatically creates parent directories. "
-        "For partial edits in existing files, use 'edit'."
+        "Create a new file or OVERWRITE an existing file completely. Use for new files OR complete rewrites "
+        "(e.g. mass edits, translations, >40% of file changed). For localized changes, use 'edit'."
     )
     schema = {
         "type": "function",
@@ -22,8 +22,10 @@ class CreateTool(BaseTool):
             "name": "create",
             "description": (
                 "Create a new file OR UNCONDITIONALLY OVERWRITE an existing file completely.\n\n"
-                "WARNING: This tool replaces the entire file content. For partial edits to an existing "
-                "file, use `edit` instead. Always `read` an existing file first to confirm its state.\n\n"
+                "Use cases:\n"
+                "- New files.\n"
+                "- Complete file rewrites (mass translations, >40% lines changed, major refactors).\n"
+                "- For small localized changes (1-5 targets), use `edit` instead. Always `read` first.\n\n"
                 "Side effects:\n"
                 "- Creates parent directories if missing.\n"
                 "- Atomic write (temp file + rename); symlinks are resolved first (real inode is written).\n"
