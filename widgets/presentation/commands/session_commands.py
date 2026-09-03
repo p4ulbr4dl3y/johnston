@@ -68,6 +68,10 @@ class NewCommand(BaseCommand):
         reset_app_state(app, is_generating=False, is_read_only=False, clear_queue=True, session_id=new_id, role=role)
 
         chat_view = app.query_one(ChatView)
+        if hasattr(chat_view, "_unloaded_messages"):
+            chat_view._unloaded_messages = []
+        if hasattr(chat_view, "_is_loading_older"):
+            chat_view._is_loading_older = False
         await chat_view.remove_children()
         chat_view.check_welcome()
         app.refresh_status_footer()

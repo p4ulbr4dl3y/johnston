@@ -733,3 +733,30 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertEqual(len(chat_view._unloaded_messages), 0)
             self.assertEqual(len(chat_view.get_user_messages()), 0)
+
+    async def test_remove_children_clears_unloaded_messages(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            chat_view._unloaded_messages = [{"type": "user", "text": "turn_old"}]
+            chat_view._is_loading_older = True
+            await chat_view.remove_children()
+            await pilot.pause()
+            self.assertEqual(chat_view._unloaded_messages, [])
+            self.assertFalse(chat_view._is_loading_older)
+
+    async def test_clear_chat_clears_all_state(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            chat_view._unloaded_messages = [{"type": "user", "text": "turn_old"}]
+            chat_view._is_loading_older = True
+            chat_view._is_loading_session = True
+            chat_view._auto_follow = False
+            await chat_view.clear_chat()
+            await pilot.pause()
+            self.assertEqual(chat_view._unloaded_messages, [])
+            self.assertFalse(chat_view._is_loading_older)
+            self.assertFalse(chat_view._is_loading_session)
+            self.assertTrue(chat_view._auto_follow)
+            self.assertTrue(chat_view._has_welcome)

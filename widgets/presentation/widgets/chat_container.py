@@ -178,6 +178,22 @@ class ChatView(VerticalScroll):
         self.scroll_end(animate=False)
         self._auto_follow = True
 
+    def remove_children(self, *args, **kwargs):
+        selector = args[0] if args else kwargs.get("selector", "*")
+        if selector == "*" or not selector:
+            self._unloaded_messages = []
+            self._is_loading_older = False
+        return super().remove_children(*args, **kwargs)
+
+    async def clear_chat(self) -> None:
+        """Clear all messages, pagination buffer, and restore welcome widget."""
+        self._unloaded_messages = []
+        self._is_loading_older = False
+        self._is_loading_session = False
+        await self.remove_children()
+        self.check_welcome()
+        self._auto_follow = True
+
     def on_mount(self) -> None:
         self.check_welcome()
 
@@ -497,6 +513,8 @@ class ChatView(VerticalScroll):
         for msg in msgs_to_render:
             if isinstance(msg, dict):
                 await self.restore_message(msg, task_manager=task_manager)
+        self._is_loading_older = False
+        self._is_loading_session = False
         self.check_welcome()
         self._auto_follow = True
         self.call_after_refresh(lambda: self.scroll_end(animate=False))

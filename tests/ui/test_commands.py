@@ -775,6 +775,27 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         await cmd.execute(app)
         self.assertFalse(t1.is_running)
 
+    async def test_new_command_clears_unloaded_messages(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from widgets.presentation.commands import NewCommand
+
+        app = MockApp()
+        app.message_queue = MagicMock()
+        app.sm = MagicMock()
+        app.sm.generate_session_id.return_value = "new-id"
+        mock_chat = MagicMock()
+        mock_chat._unloaded_messages = [{"type": "user", "text": "stale_turn"}]
+        mock_chat._is_loading_older = True
+        mock_chat.remove_children = AsyncMock()
+        app.query_one = MagicMock(return_value=mock_chat)
+
+        cmd = NewCommand()
+        await cmd.execute(app)
+
+        self.assertEqual(mock_chat._unloaded_messages, [])
+        self.assertFalse(mock_chat._is_loading_older)
+
     async def test_new_command_resets_role(self):
         from unittest.mock import AsyncMock, MagicMock
 
