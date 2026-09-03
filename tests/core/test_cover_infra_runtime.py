@@ -317,12 +317,19 @@ def test_format_skills_markdown_full():
     skills = [
         Skill("p1", "Proj desc", Scope("project")),
         Skill("g1", "", Scope("global")),
+        Skill("b1", "Bundled desc", Scope("bundled")),
     ]
     md = format_skills_markdown(skills)
     assert "<skills>" in md
     assert "- p1: Proj desc" in md
     assert "- g1" in md
+    assert "- b1: Bundled desc" in md
     assert "</skills>" in md
+    # Ensure priority order: p1 (0) before g1 (1) before b1 (2)
+    pos_p1 = md.index("- p1")
+    pos_g1 = md.index("- g1")
+    pos_b1 = md.index("- b1")
+    assert pos_p1 < pos_g1 < pos_b1
 
 
 if __name__ == "__main__":

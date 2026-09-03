@@ -31,7 +31,15 @@ def format_skills_markdown(skills: List[Any]) -> str:
     def _sort_key(s: Any) -> tuple:
         scope = getattr(s, "scope", None)
         scope_val = getattr(scope, "value", scope) if scope is not None else None
-        priority = 0 if str(scope_val).lower() in ("project", "project_dir") else 1
+        scope_str = str(scope_val).lower() if scope_val is not None else ""
+        if scope_str in ("project", "project_dir"):
+            priority = 0
+        elif scope_str == "global":
+            priority = 1
+        elif scope_str in ("bundled", "builtin", "default"):
+            priority = 2
+        else:
+            priority = 1
         return (priority, str(getattr(s, "name", "")).lower())
 
     sorted_skills = sorted(skills, key=_sort_key)
