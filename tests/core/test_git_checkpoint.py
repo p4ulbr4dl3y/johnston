@@ -417,6 +417,274 @@ class TestGitCheckpointManager(unittest.TestCase):
         )
         self.assertEqual(diff_empty, [])
 
+    def _shadow_tree(self, shadow_dir, commit_sha):
+        res = gcp.run_git(["rev-parse", f"{commit_sha}^{{tree}}"], cwd=shadow_dir)
+        self.assertEqual(res.returncode, 0)
+        return res.stdout.strip()
+
+    def _full_workspace_tree(self, repo_path, shadow_dir):
+        """Reference oracle: tree a full `add -A` snapshot would produce."""
+        with GitCheckpointManager._shadow_index_env(shadow_dir, repo_path) as env:
+            add_res = gcp.run_git(["add", "-A"], cwd=repo_path, env=env)
+            self.assertEqual(add_res.returncode, 0)
+            tree_res = gcp.run_git(["write-tree"], cwd=repo_path, env=env)
+            self.assertEqual(tree_res.returncode, 0)
+            return tree_res.stdout.strip()
+
+    def _write(self, repo_path, name, content):
+        with open(os.path.join(repo_path, name), "w") as f:
+            f.write(content)
+
+    def test_delta_checkpoint_tree_matches_full_workspace(self):
+        """Delta-built checkpoint 2 must produce EXACTLY the full workspace tree.
+
+        Covers edit, new-file, delete-file deltas, restore-from-delta commit,
+        and diff correctness (checkpoint 1 -> 2 and 2 -> workspace).
+        """
+        repo_path = self._init_git_repo()
+        sid = "session_delta"
+
+        for name, content in (("a.txt", "a0\n"), ("b.txt", "b0\n"), ("d.txt", "d0\n")):
+            self._write(repo_path, name, content)
+
+        cp0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(cp0)
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+
+        # Turn 1 delta: edit a, edit b, create c, delete d.
+        self._write(repo_path, "a.txt", "a1\n")
+        self._write(repo_path, "b.txt", "b1\n")
+        self._write(repo_path, "c.txt", "c1\n")
+        os.remove(os.path.join(repo_path, "d.txt"))
+
+        cp1 = GitCheckpointManager.create_checkpoint(sid, 1, project_path=repo_path)
+        self.assertIsNotNone(cp1)
+        self.assertNotEqual(cp0, cp1)
+
+        # (a) delta tree == full-snapshot tree.
+        tree1 = self._shadow_tree(shadow_dir, cp1)
+        self.assertEqual(tree1, self._full_workspace_tree(repo_path, shadow_dir))
+
+        # Parent of the delta commit is the previous checkpoint.
+        cat_res = gcp.run_git(["cat-file", "-p", cp1], cwd=shadow_dir)
+        self.assertEqual(cat_res.returncode, 0)
+        parents = [line.split()[1] for line in cat_res.stdout.splitlines() if line.startswith("parent ")]
+        self.assertEqual(parents, [cp0])
+
+        # (g) diff between checkpoint trees shows exactly the delta paths.
+        diff_res = gcp.run_git(["diff", "--name-only", f"{cp0}^{{tree}}", f"{cp1}^{{tree}}"], cwd=shadow_dir)
+        self.assertEqual(diff_res.returncode, 0)
+        self.assertEqual(sorted(diff_res.stdout.splitlines()), ["a.txt", "b.txt", "c.txt", "d.txt"])
+
+        # (g) workspace (== checkpoint 2 state) diffs against checkpoint 2 = none,
+        # against checkpoint 1 = the four delta paths.
+        self.assertEqual(GitCheckpointManager.get_checkpoint_diff(sid, 1, project_path=repo_path), [])
+        cp_diff = GitCheckpointManager.get_checkpoint_diff(sid, 0, project_path=repo_path)
+        self.assertEqual(sorted(d[0] for d in cp_diff), ["a.txt", "b.txt", "c.txt", "d.txt"])
+
+        # (c) restore from the delta-built checkpoint 2 -> workspace == cp1 state.
+        self._write(repo_path, "a.txt", "a2\n")
+        os.remove(os.path.join(repo_path, "c.txt"))
+        self.assertTrue(GitCheckpointManager.restore_checkpoint(sid, 1, project_path=repo_path))
+        with open(os.path.join(repo_path, "a.txt")) as f:
+            self.assertEqual(f.read(), "a1\n")
+        with open(os.path.join(repo_path, "b.txt")) as f:
+            self.assertEqual(f.read(), "b1\n")
+        with open(os.path.join(repo_path, "c.txt")) as f:
+            self.assertEqual(f.read(), "c1\n")
+        self.assertFalse(os.path.exists(os.path.join(repo_path, "d.txt")))
+
+    def test_delta_checkpoint_stages_only_changed_paths(self):
+        """The delta snapshot must stage exactly [A, B, C, D] and nothing else."""
+        repo_path = self._init_git_repo()
+        sid = "session_delta_staged"
+
+        for name, content in (("a.txt", "a0\n"), ("b.txt", "b0\n"), ("d.txt", "d0\n")):
+            self._write(repo_path, name, content)
+        cp0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(cp0)
+
+        self._write(repo_path, "a.txt", "a1\n")
+        self._write(repo_path, "b.txt", "b1\n")
+        self._write(repo_path, "c.txt", "c1\n")
+        os.remove(os.path.join(repo_path, "d.txt"))
+
+        captured = {}
+        original = gcp.run_git
+
+        def spy(args, **kw):
+            if "--pathspec-file-nul" in args:
+                captured["input"] = kw.get("input", "")
+                captured["args"] = list(args)
+            return original(args, **kw)
+
+        with mock.patch.object(gcp, "run_git", side_effect=spy):
+            cp1 = GitCheckpointManager.create_checkpoint(sid, 1, project_path=repo_path)
+        self.assertIsNotNone(cp1)
+        self.assertIn("--literal-pathspecs", captured["args"])
+        self.assertEqual(set(captured["input"].split("\0")), {"a.txt", "b.txt", "c.txt", "d.txt"})
+
+    def test_delta_checkpoint_first_checkpoint_uses_full_add(self):
+        """No prior ref -> full `add -A` fallback (legacy path)."""
+        repo_path = self._init_git_repo()
+        sid = "session_delta_first"
+
+        self._write(repo_path, "a.txt", "a0\n")
+
+        full_add_calls = []
+        original = gcp.run_git
+
+        def spy(args, **kw):
+            if args == ["add", "-A"]:
+                full_add_calls.append(args)
+            return original(args, **kw)
+
+        with mock.patch.object(gcp, "run_git", side_effect=spy):
+            cp0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(cp0)
+        self.assertEqual(len(full_add_calls), 1)
+
+    def test_delta_checkpoint_no_changes_reuses_tree(self):
+        """Unchanged workspace -> new commit reuses the previous tree (no index rebuild)."""
+        repo_path = self._init_git_repo()
+        sid = "session_delta_noop"
+
+        cp0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(cp0)
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+
+        index_ops = []
+        original = gcp.run_git
+
+        def spy(args, **kw):
+            if args[0] in ("read-tree", "write-tree") or "--pathspec-file-nul" in args:
+                index_ops.append(args[0])
+            return original(args, **kw)
+
+        with mock.patch.object(gcp, "run_git", side_effect=spy):
+            cp1 = GitCheckpointManager.create_checkpoint(sid, 1, project_path=repo_path)
+        self.assertIsNotNone(cp1)
+        self.assertNotEqual(cp0, cp1)
+        # read-tree seeds the index for change detection, but the no-op delta
+        # must skip the targeted add and the tree rebuild entirely.
+        self.assertEqual(index_ops, ["read-tree"])
+        self.assertEqual(self._shadow_tree(shadow_dir, cp1), self._shadow_tree(shadow_dir, cp0))
+        self.assertEqual(self._shadow_tree(shadow_dir, cp1), self._full_workspace_tree(repo_path, shadow_dir))
+
+        # Restoring the no-op checkpoint keeps the workspace unchanged.
+        self.assertTrue(GitCheckpointManager.restore_checkpoint(sid, 1, project_path=repo_path))
+        with open(os.path.join(repo_path, "initial.txt")) as f:
+            self.assertEqual(f.read(), "initial content\n")
+
+    def test_delta_checkpoint_untracked_only_changes(self):
+        """Delta whose only changes are new untracked files."""
+        repo_path = self._init_git_repo()
+        sid = "session_delta_untracked"
+
+        cp0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(cp0)
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+
+        self._write(repo_path, "u1.txt", "u1\n")
+        self._write(repo_path, "u2.txt", "u2\n")
+
+        cp1 = GitCheckpointManager.create_checkpoint(sid, 1, project_path=repo_path)
+        self.assertIsNotNone(cp1)
+        self.assertEqual(self._shadow_tree(shadow_dir, cp1), self._full_workspace_tree(repo_path, shadow_dir))
+
+        # Restore brings both new files back.
+        os.remove(os.path.join(repo_path, "u1.txt"))
+        os.remove(os.path.join(repo_path, "u2.txt"))
+        self.assertTrue(GitCheckpointManager.restore_checkpoint(sid, 1, project_path=repo_path))
+        for name in ("u1.txt", "u2.txt"):
+            self.assertTrue(os.path.exists(os.path.join(repo_path, name)))
+
+    def test_delta_checkpoint_falls_back_to_full_add_when_detection_fails(self):
+        """Delta detection failure must fall back to a full `add -A` snapshot."""
+        repo_path = self._init_git_repo()
+        sid = "session_delta_fallback"
+
+        cp0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(cp0)
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+
+        self._write(repo_path, "initial.txt", "modified later\n")
+        self._write(repo_path, "newfile.txt", "new\n")
+
+        original = gcp.run_git
+
+        def spy(args, **kw):
+            if args and args[0] == "ls-files":
+                return subprocess.CompletedProcess(["git"] + args, 1, "", "mock detection failure")
+            return original(args, **kw)
+
+        with mock.patch.object(gcp, "run_git", side_effect=spy):
+            cp1 = GitCheckpointManager.create_checkpoint(sid, 1, project_path=repo_path)
+        self.assertIsNotNone(cp1)
+        # Fallback snapshot must still capture the exact workspace state.
+        self.assertEqual(self._shadow_tree(shadow_dir, cp1), self._full_workspace_tree(repo_path, shadow_dir))
+        self.assertTrue(GitCheckpointManager.restore_checkpoint(sid, 1, project_path=repo_path))
+
+    def test_delta_checkpoint_after_rewind_continue(self):
+        """Checkpointing after a rewind restore must stay correct (chain + tree)."""
+        repo_path = self._init_git_repo()
+        sid = "session_delta_rewind"
+
+        self._write(repo_path, "a.txt", "a0\n")
+        cp0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(cp0)
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+
+        self._write(repo_path, "a.txt", "a1\n")
+        cp1 = GitCheckpointManager.create_checkpoint(sid, 1, project_path=repo_path)
+        self.assertIsNotNone(cp1)
+
+        # Rewind to checkpoint 0, then continue the session with a new turn.
+        self.assertTrue(GitCheckpointManager.restore_checkpoint(sid, 0, project_path=repo_path))
+        self._write(repo_path, "b.txt", "b-after-rewind\n")
+        cp2 = GitCheckpointManager.create_checkpoint(sid, 2, project_path=repo_path)
+        self.assertIsNotNone(cp2)
+
+        # Delta-built tree still equals the workspace state.
+        self.assertEqual(self._shadow_tree(shadow_dir, cp2), self._full_workspace_tree(repo_path, shadow_dir))
+        # Parent chain: cp2 -> cp1 (nearest prior ref), even across the rewind.
+        cat_res = gcp.run_git(["cat-file", "-p", cp2], cwd=shadow_dir)
+        parents = [line.split()[1] for line in cat_res.stdout.splitlines() if line.startswith("parent ")]
+        self.assertEqual(parents, [cp1])
+        # Restore of the post-rewind checkpoint is exact.
+        self._write(repo_path, "b.txt", "b-mutated\n")
+        self.assertTrue(GitCheckpointManager.restore_checkpoint(sid, 2, project_path=repo_path))
+        with open(os.path.join(repo_path, "b.txt")) as f:
+            self.assertEqual(f.read(), "b-after-rewind\n")
+
+    def test_delta_checkpoint_special_char_filenames(self):
+        """Glob metacharacters in filenames must not expand during delta staging."""
+        repo_path = self._init_git_repo()
+        sid = "session_delta_glob"
+
+        self._write(repo_path, "f[1].txt", "one\n")
+        self._write(repo_path, "with space.txt", "space\n")
+        cp0 = GitCheckpointManager.create_checkpoint(sid, 0, project_path=repo_path)
+        self.assertIsNotNone(cp0)
+        shadow_dir, _ = GitCheckpointManager._get_shadow_dir(repo_path)
+
+        self._write(repo_path, "f[1].txt", "one v2\n")
+        self._write(repo_path, "new [x].txt", "new\n")
+
+        captured = {}
+        original = gcp.run_git
+
+        def spy(args, **kw):
+            if "--pathspec-file-nul" in args:
+                captured["input"] = kw.get("input", "")
+            return original(args, **kw)
+
+        with mock.patch.object(gcp, "run_git", side_effect=spy):
+            cp1 = GitCheckpointManager.create_checkpoint(sid, 1, project_path=repo_path)
+        self.assertIsNotNone(cp1)
+        self.assertEqual(set(captured["input"].split("\0")), {"f[1].txt", "new [x].txt"})
+        self.assertEqual(self._shadow_tree(shadow_dir, cp1), self._full_workspace_tree(repo_path, shadow_dir))
+
 
 if __name__ == "__main__":
     unittest.main()
