@@ -430,6 +430,17 @@ class PromptBuilder:
             # provider's model list is user-editable, so escape defensively.
             sys_prompt = sys_prompt.replace("{model_name}", escape_xml(model_label))
 
+        if "{compaction_ratio}" in sys_prompt:
+            try:
+                from core.infrastructure.config.settings import get_settings
+
+                ratio = int(get_settings().llm.compaction_threshold_ratio * 100)
+            except Exception:
+                from core.domain.defaults.config import DEFAULT_COMPACTION_THRESHOLD_RATIO
+
+                ratio = int(DEFAULT_COMPACTION_THRESHOLD_RATIO * 100)
+            sys_prompt = sys_prompt.replace("{compaction_ratio}", str(ratio))
+
         if self.is_subagent and self.worktree_branch and "<worktree_guidelines>" not in sys_prompt:
             # Branch name is user-controlled and gets interpolated into the
             # system prompt. Escape it so a name containing literal

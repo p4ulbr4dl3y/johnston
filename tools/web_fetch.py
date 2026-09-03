@@ -8,10 +8,14 @@ from typing import Any, Dict
 
 import httpx
 
+from core.domain.defaults.config import DEFAULT_TOOL_PAYLOAD_BYTES, DEFAULT_WEB_FETCH_TIMEOUT
 from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool
 from tools.cancel import run_cancellable
 from tools.utils import get_max_tool_payload_bytes
+
+DEFAULT_MAX_PAYLOAD_MB = DEFAULT_TOOL_PAYLOAD_BYTES // (1024 * 1024)
+DEFAULT_WEB_FETCH_TIMEOUT_INT = int(DEFAULT_WEB_FETCH_TIMEOUT)
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -157,7 +161,7 @@ class WebFetchTool(BaseTool):
                 "172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, IPv6 ULA/link-local) on initial request AND on every redirect.\n\n"
                 "Conversion: HTML to Markdown (default), PDF/DOCX/XLSX/PPTX/EPUB/IPYNB to Markdown, JSON/CSV/text preserved as-is. "
                 "With raw=true: body with script tags stripped.\n\n"
-                "Limits: response capped at max_tool_payload_bytes (10MB); timeout 20s. Follows redirects; no cookies/headers/auth. Cancellation cooperates.\n\n"
+                f"Limits: response capped at max_tool_payload_bytes ({DEFAULT_MAX_PAYLOAD_MB}MB); timeout {DEFAULT_WEB_FETCH_TIMEOUT_INT}s. Follows redirects; no cookies/headers/auth. Cancellation cooperates.\n\n"
                 "Concurrency-safe. Error kinds: http_status, network, scheme, blocked, size_exceeded, unavailable."
             ),
             "parameters": {
@@ -177,6 +181,27 @@ class WebFetchTool(BaseTool):
             },
         },
     }
+
+    def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
+        import copy
+
+        schema = copy.deepcopy(self.schema)
+        try:
+            from core.infrastructure.config.settings import get_settings
+
+            tools_cfg = get_settings().tools
+            max_mb = tools_cfg.max_tool_payload_bytes // (1024 * 1024)
+            timeout = int(tools_cfg.web_fetch_timeout)
+            fn = schema.get("function", {})
+            if "description" in fn:
+                fn["description"] = (
+                    fn["description"]
+                    .replace(f"({DEFAULT_MAX_PAYLOAD_MB}MB)", f"({max_mb}MB)")
+                    .replace(f"timeout {DEFAULT_WEB_FETCH_TIMEOUT_INT}s", f"timeout {timeout}s")
+                )
+        except Exception:
+            pass
+        return schema
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
         return True

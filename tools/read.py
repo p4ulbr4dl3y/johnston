@@ -4,6 +4,7 @@ import threading
 import time
 from typing import Any, Dict, Tuple
 
+from core.domain.defaults.config import DEFAULT_MAX_DIR_ENTRIES
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.converter import DOC_EXTENSIONS
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
@@ -298,8 +299,8 @@ class ReadTool(BaseTool):
                 "Read a file, directory, archive, MCP resource, or convert docs/images.\n\n"
                 "Forms:\n"
                 "- `path` to a file: returns lines `[<p> | lines N..M of T]` + `N|line` rows. "
-                "Window ≤800 lines; paginate with `start_line`/`end_line`.\n"
-                "- `path` to a directory: returns `[dir <p> | total N]` + sorted entries (truncated at 60).\n"
+                f"Window ≤{DEFAULT_LINE_WINDOW} lines; paginate with `start_line`/`end_line`.\n"
+                f"- `path` to a directory: returns `[dir <p> | total N]` + sorted entries (truncated at {DEFAULT_MAX_DIR_ENTRIES}).\n"
                 "- `path` to a zip/tar archive: returns `[archive <p> | total N]` + file list.\n"
                 "- `path` containing `://` (when local file doesn't exist): fetches MCP resource.\n"
                 "- PDF/DOCX/XLSX/PPTX/EPUB/IPYNB: converted to Markdown; long output is truncated with log path.\n"
@@ -327,7 +328,7 @@ class ReadTool(BaseTool):
                     "end_line": {
                         "type": "integer",
                         "minimum": 1,
-                        "description": "1-indexed end line (inclusive). Max range: 800 lines per call.",
+                        "description": f"1-indexed end line (inclusive). Max range: {DEFAULT_LINE_WINDOW} lines per call.",
                     },
                     "content_offset": {
                         "type": "integer",
@@ -350,6 +351,24 @@ class ReadTool(BaseTool):
             },
         },
     }
+
+    def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
+        import copy
+
+        schema = copy.deepcopy(self.schema)
+        try:
+            from core.infrastructure.config.settings import get_settings
+
+            tools_cfg = get_settings().tools
+            line_window = tools_cfg.read_line_window
+            props = schema.get("function", {}).get("parameters", {}).get("properties", {})
+            if "end_line" in props:
+                props["end_line"]["description"] = (
+                    f"1-indexed end line (inclusive). Max range: {line_window} lines per call."
+                )
+        except Exception:
+            pass
+        return schema
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
         return True

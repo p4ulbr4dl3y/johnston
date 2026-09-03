@@ -5,6 +5,7 @@ import time
 import uuid
 from typing import Any, Dict
 
+from core.domain.defaults.config import DEFAULT_SHELL_MAX_CAP, DEFAULT_SHELL_TIMEOUT
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from core.infrastructure.platform.platform_utils import (
     is_windows,
@@ -110,8 +111,8 @@ class ShellTool(BaseTool):
                     "timeout": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 600,
-                        "default": 120,
+                        "maximum": int(DEFAULT_SHELL_MAX_CAP),
+                        "default": int(DEFAULT_SHELL_TIMEOUT),
                         "description": "Seconds before SIGTERM. Process killed, NOT converted to background.",
                     },
                     "background": {
@@ -126,11 +127,26 @@ class ShellTool(BaseTool):
     }
 
     def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
-        if not is_subagent:
-            return self.schema
-        from core.roles.tools import _rebuild_tool
+        import copy
 
-        return _rebuild_tool(self.schema)
+        if is_subagent:
+            from core.roles.tools import _rebuild_tool
+
+            base_s = _rebuild_tool(self.schema)
+        else:
+            base_s = copy.deepcopy(self.schema)
+
+        try:
+            from core.infrastructure.config.settings import get_settings
+
+            tools_cfg = get_settings().tools
+            props = base_s.get("function", {}).get("parameters", {}).get("properties", {})
+            if "timeout" in props:
+                props["timeout"]["default"] = int(tools_cfg.shell_default_timeout)
+                props["timeout"]["maximum"] = int(tools_cfg.shell_max_cap)
+        except Exception:
+            pass
+        return base_s
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         from core.infrastructure.config.settings import get_settings

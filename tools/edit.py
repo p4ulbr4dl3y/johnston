@@ -2,6 +2,7 @@ import difflib
 import re
 from typing import Any, Dict, Tuple
 
+from core.domain.defaults.config import DEFAULT_TOOL_PAYLOAD_BYTES
 from core.domain.defaults.errors import ToolResult
 from tools.base import (
     BaseTool,
@@ -13,6 +14,8 @@ from tools.utils import (
     resolve_writable_path,
     validate_file_for_edit,
 )
+
+DEFAULT_MAX_PAYLOAD_MB = DEFAULT_TOOL_PAYLOAD_BYTES // (1024 * 1024)
 
 LEFT_SINGLE_CURLY_QUOTE = "‘"
 RIGHT_SINGLE_CURLY_QUOTE = "’"
@@ -339,7 +342,7 @@ class EditTool(BaseTool):
                 "`new_str` rules:\n"
                 "- Empty string OR absent key = DELETE the matched block.\n"
                 "- `replace_all=true` replaces all occurrences (else error on multi-match).\n\n"
-                "Atomic write via temp file + rename. Limits: file ≤10MB, regular file, UTF-8.\n\n"
+                f"Atomic write via temp file + rename. Limits: file ≤{DEFAULT_MAX_PAYLOAD_MB}MB, regular file, UTF-8.\n\n"
                 "Error kinds: `match_not_found` (with fuzzy hint), `match_ambiguous` (multi-match), "
                 "`params` (missing/empty/equal old/new), `not_found` (file missing), `is_directory`, "
                 "`encoding`, `size_exceeded`, `permission` (sandbox), `execute` (write failure)."
@@ -370,6 +373,21 @@ class EditTool(BaseTool):
             },
         },
     }
+
+    def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
+        import copy
+
+        schema = copy.deepcopy(self.schema)
+        try:
+            from core.infrastructure.config.settings import get_settings
+
+            max_mb = get_settings().tools.max_tool_payload_bytes // (1024 * 1024)
+            fn = schema.get("function", {})
+            if "description" in fn:
+                fn["description"] = fn["description"].replace(f"≤{DEFAULT_MAX_PAYLOAD_MB}MB", f"≤{max_mb}MB")
+        except Exception:
+            pass
+        return schema
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
