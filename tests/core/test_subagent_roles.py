@@ -15,7 +15,7 @@ class TestSubagentRoles(unittest.TestCase):
 
         explorer_def = registry.get_role("explorer")
         self.assertEqual(explorer_def.name, "Explorer")
-        self.assertIn("Read-Only", explorer_def.prompt)
+        self.assertIn("Read-only", explorer_def.prompt)
 
     def test_format_role_prompt(self):
         from core.roles.prompt import format_role_prompt
@@ -31,7 +31,7 @@ class TestSubagentRoles(unittest.TestCase):
         )
         self.assertEqual(
             format_role_prompt("", "No key role."),
-            "<role>\nNo key role.\n</role>",
+            '<role name="">\nNo key role.\n</role>',
         )
 
 
@@ -84,7 +84,7 @@ You run tests and report coverage.""")
             self.assertIn("run tests and report coverage", tester_def.prompt)
 
             snippet = registry.get_system_prompt_snippet(project_dir=tmpdir)
-            self.assertIn("- explorer: Read-only mode", snippet)
+            self.assertIn("- explorer (read-only): Read-only mode", snippet)
             self.assertIn(
                 "- reviewer (tools: read, grep, glob, model: clinepass/deepseek-v4-flash): Code reviewer subagent",
                 snippet,
@@ -133,8 +133,8 @@ class TestSubagentApplyRole(unittest.TestCase):
         agent.tools = []
         configure_subagent_agent(agent, "worker", app=None, worktree_branch="feat-branch")
         self.assertEqual(agent.worktree_branch, "feat-branch")
-        self.assertIn("<worktree_guidelines>", agent.system_prompt)
-        self.assertIn("branch 'feat-branch'", agent.system_prompt)
+        self.assertIn("<worktree>", agent.system_prompt)
+        self.assertIn("Branch: `feat-branch`", agent.system_prompt)
 
 
 
