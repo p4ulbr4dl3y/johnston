@@ -101,6 +101,7 @@ class ChatInput(TextArea):
         self.prompt_history_index: int = len(self.prompt_history)
         self.prompt_draft: str = ""
         self.is_shell_mode: bool = False
+        self._suggestions_active: bool = False
 
     def set_shell_mode(self, enabled: bool) -> None:
         """Toggle shell mode state and update placeholder / styling."""
@@ -280,15 +281,47 @@ class ChatInput(TextArea):
             target_col = min(col, len(lines[target_row]))
             self.move_cursor((target_row, target_col))
 
+    def _has_suggestion_trigger(self) -> bool:
+        """Return True when the cursor line carries an active /command or @file trigger.
+
+        Mirrors the trigger conditions in CommandSuggestions.update_query: a "/"
+        (outside shell mode) or "@" at line start or after whitespace, with no
+        spaces/newlines in the query part up to the cursor.
+        """
+        row, col = self.cursor_location
+        check_text = self.document.get_line(row)[:col]
+        if not self.is_shell_mode:
+            slash_idx = check_text.rfind("/")
+            if slash_idx != -1 and (slash_idx == 0 or check_text[slash_idx - 1] in " \t\n"):
+                query_part = check_text[slash_idx:]
+                if " " not in query_part and "\n" not in query_part:
+                    return True
+        at_idx = check_text.rfind("@")
+        if at_idx != -1 and (at_idx == 0 or check_text[at_idx - 1] in " \t\n"):
+            query_part = check_text[at_idx + 1 :]
+            if " " not in query_part and "\n" not in query_part:
+                return True
+        return False
+
     def _schedule_suggestions_update(self) -> None:
-        """Schedule suggestion refresh off the event loop when mounted."""
+        """Schedule suggestion refresh off the event loop when mounted.
+
+        Gated: the task is only spawned when the cursor line has an active "/" or
+        "@" trigger, or when a previously-open suggestions list needs clearing
+        after its trigger disappeared. Input changes without either never spawn a
+        task, avoiding the per-key query/update overhead entirely.
+        """
         if not getattr(self, "is_mounted", False):
+            return
+        has_trigger = self._has_suggestion_trigger()
+        if not has_trigger and not getattr(self, "_suggestions_active", False):
             return
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(self.update_suggestions())
         except RuntimeError:
-            pass
+            return
+        self._suggestions_active = has_trigger
 
     def _on_input_change(self) -> None:
         """Called on any input text change"""
