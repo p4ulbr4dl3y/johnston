@@ -358,7 +358,7 @@ class ChatView(VerticalScroll):
             prev_child = self.children[-1]
 
         is_first = (
-            not any(isinstance(c, UserMessage) for c in self.children)
+            len(self.children) == 0
             or prev_child is None
             or isinstance(prev_child, (EventDivider, WelcomeWidget))
         )

@@ -177,6 +177,17 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(err_msg.raw_text, "API Error: rate limit")
             self.assertNotIn("user-msg-first", user_msg2.classes)
 
+    async def test_user_message_after_error_without_prior_user_message_not_first(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            # Remove welcome if present to simulate container starting with error
+            chat_view.clear_welcome()
+            await chat_view.add_error_message("API Error: 429", animate=False)
+            user_msg = await chat_view.add_user_message("retry", animate=False)
+            await pilot.pause()
+            self.assertNotIn("user-msg-first", user_msg.classes)
+
     async def test_add_tool_call_sequential_flag(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:
