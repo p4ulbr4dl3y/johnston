@@ -145,6 +145,8 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
             return
         if not hasattr(app, "_subagent_expand_state") or not isinstance(app._subagent_expand_state, dict):
             app._subagent_expand_state = {}
+        if not hasattr(app, "_subagent_plan_state") or not isinstance(app._subagent_plan_state, dict):
+            app._subagent_plan_state = {}
         try:
             chat_view = self.query_one("#subagent-chat-view", ChatView)
             expanded_indices = set()
@@ -152,6 +154,14 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
                 if getattr(child, "is_expanded", False):
                     expanded_indices.add(idx)
             app._subagent_expand_state[self.session.id] = expanded_indices
+        except Exception:
+            pass
+        try:
+            notch = self.query_one(PlanNotch)
+            app._subagent_plan_state[self.session.id] = {
+                "is_expanded": getattr(notch, "is_expanded", False),
+                "display": getattr(notch, "display", False),
+            }
         except Exception:
             pass
 
@@ -225,7 +235,16 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
             if plan_data:
                 p_items, p_expl = plan_data
                 try:
-                    self.query_one(PlanNotch).set_plan(p_items, p_expl)
+                    notch = self.query_one(PlanNotch)
+                    notch.set_plan(p_items, p_expl)
+                    if app and hasattr(app, "_subagent_plan_state") and isinstance(app._subagent_plan_state, dict):
+                        p_state = app._subagent_plan_state.get(self.session.id)
+                        if isinstance(p_state, dict):
+                            if p_state.get("is_expanded") and not notch.is_expanded:
+                                notch.toggle_expanded()
+                            if "display" in p_state:
+                                notch.display = bool(p_state["display"])
+                                notch.refresh_notch()
                 except Exception:
                     pass
 

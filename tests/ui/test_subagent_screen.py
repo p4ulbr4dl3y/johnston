@@ -484,6 +484,51 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             tc = screen2.query_one(ToolCallWidget)
             self.assertTrue(tc.is_expanded)
 
+    async def test_subagent_screen_preserves_plan_state(self):
+        from widgets.presentation.widgets.plan_notch import PlanNotch
+
+        sess = self._mk("task-plan-persist", "Plan Persist Agent", "Subagent Prompt")
+        sess.add_event({
+            "type": "tool",
+            "tool_type": "update_plan",
+            "args": {
+                "plan": [{"step": "Step A", "status": "in_progress"}],
+                "explanation": "Expl",
+            },
+        })
+        screen = SubagentViewScreen("task-plan-persist")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            notch = screen.query_one(PlanNotch)
+            self.assertTrue(notch.display)
+            self.assertFalse(notch.is_expanded)
+
+            screen.action_toggle_plan()
+            self.assertTrue(notch.is_expanded)
+
+            screen.action_toggle_plan_hidden()
+            self.assertFalse(notch.display)
+
+            # Trigger saving expand and plan state
+            screen._save_expand_state()
+            self.assertIn("task-plan-persist", getattr(app, "_subagent_plan_state", {}))
+            plan_state = app._subagent_plan_state["task-plan-persist"]
+            self.assertTrue(plan_state["is_expanded"])
+            self.assertFalse(plan_state["display"])
+
+        # Reopen screen and verify restored plan state
+        screen2 = SubagentViewScreen("task-plan-persist")
+        app2 = DummyHostApp(screen2, store=self.store)
+        app2._subagent_plan_state = {"task-plan-persist": plan_state}
+
+        async with app2.run_test() as pilot:
+            await pilot.pause(0.2)
+            notch2 = screen2.query_one(PlanNotch)
+            self.assertTrue(notch2.is_expanded)
+            self.assertFalse(notch2.display)
+
     async def test_subagent_screen_active_streaming_not_finalized(self):
         sess = self._mk("task-active-stream", "Stream Agent", "Subagent Prompt")
         sess.status = "running"
