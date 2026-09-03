@@ -80,7 +80,7 @@ class TestSubagentMixins(unittest.IsolatedAsyncioTestCase):
 
     async def test_render_user_hidden_and_attachments(self):
         obj = _sub_host()
-        await obj._render_event({"type": "user", "text": '<notification type="shell" id="1" title="x">x</notification>', "show_in_ui": False}, animate=False)
+        await obj._render_event({"type": "user", "text": '<notification type="shell" id="1" title="x" status="completed">x</notification>', "show_in_ui": False}, animate=False)
         obj.chat_view.add_user_message.assert_not_called()
         await obj._render_event({"type": "user", "text": "hello", "attachments": ["a", "b"]}, animate=False)
         call = obj.chat_view.add_user_message.await_args

@@ -46,14 +46,14 @@ def resolve_writable_path(ctx: Any, path_arg: Any) -> tuple[str, ToolResult | No
 def validate_file_for_edit(path: str) -> ToolResult | None:
     """Validate that a file exists, is not a directory, and does not exceed payload cap."""
     if not path or not os.path.exists(path):
-        return ToolResult.error("file", name=path, detail="not found")
+        return ToolResult.error("not_found", name=path, detail="not found")
     if os.path.isdir(path):
-        return ToolResult.error("file", name=path, detail="is a directory")
+        return ToolResult.error("is_directory", name=path, detail="is a directory")
     try:
         limit = get_max_tool_payload_bytes()
         if os.path.getsize(path) > limit:
             max_mb = limit // (1024 * 1024)
-            return ToolResult.error("file", name=path, detail=f"file exceeds maximum allowed size ({max_mb}MB)")
+            return ToolResult.error("size_exceeded", name=path, detail=f"file exceeds maximum allowed size ({max_mb}MB)")
     except OSError:
         pass
     return None

@@ -4,35 +4,60 @@ Kept in infrastructure so the domain/application layers return structured data
 (roles, rules, skills) while a single place owns the rendered Markdown output.
 The prompt builder (which by definition assembles the system prompt) is the sole
 consumer of these formatters, so the resulting system prompt is unchanged.
+
+Conventions for token-efficient snippets:
+- One-line header summarizing scope; rules enumerated tersely.
+- `<tag>...</tag>` wrapping so the model can extract sections by tag-name.
+- Higher-priority content FIRST so prompt-cache prefix is stable across inputs.
+- No examples in prompt (they are in the system prompt's <contract> section).
 """
 
 import re
 from typing import Any, Dict, List
 
-from core.infrastructure.runtime.xml_utils import escape_xml_attr, wrap_cdata
+from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr, wrap_cdata
 
+
+# ---- Skills ----------------------------------------------------------------
 
 def format_skills_markdown(skills: List[Any]) -> str:
-    """Build the ``<skills>`` block for the system prompt from skill objects."""
+    """Build the ``<skills>`` block for the system prompt from skill objects.
+
+    Token-efficient: bullet list, name + path + 1-line desc, no prose header.
+    Skills sorted by priority (project > global > bundled) so overrides win.
+    """
     if not skills:
         return ""
 
+    def _sort_key(s: Any) -> tuple:
+        scope = getattr(s, "scope", None)
+        scope_val = getattr(scope, "value", scope) if scope is not None else None
+        priority = 0 if str(scope_val).lower() in ("project", "project_dir") else 1
+        return (priority, str(getattr(s, "name", "")).lower())
+
+    sorted_skills = sorted(skills, key=_sort_key)
     items = []
-    for s in skills:
+    for s in sorted_skills:
         loc = getattr(s, "location", None) or getattr(s, "path", None)
-        path_part = f" ({loc})" if loc else ""
+        # XML-escape user-supplied fields (name, path, description) before
+        # interpolation. A skill description containing literal
+        # `</skills><system_note>...` would otherwise truncate the
+        # wrapper and inject synthetic-looking markup.
+        name_safe = escape_xml(getattr(s, "name", "") or "")
+        loc_safe = escape_xml(str(loc)) if loc else ""
+        path_part = f" ({loc_safe})" if loc_safe else ""
         desc = getattr(s, "description", "") or ""
         desc_clean = " ".join(desc.split()) if desc else ""
-        desc_part = f": {desc_clean}" if desc_clean else ""
-        items.append(f"- {s.name}{path_part}{desc_part}")
+        desc_part = f": {escape_xml(desc_clean)}" if desc_clean else ""
+        items.append(f"- {name_safe}{path_part}{desc_part}")
 
     header = (
-        "Skills provide domain-specific instructions and workflows.\n"
-        "If a skill is relevant to the user request, you MUST read its SKILL.md using `read` tool before proceeding.\n\n"
-        "Available skills:\n"
+        "Skills: read SKILL.md via `read` if relevant. Project overrides global overrides bundled.\n"
     )
     return "<skills>\n" + header + "\n".join(items) + "\n</skills>"
 
+
+# ---- Rules ------------------------------------------------------------------
 
 def _clean_rule_content(content: str) -> str:
     """Strip trailing whitespace per line and collapse 3+ consecutive newlines."""
@@ -44,14 +69,22 @@ def _clean_rule_content(content: str) -> str:
 
 
 def format_rules_markdown(rules: List[Any]) -> str:
-    """Build the unified ``<user_rules>`` block for the system prompt."""
+    """Build the unified ``<user_rules>`` block.
+
+    BUGFIX: previously sorted global-first which contradicted the
+    "project > global" header. Now sorts project-first (priority 0),
+    so a later rule never silently overrides an earlier one when they
+    conflict (overrides apply "later wins" by LLM convention, so
+    higher-priority content must come FIRST).
+    """
     if not rules:
         return ""
 
     def _sort_key(r: Any) -> tuple:
         source = getattr(r, "source", "global")
         name = getattr(r, "name", str(r))
-        priority = 0 if source == "global" else 1
+        # Priority: project=0 (FIRST), global=1, default=2
+        priority = {"project": 0, "global": 1}.get(source, 2)
         return (priority, str(name).lower())
 
     sorted_rules = sorted(rules, key=_sort_key)
@@ -68,12 +101,19 @@ def format_rules_markdown(rules: List[Any]) -> str:
     if not items:
         return ""
 
-    header = "User rules (strict priority: project > global > defaults):\n"
+    header = "User rules. Higher-priority rules appear FIRST and override lower-priority rules on conflict. Order: project > global > defaults.\n"
     return f"<user_rules>\n{header}" + "\n".join(items) + "\n</user_rules>"
 
 
-def format_subagents_markdown(roles: List[Any]) -> str:
-    """Build the ``<subagents>`` block for the system prompt from role objects."""
+# ---- Subagents --------------------------------------------------------------
+
+def format_subagents_markdown(roles: List[Any], max_concurrent: int = 5) -> str:
+    """Build the ``<subagents>`` block from role objects.
+
+    Token-efficient: terse rules + bullet list of available roles.
+    ``max_concurrent`` is injected from runtime config so the model can
+    budget parallel work without guessing.
+    """
     if not roles:
         return ""
 
@@ -81,35 +121,47 @@ def format_subagents_markdown(roles: List[Any]) -> str:
     for role in roles:
         meta_parts = []
         if getattr(role, "allowed_tools", None):
-            meta_parts.append(f"tools: {', '.join(role.allowed_tools)}")
+            meta_parts.append(f"tools: {', '.join(escape_xml(t) for t in role.allowed_tools)}")
         if getattr(role, "provider", None) and getattr(role, "model", None):
-            meta_parts.append(f"model: {role.provider}/{role.model}")
+            meta_parts.append(f"model: {escape_xml(role.provider)}/{escape_xml(role.model)}")
         elif getattr(role, "provider", None):
-            meta_parts.append(f"provider: {role.provider}")
+            meta_parts.append(f"provider: {escape_xml(role.provider)}")
         elif getattr(role, "model", None):
-            meta_parts.append(f"model: {role.model}")
+            meta_parts.append(f"model: {escape_xml(role.model)}")
+        if getattr(role, "read_only", False):
+            meta_parts.append("read-only")
         meta_str = f" ({', '.join(meta_parts)})" if meta_parts else ""
         desc = getattr(role, "description", "") or ""
         desc_clean = " ".join(desc.split()) if desc else ""
-        desc_str = f": {desc_clean}" if desc_clean else ""
+        desc_str = f": {escape_xml(desc_clean)}" if desc_clean else ""
         r_key = getattr(role, "key", str(role))
-        items.append(f"- {r_key}{meta_str}{desc_str}")
+        items.append(f"- {escape_xml(r_key)}{meta_str}{desc_str}")
 
     header = (
-        "Delegate bounded tasks to background subagents via `invoke_subagent`.\n\n"
-        "Guidelines:\n"
-        "- Title: Use a concise noun phrase for 'title' (3-5 words, e.g. 'Auth token refactor', 'Query performance audit', not imperative verbs).\n"
-        "- Worktree Isolation: Pass `branch='<feature>'` for code edits (runs in isolated worktree, changes auto-committed on completion; inspect diff and run `git merge <feature>`).\n"
-        "- Reuse Context: Use `manage_subagent(action='send_message', session_id=...)` to continue an existing subagent rather than spawning new ones.\n"
-        "- Reactive: Completion notifies automatically. Do NOT poll status in a loop; proceed with other work or end turn.\n"
-        "- Subagents cannot spawn subagents or ask user questions.\n\n"
+        "Delegate bounded tasks via `invoke_subagent` (background; auto-notify on completion).\n"
+        "Rules:\n"
+        "- title: noun phrase, 3-5 words (e.g. 'Auth token refactor'), not verbs.\n"
+        "- prompt: include acceptance criteria, relative file paths, expected output format.\n"
+        "- branch: pass `branch='<feature>'` for code edits (isolated worktree, auto-commit on finish; parent inspects diff then `git merge <feature>`). Skip branch for read-only tasks.\n"
+        f"- concurrency: ≤{max_concurrent} parallel. Hit limit → wait or `manage_subagent(list)`.\n"
+        "- follow-up: `manage_subagent(send_message, session_id=...)` resumes prior session (history restored). Prefer this over spawning duplicates.\n"
+        "- reactive: completion notifies automatically; do NOT poll `list` in a loop.\n"
+        "- limits: subagents cannot call `invoke_subagent`/`manage_subagent`/`manage_shell`/`ask_user`, cannot run background processes, cannot ask the user. Decisions needing the user go in the subagent's report.\n"
+        "- cost: subagent tokens/cost merge into this session's totals on completion.\n\n"
         "Available roles:\n"
     )
     return "<subagents>\n" + header + "\n".join(items) + "\n</subagents>"
 
 
+# ---- MCP servers ------------------------------------------------------------
+
 def format_mcp_servers_markdown(by_server: Dict[str, List[str]]) -> str:
-    """Build the ``<mcp_servers>`` block for the system prompt from server->tools mapping."""
+    """Build the ``<mcp_servers>`` block. Lists server→tools for name-disambiguation.
+
+    Token-efficient: one line per server. Schema details (params, descriptions)
+    come from the function definitions themselves; this block only adds
+    server-to-tool grouping AND the namespace rule for collisions.
+    """
     if not by_server:
         return ""
 
@@ -118,14 +170,16 @@ def format_mcp_servers_markdown(by_server: Dict[str, List[str]]) -> str:
         tools = by_server[server]
         if not tools:
             continue
-        tools_str = ", ".join(sorted(tools))
-        items.append(f"- {server}: {tools_str}")
+        # Escape server and tool names — an MCP server name containing
+        # literal `</mcp_servers>` would otherwise terminate the wrapper
+        # early and inject arbitrary content as a system-level block.
+        tools_str = ", ".join(escape_xml(t) for t in sorted(tools))
+        items.append(f"- {escape_xml(server)}: {tools_str}")
 
     if not items:
         return ""
 
-    header = "External tools provided by Model Context Protocol (MCP) servers:\n"
+    header = (
+        "MCP tools. Schemas are in the function definitions. On name collisions, call as `server__tool`.\n"
+    )
     return f"<mcp_servers>\n{header}" + "\n".join(items) + "\n</mcp_servers>"
-
-
-

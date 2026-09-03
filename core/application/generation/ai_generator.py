@@ -18,6 +18,10 @@ from typing import Any, Callable, Optional
 
 from core.application.session.stream import record_subagent_step
 from core.domain.defaults.errors import parse_stream_step
+from core.domain.policies.messages import (
+    SYSTEM_NOTICE_KIND_INTERRUPTED,
+    format_system_note,
+)
 from core.domain.ports.checkpoint import get_checkpoint_manager
 from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
 
@@ -357,7 +361,19 @@ async def _handle_interruption(
         partial = (getattr(bot_handle, "content", "") if bot_handle else "").strip()
         if partial:
             agent.history.append({"role": "assistant", "content": partial})
-        agent.history.append({"role": "user", "content": "<system_note>Interrupted</system_note>"})
+        # Structured interruption note. The model sees a typed signal with
+        # phase info (streaming/bot) so it knows the previous turn was cut
+        # short and can decide whether to retry, summarize, or ask the user.
+        # Body deliberately empty — the kind attribute carries the meaning;
+        # filling the body would be redundant and risks injection of partial
+        # tool output that the model would otherwise re-execute.
+        phase = "bot" if partial else "streaming"
+        note = format_system_note(
+            kind=SYSTEM_NOTICE_KIND_INTERRUPTED,
+            body="",
+            phase=phase,
+        )
+        agent.history.append({"role": "user", "content": note})
         try:
             from core.infrastructure.runtime.token_util import estimate_tokens
 

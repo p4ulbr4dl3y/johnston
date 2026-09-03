@@ -103,7 +103,7 @@ def _unknown_tool_result(name: str, clean_name: str) -> ToolResult:
     hint = ""
     if matches:
         hint = f" Did you mean '{matches[0]}'?"
-    return ToolResult.error("unknown", detail=hint.strip(), name=name)
+    return ToolResult.error("unknown_tool", detail=hint.strip(), name=name)
 
 
 def get_default_tools() -> list[Dict[str, Any]]:
@@ -238,7 +238,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             active_mcp_tools = cached_tools
     except Exception as e:
         logger.warning("MCP cached tools read failed: %s", e, exc_info=True)
-        return ToolResult.error("mcp", detail=f"failed to read cached tools: {e}", name=name)
+        return ToolResult.error("unavailable", detail=f"[mcp] failed to read cached tools: {e}", name=name)
     # Case-insensitive match on the canonical (stripped+lowercased) name so the
     # MCP lookup follows the same normalization rules as builtin dispatch.
     is_mcp = any((t.get("function", {}).get("name") or "").lower() == clean_name for t in active_mcp_tools)
@@ -252,7 +252,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
                 is_mcp = True
         except Exception as e:
             logger.warning("MCP capability resolution failed for '%s': %s", name, e, exc_info=True)
-            return ToolResult.error("mcp", detail=f"failed to resolve capabilities: {e}", name=name)
+            return ToolResult.error("unavailable", detail=f"[mcp] failed to resolve capabilities: {e}", name=name)
 
     if not is_mcp:
         # Full listing fallback: starts/refreshes servers that cache misses
@@ -278,7 +278,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
                 _remember_mcp_miss(name)
         except Exception as e:
             logger.warning("MCP active tools listing failed: %s", e, exc_info=True)
-            return ToolResult.error("mcp", detail=f"failed to list active tools: {e}", name=name)
+            return ToolResult.error("unavailable", detail=f"[mcp] failed to list active tools: {e}", name=name)
 
     if not is_mcp:
         return _unknown_tool_result(name, clean_name)
@@ -327,9 +327,9 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             return tool_res
     except Exception as e:
         logger.warning("MCP tool '%s' execution failed: %s", name, e, exc_info=True)
-        return ToolResult.error("mcp", detail=str(e), name=name)
+        return ToolResult.error("unavailable", detail=f"[mcp] {e}", name=name)
 
-    return ToolResult.error("unknown", name=name)
+    return ToolResult.error("unknown_tool", name=name)
 
 
 class DefaultToolRegistry:

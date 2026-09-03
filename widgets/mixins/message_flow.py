@@ -502,13 +502,23 @@ class MessageFlowMixin:
             task_status = getattr(task, "status", None)
             status_val = task_status.value if hasattr(task_status, "value") else ""
             exit_code = getattr(task, "exit_code", None)
+            notif_status = "completed"
+            if status_val in ("error", "killed", "cancelled"):
+                notif_status = status_val
             if status_val in ("error", "killed") or (exit_code not in (None, 0)):
                 state_hint = (
                     f"[exit code: {exit_code}]" if exit_code is not None else f"[status: {status_val}]"
                 )
                 body = f"{state_hint}\n{body}"
 
-            msg = format_background_notification("shell", command_str, task_id, body)
+            msg = format_background_notification(
+                "shell",
+                command_str,
+                task_id,
+                body,
+                status=notif_status,
+                truncated=len(result) > 4000,
+            )
             curr_sid = getattr(self, "current_session_id", None)
             if self.is_generating:
                 self.message_queue.append((msg, False, None, curr_sid))

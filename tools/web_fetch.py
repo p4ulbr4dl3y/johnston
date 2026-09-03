@@ -151,13 +151,26 @@ class WebFetchTool(BaseTool):
         "type": "function",
         "function": {
             "name": "web_fetch",
+            "description": (
+                "Fetch HTTP/HTTPS URL and convert to Markdown (or raw body when raw=true).\n\n"
+                "Security: SSRF-protected. Blocks private/loopback IPs (127.0.0.0/8, 10.0.0.0/8, "
+                "172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, IPv6 ULA/link-local) on initial request AND on every redirect.\n\n"
+                "Conversion: HTML to Markdown (default), PDF/DOCX/XLSX/PPTX/EPUB/IPYNB to Markdown, JSON/CSV/text preserved as-is. "
+                "With raw=true: body with script tags stripped.\n\n"
+                "Limits: response capped at max_tool_payload_bytes (10MB); timeout 20s. Follows redirects; no cookies/headers/auth. Cancellation cooperates.\n\n"
+                "Concurrency-safe. Error kinds: http_status, network, scheme, blocked, size_exceeded, unavailable."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "url": {"type": "string", "description": "HTTP or HTTPS URL"},
+                    "url": {
+                        "type": "string",
+                        "description": "HTTP or HTTPS URL. Non-http schemes return scheme error.",
+                    },
                     "raw": {
                         "type": "boolean",
-                        "description": "Return raw response without Markdown conversion (default: false)",
+                        "default": False,
+                        "description": "Skip Markdown conversion. Returns body with script tags stripped.",
                     },
                 },
                 "required": ["url"],
@@ -229,7 +242,7 @@ class WebFetchTool(BaseTool):
                     try:
                         if int(cl) > payload_limit:
                             return ToolResult.error(
-                                "file", detail=f"exceeds {payload_limit // (1024 * 1024)}MB", name=url
+                                "size_exceeded", detail=f"exceeds {payload_limit // (1024 * 1024)}MB", name=url
                             )
                     except ValueError:
                         pass
@@ -241,16 +254,16 @@ class WebFetchTool(BaseTool):
                     total += len(chunk)
                     if total > payload_limit:
                         return ToolResult.error(
-                            "file", detail=f"exceeds {payload_limit // (1024 * 1024)}MB", name=url
+                            "size_exceeded", detail=f"exceeds {payload_limit // (1024 * 1024)}MB", name=url
                         )
                     chunks.append(chunk)
                 content_bytes = b"".join(chunks)
         except httpx.HTTPStatusError as e:
-            return ToolResult.error("http", detail=f"{e.response.status_code} {e.response.reason_phrase}", name=url)
+            return ToolResult.error("http_status", detail=f"{e.response.status_code} {e.response.reason_phrase}", name=url)
         except httpx.TimeoutException:
             return ToolResult.error("timeout", name=url)
         except Exception as e:
-            return ToolResult.error("fetch", detail=str(e), name=url)
+            return ToolResult.error("network", detail=str(e), name=url)
 
         if raw_mode:
             text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))

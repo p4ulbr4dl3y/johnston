@@ -155,12 +155,15 @@ class TestRetryableErrors(unittest.IsolatedAsyncioTestCase):
         ]
 
         sanitized = agent._sanitize_vision_error_messages(messages)
-        # Verify user message is preserved with text and note
+        # Verify user message is preserved with text and note. The runtime
+        # emits the versioned <system_note kind="images_omitted" reason="...">
+        # form, not the legacy plain-text one.
         self.assertEqual(len(sanitized), 4)
         user_msg = sanitized[3]
         self.assertEqual(user_msg["role"], "user")
         self.assertIn("Preview:", user_msg["content"])
-        self.assertIn("<system_note>Images omitted: vision unsupported</system_note>", user_msg["content"])
+        self.assertIn('<system_note kind="images_omitted"', user_msg["content"])
+        self.assertIn('reason="vision_unsupported"', user_msg["content"])
         # Verify tool content was replaced with hint
         tool_msg = sanitized[2]
         self.assertEqual(tool_msg["role"], "tool")

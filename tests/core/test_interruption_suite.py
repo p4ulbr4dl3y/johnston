@@ -109,12 +109,14 @@ class TestHandleInterruption:
 
         bot_handle.finalize_stream.assert_awaited_once()
 
-        # Check history contains partial response + interruption note
+        # Check history contains partial response + interruption note. The
+        # runtime emits the versioned <system_note kind="interrupted" phase="...">
+        # form, not the legacy plain-text one.
         assert len(agent.history) == 3
         assert agent.history[1] == {"role": "assistant", "content": "Partial generated response from LLM"}
         assert agent.history[2] == {
             "role": "user",
-            "content": "<system_note>Interrupted</system_note>",
+            "content": '<system_note kind="interrupted" phase="bot"></system_note>',
         }
 
         # Token accounting and UI refresh
@@ -154,7 +156,7 @@ class TestHandleInterruption:
         assert agent.history[0] == {"role": "user", "content": "Hello"}
         assert agent.history[1] == {
             "role": "user",
-            "content": "<system_note>Interrupted</system_note>",
+            "content": '<system_note kind="interrupted" phase="streaming"></system_note>',
         }
 
     @pytest.mark.asyncio
@@ -210,7 +212,10 @@ class TestHandleInterruption:
             start_time=time.time(),
         )
 
-        assert any("<system_note>Interrupted</system_note>" in m.get("content", "") for m in agent.history)
+        assert any(
+            '<system_note kind="interrupted"' in m.get("content", "")
+            for m in agent.history
+        )
 
 
 # ============================================================================
@@ -224,6 +229,9 @@ class TestCompactionAndSanitization:
     def test_is_system_note_detection(self):
         assert is_system_note({"role": "user", "content": "<system_note>Interrupted</system_note>"}) is True
         assert is_system_note({"role": "user", "content": "<system_note>Custom message</system_note>"}) is True
+        # Canonical versioned form (kind= attribute) is also recognised.
+        assert is_system_note({"role": "user", "content": '<system_note kind="interrupted" phase="bot"></system_note>'}) is True
+        assert is_system_note({"role": "user", "content": '<notification type="shell">x</notification>'}) is True
         assert is_system_note({"role": "user", "content": "Just a normal user message"}) is False
         assert is_system_note({"role": "assistant", "content": "Sure, here is the answer"}) is False
         assert is_system_note("Not a dict") is False
@@ -435,8 +443,8 @@ class TestSessionInterruptionFiltering:
 
     def test_is_ui_visible_user_message_filters_interruption_note(self):
         normal_msg = {"type": "user", "text": "Can you check this?"}
-        interruption_note = {"type": "user", "text": "<system_note>Response interrupted by user</system_note>"}
-        short_interruption_note = {"type": "user", "text": "<system_note>Response interrupted</system_note>"}
+        interruption_note = {"type": "user", "text": '<system_note kind="interrupted" phase="bot"></system_note>'}
+        short_interruption_note = {"type": "user", "text": '<system_note kind="interrupted"></system_note>'}
 
         assert is_ui_visible_user_message(normal_msg) is True
         assert is_ui_visible_user_message(interruption_note) is False
@@ -499,7 +507,7 @@ class TestGeneratorStreamInterruptionFlow:
         # Divider added
         canvas.add_event_divider.assert_awaited_once_with("Response Interrupted")
         # System note in history
-        assert any("<system_note>Interrupted</system_note>" in m["content"] for m in agent.history)
+        assert any('<system_note kind="interrupted"' in m["content"] for m in agent.history)
 
     @pytest.mark.asyncio
     async def test_cancellation_during_bot_delta_stream(self):
@@ -544,7 +552,7 @@ class TestGeneratorStreamInterruptionFlow:
         assert agent.history[1] == {"role": "assistant", "content": "Chunk 1 Chunk 2"}
         assert agent.history[2] == {
             "role": "user",
-            "content": "<system_note>Interrupted</system_note>",
+            "content": '<system_note kind="interrupted" phase="bot"></system_note>',
         }
 
     @pytest.mark.asyncio
@@ -610,7 +618,7 @@ class TestGeneratorStreamInterruptionFlow:
         # Tool widget marked cancelled even on raw KeyboardInterrupt
         mock_tool_widget.mark_cancelled.assert_called_once()
         canvas.add_event_divider.assert_awaited_once_with("Response Interrupted")
-        assert any("<system_note>Interrupted</system_note>" in m["content"] for m in agent.history)
+        assert any('<system_note kind="interrupted"' in m["content"] for m in agent.history)
 
     def test_ask_user_wizard_screen_has_quit_bindings(self):
         from widgets.presentation.screens.ask_user import AskUserWizardScreen

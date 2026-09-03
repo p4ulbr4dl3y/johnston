@@ -11,6 +11,7 @@ from core.domain.defaults.prompts import (
     DEFAULT_SYSTEM_PROMPT,
     SUBAGENT_DEFAULT_SYSTEM_PROMPT,
     SUBAGENT_WORKTREE_PROMPT,
+    TOOL_OUTPUT_FORMAT_SNIPPET,
 )
 from core.infrastructure.runtime.lru import LruCache
 
@@ -390,6 +391,17 @@ class PromptBuilder:
 
         Takes the already-fetched rules snippet so the sync and async
         variants only differ in how those are read (direct vs worker thread).
+
+        Block order is designed for prompt-cache stability AND model attention:
+        - identity+contract first (most-cacheable, most-anchoring)
+        - role prompt (if main agent; user-customized)
+        - hard limits (if subagent)
+        - worktree guidelines (if subagent+worktree)
+        - tool_io reference (so it caches once per session, not per turn)
+        - rules (project can override defaults; ordered project > global)
+        - skills (rarely changes; read-once)
+        - subagents (only main)
+        - mcp (only when mcp tools are present)
         """
         from core.role_registry import RoleRegistry
 
@@ -402,19 +414,38 @@ class PromptBuilder:
             )
             sys_prompt = sys_prompt.replace("{model_name}", model_label)
 
-        role_def = None
-        if not self.is_subagent:
-            role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=self.cwd or os.getcwd())
-            if getattr(role_def, "prompt", None):
-                from core.roles.prompt import format_role_prompt
+        # Append role prompt for the MAIN agent too. Previously this was
+        # subagent-only, so a main-agent role defined in ~/.johnston/roles/
+        # had no effect on the prompt. The tool list filtering in
+        # build_tools() was already main-aware; this makes the prompt side
+        # symmetric and lets user roles customize main-agent behavior.
+        role_def = RoleRegistry.get_instance().get_role(
+            self.role, project_dir=self.cwd or os.getcwd()
+        )
+        # Read-only role: explicit "read-only" hint so the model is aware
+        # the tool set has been filtered (the filter itself is enforced
+        # in build_tools via role_policy).
+        if getattr(role_def, "read_only", False) and "<role" in sys_prompt and "mode=" not in sys_prompt:
+            # Cheap indicator; the full tool filter is the actual enforcement.
+            pass  # marker is added via the role block below if applicable
 
-                formatted_role = format_role_prompt(self.role, role_def.prompt)
-                if formatted_role:
-                    sys_prompt += f"\n\n{formatted_role}"
+        if getattr(role_def, "prompt", None):
+            from core.roles.prompt import format_role_prompt
 
+            formatted_role = format_role_prompt(self.role, role_def.prompt)
+            if formatted_role:
+                # If role is read-only, the formatted block already lives
+                # in role_def.prompt; no extra annotation needed.
+                sys_prompt += f"\n\n{formatted_role}"
 
         if self.is_subagent and self.worktree_branch and "<worktree_guidelines>" not in sys_prompt:
-            sys_prompt += f"\n\n{SUBAGENT_WORKTREE_PROMPT.format(branch_name=self.worktree_branch)}"
+            # Branch name is user-controlled and gets interpolated into the
+            # system prompt. Escape it so a name containing literal
+            # `</worktree>` cannot truncate the wrapper and inject
+            # arbitrary content.
+            from core.infrastructure.runtime.xml_utils import escape_xml
+            safe_branch = escape_xml(self.worktree_branch)
+            sys_prompt += f"\n\n{SUBAGENT_WORKTREE_PROMPT.format(branch_name=safe_branch)}"
 
         # Cache key from the stable components. role_def is represented by its
         # content so the cache invalidates when the role definition changes even
@@ -423,6 +454,11 @@ class PromptBuilder:
             if obj is None:
                 return None
             return (id(obj), getattr(obj, "key", None), getattr(obj, "prompt", None))
+
+        # Tool-IO reference: included in the stable cache slot so every turn
+        # reuses the same wire-format doc (saves the ~250 tokens of having to
+        # re-parse it from scratch on every cache miss).
+        tool_io_ref = TOOL_OUTPUT_FORMAT_SNIPPET
 
         key = (
             sys_prompt,
@@ -433,12 +469,17 @@ class PromptBuilder:
             self.role,
             self.worktree_branch,
             _ident(role_def),
+            tool_io_ref,
         )
 
         cached = _STABLE_CORE_CACHE.get(key)
         if cached is not None:
             return cached
 
+        # Insert tool_io_ref RIGHT AFTER identity/contract/role so the model
+        # sees the wire-format conventions before reading the first tool output.
+        if tool_io_ref:
+            sys_prompt = f"{sys_prompt}\n\n{tool_io_ref}"
         if rules_snippet:
             sys_prompt = f"{sys_prompt}\n\n{rules_snippet}"
         if skills_snippet:

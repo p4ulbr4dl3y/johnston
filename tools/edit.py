@@ -298,11 +298,11 @@ def apply_edit(
 
     if count == 0:
         hint = _generate_fuzzy_match_hint(content, old_str, path)
-        return ToolResult.error("match", detail=f"exact block not found in '{path}'.{hint}")
+        return ToolResult.error("match_not_found", detail=f"exact block not found in '{path}'.{hint}")
 
     if count > 1 and not replace_all:
         return ToolResult.error(
-            "match",
+            "match_ambiguous",
             detail=(
                 f"target matches {count} occurrences in '{path}'. "
                 f"Include 2-4 lines of surrounding context to make old_str unique, or set replace_all=true."
@@ -328,24 +328,42 @@ class EditTool(BaseTool):
         "type": "function",
         "function": {
             "name": "edit",
+            "description": (
+                "Replace text in an EXISTING file via exact-match. For NEW files, use `create`. "
+                "Always `read` the file first to see current content.\n\n"
+                "`old_str` rules:\n"
+                "- Must be unique in the file. Include 2-4 lines of surrounding context if needed.\n"
+                "- Whitespace-agnostic at line starts (tabs/spaces normalized). CRLF/LF handled.\n"
+                "- Quote-style preserved: curly quotes stay curly if file uses them.\n"
+                "- If not found, error includes a fuzzy-match hint with the closest line.\n\n"
+                "`new_str` rules:\n"
+                "- Empty string OR absent key = DELETE the matched block.\n"
+                "- `replace_all=true` replaces all occurrences (else error on multi-match).\n\n"
+                "Atomic write via temp file + rename. Limits: file ≤10MB, regular file, UTF-8.\n\n"
+                "Error kinds: `match_not_found` (with fuzzy hint), `match_ambiguous` (multi-match), "
+                "`params` (missing/empty/equal old/new), `not_found` (file missing), `is_directory`, "
+                "`encoding`, `size_exceeded`, `permission` (sandbox), `execute` (write failure)."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Absolute or relative file path"},
+                    "path": {
+                        "type": "string",
+                        "description": "File path. Must exist and be a regular file. Use relative path.",
+                    },
                     "old_str": {
                         "type": "string",
-                        "description": "Exact text to replace. Must be unique in the file (include 2-4 lines of surrounding context if needed).",
                         "minLength": 1,
+                        "description": "Exact text to replace. Must be unique. Whitespace-agnostic at line starts.",
                     },
                     "new_str": {
                         "type": "string",
-                        "description": "New replacement text. Omit or set to empty string to delete old_str.",
-                        "default": "",
+                        "description": "Replacement text. Empty or absent = delete old_str.",
                     },
                     "replace_all": {
                         "type": "boolean",
-                        "description": "Replace all occurrences of old_str across the file (default: false).",
                         "default": False,
+                        "description": "Replace all occurrences (else error if more than 1 match).",
                     },
                 },
                 "required": ["path", "old_str"],
@@ -394,10 +412,10 @@ class EditTool(BaseTool):
         try:
             return await run_cancellable(_do_edit)
         except (UnicodeDecodeError, UnicodeEncodeError) as ue:
-            return ToolResult.error("file", detail=str(ue), name=path)
+            return ToolResult.error("encoding", detail=str(ue), name=path)
         except ValueError as ve:
             # Unexpected ValueError: wrap as params.
             return ToolResult.error("params", detail=str(ve))
         except Exception as e:
-            return ToolResult.error("file", detail=str(e), name=path)
+            return ToolResult.error("execute", detail=f"write failed: {e}", name=path)
 

@@ -119,9 +119,21 @@ class RoleRegistry:
         if not subagent_roles:
             return ""
 
+        # Pull max_concurrent from config so the subagent block carries the
+        # real budget; fall back to the documented default if config is
+        # unavailable (headless / early-init paths).
+        try:
+            from core.infrastructure.config.settings import get_settings
+
+            max_concurrent = get_settings().subagents.max_concurrent
+        except Exception:
+            from core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
+
+            max_concurrent = DEFAULT_MAX_CONCURRENT_SUBAGENTS
+
         from core.infrastructure.runtime.prompt_markdown import format_subagents_markdown
 
-        return format_subagents_markdown(list(subagent_roles.values()))
+        return format_subagents_markdown(list(subagent_roles.values()), max_concurrent=max_concurrent)
 
 
     def _parse_md_role(self, fpath: str, source: str) -> Optional[AgentRole]:

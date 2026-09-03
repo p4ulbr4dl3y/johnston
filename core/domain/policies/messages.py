@@ -8,6 +8,27 @@ Two message spaces exist and MUST agree on what counts as a "real user turn":
 Rewind, fork, git-checkpoint indexing and persistence all map UI-visible turn
 positions onto these spaces. Every walk over either space must go through this
 module so the index spaces cannot silently diverge.
+
+Wire format for synthetic user messages (system-generated, never user-typed).
+There is exactly ONE canonical form for each message type — no version
+attribute, no legacy variants:
+
+- ``<system_note kind="..." attrs>...</system_note>`` — runtime annotations
+  (interruption, vision fallback, queue arrival, etc.). ``kind`` is a closed
+  enum; unknown kinds are emitted but the model is told to treat any
+  system_note as informational. The body and all attributes are XML-escaped
+  so a tool result containing literal ``</system_note>`` cannot truncate the
+  wrapper.
+- ``<notification type="shell|subagent" id="..." title="..." status="..." truncated="..." duration_ms="...">...</notification>`` —
+  background-task completions. The body is XML-escaped to prevent wrapper
+  truncation by injection.
+- ``<compaction_checkpoint>...</compaction_checkpoint>`` — historical context
+  handoff (see core/base_provider/compaction.py). Unversioned is the only
+  form; the parser strictly refuses malformed bodies.
+
+All three are HIDDEN from the UI (TRANSCRIPT_HIDDEN_PREFIXES) and excluded
+from real-user-turn counts. They are also dropped from compaction's
+preserved-user-messages list so they don't pollute the next summary.
 """
 
 from typing import Any, List, Optional
@@ -21,11 +42,115 @@ USER_EVENT_TYPE = "user"
 TRANSCRIPT_HIDDEN_PREFIXES = (
     "<system_note",
     "<notification",
+    "<compaction_checkpoint",
 )
 STALE_NOTE_PREFIX = (
     "<system_note",
 )
 
+
+# ---------------------------------------------------------------------------
+# Wire format constants for synthetic user messages
+# ---------------------------------------------------------------------------
+
+# Canonical kinds for <system_note kind="...">. Adding a new kind means
+# updating both this list AND the system prompt's <context> block so the
+# model knows what to do with it.
+SYSTEM_NOTICE_KIND_INTERRUPTED = "interrupted"
+SYSTEM_NOTICE_KIND_IMAGES_OMITTED = "images_omitted"
+SYSTEM_NOTICE_KIND_VISION_UNSUPPORTED = "vision_unsupported"
+SYSTEM_NOTICE_KIND_RATE_LIMITED = "rate_limited"
+SYSTEM_NOTICE_KIND_CONTEXT_TRIMMED = "context_trimmed"
+SYSTEM_NOTICE_KIND_QUEUE_ARRIVED = "queue_arrived"
+SYSTEM_NOTICE_KIND_PROVIDER_RECOVERED = "provider_recovered"
+SYSTEM_NOTICE_KIND_TOOL_RESULT_LOST = "tool_result_lost"
+
+NOTIFICATION_KIND_SHELL = "shell"
+NOTIFICATION_KIND_SUBAGENT = "subagent"
+
+
+def _xml_escape(s: Any) -> str:
+    """Strict XML attribute/text escape for synthetic-message payloads.
+
+    Used for every value that lands inside a synthetic-message body or
+    attribute. Without this, a subagent report containing literal
+    `</notification>` would truncate the wrapper and inject a
+    prompt-injection surface.
+    """
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
+
+
+def format_system_note(kind: str, body: str, **attrs: Any) -> str:
+    """Build a ``<system_note>`` synthetic user message.
+
+    The kind is mandatory; it tells the model (and our parsers) what the
+    note means so the system prompt can enumerate behavior per kind.
+    The kind attribute discriminates; the system prompt instructs the
+    model to treat any system_note as informational, not actionable.
+
+    Attributes (optional): when, what, model, path, etc. — caller
+    decides what context is useful. Keep them terse.
+    """
+    kind_clean = _xml_escape(kind or "info")
+    attr_str = ""
+    for k, v in attrs.items():
+        if v is None or v == "":
+            continue
+        attr_str += f' {k}="{_xml_escape(v)}"'
+    body_clean = _xml_escape(body or "")
+    return f"<system_note kind=\"{kind_clean}\"{attr_str}>{body_clean}</system_note>"
+
+
+def format_background_notification(
+    type_: str,
+    title: str,
+    task_id: str,
+    result: str,
+    *,
+    status: str = "completed",
+    truncated: bool = False,
+    duration_ms: Optional[int] = None,
+) -> str:
+    """Build a ``<notification>`` synthetic user message.
+
+    Emitted as a synthetic user message when a background shell or
+    subagent finishes. The result body is XML-escaped so a subagent
+    report containing ``</notification>`` cannot truncate the wrapper.
+
+    Attributes:
+        type:   "shell" | "subagent"
+        id:     task_id / subagent session_id
+        title:  human label
+        status: "completed" | "cancelled" | "error" | "running"
+        truncated: True iff result was capped; full result in companion log
+        duration_ms: optional wall-clock time
+    """
+    t_clean = _xml_escape(type_)
+    title_clean = _xml_escape(title)
+    id_clean = _xml_escape(task_id)
+    status_clean = _xml_escape(status)
+    duration_attr = f' duration_ms="{int(duration_ms)}"' if duration_ms is not None else ""
+    trunc_attr = ' truncated="true"' if truncated else ""
+    body_clean = _xml_escape(result)
+    return (
+        f'<notification type="{t_clean}" '
+        f'id="{id_clean}" title="{title_clean}" '
+        f'status="{status_clean}"{duration_attr}{trunc_attr}>'
+        f"{body_clean}"
+        f"</notification>"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Classification helpers (unchanged behavior, more robust markers)
+# ---------------------------------------------------------------------------
 
 def is_ui_visible_user_message(msg: Any) -> bool:
     """True if a transcript event should be rendered/counted as a user turn."""
@@ -85,8 +210,8 @@ def transcript_before_turn(messages: List[Any], seq_idx: int) -> List[Any]:
 # Agent history entries (provider history)
 # ---------------------------------------------------------------------------
 
-# Compaction embeds summaries into history as fake user messages.
-HISTORY_CHECKPOINT_MARKERS = ("<compaction_checkpoint>",)
+# Compaction embeds summaries into history as fake user messages. There is
+# exactly one canonical form — the walker just looks for the tag prefix.
 HISTORY_NOTE_PREFIX = (
     "<system_note",
     "<notification",
@@ -94,17 +219,23 @@ HISTORY_NOTE_PREFIX = (
 
 
 def is_checkpoint_message(msg: Any) -> bool:
-    """True if a history entry is a compaction checkpoint or previous summary."""
+    """True if a history entry is a compaction checkpoint.
+
+    A checkpoint is any user message whose content opens with the canonical
+    ``<compaction_checkpoint>`` tag. The body parsing is the compactor's job
+    (see core/base_provider/compaction.py); this function is a cheap prefix
+    check used by the turn counters and rewind walk.
+    """
     if not isinstance(msg, dict):
         return False
     content = msg.get("content", "")
     if isinstance(content, str):
-        return any(marker in content for marker in HISTORY_CHECKPOINT_MARKERS)
+        return content.startswith("<compaction_checkpoint>")
     if isinstance(content, list):
         for part in content:
             if isinstance(part, dict):
                 text = str(part.get("text", ""))
-                if any(marker in text for marker in HISTORY_CHECKPOINT_MARKERS):
+                if text.startswith("<compaction_checkpoint>"):
                     return True
     return False
 
@@ -152,23 +283,3 @@ def history_before_turn(history: List[Any], seq_idx: int) -> List[Any]:
         return list(history)
     return history[:cutoff]
 
-
-def format_background_notification(
-    type_: str,
-    title: str,
-    task_id: str,
-    result: str,
-) -> str:
-    """Unified template for background-task completion notifications.
-
-    Emitted as a synthetic user message when a background shell/subagent finishes:
-    `<notification type="..." id="..." title="...">\n...\n</notification>`
-    """
-    t_clean = (type_ or "").replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
-    title_clean = (title or "").replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
-    id_clean = (task_id or "").replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
-    return (
-        f'<notification type="{t_clean}" id="{id_clean}" title="{title_clean}">\n'
-        f"{result}\n"
-        f"</notification>"
-    )

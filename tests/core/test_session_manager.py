@@ -198,7 +198,7 @@ class TestSessionManagerPureReader(unittest.TestCase):
         self.assertTrue(is_ui_visible_user_message({"type": "user", "text": "hello", "show_in_ui": True}))
         self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "hello", "show_in_ui": False}))
         self.assertFalse(is_ui_visible_user_message({"type": "user", "text": '<notification type="shell">Background shell</notification>'}))
-        self.assertFalse(is_ui_visible_user_message({"type": "user", "text": "<system_note>Response interrupted</system_note>"}))
+        self.assertFalse(is_ui_visible_user_message({"type": "user", "text": '<system_note kind="interrupted"></system_note>'}))
         self.assertFalse(is_ui_visible_user_message("not a dict"))
         self.assertFalse(is_ui_visible_user_message(None))
 

@@ -178,6 +178,7 @@ class InvokeSubagentTool(BaseTool):
             title,
             session_id,
             "{result_text}",
+            status="completed",
         )
 
         bg_task = asyncio.create_task(
