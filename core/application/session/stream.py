@@ -427,6 +427,7 @@ async def send_subagent_followup(
             session.title,
             session.id,
             "{result_text}",
+            status="completed",
         )
 
         # The stream drains session.pending_messages inline, so only the

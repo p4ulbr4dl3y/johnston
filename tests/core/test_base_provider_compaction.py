@@ -57,7 +57,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             self.assertIn("compacted successfully", msg)
             self.assertEqual(len(agent.history), 5)  # preserved user turn + 1 summary checkpoint + 3 tail messages
             self.assertEqual(agent.history[0]["content"], "Fix bug in auth.py")
-            self.assertIn("<compaction_checkpoint>", agent.history[1]["content"])
+            self.assertIn('<compaction_checkpoint>', agent.history[1]["content"])
             self.assertIn("<objective>", agent.history[1]["content"])
             self.assertIn("auth.py", agent.history[1]["content"])
 
@@ -86,7 +86,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(success)
             # The root subagent prompt must be preserved at index 0
             self.assertEqual(agent.history[0]["content"], "Refactor database models in db/schema.py with strict constraints.")
-            self.assertIn("<compaction_checkpoint>", agent.history[1]["content"])
+            self.assertIn('<compaction_checkpoint>', agent.history[1]["content"])
 
     async def test_compact_history_calls_build_prompt_context_only_once(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
@@ -287,10 +287,10 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
         )
         agent.history = [
-            {"role": "user", "content": "<compaction_checkpoint>\nearlier work\n</compaction_checkpoint>"},
+            {"role": "user", "content": '<compaction_checkpoint>\nearlier work\n</compaction_checkpoint>'},
             {"role": "user", "content": "Tail 0"},
             {"role": "assistant", "content": "Resp 0"},
-            {"role": "user", "content": "<system_note>Response interrupted by user</system_note>"},
+            {"role": "user", "content": '<system_note kind="interrupted" phase="bot"></system_note>'},
             {"role": "user", "content": "Tail 1"},
             {"role": "assistant", "content": "Resp 1"},
         ]
@@ -299,7 +299,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
         # are not user turns). Truncate to the 2nd real user turn -> keep Tail 0.
         agent.truncate_history_to_user_message(1)
         contents = [m["content"] for m in agent.history]
-        self.assertEqual(contents, ["<compaction_checkpoint>\nearlier work\n</compaction_checkpoint>", "Tail 0", "Resp 0"])
+        self.assertEqual(contents, ['<compaction_checkpoint>\nearlier work\n</compaction_checkpoint>', "Tail 0", "Resp 0"])
 
         # Truncate to the 1st real user turn -> drops the checkpoint too.
         agent.truncate_history_to_user_message(0)
@@ -310,7 +310,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             api_key="test", model="test-model", base_url="http://test", system_prompt="test", provider_key="test_prov"
         )
         agent.history = [
-            {"role": "user", "content": "<compaction_checkpoint>\nearlier work\n</compaction_checkpoint>"},
+            {"role": "user", "content": '<compaction_checkpoint>\nearlier work\n</compaction_checkpoint>'},
             {"role": "user", "content": "Tail 0"},
             {"role": "assistant", "content": "Resp 0"},
         ]

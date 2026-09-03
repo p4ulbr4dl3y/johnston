@@ -9,6 +9,7 @@ from core.infrastructure.runtime.subagent_tracker import (
     _record_subagent_session,
 )
 from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+from core.infrastructure.runtime.xml_utils import escape_xml_attr
 from tools.base import BaseTool
 
 
@@ -178,6 +179,7 @@ class InvokeSubagentTool(BaseTool):
             title,
             session_id,
             "{result_text}",
+            status="completed",
         )
 
         bg_task = asyncio.create_task(
@@ -197,8 +199,8 @@ class InvokeSubagentTool(BaseTool):
         session.async_task = bg_task
         ctx.refresh_status()
 
-        branch_info = f" | branch {branch_name}" if branch_name else ""
-        content_txt = f"[subagent started | id {session_id} | role {canonical_role}{branch_info}]"
+        branch_info = f" | branch {escape_xml_attr(branch_name)}" if branch_name else ""
+        content_txt = f"[subagent started | id {session_id} | role {escape_xml_attr(canonical_role)}{branch_info}]"
         return ToolResult(
             status=ToolResultStatus.RUNNING,
             content=content_txt,

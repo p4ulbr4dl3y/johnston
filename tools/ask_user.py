@@ -45,37 +45,67 @@ class AskUserTool(BaseTool):
         "type": "function",
         "function": {
             "name": "ask_user",
+            "description": (
+                "Ask interactive multiple-choice questions when requirements or design decisions are ambiguous. "
+                "Each question should have 2-4 options with concise label and helpful description. "
+                "Include '(Recommended)' in the label of suggested choices."
+            ),
+            "description_verbose": (
+                "Ask the user 1-4 multiple-choice questions for ambiguous design decisions. "
+                "Reserve for genuine forks, NOT routine confirmations.\n\n"
+                "Format example:\n"
+                "```\n"
+                "ask_user(questions=[\n"
+                "  {\"question\": \"Which auth strategy?\", \"header\": \"Auth\", \"options\": [\n"
+                "    {\"label\": \"JWT (Recommended)\", \"description\": \"Stateless, scales horizontally\"},\n"
+                "    {\"label\": \"Session cookies\", \"description\": \"Server-side state, simpler\"}\n"
+                "  ]}\n"
+                "])\n"
+                "```\n\n"
+                "Rules:\n"
+                "- 1-4 questions per call; each has 2-4 options.\n"
+                "- Append `(Recommended)` to the suggested option's label (UI highlights it).\n"
+                "- `header` is a short tag (≤12 chars) shown above the question.\n"
+                "- `is_multi_select=true` allows multiple selections; comma-separated in output.\n"
+                "- User can press Esc to cancel → returns `[cancelled by user]`.\n\n"
+                "Subagent behavior: REMOVED from subagent toolset. Use sparingly in main agent — every call "
+                "blocks the agent loop until the user answers."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "questions": {
                         "type": "array",
-                        "description": "List of questions to ask the user (1-4 questions)",
+                        "description": "List of 1-4 questions.",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "question": {"type": "string", "description": "Question text ending with '?'"},
+                                "question": {
+                                    "type": "string",
+                                    "description": "Question text ending with '?'.",
+                                },
                                 "header": {
                                     "type": "string",
-                                    "description": "Very short label/tag (e.g. 'Approach', 'Library')",
+                                    "description": "Short tag (≤12 chars) shown above the question.",
                                 },
                                 "is_multi_select": {
                                     "type": "boolean",
-                                    "description": "Allow multiple option selections if true",
+                                    "default": False,
+                                    "description": "Allow multiple option selections.",
                                 },
                                 "options": {
                                     "type": "array",
-                                    "description": "Selectable choices (2-4 options, add '(Recommended)' to suggested choice label)",
+                                    "description": "2-4 options. Add '(Recommended)' to suggested choice.",
                                     "items": {
                                         "type": "object",
                                         "properties": {
                                             "label": {
                                                 "type": "string",
-                                                "description": "Short choice text (1-5 words)",
+                                                "description": "Short choice text (1-5 words).",
                                             },
                                             "description": {
                                                 "type": "string",
-                                                "description": "Explanation of trade-offs or implications",
+                                                "description": "Trade-offs or implications.",
                                             },
                                         },
                                         "required": ["label"],

@@ -294,20 +294,55 @@ class ReadTool(BaseTool):
         "type": "function",
         "function": {
             "name": "read",
+            "description": (
+                "Read a file, directory, archive, MCP resource, or convert docs/images.\n\n"
+                "Forms:\n"
+                "- `path` to a file: returns lines `[<p> | lines N..M of T]` + `N|line` rows. "
+                "Window ≤800 lines; paginate with `start_line`/`end_line`.\n"
+                "- `path` to a directory: returns `[dir <p> | total N]` + sorted entries (truncated at 60).\n"
+                "- `path` to a zip/tar archive: returns `[archive <p> | total N]` + file list.\n"
+                "- `path` containing `://` (when local file doesn't exist): fetches MCP resource.\n"
+                "- PDF/DOCX/XLSX/PPTX/EPUB/IPYNB: converted to Markdown; long output is truncated with log path.\n"
+                "- Image (PNG/JPEG/GIF/WebP): converted to base64 JSON for vision; use `detail` to control size.\n\n"
+                "Outputs are concurrency-safe: emit multiple `read` calls in one step and the runtime "
+                "runs them in parallel. Long conversions (PDF/DOCX, big images) are cancellable.\n\n"
+                "Errors: `not_found` (with fuzzy-match hint), `is_directory`, `size_exceeded`, `encoding`, "
+                "`binary_file`, `permission` (sandbox), `image`/`doc` (conversion failure)."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Absolute or relative file, directory, or archive path",
+                        "description": (
+                            "File, directory, archive, or `scheme://...` MCP resource path. "
+                            "Relative paths resolve against cwd (from <environment>)."
+                        ),
                     },
-                    "start_line": {"type": "integer", "description": "Start line (1-indexed)"},
-                    "end_line": {"type": "integer", "description": "End line (inclusive)"},
+                    "start_line": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "1-indexed start line. Use with `end_line` to paginate.",
+                    },
+                    "end_line": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "1-indexed end line (inclusive). Max range: 800 lines per call.",
+                    },
                     "content_offset": {
                         "type": "integer",
+                        "minimum": 0,
                         "description": (
-                            "Byte offset to continue reading large or minified single-line files. "
-                            "Seeks directly to byte position."
+                            "Byte offset for minified single-line files or large pastes. "
+                            "When set, line numbers are NOT shown."
+                        ),
+                    },
+                    "detail": {
+                        "type": "string",
+                        "enum": ["low", "high", "original"],
+                        "description": (
+                            "Image processing detail. `low`=512px, `high`=2048px (default), "
+                            "`original`=no resize. Ignored for non-image paths."
                         ),
                     },
                 },
@@ -372,7 +407,7 @@ class ReadTool(BaseTool):
                     elif entries:
                         sample = sorted(entries)[:5]
                         hint = f" (available files: {', '.join(sample)})"
-                return ToolResult.error("file", detail="not found" + hint, name=path)
+                return ToolResult.error("not_found", detail="not found" + hint, name=path)
 
             if os.path.isdir(path):
                 try:
@@ -416,7 +451,7 @@ class ReadTool(BaseTool):
                 limit = get_max_tool_payload_bytes()
                 if file_size > limit:
                     return ToolResult.error(
-                        "file", detail=f"exceeds {limit // (1024 * 1024)}MB", name=path
+                        "size_exceeded", detail=f"exceeds {limit // (1024 * 1024)}MB", name=path
                     )
             except OSError as e:
                 return ToolResult.error("check", detail=str(e), name=path)
@@ -512,7 +547,7 @@ class ReadTool(BaseTool):
 
                 lines = await run_cancellable(_read_file_lines, path, content_offset, start_line_int, end_line_int)
             except Exception as e:
-                return ToolResult.error("file", detail=str(e), name=path)
+                return ToolResult.error("execute", detail=f"read failed: {e}", name=path)
 
         from tools.utils import format_line_pagination
 

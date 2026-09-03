@@ -74,7 +74,7 @@ def _truncate_output(res: str) -> str:
 class ShellTool(BaseTool):
     name = "shell"
     description = (
-        "Execute non-interactive shell command. ALWAYS specify explicit path (e.g. 'rg foo .') "
+        "Execute a NON-INTERACTIVE shell command. ALWAYS specify explicit path (e.g. 'rg foo .') "
         "to avoid stdin hang. Set background=true for servers/long jobs. Use unbuffered output "
         "(flush/flags) for long scripts, loops, and streaming logs. Manage, send stdin, or kill via 'manage_shell'."
     )
@@ -83,20 +83,41 @@ class ShellTool(BaseTool):
         "type": "function",
         "function": {
             "name": "shell",
+            "description": (
+                "Execute a NON-INTERACTIVE shell command synchronously. Output: `[exit N]` line "
+                "followed by stdout/stderr; truncated past `max_shell_output_chars` with "
+                "`[truncated | log <p> | next read(path=<log>, start_line=N)]` footer.\n\n"
+                "Anti-patterns (will hang or fail):\n"
+                "- Interactive REPLs: `python -i`, `node`, `irb`, `psql` without `-c`, etc.\n"
+                "- Pagers: `less`, `more`, `vim`, `nano`. Use `cat` or pipe to `head`/`tail`.\n"
+                "- Commands that read stdin without explicit input: `fzf`, `ssh` without `-o BatchMode=yes`.\n"
+                "Always pass non-interactive flags: `-y` (apt), `--non-interactive`, `--batch`, `-c '<query>'`.\n\n"
+                "Environment:\n"
+                "- Runs in cwd (from <environment>); subagent cwd is its worktree root.\n"
+                "- `manage_shell` is unavailable in subagents (tool removed).\n"
+                "- `background=true` is rejected in subagents (sync-only).\n"
+                "- If sandbox backend unavailable, runs unsandboxed with `[sandbox unavailable]` banner.\n\n"
+                "Error kinds: `timeout` (process killed, NOT backgrounded), `http_status`/etc. don't apply; "
+                "use `not_found` for `command not found` (exit 127), `permission` for `Permission denied`."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "command": {
                         "type": "string",
-                        "description": "Shell command to run",
+                        "description": "Non-interactive shell command. NO interactive REPLs or paginators.",
                     },
-                    "timeout": {"type": "integer", "description": "Timeout in seconds (default: 120, max: 600)"},
+                    "timeout": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 600,
+                        "default": 120,
+                        "description": "Seconds before SIGTERM. Process killed, NOT converted to background.",
+                    },
                     "background": {
                         "type": "boolean",
-                        "description": (
-                            "Run in background. Returns task_id and live log path; "
-                            "completion notifies automatically (default: false)"
-                        ),
+                        "default": False,
+                        "description": "Run as background task. Returns task_id + log path. Main agent only — subagents get an error.",
                     },
                 },
                 "required": ["command"],

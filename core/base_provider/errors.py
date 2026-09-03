@@ -4,6 +4,12 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
+from core.domain.policies.messages import (
+    SYSTEM_NOTICE_KIND_IMAGES_OMITTED,
+    SYSTEM_NOTICE_KIND_VISION_UNSUPPORTED,
+    _xml_escape,
+    format_system_note,
+)
 from core.infrastructure.adapters.base import extract_image_payload
 
 
@@ -264,8 +270,25 @@ class ErrorHandlingMixin:
                         for item in content
                         if isinstance(item, dict) and item.get("type") == "text" and item.get("text")
                     ]
-                    clean_text = "\n".join(text_parts).strip()
-                    note = "<system_note>Images omitted: vision unsupported</system_note>"
+                    # Escape the user-supplied text before concatenating with
+                    # the synthetic system_note. Without this, a malicious or
+                    # careless user message containing literal
+                    # `</system_note><system_note kind="...">...` would
+                    # truncate our wrapper and inject a fake system_note that
+                    # the model would treat as authoritative.
+                    clean_text = "\n".join(_xml_escape(p) for p in text_parts).strip()
+                    # Structured system_note with kind + reason attrs. The
+                    # model sees WHY images are gone (model lacks vision)
+                    # and WHAT to do (don't retry, tell the user). Prevents
+                    # endless image-resend loops when a user attaches to a
+                    # non-vision-capable session.
+                    note = format_system_note(
+                        kind=SYSTEM_NOTICE_KIND_IMAGES_OMITTED,
+                        body="Attached images were stripped: the active model does not support vision. "
+                             "Do not attempt to re-attach or re-send the same image; tell the user you "
+                             "cannot view it and ask them to describe the content in text.",
+                        reason="vision_unsupported",
+                    )
                     combined_text = f"{clean_text}\n{note}".strip() if clean_text else note
                     sanitized.append({"role": "user", "content": combined_text})
                     continue
