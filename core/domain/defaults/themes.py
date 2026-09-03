@@ -11,6 +11,7 @@ from core.domain.entities.theme import Theme
 THEMES_JSON_PATH = Path(__file__).with_name("themes.json")
 
 _themes_cache: dict[str, Theme] | None = None
+_ZINC_DARK: Optional[Theme] = None
 
 
 def _ensure_loaded() -> dict[str, Theme]:
@@ -33,7 +34,26 @@ def list_themes() -> list[Theme]:
 
 
 DEFAULT_THEME_NAME = "zinc"
-ZINC_DARK: Theme = _ensure_loaded()["zinc"]
+
+# Declared for typing/`__all__`; resolved lazily on first access via ``__getattr__``
+# so importing this module performs no file I/O.
+ZINC_DARK: Theme
+
+
+def _get_zinc_dark() -> Theme:
+    """Resolve the built-in zinc theme lazily on first access."""
+    global _ZINC_DARK
+    if _ZINC_DARK is None:
+        _ZINC_DARK = _ensure_loaded()["zinc"]
+    return _ZINC_DARK
+
+
+def __getattr__(name: str) -> Theme:
+    """Resolve ``ZINC_DARK`` on first access so importing the module does no I/O."""
+    if name == "ZINC_DARK":
+        return _get_zinc_dark()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "DEFAULT_THEME_NAME",

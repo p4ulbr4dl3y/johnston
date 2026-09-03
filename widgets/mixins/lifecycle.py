@@ -51,7 +51,9 @@ class LifecycleMixin:
     def on_mount(self) -> None:
         """Instant focus on start, background catalog refresh and status bar refresh"""
         install_asyncio_exception_handler()
-        from widgets.app.theme_manager import theme_manager
+        from widgets.app.theme_manager import prewarm_terminal_palette, theme_manager
+
+        prewarm_terminal_palette()
         if hasattr(self, 'register_theme'):
             available = getattr(self, 'available_themes', {})
             for t in theme_manager.get_all_textual_themes():

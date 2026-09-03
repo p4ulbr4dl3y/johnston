@@ -95,3 +95,34 @@ class ThemeManager(CoreThemeManager):
 
 theme_manager = ThemeManager.get_instance()
 
+
+def prewarm_terminal_palette() -> None:
+    """Warm the memoized terminal palette off the event loop, fire-and-forget.
+
+    The first ``query_terminal_palette`` call does raw termios setup plus a
+    blocking select/read for up to its timeout, so it must not run on the event
+    loop during the first ANSI render (loading indicator / native theme
+    adaptation). Scheduling it on a worker thread at app mount fills the
+    memoized cache before rendering; any failure is swallowed — the synchronous
+    render path still falls back to the memoized one-time result.
+    """
+    import asyncio
+
+    from core.infrastructure.platform.terminal_theme import query_terminal_palette
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+
+    async def _warm() -> None:
+        try:
+            await asyncio.to_thread(query_terminal_palette)
+        except Exception:
+            pass
+
+    try:
+        loop.create_task(_warm())
+    except Exception:
+        pass
+

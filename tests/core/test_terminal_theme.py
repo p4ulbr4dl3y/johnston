@@ -211,3 +211,25 @@ def test_query_posix_palette_tmux_wrapper(monkeypatch):
     assert bg == "#000000"
     assert fg == "#ffffff"
 
+
+def test_query_terminal_palette_second_call_hits_cache(monkeypatch):
+    import core.infrastructure.platform.terminal_theme as tt
+
+    monkeypatch.delenv("COLORFGBG", raising=False)
+    monkeypatch.setattr(tt.sys, "platform", "linux")
+    monkeypatch.setattr(tt.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(tt.sys.stdout, "isatty", lambda: True)
+    query_calls = []
+
+    def _stub_query(timeout):
+        query_calls.append(timeout)
+        return ("#111111", "#eeeeee")
+
+    monkeypatch.setattr(tt, "_query_posix_palette", _stub_query)
+    tt._CACHED_TERMINAL_COLORS = None
+    assert query_terminal_palette() == ("#111111", "#eeeeee")
+    # Second call (e.g. first ANSI render after the off-loop prewarm) is served
+    # from the memoized cache and never touches the terminal again.
+    assert query_terminal_palette() == ("#111111", "#eeeeee")
+    assert len(query_calls) == 1
+

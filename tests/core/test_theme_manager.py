@@ -501,7 +501,73 @@ def test_is_ansi_theme_returns_false_for_regular_theme():
     assert is_ansi_theme(_make_theme(name="charcoal", bg_app="#18181b")) is False
 
 
+def test_themes_module_import_is_lazy(monkeypatch):
+    """Importing the themes module does no I/O; ZINC_DARK resolves on first access."""
+    import builtins
+    import importlib
+
+    import core.domain.defaults.themes as themes_mod
+
+    real_open = builtins.open
+    opened = []
+
+    def spy_open(*args, **kwargs):
+        opened.append(str(args[0]))
+        return real_open(*args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", spy_open)
+    importlib.reload(themes_mod)
+    assert not [p for p in opened if p.endswith("themes.json")]
+
+    reference = themes_mod.ZINC_DARK
+    assert reference.name == "zinc"
+    assert any(p.endswith("themes.json") for p in opened)
+    assert themes_mod.ZINC_DARK is reference  # memoized after first resolution
+    assert themes_mod.get_theme("zinc") == reference
 
 
+def test_zinc_dark_from_import_still_works():
+    from core.domain.defaults.themes import ZINC_DARK
+
+    assert ZINC_DARK.name == "zinc"
+    assert ZINC_DARK.label == "Zinc Dark"
 
 
+def test_prewarm_terminal_palette_requires_running_loop():
+    """Outside a running event loop the prewarm is a no-op (never blocks)."""
+    from widgets.app.theme_manager import prewarm_terminal_palette
+
+    prewarm_terminal_palette()
+
+
+def test_prewarm_terminal_palette_fire_and_forget(monkeypatch):
+    """The palette query is scheduled on a worker thread and failures are swallowed."""
+    import asyncio
+
+    from core.infrastructure.platform import terminal_theme
+    from widgets.app.theme_manager import prewarm_terminal_palette
+
+    async def run() -> None:
+        to_thread_calls = []
+
+        async def fake_to_thread(fn, *args, **kwargs):
+            to_thread_calls.append(True)
+            return fn(*args, **kwargs)
+
+        monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
+        monkeypatch.setattr(terminal_theme, "query_terminal_palette", lambda: ("#222222", "#ffffff"))
+        prewarm_terminal_palette()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert to_thread_calls == [True]
+
+        # A failure inside the query must not surface as an unhandled task error.
+        def boom() -> tuple[str, str]:
+            raise RuntimeError("no terminal")
+
+        monkeypatch.setattr(terminal_theme, "query_terminal_palette", boom)
+        prewarm_terminal_palette()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+
+    asyncio.run(run())

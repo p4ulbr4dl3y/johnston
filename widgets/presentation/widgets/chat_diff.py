@@ -1,5 +1,7 @@
 import difflib
 import re
+import threading
+from collections import OrderedDict
 from typing import Any
 
 from pygments.lexers import get_lexer_by_name
@@ -179,6 +181,42 @@ GIT_HEADER_PREFIXES = (
     "GIT binary patch",
 )
 
+_LEX_CACHE_MAX = 32
+_lex_cache: OrderedDict[tuple[str, str], tuple[tuple[Text, ...], tuple[Text, ...]]] = OrderedDict()
+_lex_cache_lock = threading.Lock()
+
+
+def _get_lexed_lines(
+    diff_text: str,
+    file_path: str,
+    old_code_lines: list[str],
+    new_code_lines: list[str],
+    lexer: Any,
+) -> tuple[list[Text], list[Text]]:
+    """Lex old/new code lines, reusing the pygments pass for repeated inputs.
+
+    ``format_edit_diff`` is recomputed on every tool-content refresh with the same
+    ``(diff_text, file_path)``; lexing the whole diff buffer is the dominant cost, so
+    identical inputs reuse the previous result. The lexing inputs are fully
+    determined by the two key strings (parsed code lines and the lexer derive from
+    them), and theme coloring/word diffs still recompute on every call. Callers
+    mutate the returned ``Text`` objects (intra-line word diffs), so cache entries
+    are always handed out as copies to keep the stored representation pristine.
+    """
+    key = (diff_text, file_path)
+    with _lex_cache_lock:
+        cached = _lex_cache.get(key)
+        if cached is not None:
+            _lex_cache.move_to_end(key)
+            return ([t.copy() for t in cached[0]], [t.copy() for t in cached[1]])
+    old_texts = lex_block_to_line_texts(old_code_lines, lexer)
+    new_texts = lex_block_to_line_texts(new_code_lines, lexer)
+    with _lex_cache_lock:
+        _lex_cache[key] = (tuple(t.copy() for t in old_texts), tuple(t.copy() for t in new_texts))
+        if len(_lex_cache) > _LEX_CACHE_MAX:
+            _lex_cache.popitem(last=False)
+    return old_texts, new_texts
+
 
 def get_diff_colors(theme: Any = None) -> tuple[str, str, str, str, str]:
     """Return (add_fg, add_bg, remove_fg, remove_bg, gutter) harmonized with active theme."""
@@ -351,8 +389,7 @@ def format_edit_diff(diff_text: str, file_path: str, view_mode: str = "unified")
                 except Exception:
                     pass
 
-    old_texts = lex_block_to_line_texts(old_code_lines, lexer)
-    new_texts = lex_block_to_line_texts(new_code_lines, lexer)
+    old_texts, new_texts = _get_lexed_lines(diff_text, file_path, old_code_lines, new_code_lines, lexer)
 
     diff_add_fg, diff_add_bg, diff_remove_fg, diff_remove_bg, diff_gutter = get_diff_colors()
     diff_add_word_bg, diff_remove_word_bg = get_diff_word_colors()

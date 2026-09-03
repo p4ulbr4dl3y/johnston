@@ -294,4 +294,64 @@ class TestFormatEditDiff(unittest.TestCase):
         self.assertIn("│", exported)
 
 
+def test_format_edit_diff_lex_cache_reuses_identical_inputs(monkeypatch):
+    import widgets.presentation.widgets.chat_diff as cd
+
+    diff = (
+        "--- a/file.py\n"
+        "+++ b/file.py\n"
+        "@@ -1,3 +1,3 @@\n"
+        " def keep():\n"
+        "-    old = 1\n"
+        "+    new = 2\n"
+        "     return\n"
+    )
+    lex_calls = []
+    real_lex = cd.lex_block_to_line_texts
+
+    def spy_lex(code_lines, lexer, **kwargs):
+        lex_calls.append(code_lines)
+        return real_lex(code_lines, lexer, **kwargs)
+
+    monkeypatch.setattr(cd, "lex_block_to_line_texts", spy_lex)
+    with cd._lex_cache_lock:
+        cd._lex_cache.clear()
+    try:
+        first = cd.format_edit_diff(diff, "file.py")
+        assert len(lex_calls) == 2  # old + new code blocks each lexed once
+        second = cd.format_edit_diff(diff, "file.py")
+        assert len(lex_calls) == 2  # identical inputs -> no re-lex
+        assert first.plain == second.plain
+        cd.format_edit_diff(diff, "file.py", view_mode="split")
+        assert len(lex_calls) == 2  # lexed lines are view-mode independent
+        cd.format_edit_diff(diff, "other.py")
+        assert len(lex_calls) == 4  # different file_path -> re-lex
+        cd.format_edit_diff("--- a/f.py\n+++ b/f.py\n@@ -1,1 +1,1 @@\n-a\n+b\n", "file.py")
+        assert len(lex_calls) == 6  # different diff_text -> re-lex
+    finally:
+        with cd._lex_cache_lock:
+            cd._lex_cache.clear()
+
+
+def test_format_edit_diff_lex_cache_never_serves_mutated_texts(monkeypatch):
+    """Word-diff styling must not leak between cache hits (entries are copied out)."""
+    import widgets.presentation.widgets.chat_diff as cd
+
+    diff_a = "--- a/a.py\n+++ b/a.py\n@@ -1,1 +1,1 @@\n-if user_count > 10:\n+if user_count <= 10:\n"
+    with cd._lex_cache_lock:
+        cd._lex_cache.clear()
+    try:
+        first = cd.format_edit_diff(diff_a, "a.py")
+        # First render styles the word-diff spans on the removed/added lines.
+        dl_old = first.formatted_lines[0]
+        assert any("on #5e2129" in s.style for s in dl_old.code._spans)
+        # A repeat with identical inputs must produce the same styled output.
+        second = cd.format_edit_diff(diff_a, "a.py")
+        dl_old2 = second.formatted_lines[0]
+        assert any("on #5e2129" in s.style for s in dl_old2.code._spans)
+    finally:
+        with cd._lex_cache_lock:
+            cd._lex_cache.clear()
+
+
 
