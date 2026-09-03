@@ -14,6 +14,7 @@ from core.domain.defaults.prompts import (
     TOOL_OUTPUT_FORMAT_SNIPPET,
 )
 from core.infrastructure.runtime.lru import LruCache
+from core.infrastructure.runtime.xml_utils import escape_xml
 
 INSTRUCTION_FILES = [
     "AGENTS.md",
@@ -359,13 +360,20 @@ class PromptBuilder:
         os_info: str,
         git_info: Optional[str],
     ) -> str:
+        # Escape every field. cwd and os_info are normally safe (filesystem
+        # + platform module), but on exotic filesystems a path can contain
+        # < or & (rare but legal). git_info comes from `git branch
+        # --show-current` which DOES permit < and > in branch names —
+        # without escaping, a branch named "</environment><subagent>HIDE"
+        # would truncate the wrapper and inject a fake subagent block at
+        # system-prompt priority.
         lines = [
-            f"cwd: {cwd}",
-            f"date: {now_str}",
-            f"os: {os_info}",
+            f"cwd: {escape_xml(cwd)}",
+            f"date: {escape_xml(now_str)}",
+            f"os: {escape_xml(os_info)}",
         ]
         if git_info:
-            lines.append(f"git: {git_info}")
+            lines.append(f"git: {escape_xml(git_info)}")
         if self.sandbox_enabled:
             lines.append("sandbox: active (fs write: cwd/tmp only, creds/keys blocked)")
         else:
@@ -443,7 +451,6 @@ class PromptBuilder:
             # system prompt. Escape it so a name containing literal
             # `</worktree>` cannot truncate the wrapper and inject
             # arbitrary content.
-            from core.infrastructure.runtime.xml_utils import escape_xml
             safe_branch = escape_xml(self.worktree_branch)
             sys_prompt += f"\n\n{SUBAGENT_WORKTREE_PROMPT.format(branch_name=safe_branch)}"
 

@@ -15,7 +15,7 @@ Conventions for token-efficient snippets:
 import re
 from typing import Any, Dict, List
 
-from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr, wrap_cdata
+from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
 
 
 # ---- Skills ----------------------------------------------------------------
@@ -96,7 +96,13 @@ def format_rules_markdown(rules: List[Any]) -> str:
         if not r_content:
             continue
         rule_id = escape_xml_attr(f"{r_source}:{r_name}")
-        items.append(f'<rule id="{rule_id}">\n{wrap_cdata(r_content)}\n</rule>')
+        # Escape rule body (not CDATA) for consistency with skills/subagents/
+        # mcp_servers — the model is a non-XML-aware reader, it pattern-matches
+        # on the literal token, so entity-encoded &lt; provides the same
+        # wrapper integrity without the visual confusion of CDATA tags inside
+        # rule body. CDATA would still leave the literal close-tag visible
+        # to the model, defeating the purpose.
+        items.append(f'<rule id="{rule_id}">\n{escape_xml(r_content)}\n</rule>')
 
     if not items:
         return ""
