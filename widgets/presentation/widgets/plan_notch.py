@@ -9,6 +9,7 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
+from core.application.session.actions import restore_plan_from_messages
 from widgets.presentation.widgets.footer_layout import format_hint, get_theme_colors
 from widgets.utils.row_format import display_width, ellipsize
 
@@ -16,6 +17,55 @@ from widgets.utils.row_format import display_width, ellipsize
 class PlanItem(TypedDict, total=False):
     step: str
     status: str
+
+
+extract_active_plan_from_messages = restore_plan_from_messages
+
+
+class PlanActionsMixin:
+    """Shared plan notch actions and update handlers for screens and JohnstonApp."""
+
+    def action_toggle_plan(self) -> None:
+        """Toggle expansion of the top plan notch widget."""
+        try:
+            notches = list(self.query(PlanNotch))
+            if not notches and hasattr(self, "screen") and self.screen:
+                notches = list(self.screen.query(PlanNotch))
+            if not notches:
+                return
+            notch = notches[0]
+            if not notch.plan_items:
+                if hasattr(self, "notify"):
+                    self.notify("No active plan", severity="information")
+                return
+            notch.toggle_expanded()
+        except Exception:
+            pass
+
+    def action_toggle_plan_hidden(self) -> None:
+        """Toggle visibility/hidden state of the top plan notch widget."""
+        try:
+            notches = list(self.query(PlanNotch))
+            if not notches and hasattr(self, "screen") and self.screen:
+                notches = list(self.screen.query(PlanNotch))
+            if notches:
+                notches[0].toggle_hidden()
+        except Exception:
+            pass
+
+    def on_plan_update(self, plan: list[dict], explanation: str = "") -> None:
+        """Handle plan update event from update_plan tool."""
+        validated_plan = [p for p in plan if isinstance(p, dict)] if isinstance(plan, list) else []
+        self.current_plan = validated_plan
+        self.current_plan_explanation = str(explanation or "").strip()
+        try:
+            notches = list(self.query(PlanNotch))
+            if not notches and hasattr(self, "screen") and self.screen:
+                notches = list(self.screen.query(PlanNotch))
+            for notch in notches:
+                notch.set_plan(validated_plan, str(explanation or "").strip())
+        except Exception:
+            pass
 
 
 class PlanNotch(Static):

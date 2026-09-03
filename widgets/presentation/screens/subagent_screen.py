@@ -7,12 +7,17 @@ from textual.screen import ModalScreen
 from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
-from widgets.presentation.widgets.plan_notch import PlanNotch, PlanNotchContainer
+from widgets.presentation.widgets.plan_notch import (
+    PlanActionsMixin,
+    PlanNotch,
+    PlanNotchContainer,
+    extract_active_plan_from_messages,
+)
 from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 from widgets.utils.key_aliases import expand_bindings
 
 
-class SubagentViewScreen(ModalScreen[None]):
+class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
     """Full-screen view of a subagent's chat without input panel."""
 
     inherit_bindings = False
@@ -84,25 +89,6 @@ class SubagentViewScreen(ModalScreen[None]):
             yield ChatView(id="subagent-chat-view", show_welcome=False)
             yield SubagentStatusFooter(from_tasks=self.from_tasks, id="subagent-status-footer")
 
-    def action_toggle_plan(self) -> None:
-        """Toggle expansion of the top plan notch widget."""
-        try:
-            notch = self.query_one(PlanNotch)
-            if not notch.plan_items:
-                self.notify("No active plan", severity="information")
-                return
-            notch.toggle_expanded()
-        except Exception:
-            pass
-
-    def action_toggle_plan_hidden(self) -> None:
-        """Toggle visibility/hidden state of the top plan notch widget."""
-        try:
-            notch = self.query_one(PlanNotch)
-            notch.toggle_hidden()
-        except Exception:
-            pass
-
     def on_mount(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
         chat_view.focus()
@@ -170,10 +156,7 @@ class SubagentViewScreen(ModalScreen[None]):
             pass
 
     def _on_plan_update(self, plan: list, explanation: str) -> None:
-        try:
-            self.query_one(PlanNotch).set_plan(plan, explanation)
-        except Exception:
-            pass
+        self.on_plan_update(plan, explanation)
 
     async def _load_history_session(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
@@ -190,7 +173,7 @@ class SubagentViewScreen(ModalScreen[None]):
         self.driver = ChatStreamDriver(
             chat_view,
             on_tool_widget=lambda w: setattr(self, "_last_tool_widget", w),
-            on_plan_update=self._on_plan_update,
+            on_plan_update=self.on_plan_update,
         )
 
         is_running = bool(self.session and getattr(self.session, "status", "") == "running")
@@ -218,15 +201,33 @@ class SubagentViewScreen(ModalScreen[None]):
                 for e in history_events
             )
             if not has_user_msg and getattr(self.session, "prompt", None):
-                await chat_view.add_user_message(self.session.prompt, animate=False)
+                history_events.insert(0, {"type": "user", "text": self.session.prompt})
 
-            for idx, evt in enumerate(history_events):
-                is_last_running = is_running and (idx == len(history_events) - 1)
+            raw_page_size = getattr(chat_view, "PAGE_SIZE", 50)
+            page_size = raw_page_size if isinstance(raw_page_size, int) else 50
+            if len(history_events) > page_size:
+                chat_view._unloaded_messages = history_events[:-page_size]
+                events_to_render = history_events[-page_size:]
+            else:
+                chat_view._unloaded_messages = []
+                events_to_render = history_events
+
+            for idx, evt in enumerate(events_to_render):
+                is_last_running = is_running and (idx == len(events_to_render) - 1)
                 await self.driver.consume_session_event(
                     evt,
                     animate=is_last_running,
                     is_active=is_last_running,
                 )
+
+            # Restore active plan from transcript if present
+            plan_data = extract_active_plan_from_messages(self.session.messages)
+            if plan_data:
+                p_items, p_expl = plan_data
+                try:
+                    self.query_one(PlanNotch).set_plan(p_items, p_expl)
+                except Exception:
+                    pass
 
         for idx, child in enumerate(chat_view.children):
             if idx in expand_state and hasattr(child, "set_expanded"):
@@ -246,26 +247,7 @@ class SubagentViewScreen(ModalScreen[None]):
         if not self.is_mounted:
             return
 
-        if self.session:
-            has_subsequent_user_msg = False
-            for evt in reversed(self.session.messages or []):
-                if not isinstance(evt, dict):
-                    continue
-                etype = evt.get("type")
-                if etype == "user":
-                    has_subsequent_user_msg = True
-                elif etype == "tool" and evt.get("tool_type") == "update_plan":
-                    args = evt.get("args") or {}
-                    if isinstance(args, dict) and args.get("plan"):
-                        p_items = [p for p in args.get("plan", []) if isinstance(p, dict)]
-                        if p_items and all(p.get("status") == "completed" for p in p_items) and has_subsequent_user_msg:
-                            break
-                        try:
-                            self.query_one(PlanNotch).set_plan(p_items, args.get("explanation", ""))
-                        except Exception:
-                            pass
-                        break
-            self._refresh_chrome()
+        self._refresh_chrome()
 
     def on_unmount(self) -> None:
         self._save_expand_state()

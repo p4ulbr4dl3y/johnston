@@ -14,14 +14,17 @@ from core.domain.entities.session import AgentSession, SessionStatus
 logger = logging.getLogger(__name__)
 
 
-def _sync_subagent_metrics(session: AgentSession, subagent: Any) -> None:
-    """Copy token/cost metrics from the live subagent onto its session record."""
+def sync_session_metrics(session: AgentSession, agent: Any) -> None:
+    """Copy token/cost metrics from the live agent onto its session record."""
     for attr in ("tokens_input", "tokens_output", "total_tokens", "cost_usd", "last_context_tokens"):
-        setattr(session, attr, getattr(subagent, attr, getattr(session, attr)))
+        setattr(session, attr, getattr(agent, attr, getattr(session, attr)))
 
 
-def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: list) -> None:
-    """Records a subagent execution step into the session in canonical message format.
+_sync_subagent_metrics = sync_session_metrics
+
+
+def record_session_step(step: tuple, session: AgentSession, text_accumulator: list) -> None:
+    """Records an agent execution step into the session in canonical message format.
 
     Raw stream events (thinking_start/delta/end, bot_delta/text,
     tool_result) are canonicalized here into shared types (thinking/bot/tool)
@@ -82,6 +85,9 @@ def record_subagent_step(step: tuple, session: AgentSession, text_accumulator: l
         session.add_event({"type": "event_divider", "text": val1 or "Session Compacted"})
     elif etype == "error":
         session.add_event({"type": "error", "text": val1 or "Error"})
+
+
+record_subagent_step = record_session_step
 
 
 def configure_subagent_agent(

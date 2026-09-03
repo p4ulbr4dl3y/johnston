@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Optional
 
-from core.application.session.stream import record_subagent_step
+from core.application.session.stream import record_session_step
 from core.domain.defaults.errors import parse_stream_step
 from core.domain.policies.messages import (
     SYSTEM_NOTICE_KIND_INTERRUPTED,
@@ -280,7 +280,7 @@ async def generate_ai_response(
                         canvas, session_id, project_path, checkpoint_manager=checkpoint_manager
                     )
             else:
-                record_subagent_step(step, session, transcript_acc)
+                record_session_step(step, session, transcript_acc)
 
             await driver.consume_stream_step(step)
 

@@ -54,7 +54,10 @@ class SessionPersistenceMixin:
         try:
             from widgets.presentation.widgets.plan_notch import PlanNotch
 
-            self.query_one(PlanNotch).clear_plan()
+            notches = list(self.query(PlanNotch)) if hasattr(self, "query") else []
+            for n in notches:
+                if hasattr(n, "clear_plan"):
+                    n.clear_plan()
         except Exception:
             pass
 

@@ -502,21 +502,51 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.2)
             self.assertIn("and more", screen.bot_msg.content or screen.bot_msg._join_stream_content())
 
-    async def test_subagent_screen_active_thinking_default_collapsed(self):
-        sess = self._mk("task-active-think", "Think Agent", "Subagent Prompt")
-        sess.status = "running"
-        sess.add_event({"type": "thinking", "text": "Currently thinking"})
+    async def test_subagent_screen_pagination_and_plan(self):
+        sess = self._mk("task-paginated-plan", "Paginated Agent", "Subagent Prompt")
+        sess.status = "completed"
+        # Add 60 tool events to trigger pagination (PAGE_SIZE default is 50)
+        for i in range(60):
+            sess.add_event({
+                "type": "tool",
+                "tool_type": "shell",
+                "target": f"echo {i}",
+                "result_text": f"res {i}",
+                "status": "done",
+            })
+        sess.add_event({
+            "type": "tool",
+            "tool_type": "update_plan",
+            "args": {
+                "plan": [{"step": "Task 1", "status": "completed"}, {"step": "Task 2", "status": "in_progress"}],
+                "explanation": "Working on task 2",
+            },
+        })
 
-        screen = SubagentViewScreen("task-active-think")
+        screen = SubagentViewScreen("task-paginated-plan")
         app = DummyHostApp(screen, store=self.store)
 
         async with app.run_test() as pilot:
-            await pilot.pause(0.2)
-            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+            if getattr(screen, "_history_worker", None):
+                await screen._history_worker.wait()
+            await pilot.pause(0.1)
+            chat_view = screen.query_one(ChatView)
+            from widgets.presentation.widgets.plan_notch import PlanNotch
 
-            tw = screen.query_one(ThinkingWidget)
-            self.assertIsNotNone(tw)
-            self.assertFalse(tw.is_expanded)
+            notch = screen.query_one(PlanNotch)
+            self.assertTrue(notch.display)
+            self.assertEqual(len(notch.plan_items), 2)
+            self.assertEqual(notch.plan_explanation, "Working on task 2")
+
+            # Verify pagination state
+            self.assertTrue(chat_view.has_older_messages())
+            self.assertTrue(len(chat_view._unloaded_messages) > 0)
+
+            # Test plan toggle actions from PlanActionsMixin
+            screen.action_toggle_plan()
+            self.assertTrue(notch.is_expanded)
+            screen.action_toggle_plan_hidden()
+            self.assertFalse(notch.display)
 
 
 if __name__ == "__main__":

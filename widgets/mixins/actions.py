@@ -6,9 +6,10 @@ from textual import events
 from widgets.chat_input import ChatInput
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.presentation.widgets.chat_welcome import WelcomeWidget
+from widgets.presentation.widgets.plan_notch import PlanActionsMixin
 
 
-class ActionsMixin:
+class ActionsMixin(PlanActionsMixin):
     """Actions and pointer/selection event handlers for JohnstonApp."""
 
     def action_toggle_role(self) -> None:
@@ -43,51 +44,6 @@ class ActionsMixin:
         try:
             chat_view = self.query_one(ChatView)
             chat_view.toggle_expand("all")
-        except Exception:
-            pass
-
-    def action_toggle_plan(self) -> None:
-        """Toggle expansion of the top plan notch widget"""
-        try:
-            from widgets.presentation.widgets.plan_notch import PlanNotch
-
-            notches = list(self.query(PlanNotch))
-            if not notches and hasattr(self, "screen") and self.screen:
-                notches = list(self.screen.query(PlanNotch))
-            if not notches:
-                return
-            notch = notches[0]
-            if not notch.plan_items:
-                if hasattr(self, "notify"):
-                    self.notify("No active plan", severity="information")
-                return
-            notch.toggle_expanded()
-        except Exception:
-            pass
-
-    def action_toggle_plan_hidden(self) -> None:
-        """Toggle visibility/hidden state of the top plan notch widget"""
-        try:
-            from widgets.presentation.widgets.plan_notch import PlanNotch
-
-            notch = self.query_one(PlanNotch)
-            notch.toggle_hidden()
-        except Exception:
-            pass
-
-    def on_plan_update(self, plan: list[dict], explanation: str = "") -> None:
-        """Handle plan update event from update_plan tool."""
-        validated_plan = [p for p in plan if isinstance(p, dict)] if isinstance(plan, list) else []
-        self.current_plan = validated_plan
-        self.current_plan_explanation = str(explanation or "").strip()
-        try:
-            from widgets.presentation.widgets.plan_notch import PlanNotch
-
-            notches = list(self.query(PlanNotch))
-            if not notches and hasattr(self, "screen") and self.screen:
-                notches = list(self.screen.query(PlanNotch))
-            for notch in notches:
-                notch.set_plan(validated_plan, self.current_plan_explanation)
         except Exception:
             pass
 
