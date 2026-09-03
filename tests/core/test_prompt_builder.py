@@ -26,7 +26,7 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("System prompt test", [], role="explorer")
         sys_prompt = builder.build_system_prompt()
         self.assertIn('<role name="explorer"', sys_prompt)
-        self.assertIn("Read-Only", sys_prompt)
+        self.assertIn("Read-only", sys_prompt)
         self.assertIn("sandbox: active (fs write: cwd/tmp only, creds/keys blocked)", sys_prompt)
 
     def test_build_tools_explorer_mode_filters_create_edit(self):
@@ -142,7 +142,7 @@ class TestPromptBuilder(unittest.TestCase):
         builder = PromptBuilder("Subagent base prompt", [], role="orchestrator", is_subagent=True)
         prompt = builder.build_system_prompt()
         self.assertIn("Subagent base prompt", prompt)
-        self.assertNotIn('<role name="orchestrator"', prompt)
+        self.assertIn('<role name="orchestrator"', prompt)
         self.assertNotIn("<subagents>", prompt)
         self.assertIn("<environment", prompt)
 
@@ -177,10 +177,10 @@ class TestPromptBuilder(unittest.TestCase):
             worktree_branch="feature-x",
         )
         prompt = builder.build_system_prompt()
-        self.assertIn("<worktree_guidelines>", prompt)
-        self.assertIn("branch 'feature-x'", prompt)
-        self.assertIn("NEVER modify files in parent repository paths", prompt)
-        self.assertIn("DO NOT switch branches", prompt)
+        self.assertIn("<worktree>", prompt)
+        self.assertIn("Branch: `feature-x`", prompt)
+        self.assertIn("Relative paths ONLY", prompt)
+        self.assertIn("git checkout/switch", prompt)
 
 
     def test_build_system_prompt_all_instruction_formats(self):

@@ -287,10 +287,10 @@ def test_build_system_prompt_deterministic_same_run():
     assert b1.build_system_prompt() == b2.build_system_prompt()
 
 
-def test_build_system_prompt_subagent_no_role_prompt_injected():
+def test_build_system_prompt_subagent_injects_role_prompt():
     b = PromptBuilder("Base", [], role="orchestrator", is_subagent=True)
     out = b.build_system_prompt()
-    assert '<role name="orchestrator"' not in out
+    assert '<role name="orchestrator"' in out
 
 
 # ---------------------------------------------------------------------------
@@ -334,7 +334,7 @@ def test_project_snippet_cached_until_mtime_change(tmp_path):
 
     out1 = pb.get_project_instructions_snippet(str(tmp_path))
     out2 = pb.get_project_instructions_snippet(str(tmp_path))
-    assert '<rule id="project:AGENTS.md">\n<![CDATA[\nv1\n]]>\n</rule>' in out1
+    assert '<rule id="project:AGENTS.md">\nv1\n</rule>' in out1
     assert out1 == out2
 
     # Cache populated for this cwd after the reads.
