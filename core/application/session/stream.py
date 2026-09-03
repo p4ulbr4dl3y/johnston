@@ -9,7 +9,7 @@ import logging
 from typing import Any, Callable, Optional
 
 from core.domain.defaults.errors import ToolResult, parse_stream_step, parse_tool_result_step
-from core.domain.entities.session import AgentSession, SessionStatus
+from core.domain.entities.session import AgentSession, SessionStatus, record_session_interruption
 
 logger = logging.getLogger(__name__)
 
@@ -210,21 +210,7 @@ async def _run_single_subagent_message(
     except asyncio.CancelledError:
         acc[0] = "[Subagent cancelled]"
         _sync_subagent_metrics(session, subagent)
-        if (
-            hasattr(session, "messages")
-            and session.messages
-            and session.messages[-1].get("type") == "tool"
-            and "result_text" not in session.messages[-1]
-        ):
-            session.add_event({
-                "type": "tool",
-                "result_text": "[interrupted | tool cancelled]",
-                "status": "cancelled",
-            })
-        try:
-            session.add_event({"type": "event_divider", "text": "Response Interrupted"})
-        except Exception:
-            pass
+        record_session_interruption(session, "Response Interrupted")
         session.finish(SessionStatus.CANCELLED, "Cancelled by user")
         try:
             await _safe_save(store, session)
@@ -235,6 +221,7 @@ async def _run_single_subagent_message(
         # _safe_save). A failure to persist must not leave a COMPLETED status.
         acc[0] = f"[{error_prefix}: {err}]"
         _sync_subagent_metrics(session, subagent)
+        record_session_interruption(session, "Response Interrupted")
         session.finish(SessionStatus.ERROR, str(err))
         try:
             await _safe_save(store, session)

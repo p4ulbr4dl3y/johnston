@@ -18,6 +18,7 @@ from typing import Any, Callable, Optional
 
 from core.application.session.stream import record_session_step
 from core.domain.defaults.errors import parse_stream_step
+from core.domain.entities.session import record_session_interruption
 from core.domain.policies.messages import (
     SYSTEM_NOTICE_KIND_INTERRUPTED,
     format_system_note,
@@ -392,22 +393,7 @@ async def _handle_interruption(
             h.mark_cancelled()
         except Exception:  # noqa: BLE001
             pass
-    if session and hasattr(session, "add_event"):
-        if hasattr(session, "messages") and session.messages:
-            for msg in session.messages:
-                if isinstance(msg, dict) and msg.get("type") == "tool" and "result_text" not in msg:
-                    try:
-                        session.add_event({
-                            "type": "tool",
-                            "result_text": "[interrupted | tool cancelled]",
-                            "status": "cancelled",
-                        })
-                    except Exception:  # noqa: BLE001
-                        pass
-        try:
-            session.add_event({"type": "event_divider", "text": "Response Interrupted"})
-        except Exception:  # noqa: BLE001
-            pass
+    record_session_interruption(session, "Response Interrupted")
     try:
         await canvas.add_event_divider("Response Interrupted")
     except Exception:  # noqa: BLE001

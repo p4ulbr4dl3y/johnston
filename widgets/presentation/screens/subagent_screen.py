@@ -229,6 +229,8 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
                     animate=is_last_running,
                     is_active=is_last_running,
                 )
+            if not is_running and self.driver:
+                self.driver.finalize_thinking_stream()
 
             # Restore active plan from transcript if present
             plan_data = extract_active_plan_from_messages(self.session.messages)
@@ -350,6 +352,7 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
             if hasattr(self.session, "finish"):
                 self.session.finish("cancelled", "Terminated from subagent view")
             if self.driver:
+                self.driver.finalize_thinking_stream()
                 while self.driver.tool_handles:
                     w = self.driver.tool_handles.popleft()
                     if hasattr(w, "mark_cancelled"):

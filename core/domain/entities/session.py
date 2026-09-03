@@ -224,6 +224,30 @@ class AgentSession:
         self.status = status
         self.add_event({"type": MessageType.STATUS_CHANGE.value, "status": status, "error": error_msg})
 
+    def record_interruption(self, divider_text: str = "Response Interrupted") -> None:
+        """Finalize any in-flight tool or thinking events and append an interruption divider."""
+        if self.messages:
+            for msg in reversed(self.messages):
+                if isinstance(msg, dict):
+                    if msg.get("type") == MessageType.TOOL.value and "result_text" not in msg:
+                        self.add_event({
+                            "type": MessageType.TOOL.value,
+                            "result_text": "[interrupted | tool cancelled]",
+                            "status": "cancelled",
+                        })
+                    elif msg.get("type") == MessageType.THINKING.value and "duration" not in msg:
+                        self.add_event({
+                            "type": MessageType.THINKING.value,
+                            "duration": 0.0,
+                        })
+                    else:
+                        break
+        try:
+            self.add_event({"type": MessageType.EVENT_DIVIDER.value, "text": divider_text})
+        except Exception:
+            pass
+
+
     # -- persistence -------------------------------------------------------
 
     def _history(self) -> List[Dict[str, Any]]:
@@ -394,4 +418,40 @@ class AgentSession:
                 return sess
         except Exception:
             return None
+
+
+def record_session_interruption(session: Any, divider_text: str = "Response Interrupted") -> None:
+    """Unify cancellation/interruption finalization across main agent and subagents."""
+    if not session:
+        return
+    if isinstance(session, AgentSession):
+        session.record_interruption(divider_text)
+        return
+    if hasattr(session, "messages") and session.messages:
+        for msg in reversed(session.messages):
+            if isinstance(msg, dict):
+                if msg.get("type") == MessageType.TOOL.value and "result_text" not in msg:
+                    try:
+                        session.add_event({
+                            "type": MessageType.TOOL.value,
+                            "result_text": "[interrupted | tool cancelled]",
+                            "status": "cancelled",
+                        })
+                    except Exception:
+                        pass
+                elif msg.get("type") == MessageType.THINKING.value and "duration" not in msg:
+                    try:
+                        session.add_event({
+                            "type": MessageType.THINKING.value,
+                            "duration": 0.0,
+                        })
+                    except Exception:
+                        pass
+                else:
+                    break
+    if hasattr(session, "add_event"):
+        try:
+            session.add_event({"type": MessageType.EVENT_DIVIDER.value, "text": divider_text})
+        except Exception:
+            pass
 

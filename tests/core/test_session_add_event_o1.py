@@ -187,3 +187,27 @@ def test_tracker_not_persisted(sess):
     assert "next_unmatched" not in json.dumps(sess.to_dict())
     assert not any("_next_unmatched_tool_idx" in k for k in _walk_keys(lines))
     assert not any("_next_unmatched_tool_idx" in k for k in _walk_keys(sess.to_dict()))
+
+
+def test_record_interruption_finalizes_tool_and_thinking(sess):
+    from core.domain.entities.session import record_session_interruption
+
+    _add_tool(sess, "edit.py")
+    sess.add_event({"type": "thinking", "text": "pondering"})
+
+    record_session_interruption(sess, "Response Interrupted")
+
+    # Tool is cancelled
+    tool_msg = next(m for m in sess.messages if m.get("type") == "tool")
+    assert tool_msg["status"] == "cancelled"
+    assert tool_msg["result_text"] == "[interrupted | tool cancelled]"
+
+    # Thinking has duration
+    think_msg = next(m for m in sess.messages if m.get("type") == "thinking")
+    assert think_msg["duration"] == 0.0
+
+    # Interrupted event divider added
+    divider = sess.messages[-1]
+    assert divider["type"] == "event_divider"
+    assert divider["text"] == "Response Interrupted"
+

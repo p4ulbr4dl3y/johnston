@@ -593,6 +593,49 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             screen.action_toggle_plan_hidden()
             self.assertFalse(notch.display)
 
+    async def test_subagent_screen_interrupted_thinking_finalizes(self):
+        sess = self._mk("task-interrupt-think", "Interrupt Think", "prompt")
+        sess.status = "cancelled"
+        sess.add_event({"type": "thinking", "text": "partial reasoning..."})
+        sess.add_event({"type": "event_divider", "text": "Response Interrupted"})
+
+        screen = SubagentViewScreen("task-interrupt-think")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            if getattr(screen, "_history_worker", None):
+                await screen._history_worker.wait()
+            await pilot.pause(0.1)
+            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+
+            tw = screen.query_one(ThinkingWidget)
+            self.assertFalse(tw.is_thinking)
+            rendered = str(tw.header_label.render())
+            self.assertNotIn("ctrl+o", rendered)
+            self.assertIn("Thought for", rendered)
+
+    async def test_subagent_kill_finalizes_thinking(self):
+        sess = self._mk("task-kill-think", "Kill Think", "prompt")
+        sess.status = "running"
+        sess.add_event({"type": "thinking", "text": "actively thinking..."})
+
+        screen = SubagentViewScreen("task-kill-think")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            if getattr(screen, "_history_worker", None):
+                await screen._history_worker.wait()
+            await pilot.pause(0.1)
+            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+
+            tw = screen.query_one(ThinkingWidget)
+            self.assertTrue(tw.is_thinking)
+
+            screen.action_kill_subagent()
+            self.assertFalse(tw.is_thinking)
+            rendered = str(tw.header_label.render())
+            self.assertNotIn("ctrl+o", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

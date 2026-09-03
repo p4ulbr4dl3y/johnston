@@ -522,6 +522,19 @@ class TestSafeSaves:
             for m in sess.messages
         )
 
+    @pytest.mark.asyncio
+    async def test_cancelled_subagent_finalizes_active_thinking(self):
+        sub = FakeSubagent(exc=asyncio.CancelledError())
+        sess = make_session()
+        sess.add_event({"type": "thinking", "text": "in progress"})
+        ctx = FakeCtx()
+        await run_subagent_stream_bg(sub, "p", sess, ctx, FakeStore())
+        assert sess.status == STATUS_CANCELLED
+        think_msg = next(m for m in sess.messages if m.get("type") == "thinking")
+        assert "duration" in think_msg
+        assert think_msg["duration"] == 0.0
+
+
 
 # ---------------------------------------------------------------------------
 # configure_subagent_agent

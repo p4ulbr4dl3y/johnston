@@ -39,10 +39,20 @@ class ChatStreamDriver:
         self.thinking_handle: Optional[ThinkingWidget] = None
         self.tool_handles: collections.deque[ToolCallWidget] = collections.deque()
 
+    def finalize_thinking_stream(self, duration: float = 0.0, content: str = "") -> None:
+        """Finalize any in-flight thinking widget."""
+        if self.thinking_handle is not None:
+            if hasattr(self.thinking_handle, "finish_thinking"):
+                try:
+                    self.thinking_handle.finish_thinking(duration, content)
+                except Exception:
+                    pass
+            self.thinking_handle = None
+
     def reset(self) -> None:
         """Reset internal handles and queue state."""
+        self.finalize_thinking_stream()
         self.bot_handle = None
-        self.thinking_handle = None
         self.tool_handles.clear()
 
     async def finalize_bot_stream(self) -> None:
@@ -96,6 +106,7 @@ class ChatStreamDriver:
                     self.thinking_handle.finish_thinking(duration, val2)
             self.thinking_handle = None
         elif event_type == "tool":
+            self.finalize_thinking_stream()
             await self.finalize_bot_stream()
             targs = val3 if isinstance(val3, dict) else {}
             tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs)
@@ -131,6 +142,7 @@ class ChatStreamDriver:
                         break
                 logger.debug("Received tool_result step with empty tool_handles queue: %s", val1)
         elif event_type == "bot_delta":
+            self.finalize_thinking_stream()
             if val1:
                 if self.bot_handle is None:
                     self.bot_handle = await self.chat_view.add_bot_message()
@@ -172,6 +184,7 @@ class ChatStreamDriver:
                 except Exception:
                     pass
         elif event_type in ("bot_text", "outro"):
+            self.finalize_thinking_stream()
             if val1.strip():
                 if self.bot_handle is None:
                     self.bot_handle = await self.chat_view.add_bot_message()
@@ -183,9 +196,11 @@ class ChatStreamDriver:
             else:
                 await self.finalize_bot_stream()
         elif event_type == "error":
+            self.finalize_thinking_stream()
             err_text = val1 or "Error"
             await self.chat_view.add_error_message(err_text)
         elif event_type == "event_divider":
+            self.finalize_thinking_stream()
             div_text = val1 or "Session Compacted"
             await self.chat_view.add_event_divider(div_text)
 
@@ -222,11 +237,15 @@ class ChatStreamDriver:
             else:
                 if hasattr(self.thinking_handle, "update_thinking"):
                     self.thinking_handle.update_thinking(txt)
-            if evt.get("duration") is not None:
+            if evt.get("duration") is not None or not is_active:
+                dur = evt.get("duration")
+                if dur is None or not math.isfinite(dur):
+                    dur = 0.0
                 if hasattr(self.thinking_handle, "finish_thinking"):
-                    self.thinking_handle.finish_thinking(evt.get("duration", 0.0), txt)
+                    self.thinking_handle.finish_thinking(dur, txt)
                 self.thinking_handle = None
         elif etype == "tool":
+            self.finalize_thinking_stream()
             # Check if this event is a completion event for an in-flight tool
             if "result_text" in evt and not evt.get("tool_type"):
                 while self.tool_handles:
@@ -277,6 +296,7 @@ class ChatStreamDriver:
                 if "result_text" not in evt and evt.get("status") not in ("done", "error", "cancelled"):
                     self.tool_handles.append(widget)
         elif etype == "bot":
+            self.finalize_thinking_stream()
             txt = evt.get("text", "")
             if not animate and not is_active and not txt.strip():
                 return
@@ -301,6 +321,8 @@ class ChatStreamDriver:
                 except Exception:
                     pass
         elif etype == "error":
+            self.finalize_thinking_stream()
             await self.chat_view.add_error_message(evt.get("text", "Error"), animate=animate)
         elif etype == "event_divider":
+            self.finalize_thinking_stream()
             await self.chat_view.add_event_divider(evt.get("text", "Session Compacted"), animate=animate)
