@@ -463,7 +463,30 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
         self.assertTrue("required for 'send_message'" in res_msg or "required for &apos;send_message&apos;" in res_msg)
         self.assertTrue("manage_subagent(action='list')" in res_msg or "manage_subagent(action=&apos;list&apos;)" in res_msg)
 
+    async def test_manage_subagent_consecutive_list_polling_circuit_breaker(self):
+        sess = self._mk_subagent("sub-poll-1", role="worker")
+        app, _ = self._app_with_widget(sess)
+        tool = ManageSubagentTool()
+
+        # First two list calls succeed
+        res1 = await tool.execute({"action": "list"}, ctx=app)
+        self.assertFalse(res1.is_error)
+        res2 = await tool.execute({"action": "list"}, ctx=app)
+        self.assertFalse(res2.is_error)
+
+        # 3rd consecutive call with identical status triggers circuit breaker
+        res3 = await tool.execute({"action": "list"}, ctx=app)
+        self.assertTrue(res3.is_error)
+        self.assertIn("Consecutive polling of", res3.content)
+        self.assertIn("is blocked", res3.content)
+
+        # Non-list action resets breaker
+        await tool.execute({"action": "kill", "session_id": "sub-poll-1"}, ctx=app)
+        res4 = await tool.execute({"action": "list"}, ctx=app)
+        self.assertFalse(res4.is_error)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

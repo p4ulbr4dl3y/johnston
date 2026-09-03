@@ -210,7 +210,5 @@ Pagination: `[<p> | lines N..M of T]` then `N|line content`. Use `read(path, sta
 
 Plan progress: `[plan updated | N/M done | <explanation>]`. Plan persists; do not re-emit.
 
-Backgrounded: `[task backgrounded by user | id X | log Y]` means process actively runs in background. DO NOT re-execute the command. System wakes you with `<notification type="shell">` on finish.
-
 Subagent notify: `result_text` is parent view of subagent report. session_id is correlation key.
 </tool_io_reference>"""

@@ -58,6 +58,25 @@ class ManageSubagentTool(BaseTool):
 
         if action == "list":
             target_sessions = store.children(curr_session_id) if curr_session_id else store.list(kind="subagent")
+            fp = [(str(getattr(s, "id", "")), str(getattr(s, "status", ""))) for s in (target_sessions or [])]
+            last_fp = getattr(self, "_last_list_fp", None)
+            count = getattr(self, "_consecutive_list_count", 0)
+            if last_fp == fp and count >= 2:
+                return ToolResult.error(
+                    "execute",
+                    detail=(
+                        "Consecutive polling of 'list' is blocked. Subagent status has not changed. "
+                        "The system automatically wakes you with <notification type='subagent'> on finish. "
+                        "Stop calling tools to wait."
+                    ),
+                    name="manage_subagent",
+                )
+            if last_fp == fp:
+                self._consecutive_list_count = count + 1
+            else:
+                self._last_list_fp = fp
+                self._consecutive_list_count = 1
+
             if not target_sessions:
                 return ToolResult.done(
                     content="[subagents 0]",
@@ -96,6 +115,8 @@ class ManageSubagentTool(BaseTool):
 
             content_txt = f"[subagents {len(target_sessions)} | id|status|role|title]\n" + "\n".join(items)
             return ToolResult.done(content=content_txt, display="")
+
+        self._consecutive_list_count = 0
 
         if not session_id:
             return ToolResult.error(

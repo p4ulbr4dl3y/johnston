@@ -57,8 +57,29 @@ class ManageShellTool(BaseTool):
         tasks = filter_to_session(tasks, curr_sid)
 
         if action == "list":
+            fp = [(getattr(t, "id", None), getattr(t, "is_running", None)) for t in (tasks or [])]
+            last_fp = getattr(self, "_last_list_fp", None)
+            count = getattr(self, "_consecutive_list_count", 0)
+            if last_fp == fp and count >= 2:
+                return ToolResult.error(
+                    "execute",
+                    detail=(
+                        "Consecutive polling of 'list' is blocked. Task status has not changed. "
+                        "The system automatically wakes you with <notification type='shell'> on exit. "
+                        "Stop calling tools to wait."
+                    ),
+                    name="manage_shell",
+                )
+            if last_fp == fp:
+                self._consecutive_list_count = count + 1
+            else:
+                self._last_list_fp = fp
+                self._consecutive_list_count = 1
+
             content_plain = format_tasks_plain(tasks)
             return ToolResult.done(content=content_plain, display="")
+
+        self._consecutive_list_count = 0
 
         if action == "send_input":
             if not task_id:
