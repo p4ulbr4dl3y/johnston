@@ -258,14 +258,34 @@ class MCPClientBase:
 
     @staticmethod
     def _format_content(result: Any) -> str:
-        """Serialize a tools/call result ``content`` list into one output string."""
+        """Serialize a tools/call result ``content`` list into one output string.
+
+        All string fields are XML-escaped so a malicious MCP server cannot
+        inject synthetic-message tags (``<system_note>``, ``<notification>``,
+        ``<compaction_checkpoint>``) into the model's view via tool output.
+        The model pattern-matches on these tags; without escaping, a
+        server could make the model skip pending tool calls (kind=interrupted)
+        or otherwise misbehave. JSON wrappers around non-text payloads
+        keep the structured shape but escape string values inside.
+        """
+        from core.infrastructure.runtime.xml_utils import escape_xml
+
+        def _scrub(value: Any) -> Any:
+            if isinstance(value, str):
+                return escape_xml(value)
+            if isinstance(value, dict):
+                return {k: _scrub(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [_scrub(v) for v in value]
+            return value
+
         content_items = result.get("content", []) if isinstance(result, dict) else []
         output_parts = []
         for item in content_items:
             if isinstance(item, dict) and item.get("type") == "text":
-                output_parts.append(item.get("text", ""))
+                output_parts.append(escape_xml(str(item.get("text", ""))))
             else:
-                output_parts.append(json.dumps(item, ensure_ascii=False))
+                output_parts.append(json.dumps(_scrub(item), ensure_ascii=False))
         return "\n".join(output_parts).strip()
 
     def _parse_tool_response(self, tool_name: str, res: Optional[Dict[str, Any]]) -> str:
