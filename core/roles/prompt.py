@@ -63,7 +63,11 @@ def apply_prompt(
     if wt_branch:
         subagent.worktree_branch = wt_branch
     model_label = (getattr(definition, "model", None) or "").strip() or "an expert AI assistant"
-    prompt = SUBAGENT_DEFAULT_SYSTEM_PROMPT.replace("{model_name}", model_label)
+    # model_label comes from role files (user-editable JSON/MD). Escape
+    # so a malicious role file can't inject literal <system_note>,
+    # <subagent>, or <worktree> close-tags at the identity-block level.
+    safe_model_label = escape_xml(model_label)
+    prompt = SUBAGENT_DEFAULT_SYSTEM_PROMPT.replace("{model_name}", safe_model_label)
     body = getattr(definition, "prompt", "")
     parts = [prompt]
     if body:
