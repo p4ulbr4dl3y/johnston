@@ -62,38 +62,52 @@ def format_role_prompt(role_key: str, prompt_text: str) -> str:
 
 
 def apply_prompt(
-    subagent: Any,
+    agent: Any,
     definition: AgentRole,
     worktree_branch: Optional[str] = None,
+    is_subagent: bool = True,
 ) -> None:
-    """Set the subagent's role-aware system prompt and pinned model (if any)."""
-    from core.domain.defaults.prompts import SUBAGENT_DEFAULT_SYSTEM_PROMPT, SUBAGENT_WORKTREE_PROMPT
+    """Set the agent's role-aware system prompt and pinned model (if any)."""
+    from core.domain.defaults.prompts import (
+        DEFAULT_SYSTEM_PROMPT,
+        SUBAGENT_DEFAULT_SYSTEM_PROMPT,
+        SUBAGENT_WORKTREE_PROMPT,
+    )
 
-    subagent.role = definition.key
-    wt_branch = worktree_branch or getattr(subagent, "worktree_branch", None)
-    if wt_branch:
-        subagent.worktree_branch = wt_branch
-    model_label = (getattr(definition, "model", None) or "").strip() or "an expert AI assistant"
+    key = getattr(definition, "key", "")
+    if is_subagent and isinstance(key, str) and key:
+        agent.role = key
+    elif not getattr(agent, "role", None) and isinstance(key, str) and key:
+        agent.role = key
+
+    wt_branch = worktree_branch or getattr(agent, "worktree_branch", None)
+    if wt_branch and isinstance(wt_branch, str):
+        agent.worktree_branch = wt_branch
+    raw_model = getattr(definition, "model", None)
+    model_label = raw_model.strip() if isinstance(raw_model, str) and raw_model.strip() else "an expert AI assistant"
     # model_label comes from role files (user-editable JSON/MD). Escape
     # so a malicious role file can't inject literal <system_note>,
     # <subagent>, or <worktree> close-tags at the identity-block level.
     safe_model_label = escape_xml(model_label)
-    prompt = SUBAGENT_DEFAULT_SYSTEM_PROMPT.replace("{model_name}", safe_model_label)
+    base_prompt = SUBAGENT_DEFAULT_SYSTEM_PROMPT if is_subagent else DEFAULT_SYSTEM_PROMPT
+    prompt = base_prompt.replace("{model_name}", safe_model_label)
     body = getattr(definition, "prompt", "")
     parts = [prompt]
-    if body:
-        formatted = format_role_prompt(definition.key, body)
+    if isinstance(body, str) and body.strip():
+        formatted = format_role_prompt(key if isinstance(key, str) else "", body)
         if formatted:
             parts.append(formatted)
-    if wt_branch:
+    if is_subagent and wt_branch and isinstance(wt_branch, str):
         # Branch name is user-controlled (passed via invoke_subagent(branch=...))
         # and gets interpolated into the system prompt. Escape it so a name
         # containing literal </worktree> cannot truncate the wrapper and inject
         # arbitrary content into the subagent's system prompt.
         safe_branch = escape_xml(wt_branch)
         parts.append(SUBAGENT_WORKTREE_PROMPT.format(branch_name=safe_branch))
-    subagent.system_prompt = "\n\n".join(parts)
-    if getattr(definition, "model", None):
-        subagent.model = definition.model
+    agent.system_prompt = "\n\n".join(parts)
+    if isinstance(raw_model, str) and raw_model:
+        agent.model = raw_model
+
+
 
 

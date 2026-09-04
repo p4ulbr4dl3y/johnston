@@ -133,6 +133,38 @@ def record_session_step(step: tuple, session: AgentSession, text_accumulator: li
 record_subagent_step = record_session_step
 
 
+def configure_agent(
+    agent: Any,
+    role_key: str = "worker",
+    app: Any = None,
+    project_dir: Optional[str] = None,
+    is_subagent: bool = False,
+    worktree_branch: Optional[str] = None,
+) -> Any:
+    """Configures an agent (main or subagent): binds the app, marks role & subagent flag,
+    sets limits/sandbox, and applies role definitions (system prompt, model, tool filtering).
+    """
+    agent.app = app
+    agent.is_subagent = is_subagent
+    if is_subagent:
+        from core.infrastructure.config.settings import get_settings
+
+        agent.auto_compact_token_limit = get_settings().subagents.auto_compact_token_limit
+        if worktree_branch:
+            agent.worktree_branch = worktree_branch
+    if app and hasattr(app, "sandbox_enabled"):
+        agent.sandbox_enabled = app.sandbox_enabled
+    from core.roles import apply_role
+
+    return apply_role(
+        agent,
+        role_key,
+        project_dir=project_dir,
+        worktree_branch=worktree_branch,
+        is_subagent=is_subagent,
+    )
+
+
 def configure_subagent_agent(
     subagent: Any,
     role_key: str,
@@ -146,18 +178,15 @@ def configure_subagent_agent(
     Shared by invoke_subagent spawn and manage_subagent follow-ups so the setup
     stays identical (and survives process restarts in the follow-up path).
     """
-    subagent.app = app
-    subagent.is_subagent = True
-    from core.infrastructure.config.settings import get_settings
+    return configure_agent(
+        subagent,
+        role_key=role_key,
+        app=app,
+        project_dir=project_dir,
+        is_subagent=True,
+        worktree_branch=worktree_branch,
+    )
 
-    subagent.auto_compact_token_limit = get_settings().subagents.auto_compact_token_limit
-    if worktree_branch:
-        subagent.worktree_branch = worktree_branch
-    if app and hasattr(app, "sandbox_enabled"):
-        subagent.sandbox_enabled = app.sandbox_enabled
-    from core.roles import apply_role
-
-    return apply_role(subagent, role_key, project_dir=project_dir, worktree_branch=worktree_branch)
 
 
 

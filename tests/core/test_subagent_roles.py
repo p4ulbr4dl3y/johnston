@@ -136,6 +136,51 @@ class TestSubagentApplyRole(unittest.TestCase):
         self.assertIn("<worktree>", agent.system_prompt)
         self.assertIn("Branch: `feat-branch`", agent.system_prompt)
 
+    def test_configure_agent_unified_main_and_subagent(self):
+        import tempfile
+
+        from core.application.session.stream import configure_agent
+        from core.role_registry import RoleRegistry
+
+        class _FakeAgent:
+            def __init__(self):
+                self.tools = [
+                    {"function": {"name": "read"}},
+                    {"function": {"name": "shell", "parameters": {"properties": {"timeout": {}, "wait_seconds": {}}}}},
+                    {"function": {"name": "invoke_subagent"}},
+                ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            roles_dir = os.path.join(tmpdir, ".johnston", "roles")
+            os.makedirs(roles_dir, exist_ok=True)
+            with open(os.path.join(roles_dir, "lead.md"), "w", encoding="utf-8") as f:
+                f.write("---\nname: Lead\nscope: main\n---\nLead prompt")
+
+            RoleRegistry.get_instance().load_roles(project_dir=tmpdir)
+
+            # Main agent configuration
+            main_agent = _FakeAgent()
+            configure_agent(main_agent, "lead", project_dir=tmpdir, is_subagent=False)
+            self.assertFalse(main_agent.is_subagent)
+            self.assertEqual(main_agent.role, "lead")
+            self.assertTrue(getattr(main_agent, "allow_task", True))
+            main_tool_names = [t["function"]["name"] for t in main_agent.tools]
+            self.assertIn("invoke_subagent", main_tool_names)
+            shell_tool = next(t for t in main_agent.tools if t["function"]["name"] == "shell")
+            self.assertIn("wait_seconds", shell_tool["function"]["parameters"]["properties"])
+
+            # Subagent configuration: falls back to worker, hardens shell, strips invoke_subagent
+            sub_agent = _FakeAgent()
+            configure_agent(sub_agent, "lead", project_dir=tmpdir, is_subagent=True)
+            self.assertTrue(sub_agent.is_subagent)
+            self.assertEqual(sub_agent.role, "worker")
+            self.assertFalse(sub_agent.allow_task)
+            sub_tool_names = [t["function"]["name"] for t in sub_agent.tools]
+            self.assertNotIn("invoke_subagent", sub_tool_names)
+            sub_shell_tool = next(t for t in sub_agent.tools if t["function"]["name"] == "shell")
+            self.assertNotIn("wait_seconds", sub_shell_tool["function"]["parameters"]["properties"])
+
+
 
 
 class TestSubagentApplyProvider(unittest.TestCase):

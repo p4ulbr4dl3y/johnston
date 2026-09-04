@@ -49,21 +49,23 @@ def rebind_provider(subagent: Any, provider_key: str) -> None:
             setattr(subagent, field, getattr(rebuilt, field))
 
 
-def apply_provider(subagent: Any, definition: AgentRole) -> None:
-    """If the role pins a provider, switch the subagent to it.
+def apply_provider(agent: Any, definition: AgentRole) -> None:
+    """If the role pins a provider, switch the agent to it.
 
     Otherwise inherit the active provider from the parent (the default). Raises
     ``ValueError`` when the pinned provider is not connected or cannot back an
     agent.
     """
     provider = getattr(definition, "provider", None)
-    if not provider:
+    if not isinstance(provider, str) or not provider.strip():
         return
     from core.provider_manager import ProviderManager
 
     pm = ProviderManager()
     pm.load_providers()
     if not pm.is_provider_connected(provider):
-        raise ValueError(f"provider '{provider}' for role '{definition.key}' is not connected")
-    if getattr(subagent, "provider_key", "") != provider:
-        rebind_provider(subagent, provider)
+        key = getattr(definition, "key", "")
+        raise ValueError(f"provider '{provider}' for role '{key}' is not connected")
+    if getattr(agent, "provider_key", "") != provider:
+        rebind_provider(agent, provider)
+

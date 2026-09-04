@@ -11,23 +11,35 @@ HARDENED_SHELL_DESCRIPTION = (
 )
 
 
-def apply_role_tools(subagent: Any, definition: AgentRole) -> None:
-    """Filter the subagent's tools by role and harden the shell description.
+def apply_role_tools(agent: Any, definition: AgentRole, is_subagent: bool = True) -> None:
+    """Filter the agent's tools by role and harden tools for subagents.
 
-    Disables nested subagent spawning, background task management, UI questions,
-    and applies the role's read-only/allowed/disallowed lists. The shell tool's
-    description is replaced with a non-interactive, timeout-bound variant and
-    background execution is stripped. Uses the same single role-tool policy
-    (``role_tool_error`` with ``is_subagent=True``) as prompt_builder and the
-    role registry.
+    For subagents: disables nested subagent spawning, background task management, UI questions,
+    and applies the role's read-only/allowed/disallowed lists. The shell tool's description
+    is replaced with a non-interactive, timeout-bound variant and background execution is stripped.
+    For main agents: applies allowed/disallowed lists while preserving interactive capabilities.
     """
-    subagent.allow_task = False
-    subagent.tools = [
-        t
-        for t in (getattr(subagent, "tools", None) or [])
-        if role_tool_error(definition, t.get("function", {}).get("name", ""), is_subagent=True) is None
-    ]
-    subagent.tools = [_rebuild_tool(t) for t in subagent.tools]
+    raw_tools = getattr(agent, "tools", None)
+    if not raw_tools and callable(getattr(agent, "default_tools_provider", None)):
+        raw_tools = agent.default_tools_provider()
+    raw_tools = raw_tools or []
+
+    if is_subagent:
+        agent.allow_task = False
+        filtered = [
+            t
+            for t in raw_tools
+            if role_tool_error(definition, t.get("function", {}).get("name", ""), is_subagent=True) is None
+        ]
+        agent.tools = [_rebuild_tool(t) for t in filtered]
+    else:
+        agent.allow_task = getattr(agent, "allow_task", True)
+        agent.tools = [
+            t
+            for t in raw_tools
+            if role_tool_error(definition, t.get("function", {}).get("name", ""), is_subagent=False) is None
+        ]
+
 
 
 def _rebuild_tool(t) -> dict:

@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Optional
 
-from core.application.session.stream import record_session_step
+from core.application.session.stream import record_session_step, sync_session_metrics
 from core.domain.defaults.errors import parse_stream_step
 from core.domain.entities.session import record_session_interruption
 from core.domain.policies.messages import (
@@ -339,9 +339,14 @@ async def generate_ai_response(
                 session_id, active_msg_idx, active_user_event, project_path, checkpoint_manager
             )
         try:
+            sync_session_metrics(session, agent)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
             await save_db.flush()
         except Exception:  # noqa: BLE001
             pass
+
 
 
 async def _handle_interruption(
