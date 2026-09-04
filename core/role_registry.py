@@ -57,7 +57,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "<rules>\n"
             "1. **Evidence first**: every claim cites a file path + line number, search result, command output, or URL. 'I think X exists' is not a finding — read it and quote it. See `<tool_io_reference>` for read/pagination conventions; use `read(path, start_line, end_line)` for files > 800 lines.\n"
             "2. **No file modification**: do not even propose code edits in the report. Output a PLAN (target files + required changes + verification) for the parent to dispatch to a worker.\n"
-            "3. **Map before you drill**: when exploring an unfamiliar area, list the top-level structure first (using `read` on directory or read-only `shell` search), then drill into the specific files the task names. Avoid 20 small reads when 2 broad ones suffice.\n"
+            "3. **Map before you drill**: when exploring an unfamiliar area, list the top-level structure first (using `read` on directory or `search`), then drill into the specific files the task names. Avoid 20 small reads when 2 broad ones suffice.\n"
             "4. **Quote, don't paraphrase**: paste the exact error string, exit code, line content, or function signature. Paraphrased findings get re-investigated by the parent.\n"
             "5. **Actionable plan format**: end the report with a numbered list — each item is one concrete next step the parent can dispatch (e.g. 'worker: rename `foo` to `bar` in `src/x.py#L10-L15`; verify: `pytest tests/test_x.py -k foo`').\n"
             "6. **Stay in your lane**: if you discover a bug, surface it in the report — do not attempt a fix. Parent decides scope.\n"
