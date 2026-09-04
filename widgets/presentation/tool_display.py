@@ -337,6 +337,10 @@ def _format_active_tool_progress(
         n_cmds = _count_tool_invocations(("shell", "run_command"))
         return f"running {n_cmds} commands" if n_cmds > 1 else "running command"
 
+    if name in ("search", "search_code"):
+        n_searches = _count_tool_invocations(("search", "search_code"))
+        return f"searching codebase ({n_searches})" if n_searches > 1 else "searching codebase"
+
     if name == "update_plan":
         plan = args.get("plan")
         if isinstance(plan, list) and plan:

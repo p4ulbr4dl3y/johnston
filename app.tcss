@@ -252,7 +252,7 @@ WelcomeWidget {
     margin-top: 0;
 }
 
-.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-invoke_subagent {
+.tool-create, .tool-read, .tool-edit, .tool-shell, .tool-invoke_subagent, .tool-search {
     color: $fg-secondary;
 }
 

@@ -27,6 +27,7 @@ DISPLAY_NAMES: dict[str, str] = {
     "create": "Create",
     "edit": "Edit",
     "shell": "Shell",
+    "search": "Search",
     "ask_user": "AskUser",
     "manage_shell": "ManageShell",
     "invoke_subagent": "InvokeSubagent",
@@ -89,6 +90,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         "create",
         "edit",
         "shell",
+        "search",
         "update_plan",
     }
 
@@ -167,8 +169,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return False
         if canonical == "ask_user":
             return bool((self.result_text or "").strip())
+        if canonical == "read":
+            res = (self.result_text or "").lstrip()
+            return res.startswith(("[dir", "[archive"))
         if canonical in (
-            "read",
             "web_fetch",
             "invoke_subagent",
             "manage_shell",

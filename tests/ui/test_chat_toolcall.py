@@ -9,6 +9,9 @@ from widgets.chat_toolcall import ToolCallWidget
 class TestToolCallWidgetHelpers(unittest.TestCase):
     def test_is_expandable_variants(self):
         self.assertFalse(ToolCallWidget("read", "f.py").is_expandable())
+        self.assertTrue(ToolCallWidget("read", "src", result_text="[dir src | total 2]\na\nb").is_expandable())
+        self.assertTrue(ToolCallWidget("read", "a.zip", result_text="[archive a.zip | total 1]\nx").is_expandable())
+        self.assertTrue(ToolCallWidget("search", "x", result_text="[search=content]\nfoo:1: bar").is_expandable())
         self.assertFalse(ToolCallWidget("web_fetch", "http://x").is_expandable())
         self.assertFalse(ToolCallWidget("invoke_subagent", "prompt").is_expandable())
         self.assertFalse(ToolCallWidget("manage_shell", "list", args={"action": "list"}).is_expandable())
@@ -188,10 +191,12 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         names = widget.DISPLAY_NAMES
         self.assertEqual(names.get("read"), "Read")
         self.assertEqual(names.get("shell"), "Shell")
+        self.assertEqual(names.get("search"), "Search")
         self.assertEqual(names.get("nope", "fallback"), "fallback")
         self.assertEqual(names.get("create"), "Create")
         self.assertEqual(names.get("unknown_tool"), None)
         self.assertIn("read", widget.SYSTEM_TOOLS)
+        self.assertIn("search", widget.SYSTEM_TOOLS)
         self.assertNotIn("not_a_real_tool_xyz", widget.SYSTEM_TOOLS)
         self.assertNotIn(123, widget.SYSTEM_TOOLS)
 

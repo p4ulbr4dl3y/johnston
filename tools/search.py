@@ -618,6 +618,12 @@ def search_sync(
         )
 
     header_kv: Dict[str, Any] = {"search": mode}
+    try:
+        rel_p = os.path.relpath(path, cwd)
+        if rel_p not in (".", ""):
+            header_kv["path"] = rel_p
+    except Exception:
+        pass
     if query.strip():
         header_kv["query"] = query
     if glob_pattern:
