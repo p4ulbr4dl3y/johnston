@@ -258,6 +258,10 @@ class AgentSession:
         except Exception:
             pass
 
+    def record_compaction(self, title: str = "Session Compacted") -> None:
+        """Record compaction event divider into session messages."""
+        self.add_event({"type": MessageType.EVENT_DIVIDER.value, "text": title})
+
 
     # -- persistence -------------------------------------------------------
 
@@ -478,4 +482,19 @@ def record_session_interruption(session: Any, divider_text: str = "Response Inte
             session.add_event({"type": MessageType.EVENT_DIVIDER.value, "text": divider_text})
         except Exception:
             pass
+
+
+def record_session_compaction(session: Any, title: str = "Session Compacted") -> None:
+    """Unify compaction divider recording across session instances."""
+    if not session:
+        return
+    if isinstance(session, AgentSession):
+        session.record_compaction(title)
+        return
+    if hasattr(session, "add_event"):
+        try:
+            session.add_event({"type": MessageType.EVENT_DIVIDER.value, "text": title})
+        except Exception:
+            pass
+
 

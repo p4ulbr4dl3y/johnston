@@ -141,6 +141,7 @@ async def compact_session(
     on_begin: Callable[[], None],
     on_divider_update: Callable[[str], None],
     refresh_footer_cb: Callable[[], None],
+    session: Optional[Any] = None,
 ) -> CompactionOutcome:
     """Compact agent history.
 
@@ -156,6 +157,7 @@ async def compact_session(
       divider title in the UI.
     * ``refresh_footer_cb`` — called after successful compaction to refresh
       the status footer.
+    * ``session`` — optional session entity to record the compaction event divider before saving.
     """
     if not agent:
         return CompactionOutcome(status=CompactionStatus.FAILED, message="No active agent found")
@@ -177,6 +179,10 @@ async def compact_session(
             outcome = CompactionOutcome(
                 status=CompactionStatus.COMPLETED, message=msg, title=title, tokens=tokens
             )
+            if session is not None:
+                from core.domain.entities.session import record_session_compaction
+
+                record_session_compaction(session, title)
             on_divider_update(title)
             refresh_footer_cb()
         else:

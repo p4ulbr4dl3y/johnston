@@ -1438,11 +1438,11 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.save_current_session = MagicMock()
 
         outcome = SimpleNamespace(success=True, message="ok", title="Session Compacted (500 → 100)")
-        with patch("widgets.presentation.commands.session_commands.compact_session", return_value=outcome):
+        with patch("widgets.presentation.commands.session_commands.compact_session", return_value=outcome) as mock_compact:
             await CompactCommand().execute(app)
 
-        mock_sess.add_event.assert_called_once_with({"type": "event_divider", "text": "Session Compacted (500 → 100)"})
-        app.save_current_session.assert_called_once()
+        mock_compact.assert_awaited_once()
+        self.assertEqual(mock_compact.call_args.kwargs["session"], mock_sess)
 
     async def test_questions_wizard_active(self):
         app = SimpleApp()

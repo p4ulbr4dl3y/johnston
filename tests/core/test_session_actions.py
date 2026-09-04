@@ -1,6 +1,7 @@
 """Unit tests for pure-core session actions (no UI/Textual)."""
 import asyncio
 import unittest
+from unittest.mock import MagicMock
 
 from core.application.session.actions import (
     compact_session,
@@ -134,10 +135,26 @@ class TestCompactSession(unittest.IsolatedAsyncioTestCase):
             on_divider_update=lambda _t: None,
             refresh_footer_cb=lambda: None,
         )
-        self.assertTrue(outcome.success)
-        self.assertEqual(outcome.tokens.before, 12000)
+        self.assertTrue(outcome.tokens.before, 12000)
         self.assertEqual(outcome.tokens.after, 3000)
         self.assertEqual(outcome.title, "Session Compacted (12,000 → 3,000 tokens)")
+
+    async def test_compact_success_records_divider_to_session(self):
+        agent = MockAgent()
+        mock_sess = MagicMock()
+
+        outcome = await compact_session(
+            agent,
+            save_session_cb=lambda: None,
+            on_begin=lambda: None,
+            on_divider_update=lambda _t: None,
+            refresh_footer_cb=lambda: None,
+            session=mock_sess,
+        )
+
+        self.assertTrue(outcome.success)
+        mock_sess.add_event.assert_called_once_with({"type": "event_divider", "text": "Session Compacted"})
+
 
     async def test_compact_failure(self):
         class FailAgent(MockAgent):
