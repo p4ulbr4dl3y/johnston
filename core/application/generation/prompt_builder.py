@@ -607,15 +607,20 @@ class PromptBuilder:
         mcp_tools = mcp_mgr.get_cached_tools()
         clean_mcp_tools = [{"type": t["type"], "function": t["function"]} for t in mcp_tools]
 
-        all_tools = list(self.base_tools) + clean_mcp_tools
-
+        base_tools_list = list(self.base_tools)
         role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=self.cwd or os.getcwd())
 
         # Single role-tool policy (shared with roles/tools and role_registry).
         # is_subagent passes the subagent-excluded-tool check into the core policy.
-        filtered_tools = [
+        filtered_base = [
             t
-            for t in all_tools
+            for t in base_tools_list
+            if role_tool_error(role_def, t.get("function", {}).get("name", ""), is_subagent=self.is_subagent) is None
+        ]
+
+        filtered_mcp = [
+            t
+            for t in clean_mcp_tools
             if role_tool_error(role_def, t.get("function", {}).get("name", ""), is_subagent=self.is_subagent) is None
         ]
 
@@ -625,33 +630,37 @@ class PromptBuilder:
             and self.subagent_schema
             and not any(
                 t.get("function", {}).get("name", "").lower() == "invoke_subagent"
-                for t in filtered_tools
+                for t in filtered_base
             )
         ):
-            filtered_tools.append(self.subagent_schema)
+            filtered_base.append(self.subagent_schema)
 
         if self.is_subagent:
             from core.roles.tools import _rebuild_tool
 
-            filtered_tools = [_rebuild_tool(t) for t in filtered_tools]
+            filtered_base = [_rebuild_tool(t) for t in filtered_base]
+            filtered_mcp = [_rebuild_tool(t) for t in filtered_mcp]
 
-        allowed_tools = filtered_tools
+        # Built-ins win on name conflict with MCP tools.
+        base_names = {t.get("function", {}).get("name", "") for t in filtered_base}
+        filtered_mcp = [
+            t for t in filtered_mcp if t.get("function", {}).get("name", "") not in base_names
+        ]
 
-        def _sort_tool_schema(tool_dict: Dict[str, Any]) -> Dict[str, Any]:
+        def _normalize_tool_schema(tool_dict: Dict[str, Any]) -> Dict[str, Any]:
             import copy
 
             t = copy.deepcopy(tool_dict)
             fn = t.get("function", {})
             params = fn.get("parameters", {})
             if isinstance(params, dict):
-                props = params.get("properties")
-                if isinstance(props, dict):
-                    params["properties"] = dict(sorted(props.items()))
+                # Preserve author's logical property order (e.g. target_file before content).
+                # Only normalize/sort required fields deterministically.
                 req = params.get("required")
                 if isinstance(req, list):
                     try:
-                        params["required"] = sorted(req)
-                    except TypeError:
+                        params["required"] = sorted(req, key=lambda item: (type(item).__name__, str(item)))
+                    except Exception:
                         params["required"] = req
             return t
 
@@ -659,12 +668,24 @@ class PromptBuilder:
         # objects (and role flags) are unchanged this turn, skipping the
         # per-schema deepcopy + re-sort. A fresh build always happens after any
         # tool swap because old object ids drop out of the key.
-        key = (tuple(id(t) for t in allowed_tools), self.is_subagent, self.allow_task)
+        key = (
+            tuple(id(t) for t in filtered_base),
+            tuple(id(t) for t in filtered_mcp),
+            self.is_subagent,
+            self.allow_task,
+        )
         cached = _TOOLS_CACHE.get(key)
         if cached is not None:
             return list(cached)
 
-        sorted_tools = [_sort_tool_schema(t) for t in allowed_tools]
-        sorted_tools.sort(key=lambda t: (t.get("function", {}) or {}).get("name", ""))
+        # Partitioned sort (built-ins prefix, followed by MCP tools).
+        # Stable built-in prefix prevents MCP tool additions from invalidating KV cache.
+        sorted_base = [_normalize_tool_schema(t) for t in filtered_base]
+        sorted_base.sort(key=lambda t: (t.get("function", {}) or {}).get("name", ""))
+
+        sorted_mcp = [_normalize_tool_schema(t) for t in filtered_mcp]
+        sorted_mcp.sort(key=lambda t: (t.get("function", {}) or {}).get("name", ""))
+
+        sorted_tools = sorted_base + sorted_mcp
         _TOOLS_CACHE.put(key, sorted_tools)
         return list(sorted_tools)

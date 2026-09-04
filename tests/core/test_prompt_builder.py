@@ -53,7 +53,7 @@ class TestPromptBuilder(unittest.TestCase):
         names = [t.get("function", {}).get("name") for t in tools]
         self.assertEqual(names, sorted(names))
 
-    def test_build_tools_properties_and_required_sorted_deterministically(self):
+    def test_build_tools_properties_preserves_order_and_required_sorted(self):
         base_tools = [
             {
                 "type": "function",
@@ -78,7 +78,9 @@ class TestPromptBuilder(unittest.TestCase):
         prop_keys = list(params["properties"].keys())
         req_keys = params["required"]
 
-        self.assertEqual(prop_keys, ["a_param", "m_param", "z_param"])
+        # Author's property order is preserved to assist model token generation
+        self.assertEqual(prop_keys, ["z_param", "a_param", "m_param"])
+        # Required list is sorted deterministically
         self.assertEqual(req_keys, ["a_param", "m_param", "z_param"])
 
     def test_build_system_prompt_includes_project_instructions(self):

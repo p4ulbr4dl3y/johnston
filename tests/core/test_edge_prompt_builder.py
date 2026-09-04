@@ -235,6 +235,42 @@ def test_build_tools_allow_task_zero_falsy():
     assert "invoke_subagent" not in names
 
 
+def test_build_tools_partitioned_mcp_after_builtins(monkeypatch):
+    """MCP tools must sort separately and be appended after built-in tools prefix."""
+    class FakeMcpManager:
+        def get_cached_tools(self):
+            return [
+                {"type": "function", "function": {"name": "zebra_mcp"}},
+                {"type": "function", "function": {"name": "alpha_mcp"}},
+            ]
+
+    monkeypatch.setattr("core.infrastructure.mcp.get_mcp_manager", lambda: FakeMcpManager())
+    base = [{"function": {"name": "write"}}, {"function": {"name": "bash"}}]
+    b = PromptBuilder("p", base, role="worker", allow_task=False)
+    names = [t["function"]["name"] for t in b.build_tools()]
+    # Built-ins sorted first, then MCP tools sorted:
+    assert names == ["bash", "write", "alpha_mcp", "zebra_mcp"]
+
+
+def test_build_tools_mcp_name_conflict_builtin_wins(monkeypatch):
+    """If an MCP tool has the same name as a built-in tool, built-in wins and MCP duplicate is dropped."""
+    class FakeMcpManager:
+        def get_cached_tools(self):
+            return [
+                {"type": "function", "function": {"name": "bash", "description": "mcp duplicate"}},
+                {"type": "function", "function": {"name": "mcp_extra"}},
+            ]
+
+    monkeypatch.setattr("core.infrastructure.mcp.get_mcp_manager", lambda: FakeMcpManager())
+    base = [{"function": {"name": "bash", "description": "builtin"}}]
+    b = PromptBuilder("p", base, role="worker", allow_task=False)
+    tools = b.build_tools()
+    assert len(tools) == 2
+    assert tools[0]["function"]["name"] == "bash"
+    assert tools[0]["function"]["description"] == "builtin"
+    assert tools[1]["function"]["name"] == "mcp_extra"
+
+
 # ---------------------------------------------------------------------------
 # build_system_prompt edge cases
 # ---------------------------------------------------------------------------

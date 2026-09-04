@@ -160,18 +160,26 @@ def resolve_stream_timeout(stream_timeout: Optional[float] = None) -> float:
         return 60.0
 
 
-def sort_keys_recursive(obj: Any) -> Any:
-    """Recursively sorts dictionary keys to guarantee deterministic JSON serialization (stableStringify)."""
-    if isinstance(obj, dict):
-        # JSON object keys are strings, but real inputs may carry mixed types.
-        # Sort by (type, value) so non-comparable keys don't raise TypeError.
-        return {
-            k: sort_keys_recursive(v)
-            for k, v in sorted(obj.items(), key=lambda item: (type(item[0]).__name__, str(item[0])))
-        }
-    elif isinstance(obj, list):
-        return [sort_keys_recursive(elem) for elem in obj]
-    return obj
+def sort_keys_recursive(obj: Any, preserve_keys: Optional[Tuple[str, ...]] = None) -> Any:
+    """Recursively sorts dictionary keys to guarantee deterministic JSON serialization (stableStringify).
+
+    If ``preserve_keys`` is provided, dictionaries whose key in the parent matches one of the
+    names in ``preserve_keys`` (e.g. ``("properties",)``) retain their insertion order while
+    their nested values are still recursively normalized.
+    """
+    def _recurse(curr: Any, parent_key: Optional[str] = None) -> Any:
+        if isinstance(curr, dict):
+            if preserve_keys and parent_key in preserve_keys:
+                return {k: _recurse(v, k) for k, v in curr.items()}
+            return {
+                k: _recurse(v, k)
+                for k, v in sorted(curr.items(), key=lambda item: (type(item[0]).__name__, str(item[0])))
+            }
+        elif isinstance(curr, list):
+            return [_recurse(elem, parent_key) for elem in curr]
+        return curr
+
+    return _recurse(obj)
 
 
 def parse_tool_call_args(tc: dict) -> Tuple[str, Dict[str, Any]]:
@@ -298,7 +306,7 @@ def normalize_tool_arguments_str(raw: Any) -> str:
         except Exception:
             return "{}"
         return raw
-    return json.dumps(raw, ensure_ascii=False)
+    return json.dumps(raw, ensure_ascii=False, sort_keys=True)
 
 
 def parse_sse_line(line: str) -> Optional[Any]:

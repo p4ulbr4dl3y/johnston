@@ -31,7 +31,7 @@ def _get_sorted_tools(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     cached = _sort_cache.get(key)
     if cached is not None:
         return cached
-    sorted_tools = sort_keys_recursive(tools)
+    sorted_tools = sort_keys_recursive(tools, preserve_keys=("properties",))
     _sort_cache.put(key, sorted_tools)
     return sorted_tools
 

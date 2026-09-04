@@ -47,6 +47,23 @@ class TestSortKeysRecursive:
         # Deterministic ordering: sorted by (typename, str) -> ints before strs.
         assert list(res.keys()) == [1, "a"]
 
+    def test_preserve_keys_keeps_insertion_order(self):
+        obj = {
+            "z": 1,
+            "properties": {
+                "z_prop": {"type": "string", "desc": "z"},
+                "a_prop": {"type": "number", "desc": "a"},
+            },
+            "a": 2,
+        }
+        res = sort_keys_recursive(obj, preserve_keys=("properties",))
+        # Top-level keys are sorted
+        assert list(res.keys()) == ["a", "properties", "z"]
+        # 'properties' keys preserve original insertion order
+        assert list(res["properties"].keys()) == ["z_prop", "a_prop"]
+        # Inside each property, keys are sorted deterministically
+        assert list(res["properties"]["z_prop"].keys()) == ["desc", "type"]
+
 
 # --------------------------------------------------------------------------- #
 # parse_tool_call_args
@@ -213,6 +230,9 @@ class TestNormalizeToolArgumentsStr:
 
     def test_emojis_preserved(self):
         assert normalize_tool_arguments_str({"e": "🔥"}) == '{"e": "🔥"}'
+
+    def test_dict_keys_sorted_deterministically(self):
+        assert normalize_tool_arguments_str({"z": 1, "a": 2}) == '{"a": 2, "z": 1}'
 
 
 # --------------------------------------------------------------------------- #
