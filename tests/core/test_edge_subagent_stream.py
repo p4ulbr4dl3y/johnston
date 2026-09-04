@@ -892,4 +892,27 @@ class TestSubagentStepAndErrorHandling:
         )
         assert len(ctx.messages) == 0
 
+    @pytest.mark.asyncio
+    async def test_execute_session_turn_main_and_callback(self):
+        from core.application.session.stream import execute_session_turn
+
+        agent = FakeSubagent(steps=[("bot_delta", "Hello from runner")])
+        agent.is_subagent = False
+        sess = make_session()
+        store = FakeStore()
+        captured = []
+
+        res = await execute_session_turn(
+            agent,
+            "Hi",
+            sess,
+            store,
+            step_callback=lambda step, s, a: captured.append(step),
+        )
+        assert res == "Hello from runner"
+        assert sess.status == SessionStatus.COMPLETED
+        assert len(captured) == 1
+        assert store.saved == [sess]
+
+
 

@@ -247,30 +247,38 @@ async def _safe_save(store: Any, session: AgentSession) -> None:
         raise
 
 
-async def _run_single_subagent_message(
-    subagent: Any,
+async def execute_session_turn(
+    agent: Any,
     message: str,
     session: AgentSession,
-    ctx: Any,
     store: Any,
-    error_prefix: str = "Subagent error",
+    *,
+    error_prefix: str = "Execution error",
+    cancel_message: Optional[str] = None,
+    step_callback: Optional[Callable[[tuple, AgentSession, list], None]] = None,
 ) -> str:
-    """Runs a single subagent message stream, recording steps and finishing the session.
+    """Runs a single agent message stream, recording steps into session and finishing the session.
 
-    Returns the accumulated text and handles success/cancel/error transitions,
+    Returns accumulated text and handles success/cancel/error transitions,
     persisting the session in each terminal state.
     """
     acc = [""]
     last_api_error = [None]
+    is_sub = getattr(agent, "is_subagent", False)
+    cancelled_text = cancel_message or ("[Subagent cancelled]" if is_sub else "[Session cancelled]")
+    err_prefix = error_prefix or ("Subagent error" if is_sub else "Error")
+
     try:
-        async for step in subagent.stream_steps(message):
+        async for step in agent.stream_steps(message):
             if step and (
                 step[0] == "error"
                 or (step[0] == "event_divider" and len(step) > 1 and str(step[1]).startswith("API Error:"))
             ):
                 last_api_error[0] = str(step[1])
-            record_subagent_step(step, session, acc)
-        _sync_subagent_metrics(session, subagent)
+            record_session_step(step, session, acc)
+            if step_callback:
+                step_callback(step, session, acc)
+        sync_session_metrics(session, agent)
         if last_api_error[0]:
             if not acc[0].strip():
                 acc[0] = f"[{last_api_error[0]}]"
@@ -281,19 +289,17 @@ async def _run_single_subagent_message(
             session.finish(SessionStatus.COMPLETED)
         await _safe_save(store, session)
     except asyncio.CancelledError:
-        acc[0] = "[Subagent cancelled]"
-        _sync_subagent_metrics(session, subagent)
+        acc[0] = cancelled_text
+        sync_session_metrics(session, agent)
         record_session_interruption(session, "Response Interrupted")
         session.finish(SessionStatus.CANCELLED, "Cancelled by user")
         try:
             await _safe_save(store, session)
         except Exception as err:
-            acc[0] = f"[{error_prefix}: failed to save cancelled session: {err}]"
+            acc[0] = f"[{err_prefix}: failed to save cancelled session: {err}]"
     except Exception as err:
-        # Covers stream errors AND a failed post-completion save (propagated by
-        # _safe_save). A failure to persist must not leave a COMPLETED status.
-        acc[0] = f"[{error_prefix}: {err}]"
-        _sync_subagent_metrics(session, subagent)
+        acc[0] = f"[{err_prefix}: {err}]"
+        sync_session_metrics(session, agent)
         record_session_interruption(session, "Response Interrupted")
         session.finish(SessionStatus.ERROR, str(err))
         try:
@@ -301,6 +307,25 @@ async def _run_single_subagent_message(
         except Exception:
             pass
     return acc[0]
+
+
+async def _run_single_subagent_message(
+    subagent: Any,
+    message: str,
+    session: AgentSession,
+    ctx: Any = None,
+    store: Any = None,
+    error_prefix: str = "Subagent error",
+) -> str:
+    """Runs a single subagent message stream, recording steps and finishing the session."""
+    return await execute_session_turn(
+        subagent,
+        message,
+        session,
+        store,
+        error_prefix=error_prefix,
+        cancel_message="[Subagent cancelled]",
+    )
 
 
 async def run_subagent_stream_bg(
