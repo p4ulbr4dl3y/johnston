@@ -3,7 +3,6 @@ import hashlib
 import json
 import logging
 import os
-import random
 import re
 import time
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
@@ -729,13 +728,13 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
 
                         is_retryable = self._is_retryable_error(api_err)
                         if is_retryable and attempt < max_retries:
-                            retry_after = self._extract_retry_after(api_err)
-                            if retry_after is not None and retry_after > 0:
-                                actual_delay = min(max_retry_delay, max(retry_delay, retry_after))
-                            else:
-                                delay = min(max_retry_delay, retry_delay * (retry_backoff ** (attempt - 1)))
-                                jitter = random.uniform(0, 0.5 * delay)
-                                actual_delay = delay + jitter
+                            actual_delay = self._calculate_retry_delay(
+                                attempt,
+                                api_err,
+                                retry_delay=retry_delay,
+                                retry_backoff=retry_backoff,
+                                max_retry_delay=max_retry_delay,
+                            )
                             if full_assistant_parts:
                                 # Signal the UI to drop the partially-streamed text so the
                                 # retried attempt starts from a blank reply (no duplication).

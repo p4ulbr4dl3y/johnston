@@ -359,6 +359,40 @@ async def test_compact_history_adapter_error_returns_failure():
 
 
 @pytest.mark.asyncio
+async def test_compact_history_adapter_transient_503_retries_and_succeeds():
+    agent = _agent(
+        [
+            {"role": "user", "content": "Fix bug"},
+            {"role": "assistant", "content": "Inspecting"},
+            {"role": "tool", "tool_call_id": "c", "name": "edit", "content": "ok"},
+            {"role": "user", "content": "more"},
+            {"role": "assistant", "content": "Done"},
+            {"role": "user", "content": "Submit"},
+        ]
+    )
+    agent.retry_delay = 0.001
+    agent.max_retries = 2
+    agent._last_sys_tokens = 0
+    agent.last_context_tokens = 0
+
+    attempts = 0
+
+    class _FlakyAdapter:
+        async def stream_chat(self, *a, **k):
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise Exception("503 Service Unavailable")
+            yield ("adapter_text", _SUMMARY)
+
+    with patch("core.adapters.get_adapter", return_value=_FlakyAdapter()):
+        success, msg = await agent.compact_history()
+    assert success is True
+    assert attempts == 2
+    assert any("<compaction_checkpoint>" in m.get("content", "") for m in agent.history)
+
+
+@pytest.mark.asyncio
 async def test_compact_history_budget_trim_oldest():
     agent = _agent(
         [

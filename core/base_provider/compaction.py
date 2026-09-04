@@ -576,7 +576,6 @@ class CompactionMixin:
                 from core.adapters import get_adapter
 
                 adapter = get_adapter(getattr(self, "api_type", "openai"))
-                chunks = []
                 stream_kwargs = build_stream_kwargs(
                     self,
                     messages=compact_messages,
@@ -584,10 +583,14 @@ class CompactionMixin:
                     max_tokens=getattr(self, "max_tokens", DEFAULT_MAX_TOKENS) or DEFAULT_MAX_TOKENS,
                 )
 
-                async for tag, payload in adapter.stream_chat(**stream_kwargs):
-                    if tag == "adapter_text" and payload:
-                        chunks.append(payload)
-                summary_text = "".join(chunks).strip()
+                if hasattr(self, "_stream_response_with_retry"):
+                    summary_text, _ = await self._stream_response_with_retry(adapter, stream_kwargs)
+                else:
+                    chunks = []
+                    async for tag, payload in adapter.stream_chat(**stream_kwargs):
+                        if tag == "adapter_text" and payload:
+                            chunks.append(payload)
+                    summary_text = "".join(chunks).strip()
             except Exception as stream_e:
                 last_err = str(stream_e)
                 summary_text = ""

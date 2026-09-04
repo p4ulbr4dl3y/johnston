@@ -371,3 +371,94 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(retry_events), 1)
         self.assertEqual(events[-1], ("bot_text", "recovered", ""))
 
+    def test_calculate_retry_delay_with_retry_after(self):
+        from core.base_provider.errors import calculate_retry_delay
+
+        class _ErrWithHeaders(Exception):
+            def __init__(self):
+                super().__init__("rate limit")
+                self.response = unittest.mock.MagicMock(headers={"retry-after": "7.5"})
+
+        delay = calculate_retry_delay(1, _ErrWithHeaders(), retry_delay=1.0, max_retry_delay=60.0)
+        self.assertEqual(delay, 7.5)
+
+    def test_calculate_retry_delay_backoff_and_jitter(self):
+        from core.base_provider.errors import calculate_retry_delay
+
+        err = Exception("503 Service Unavailable")
+        # attempt 1: base delay 2.0, jitter between 0 and 1.0 (2.0 to 3.0)
+        d1 = calculate_retry_delay(1, err, retry_delay=2.0, retry_backoff=2.0, max_retry_delay=60.0)
+        self.assertGreaterEqual(d1, 2.0)
+        self.assertLessEqual(d1, 3.0)
+
+        # attempt 2: base delay 4.0, jitter between 0 and 2.0 (4.0 to 6.0)
+        d2 = calculate_retry_delay(2, err, retry_delay=2.0, retry_backoff=2.0, max_retry_delay=60.0)
+        self.assertGreaterEqual(d2, 4.0)
+        self.assertLessEqual(d2, 6.0)
+
+    async def test_stream_response_with_retry_success_after_transient_error(self):
+        from core.base_provider.errors import stream_response_with_retry
+
+        attempts = 0
+
+        class _Adapter:
+            async def stream_chat(self, **kwargs):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise Exception("503 Service Unavailable")
+                yield ("adapter_thought", "thinking hard")
+                yield ("adapter_text", "hello ")
+                yield ("adapter_text", "world")
+
+        retried = []
+
+        def on_retry(att, max_att, delay, err):
+            retried.append((att, err))
+
+        text, thought = await stream_response_with_retry(
+            _Adapter(),
+            {},
+            max_retries=3,
+            retry_delay=0.001,
+            on_retry=on_retry,
+        )
+        self.assertEqual(text, "hello world")
+        self.assertEqual(thought, "thinking hard")
+        self.assertEqual(attempts, 2)
+        self.assertEqual(len(retried), 1)
+
+    async def test_stream_response_with_retry_non_retryable_raises_immediately(self):
+        from core.base_provider.errors import stream_response_with_retry
+
+        attempts = 0
+
+        class _Adapter:
+            async def stream_chat(self, **kwargs):
+                nonlocal attempts
+                attempts += 1
+                raise Exception("401 Unauthorized")
+                yield ("adapter_text", "nope")
+
+        with self.assertRaises(Exception) as ctx:
+            await stream_response_with_retry(_Adapter(), {}, max_retries=3, retry_delay=0.001)
+        self.assertIn("401", str(ctx.exception))
+        self.assertEqual(attempts, 1)
+
+    async def test_stream_response_with_retry_exhausted_raises(self):
+        from core.base_provider.errors import stream_response_with_retry
+
+        attempts = 0
+
+        class _Adapter:
+            async def stream_chat(self, **kwargs):
+                nonlocal attempts
+                attempts += 1
+                raise Exception("503 Service Unavailable")
+                yield ("adapter_text", "nope")
+
+        with self.assertRaises(Exception) as ctx:
+            await stream_response_with_retry(_Adapter(), {}, max_retries=2, retry_delay=0.001)
+        self.assertIn("503", str(ctx.exception))
+        self.assertEqual(attempts, 2)
+

@@ -1,8 +1,9 @@
 import ast
 import asyncio
 import json
+import random
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from core.domain.policies.messages import (
     SYSTEM_NOTICE_KIND_IMAGES_OMITTED,
@@ -122,109 +123,230 @@ def format_api_error(err: Exception) -> str:
     return f"{header} `{msg}`" if msg else f"{header} `Unknown error`"
 
 
+def extract_retry_after(err: Exception) -> Optional[float]:
+    """Extracts suggested retry delay in seconds from response headers or error context."""
+    if err is None:
+        return None
+    try:
+        response = getattr(err, "response", None)
+        headers = getattr(response, "headers", None) if response is not None else None
+        if headers is not None:
+            if "retry-after-ms" in headers:
+                val = float(headers["retry-after-ms"])
+                if val > 0:
+                    return val / 1000.0
+            if "retry-after" in headers:
+                val = float(headers["retry-after"])
+                if val > 0:
+                    return val
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def is_retryable_error(err: Exception) -> bool:
+    if err is None:
+        return False
+
+    err_str = str(err).lower()
+
+    # 1. HTTP status code check
+    status_code: Optional[int] = getattr(err, "status_code", None)
+    if status_code is None and hasattr(err, "response") and getattr(err, "response", None) is not None:
+        status_code = getattr(err.response, "status_code", None)
+
+    if status_code in (400, 401, 403, 404, 422):
+        return False
+
+    # 2. Non-retryable error terms
+    non_retryable_terms = [
+        "invalid api key",
+        "unauthorized",
+        "authentication",
+        "invalid_api_key",
+        "context_length_exceeded",
+        "context window",
+        "maximum context length",
+        "invalid request",
+        "model_not_found",
+        "permission_denied",
+        "account_deactivated",
+        "billing_not_active",
+    ]
+    if any(term in err_str for term in non_retryable_terms):
+        return False
+
+    # 3. Explicit retryable HTTP status codes (e.g. 429, 5xx, 529 overloaded)
+    if status_code in (408, 429, 500, 502, 503, 504, 524, 529):
+        return True
+
+    # 4. Asyncio / Runtime timeout errors
+    if isinstance(err, (asyncio.TimeoutError, RuntimeError)):
+        if "timeout" in err_str or isinstance(err, asyncio.TimeoutError):
+            return True
+
+    # 5. HTTPX exception types
+    try:
+        import httpx
+
+        if isinstance(err, (httpx.TimeoutException, httpx.NetworkError)):
+            return True
+        if isinstance(err, httpx.HTTPStatusError):
+            if err.response.status_code in (401, 400, 403, 404, 422):
+                return False
+            return True
+    except ImportError:
+        pass
+
+    # 6. Fallback retryable terms
+    retryable_terms = [
+        "timeout",
+        "timed out",
+        "rate limit",
+        "429",
+        "500",
+        "502",
+        "503",
+        "504",
+        "524",
+        "529",
+        "connection",
+        "network",
+        "server error",
+        "reset",
+        "refused",
+        "overloaded",
+        "chunk timeout",
+        "service unavailable",
+        "gateway timeout",
+    ]
+    if any(term in err_str for term in retryable_terms):
+        return True
+
+    return False
+
+
+def calculate_retry_delay(
+    attempt: int,
+    err: Exception,
+    retry_delay: float = 1.0,
+    retry_backoff: float = 2.0,
+    max_retry_delay: float = 60.0,
+    extract_retry_after_fn: Optional[Callable[[Exception], Optional[float]]] = None,
+) -> float:
+    """Calculates retry delay taking into account retry-after header, backoff and jitter."""
+    extract_fn = extract_retry_after_fn or extract_retry_after
+    retry_after = extract_fn(err)
+    if retry_after is not None and retry_after > 0:
+        return min(max_retry_delay, max(retry_delay, retry_after))
+
+    delay = min(max_retry_delay, retry_delay * (retry_backoff ** max(0, attempt - 1)))
+    jitter = random.uniform(0, 0.5 * delay)
+    return delay + jitter
+
+
+async def stream_response_with_retry(
+    adapter: Any,
+    stream_kwargs: Dict[str, Any],
+    *,
+    max_retries: int = 3,
+    retry_delay: float = 1.0,
+    retry_backoff: float = 2.0,
+    max_retry_delay: float = 60.0,
+    on_retry: Optional[Callable[[int, int, float, Exception], None]] = None,
+    is_retryable_fn: Optional[Callable[[Exception], bool]] = None,
+    extract_retry_after_fn: Optional[Callable[[Exception], Optional[float]]] = None,
+) -> Tuple[str, str]:
+    """Stream an LLM response with unified exponential backoff and jitter retry.
+
+    Returns (text, thought).
+    """
+    retryable_checker = is_retryable_fn or is_retryable_error
+    attempt = 0
+    while True:
+        attempt += 1
+        text_chunks: List[str] = []
+        thought_chunks: List[str] = []
+        try:
+            async for tag, payload in adapter.stream_chat(**stream_kwargs):
+                if tag == "adapter_text" and payload:
+                    text_chunks.append(payload)
+                elif tag == "adapter_thought" and payload:
+                    thought_chunks.append(payload)
+            return "".join(text_chunks).strip(), "".join(thought_chunks).strip()
+        except Exception as err:
+            if retryable_checker(err) and attempt < max_retries:
+                delay = calculate_retry_delay(
+                    attempt,
+                    err,
+                    retry_delay=retry_delay,
+                    retry_backoff=retry_backoff,
+                    max_retry_delay=max_retry_delay,
+                    extract_retry_after_fn=extract_retry_after_fn,
+                )
+                if on_retry is not None:
+                    on_retry(attempt, max_retries, delay, err)
+                await asyncio.sleep(delay)
+                continue
+            raise
+
+
 class ErrorHandlingMixin:
     """Mixin providing retry-classification and vision-error handling for BaseAgent."""
 
     def _extract_retry_after(self, err: Exception) -> Optional[float]:
         """Extracts suggested retry delay in seconds from response headers or error context."""
-        if err is None:
-            return None
-        try:
-            response = getattr(err, "response", None)
-            headers = getattr(response, "headers", None) if response is not None else None
-            if headers is not None:
-                if "retry-after-ms" in headers:
-                    val = float(headers["retry-after-ms"])
-                    if val > 0:
-                        return val / 1000.0
-                if "retry-after" in headers:
-                    val = float(headers["retry-after"])
-                    if val > 0:
-                        return val
-        except (ValueError, TypeError):
-            pass
-        return None
+        return extract_retry_after(err)
 
     def _is_retryable_error(self, err: Exception) -> bool:
-        if err is None:
-            return False
+        return is_retryable_error(err)
 
-        err_str = str(err).lower()
+    def _calculate_retry_delay(
+        self,
+        attempt: int,
+        err: Exception,
+        retry_delay: Optional[float] = None,
+        retry_backoff: Optional[float] = None,
+        max_retry_delay: Optional[float] = None,
+    ) -> float:
+        base_delay = retry_delay if retry_delay is not None else getattr(self, "retry_delay", 1.0)
+        backoff = retry_backoff if retry_backoff is not None else getattr(self, "retry_backoff", 2.0)
+        max_delay = max_retry_delay if max_retry_delay is not None else getattr(self, "max_retry_delay", 60.0)
+        return calculate_retry_delay(
+            attempt,
+            err,
+            retry_delay=base_delay,
+            retry_backoff=backoff,
+            max_retry_delay=max_delay,
+            extract_retry_after_fn=self._extract_retry_after,
+        )
 
-        # 1. HTTP status code check
-        status_code: Optional[int] = getattr(err, "status_code", None)
-        if status_code is None and hasattr(err, "response") and getattr(err, "response", None) is not None:
-            status_code = getattr(err.response, "status_code", None)
-
-        if status_code in (400, 401, 403, 404, 422):
-            return False
-
-        # 2. Non-retryable error terms
-        non_retryable_terms = [
-            "invalid api key",
-            "unauthorized",
-            "authentication",
-            "invalid_api_key",
-            "context_length_exceeded",
-            "context window",
-            "maximum context length",
-            "invalid request",
-            "model_not_found",
-            "permission_denied",
-            "account_deactivated",
-            "billing_not_active",
-        ]
-        if any(term in err_str for term in non_retryable_terms):
-            return False
-
-        # 3. Explicit retryable HTTP status codes (e.g. 429, 5xx, 529 overloaded)
-        if status_code in (408, 429, 500, 502, 503, 504, 524, 529):
-            return True
-
-        # 4. Asyncio / Runtime timeout errors
-        if isinstance(err, (asyncio.TimeoutError, RuntimeError)):
-            if "timeout" in err_str or isinstance(err, asyncio.TimeoutError):
-                return True
-
-        # 5. HTTPX exception types
-        try:
-            import httpx
-
-            if isinstance(err, (httpx.TimeoutException, httpx.NetworkError)):
-                return True
-            if isinstance(err, httpx.HTTPStatusError):
-                if err.response.status_code in (401, 400, 403, 404, 422):
-                    return False
-                return True
-        except ImportError:
-            pass
-
-        # 6. Fallback retryable terms
-        retryable_terms = [
-            "timeout",
-            "timed out",
-            "rate limit",
-            "429",
-            "500",
-            "502",
-            "503",
-            "504",
-            "524",
-            "529",
-            "connection",
-            "network",
-            "server error",
-            "reset",
-            "refused",
-            "overloaded",
-            "chunk timeout",
-            "service unavailable",
-            "gateway timeout",
-        ]
-        if any(term in err_str for term in retryable_terms):
-            return True
-
-        return False
+    async def _stream_response_with_retry(
+        self,
+        adapter: Any,
+        stream_kwargs: Dict[str, Any],
+        *,
+        max_retries: Optional[int] = None,
+        retry_delay: Optional[float] = None,
+        retry_backoff: Optional[float] = None,
+        max_retry_delay: Optional[float] = None,
+        on_retry: Optional[Callable[[int, int, float, Exception], None]] = None,
+    ) -> Tuple[str, str]:
+        limit = max_retries if max_retries is not None else getattr(self, "max_retries", 3)
+        base_delay = retry_delay if retry_delay is not None else getattr(self, "retry_delay", 1.0)
+        backoff = retry_backoff if retry_backoff is not None else getattr(self, "retry_backoff", 2.0)
+        max_delay = max_retry_delay if max_retry_delay is not None else getattr(self, "max_retry_delay", 60.0)
+        return await stream_response_with_retry(
+            adapter,
+            stream_kwargs,
+            max_retries=limit,
+            retry_delay=base_delay,
+            retry_backoff=backoff,
+            max_retry_delay=max_delay,
+            on_retry=on_retry,
+            is_retryable_fn=self._is_retryable_error,
+            extract_retry_after_fn=self._extract_retry_after,
+        )
 
     def _is_vision_error(self, err: Exception) -> bool:
         if err is None:

@@ -374,17 +374,12 @@ async def auto_title_session(
                 thinking_effort="none",
             )
 
-            async def _call_stream() -> tuple[str, str]:
-                text_chunks = []
-                thought_chunks = []
-                async for tag, payload in adapter.stream_chat(**stream_kwargs):
-                    if tag == "adapter_text" and payload:
-                        text_chunks.append(payload)
-                    elif tag == "adapter_thought" and payload:
-                        thought_chunks.append(payload)
-                return "".join(text_chunks).strip(), "".join(thought_chunks).strip()
+            from core.base_provider.errors import stream_response_with_retry
 
-            raw_text, raw_thought = await asyncio.wait_for(_call_stream(), timeout=effective_timeout)
+            raw_text, raw_thought = await asyncio.wait_for(
+                stream_response_with_retry(adapter, stream_kwargs, max_retries=1),
+                timeout=effective_timeout,
+            )
             parsed_title = parse_session_title(raw_text, max_len=configured_max_len)
             if not parsed_title and raw_thought:
                 parsed_title = extract_title_from_thought(raw_thought, max_len=configured_max_len)
