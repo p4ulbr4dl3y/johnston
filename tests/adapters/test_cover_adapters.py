@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.adapters import (
+    AnthropicAdapter,
     GeminiAdapter,
     OpenAIAdapter,
     format_messages_for_openai,
@@ -252,4 +253,46 @@ async def test_openai_stream_data_choices_and_empty_delta():
     assert texts == "hello"
     usage = [e for e in events if e[0] == "adapter_usage"]
     assert usage and usage[0][1]["total_tokens"] == 7
+
+
+@pytest.mark.asyncio
+async def test_anthropic_eager_input_streaming_on_direct_api():
+    captured_payload = None
+
+    class _CaptureStreamClient:
+        def stream(self, method, url, headers=None, json=None, timeout=None):
+            nonlocal captured_payload
+            captured_payload = json
+            return _MockStreamCM([])
+
+    adapter = AnthropicAdapter()
+    adapter._get_client = lambda base_url, api_key: _CaptureStreamClient()
+
+    tools = [{"function": {"name": "write", "parameters": {"properties": {"x": {}}}}}]
+    async for _ in adapter.stream_chat("https://api.anthropic.com", "key", "model", [{"role": "user", "content": "hi"}], tools=tools):
+        pass
+
+    assert captured_payload is not None
+    assert captured_payload["tools"][0].get("eager_input_streaming") is True
+
+
+@pytest.mark.asyncio
+async def test_anthropic_no_eager_input_streaming_on_proxy():
+    captured_payload = None
+
+    class _CaptureStreamClient:
+        def stream(self, method, url, headers=None, json=None, timeout=None):
+            nonlocal captured_payload
+            captured_payload = json
+            return _MockStreamCM([])
+
+    adapter = AnthropicAdapter()
+    adapter._get_client = lambda base_url, api_key: _CaptureStreamClient()
+
+    tools = [{"function": {"name": "write", "parameters": {"properties": {"x": {}}}}}]
+    async for _ in adapter.stream_chat("http://local-proxy:8000", "key", "model", [{"role": "user", "content": "hi"}], tools=tools):
+        pass
+
+    assert captured_payload is not None
+    assert "eager_input_streaming" not in captured_payload["tools"][0]
 

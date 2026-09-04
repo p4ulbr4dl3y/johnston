@@ -247,18 +247,20 @@ class AnthropicAdapter(BaseApiAdapter):
 
         if tools:
             converted_tools = []
+            is_direct_anthropic = not base_url or "api.anthropic.com" in base_url
             for t in tools:
                 fn = t.get("function", {})
                 fn_name = fn.get("name", "")
                 if not fn_name:
                     continue
-                converted_tools.append(
-                    {
-                        "name": fn_name,
-                        "description": fn.get("description", ""),
-                        "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
-                    }
-                )
+                tool_entry = {
+                    "name": fn_name,
+                    "description": fn.get("description", ""),
+                    "input_schema": fn.get("parameters", {"type": "object", "properties": {}}),
+                }
+                if is_direct_anthropic:
+                    tool_entry["eager_input_streaming"] = True
+                converted_tools.append(tool_entry)
             if converted_tools:
                 sorted_tools = _get_sorted_tools(converted_tools)
                 # Shallow-copy list + dict-copy last element so the cache_control
