@@ -46,6 +46,7 @@ class MessageType(str, Enum):
     TOOL = "tool"
     TOOL_GENERATING = "tool_generating"
     TOOL_GENERATING_UPDATE = "tool_generating_update"
+    TOOL_SHELL_OUTPUT = "tool_shell_output"
     STATUS_CHANGE = "status_change"
     EVENT_DIVIDER = "event_divider"
     ERROR = "error"
@@ -157,8 +158,10 @@ class AgentSession:
         if etype in (
             MessageType.TOOL_GENERATING,
             MessageType.TOOL_GENERATING_UPDATE,
+            MessageType.TOOL_SHELL_OUTPUT,
             "tool_generating",
             "tool_generating_update",
+            "tool_shell_output",
         ):
             if not self.listeners:
                 return
@@ -179,7 +182,10 @@ class AgentSession:
             last.pop("final", None)
             last.pop("delta", None)
         elif etype == MessageType.THINKING and last and last.get("type") == MessageType.THINKING and "duration" not in last:
-            last["text"] = event.get("text", "")
+            if event.get("phase") == "delta":
+                last["text"] = (last.get("text", "") or "") + (event.get("text", "") or "")
+            else:
+                last["text"] = event.get("text", "")
             if event.get("duration") is not None:
                 last["duration"] = event["duration"]
             last.pop("phase", None)

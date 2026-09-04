@@ -1165,3 +1165,36 @@ async def test_shell_wait_seconds_positive_transitions_to_background(tool, make_
         p.stdout.feed_eof()
         await asyncio.sleep(0.05)
 
+
+async def test_shell_subagent_routes_output_to_session_not_host_widget(tool, make_app_mock, make_tool_context):
+    app = _app(make_app_mock)
+    host_widget = MagicMock()
+    app.current_tool_widget = host_widget
+
+    session = MagicMock()
+    session.id = "sub-session-999"
+    events = []
+    session.add_event = lambda e: events.append(e)
+
+    ctx = make_tool_context(app=app, is_subagent=True)
+    ctx.session = session
+
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"subagent output line 1\n")
+    reader.feed_eof()
+    p = _process(wait_result=0, stdout=reader)
+
+    with (
+        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch.object(ShellTool, "_create_std_process", return_value=p),
+    ):
+        res = await tool.execute({"command": "echo sub"}, ctx=ctx)
+        assert not res.is_error
+        # Host widget must NOT receive the subagent output
+        host_widget.append_shell_output.assert_not_called()
+        # Session must receive tool_shell_output events
+        shell_events = [e for e in events if e.get("type") == "tool_shell_output"]
+        assert len(shell_events) > 0
+        assert "subagent output line 1" in "".join(e.get("text", "") for e in shell_events)
+
+

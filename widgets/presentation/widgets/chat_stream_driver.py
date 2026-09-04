@@ -415,6 +415,16 @@ class ChatStreamDriver:
                         if hasattr(th, "update_tool_call"):
                             th.update_tool_call(target=target)
                         break
+        elif etype == "tool_shell_output":
+            txt = evt.get("text", "")
+            target_th = self.tool_handles[-1] if self.tool_handles else None
+            if target_th is None:
+                for child in reversed(list(getattr(self.chat_view, "children", []))):
+                    if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
+                        target_th = child
+                        break
+            if target_th and hasattr(target_th, "append_shell_output"):
+                target_th.append_shell_output(txt)
         elif etype == "tool":
             self.finalize_thinking_stream()
             # Check if this event is a completion event for an in-flight tool

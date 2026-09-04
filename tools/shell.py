@@ -210,15 +210,18 @@ class ShellTool(BaseTool):
                 hard_timeout=hard_timeout,
             )
             target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
-            if target_widget is not None:
+            if target_widget is not None and not getattr(ctx, "is_subagent", False):
                 task.add_listener(target_widget.append_shell_output)
+            if getattr(ctx, "session", None) and hasattr(ctx.session, "add_event"):
+                task.add_listener(lambda chunk: ctx.session.add_event({"type": "tool_shell_output", "text": chunk}))
             callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
             progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
             task.is_background = True
             # Open the log BEFORE attaching so the widget/registry receive the real
             # log path (task.log_path is only populated by open_log()).
             task.open_log()
-            _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path)
+            if not getattr(ctx, "is_subagent", False):
+                _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path)
             ctx.add_background_task(task)
             task.start_reading(on_completed=callback, on_progress=progress_cb)
 
@@ -280,9 +283,12 @@ class ShellTool(BaseTool):
             hard_timeout=task_hard_timeout,
         )
         target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
-        if target_widget is not None:
+        if target_widget is not None and not getattr(ctx, "is_subagent", False):
             task.add_listener(target_widget.append_shell_output)
-        _attach_shell_widget(ctx.host, task_id, target_widget)
+        if getattr(ctx, "session", None) and hasattr(ctx.session, "add_event"):
+            task.add_listener(lambda chunk: ctx.session.add_event({"type": "tool_shell_output", "text": chunk}))
+        if not getattr(ctx, "is_subagent", False):
+            _attach_shell_widget(ctx.host, task_id, target_widget)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
         progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
         ctx.add_background_task(task)

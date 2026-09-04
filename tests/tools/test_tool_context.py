@@ -113,7 +113,28 @@ class TestToolContextAdvanced(unittest.TestCase):
         ctx_off = ToolContext(agent)
         self.assertFalse(ctx_off.sandbox_enabled)
 
+    def test_session_and_session_id_resolution(self):
+        app = DummyApp()
+        app.current_session_id = "parent-123"
+
+        # Direct app
+        ctx1 = ToolContext(app)
+        self.assertEqual(ctx1.session_id, "parent-123")
+
+        # Subagent agent with its own session
+        subagent = DummyAgent()
+        subagent.app = app
+        subagent.is_subagent = True
+        sub_sess = MagicMock()
+        sub_sess.id = "subagent-session-456"
+        subagent.session = sub_sess
+
+        ctx2 = ToolContext(subagent)
+        self.assertEqual(ctx2.session, sub_sess)
+        self.assertEqual(ctx2.session_id, "subagent-session-456")
+
 
 if __name__ == "__main__":
+
     unittest.main()
 

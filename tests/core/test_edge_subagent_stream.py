@@ -174,6 +174,32 @@ class TestUnknownAndSemantics:
         assert received_events[2]["tool_id"] == "c1"
         assert len(sess.messages) == 1  # now persisted to messages
 
+    def test_tool_shell_output_ephemeral(self):
+        sess = make_session()
+        received_events = []
+        sess.add_listener(lambda e: received_events.append(e))
+
+        sess.add_event({"type": "tool_shell_output", "text": "compiling...\n"})
+        assert len(received_events) == 1
+        assert received_events[0] == {"type": "tool_shell_output", "text": "compiling...\n"}
+        assert len(sess.messages) == 0  # not in persisted messages
+
+    def test_thinking_delta_accumulation(self):
+        sess = make_session()
+        acc = [""]
+        from core.application.session.stream import record_subagent_step
+
+        record_subagent_step(("thinking_start", "Starting thought", ""), sess, acc)
+        assert sess.messages[-1]["text"] == "Starting thought"
+
+        record_subagent_step(("thinking_delta", " - part 2", ""), sess, acc)
+        assert sess.messages[-1]["text"] == "Starting thought - part 2"
+
+        record_subagent_step(("thinking_end", "1.5", "Starting thought - part 2 done"), sess, acc)
+        assert sess.messages[-1]["text"] == "Starting thought - part 2 done"
+        assert sess.messages[-1]["duration"] == 1.5
+
+
 
 
 # ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ class ToolContext:
 
     def __init__(self, app: Any = None, is_subagent: bool = False, cwd: str = None):
         role = getattr(app, "role", "")
+        raw_target = app
         if app is not None and not type(app).__name__.startswith(("MagicMock", "Mock", "AsyncMock")):
             inner_app = getattr(app, "app", None)
             if inner_app is not None:
@@ -18,6 +19,14 @@ class ToolContext:
                     role = getattr(app, "role", "")
                 app = inner_app
         self.host = app
+        session = None
+        if raw_target is not None:
+            if type(raw_target).__name__.startswith(("MagicMock", "Mock", "AsyncMock")):
+                if "session" in getattr(raw_target, "__dict__", {}):
+                    session = raw_target.session
+            else:
+                session = getattr(raw_target, "session", None)
+        self.session = session
         self.is_subagent = is_subagent or (getattr(app, "is_subagent", False) if app else False)
         self.subagent_role = role or ("worker" if self.is_subagent else "")
         self.cwd = None
@@ -93,9 +102,14 @@ class ToolContext:
     @property
     def session_id(self) -> str | None:
         """Current session id attribute."""
+        if getattr(self, "session", None):
+            sid = getattr(self.session, "id", None)
+            if isinstance(sid, str):
+                return sid
         if not self.host:
             return None
-        return getattr(self.host, "current_session_id", None)
+        sid = getattr(self.host, "current_session_id", None)
+        return sid if isinstance(sid, str) else None
 
     @property
     def sandbox_enabled(self) -> bool:

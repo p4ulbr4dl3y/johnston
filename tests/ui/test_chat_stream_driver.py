@@ -373,3 +373,15 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         tool_widget.set_result.assert_called_once_with("diff output", is_error=False, status="done", returncode=0)
         self.assertEqual(len(self.driver.tool_handles), 0)
 
+    async def test_session_event_tool_shell_output(self):
+        tool_widget = MagicMock()
+        tool_widget.status = "running"
+        tool_widget.append_shell_output = MagicMock()
+        self.driver.tool_handles.append(tool_widget)
+
+        await self.driver.consume_session_event({
+            "type": "tool_shell_output",
+            "text": "building project...\n",
+        })
+        tool_widget.append_shell_output.assert_called_once_with("building project...\n")
+
