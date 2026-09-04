@@ -1427,6 +1427,23 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app.is_generating)
         self.assertEqual(processed, [("next-prompt", True)])
 
+    async def test_compact_success_saves_event_divider(self):
+        app = SimpleApp()
+        app.agent = MagicMock()
+        app.refresh_status_footer = MagicMock()
+        app.current_session_id = "sess-1"
+        mock_sess = MagicMock()
+        app.sm = MagicMock()
+        app.sm.get.return_value = mock_sess
+        app.save_current_session = MagicMock()
+
+        outcome = SimpleNamespace(success=True, message="ok", title="Session Compacted (500 → 100)")
+        with patch("widgets.presentation.commands.session_commands.compact_session", return_value=outcome):
+            await CompactCommand().execute(app)
+
+        mock_sess.add_event.assert_called_once_with({"type": "event_divider", "text": "Session Compacted (500 → 100)"})
+        app.save_current_session.assert_called_once()
+
     async def test_questions_wizard_active(self):
         app = SimpleApp()
         from widgets.presentation.screens.ask_user import AskUserWizardScreen

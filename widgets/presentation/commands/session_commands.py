@@ -188,6 +188,7 @@ class CompactCommand(BaseCommand):
                         sess = app.sm.get(app.current_session_id, reload=False)
                         if sess:
                             sess.add_event({"type": "event_divider", "text": outcome.title or "Session Compacted"})
+                            save_cb()
                 except Exception:
                     pass
             else:
