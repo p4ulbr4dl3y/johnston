@@ -489,7 +489,10 @@ class TestChatViewAutoFollow(unittest.IsolatedAsyncioTestCase):
             chat_view = app.query_one(ChatView)
             await chat_view.add_user_message("\n".join(f"history line {i}" for i in range(60)))
             bot = await chat_view.add_bot_message()
-            await pilot.pause()
+            for _ in range(50):
+                if chat_view.is_at_bottom():
+                    break
+                await pilot.pause(0.05)
             self.assertTrue(chat_view.is_at_bottom())
             initial_max = chat_view.max_scroll_y
             bot.append_stream_content("tail line\n" * 40)
