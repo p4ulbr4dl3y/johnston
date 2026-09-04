@@ -12,38 +12,22 @@ DEFAULT_MAX_PAYLOAD_MB = DEFAULT_TOOL_PAYLOAD_BYTES // (1024 * 1024)
 
 class CreateTool(BaseTool):
     name = "create"
-    description = (
-        "Create a new file or OVERWRITE an existing file completely. Use for new files OR complete rewrites "
-        "(e.g. mass edits, translations, >40% of file changed). For localized changes, use 'edit'."
-    )
+    description = "Create a new file or completely overwrite an existing file. Parent directories created automatically."
     schema = {
         "type": "function",
         "function": {
             "name": "create",
-            "description": (
-                "Create a new file OR UNCONDITIONALLY OVERWRITE an existing file completely.\n\n"
-                "Use cases:\n"
-                "- New files.\n"
-                "- Complete file rewrites (mass translations, >40% lines changed, major refactors).\n"
-                "- For small localized changes (1-5 targets), use `edit` instead. Always `read` first.\n\n"
-                "Side effects:\n"
-                "- Creates parent directories if missing.\n"
-                "- Atomic write (temp file + rename); symlinks are resolved first (real inode is written).\n"
-                "- In sandbox: writes restricted to project cwd; outside-cwd paths return `permission`.\n\n"
-                "Output: `[created <path> | N lines]` (new file), `[unchanged ...]` (no diff), "
-                "or a unified diff when overwriting an existing file.\n\n"
-                f"Encoding: UTF-8. Limits: file size bounded by `max_tool_payload_bytes` ({DEFAULT_MAX_PAYLOAD_MB}MB); larger returns `size_exceeded`."
-            ),
+            "description": "Create a new file or completely overwrite an existing file. Parent directories created automatically.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "File path. Will be created or overwritten. Use relative path.",
+                        "description": "Relative file path to create or overwrite.",
                     },
                     "content": {
                         "type": "string",
-                        "description": "Full file content. Empty string creates an empty file.",
+                        "description": "Full file content (empty string creates an empty file).",
                     },
                 },
                 "required": ["path", "content"],

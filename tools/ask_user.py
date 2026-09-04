@@ -37,18 +37,14 @@ def _sort_recommended_first(options: list[dict]) -> list[dict]:
 class AskUserTool(BaseTool):
     name = "ask_user"
     description = (
-        "Ask interactive multiple-choice questions when requirements or design decisions are ambiguous. "
-        "Each question should have 2-4 options with concise label and helpful description. "
-        "Include '(Recommended)' in the label of suggested choices."
+        "Prompt user with an interactive modal to clarify ambiguous requirements or choose implementation options."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "ask_user",
             "description": (
-                "Ask interactive multiple-choice questions when requirements or design decisions are ambiguous. "
-                "Each question should have 2-4 options with concise label and helpful description. "
-                "Include '(Recommended)' in the label of suggested choices."
+                "Prompt user with an interactive modal to clarify ambiguous requirements or choose implementation options."
             ),
             "description_verbose": (
                 "Ask the user 1-4 multiple-choice questions for ambiguous design decisions. "

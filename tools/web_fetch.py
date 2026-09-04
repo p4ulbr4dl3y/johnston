@@ -149,32 +149,24 @@ async def _guard_request(req: "httpx.Request") -> None:
 
 class WebFetchTool(BaseTool):
     name = "web_fetch"
-    description = "Fetch content from HTTP/HTTPS URL and convert HTML/documents (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) to Markdown."
+    description = "Fetch content from an HTTP/HTTPS URL and convert HTML or rich documents to Markdown."
 
     schema = {
         "type": "function",
         "function": {
             "name": "web_fetch",
-            "description": (
-                "Fetch HTTP/HTTPS URL and convert to Markdown (or raw body when raw=true).\n\n"
-                "Security: SSRF-protected. Blocks private/loopback IPs (127.0.0.0/8, 10.0.0.0/8, "
-                "172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, IPv6 ULA/link-local) on initial request AND on every redirect.\n\n"
-                "Conversion: HTML to Markdown (default), PDF/DOCX/XLSX/PPTX/EPUB/IPYNB to Markdown, JSON/CSV/text preserved as-is. "
-                "With raw=true: body with script tags stripped.\n\n"
-                f"Limits: response capped at max_tool_payload_bytes ({DEFAULT_MAX_PAYLOAD_MB}MB); timeout {DEFAULT_WEB_FETCH_TIMEOUT_INT}s. Follows redirects; no cookies/headers/auth. Cancellation cooperates.\n\n"
-                "Concurrency-safe. Error kinds: http_status, network, scheme, blocked, size_exceeded, unavailable."
-            ),
+            "description": "Fetch content from an HTTP/HTTPS URL and convert HTML or rich documents to Markdown.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "url": {
                         "type": "string",
-                        "description": "HTTP or HTTPS URL. Non-http schemes return scheme error.",
+                        "description": "Full HTTP or HTTPS URL to fetch.",
                     },
                     "raw": {
                         "type": "boolean",
                         "default": False,
-                        "description": "Skip Markdown conversion. Returns body with script tags stripped.",
+                        "description": "If true, return raw text/HTML without Markdown conversion.",
                     },
                 },
                 "required": ["url"],

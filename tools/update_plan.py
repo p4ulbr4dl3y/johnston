@@ -7,29 +7,14 @@ from tools.base import BaseTool
 class UpdatePlanTool(BaseTool):
     name = "update_plan"
     description = (
-        "Update multi-step plan checklist. Rules: "
-        "1) Short steps (<=7 words). "
-        "2) Exactly one 'in_progress' step at a time. "
-        "3) Update BEFORE executing step actions. "
-        "4) Do not repeat plan in response text."
+        "Update multi-step task checklist. Exactly one step must be 'in_progress'. Update before taking actions."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "update_plan",
             "description": (
-                "Maintain a multi-step plan checklist. Use for ≥3-step work; trivial single-step tasks don't need a plan.\n\n"
-                "Rules:\n"
-                "1. Short steps (≤7 words each).\n"
-                "2. Exactly ONE step `in_progress` at a time.\n"
-                "3. Update BEFORE executing each step (mark next as `in_progress` first).\n"
-                "4. Mark `completed` immediately after verification — do not batch.\n"
-                "5. Do NOT repeat plan contents in response text; the plan IS the progress view.\n"
-                "6. Plan persists across turns within session; do not re-emit unchanged plan.\n"
-                "7. Max recommended steps: 10. For longer work, use subagent (`invoke_subagent`).\n\n"
-                "Subagent behavior: subagent plans are stored on the agent's session but NOT shown in the parent's UI.\n\n"
-                "Statuses: `pending` (not started), `in_progress` (currently executing, exactly 1), `completed` (verified done).\n\n"
-                "Output: `[plan updated | N/M done | <explanation>]`."
+                "Update multi-step task checklist. Exactly one step must be 'in_progress'. Update before taking actions."
             ),
             "parameters": {
                 "type": "object",

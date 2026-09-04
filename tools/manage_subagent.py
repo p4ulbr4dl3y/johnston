@@ -7,14 +7,12 @@ from tools.base import BaseTool
 
 class ManageSubagentTool(BaseTool):
     name = "manage_subagent"
-    description = (
-        "Manage subagents: list active sessions, kill running tasks, or send follow-up messages. "
-        "Follow-ups resume finished agents or queue if busy."
-    )
+    description = "Manage subagent sessions: inspect active tasks, terminate, or send follow-up instructions."
     schema = {
         "type": "function",
         "function": {
             "name": "manage_subagent",
+            "description": "Manage subagent sessions: inspect active tasks, terminate, or send follow-up instructions.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -22,22 +20,16 @@ class ManageSubagentTool(BaseTool):
                         "type": "string",
                         "enum": ["list", "kill", "send_message"],
                         "description": (
-                            "Action to perform: 'list' (active subagents), 'send_message', 'kill'. "
-                            "NEVER poll 'list' to wait for completion, and NEVER call 'list' to verify "
-                            "a subagent completed via <notification> — the runtime notification is authoritative. "
-                            "Use 'list' ONLY to recover lost session IDs."
+                            "Operation: 'list' (active sessions), 'send_message' (resume subagent with new input), 'kill' (terminate session)."
                         ),
                     },
                     "session_id": {
                         "type": "string",
-                        "description": "Subagent session_id (required for 'kill' and 'send_message')",
+                        "description": "Target subagent session ID.",
                     },
                     "message": {
                         "type": "string",
-                        "description": (
-                            "Follow-up instruction for 'send_message' (queues if running, resumes session and worktree if done). "
-                            "Use for refinements, fixes on partial/blocked tasks, or next steps in same scope."
-                        ),
+                        "description": "Follow-up text message when action is 'send_message'.",
                     },
                 },
                 "required": ["action"],

@@ -17,30 +17,28 @@ from tools.base import BaseTool
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
     description = (
-        "Launch an autonomous subagent in the background for a bounded task (up to concurrent limit). "
-        "After launching: STOP calling tools immediately. "
-        "Runtime automatically wakes you with <notification type='subagent'> on finish — NEVER poll "
-        "manage_subagent(list) to wait. Manage or follow up via 'manage_subagent'."
+        "Launch an autonomous subagent in the background to execute an isolated task. Yield turn immediately after launch."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "invoke_subagent",
+            "description": (
+                "Launch an autonomous subagent in the background to execute an isolated task. Yield turn immediately after launch."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "title": {
                         "type": "string",
                         "description": (
-                            "Short task title in English as a noun phrase (3-5 words, "
-                            "e.g. 'Auth token refactor', 'Query performance audit', not verbs)"
+                            "Short task title in English as a noun phrase (3-5 words, e.g. 'Auth token refactor')."
                         ),
                     },
                     "prompt": {
                         "type": "string",
                         "description": (
-                            "Task instructions with clear boundaries, relative file paths only "
-                            "(do NOT include absolute project paths), and expected output format"
+                            "Actionable task instructions, acceptance criteria, and expected verification."
                         ),
                     },
                     "type": {

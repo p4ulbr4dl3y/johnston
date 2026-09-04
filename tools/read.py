@@ -4,7 +4,6 @@ import threading
 import time
 from typing import Any, Dict, Tuple
 
-from core.domain.defaults.config import DEFAULT_MAX_DIR_ENTRIES
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.converter import DOC_EXTENSIONS
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
@@ -296,19 +295,9 @@ class ReadTool(BaseTool):
         "function": {
             "name": "read",
             "description": (
-                "Read a file, directory, archive, MCP resource, or convert docs/images.\n\n"
-                "Forms:\n"
-                "- `path` to a file: returns lines `[<p> | lines N..M of T]` + `N|line` rows. "
-                f"Window ≤{DEFAULT_LINE_WINDOW} lines; paginate with `start_line`/`end_line`.\n"
-                f"- `path` to a directory: returns `[dir <p> | total N]` + sorted entries (truncated at {DEFAULT_MAX_DIR_ENTRIES}).\n"
-                "- `path` to a zip/tar archive: returns `[archive <p> | total N]` + file list.\n"
-                "- `path` containing `://` (when local file doesn't exist): fetches MCP resource.\n"
-                "- PDF/DOCX/XLSX/PPTX/EPUB/IPYNB: converted to Markdown; long output is truncated with log path.\n"
-                "- Image (PNG/JPEG/GIF/WebP): converted to base64 JSON for vision.\n\n"
-                "Outputs are concurrency-safe: emit multiple `read` calls in one step and the runtime "
-                "runs them in parallel. Long conversions (PDF/DOCX, big images) are cancellable.\n\n"
-                "Errors: `not_found` (with fuzzy-match hint), `is_directory`, `size_exceeded`, `encoding`, "
-                "`binary_file`, `permission` (sandbox), `image`/`doc` (conversion failure)."
+                "Read file contents, inspect directory listings, or view archive contents (ZIP/TAR). "
+                "Converts rich documents (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) and images (base64 JSON). "
+                f"Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers; paginate using start_line/end_line."
             ),
             "parameters": {
                 "type": "object",

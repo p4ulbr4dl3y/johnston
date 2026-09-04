@@ -12,11 +12,12 @@ from tools.base import BaseTool
 
 class ManageShellTool(BaseTool):
     name = "manage_shell"
-    description = "Manage background shell processes: list running tasks, send stdin input, or kill."
+    description = "Control active background shell tasks."
     schema = {
         "type": "function",
         "function": {
             "name": "manage_shell",
+            "description": "Control active background shell tasks.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -24,10 +25,7 @@ class ManageShellTool(BaseTool):
                         "type": "string",
                         "enum": ["list", "send_input", "kill"],
                         "description": (
-                            "Action to perform: 'list' (check active tasks), 'send_input', 'kill'. "
-                            "NEVER poll 'list' to wait for task completion, and NEVER call 'list' to verify "
-                            "a task completed via <notification> — the runtime notification is authoritative. "
-                            "Use 'list' ONLY if you lost track of tasks."
+                            "Operation: 'list' (show running tasks), 'send_input' (send stdin to task), 'kill' (terminate process)."
                         ),
                     },
                     "task_id": {

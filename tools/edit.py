@@ -324,53 +324,35 @@ def apply_edit(
 class EditTool(BaseTool):
     name = "edit"
     description = (
-        "Replace text in a file via exact-match. Use for surgical/localized changes. "
-        "For wholesale rewrites (>40% of file changed), prefer 'create'. "
-        "For mass repetitive transforms across files, prefer python script via 'shell'."
+        "Replace text in an existing file via exact-match. Provide 2-4 lines of surrounding context to ensure uniqueness."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "edit",
             "description": (
-                "Replace text in an EXISTING file via exact-match. Use for surgical/localized changes.\n"
-                "Tradeoffs:\n"
-                "- Localized edits (1-5 targets): use `edit` (smallest diff).\n"
-                "- Complete rewrites (>40% changed, mass translations): use `create`.\n"
-                "- Mass repetitive transforms across files: run python script via `shell`.\n\n"
-                "`old_str` rules:\n"
-                "- Must be unique in the file. Include 2-4 lines of surrounding context if needed.\n"
-                "- Whitespace-agnostic at line starts (tabs/spaces normalized). CRLF/LF handled.\n"
-                "- Quote-style preserved: curly quotes stay curly if file uses them.\n"
-                "- If not found, error includes a fuzzy-match hint with the closest line.\n\n"
-                "`new_str` rules:\n"
-                "- Empty string OR absent key = DELETE the matched block.\n"
-                "- `replace_all=true` replaces all occurrences (else error on multi-match).\n\n"
-                f"Atomic write via temp file + rename. Limits: file ≤{DEFAULT_MAX_PAYLOAD_MB}MB, regular file, UTF-8.\n\n"
-                "Error kinds: `match_not_found` (with fuzzy hint), `match_ambiguous` (multi-match), "
-                "`params` (missing/empty/equal old/new), `not_found` (file missing), `is_directory`, "
-                "`encoding`, `size_exceeded`, `permission` (sandbox), `execute` (write failure)."
+                "Replace text in an existing file via exact-match. Provide 2-4 lines of surrounding context to ensure uniqueness."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "File path. Must exist and be a regular file. Use relative path.",
+                        "description": "Relative file path of an existing regular file.",
                     },
                     "old_str": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "Exact text to replace. Must be unique. Whitespace-agnostic at line starts.",
+                        "description": "Exact text block to replace.",
                     },
                     "new_str": {
                         "type": "string",
-                        "description": "Replacement text. Empty or absent = delete old_str.",
+                        "description": "Replacement text. Omit or set to empty string to delete old_str.",
                     },
                     "replace_all": {
                         "type": "boolean",
                         "default": False,
-                        "description": "Replace all occurrences (else error if more than 1 match).",
+                        "description": "If true, replace every occurrence of old_str instead of requiring a unique match.",
                     },
                 },
                 "required": ["path", "old_str"],

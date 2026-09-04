@@ -75,9 +75,8 @@ def _truncate_output(res: str) -> str:
 class ShellTool(BaseTool):
     name = "shell"
     description = (
-        "Execute a NON-INTERACTIVE shell command. ALWAYS specify explicit path (e.g. 'rg foo .') "
-        "to avoid stdin hang. Set wait_seconds=0 for servers/long jobs. Use unbuffered output "
-        "(flush/flags) for long scripts, loops, and streaming logs. Manage, send stdin, or kill via 'manage_shell'."
+        "Execute a non-interactive shell command synchronously or with background execution. "
+        "Outputs [exit N] followed by command stdout/stderr."
     )
 
     schema = {
@@ -85,25 +84,8 @@ class ShellTool(BaseTool):
         "function": {
             "name": "shell",
             "description": (
-                "Execute a NON-INTERACTIVE shell command synchronously. Output: `[exit N]` line "
-                "followed by stdout/stderr; truncated past `max_shell_output_chars` with "
-                "`[truncated | log <p> | next read(path=<log>, start_line=N)]` footer.\n\n"
-                "Anti-patterns (will hang or fail):\n"
-                "- Interactive REPLs: `python -i`, `node`, `irb`, `psql` without `-c`, etc.\n"
-                "- Pagers: `less`, `more`, `vim`, `nano`. For sync inspection use `cat` or pipe to `head`/`tail`. "
-                "NEVER pipe background commands (`wait_seconds=0`) to `tail`/`head` — runtime streams full log to disk "
-                "and tails notification automatically; piping blocks live stream and triggers false inactivity alerts.\n"
-                "- Commands that read stdin without explicit input: `fzf`, `ssh` without `-o BatchMode=yes`.\n"
-                "- Stdout buffering: pipes and non-Python tools buffer output in 4KB blocks. "
-                "Use unbuffered flags (e.g. `stdbuf -oL`, `grep --line-buffered`) for live logs. Python is auto-unbuffered.\n"
-                "Always pass non-interactive flags: `-y` (apt), `--non-interactive`, `--batch`, `-c '<query>'`.\n\n"
-                "Environment:\n"
-                "- Runs in cwd (from <environment>); subagent cwd is its worktree root.\n"
-                "- `manage_shell` is unavailable in subagents (tool removed).\n"
-                "- `wait_seconds` is rejected in subagents (sync-only).\n"
-                "- If sandbox backend unavailable, runs unsandboxed with `[sandbox unavailable]` banner.\n\n"
-                "Error kinds: `timeout` (process killed, NOT backgrounded), `http_status`/etc. don't apply; "
-                "use `not_found` for `command not found` (exit 127), `permission` for `Permission denied`."
+                "Execute a non-interactive shell command. Command runs in project cwd. "
+                "Always use non-interactive flags (e.g. -y, --batch) and avoid interactive REPLs/paginators."
             ),
             "parameters": {
                 "type": "object",
