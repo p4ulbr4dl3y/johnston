@@ -690,6 +690,14 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             tc = screen.query_one(ToolCallWidget)
             self.assertEqual(tc.status, "cancelled")
 
+    async def test_session_chat_screen_alias_and_init(self):
+        from widgets.presentation.screens.subagent_screen import SessionChatScreen, SubagentViewScreen
+
+        self.assertIs(SessionChatScreen, SubagentViewScreen)
+        screen = SessionChatScreen("task-123", show_input=False)
+        self.assertFalse(screen.show_input)
+        self.assertEqual(screen.session_id_or_desc, "task-123")
+
 
 if __name__ == "__main__":
     unittest.main()

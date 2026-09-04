@@ -4,7 +4,6 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 
-from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
 from widgets.presentation.widgets.plan_notch import (
@@ -17,8 +16,8 @@ from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
 from widgets.utils.key_aliases import expand_bindings
 
 
-class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
-    """Full-screen view of a subagent's chat without input panel."""
+class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
+    """Unified modal screen displaying an agent/subagent session chat transcript."""
 
     inherit_bindings = False
     BINDINGS = expand_bindings([
@@ -31,9 +30,10 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
         ("ctrl+q", "quit_app", "Quit"),
     ])
 
-    def __init__(self, session_id_or_desc: str, from_tasks: bool = False):
+    def __init__(self, session_id_or_desc: str, show_input: bool = False, from_tasks: bool = False):
         super().__init__()
         self.session_id_or_desc = session_id_or_desc
+        self.show_input = show_input
         self.from_tasks = from_tasks
         self.session = None
         self.driver: ChatStreamDriver | None = None
@@ -177,9 +177,6 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
         except Exception:
             pass
 
-        for child in list(chat_view.children):
-            child.remove()
-
         self.driver = ChatStreamDriver(
             chat_view,
             on_tool_widget=lambda w: setattr(self, "_last_tool_widget", w),
@@ -201,34 +198,10 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
                 break
 
         if self.session:
-            history_events = [dict(m) for m in self.session.messages if isinstance(m, dict)]
             self.session.remove_listener(self._on_live_event)
             self.session.add_listener(self._on_live_event)
-            has_user_msg = any(
-                isinstance(e, dict) and e.get("type") == "user" and is_ui_visible_user_message(e)
-                for e in history_events
-            )
-            if not has_user_msg and getattr(self.session, "prompt", None):
-                history_events.insert(0, {"type": "user", "text": self.session.prompt})
 
-            raw_page_size = getattr(chat_view, "PAGE_SIZE", 50)
-            page_size = raw_page_size if isinstance(raw_page_size, int) else 50
-            if len(history_events) > page_size:
-                chat_view._unloaded_messages = history_events[:-page_size]
-                events_to_render = history_events[-page_size:]
-            else:
-                chat_view._unloaded_messages = []
-                events_to_render = history_events
-
-            for idx, evt in enumerate(events_to_render):
-                is_last_running = is_running and (idx == len(events_to_render) - 1)
-                await self.driver.consume_session_event(
-                    evt,
-                    animate=is_last_running,
-                    is_active=is_last_running,
-                )
-            if not is_running and self.driver:
-                self.driver.finalize_thinking_stream()
+            await ChatView.load_session(chat_view, self.session, driver=self.driver, is_running=is_running)
 
             # Restore active plan from transcript if present
             plan_data = extract_active_plan_from_messages(self.session.messages)
@@ -373,3 +346,7 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
         """Quit the application."""
         if self.app:
             self.app.exit()
+
+
+SubagentViewScreen = SessionChatScreen
+

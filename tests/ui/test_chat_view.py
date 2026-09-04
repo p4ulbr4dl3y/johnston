@@ -798,3 +798,19 @@ class TestChatViewDividerSpacing(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(err.styles.margin.top, 1)
             self.assertEqual(err.styles.margin.bottom, 0)
 
+    async def test_load_session(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            session = MagicMock()
+            session.messages = [
+                {"type": "user", "text": "Hello session"},
+                {"type": "bot", "text": "Hello user"},
+            ]
+            session.prompt = ""
+            await chat_view.load_session(session)
+            await pilot.pause()
+            self.assertEqual(chat_view.get_total_user_message_count(), 1)
+            self.assertFalse(chat_view.loading)
+
+

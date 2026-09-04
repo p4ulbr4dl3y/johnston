@@ -46,11 +46,6 @@ class SessionPersistenceMixin:
             self.sm.set_active_session_id(session_id)
 
         chat_view = self.query_one(ChatView)
-        chat_view.loading = True
-        chat_view._is_loading_session = True
-        for child in list(chat_view.children):
-            child.remove()
-
         try:
             from widgets.presentation.widgets.plan_notch import PlanNotch
 
@@ -61,75 +56,32 @@ class SessionPersistenceMixin:
         except Exception:
             pass
 
-        # Restore complete element history in UI (user, bot, thinking, tool) with pagination
-        saved_msgs = session.messages
-
-        from widgets.presentation.widgets.chat_container import restore_message_item
-
-        async def _restore_messages(msgs: Any):
+        async def _restore_messages(sess: Any):
+            task_mgr = getattr(self, "task_manager", None)
             try:
-                msg_list = list(msgs) if msgs is not None else []
-                raw_page_size = getattr(chat_view, "PAGE_SIZE", 50)
-                page_size = raw_page_size if isinstance(raw_page_size, int) else 50
-                if len(msg_list) > page_size:
-                    chat_view._unloaded_messages = msg_list[:-page_size]
-                    msgs_to_render = msg_list[-page_size:]
-                else:
-                    chat_view._unloaded_messages = []
-                    msgs_to_render = msg_list
-
-                task_mgr = getattr(self, "task_manager", None)
-                for msg in msgs_to_render:
-                    if not isinstance(msg, dict):
-                        continue
-                    try:
-                        await restore_message_item(chat_view, msg, task_manager=task_mgr)
-                        if len(getattr(chat_view, "children", [])) % 5 == 0:
-                            await asyncio.sleep(0)
-                    except Exception as err:
-                        logger.warning("Error restoring UI message item: %s", err)
+                await ChatView.load_session(chat_view, sess, task_manager=task_mgr)
             except Exception as err:
                 try:
                     self.notify(f"UI restoration failed: {err}", severity="warning")
                 except Exception:
                     pass
 
-            if hasattr(chat_view, "check_welcome") and callable(chat_view.check_welcome):
-                chat_view.check_welcome()
-            await asyncio.sleep(0)
-
-            def _finish_session_load():
-                try:
-                    if hasattr(chat_view, "scroll_end"):
-                        chat_view.scroll_end(animate=False)
-                except Exception:
-                    pass
-                chat_view._is_loading_session = False
-                chat_view.loading = False
-                try:
-                    from widgets.presentation.widgets.plan_notch import PlanNotch
-
-                    notches = list(self.query(PlanNotch))
-                    if not notches and hasattr(self, "screen") and self.screen:
-                        notches = list(self.screen.query(PlanNotch))
-                    cur_plan = getattr(self, "current_plan", None)
-                    for notch in notches:
-                        if cur_plan:
-                            notch.set_plan(cur_plan, getattr(self, "current_plan_explanation", ""))
-                        else:
-                            notch.clear_plan()
-                except Exception:
-                    pass
-
             try:
-                if hasattr(chat_view, "call_after_refresh") and callable(chat_view.call_after_refresh):
-                    chat_view.call_after_refresh(_finish_session_load)
-                else:
-                    _finish_session_load()
-            except Exception:
-                _finish_session_load()
+                from widgets.presentation.widgets.plan_notch import PlanNotch
 
-        self.run_worker(_restore_messages(saved_msgs))
+                notches = list(self.query(PlanNotch)) if hasattr(self, "query") else []
+                if not notches and hasattr(self, "screen") and self.screen:
+                    notches = list(self.screen.query(PlanNotch))
+                cur_plan = getattr(self, "current_plan", None)
+                for notch in notches:
+                    if cur_plan:
+                        notch.set_plan(cur_plan, getattr(self, "current_plan_explanation", ""))
+                    else:
+                        notch.clear_plan()
+            except Exception:
+                pass
+
+        self.run_worker(_restore_messages(session))
 
         # Restore agent context
         if self.agent is None and hasattr(self, "pm") and self.pm:
@@ -172,6 +124,7 @@ class SessionPersistenceMixin:
         restored_plan = None
         restored_explanation = ""
         try:
+            saved_msgs = getattr(session, "messages", [])
             msg_seq = list(saved_msgs) if saved_msgs is not None else []
             restored_plan, restored_explanation = restore_plan_from_messages(msg_seq)
         except Exception:
