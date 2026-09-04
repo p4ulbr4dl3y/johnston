@@ -55,7 +55,7 @@ class ChatStreamDriver:
         self.bot_handle = None
         self.tool_handles.clear()
 
-    def cleanup_unfinalized_tools(self, error_message: Optional[str] = None) -> None:
+    def cleanup_unfinalized_tools(self, error_message: Optional[str] = "Interrupted") -> None:
         """Mark or remove any unfinalized (generating or running) tool widgets."""
         while self.tool_handles:
             th = self.tool_handles.popleft()
@@ -68,9 +68,10 @@ class ChatStreamDriver:
                         th.mark_cancelled()
                     except Exception:
                         pass
-            elif st == "running" and error_message:
+            elif st == "running":
+                msg = error_message or "Interrupted"
                 try:
-                    th.set_result(error_message, is_error=True, status="error")
+                    th.set_result(msg, is_error=True, status="error")
                 except Exception:
                     pass
 
@@ -139,18 +140,22 @@ class ChatStreamDriver:
             meta = val3 if isinstance(val3, dict) else {}
             target_id = meta.get("id")
             target_idx = meta.get("index")
-            if target_id or target_idx is not None:
+            matched = False
+            if target_id:
                 for th in self.tool_handles:
-                    if getattr(th, "status", None) == "generating":
-                        if target_id and getattr(th, "tool_call_id", None) == target_id:
-                            if hasattr(th, "update_tool_call"):
-                                th.update_tool_call(target=val2)
-                            break
-                        if target_idx is not None and getattr(th, "tool_call_index", None) == target_idx:
-                            if hasattr(th, "update_tool_call"):
-                                th.update_tool_call(target=val2)
-                            break
-            else:
+                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_id", None) == target_id:
+                        if hasattr(th, "update_tool_call"):
+                            th.update_tool_call(target=val2)
+                        matched = True
+                        break
+            if not matched and target_idx is not None:
+                for th in self.tool_handles:
+                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_index", None) == target_idx:
+                        if hasattr(th, "update_tool_call"):
+                            th.update_tool_call(target=val2)
+                        matched = True
+                        break
+            if not matched and not target_id and target_idx is None:
                 for th in self.tool_handles:
                     if getattr(th, "status", None) == "generating":
                         if hasattr(th, "update_tool_call"):
@@ -169,9 +174,9 @@ class ChatStreamDriver:
                         break
             if gen_handle is None:
                 for th in self.tool_handles:
-                    if (
-                        getattr(th, "status", None) == "generating"
-                        and getattr(th, "canonical_tool", None) == val1
+                    if getattr(th, "status", None) == "generating" and (
+                        getattr(th, "canonical_tool", None) == val1
+                        or getattr(th, "tool_type", None) == val1
                     ):
                         gen_handle = th
                         break
@@ -196,14 +201,27 @@ class ChatStreamDriver:
         elif event_type == "tool_result":
             parsed_tool_result = parse_tool_result_step(step)
             res_status = parsed_tool_result.status.value if parsed_tool_result.status is not None else None
-            while self.tool_handles:
-                st = getattr(self.tool_handles[0], "status", None)
-                if isinstance(st, str) and st not in ("running", "generating"):
-                    self.tool_handles.popleft()
-                else:
-                    break
-            if self.tool_handles:
-                cur_tool_handle = self.tool_handles.popleft()
+            tool_id = step[6] if len(step) > 6 else None
+            cur_tool_handle = None
+
+            if tool_id:
+                for th in self.tool_handles:
+                    if getattr(th, "tool_call_id", None) == tool_id:
+                        cur_tool_handle = th
+                        self.tool_handles.remove(th)
+                        break
+
+            if cur_tool_handle is None:
+                while self.tool_handles:
+                    st = getattr(self.tool_handles[0], "status", None)
+                    if isinstance(st, str) and st not in ("running", "generating"):
+                        self.tool_handles.popleft()
+                    else:
+                        break
+                if self.tool_handles:
+                    cur_tool_handle = self.tool_handles.popleft()
+
+            if cur_tool_handle is not None:
                 cur_tool_handle.set_result(
                     val1,
                     is_error=parsed_tool_result.is_error,
@@ -211,16 +229,25 @@ class ChatStreamDriver:
                     returncode=parsed_tool_result.returncode,
                 )
             else:
-                for child in reversed(list(getattr(self.chat_view, "children", []))):
-                    if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
-                        child.set_result(
-                            val1,
-                            is_error=parsed_tool_result.is_error,
-                            status=res_status,
-                            returncode=parsed_tool_result.returncode,
-                        )
-                        break
-                logger.debug("Received tool_result step with empty tool_handles queue: %s", val1)
+                if tool_id:
+                    for child in reversed(list(getattr(self.chat_view, "children", []))):
+                        if isinstance(child, ToolCallWidget) and getattr(child, "tool_call_id", None) == tool_id:
+                            cur_tool_handle = child
+                            break
+                if cur_tool_handle is None:
+                    for child in reversed(list(getattr(self.chat_view, "children", []))):
+                        if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
+                            cur_tool_handle = child
+                            break
+                if cur_tool_handle is not None:
+                    cur_tool_handle.set_result(
+                        val1,
+                        is_error=parsed_tool_result.is_error,
+                        status=res_status,
+                        returncode=parsed_tool_result.returncode,
+                    )
+                else:
+                    logger.debug("Received tool_result step with empty tool_handles queue: %s", val1)
         elif event_type == "bot_delta":
             self.finalize_thinking_stream()
             if val1:

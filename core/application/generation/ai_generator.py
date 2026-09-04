@@ -395,12 +395,26 @@ async def _handle_interruption(
         except Exception:  # noqa: BLE001
             pass
     active_handles = tool_handles if tool_handles is not None else tool_handle
-    handles_to_cancel = (
-        list(active_handles) if isinstance(active_handles, (deque, list)) else ([active_handles] if active_handles else [])
-    )
+    if isinstance(active_handles, deque):
+        handles_to_cancel = []
+        while active_handles:
+            handles_to_cancel.append(active_handles.popleft())
+    elif isinstance(active_handles, list):
+        handles_to_cancel = list(active_handles)
+        active_handles.clear()
+    elif active_handles:
+        handles_to_cancel = [active_handles]
+    else:
+        handles_to_cancel = []
     for h in handles_to_cancel:
         try:
-            h.mark_cancelled()
+            if getattr(h, "status", None) == "generating":
+                if hasattr(h, "remove"):
+                    h.remove()
+                else:
+                    h.mark_cancelled()
+            else:
+                h.mark_cancelled()
         except Exception:  # noqa: BLE001
             pass
     record_session_interruption(session, "Response Interrupted")

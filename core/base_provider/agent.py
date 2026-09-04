@@ -843,6 +843,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 resolved.is_error,
                                 resolved.status,
                                 resolved.returncode,
+                                t_id,
                             )
                             messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
                             self._append_history(messages[-1])
@@ -865,6 +866,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 resolved.is_error,
                                 resolved.status,
                                 resolved.returncode,
+                                t_id,
                             )
                             messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
 

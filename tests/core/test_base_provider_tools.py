@@ -255,9 +255,13 @@ class TestToolStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 async for evt in agent.stream_steps("run shell"):
                     events.append(evt)
 
-        self.assertIn(
-            ("tool_result", "ERR: denied 'shell': blocked by policy", "", True, "error", None), events
-        )
+        matching = [
+            e for e in events
+            if e[0] == "tool_result" and "ERR: denied 'shell': blocked by policy" in str(e[1])
+        ]
+        self.assertEqual(len(matching), 1)
+        self.assertTrue(matching[0][3])
+        self.assertEqual(matching[0][6], "tc_1")
         agent.tool_executor.assert_not_called()
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
 

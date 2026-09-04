@@ -127,6 +127,25 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         tw1.mark_running.assert_not_called()
         self.assertIn(tw2, tracked_widgets)
 
+        # Result for c2 arrives first
+        tw2.set_result = MagicMock()
+        tw1.set_result = MagicMock()
+        await self.driver.consume_stream_step(("tool_result", "content b", "", False, ToolResultStatus.DONE, 0, "c2"))
+        tw2.set_result.assert_called_once_with("content b", is_error=False, status="done", returncode=0)
+        tw1.set_result.assert_not_called()
+        self.assertEqual(len(self.driver.tool_handles), 1)
+        self.assertIn(tw1, self.driver.tool_handles)
+
+    async def test_tool_generating_update_priority_two_pass(self):
+        tw1 = MagicMock(status="generating", tool_call_id="c1", tool_call_index=0, update_tool_call=MagicMock())
+        tw2 = MagicMock(status="generating", tool_call_id="c2", tool_call_index=0, update_tool_call=MagicMock())
+        self.driver.tool_handles.extend([tw1, tw2])
+
+        # Target c2 explicitly even if both share index 0
+        await self.driver.consume_stream_step(("tool_generating_update", "read", "c2.py", {"id": "c2", "index": 0}))
+        tw2.update_tool_call.assert_called_once_with(target="c2.py")
+        tw1.update_tool_call.assert_not_called()
+
     async def test_stream_retry_cleans_up_generating_tool_widgets(self):
         tw = MagicMock()
         tw.status = "generating"

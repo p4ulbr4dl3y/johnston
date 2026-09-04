@@ -378,6 +378,24 @@ async def test_interruption_finalize_stream_error_swallowed():
 
 
 @pytest.mark.asyncio
+async def test_interruption_removes_generating_tools():
+    tool_handle = MagicMock(status="generating", remove=MagicMock())
+    canvas = _canvas(
+        add_tool_call=AsyncMock(return_value=tool_handle),
+    )
+
+    async def stream(prompt, attachments=None):
+        yield ("tool_generating", "read", "foo.py", {"id": "c1"})
+        raise asyncio.CancelledError
+
+    agent = _FakeAgent(stream)
+    with pytest.raises(asyncio.CancelledError):
+        await generate_ai_response(agent, _fake_session(), canvas, session_id="s1", user_text="hi")
+
+    tool_handle.remove.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_generation_failure_during_thinking_finishes_thinking_widget():
     thinking = MagicMock(is_thinking=True, finish_thinking=MagicMock())
     canvas = _canvas(
