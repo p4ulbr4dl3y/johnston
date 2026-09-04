@@ -266,12 +266,12 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         ), patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
-        self.assertIn("Worker", footer._last_grid_rows[0][0])
-        self.assertIn("[Select model: /models]", footer._last_grid_rows[0][0])
-        self.assertIn("sandboxed", footer._last_grid_rows[1][0])
-        self.assertIn("review", footer._last_grid_rows[1][0])
-        self.assertIn("esc", footer._last_grid_rows[1][1])
-        self.assertIn("Close", footer._last_grid_rows[1][1])
+        self.assertIn("Test Subagent Task", footer._last_grid_rows[0][0])
+        self.assertIn("esc", footer._last_grid_rows[0][1])
+        self.assertIn("Close", footer._last_grid_rows[0][1])
+        self.assertEqual(footer._last_grid_rows[1], ("", ""))
+        self.assertIn("Worker", footer._last_grid_rows[2][0])
+        self.assertIn("[Select model: /models]", footer._last_grid_rows[2][0])
 
     def test_render_footer_reflects_execution_mode_and_sandbox_off(self):
         from core.permission_manager import PermissionManager
@@ -289,6 +289,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         session.total_tokens = 100
         session.cost_usd = 0.0
         session.sandbox_enabled = False
+        session.title = "Task Title"
         footer.session = session
 
         pm = PermissionManager.get_instance()
@@ -299,8 +300,9 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
                 "widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
             ), patch.object(footer, "_git_diff_stats", return_value=""):
                 footer._render_footer()
-            self.assertNotIn("sandboxed", footer._last_grid_rows[1][0])
-            self.assertIn("yolo", footer._last_grid_rows[1][0])
+            self.assertIn("Task Title", footer._last_grid_rows[0][0])
+            self.assertEqual(footer._last_grid_rows[1], ("", ""))
+            self.assertIn("Worker", footer._last_grid_rows[2][0])
         finally:
             pm.set_session_mode(orig_mode)
 
@@ -331,11 +333,11 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         ):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
-        self.assertIn("gpt-4o", footer._last_grid_rows[0][0])
-        self.assertIn("ctx", footer._last_grid_rows[0][1])
-        self.assertIn("my_repo", footer._last_grid_rows[1][0])
-        self.assertIn("sandboxed", footer._last_grid_rows[1][0])
-        self.assertIn("esc", footer._last_grid_rows[1][1])
+        self.assertIn("Compact", footer._last_grid_rows[0][0])
+        self.assertIn("esc", footer._last_grid_rows[0][1])
+        self.assertEqual(footer._last_grid_rows[1], ("", ""))
+        self.assertIn("gpt-4o", footer._last_grid_rows[2][0])
+        self.assertIn("ctx", footer._last_grid_rows[2][1])
 
     def test_render_footer_sandbox_disabled(self):
         footer = SubagentStatusFooter()

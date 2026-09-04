@@ -92,9 +92,12 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
         grid.add_column(justify="left")
         grid.add_column(justify="right")
         if not self.session:
+            esc_label = "esc Back" if getattr(self, "from_tasks", False) else "esc Close"
+            esc_hint = format_hint(esc_label)
+            grid.add_row("", esc_hint)
             grid.add_row("", "")
             grid.add_row("", "")
-            self._last_grid_rows = [("", ""), ("", "")]
+            self._last_grid_rows = [("", esc_hint), ("", ""), ("", "")]
             self.update(grid)
             return
         session = self.session
@@ -192,6 +195,14 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
 
             agent_role = getattr(agent, "role", None) or getattr(session, "role", "worker")
             branch = getattr(session, "branch_name", "") or self._git_branch(cwd=directory)
+            title_text = (
+                getattr(session, "title", "")
+                or getattr(session, "prompt", "")
+                or getattr(session, "id", "")
+                or "(subagent task)"
+            ).strip()
+            clean_title = " ".join(title_text.split()) or "(subagent task)"
+
             grid, rows = _build_subagent_grid(
                 provider_display=provider_display,
                 clean_model=clean_model,
@@ -214,6 +225,8 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
                 execution_mode=execution_mode,
                 is_running=bool(getattr(session, "status", "") == "running" or self.is_generating),
                 from_tasks=getattr(self, "from_tasks", False),
+                title=clean_title,
+                width=width,
             )
 
             self._last_grid_rows = rows

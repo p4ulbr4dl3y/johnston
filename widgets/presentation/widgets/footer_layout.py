@@ -9,7 +9,7 @@ from rich.table import Table
 from core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from core.models_catalog import format_context_tokens
 from widgets.mixins.stream_frame import SPINNER_FRAMES
-from widgets.utils.row_format import build_env_left_parts, build_status_right_text, ellipsize, format_cost
+from widgets.utils.row_format import build_status_right_text, ellipsize, format_cost
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
 STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "
@@ -156,23 +156,38 @@ def _build_subagent_grid(
     spinner_idx: int = 0,
     directory: str = "",
     branch: str = "",
-    git_diff_stats,
+    git_diff_stats=None,
     is_compact: bool = False,
     sandbox_enabled: bool = True,
     execution_mode: str = "review",
     is_running: bool = False,
     from_tasks: bool = False,
+    title: str = "",
+    width: int = 80,
 ) -> tuple[Table, list[tuple[str, str]]]:
-    """Shared subagent-status table builder (2-line layout, with compact support)."""
+    """Shared subagent-status table builder (2-line layout: Title/Bindings + Role/Metrics)."""
     grid = Table.grid(expand=True)
     grid.add_column(justify="left")
     grid.add_column(justify="right")
 
-    _, t_secondary, t_muted, _ = get_theme_colors()
+    t_primary, t_secondary, t_muted, _ = get_theme_colors()
     txt = t_secondary
     sep = f"  [{t_muted}]•[/]  "
     sep_compact = f" [{t_muted}]•[/] "
     arrow_sep = f" [{t_muted}]›[/] "
+
+    # Row 1: Left [Title (primary)] | Right [Bindings]
+    esc_label = "esc Back" if from_tasks else "esc Close"
+    if is_compact:
+        raw_hints = f"{esc_label.split(' ')[0]} • ctrl+k" if is_running else esc_label.split(' ')[0]
+    else:
+        raw_hints = f"{esc_label} • ctrl+k Kill" if is_running else esc_label
+    row1_right = format_hint(raw_hints)
+
+    clean_title = " ".join(title.split()) if title else "(subagent task)"
+    max_title_len = max(8, width - len(raw_hints) - (4 if is_compact else 6))
+    title_part = ellipsize(clean_title, max_title_len)
+    row1_left = f"[bold {t_primary}]{title_part}[/]"
 
     from core.role_registry import get_role_display_name
 
@@ -183,59 +198,38 @@ def _build_subagent_grid(
     else:
         role_formatted = role_str
 
-    esc_label = "esc Back" if from_tasks else "esc Close"
     if is_compact:
-        raw_hints = f"{esc_label.split(' ')[0]} • ctrl+k" if is_running else esc_label.split(' ')[0]
-    else:
-        raw_hints = f"{esc_label} • ctrl+k Kill" if is_running else esc_label
-    row2_right = format_hint(raw_hints)
-
-    if is_compact:
-        # Row 1 (Compact): Left [Role • Model] | Right [pct% ctx • $0.02 / tok]
-        row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
+        # Row 2 (Compact): Left [Role • Model] | Right [pct% ctx • $0.02 / tok]
+        row2_left_parts = [f"[{txt}]{role_formatted}[/]"]
         if is_connected and clean_model and clean_model != "[Select model: /models]":
-            row1_left_parts.append(f"[{txt}]{clean_model}[/]")
-        row1_left = sep_compact.join(row1_left_parts)
+            row2_left_parts.append(f"[{txt}]{clean_model}[/]")
+        row2_left = sep_compact.join(row2_left_parts)
 
-        row1_right = build_status_right_text(
+        row2_right = build_status_right_text(
             is_connected, model_name, context_used, context_limit, cost_usd, total_tokens, txt, sep_compact
         )
 
-        # Row 2 (Compact): Left [dir • branch (+N/-M) • sb:on • mode] | Right [esc • ctrl+k]
-        dir_basename = os.path.basename(os.path.abspath(directory)) or directory
-        row2_left_parts = [f"[{txt}]{dir_basename}[/]"]
-        diff_text = git_diff_stats()
-        if branch and diff_text:
-            row2_left_parts.append(f"[{txt}]{branch} ({diff_text})[/]")
-        elif branch:
-            row2_left_parts.append(f"[{txt}]{branch}[/]")
-        elif diff_text:
-            row2_left_parts.append(f"[{txt}]({diff_text})[/]")
-        if sandbox_enabled:
-            row2_left_parts.append(f"[{txt}]sandboxed[/]")
-        if execution_mode:
-            row2_left_parts.append(f"[{txt}]{execution_mode}[/]")
-        row2_left = sep_compact.join(row2_left_parts)
-
         grid.add_row(row1_left, row1_right)
+        grid.add_row("", "")
         grid.add_row(row2_left, row2_right)
         rows = [
             (row1_left, row1_right),
+            ("", ""),
             (row2_left, row2_right),
         ]
         return grid, rows
 
     # Full mode
-    # Row 1: Left [Role • Provider › Model (effort)] | Right [Context bar • tokens • cost]
-    row1_left_parts = [f"[{txt}]{role_formatted}[/]"]
+    # Row 2: Left [Role • Provider › Model (effort)] | Right [Context bar • tokens • cost]
+    row2_left_parts = [f"[{txt}]{role_formatted}[/]"]
     if is_connected and provider_display and clean_model and clean_model != "[Select model: /models]":
         model_part = f"[{txt}]{provider_display}[/]{arrow_sep}[{txt}]{clean_model}[/]"
         if thinking_effort and thinking_effort != "auto":
             model_part += f" [{txt}]({thinking_effort})[/]"
-        row1_left_parts.append(model_part)
+        row2_left_parts.append(model_part)
     elif clean_model:
-        row1_left_parts.append(f"[{txt}]{clean_model}[/]")
-    row1_left = sep.join(row1_left_parts)
+        row2_left_parts.append(f"[{txt}]{clean_model}[/]")
+    row2_left = sep.join(row2_left_parts)
 
     if is_connected and model_name:
         pct = (context_used / context_limit * 100) if context_limit > 0 else 0.0
@@ -246,25 +240,23 @@ def _build_subagent_grid(
         bar_str = f"[{t_secondary}]{'█' * filled}[/][{t_muted}]{'░' * empty}[/]"
         cost_str = format_cost(cost_usd)
         tok_str = format_context_tokens(total_tokens)
-        row1_right_parts = [
+        row2_right_parts = [
             f"[{t_muted}][[/]{bar_str}[{t_muted}]][/] [{txt}]{pct:.0f}% ({format_context_tokens(context_used)}/{context_window})[/]",
             f"[{txt}]{tok_str} tok[/]",
             f"[{txt}]{cost_str}[/]",
         ]
-        row1_right = sep.join(row1_right_parts)
+        row2_right = sep.join(row2_right_parts)
     else:
-        row1_right = f"[{txt}]Run /connect to set up API key.[/]"
+        row2_right = f"[{txt}]Run /connect to set up API key.[/]"
+
     grid.add_row(row1_left, row1_right)
-
-    # Row 2: Left [directory • branch (+N/-M) • sandbox: on • mode] | Right [esc: close • ctrl+k: kill]
-    dir_text = format_display_path(directory)
-    diff_text = git_diff_stats()
-    row2_left = build_env_left_parts(dir_text, branch, diff_text, sandbox_enabled, execution_mode, txt, sep)
-
+    grid.add_row("", "")
     grid.add_row(row2_left, row2_right)
 
     rows = [
         (row1_left, row1_right),
+        ("", ""),
         (row2_left, row2_right),
     ]
     return grid, rows
+

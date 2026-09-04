@@ -1206,7 +1206,7 @@ AttachmentHint {
 
 #subagent-status-footer {
     width: 100%;
-    height: 4;
+    height: 5;
     padding: 1 1 1 1;
     background: $bg-surface;
     color: $fg-muted;
