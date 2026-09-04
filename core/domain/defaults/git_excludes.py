@@ -170,3 +170,10 @@ DEFAULT_IGNORE_DIRS = frozenset(
     if pattern.endswith("/") and "*" not in pattern
     for name in (pattern.rstrip("/"),)
 )
+
+# Non-text and binary extensions derived from the exclusion patterns.
+DEFAULT_BINARY_EXTENSIONS = frozenset(
+    line.strip()[1:].lower()
+    for line in DEFAULT_EXCLUDES.strip().splitlines()
+    if line.strip().startswith("*.") and "/" not in line and "*" not in line.strip()[2:]
+)

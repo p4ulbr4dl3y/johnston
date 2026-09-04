@@ -5,6 +5,7 @@ import time
 from typing import Any, Dict, Tuple
 
 from core.domain.defaults.errors import ToolResult
+from core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
 from core.infrastructure.converter import DOC_EXTENSIONS
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
 from core.infrastructure.runtime.lru import LruCache
@@ -451,7 +452,12 @@ class ReadTool(BaseTool):
 
                     for entry in raw_entries:
                         full_p = os.path.join(path, entry)
-                        is_hidden = entry.startswith(".") or entry == "__pycache__"
+                        is_hidden = (
+                            entry in DEFAULT_IGNORE_DIRS
+                            or entry.startswith(".")
+                            or entry.endswith(".egg-info")
+                            or entry == "__pycache__"
+                        )
                         if os.path.isdir(full_p):
                             try:
                                 count = len(os.listdir(full_p))

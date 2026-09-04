@@ -9,6 +9,7 @@ import threading
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from core.domain.defaults.errors import ToolResult
+from core.domain.defaults.git_excludes import DEFAULT_BINARY_EXTENSIONS, DEFAULT_IGNORE_DIRS
 from tools.base import (
     ERROR_KIND_NOT_FOUND,
     ERROR_KIND_PARAMS,
@@ -24,55 +25,20 @@ from tools.cancel import run_cancellable
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_EXCLUDE_DIRS: Set[str] = {
-    ".git",
+DEFAULT_EXCLUDE_DIRS: Set[str] = set(DEFAULT_IGNORE_DIRS) | {
     ".hg",
     ".svn",
-    ".venv",
-    "venv",
-    "env",
-    "__pycache__",
-    "node_modules",
-    "dist",
-    "build",
-    "target",
-    ".next",
-    ".nuxt",
     ".cache",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".tox",
-    ".coverage",
     ".idea",
     ".vscode",
     "coverage",
     "htmlcov",
 }
 
-BINARY_EXTENSIONS: Set[str] = {
+BINARY_EXTENSIONS: Set[str] = set(DEFAULT_BINARY_EXTENSIONS) | {
     ".pyc",
     ".pyo",
-    ".exe",
-    ".dll",
-    ".so",
-    ".dylib",
-    ".o",
-    ".a",
-    ".class",
-    ".jar",
-    ".war",
-    ".db",
-    ".sqlite",
-    ".sqlite3",
-    ".wasm",
-    ".zip",
-    ".tar",
-    ".gz",
-    ".tgz",
-    ".bz2",
-    ".xz",
-    ".7z",
+    ".pyd",
     ".pdf",
     ".png",
     ".jpg",
@@ -81,17 +47,10 @@ BINARY_EXTENSIONS: Set[str] = {
     ".ico",
     ".webp",
     ".svg",
-    ".mp3",
-    ".mp4",
-    ".mov",
-    ".avi",
-    ".flac",
     ".woff",
     ".woff2",
     ".ttf",
     ".eot",
-    ".iso",
-    ".bin",
 }
 
 CODE_EXTENSIONS: Set[str] = {
