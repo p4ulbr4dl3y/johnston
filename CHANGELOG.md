@@ -7,6 +7,127 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.29.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.28.0...johnston-v0.29.0) (2026-09-04)
+
+
+### Features
+
+* **agent:** support auto_compact_token_limit for subagents and main ([1ae1f35](https://github.com/p4ulbr4dl3y/johnston/commit/1ae1f35641c1eb77eca13c5aff5a22d6b1879430))
+* **agent:** upgrade agent loop wire formats and prompts ([d36feea](https://github.com/p4ulbr4dl3y/johnston/commit/d36feea41ca0931b4c94fa2c1a559eda15c3254a))
+* **lifecycle:** add background model catalog refresh on app mount ([c65f723](https://github.com/p4ulbr4dl3y/johnston/commit/c65f7238c8ee54e3a29ea3c502a80ee774d6b0b1))
+* **roles:** inject role_name and normalize role display names in UI ([ce4ab72](https://github.com/p4ulbr4dl3y/johnston/commit/ce4ab7253b76c81fb717bbb739f11f63b951baeb))
+* **session:** numbered fork titles ([1ab49ab](https://github.com/p4ulbr4dl3y/johnston/commit/1ab49ab339b49a105eb037020f3d7ade39c2c749))
+* **subagents:** normalize status and title in manage_subagent ([2e84c5f](https://github.com/p4ulbr4dl3y/johnston/commit/2e84c5f91674994ce7d93f233874de43c4567da4))
+* **tasks:** enrich manage_shell list output with status and duration ([b56eb33](https://github.com/p4ulbr4dl3y/johnston/commit/b56eb33e0fac8d450adeaac80def41fd0e612d47))
+* **theme:** optimize theme catalog and harmonize WCAG AA contrast ([#37](https://github.com/p4ulbr4dl3y/johnston/issues/37)) ([2c7c767](https://github.com/p4ulbr4dl3y/johnston/commit/2c7c7675432c67fe098a5123c741b825260817e2))
+* **tools:** support label and description options in ask_user ([73f0baf](https://github.com/p4ulbr4dl3y/johnston/commit/73f0baf98cc0453f62ebaf2c5f72afbdf1a9d1dd))
+* **ui:** accessibility, feedback and polish sprints 1-3 (P0-1..P2-14) ([#40](https://github.com/p4ulbr4dl3y/johnston/issues/40)) ([e7c7d4b](https://github.com/p4ulbr4dl3y/johnston/commit/e7c7d4b6018613ef6b56fe4acef8a62e25ee0936))
+* **ui:** add /commands and /keybinds slash commands ([5208b86](https://github.com/p4ulbr4dl3y/johnston/commit/5208b86543e79c922e791411841269ab60f602c9))
+* **ui:** add contextual hotkey hints for generation and tools ([bc3dabf](https://github.com/p4ulbr4dl3y/johnston/commit/bc3dabf455c1ebe6622feccf7fe4b4d26eff38c0))
+* **ui:** add multi-select support to ask_user wizard screen ([9cabbfe](https://github.com/p4ulbr4dl3y/johnston/commit/9cabbfe31cbed4fbb19df1f487b9a6f81ef4347e))
+* **ui:** add remaining items indicator to suggestions menu ([e100a0a](https://github.com/p4ulbr4dl3y/johnston/commit/e100a0ae02dd9c7b87ead1bd57db79c2d10b90ab))
+* **ui:** add responsive chat placeholder with @ and image hints ([38ce01c](https://github.com/p4ulbr4dl3y/johnston/commit/38ce01cbc02f2ff9cff39506cd9efddd440340fa))
+* **ui:** add word diff, split mode and hunk nav to diff viewer ([c19f890](https://github.com/p4ulbr4dl3y/johnston/commit/c19f890598d7d9b139efcfdf1ea0ce5c377b2b6a))
+* **ui:** display subagent plan progress in tasks modal ([42e0af2](https://github.com/p4ulbr4dl3y/johnston/commit/42e0af24cbeeb8d1abbfb4382ef46c14d4d598d3))
+* **ui:** increase suggestions popup max height from 5 to 8 ([bbbf465](https://github.com/p4ulbr4dl3y/johnston/commit/bbbf465de59a44df0b9edf570dc3d9399d21e1af))
+* **ui:** modernize hotkey hints format and inline toolcall styling ([ed92c04](https://github.com/p4ulbr4dl3y/johnston/commit/ed92c046da8d547a67196f0c069b34617369b57b))
+* **ui:** polish ask_user option styling and header category badge ([d316fe1](https://github.com/p4ulbr4dl3y/johnston/commit/d316fe19f2c0fc98a9a5631c03befde3aa5a8444))
+* **ui:** preserve subagent plan notch expand/display state in memory ([bf48c18](https://github.com/p4ulbr4dl3y/johnston/commit/bf48c18eaeaf3f82464535725e9c8728c62fdb27))
+* **ui:** render errors via ErrorMessage and clean up error format ([b35a690](https://github.com/p4ulbr4dl3y/johnston/commit/b35a6903e73e4ebf037ea14236c159458444db7f))
+* **ui:** shorten chat placeholder and bind ? to help modal ([af23fa8](https://github.com/p4ulbr4dl3y/johnston/commit/af23fa85e5268704ffe5c0f2a5a68f570479d7c5))
+* **ui:** stream tool call generation with hollow yellow status ([26fcdc5](https://github.com/p4ulbr4dl3y/johnston/commit/26fcdc549615bcabd4b75089359559d78257777c))
+* **ui:** unify chat stream driver and add running session badges ([f433a19](https://github.com/p4ulbr4dl3y/johnston/commit/f433a19a51614d4e246cfb1e4d73f9c4f0e1634f))
+* **ui:** unify modal tab toggle and add right-aligned item counter ([6daa07d](https://github.com/p4ulbr4dl3y/johnston/commit/6daa07d4bf1458887894677af21d72969fcafe46))
+
+
+### Bug Fixes
+
+* **adapters:** close pending coroutines when fetch or client close fails ([02a8f37](https://github.com/p4ulbr4dl3y/johnston/commit/02a8f37e0d9cad2a6757442a13d95e01ebbb47c5))
+* **catalog:** preserve existing cached limits on partial cache saves ([1f80fe3](https://github.com/p4ulbr4dl3y/johnston/commit/1f80fe3ebf8f2723def8a23d35340b5abe0f041d))
+* **catalog:** remove heuristic fallback from vision detection ([cbcc99c](https://github.com/p4ulbr4dl3y/johnston/commit/cbcc99c1c3ff8e1bf044d5437ef6a5276187aa37))
+* **commands:** unify session diff scoping via touched files helper ([a47d1d0](https://github.com/p4ulbr4dl3y/johnston/commit/a47d1d0525bd4aae2fb1bfb063c5947b2b874455))
+* **compaction:** use default max tokens for summary generation ([af00bd1](https://github.com/p4ulbr4dl3y/johnston/commit/af00bd16569d673283330e194fb0e877bd401ec2))
+* **core:** silent token escalation and dedup session fork logic ([a4e833a](https://github.com/p4ulbr4dl3y/johnston/commit/a4e833a3df2f62dae94c175d344a2ea4f0ebca01))
+* **permissions:** harden cascade and shell pattern evaluation ([47f45c9](https://github.com/p4ulbr4dl3y/johnston/commit/47f45c99275c2483938311f866a6201d263e8a50))
+* **platform:** use mtime_ns and size for cached json read ([2e38911](https://github.com/p4ulbr4dl3y/johnston/commit/2e38911a1684cd20bcc196802244dce21e4c25f3))
+* **prompts:** add ask_user, edit recovery, secrets, and push rules ([9d4f51a](https://github.com/p4ulbr4dl3y/johnston/commit/9d4f51aa0d06ed3a0ff1affabb57c4e597a43792))
+* **prompts:** add subagent delegation threshold and merge rules ([0c707ce](https://github.com/p4ulbr4dl3y/johnston/commit/0c707cefbd6f32a41da5f6370405c30a87d22c30))
+* **prompts:** add truncation strategy for tracebacks vs mass output ([842059b](https://github.com/p4ulbr4dl3y/johnston/commit/842059b6117d5caed212c01863d44651272731a8))
+* **prompts:** document edit vs create vs shell rewrite tradeoffs ([6484a10](https://github.com/p4ulbr4dl3y/johnston/commit/6484a1013f8b2aa6cdc3a693550c107148db2514))
+* **prompts:** document stdout buffering and user backgrounding ([6270ad4](https://github.com/p4ulbr4dl3y/johnston/commit/6270ad435b6114709e9d071596a5977d3a4de539))
+* **prompts:** document subagent follow-up vs spawn criteria ([d9ea307](https://github.com/p4ulbr4dl3y/johnston/commit/d9ea307f65146b4a23e2a80ae30a23f3d9101e82))
+* **prompts:** eliminate polling on background shell and subagents ([be08265](https://github.com/p4ulbr4dl3y/johnston/commit/be082654be9370fe921a82035067884633506828))
+* **prompts:** generalize tool calls wording in subagent worktree prompt ([a979ce4](https://github.com/p4ulbr4dl3y/johnston/commit/a979ce4bc54cc2932be30197eb965b23e497754e))
+* **prompts:** require relative paths in main and subagent guidelines ([a180a31](https://github.com/p4ulbr4dl3y/johnston/commit/a180a31097945c828808759971284dfb71031270))
+* **prompts:** sharpen autonomy, recovery, and reasoning guidelines ([6e704fc](https://github.com/p4ulbr4dl3y/johnston/commit/6e704fc6d0ecf51fe3b60a62623aa860e61d37c8))
+* **prompts:** streamline tool_io and wire format reference ([003c46f](https://github.com/p4ulbr4dl3y/johnston/commit/003c46f02bdbefd6fa4b1c3065cceec3b233dc54))
+* **prompts:** sync code modification rules to subagent contract ([eb9e0b0](https://github.com/p4ulbr4dl3y/johnston/commit/eb9e0b0892d72996159ba0daed8a5cda8d8724d5))
+* **prompts:** use generic relative path example in worktree prompt ([96d342b](https://github.com/p4ulbr4dl3y/johnston/commit/96d342b8238c8ab75574245034438070be6e93fe))
+* **providers:** preserve stale model cache and bump remote timeout ([5c79ca7](https://github.com/p4ulbr4dl3y/johnston/commit/5c79ca79178d127c30466d978d8d0b6c99ae7e09))
+* resolve edge bugs in shell, adapters, providers and screens ([efe7870](https://github.com/p4ulbr4dl3y/johnston/commit/efe78703c42b311c84bf530405e62b797e3dbb26))
+* resolve verified bugs across tools, core and widgets ([cd875ae](https://github.com/p4ulbr4dl3y/johnston/commit/cd875ae59d6c6c9e4966defdd4984176f3ab1dc7))
+* **session:** cap fork title base and reject subagent forks ([94781c3](https://github.com/p4ulbr4dl3y/johnston/commit/94781c344ea0f96f8693b64721ba3b633e7e1654))
+* **session:** clean up subagents, tasks and plan on rewind/fork ([0a48b81](https://github.com/p4ulbr4dl3y/johnston/commit/0a48b81120378ad26db1dc1f372615c552cf167a))
+* **session:** correct user event filtering and untracked touched files ([eee45e8](https://github.com/p4ulbr4dl3y/johnston/commit/eee45e81d71c92e506fc2a21dfcad8173749db37))
+* **session:** finalize thinking on interrupt and unify cleanup ([8aabf3e](https://github.com/p4ulbr4dl3y/johnston/commit/8aabf3e4c5f726510edf811a7e13bd5445b6ffe8))
+* **session:** truncate unloaded messages and reset chat view on fork ([0f2cf97](https://github.com/p4ulbr4dl3y/johnston/commit/0f2cf970734cda547b5b85c896abf5b0c5b7b4d7))
+* **skills:** prioritize project over global over bundled in prompt ([0375049](https://github.com/p4ulbr4dl3y/johnston/commit/037504911bdff2f85e7942e417f3fdc4f3b92a62))
+* **stream:** initialize tool_call_id on widget for direct tool calls ([0f23e26](https://github.com/p4ulbr4dl3y/johnston/commit/0f23e26d3f8cc44b2730dc85aa18cd6c1ec094ba))
+* **stream:** match tool results by id and avoid duplicate tool cleanup ([af593d6](https://github.com/p4ulbr4dl3y/johnston/commit/af593d6e632ce744c8028ddf903dee29f1e131e1))
+* **subagent:** enforce relative paths in worktree prompts and schema ([52d6694](https://github.com/p4ulbr4dl3y/johnston/commit/52d669472e2624b7b12523fcb928037203da146b))
+* **subagent:** persist follow-up immediately and fix session sync ([a61b2e3](https://github.com/p4ulbr4dl3y/johnston/commit/a61b2e357ddd84d6f9bcd0e3410bd283d4948f33))
+* **subagents:** fix live tool status tracking and remove auto-expansion ([00a7772](https://github.com/p4ulbr4dl3y/johnston/commit/00a7772971ca81d908bba9907ecb5a84ad699fd0))
+* **subagents:** use generic examples in subagent title guidelines ([8944efe](https://github.com/p4ulbr4dl3y/johnston/commit/8944efe0e32639b7d27a506a48c2ba31e05ce3a8))
+* **subagents:** xml-escape result_text in background notification ([4d95e6a](https://github.com/p4ulbr4dl3y/johnston/commit/4d95e6afaf31fd726af074c31f66eb1dea834052))
+* **tests:** repair suite after wire-format/escaping refactor ([70390e2](https://github.com/p4ulbr4dl3y/johnston/commit/70390e2f32422820ac84913d6547afee0d71f1af))
+* **tools:** add anti-polling circuit breaker to list actions ([693eb4d](https://github.com/p4ulbr4dl3y/johnston/commit/693eb4d00cb55b58ca34135f8d43039e84ee13cb))
+* **tools:** bind schema limits and prompt compaction to settings ([186e6d6](https://github.com/p4ulbr4dl3y/johnston/commit/186e6d6b38550c41117e600a3479294fc3643a9e))
+* **tools:** harden ask_user marker detection, answer split and label dedupe ([f4b9341](https://github.com/p4ulbr4dl3y/johnston/commit/f4b9341689fa90c28881b8e08786a7bd647c3de3))
+* **tools:** isolate subagent update_plan from main app plan notch ([f417fa1](https://github.com/p4ulbr4dl3y/johnston/commit/f417fa10f4afe1578db44f31de38cf33db9da7ad))
+* **ui:** add horizontal padding to diff file list in sidebar ([7ef9844](https://github.com/p4ulbr4dl3y/johnston/commit/7ef9844234d3e41b2baf6af606fd30407e4e0f2c))
+* **ui:** await async key handlers lost to sync super() calls ([f37fa3e](https://github.com/p4ulbr4dl3y/johnston/commit/f37fa3eda11e03f4db04f8cd984adfe63fd75885))
+* **ui:** clean up unfinalized tool widgets and match tools by id ([0e272ff](https://github.com/p4ulbr4dl3y/johnston/commit/0e272fff90f033ad51823fd7a498cba336d2182c))
+* **ui:** clear pagination buffer and loading state on /new ([c23a89c](https://github.com/p4ulbr4dl3y/johnston/commit/c23a89c591096208092ec04c7ada95e1806baeb8))
+* **ui:** disambiguate diff sidebar files and add footer spacing ([12a2492](https://github.com/p4ulbr4dl3y/johnston/commit/12a249283c5c514a9c91fce92e3c8bdf2db41c4a))
+* **ui:** dynamic sequential tool spacing across generation turns ([71143d2](https://github.com/p4ulbr4dl3y/johnston/commit/71143d281daaa253fe13aa00194bcd10ef889750))
+* **ui:** eliminate subagent tool queue duplicate on mount ([f047f0a](https://github.com/p4ulbr4dl3y/johnston/commit/f047f0aaf16e81863cb5646041fe627cb53db9dc))
+* **ui:** hide shell background hint in subagent chat view ([659b6e8](https://github.com/p4ulbr4dl3y/johnston/commit/659b6e826f698e9ae8217302e1ba4091a686442a))
+* **ui:** isolate tool generation metadata and fix target fallback ([d87803e](https://github.com/p4ulbr4dl3y/johnston/commit/d87803e5f19a71adf031e59887222c73a57a82fe))
+* **ui:** preserve border-top on user message following error ([bd10d3d](https://github.com/p4ulbr4dl3y/johnston/commit/bd10d3d1b48c73181d2c2d56d812823a38012929))
+* **ui:** preserve live shell streaming when backgrounded ([851eda0](https://github.com/p4ulbr4dl3y/johnston/commit/851eda025fb71994e82bf6bf5a5caf38cd760706))
+* **ui:** preserve subagent expand state and active stream on re-entry ([5d4abb4](https://github.com/p4ulbr4dl3y/johnston/commit/5d4abb4b23477eeb161ec048cf31484647c67920))
+* **ui:** remove redundant top padding for first user message ([aa7ea3d](https://github.com/p4ulbr4dl3y/johnston/commit/aa7ea3d176b9ccce61eda8ba3612f2a5343ec16c))
+* **ui:** remove session load delay and stabilize notch tests ([1db210a](https://github.com/p4ulbr4dl3y/johnston/commit/1db210a642aab34ff7b8a195184457c2325dd531))
+* **ui:** remove top margin on diff search input ([5963a93](https://github.com/p4ulbr4dl3y/johnston/commit/5963a9329912ceecae9f8d6cd203a93235d40e20))
+* **ui:** render ask_user expansion in secondary raw text style ([70dd8f6](https://github.com/p4ulbr4dl3y/johnston/commit/70dd8f64f1713325d422cedba161ad197cc7e4fb))
+* **ui:** show (esc to interrupt) after model in status footer ([cbb6121](https://github.com/p4ulbr4dl3y/johnston/commit/cbb61212c61105a80a89045cf985e6473071ed83))
+* **ui:** show expand hint only for running toolcalls and thoughts ([46e14f0](https://github.com/p4ulbr4dl3y/johnston/commit/46e14f0315a48e850952b11522da84c47aa51628))
+* **ui:** stop leaking coroutines and timers during app shutdown ([c63879d](https://github.com/p4ulbr4dl3y/johnston/commit/c63879d68930fe4270855f662d4c07a06b6e7a0e))
+* **ui:** strip markdown bold markers when rendering ask_user ([3f4c629](https://github.com/p4ulbr4dl3y/johnston/commit/3f4c629fb02048624923bb8dabf478c785d87447))
+* **ui:** suppress duplicate turn divider after event divider ([5eaf70c](https://github.com/p4ulbr4dl3y/johnston/commit/5eaf70cf231fccbb47399161691e9ece00522162))
+* **ui:** symmetric input padding and slash command attachments ([62a2cce](https://github.com/p4ulbr4dl3y/johnston/commit/62a2cce68bef9c8ec0f9e7baae42ce6d16e14db6))
+* **ui:** unify chat stream and subagent screen event rendering ([85e1d51](https://github.com/p4ulbr4dl3y/johnston/commit/85e1d51b04cc3d2670d42616d0582365d07ed23d))
+* **ui:** use explicit set_expanded for subagent child widgets ([1ecc6c0](https://github.com/p4ulbr4dl3y/johnston/commit/1ecc6c0414c5c1584f3c1ad93e72e00b8f5fcb31))
+* **ui:** use inline key-to-act hint in attachment bar ([cae39ee](https://github.com/p4ulbr4dl3y/johnston/commit/cae39ee218093b8b50553fa69a46fe664f88635c))
+* update regression tests and document edit tool behavior ([0893f58](https://github.com/p4ulbr4dl3y/johnston/commit/0893f586735718345548f3f8b8c5da8e537db6f1))
+
+
+### Performance Improvements
+
+* **markdown:** cache fence highlights and pre-warm off UI thread ([5d99a5c](https://github.com/p4ulbr4dl3y/johnston/commit/5d99a5c7563a72b01fd7aab0419681d90844baf2))
+* **ui:** off-loop palette prewarm, lazy themes import, cache diff lexing ([263fe47](https://github.com/p4ulbr4dl3y/johnston/commit/263fe47d635190e916c9300122518bacc64b5aeb))
+
+
+### Reverts
+
+* undo PR 40 (feat(ui): accessibility and polish) ([4a27fb0](https://github.com/p4ulbr4dl3y/johnston/commit/4a27fb0d3b78a200e9dad491b5d01224c33a6365))
+
+
+### Documentation
+
+* **skills:** align johnston-guide references with actual tool schemas ([7020152](https://github.com/p4ulbr4dl3y/johnston/commit/70201523810914613a4f89cdc20a34f0f5547ceb))
+* **skills:** update johnston-guide references to match codebase ([b9bcd61](https://github.com/p4ulbr4dl3y/johnston/commit/b9bcd6136ed061164fae6fcc3ec17efafa7e6502))
+
 ## [0.28.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.27.1...johnston-v0.28.0) (2026-08-31)
 
 
