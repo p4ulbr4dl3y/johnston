@@ -337,7 +337,6 @@ class AgentSession:
         sess.tokens_cache_read = _coerce_int(data.get("tokens_cache_read"))
         sess.project_dir = data.get("project_dir", "")
         sess.branch_name = data.get("branch_name", "")
-        sess.reconcile_compaction_divider()
         return sess
 
     def reconcile_compaction_divider(self) -> None:
