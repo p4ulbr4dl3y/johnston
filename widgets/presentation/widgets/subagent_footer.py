@@ -1,8 +1,6 @@
 """Subagent screen header and footer widgets."""
 from __future__ import annotations
 
-import os
-
 from rich.table import Table
 from textual.widgets import Static
 
@@ -25,6 +23,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
 
     can_focus = False
     ALLOW_SELECT = False
+    _stream_frame_row_index = -1
 
     def __init__(self, *args, from_tasks: bool = False, **kwargs) -> None:
         super().__init__("", *args, **kwargs)
@@ -137,8 +136,6 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
             if not clean_model:
                 clean_model = "[Select model: /models]"
 
-            directory = getattr(session, "project_dir", "") or os.getcwd()
-
             from core.infrastructure.runtime.token_util import estimate_tokens
 
             msgs = getattr(session, "messages", None)
@@ -174,27 +171,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
             width = resolve_width(self)
             is_compact = is_compact_width(width)
 
-            sandbox_val = getattr(session, "sandbox_enabled", None)
-            if sandbox_val is None and agent:
-                sandbox_val = getattr(agent, "sandbox_enabled", None)
-            if sandbox_val is None and cur_app:
-                sandbox_val = getattr(cur_app, "sandbox_enabled", None)
-            if sandbox_val is None:
-                if getattr(session, "role", "") == "explorer" or getattr(agent, "read_only", False):
-                    sandbox_val = True
-                else:
-                    from core.infrastructure.config.config_helpers import load_sandbox_config
-
-                    sandbox_val = load_sandbox_config()
-            sandbox_enabled = bool(sandbox_val)
-
-            from core.permission_manager import PermissionManager
-
-            pm_inst = PermissionManager.get_instance()
-            execution_mode = pm_inst.execution_mode.value if pm_inst else "review"
-
             agent_role = getattr(agent, "role", None) or getattr(session, "role", "worker")
-            branch = getattr(session, "branch_name", "") or self._git_branch(cwd=directory)
             title_text = (
                 getattr(session, "title", "")
                 or getattr(session, "prompt", "")
@@ -217,12 +194,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
                 agent_role=agent_role,
                 is_generating=self.is_generating,
                 spinner_idx=self._spinner_idx,
-                directory=directory,
-                branch=branch,
-                git_diff_stats=lambda: self._git_diff_stats(cwd=directory),
                 is_compact=is_compact,
-                sandbox_enabled=sandbox_enabled,
-                execution_mode=execution_mode,
                 is_running=bool(getattr(session, "status", "") == "running" or self.is_generating),
                 from_tasks=getattr(self, "from_tasks", False),
                 title=clean_title,

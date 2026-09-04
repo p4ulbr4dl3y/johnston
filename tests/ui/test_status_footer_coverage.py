@@ -239,6 +239,29 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
             footer._spin()
         rsf.assert_called_once()
 
+    def test_render_stream_frame_only_animates_bottom_row(self):
+        footer = SubagentStatusFooter()
+        footer.is_generating = True
+        footer._spinner_idx = 1  # SPINNER_FRAMES[1] == "⠙"
+        footer._last_grid_rows = [
+            ("[bold #ffffff]Project structure[/]", "esc Back"),
+            ("", ""),
+            ("[#a1a1aa]⠋ Explorer[/]", "[#a1a1aa]cost[/]"),
+        ]
+        with patch.object(footer, "update") as mock_update:
+            footer._render_stream_frame()
+            mock_update.assert_called_once()
+            grid = mock_update.call_args[0][0]
+            self.assertEqual(len(grid.rows), 3)
+
+        # Direct swap_frame tests
+        # Title with brackets has no spinner -> returns untouched
+        untouched = footer._swap_frame("[bold #ffffff]Project structure[/]", "⠙")
+        self.assertEqual(untouched, "[bold #ffffff]Project structure[/]")
+        # Role with existing spinner -> correctly swaps
+        swapped = footer._swap_frame("[#a1a1aa]⠋ Explorer[/]", "⠙")
+        self.assertEqual(swapped, "[#a1a1aa]⠙ Explorer[/]")
+
     def test_render_footer_provider_active_and_pricing(self):
         footer = SubagentStatusFooter()
         footer._harness_app = MagicMock()
@@ -364,12 +387,35 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         cm.load_providers.return_value = {}
         cm.is_provider_connected.return_value = False
         app.pm = cm
-        footer._harness_app = app
         footer.session = session
-        with patch.object(footer, "_git_diff_stats", return_value=""):
-            footer._render_footer()
+        footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
-        self.assertNotIn("sandboxed", footer._last_grid_rows[1][0])
+        all_text = "\n".join(cell for row in footer._last_grid_rows for cell in row)
+        self.assertNotIn("sandboxed", all_text)
+        self.assertIn("Worker", footer._last_grid_rows[2][0])
+
+    def test_render_footer_escapes_title_markup(self):
+        footer = SubagentStatusFooter()
+        app = MagicMock()
+        cm = MagicMock()
+        cm.get_active_provider_key.return_value = "openai"
+        cm.load_providers.return_value = {}
+        cm.is_provider_connected.return_value = False
+        app.pm = cm
+        app.agent = None
+        footer._harness_app = app
+        session = MagicMock()
+        session.agent = None
+        session.role = "worker"
+        session.messages = []
+        session.last_context_tokens = 0
+        session.total_tokens = 0
+        session.cost_usd = 0.0
+        session.title = "[red]Feature[/red]"
+        footer.session = session
+        footer._render_footer()
+        self.assertIsNotNone(footer._last_grid_rows)
+        self.assertIn(r"\[red]Feature\[/red]", footer._last_grid_rows[0][0])
 
     def test_render_footer_exception(self):
         footer = SubagentStatusFooter()

@@ -17,23 +17,27 @@ class StreamFrameMixin:
         if not self.is_generating:
             return
         rows = getattr(self, "_last_grid_rows", None)
-        if rows is None:
+        if not rows:
             return
         try:
             frame = SPINNER_FRAMES[self._spinner_idx % len(SPINNER_FRAMES)]
             grid = Table.grid(expand=True)
-            if rows and len(rows[0]) == 1:
+            target_row = getattr(self, "_stream_frame_row_index", 0)
+            if target_row < 0:
+                target_row = len(rows) + target_row
+
+            if len(rows[0]) == 1:
                 grid.add_column(justify="left")
                 for i, row in enumerate(rows):
                     cell = row[0]
-                    if i == 0:
+                    if i == target_row:
                         cell = self._swap_frame(cell, frame)
                     grid.add_row(cell)
             else:
                 grid.add_column(justify="left")
                 grid.add_column(justify="right")
                 for i, (left, right) in enumerate(rows):
-                    if i == 0:
+                    if i == target_row:
                         left = self._swap_frame(left, frame)
                     grid.add_row(left, right)
             self.update(grid)
@@ -43,8 +47,8 @@ class StreamFrameMixin:
     @staticmethod
     def _swap_frame(left: str, frame: str) -> str:
         """Replace the old spinner char in the cached left cell with the new frame."""
-        try:
-            idx = left.index("]") + 1
-            return left[:idx] + frame + left[idx + 1 :]
-        except Exception:
-            return left
+        for f in SPINNER_FRAMES:
+            if f in left:
+                return left.replace(f, frame, 1)
+        return left
+

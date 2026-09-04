@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 
+from rich.markup import escape
 from rich.table import Table
 
 from core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
@@ -187,7 +188,7 @@ def _build_subagent_grid(
     clean_title = " ".join(title.split()) if title else "(subagent task)"
     max_title_len = max(8, width - len(raw_hints) - (4 if is_compact else 6))
     title_part = ellipsize(clean_title, max_title_len)
-    row1_left = f"[bold {t_primary}]{title_part}[/]"
+    row1_left = f"[bold {t_primary}]{escape(title_part)}[/]"
 
     from core.role_registry import get_role_display_name
 
