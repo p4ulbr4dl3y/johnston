@@ -233,13 +233,9 @@ def merge_subagent_metrics(subagent: Any, context: Any) -> None:
 
 
 async def _safe_save(store: Any, session: AgentSession) -> None:
-    """Persist a session, logging and re-raising on storage failure.
-
-    A silent swallow meant a failed save still marked the subagent COMPLETED,
-    losing the session on disk. Now the failure is fully logged and propagated
-    so callers can flip the status away from success; caller that chooses to
-    contain the error may catch it explicitly.
-    """
+    """Persist a session, logging and re-raising on storage failure."""
+    if store is None:
+        return
     try:
         await asyncio.to_thread(store.save, session)
     except Exception:
@@ -357,6 +353,11 @@ async def run_subagent_stream_bg(
                 subagent, message, session, ctx, store, error_prefix=error_prefix
             )
 
+            if session.status in (SessionStatus.CANCELLED, SessionStatus.ERROR, "cancelled", "error"):
+                if getattr(session, "pending_messages", None):
+                    session.pending_messages.clear()
+                break
+
             # Drain follow-up messages queued while the previous message ran.
             if session.pending_messages:
                 message = session.pending_messages.pop(0)
@@ -417,30 +418,10 @@ async def run_subagent_stream_bg(
 
 
 def cancel_running_subagents(store: Any, parent_id: Optional[str] = None) -> int:
-    """Cancels running subagent asyncio tasks and marks their sessions cancelled.
+    """Cancels running subagent asyncio tasks and marks their sessions cancelled."""
+    from core.application.session.subagent_service import SubagentService
 
-    Subagent sessions are the single source of truth for running state, so
-    cancellation lives here instead of a parallel in-memory task registry.
-    """
-    if parent_id:
-        sessions = store.children(parent_id)
-    else:
-        sessions = store.list(kind="subagent")
-
-    cancelled = 0
-    for sess in sessions:
-        if getattr(sess, "status", "") != SessionStatus.RUNNING:
-            continue
-        async_task = getattr(sess, "async_task", None)
-        if async_task and not async_task.done():
-            try:
-                async_task.cancel()
-            except Exception:
-                pass
-        sess.finish(SessionStatus.CANCELLED, "Cancelled")
-        store.save(sess)
-        cancelled += 1
-    return cancelled
+    return SubagentService.cancel_running_subagents(store, parent_id)
 
 
 async def send_subagent_followup(
@@ -460,6 +441,7 @@ async def send_subagent_followup(
     # status. If the subagent is currently busy (live async_task), the
     # message is queued and drained by the running stream; otherwise it
     # starts immediately.
+    setattr(session, "suppress_notification", False)
     if session.async_task and hasattr(session.async_task, "done") and not session.async_task.done():
         if not hasattr(session, "pending_messages"):
             session.pending_messages = []

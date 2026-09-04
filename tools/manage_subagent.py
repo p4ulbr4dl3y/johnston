@@ -1,7 +1,6 @@
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
-from core.domain.entities.session import SessionStatus
 from tools.base import BaseTool
 
 
@@ -49,8 +48,10 @@ class ManageSubagentTool(BaseTool):
         store = get_session_store(ctx.host)
         curr_session_id = ctx.session_id
 
+        from core.application.session.subagent_service import SubagentService
+
         if action == "list":
-            target_sessions = store.children(curr_session_id) if curr_session_id else store.list(kind="subagent")
+            target_sessions = SubagentService.list_subagents(store, curr_session_id)
             fp = [(str(getattr(s, "id", "")), str(getattr(s, "status", ""))) for s in (target_sessions or [])]
             last_fp = getattr(self, "_last_list_fp", None)
             count = getattr(self, "_consecutive_list_count", 0)
@@ -67,43 +68,7 @@ class ManageSubagentTool(BaseTool):
             self._last_list_fp = fp
             self._consecutive_list_count = count + 1 if last_fp == fp else 1
 
-            if not target_sessions:
-                return ToolResult.done(
-                    content="[subagents 0]",
-                    display="",
-                )
-
-            items = []
-            for sess in target_sessions:
-                s_id = str(sess.id)
-                raw_st = getattr(sess, "status", None)
-                if isinstance(raw_st, SessionStatus):
-                    st = raw_st.value.lower()
-                else:
-                    st = str(raw_st or "").lower()
-
-                if getattr(sess, "async_task", None) and not sess.async_task.done():
-                    s_status = "running"
-                elif st in ("active", "running"):
-                    s_status = "running"
-                elif st in ("completed", "done", "finished"):
-                    s_status = "completed"
-                elif st in ("cancelled", "canceled", "killed"):
-                    s_status = "cancelled"
-                elif st in ("error", "failed"):
-                    s_status = "error"
-                else:
-                    s_status = st or "unknown"
-
-                s_role = str(getattr(sess, "role", "worker") or "worker")
-                raw_title = getattr(sess, "title", "") or ""
-                if (not raw_title or raw_title.lower() == "untitled") and getattr(sess, "prompt", ""):
-                    raw_title = getattr(sess, "prompt", "")
-                raw_title = raw_title or "(subagent task)"
-                s_title = " ".join(str(raw_title).split())
-                items.append(f"{s_id}|{s_status}|{s_role}|{s_title}")
-
-            content_txt = f"[subagents {len(target_sessions)} | id|status|role|title]\n" + "\n".join(items)
+            content_txt = SubagentService.format_subagents_list(target_sessions)
             return ToolResult.done(content=content_txt, display="")
 
         self._consecutive_list_count = 0
@@ -120,31 +85,9 @@ class ManageSubagentTool(BaseTool):
             return ToolResult.error("notfound", name=session_id)
 
         if action == "kill":
-            setattr(session, "suppress_notification", True)
-            if session.status != "running":
-                msg = f"[killed {session.id}]"
-                return ToolResult.done(content=msg, display="")
-
-            if session.async_task and not session.async_task.done():
-                try:
-                    session.async_task.cancel()
-                except Exception:
-                    pass
-
-            session.finish(SessionStatus.CANCELLED, "Cancelled via subagent tool")
-            store.save(session)
-            msg = f"[killed {session.id}]"
-            return ToolResult.done(content=msg, display="")
+            return SubagentService.kill_subagent(session, store)
 
         elif action == "send_message":
-            if not message:
-                return ToolResult.error(
-                    "params",
-                    name="message",
-                    detail="required for 'send_message'. Provide the text instructions to send.",
-                )
-            from core.application.session.stream import send_subagent_followup
-
-            return await send_subagent_followup(session, message, ctx, store)
+            return await SubagentService.send_message(session, message, ctx, store)
 
         return ToolResult.error("action", detail="valid: list, kill, send_message", name=action)

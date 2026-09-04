@@ -221,6 +221,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
     def client(self) -> Any:
         if self._client is None:
             import unittest.mock
+
             self._client = unittest.mock.MagicMock()
         return self._client
 
