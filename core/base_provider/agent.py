@@ -7,7 +7,11 @@ import re
 import time
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
 
-from core.base_provider.compaction import CompactionMixin, should_compact
+from core.base_provider.compaction import (
+    CompactionMixin,
+    resolve_auto_compact_limit,
+    should_compact,
+)
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
 from core.base_provider.tools import ToolMixin
 from core.domain.defaults.config import DEFAULT_MAX_TOKENS, ESCALATED_MAX_TOKENS
@@ -379,13 +383,14 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         return None
 
     def _has_queued_messages(self) -> bool:
-        """True if the queue has a message for the current session."""
+        """True if the queue has a message for the current session/agent."""
+        session = getattr(self, "session", None)
+        if session is not None and getattr(session, "pending_messages", None):
+            return True
+        if getattr(self, "pending_messages", None):
+            return True
         if getattr(self, "is_subagent", False):
-            session = getattr(self, "session", None)
-            if session is not None and getattr(session, "pending_messages", None):
-                return True
-            pending = getattr(self, "pending_messages", None)
-            return bool(pending)
+            return False
         app = getattr(self, "app", None)
         if app is None:
             return False
@@ -398,6 +403,57 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             if item_sid is None or sid is None or item_sid == sid:
                 return True
         return False
+
+    def _drain_queued_messages(self) -> List[Tuple[str, Any, bool, Any]]:
+        """Drain queued user messages for this agent across session, self, or app queue.
+
+        Yields/returns normalized tuples: (prompt, attachments, show_in_ui, display_text)
+        """
+        drained: List[Tuple[str, Any, bool, Any]] = []
+        session = getattr(self, "session", None)
+        pending_list = None
+        if session is not None and getattr(session, "pending_messages", None):
+            pending_list = session.pending_messages
+        elif getattr(self, "pending_messages", None):
+            pending_list = self.pending_messages
+
+        if pending_list:
+            while pending_list:
+                item = pending_list.pop(0)
+                if isinstance(item, str):
+                    drained.append((item, None, True, None))
+                elif isinstance(item, (list, tuple)):
+                    msg = item[0]
+                    show = item[1] if len(item) > 1 else True
+                    atts = item[2] if len(item) > 2 else None
+                    disp = item[4] if len(item) > 4 else None
+                    drained.append((msg, atts, show, disp))
+            return drained
+
+        if getattr(self, "is_subagent", False):
+            return drained
+
+        app = getattr(self, "app", None)
+        if app is not None:
+            mq = getattr(app, "message_queue", None)
+            if mq:
+                sid = getattr(app, "current_session_id", None)
+                kept = []
+                for item in mq:
+                    item_sid = item[3] if len(item) > 3 else None
+                    if item_sid is not None and sid is not None and item_sid != sid:
+                        kept.append(item)
+                        continue
+                    drained.append(
+                        (
+                            item[0],
+                            item[2] if len(item) > 2 else None,
+                            item[1] if len(item) > 1 else True,
+                            item[4] if len(item) > 4 else None,
+                        )
+                    )
+                mq[:] = kept
+        return drained
 
     async def stream_steps(
         self, user_text: str, attachments: Optional[List[Any]] = None
@@ -431,12 +487,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         settings = get_settings()
         compaction_ratio = settings.llm.compaction_threshold_ratio
         threshold = int(cur_limit * compaction_ratio)
-        compact_limit = getattr(self, "auto_compact_token_limit", None)
-        if compact_limit is None:
-            if getattr(self, "is_subagent", False):
-                compact_limit = settings.subagents.auto_compact_token_limit
-            else:
-                compact_limit = settings.llm.auto_compact_token_limit
+        compact_limit = resolve_auto_compact_limit(self)
         if compact_limit is not None and compact_limit > 0:
             threshold = min(threshold, compact_limit)
         sys_overhead = getattr(self, "_last_sys_tokens", 0) or 0
@@ -509,50 +560,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         try:
             while True:
                 # Drain queued user messages between agent steps.
-                if getattr(self, "is_subagent", False):
-                    session = getattr(self, "session", None)
-                    pending_list = None
-                    if session is not None and hasattr(session, "pending_messages") and session.pending_messages:
-                        pending_list = session.pending_messages
-                    elif hasattr(self, "pending_messages") and self.pending_messages:
-                        pending_list = self.pending_messages
-
-                    if pending_list:
-                        while pending_list:
-                            item = pending_list.pop(0)
-                            msg_text = item if isinstance(item, str) else item[0]
-                            messages.append({"role": "user", "content": msg_text})
-                            self._append_history(messages[-1])
-                            yield ("queued_user_message", msg_text, None, True, None)
-                else:
-                    app = getattr(self, "app", None)
-                    if app is not None:
-                        mq = getattr(app, "message_queue", None)
-                        if mq:
-                            sid = getattr(app, "current_session_id", None)
-                            # Iterate over a snapshot so foreign-session items are left
-                            # in place (no infinite loop) while own items are consumed.
-                            # Single-pass drain: keep foreign-session items in place,
-                            # consume own items. O(n) instead of list()+remove() O(n^2).
-                            kept = []
-                            for item in mq:
-                                item_sid = item[3] if len(item) > 3 else None
-                                if item_sid is not None and sid is not None and item_sid != sid:
-                                    kept.append(item)
-                                    continue
-                                messages.append({"role": "user", "content": item[0]})
-                                self._append_history(messages[-1])
-                                # Carry the queued item's display_text (item[4]) so the UI
-                                # can render the short command instead of the full prompt text
-                                # (e.g. "/skill-name" vs the expanded <skill ...> block).
-                                yield (
-                                    "queued_user_message",
-                                    item[0],
-                                    item[2] if len(item) > 2 else None,
-                                    item[1],
-                                    item[4] if len(item) > 4 else None,
-                                )
-                            mq[:] = kept
+                for msg_text, atts, show_ui, disp_text in self._drain_queued_messages():
+                    messages.append({"role": "user", "content": msg_text})
+                    self._append_history(messages[-1])
+                    yield ("queued_user_message", msg_text, atts, show_ui, disp_text)
 
                 step_usage = None
                 # messages = [system] + self.history (invariant maintained below), so

@@ -1033,3 +1033,58 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(tool_steps[0][1], "edit")
         self.assertEqual(tool_steps[0][2], "app.py")
 
+    def test_drain_queued_messages_session_pending(self):
+        agent = BaseAgent(api_key="k", model="m", base_url="http://t", provider_key="p")
+        sess = unittest.mock.MagicMock()
+        sess.pending_messages = ["task 1", ("task 2", False, ["att.txt"], "s1", "/cmd")]
+        agent.session = sess
+        drained = agent._drain_queued_messages()
+        self.assertEqual(len(drained), 2)
+        self.assertEqual(drained[0], ("task 1", None, True, None))
+        self.assertEqual(drained[1], ("task 2", ["att.txt"], False, "/cmd"))
+        self.assertEqual(sess.pending_messages, [])
+
+    def test_drain_queued_messages_app_queue(self):
+        agent = BaseAgent(api_key="k", model="m", base_url="http://t", provider_key="p")
+        app = unittest.mock.MagicMock()
+        app.current_session_id = "s1"
+        app.message_queue = [
+            ("msg 1", True, None, "s1"),
+            ("msg foreign", True, None, "s2"),
+            ("msg 2", False, ["f.py"], "s1", "/skill"),
+        ]
+        agent.app = app
+        drained = agent._drain_queued_messages()
+        self.assertEqual(len(drained), 2)
+        self.assertEqual(drained[0], ("msg 1", None, True, None))
+        self.assertEqual(drained[1], ("msg 2", ["f.py"], False, "/skill"))
+        self.assertEqual(len(app.message_queue), 1)
+        self.assertEqual(app.message_queue[0][0], "msg foreign")
+
+    def test_resolve_auto_compact_limit(self):
+        from core.base_provider.compaction import resolve_auto_compact_limit
+
+        agent = BaseAgent(api_key="k", model="m", base_url="http://t", provider_key="p")
+        agent.auto_compact_token_limit = 12345
+        self.assertEqual(resolve_auto_compact_limit(agent), 12345)
+
+        agent.auto_compact_token_limit = None
+        agent.is_subagent = True
+        limit_sub = resolve_auto_compact_limit(agent)
+        self.assertIsInstance(limit_sub, int)
+
+    def test_collect_user_messages_preserve_root_prompt(self):
+        from core.base_provider.compaction import collect_user_messages
+
+        history = [
+            {"role": "user", "content": "Root prompt"},
+            {"role": "assistant", "content": "Resp 1"},
+            {"role": "user", "content": "Second prompt"},
+            {"role": "assistant", "content": "Resp 2"},
+            {"role": "user", "content": "Third prompt"},
+        ]
+        res = collect_user_messages(history, max_tokens=1000, preserve_root_prompt=True)
+        self.assertEqual(res[0]["content"], "Root prompt")
+        self.assertEqual([m["content"] for m in res], ["Root prompt", "Second prompt", "Third prompt"])
+
+

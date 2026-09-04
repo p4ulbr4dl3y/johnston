@@ -151,17 +151,36 @@ def _summary_signature(text: Any) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:16]
 
 
+def resolve_auto_compact_limit(agent: Any) -> Optional[int]:
+    """Resolve auto-compact token limit for an agent based on instance override or settings."""
+    limit = getattr(agent, "auto_compact_token_limit", None)
+    if limit is not None:
+        return limit
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        settings = get_settings()
+        if getattr(agent, "is_subagent", False):
+            return settings.subagents.auto_compact_token_limit
+        return settings.llm.auto_compact_token_limit
+    except Exception:
+        return None
+
+
 def collect_user_messages(
     history: List[Dict[str, Any]],
     max_tokens: Optional[int] = None,
     is_subagent: bool = False,
+    preserve_root_prompt: Optional[bool] = None,
 ) -> List[Dict[str, Any]]:
     """Collects real user messages to preserve across compaction checkpoints.
 
     - Excludes <compaction_checkpoint> items and <system_note> synthetic notes.
-    - If is_subagent=True, guarantees the root task prompt (1st real user message) is always preserved.
+    - If preserve_root_prompt=True (or is_subagent=True), guarantees root task prompt is preserved.
     - Preserves user messages up to `max_tokens` budget.
     """
+    if preserve_root_prompt is None:
+        preserve_root_prompt = is_subagent
     if max_tokens is None:
         try:
             from core.infrastructure.config.settings import get_settings
@@ -179,7 +198,7 @@ def collect_user_messages(
     if not real_user_msgs:
         return []
 
-    if is_subagent:
+    if preserve_root_prompt:
         root_prompt = real_user_msgs[0]
         subsequent = real_user_msgs[1:]
         root_tokens = estimate_tokens(root_prompt)
@@ -523,18 +542,7 @@ class CompactionMixin:
             except Exception:
                 summarize_ratio = DEFAULT_COMPACTION_SUMMARIZE_RATIO
             limit_for_compaction = getattr(self, "context_limit", DEFAULT_CONTEXT_LIMIT)
-            compact_limit = getattr(self, "auto_compact_token_limit", None)
-            if compact_limit is None:
-                try:
-                    from core.infrastructure.config.settings import get_settings
-
-                    settings = get_settings()
-                    if getattr(self, "is_subagent", False):
-                        compact_limit = settings.subagents.auto_compact_token_limit
-                    else:
-                        compact_limit = settings.llm.auto_compact_token_limit
-                except Exception:
-                    pass
+            compact_limit = resolve_auto_compact_limit(self)
             if compact_limit is not None and compact_limit > 0:
                 limit_for_compaction = min(limit_for_compaction, compact_limit)
             max_summarize_tokens = int(limit_for_compaction * summarize_ratio)
@@ -627,8 +635,10 @@ class CompactionMixin:
             checkpoint_item = {"role": "user", "content": checkpoint_content}
 
             # Collect preserved user messages
-            is_sub = getattr(self, "is_subagent", False)
-            preserved_users = collect_user_messages(self.history, is_subagent=is_sub)
+            preserve_root = getattr(self, "preserve_root_prompt", None)
+            if preserve_root is None:
+                preserve_root = getattr(self, "is_subagent", False)
+            preserved_users = collect_user_messages(self.history, preserve_root_prompt=preserve_root)
 
             # Avoid duplicate user messages that are already in recent_tail.
             # Use content signature (not id()) so dedup survives sanitize

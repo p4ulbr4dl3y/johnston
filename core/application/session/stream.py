@@ -146,6 +146,7 @@ def configure_agent(
     """
     agent.app = app
     agent.is_subagent = is_subagent
+    agent.preserve_root_prompt = is_subagent
     if is_subagent:
         from core.infrastructure.config.settings import get_settings
 
