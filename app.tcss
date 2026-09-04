@@ -192,6 +192,7 @@ WelcomeWidget {
 }
 
 .event-divider:last-child {
+    margin-top: 1;
     margin-bottom: 0;
 }
 
@@ -205,6 +206,7 @@ WelcomeWidget {
 }
 
 .error-msg:last-child {
+    margin-top: 1;
     margin-bottom: 0;
 }
 

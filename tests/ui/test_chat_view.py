@@ -760,3 +760,38 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(chat_view._is_loading_session)
             self.assertTrue(chat_view._auto_follow)
             self.assertTrue(chat_view._has_welcome)
+
+
+class TestChatViewDividerSpacing(unittest.IsolatedAsyncioTestCase):
+    async def test_event_divider_and_error_margin_spacing(self):
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_view = app.query_one(ChatView)
+            chat_view.clear_welcome()
+
+            # EventDivider as last-child
+            user = await chat_view.add_user_message("msg")
+            divider = await chat_view.add_event_divider("Response Interrupted")
+            await pilot.pause()
+
+            self.assertEqual(divider.styles.margin.top, 1)
+            self.assertEqual(divider.styles.margin.bottom, 0)
+            self.assertEqual(divider.region.y - (user.region.y + user.region.height), 1)
+
+            # EventDivider as middle child
+            bot = await chat_view.add_bot_message()
+            bot.content = "bot reply"
+            await pilot.pause()
+
+            self.assertEqual(divider.styles.margin.top, 1)
+            self.assertEqual(divider.styles.margin.bottom, 1)
+            self.assertEqual(divider.region.y - (user.region.y + user.region.height), 1)
+            self.assertEqual(bot.region.y - (divider.region.y + divider.region.height), 1)
+
+            # ErrorMessage as last-child
+            err = await chat_view.add_error_message("Error occurred")
+            await pilot.pause()
+
+            self.assertEqual(err.styles.margin.top, 1)
+            self.assertEqual(err.styles.margin.bottom, 0)
+
