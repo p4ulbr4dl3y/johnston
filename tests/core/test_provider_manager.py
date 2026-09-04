@@ -466,9 +466,11 @@ def test_active_provider_field_is_ignored(pm, tmp_path):
     # ``model`` is the single source of truth; a stale legacy ``active_provider``
     # field is never read, so an active_provider-only config yields no provider.
     _write(tmp_path / "config.json", {"active_provider": "openai"})
+    pm.invalidate_cache()
     assert pm.get_active_provider_key() == ""
 
     _write(tmp_path / "config.json", {"model": "openai/gpt-4o", "active_provider": "anthropic"})
+    pm.invalidate_cache()
     assert pm.get_active_provider_key() == "openai"
 
 

@@ -169,19 +169,19 @@ def update_json_config(
 
 
 def cached_json_read(path: str, default: Any = None) -> Any:
-    """Reads a JSON file, returning a cache value when the file mtime is unchanged."""
-    if not os.path.exists(path):
+    """Reads a JSON file, returning a cache value when the file mtime/size is unchanged."""
+    path = os.fspath(path)
+    try:
+        st = os.stat(path)
+        stat_key = (st.st_mtime_ns, st.st_size)
+    except OSError:
         _json_read_cache.pop(path, None)
         return default
-    try:
-        mtime = os.path.getmtime(path)
-    except OSError:
-        mtime = None
     cached = _json_read_cache.get(path)
-    if cached is not None and cached[0] == mtime:
+    if cached is not None and cached[0] == stat_key:
         return cached[1]
     data = read_json(path, default)
-    _json_read_cache[path] = (mtime, data)
+    _json_read_cache[path] = (stat_key, data)
     return data
 
 
