@@ -248,6 +248,15 @@ class OpenAIAdapter(BaseApiAdapter):
                             fn_args = tc_fn.get("arguments", "") if fn_is_dict else getattr(tc_fn, "arguments", "")
                             if fn_args:
                                 tool_call_arg_parts.setdefault(idx, []).append(fn_args)
+                            yield (
+                                "adapter_tool_delta",
+                                {
+                                    "index": idx,
+                                    "id": tool_calls[idx].get("id", ""),
+                                    "name": tool_calls[idx].get("name", ""),
+                                    "arguments_delta": fn_args or "",
+                                },
+                            )
         finally:
             if not producer_task.done():
                 producer_task.cancel()

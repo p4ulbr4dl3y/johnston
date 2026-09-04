@@ -1,3 +1,4 @@
+import json
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -410,6 +411,9 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
         self.assertEqual(tc[0][1]["arguments"], '{"command":"ls"}')
+        deltas = [e for e in events if e[0] == "adapter_tool_delta"]
+        self.assertGreaterEqual(len(deltas), 2)
+        self.assertEqual(deltas[0][1]["name"], "shell")
 
     async def test_stream_max_tokens(self):
         lines = ['data: {"choices":[{"delta":{"content":"x"}}]}']
@@ -456,6 +460,9 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
+        deltas = [e for e in events if e[0] == "adapter_tool_delta"]
+        self.assertGreaterEqual(len(deltas), 3)
+        self.assertEqual(deltas[0][1]["name"], "shell")
 
     async def test_stream_thinking_delta(self):
         lines = [
@@ -818,6 +825,53 @@ class TestGeminiThoughtStreaming(unittest.IsolatedAsyncioTestCase):
         text_events = [e[1] for e in events if e[0] == "adapter_text"]
         self.assertEqual(thought_events, ["let me think"])
         self.assertEqual(text_events, ["final answer"])
+
+    async def test_gemini_stream_chat_multiple_function_calls_increments_index(self):
+        adapter = GeminiAdapter()
+        line1 = json.dumps({
+            "candidates": [{
+                "content": {
+                    "parts": [
+                        {"functionCall": {"name": "read", "args": {"path": "a.txt"}}},
+                        {"functionCall": {"name": "read", "args": {"path": "b.txt"}}},
+                    ]
+                }
+            }]
+        })
+        sse_data = f"data: {line1}\n\n"
+
+        class FakeStreamResponse:
+            def __init__(self, text):
+                self.text = text
+
+            async def aiter_lines(self):
+                for line in self.text.splitlines():
+                    yield line
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        class FakeClient:
+            def stream(self, *args, **kwargs):
+                return FakeStreamResponse(sse_data)
+
+        with patch.object(adapter, "_get_client", return_value=FakeClient()):
+            with patch("core.adapters.gemini.check_httpx_response_status", return_value=None):
+                events = [e async for e in adapter.stream_chat(
+                    base_url="http://test", api_key="k", model="gemini-2.5-flash", messages=[]
+                )]
+
+        deltas = [e[1] for e in events if e[0] == "adapter_tool_delta"]
+        self.assertEqual(len(deltas), 2)
+        self.assertEqual(deltas[0]["index"], 0)
+        self.assertEqual(deltas[0]["name"], "read")
+        self.assertEqual(deltas[1]["index"], 1)
+        self.assertEqual(deltas[1]["name"], "read")
+        calls = [e[1] for e in events if e[0] == "adapter_tool_call"]
+        self.assertEqual(len(calls), 2)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import random
+import re
 import time
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
 
@@ -28,6 +29,25 @@ from core.models_catalog import catalog
 from core.provider_manager import is_local_provider
 
 logger = logging.getLogger(__name__)
+
+_STREAMING_TARGET_RE = re.compile(
+    r'"(?:path|command|url|file_path|title|prompt|query|action)"\s*:\s*"((?:[^"\\]|\\.)*?)"'
+)
+
+
+def _extract_streaming_target(buffer: str) -> str:
+    """Extract first known target field from partial/complete tool arguments JSON buffer."""
+    if not buffer:
+        return ""
+    m = _STREAMING_TARGET_RE.search(buffer)
+    if not m:
+        return ""
+    val = m.group(1)
+    try:
+        val = json.loads(f'"{val}"')
+    except Exception:
+        val = val.replace('\\"', '"').replace("\\\\", "\\").replace("\\n", " ")
+    return str(val).strip()
 
 
 def _get_tools_digest(tools: Optional[List[Dict[str, Any]]]) -> str:
@@ -567,6 +587,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     active_thought_parts = []
                     step_usage = None
                     tool_calls_dict = {}
+                    generating_tools = {}
                     last_finish_reason = None
 
                     try:
@@ -600,6 +621,42 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     thinking_t0 = time.time()
                                 active_thought_parts.append(payload)
                                 yield ("thinking_delta", payload, "")
+                            elif tag == "adapter_tool_delta":
+                                if thinking_started:
+                                    dt = time.time() - thinking_t0
+                                    thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
+                                    yield ("thinking_end", f"{dt}", thoughts_str)
+                                    thinking_started = False
+                                idx = payload.get("index", 0)
+                                if idx not in generating_tools:
+                                    generating_tools[idx] = {
+                                        "id": payload.get("id") or new_tool_call_id(idx),
+                                        "name": payload.get("name", ""),
+                                        "args_buffer": "",
+                                        "target": "",
+                                        "announced": False,
+                                        "target_announced": False,
+                                    }
+                                g = generating_tools[idx]
+                                if payload.get("id"):
+                                    g["id"] = payload["id"]
+                                if payload.get("name"):
+                                    g["name"] = payload["name"]
+                                delta_args = payload.get("arguments_delta", "")
+                                if delta_args:
+                                    g["args_buffer"] += delta_args
+
+                                if not g["target"] and g["args_buffer"]:
+                                    g["target"] = _extract_streaming_target(g["args_buffer"])
+
+                                if g["name"] and not g["announced"]:
+                                    g["announced"] = True
+                                    if g["target"]:
+                                        g["target_announced"] = True
+                                    yield ("tool_generating", g["name"], g["target"], {"id": g["id"], "index": idx})
+                                elif g["announced"] and g["target"] and not g["target_announced"]:
+                                    g["target_announced"] = True
+                                    yield ("tool_generating_update", g["name"], g["target"], {"id": g["id"], "index": idx})
                             elif tag == "adapter_tool_call":
                                 if thinking_started:
                                     dt = time.time() - thinking_t0
@@ -607,7 +664,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     yield ("thinking_end", f"{dt}", thoughts_str)
                                     thinking_started = False
                                 idx = len(tool_calls_dict)
-                                tc_id = payload.get("id") or new_tool_call_id(idx)
+                                tc_id = payload.get("id") or (
+                                    generating_tools.get(idx, {}).get("id") if idx in generating_tools else None
+                                ) or new_tool_call_id(idx)
                                 tool_calls_dict[idx] = {
                                     "id": tc_id,
                                     "name": payload.get("name", ""),
@@ -772,7 +831,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 if isinstance(args, dict)
                                 else ""
                             )
-                            yield ("tool", t_name, str(target), args)
+                            yield ("tool", t_name, str(target), args, tc.get("id"))
 
                         # Execute concurrently and preserve original order
                         batch_results = await asyncio.gather(*(self._execute_single_tool(tc, role_def) for tc, _ in batch))
@@ -784,6 +843,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 resolved.is_error,
                                 resolved.status,
                                 resolved.returncode,
+                                t_id,
                             )
                             messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
                             self._append_history(messages[-1])
@@ -796,7 +856,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 if isinstance(args, dict)
                                 else ""
                             )
-                            yield ("tool", t_name, str(target), args)
+                            yield ("tool", t_name, str(target), args, tc.get("id"))
 
                             t_id, display_result, resolved = await self._execute_single_tool(tc, role_def)
                             yield (
@@ -806,6 +866,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 resolved.is_error,
                                 resolved.status,
                                 resolved.returncode,
+                                t_id,
                             )
                             messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
 

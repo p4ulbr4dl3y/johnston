@@ -53,6 +53,124 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.driver.tool_handles), 0)
         tool_widget.set_result.assert_called_once_with("diff content", is_error=False, status="done", returncode=0)
 
+    async def test_stream_tool_generating_to_running_lifecycle(self):
+        tool_widget = MagicMock()
+        tool_widget.status = "generating"
+        tool_widget.update_tool_call = MagicMock()
+        tool_widget.mark_running = MagicMock()
+        tool_widget.set_result = MagicMock()
+        self.chat_view.add_tool_call.return_value = tool_widget
+
+        # 1. Model starts streaming tool call
+        await self.driver.consume_stream_step(("tool_generating", "edit", "", {"id": "c1"}))
+        self.chat_view.add_tool_call.assert_awaited_once_with("edit", "", args={}, status="generating")
+        self.assertEqual(len(self.driver.tool_handles), 1)
+
+        # 2. Target path streams in
+        await self.driver.consume_stream_step(("tool_generating_update", "edit", "file.py", {"id": "c1"}))
+        tool_widget.update_tool_call.assert_called_once_with(target="file.py")
+
+        # 3. Generation finishes, execution starts
+        await self.driver.consume_stream_step(("tool", "edit", "file.py", {"path": "file.py"}))
+        tool_widget.mark_running.assert_called_once()
+        self.assertEqual(self.chat_view.add_tool_call.await_count, 1)
+
+        # 4. Result arrives
+        await self.driver.consume_stream_step(("tool_result", "diff output", "", False, ToolResultStatus.DONE, 0))
+        tool_widget.set_result.assert_called_once_with("diff output", is_error=False, status="done", returncode=0)
+        self.assertEqual(len(self.driver.tool_handles), 0)
+
+    async def test_stream_parallel_tools_generating_update_by_id(self):
+        tw1 = MagicMock()
+        tw1.status = "generating"
+        tw1.update_tool_call = MagicMock()
+        tw2 = MagicMock()
+        tw2.status = "generating"
+        tw2.update_tool_call = MagicMock()
+        self.chat_view.add_tool_call.side_effect = [tw1, tw2]
+
+        await self.driver.consume_stream_step(("tool_generating", "read", "", {"id": "c1", "index": 0}))
+        await self.driver.consume_stream_step(("tool_generating", "read", "", {"id": "c2", "index": 1}))
+
+        # Update for c2 should update tw2, not tw1
+        await self.driver.consume_stream_step(("tool_generating_update", "read", "b.py", {"id": "c2", "index": 1}))
+        tw2.update_tool_call.assert_called_once_with(target="b.py")
+        tw1.update_tool_call.assert_not_called()
+
+        # Update for c1 should update tw1
+        await self.driver.consume_stream_step(("tool_generating_update", "read", "a.py", {"id": "c1", "index": 0}))
+        tw1.update_tool_call.assert_called_once_with(target="a.py")
+
+    async def test_stream_tool_matching_by_id_and_calls_on_tool_widget(self):
+        tw1 = MagicMock()
+        tw1.status = "generating"
+        tw1.tool_call_id = "c1"
+        tw1.update_tool_call = MagicMock()
+        tw1.mark_running = MagicMock()
+
+        tw2 = MagicMock()
+        tw2.status = "generating"
+        tw2.tool_call_id = "c2"
+        tw2.update_tool_call = MagicMock()
+        tw2.mark_running = MagicMock()
+
+        self.chat_view.add_tool_call.side_effect = [tw1, tw2]
+        tracked_widgets = []
+        self.driver.on_tool_widget = lambda w: tracked_widgets.append(w)
+
+        await self.driver.consume_stream_step(("tool_generating", "read", "", {"id": "c1", "index": 0}))
+        await self.driver.consume_stream_step(("tool_generating", "read", "", {"id": "c2", "index": 1}))
+
+        # Tool c2 runs first (e.g. concurrent or out-of-order)
+        await self.driver.consume_stream_step(("tool", "read", "b.py", {"path": "b.py"}, "c2"))
+        tw2.mark_running.assert_called_once()
+        tw1.mark_running.assert_not_called()
+        self.assertIn(tw2, tracked_widgets)
+
+        # Result for c2 arrives first
+        tw2.set_result = MagicMock()
+        tw1.set_result = MagicMock()
+        await self.driver.consume_stream_step(("tool_result", "content b", "", False, ToolResultStatus.DONE, 0, "c2"))
+        tw2.set_result.assert_called_once_with("content b", is_error=False, status="done", returncode=0)
+        tw1.set_result.assert_not_called()
+        self.assertEqual(len(self.driver.tool_handles), 1)
+        self.assertIn(tw1, self.driver.tool_handles)
+
+    async def test_tool_generating_update_priority_two_pass(self):
+        tw1 = MagicMock(status="generating", tool_call_id="c1", tool_call_index=0, update_tool_call=MagicMock())
+        tw2 = MagicMock(status="generating", tool_call_id="c2", tool_call_index=0, update_tool_call=MagicMock())
+        self.driver.tool_handles.extend([tw1, tw2])
+
+        # Target c2 explicitly even if both share index 0
+        await self.driver.consume_stream_step(("tool_generating_update", "read", "c2.py", {"id": "c2", "index": 0}))
+        tw2.update_tool_call.assert_called_once_with(target="c2.py")
+        tw1.update_tool_call.assert_not_called()
+
+    async def test_stream_retry_cleans_up_generating_tool_widgets(self):
+        tw = MagicMock()
+        tw.status = "generating"
+        tw.remove = MagicMock()
+        self.driver.tool_handles.append(tw)
+
+        await self.driver.consume_stream_step(("retry", 1, 3, 1.0, Exception("429")))
+        tw.remove.assert_called_once()
+        self.assertEqual(len(self.driver.tool_handles), 0)
+
+    async def test_cleanup_unfinalized_tools(self):
+        tw_gen = MagicMock()
+        tw_gen.status = "generating"
+        tw_gen.remove = MagicMock()
+
+        tw_run = MagicMock()
+        tw_run.status = "running"
+        tw_run.set_result = MagicMock()
+
+        self.driver.tool_handles.extend([tw_gen, tw_run])
+        self.driver.cleanup_unfinalized_tools("Failed")
+
+        tw_gen.remove.assert_called_once()
+        tw_run.set_result.assert_called_once_with("Failed", is_error=True, status="error")
+
     async def test_stream_multiple_tools_fifo_order(self):
         tw1 = MagicMock()
         tw2 = MagicMock()

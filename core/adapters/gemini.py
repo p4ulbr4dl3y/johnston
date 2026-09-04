@@ -164,6 +164,7 @@ class GeminiAdapter(BaseApiAdapter):
             "POST", endpoint, headers=headers, json=payload, timeout=resolve_stream_timeout(stream_timeout)
         ) as resp:
             await check_httpx_response_status(resp)
+            tool_call_index = 0
             async for line in resp.aiter_lines():
                 evt = parse_sse_line(line)
                 if evt is None:
@@ -184,14 +185,27 @@ class GeminiAdapter(BaseApiAdapter):
                             yield ("adapter_text", p["text"])
                         elif "functionCall" in p:
                             fc = p.get("functionCall") or {}
+                            t_id = new_tool_call_id()
+                            t_name = fc.get("name", "")
+                            args_str = normalize_tool_arguments_str(fc.get("args"))
+                            yield (
+                                "adapter_tool_delta",
+                                {
+                                    "index": tool_call_index,
+                                    "id": t_id,
+                                    "name": t_name,
+                                    "arguments_delta": args_str,
+                                },
+                            )
                             yield (
                                 "adapter_tool_call",
                                 {
-                                    "id": new_tool_call_id(),
-                                    "name": fc.get("name", ""),
-                                    "arguments": normalize_tool_arguments_str(fc.get("args")),
+                                    "id": t_id,
+                                    "name": t_name,
+                                    "arguments": args_str,
                                 },
                             )
+                            tool_call_index += 1
 
                 um = evt.get("usageMetadata")
                 if um:

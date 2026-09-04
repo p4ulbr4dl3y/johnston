@@ -984,3 +984,52 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(q_steps[0]), 5)
         self.assertEqual(q_steps[0], ("queued_user_message", "Follow-up message", None, True, None))
 
+    def test_extract_streaming_target(self):
+        from core.base_provider.agent import _extract_streaming_target
+
+        self.assertEqual(_extract_streaming_target(""), "")
+        self.assertEqual(_extract_streaming_target('{"path": "foo/bar.py", "content": "..."}'), "foo/bar.py")
+        self.assertEqual(_extract_streaming_target('{"command": "pytest -v"}'), "pytest -v")
+        self.assertEqual(_extract_streaming_target('{"url": "https://example.com/api"}'), "https://example.com/api")
+        self.assertEqual(_extract_streaming_target('{"title": "Auth refactor"}'), "Auth refactor")
+        self.assertEqual(_extract_streaming_target('{"path": "unclosed'), "")
+
+    async def test_stream_steps_tool_generating_events(self):
+        agent = BaseAgent(api_key="k", model="m", base_url="http://t", provider_key="p")
+        self.addAsyncCleanup(agent.close)
+
+        call_count = 0
+
+        async def mock_stream_chat(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                yield ("adapter_tool_delta", {"index": 0, "id": "call_1", "name": "edit", "arguments_delta": '{"path": '})
+                yield ("adapter_tool_delta", {"index": 0, "id": "call_1", "name": "edit", "arguments_delta": '"app.py", '})
+                yield ("adapter_tool_call", {"id": "call_1", "name": "edit", "arguments": '{"path": "app.py", "old_str": "a", "new_str": "b"}'})
+            else:
+                yield ("adapter_text", "All done")
+
+        with unittest.mock.patch("core.adapters.get_adapter") as mock_get_adapter, \
+             unittest.mock.patch.object(agent, "_execute_single_tool") as mock_exec:
+            from core.domain.defaults.errors import ToolResult
+            mock_exec.return_value = ("call_1", "Done diff", ToolResult.done(content="Done diff"))
+            mock_adapter = unittest.mock.MagicMock()
+            mock_adapter.stream_chat = mock_stream_chat
+            mock_get_adapter.return_value = mock_adapter
+
+            steps = [s async for s in agent.stream_steps("Edit file")]
+
+        gen_steps = [s for s in steps if s[0] == "tool_generating"]
+        self.assertEqual(len(gen_steps), 1)
+        self.assertEqual(gen_steps[0][1], "edit")
+
+        up_steps = [s for s in steps if s[0] == "tool_generating_update"]
+        self.assertEqual(len(up_steps), 1)
+        self.assertEqual(up_steps[0][2], "app.py")
+
+        tool_steps = [s for s in steps if s[0] == "tool"]
+        self.assertEqual(len(tool_steps), 1)
+        self.assertEqual(tool_steps[0][1], "edit")
+        self.assertEqual(tool_steps[0][2], "app.py")
+

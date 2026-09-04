@@ -21,10 +21,15 @@ def build_gen_canvas(
     save_session: Callable[[], Any],
 ) -> GenCanvas:
     """Build a GenCanvas bound to the given chat view and app callbacks (no app/self access)."""
+    def _add_tool_call(name: str, desc: str, *args: Any, **kwargs: Any) -> Any:
+        if args and isinstance(args[0], dict) and "args" not in kwargs:
+            return chat_view.add_tool_call(name, desc, args=args[0], **kwargs)
+        return chat_view.add_tool_call(name, desc, *args, **kwargs)
+
     return GenCanvas(
         add_user_message=lambda text, atts: chat_view.add_user_message(text, attachments=atts),
         add_thinking_widget=chat_view.add_thinking_widget,
-        add_tool_call=lambda name, desc, args: chat_view.add_tool_call(name, desc, args=args),
+        add_tool_call=_add_tool_call,
         register_tool_widget=on_tool_widget,
         add_bot_message=chat_view.add_bot_message,
         add_event_divider=chat_view.add_event_divider,
