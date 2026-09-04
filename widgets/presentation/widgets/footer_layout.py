@@ -168,7 +168,7 @@ def _build_subagent_grid(
     grid.add_column(justify="left")
     grid.add_column(justify="right")
 
-    t_primary, t_secondary, t_muted, t_subtle = get_theme_colors()
+    _, t_secondary, t_muted, _ = get_theme_colors()
     txt = t_secondary
     sep = f"  [{t_muted}]•[/]  "
     sep_compact = f" [{t_muted}]•[/] "

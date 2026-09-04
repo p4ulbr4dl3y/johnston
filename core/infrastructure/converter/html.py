@@ -138,35 +138,6 @@ class HTMLToMarkdownParser(HTMLParser):
         "wbr",
     }
 
-    BLOCK_TAGS = {
-        "p",
-        "div",
-        "article",
-        "section",
-        "header",
-        "main",
-        "blockquote",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "ul",
-        "ol",
-        "li",
-        "table",
-        "tr",
-        "pre",
-        "hr",
-        "figure",
-        "figcaption",
-        "details",
-        "summary",
-        "address",
-        "dialog",
-    }
-
     def __init__(self, extract_title: bool = True) -> None:
         super().__init__()
         self._output: List[str] = []

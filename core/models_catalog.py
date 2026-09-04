@@ -13,7 +13,6 @@ from typing import Any, Dict, FrozenSet, Optional, Set
 import httpx
 
 from core.domain.defaults.config import DEFAULT_CATALOG_CACHE_TTL, DEFAULT_CONTEXT_LIMIT
-from core.domain.entities.models import ModelPricing, ModelSpec
 from core.domain.policies.model_catalog_policy import (
     _RE_FUZZY_STRIP,
     _RE_TOKEN_SPLIT,
@@ -200,16 +199,6 @@ class ModelsCatalog:
         except Exception as e:
             logger.warning("Error fetching models catalog: %s", e)
         return self._limits
-
-    def get_model_spec(self, provider_id: str, model_id: str) -> ModelSpec:
-        """Returns a structured ModelSpec domain entity for a given model."""
-        return ModelSpec(
-            id=model_id,
-            name=self.get_model_display_name(provider_id, model_id),
-            context_limit=self.get_context_limit(provider_id, model_id),
-            pricing=ModelPricing.from_dict(self.get_model_pricing(provider_id, model_id)),
-            modalities=self.get_model_modalities(provider_id, model_id),
-        )
 
     def get_discovered_providers(self) -> Dict[str, Dict[str, Any]]:
         """Returns dynamically discovered provider definitions from models.dev."""

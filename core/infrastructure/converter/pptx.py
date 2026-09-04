@@ -7,10 +7,6 @@ from typing import Any, BinaryIO, Dict, List, Tuple, Union
 from core.infrastructure.converter.markdown_table import render_markdown_table
 from core.infrastructure.converter.utils import safe_read_zip_member
 
-P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
-A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
-R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
-
 
 def _local_tag(elem_or_tag: Any) -> str:
     tag = elem_or_tag.tag if hasattr(elem_or_tag, "tag") else elem_or_tag

@@ -8,8 +8,6 @@ from typing import Any, BinaryIO, Dict, List, Optional, Tuple, Union
 
 from core.infrastructure.converter.utils import safe_read_zip_member
 
-SS_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
-
 # Excel 1900/1904 date-system epochs (serial day 0).
 _EPOCH_1900 = datetime(1899, 12, 30)
 _EPOCH_1904 = datetime(1904, 1, 1)

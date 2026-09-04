@@ -194,7 +194,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
 
         width = resolve_width(self)
         is_compact = is_compact_width(width)
-        t_primary, t_secondary, t_muted, t_subtle = get_theme_colors()
+        _, t_secondary, t_muted, _ = get_theme_colors()
         txt = t_secondary
         sep = f"  [{t_muted}]•[/]  "
         sep_compact = f" [{t_muted}]•[/] "

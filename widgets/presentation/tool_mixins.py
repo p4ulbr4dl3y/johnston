@@ -13,8 +13,6 @@ from core.domain.defaults.config import (
 )
 from widgets.presentation.tool_renderers import (
     format_code_with_line_numbers,
-    format_manage_shell_display,
-    format_manage_subagent_display,
     format_plan_display,
     format_truncation_for_ui,
 )
@@ -43,12 +41,6 @@ class FormattingMixin:
     def _format_plan_display(self, plan_items: list, explanation: str) -> Text:
         return format_plan_display(plan_items, explanation)
 
-    def _format_manage_shell_display(self) -> Any:
-        return format_manage_shell_display(self.result_text or "")
-
-    def _format_manage_subagent_display(self) -> Any:
-        return format_manage_subagent_display(self.result_text or "")
-
     def _format_edit_diff(self, diff_text: str, file_path: str) -> Any:
         diff_text = self._clean_hints_for_ui(diff_text)
         return format_edit_diff(diff_text, file_path)
@@ -58,7 +50,6 @@ class FormattingMixin:
 
     def _format_code_with_line_numbers(self, code: str) -> str:
         return format_code_with_line_numbers(code)
-
 
 class ParsingMixin:
     """Status / JSON / MCP-args parsing helpers for tool widgets."""

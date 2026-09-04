@@ -83,7 +83,7 @@ def _normalize_indentation(s: str, is_markdown: bool = False) -> Tuple[str, list
 
 
 def find_whitespace_agnostic_match(file_content: str, search_string: str, is_markdown: bool = False) -> str | None:
-    search_norm, search_mapping = _normalize_indentation(search_string, is_markdown)
+    search_norm, _ = _normalize_indentation(search_string, is_markdown)
     if not search_norm.strip():
         return None
 

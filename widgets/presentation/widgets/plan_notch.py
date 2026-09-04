@@ -275,9 +275,3 @@ class PlanNotchContainer(Container):
     def compose(self) -> ComposeResult:
         yield PlanNotch(id="plan-notch")
 
-
-class HudOverlay(Container):
-    """Overlay container for floating HUD elements."""
-
-    can_focus = False
-    ALLOW_SELECT = False

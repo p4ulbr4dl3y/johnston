@@ -710,21 +710,6 @@ class MCPProcessClient(MCPClientBase):
                 self.resources = res["result"].get("resources", [])
             return self.resources
 
-    def read_resource(self, uri: str, timeout: Optional[float] = None) -> Optional[Dict[str, Any]]:
-        with self._lock:
-            current_id = self._next_req_id()
-            req = {
-                "jsonrpc": "2.0",
-                "id": current_id,
-                "method": "resources/read",
-                "params": {"uri": uri},
-            }
-            self._send(req)
-            res = self._read_response(req_id=current_id, timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT)
-            if res and "result" in res:
-                return res["result"]
-            return None
-
     def fetch_prompts(self) -> List[Dict[str, Any]]:
         with self._lock:
             current_id = self._next_req_id()
@@ -734,23 +719,6 @@ class MCPProcessClient(MCPClientBase):
             if res and "result" in res:
                 self.prompts = res["result"].get("prompts", [])
             return self.prompts
-
-    def get_prompt(
-        self, name: str, arguments: Optional[Dict[str, str]] = None, timeout: Optional[float] = None
-    ) -> Optional[Dict[str, Any]]:
-        with self._lock:
-            current_id = self._next_req_id()
-            req = {
-                "jsonrpc": "2.0",
-                "id": current_id,
-                "method": "prompts/get",
-                "params": {"name": name, "arguments": arguments or {}},
-            }
-            self._send(req)
-            res = self._read_response(req_id=current_id, timeout=timeout or DEFAULT_TOOLS_CALL_TIMEOUT)
-            if res and "result" in res:
-                return res["result"]
-            return None
 
     # ── Tool call (stdio transport) ────────────────────────────────────────
 

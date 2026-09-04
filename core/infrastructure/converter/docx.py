@@ -7,9 +7,6 @@ from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple, Union
 from core.infrastructure.converter.markdown_table import render_markdown_table
 from core.infrastructure.converter.utils import clean_url, safe_read_zip_member
 
-W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-R_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
-
 # Paragraph/block wrappers whose descendants hold real content: content
 # controls (w:sdt), smart tags and tracked-change insertions.
 _INLINE_WRAPPERS = {"ins", "smartTag", "moveTo"}

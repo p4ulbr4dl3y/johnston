@@ -224,11 +224,6 @@ def get_project_instructions_snippet(cwd: str = None) -> str:
     return format_rules_markdown(rules)
 
 
-async def get_project_instructions_snippet_async(cwd: str = None) -> str:
-    """Async variant: reads AGENTS.md/CLAUDE.md on a thread on cache miss."""
-    return await asyncio.to_thread(get_project_instructions_snippet, cwd)
-
-
 def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
     """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules and project instruction files.
 

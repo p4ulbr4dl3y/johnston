@@ -176,9 +176,6 @@ class ProviderManager:
         self.invalidate_cache()
         self.ensure_config_dir()
 
-    def set_tool_registry(self, registry: Optional[ToolRegistryPort]) -> None:
-        self._tool_registry = registry
-
     def invalidate_cache(self):
         self._providers_memo = {}
         invalidate_json_read_cache(CONFIG_FILE)
