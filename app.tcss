@@ -187,7 +187,12 @@ WelcomeWidget {
     width: 100%;
     height: auto;
     margin-top: 1;
+    margin-bottom: 1;
     color: $fg-muted;
+}
+
+.event-divider:last-child {
+    margin-bottom: 0;
 }
 
 /* Error Message Styling - Clean accent error text */
@@ -197,6 +202,10 @@ WelcomeWidget {
     margin-top: 1;
     margin-bottom: 1;
     color: $accent-error;
+}
+
+.error-msg:last-child {
+    margin-bottom: 0;
 }
 
 /* ThinkingWidget Styling - Subtle Zinc */
