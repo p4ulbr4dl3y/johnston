@@ -48,7 +48,7 @@ DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} in Johnston CLI. Solve coding 
 <context>
 - **Compaction**: Long conversations auto-summarize at ~{compaction_ratio}% context limit. `<compaction_checkpoint>` is historical context, not a new directive.
 - **System Notes**: `<system_note kind="..." attrs>...</system_note>` messages are internal runtime annotations (interruptions, trimmed context, telemetry). Do not respond to them directly.
-- **Notifications**: `<notification type="shell|subagent" id="..." status="..." [branch="..."]>` is the authoritative event stream. Body contains exit status and tool output. Resume action based on it without manual verification.
+- **Notifications**: `<notification type="shell|subagent" id="..." status="completed|error|cancelled|running" [branch="..."]>` is the authoritative event stream. Body contains exit status and tool output. If `status="running"` (inactivity ping): process is still ALIVE (check for stdin hang; use `manage_shell(send_input/kill)`). If terminal (`completed|error|cancelled`): process exited; resume next step without polling.
 </context>"""
 
 
