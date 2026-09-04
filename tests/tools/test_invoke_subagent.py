@@ -199,6 +199,113 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sessions[0].branch_name, "")
         self.assertEqual(sessions[0].project_dir, "")
 
+    async def test_invoke_subagent_auto_branch_worker_in_git(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        tool = InvokeSubagentTool()
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [{"function": {"name": "read"}}]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+        mock_ctx.project_dir = self.temp_dir.name
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
+
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        with (
+            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
+            patch("tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+        ):
+            mock_git.return_value.stdout = "main\n"
+            mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
+
+            res = await tool.execute({"prompt": "refactor auth", "title": "Auth Token Refactor", "type": "worker"})
+            self.assertEqual(res.status.value, "running")
+            self.assertTrue(mock_wt.called)
+            called_branch = mock_wt.call_args[0][2]
+            self.assertTrue(called_branch.startswith("subagent/auth-token-refactor-"))
+            sessions = self.store.list(kind="subagent")
+            self.assertEqual(sessions[0].branch_name, called_branch)
+            self.assertEqual(sessions[0].project_dir, f"/tmp/wt/{sessions[0].id}")
+
+    async def test_invoke_subagent_non_ascii_title_fallback_in_git(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        tool = InvokeSubagentTool()
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [{"function": {"name": "read"}}]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+        mock_ctx.project_dir = self.temp_dir.name
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
+
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        with (
+            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
+            patch("tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+        ):
+            mock_git.return_value.stdout = "main\n"
+            mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
+
+            res = await tool.execute({"prompt": "refactor auth", "title": "Рефакторинг токена", "type": "worker"})
+            self.assertEqual(res.status.value, "running")
+            self.assertTrue(mock_wt.called)
+            called_branch = mock_wt.call_args[0][2]
+            self.assertTrue(called_branch.startswith("subagent/worker-"))
+            sessions = self.store.list(kind="subagent")
+            self.assertEqual(sessions[0].branch_name, called_branch)
+
+    async def test_invoke_subagent_explorer_read_only_skips_worktree_in_git(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        tool = InvokeSubagentTool()
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [{"function": {"name": "read"}}]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+        mock_ctx.project_dir = self.temp_dir.name
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
+
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        with (
+            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
+            patch("tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+        ):
+            mock_git.return_value.stdout = "main\n"
+
+            res = await tool.execute({"prompt": "investigate auth", "title": "Audit Auth", "type": "explorer"})
+            self.assertEqual(res.status.value, "running")
+            self.assertFalse(mock_wt.called)
+            sessions = self.store.list(kind="subagent")
+            self.assertEqual(sessions[0].branch_name, "")
+            self.assertEqual(sessions[0].project_dir, "")
+
     async def test_max_concurrent_counts_active_status_subagents(self):
         from unittest.mock import MagicMock
 

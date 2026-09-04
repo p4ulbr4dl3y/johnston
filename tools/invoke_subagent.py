@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import re
 import uuid
 from typing import Any, Dict
 
@@ -30,7 +31,7 @@ class InvokeSubagentTool(BaseTool):
                     "title": {
                         "type": "string",
                         "description": (
-                            "Short task title as a noun phrase (3-5 words, "
+                            "Short task title in English as a noun phrase (3-5 words, "
                             "e.g. 'Auth token refactor', 'Query performance audit', not verbs)"
                         ),
                     },
@@ -45,14 +46,6 @@ class InvokeSubagentTool(BaseTool):
                         "type": "string",
                         "enum": ["worker", "explorer"],
                         "description": "Subagent role name from available roles (default: 'worker')",
-                    },
-                    "branch": {
-                        "type": "string",
-                        "description": (
-                            "Git branch name for worktree isolation (for write/worker tasks only, omit for explorer). "
-                            "Auto-commits on finish for parent to inspect and `git merge <branch>`. "
-                            "If omitted or same as current branch, runs directly in main workspace."
-                        ),
                     },
                 },
                 "required": ["title", "prompt"],
@@ -78,7 +71,7 @@ class InvokeSubagentTool(BaseTool):
         prompt = (args.get("prompt") or "").strip()
         title = (args.get("title") or prompt[:30] or "subagent task").strip()
         subagent_type = (args.get("type") or "worker").strip().lower()
-        branch_name = (args.get("branch") or "").strip()
+        branch_override = (args.get("branch") or "").strip()
 
         if not prompt:
             return ToolResult.error("params", name="prompt", detail="required")
@@ -128,16 +121,31 @@ class InvokeSubagentTool(BaseTool):
             res = await run_git_async(["branch", "--show-current"], cwd=project_dir, timeout=5)
             current_branch = res.stdout.strip()
 
-        # Same branch as the main tree or no branch requested -> work directly in it;
-        # otherwise isolate in a worktree on the requested branch (created if missing).
-        if is_git and branch_name and branch_name != current_branch:
-            wt_path, wt_branch = await SubagentWorktreeManager.create_worktree_async(
-                project_dir, session_id, branch_name
-            )
-            if wt_path:
-                subagent.project_dir = wt_path
-                subagent.cwd = wt_path
-                subagent.worktree_branch = wt_branch
+        from core.role_registry import RoleRegistry
+        from core.roles.resolve import resolve_role
+
+        registry = RoleRegistry.get_instance()
+        role_def = resolve_role(registry, subagent_type, project_dir=project_dir)
+        is_read_only = getattr(role_def, "read_only", False)
+
+        branch_name = branch_override
+        if is_git and not is_read_only:
+            if not branch_name:
+                slug = re.sub(r"[^a-zA-Z0-9]+", "-", title).strip("-").lower()[:30]
+                role_key = getattr(role_def, "key", "worker") or "worker"
+                if len(slug) >= 3:
+                    branch_name = f"subagent/{slug}-{session_id[:8]}"
+                else:
+                    branch_name = f"subagent/{role_key}-{session_id[:8]}"
+
+            if branch_name != current_branch:
+                wt_path, wt_branch = await SubagentWorktreeManager.create_worktree_async(
+                    project_dir, session_id, branch_name
+                )
+                if wt_path:
+                    subagent.project_dir = wt_path
+                    subagent.cwd = wt_path
+                    subagent.worktree_branch = wt_branch
 
         # Apply role definition: system prompt, model, and tool filtering. Do this
         # BEFORE creating the session so session.role captures the canonically
@@ -162,7 +170,7 @@ class InvokeSubagentTool(BaseTool):
             prompt=prompt,
             status="running",
             project_dir=wt_path or "",
-            branch_name=wt_branch or (branch_name if is_git else ""),
+            branch_name=wt_branch or "",
         )
         session.agent = subagent
         subagent.session = session
@@ -201,7 +209,7 @@ class InvokeSubagentTool(BaseTool):
         session.async_task = bg_task
         ctx.refresh_status()
 
-        branch_info = f" | branch {escape_xml_attr(branch_name)}" if branch_name else ""
+        branch_info = f" | branch {escape_xml_attr(wt_branch)}" if wt_branch else ""
         content_txt = f"[subagent started | id {session_id} | role {escape_xml_attr(canonical_role)}{branch_info}]"
         return ToolResult(
             status=ToolResultStatus.RUNNING,

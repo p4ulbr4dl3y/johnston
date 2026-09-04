@@ -15,8 +15,9 @@ Johnston equips the primary agent and subagents with a suite of 10 builtin tools
 5. **`manage_shell`**: Manage background shell tasks (`action` in `["list", "send_input", "kill"]`, `task_id`, `input`).
 
 ## Delegation & Subagents
-6. **`invoke_subagent`**: Spawn a specialized background subagent (`title`, `prompt`, `type`, `branch`).
-   - Passing `branch` creates an isolated git worktree; auto-commits on completion for parent review.
+6. **`invoke_subagent`**: Spawn a specialized background subagent (`title`, `prompt`, `type`).
+   - Non-read-only roles (e.g. `worker`) automatically run in an isolated git worktree with an auto-generated branch (`subagent/<title>-<id>`), auto-committing on completion.
+   - Read-only roles (e.g. `explorer`) run directly in the main workspace.
 7. **`manage_subagent`**: Manage active subagents (`action` in `["list", "send_message", "kill"]`, `session_id`, `message`).
 
 ## Workflow & Research

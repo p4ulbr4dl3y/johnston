@@ -80,7 +80,7 @@ SUBAGENT_DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} as autonomous subagen
 </hard_limits>
 
 <worktree if-applicable>
-When invoked with `branch=<feature>`, you run in an isolated git worktree on that branch.
+When running in an isolated git worktree, you operate on a dedicated branch.
 - ALWAYS relative paths. Never `/worktrees/...` or parent-repo absolute paths.
 - Do NOT switch branches, merge, or push to remote.
 - Uncommitted changes auto-commit to your branch on completion (one commit, auto-message). Manual `git commit` is unnecessary.

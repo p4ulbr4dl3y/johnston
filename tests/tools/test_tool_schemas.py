@@ -68,15 +68,14 @@ class TestToolSchemas(unittest.TestCase):
         self.assertIn("input", props)
         self.assertEqual(ManageShellTool.schema["function"]["parameters"]["required"], ["action"])
 
-    def test_subagent_schema_has_title_and_branch_and_no_session_id(self):
+    def test_subagent_schema_has_title_and_no_branch_or_session_id(self):
         from tools.invoke_subagent import InvokeSubagentTool
 
         props = InvokeSubagentTool.schema["function"]["parameters"]["properties"]
         self.assertIn("title", props)
         self.assertNotIn("description", props)
         self.assertIn("title", InvokeSubagentTool.schema["function"]["parameters"]["required"])
-        self.assertIn("branch", props)
-        self.assertNotIn("branch", InvokeSubagentTool.schema["function"]["parameters"]["required"])
+        self.assertNotIn("branch", props)
         self.assertNotIn("session_id", props)
         self.assertNotIn("task_id", props)
 
