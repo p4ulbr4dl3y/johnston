@@ -187,7 +187,6 @@ WelcomeWidget {
     width: 100%;
     height: auto;
     margin-top: 1;
-    margin-bottom: 1;
     color: $fg-muted;
 }
 
