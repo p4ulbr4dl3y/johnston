@@ -408,6 +408,26 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
         app.sm.save.assert_called_with(sess)
         self.assertTrue(app.footer_refreshed)
 
+    async def test_schedule_auto_title_skipped_when_exiting(self):
+        from widgets.mixins.message_flow import MessageFlowMixin
+
+        class DummyApp(MessageFlowMixin):
+            def __init__(self):
+                self.is_app_active = False
+                self._exit = True
+                self.current_session_id = "s-exit"
+                self.agent = None
+                self.sm = MagicMock()
+
+        app = DummyApp()
+        sess = AgentSession("s-exit")
+        sess.messages = [{"type": "user", "text": "Prompt during exit"}]
+
+        with patch("core.application.session.auto_title.auto_title_session") as mock_title:
+            app._schedule_auto_title(sess)
+            await asyncio.sleep(0.05)
+            mock_title.assert_not_called()
+
     def test_collect_session_data_preserves_empty_title(self):
         from widgets.app.session_state import collect_session_data
 

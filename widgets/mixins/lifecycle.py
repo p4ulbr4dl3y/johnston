@@ -128,6 +128,10 @@ class LifecycleMixin:
         """Clean up all running MCP servers and background processes when closing application"""
         self.is_app_active = False
 
+        for w in getattr(self, "workers", []):
+            if getattr(w, "is_running", False):
+                w.cancel()
+
         if hasattr(self, "_theme_listener"):
             try:
                 from widgets.app.theme_manager import theme_manager

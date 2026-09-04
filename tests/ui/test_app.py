@@ -622,6 +622,20 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(matches, [])
             self.assertFalse(suggestions.display)
 
+    async def test_action_quit_cancels_workers_and_marks_inactive(self):
+        from unittest.mock import PropertyMock
+
+        app = JohnstonApp()
+        mock_worker = MagicMock()
+        mock_worker.is_running = True
+
+        with patch.object(JohnstonApp, "workers", new_callable=PropertyMock, return_value=[mock_worker]):
+            with patch.object(app, "exit") as mock_exit:
+                app.action_quit()
+                self.assertFalse(app.is_app_active)
+                mock_worker.cancel.assert_called_once()
+                mock_exit.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

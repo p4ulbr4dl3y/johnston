@@ -390,8 +390,14 @@ class MessageFlowMixin:
                 footer.set_generating(False)
             except Exception as e:
                 logger.warning("Footer update failed: %s", e)
+            is_active = bool(
+                getattr(self, "is_app_active", True)
+                and not getattr(self, "_exit", False)
+                and not getattr(self, "_closing", False)
+                and not getattr(self, "_closed", False)
+            )
             try:
-                if getattr(self, "is_app_active", True):
+                if is_active:
                     # Non-forced save: respects the built-in 1.5s debounce so the
                     # per-tool_result saves in the engine still coalesce here
                     # instead of forcing a full write on every tool call.
@@ -400,14 +406,14 @@ class MessageFlowMixin:
                 logger.warning("Session save failed: %s", e)
             self.is_generating = False
             should_auto_title = (
-                getattr(self, "is_app_active", True)
+                is_active
                 and session
                 and not getattr(session, "auto_titled", False)
                 and (not getattr(session, "_title", None) or getattr(session, "parent_id", None))
             )
             if should_auto_title:
                 self._schedule_auto_title(session)
-            if getattr(self, "is_app_active", True):
+            if is_active:
                 next_item = self._pop_queued_for_current_session()
                 if next_item is not None:
                     kw = {}
@@ -424,12 +430,26 @@ class MessageFlowMixin:
 
     def _schedule_auto_title(self, session: Any) -> None:
         """Schedule background auto-titling for a session without blocking UI."""
+        if (
+            not getattr(self, "is_app_active", True)
+            or getattr(self, "_exit", False)
+            or getattr(self, "_closing", False)
+            or getattr(self, "_closed", False)
+        ):
+            return
         if not session or getattr(session, "auto_titled", False):
             return
         if getattr(session, "_title", None) and not getattr(session, "parent_id", None):
             return
 
         async def _run() -> None:
+            if (
+                not getattr(self, "is_app_active", True)
+                or getattr(self, "_exit", False)
+                or getattr(self, "_closing", False)
+                or getattr(self, "_closed", False)
+            ):
+                return
             try:
                 from core.application.session.auto_title import auto_title_session
 

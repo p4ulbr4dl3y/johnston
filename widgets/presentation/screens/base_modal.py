@@ -63,7 +63,11 @@ class BaseModalScreen(ModalScreen[T]):
         await super()._on_mouse_up(event)
 
     def action_quit_app(self) -> None:
-        self.app.exit()
+        if self.app:
+            if hasattr(self.app, "action_quit"):
+                self.app.action_quit()
+            else:
+                self.app.exit()
 
     def action_cancel(self) -> None:
         self.dismiss(None)

@@ -371,4 +371,7 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
     def action_quit_app(self) -> None:
         """Quit the application."""
         if self.app:
-            self.app.exit()
+            if hasattr(self.app, "action_quit"):
+                self.app.action_quit()
+            else:
+                self.app.exit()

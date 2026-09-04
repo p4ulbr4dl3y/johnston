@@ -629,7 +629,12 @@ class ChatInput(TextArea):
         if event.key in KEY_QUIT:
             event.prevent_default()
             event.stop()
-            self.app.exit()
+            if self.app:
+                self.app.is_app_active = False
+                for w in getattr(self.app, "workers", []):
+                    if getattr(w, "is_running", False):
+                        w.cancel()
+                self.app.exit()
             return
 
         # Cancel active suggestions popup or agent generation via Escape

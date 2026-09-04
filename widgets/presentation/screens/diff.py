@@ -629,7 +629,10 @@ class DiffScreen(ModalSearchNavMixin, Screen[None]):
     def action_quit_app(self) -> None:
         try:
             if self.app:
-                self.app.exit()
+                if hasattr(self.app, "action_quit"):
+                    self.app.action_quit()
+                else:
+                    self.app.exit()
         except Exception:
             pass
 

@@ -147,3 +147,11 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
         return dict(ZINC_DARK.tcss_vars)
 
+    def action_quit(self) -> None:
+        """Exit application immediately, cancelling in-flight workers."""
+        self.is_app_active = False
+        for w in getattr(self, "workers", []):
+            if getattr(w, "is_running", False):
+                w.cancel()
+        self.exit()
+
