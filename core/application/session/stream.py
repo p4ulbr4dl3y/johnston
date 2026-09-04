@@ -6,7 +6,7 @@ under sessions/<parent_id>.subagents/ via SessionStore.
 
 import asyncio
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Sequence
 
 from core.domain.defaults.errors import ToolResult, parse_stream_step, parse_tool_result_step
 from core.domain.entities.session import AgentSession, SessionStatus, record_session_interruption
@@ -23,27 +23,26 @@ def sync_session_metrics(session: AgentSession, agent: Any) -> None:
 _sync_subagent_metrics = sync_session_metrics
 
 
-def record_session_step(step: tuple, session: AgentSession, text_accumulator: list) -> None:
-    """Records an agent execution step into the session in canonical message format.
-
-    Raw stream events (thinking_start/delta/end, bot_delta/text,
-    tool_result) are canonicalized here into shared types (thinking/bot/tool)
-    before being appended via AgentSession.add_event.
-    """
+def stream_step_to_session_event(
+    step: Sequence,
+    text_accumulator: Optional[list] = None,
+    from_stream_step: bool = False,
+) -> Optional[dict]:
+    """Convert a raw generator step tuple into a canonical session event dict."""
     import math
 
     parsed = parse_stream_step(step)
     if parsed is None:
-        return
+        return None
     etype = parsed.event_type
     val1 = parsed.val1
     val2 = parsed.val2
     val3 = parsed.val3
 
     if etype == "thinking_start":
-        session.add_event({"type": "thinking", "text": val1})
+        evt = {"type": "thinking", "text": val1, "phase": "start"}
     elif etype == "thinking_delta":
-        session.add_event({"type": "thinking", "text": val1})
+        evt = {"type": "thinking", "text": val1, "phase": "delta"}
     elif etype == "thinking_end":
         try:
             dur = float(val1)
@@ -51,40 +50,76 @@ def record_session_step(step: tuple, session: AgentSession, text_accumulator: li
                 dur = 0.0
         except (ValueError, TypeError):
             dur = 0.0
-        session.add_event({"type": "thinking", "text": val2, "duration": dur})
+        evt = {"type": "thinking", "text": val2, "duration": dur, "phase": "end"}
     elif etype == "thinking":
         # Informational thinking (auto-compaction/retry notices): always final.
-        session.add_event({"type": "thinking", "text": val1, "duration": 0.0})
+        evt = {"type": "thinking", "text": val1, "duration": 0.0, "phase": "end"}
     elif etype == "tool":
-        text_accumulator[0] = ""
+        if text_accumulator:
+            text_accumulator[0] = ""
         targs = val3 if isinstance(val3, dict) else {}
-        session.add_event({"type": "tool", "tool_type": val1, "target": val2, "args": targs})
+        evt = {"type": "tool", "tool_type": val1, "target": val2, "args": targs}
     elif etype == "tool_result":
-        parsed = parse_tool_result_step(step)
-        event = {"type": "tool", "result_text": val1 or parsed.content}
-        if parsed.status is not None:
-            event["status"] = parsed.status.value
-        if parsed.is_error:
-            event["is_error"] = True
-        if parsed.returncode is not None:
-            event["returncode"] = parsed.returncode
-        session.add_event(event)
+        parsed_tr = parse_tool_result_step(step)
+        evt = {"type": "tool", "result_text": val1 or parsed_tr.content}
+        if parsed_tr.status is not None:
+            evt["status"] = parsed_tr.status.value
+        if parsed_tr.is_error:
+            evt["is_error"] = True
+        if parsed_tr.returncode is not None:
+            evt["returncode"] = parsed_tr.returncode
     elif etype == "bot_delta":
-        text_accumulator[0] = text_accumulator[0] + val1
-        session.add_event({"type": "bot", "text": text_accumulator[0]})
+        if text_accumulator is not None:
+            text_accumulator[0] = text_accumulator[0] + val1
+            full_text = text_accumulator[0]
+        else:
+            full_text = val1
+        evt = {"type": "bot", "text": full_text, "delta": val1}
     elif etype == "bot_reset":
-        text_accumulator[0] = ""
-        session.add_event({"type": "bot_reset"})
+        if text_accumulator is not None:
+            text_accumulator[0] = ""
+        evt = {"type": "bot_reset"}
     elif etype in ("bot_text", "outro"):
-        text_accumulator[0] = val1
-        session.add_event({"type": "bot", "text": text_accumulator[0], "final": True})
+        if text_accumulator is not None:
+            text_accumulator[0] = val1
+        evt = {"type": "bot", "text": val1, "final": True}
     elif etype == "queued_user_message":
-        text_accumulator[0] = ""
-        session.add_event({"type": "user", "text": val1})
+        if from_stream_step:
+            return None
+        if text_accumulator is not None:
+            text_accumulator[0] = ""
+        evt = {"type": "user", "text": val1}
+    elif etype == "retry":
+        evt = {
+            "type": "retry",
+            "attempt": val1,
+            "max_retries": val2,
+            "delay": val3 or 0.0,
+            "error": parsed.val4,
+        }
     elif etype == "event_divider":
-        session.add_event({"type": "event_divider", "text": val1 or "Session Compacted"})
+        evt = {"type": "event_divider", "text": val1 or "Session Compacted"}
     elif etype == "error":
-        session.add_event({"type": "error", "text": val1 or "Error"})
+        evt = {"type": "error", "text": val1 or "Error"}
+    else:
+        return None
+
+    if from_stream_step:
+        evt["from_stream_step"] = True
+    return evt
+
+
+def record_session_step(step: tuple, session: AgentSession, text_accumulator: list) -> Optional[dict]:
+    """Records an agent execution step into the session in canonical message format.
+
+    Raw stream events (thinking_start/delta/end, bot_delta/text,
+    tool_result) are canonicalized here into shared types (thinking/bot/tool)
+    before being appended via AgentSession.add_event.
+    """
+    event = stream_step_to_session_event(step, text_accumulator)
+    if event is not None:
+        session.add_event(event)
+    return event
 
 
 record_subagent_step = record_session_step

@@ -204,8 +204,6 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
             history_events = [dict(m) for m in self.session.messages if isinstance(m, dict)]
             self.session.remove_listener(self._on_live_event)
             self.session.add_listener(self._on_live_event)
-            if not self.queue_task or self.queue_task.done():
-                self.queue_task = asyncio.create_task(self._process_queue())
             has_user_msg = any(
                 isinstance(e, dict) and e.get("type") == "user" and is_ui_visible_user_message(e)
                 for e in history_events
@@ -249,6 +247,9 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
                                 notch.refresh_notch()
                 except Exception:
                     pass
+
+            if not self.queue_task or self.queue_task.done():
+                self.queue_task = asyncio.create_task(self._process_queue())
 
         for idx, child in enumerate(chat_view.children):
             if idx in expand_state and hasattr(child, "set_expanded"):
@@ -298,7 +299,7 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
             try:
                 evt = await self.event_queue.get()
                 try:
-                    await self._render_event(evt)
+                    await self._render_event(evt, is_active=True)
                     self._refresh_chrome()
                 finally:
                     self.event_queue.task_done()
@@ -371,7 +372,4 @@ class SubagentViewScreen(PlanActionsMixin, ModalScreen[None]):
     def action_quit_app(self) -> None:
         """Quit the application."""
         if self.app:
-            if hasattr(self.app, "action_quit"):
-                self.app.action_quit()
-            else:
-                self.app.exit()
+            self.app.exit()

@@ -12,7 +12,6 @@ import logging
 import math
 from typing import Any, Callable, Optional
 
-from core.domain.defaults.errors import parse_tool_result_step
 from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.chat_toolcall import ToolCallWidget
 from widgets.presentation.widgets.chat_messages import BotMessage, ThinkingWidget
@@ -81,128 +80,18 @@ class ChatStreamDriver:
             self.bot_handle = None
 
     async def consume_stream_step(self, step: tuple) -> None:
-        """Consume a raw generator step tuple from BaseAgent.stream_steps."""
+        """Consume a raw generator step tuple from BaseAgent.stream_steps.
+
+        Translates raw tuple to a canonical session event and delegates to
+        consume_session_event for unified presentation logic.
+        """
         if not step:
             return
-        event_type = step[0]
-        val1 = step[1] if len(step) > 1 else ""
-        val2 = step[2] if len(step) > 2 else ""
-        val3 = step[3] if len(step) > 3 else None
+        from core.application.session.stream import stream_step_to_session_event
 
-        if event_type == "thinking_start":
-            self.thinking_handle = await self.chat_view.add_thinking_widget(val1)
-        elif event_type == "thinking_delta":
-            if self.thinking_handle and hasattr(self.thinking_handle, "update_thinking"):
-                self.thinking_handle.update_thinking(val1)
-        elif event_type == "thinking_end":
-            if self.thinking_handle:
-                try:
-                    duration = float(val1)
-                    if not math.isfinite(duration):
-                        duration = 0.0
-                except Exception:
-                    duration = 0.0
-                if hasattr(self.thinking_handle, "finish_thinking"):
-                    self.thinking_handle.finish_thinking(duration, val2)
-            self.thinking_handle = None
-        elif event_type == "tool":
-            self.finalize_thinking_stream()
-            await self.finalize_bot_stream()
-            targs = val3 if isinstance(val3, dict) else {}
-            tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs)
-            self.tool_handles.append(tool_handle)
-            if self.on_tool_widget:
-                self.on_tool_widget(tool_handle)
-        elif event_type == "tool_result":
-            parsed_tool_result = parse_tool_result_step(step)
-            res_status = parsed_tool_result.status.value if parsed_tool_result.status is not None else None
-            while self.tool_handles:
-                st = getattr(self.tool_handles[0], "status", None)
-                if isinstance(st, str) and st not in ("running",):
-                    self.tool_handles.popleft()
-                else:
-                    break
-            if self.tool_handles:
-                cur_tool_handle = self.tool_handles.popleft()
-                cur_tool_handle.set_result(
-                    val1,
-                    is_error=parsed_tool_result.is_error,
-                    status=res_status,
-                    returncode=parsed_tool_result.returncode,
-                )
-            else:
-                for child in reversed(list(getattr(self.chat_view, "children", []))):
-                    if isinstance(child, ToolCallWidget) and getattr(child, "status", None) == "running":
-                        child.set_result(
-                            val1,
-                            is_error=parsed_tool_result.is_error,
-                            status=res_status,
-                            returncode=parsed_tool_result.returncode,
-                        )
-                        break
-                logger.debug("Received tool_result step with empty tool_handles queue: %s", val1)
-        elif event_type == "bot_delta":
-            self.finalize_thinking_stream()
-            if val1:
-                if self.bot_handle is None:
-                    self.bot_handle = await self.chat_view.add_bot_message()
-                if hasattr(self.bot_handle, "append_stream_content"):
-                    self.bot_handle.append_stream_content(val1)
-        elif event_type == "bot_reset":
-            if self.bot_handle is not None and hasattr(self.bot_handle, "reset_stream"):
-                try:
-                    res = self.bot_handle.reset_stream()
-                    if inspect.isawaitable(res):
-                        await res
-                except Exception:
-                    pass
-        elif event_type == "retry":
-            if self.bot_handle is not None and hasattr(self.bot_handle, "reset_stream"):
-                try:
-                    res = self.bot_handle.reset_stream()
-                    if inspect.isawaitable(res):
-                        await res
-                except Exception:
-                    pass
-            if self.notify:
-                attempt = val1
-                max_retries = val2
-                delay = val3 or 0.0
-                err = step[4] if len(step) > 4 else None
-                err_msg = str(err).lower() if err else ""
-                is_rate_limit = (
-                    "rate limit" in err_msg
-                    or "429" in err_msg
-                    or getattr(err, "status_code", None) == 429
-                )
-                reason = "Rate limit reached" if is_rate_limit else "Provider error"
-                try:
-                    self.notify(
-                        f"{reason}: retrying in {max(1, int(round(delay)))}s (attempt {attempt}/{max_retries})",
-                        severity="warning",
-                    )
-                except Exception:
-                    pass
-        elif event_type in ("bot_text", "outro"):
-            self.finalize_thinking_stream()
-            if val1.strip():
-                if self.bot_handle is None:
-                    self.bot_handle = await self.chat_view.add_bot_message()
-                if hasattr(self.bot_handle, "finalize_stream"):
-                    res = self.bot_handle.finalize_stream(val1)
-                    if inspect.isawaitable(res):
-                        await res
-                self.bot_handle = None
-            else:
-                await self.finalize_bot_stream()
-        elif event_type == "error":
-            self.finalize_thinking_stream()
-            err_text = val1 or "Error"
-            await self.chat_view.add_error_message(err_text)
-        elif event_type == "event_divider":
-            self.finalize_thinking_stream()
-            div_text = val1 or "Session Compacted"
-            await self.chat_view.add_event_divider(div_text)
+        evt = stream_step_to_session_event(step, from_stream_step=True)
+        if evt is not None:
+            await self.consume_session_event(evt, animate=True, is_active=True)
 
     async def consume_session_event(
         self,
@@ -212,7 +101,7 @@ class ChatStreamDriver:
         is_expanded: bool = False,
         is_active: bool = False,
     ) -> None:
-        """Consume a canonical session event dict (from history or live session listener)."""
+        """Consume a canonical session event dict (from history, live session listener, or stream step)."""
         if not isinstance(evt, dict):
             return
         etype = evt.get("type")
@@ -230,15 +119,25 @@ class ChatStreamDriver:
             )
         elif etype == "thinking":
             txt = evt.get("text", "")
+            phase = evt.get("phase")
+            dur = evt.get("duration")
+
             if self.thinking_handle is None:
-                self.thinking_handle = await self.chat_view.add_thinking_widget(txt, animate=animate)
+                if evt.get("from_stream_step"):
+                    self.thinking_handle = await self.chat_view.add_thinking_widget(txt)
+                else:
+                    self.thinking_handle = await self.chat_view.add_thinking_widget(txt, animate=animate)
                 if is_expanded and hasattr(self.thinking_handle, "is_expandable") and self.thinking_handle.is_expandable():
                     self.thinking_handle.is_expanded = True
             else:
                 if hasattr(self.thinking_handle, "update_thinking"):
                     self.thinking_handle.update_thinking(txt)
-            if evt.get("duration") is not None or not is_active:
-                dur = evt.get("duration")
+
+            # Finalize thinking when:
+            # 1. Explicit duration is present (thought finished), OR
+            # 2. Phase is explicitly 'end', OR
+            # 3. Inactive historical replay without animation (unclosed thought in saved history)
+            if dur is not None or phase == "end" or (not is_active and not animate):
                 if dur is None or not math.isfinite(dur):
                     dur = 0.0
                 if hasattr(self.thinking_handle, "finish_thinking"):
@@ -275,14 +174,16 @@ class ChatStreamDriver:
                     logger.debug("Received session tool_result event with empty tool_handles queue: %s", evt)
             else:
                 await self.finalize_bot_stream()
+                tool_kw = {"args": evt.get("args", {})}
+                if not evt.get("from_stream_step"):
+                    tool_kw["result_text"] = evt.get("result_text", "")
+                    tool_kw["status"] = evt.get("status")
+                    tool_kw["returncode"] = evt.get("returncode")
+                    tool_kw["animate"] = animate
                 widget = await self.chat_view.add_tool_call(
                     evt.get("tool_type", ""),
                     evt.get("target", ""),
-                    result_text=evt.get("result_text", ""),
-                    args=evt.get("args", {}),
-                    status=evt.get("status"),
-                    returncode=evt.get("returncode"),
-                    animate=animate,
+                    **tool_kw,
                 )
                 if is_expanded and hasattr(widget, "is_expandable") and widget.is_expandable():
                     widget.is_expanded = True
@@ -298,19 +199,39 @@ class ChatStreamDriver:
         elif etype == "bot":
             self.finalize_thinking_stream()
             txt = evt.get("text", "")
+            delta = evt.get("delta")
             if not animate and not is_active and not txt.strip():
                 return
-            if txt:
+            if txt or delta:
                 if self.bot_handle is None:
-                    self.bot_handle = await self.chat_view.add_bot_message(animate=animate or is_active)
+                    if evt.get("from_stream_step"):
+                        self.bot_handle = await self.chat_view.add_bot_message()
+                    else:
+                        self.bot_handle = await self.chat_view.add_bot_message(animate=animate or is_active)
                 if evt.get("final") or (not animate and not is_active):
-                    if hasattr(self.bot_handle, "set_final_content"):
-                        res = self.bot_handle.set_final_content(txt)
-                        if inspect.isawaitable(res):
-                            await res
+                    if evt.get("from_stream_step"):
+                        if hasattr(self.bot_handle, "finalize_stream"):
+                            res = self.bot_handle.finalize_stream(txt)
+                            if inspect.isawaitable(res):
+                                await res
+                        elif hasattr(self.bot_handle, "set_final_content"):
+                            res = self.bot_handle.set_final_content(txt)
+                            if inspect.isawaitable(res):
+                                await res
+                    else:
+                        if hasattr(self.bot_handle, "set_final_content"):
+                            res = self.bot_handle.set_final_content(txt)
+                            if inspect.isawaitable(res):
+                                await res
+                        elif hasattr(self.bot_handle, "finalize_stream"):
+                            res = self.bot_handle.finalize_stream(txt)
+                            if inspect.isawaitable(res):
+                                await res
                     self.bot_handle = None
                 else:
-                    if hasattr(self.bot_handle, "set_stream_content"):
+                    if delta and hasattr(self.bot_handle, "append_stream_content"):
+                        self.bot_handle.append_stream_content(delta)
+                    elif hasattr(self.bot_handle, "set_stream_content"):
                         self.bot_handle.set_stream_content(txt)
         elif etype == "bot_reset":
             if self.bot_handle is not None and hasattr(self.bot_handle, "reset_stream"):
@@ -320,9 +241,47 @@ class ChatStreamDriver:
                         await res
                 except Exception:
                     pass
+        elif etype == "retry":
+            if self.bot_handle is not None and hasattr(self.bot_handle, "reset_stream"):
+                try:
+                    res = self.bot_handle.reset_stream()
+                    if inspect.isawaitable(res):
+                        await res
+                except Exception:
+                    pass
+            if self.notify:
+                attempt = evt.get("attempt") or 1
+                max_retries = evt.get("max_retries") or 3
+                delay = evt.get("delay") or 0.0
+                err = evt.get("error")
+                err_msg = str(err).lower() if err else ""
+                is_rate_limit = (
+                    "rate limit" in err_msg
+                    or "429" in err_msg
+                    or getattr(err, "status_code", None) == 429
+                )
+                reason = "Rate limit reached" if is_rate_limit else "Provider error"
+                try:
+                    self.notify(
+                        f"{reason}: retrying in {max(1, int(round(delay)))}s (attempt {attempt}/{max_retries})",
+                        severity="warning",
+                    )
+                except Exception:
+                    pass
+        elif etype == "status_change":
+            self.finalize_thinking_stream()
+            await self.finalize_bot_stream()
+            status = evt.get("status")
+            if status in ("cancelled", "error"):
+                while self.tool_handles:
+                    w = self.tool_handles.popleft()
+                    if hasattr(w, "mark_cancelled"):
+                        w.mark_cancelled()
         elif etype == "error":
             self.finalize_thinking_stream()
-            await self.chat_view.add_error_message(evt.get("text", "Error"), animate=animate)
+            err_kw = {} if evt.get("from_stream_step") else {"animate": animate}
+            await self.chat_view.add_error_message(evt.get("text", "Error"), **err_kw)
         elif etype == "event_divider":
             self.finalize_thinking_stream()
-            await self.chat_view.add_event_divider(evt.get("text", "Session Compacted"), animate=animate)
+            div_kw = {} if evt.get("from_stream_step") else {"animate": animate}
+            await self.chat_view.add_event_divider(evt.get("text", "Session Compacted"), **div_kw)

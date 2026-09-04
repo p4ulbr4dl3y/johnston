@@ -636,6 +636,60 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             rendered = str(tw.header_label.render())
             self.assertNotIn("ctrl+o", rendered)
 
+    async def test_subagent_live_thinking_stream_no_widget_duplication(self):
+        sess = self._mk("task-think-stream", "Think Stream", "prompt")
+        sess.status = "running"
+
+        screen = SubagentViewScreen("task-think-stream")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            if getattr(screen, "_history_worker", None):
+                await screen._history_worker.wait()
+            await pilot.pause(0.05)
+
+            # Emit live thinking start, deltas, and end
+            sess.add_event({"type": "thinking", "text": "Analyzing...", "phase": "start"})
+            await pilot.pause(0.05)
+            sess.add_event({"type": "thinking", "text": "Analyzing... deeper", "phase": "delta"})
+            await pilot.pause(0.05)
+            sess.add_event({"type": "thinking", "text": "Analyzing... deepest", "phase": "delta"})
+            await pilot.pause(0.05)
+            sess.add_event({"type": "thinking", "text": "Done planning", "duration": 1.2, "phase": "end"})
+            await pilot.pause(0.1)
+
+            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+
+            widgets = list(screen.query(ThinkingWidget))
+            # Exactly 1 widget must exist, NOT 4 duplicate widgets
+            self.assertEqual(len(widgets), 1)
+            tw = widgets[0]
+            self.assertFalse(tw.is_thinking)
+            self.assertEqual(tw.duration_seconds, 1.2)
+            self.assertIn("Thought for 1.2 sec", str(tw.header_label.render()))
+
+    async def test_subagent_live_status_change_cancels_in_flight_tools(self):
+        sess = self._mk("task-live-status", "Live Status", "prompt")
+        sess.status = "running"
+
+        screen = SubagentViewScreen("task-live-status")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            if getattr(screen, "_history_worker", None):
+                await screen._history_worker.wait()
+            await pilot.pause(0.05)
+
+            sess.add_event({"type": "tool", "tool_type": "shell", "target": "sleep 10"})
+            await pilot.pause(0.05)
+            sess.add_event({"type": "status_change", "status": "cancelled"})
+            await pilot.pause(0.1)
+
+            from widgets.chat_toolcall import ToolCallWidget
+
+            tc = screen.query_one(ToolCallWidget)
+            self.assertEqual(tc.status, "cancelled")
+
 
 if __name__ == "__main__":
     unittest.main()

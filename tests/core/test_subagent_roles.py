@@ -180,6 +180,22 @@ class TestSubagentApplyProvider(unittest.TestCase):
         self.assertEqual(agent.is_subagent, True)
         self.assertEqual(agent.tools, ["t1"])
 
+    def test_rebind_provider_does_not_inject_magicmock(self):
+        import types
+        import unittest.mock as mock
+
+        from core.base_provider import BaseAgent
+        from core.roles.provider import rebind_provider
+
+        real_rebuilt = BaseAgent(api_key="sk-new", model="gpt-4", base_url="http://new")
+        fake_pm = types.SimpleNamespace(create_agent_for_provider=lambda pk: real_rebuilt)
+
+        subagent = BaseAgent(api_key="sk-old", model="gpt-3.5", base_url="http://old")
+        with mock.patch("core.provider_manager.ProviderManager", return_value=fake_pm):
+            rebind_provider(subagent, "openai")
+
+        self.assertIsNone(subagent._client)
+
 
 class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
 

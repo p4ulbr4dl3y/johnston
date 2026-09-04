@@ -64,10 +64,7 @@ class BaseModalScreen(ModalScreen[T]):
 
     def action_quit_app(self) -> None:
         if self.app:
-            if hasattr(self.app, "action_quit"):
-                self.app.action_quit()
-            else:
-                self.app.exit()
+            self.app.exit()
 
     def action_cancel(self) -> None:
         self.dismiss(None)

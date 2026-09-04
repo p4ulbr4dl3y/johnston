@@ -23,7 +23,6 @@ _PROVIDER_BOUND_FIELDS = (
     "retry_delay",
     "retry_backoff",
     "max_retry_delay",
-    "client",
     "subagent_schema",
 )
 

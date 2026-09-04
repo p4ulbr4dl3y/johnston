@@ -119,6 +119,28 @@ class TestUnknownAndSemantics:
         record_subagent_step(("bot_text", "final"), s, acc)
         assert acc[0] == "final"
 
+    def test_stream_step_to_session_event_phases(self):
+        from core.application.session.stream import stream_step_to_session_event
+
+        # thinking_start
+        evt_start = stream_step_to_session_event(("thinking_start", "Starting thought", ""))
+        assert evt_start == {"type": "thinking", "text": "Starting thought", "phase": "start"}
+
+        # thinking_delta
+        evt_delta = stream_step_to_session_event(("thinking_delta", "Delta thought", ""))
+        assert evt_delta == {"type": "thinking", "text": "Delta thought", "phase": "delta"}
+
+        # thinking_end
+        evt_end = stream_step_to_session_event(("thinking_end", "2.5", "Done thought"))
+        assert evt_end == {"type": "thinking", "text": "Done thought", "duration": 2.5, "phase": "end"}
+
+        # retry
+        evt_retry = stream_step_to_session_event(("retry", 1, 3, 2.0, "Rate limit"))
+        assert evt_retry["type"] == "retry"
+        assert evt_retry["attempt"] == 1
+        assert evt_retry["max_retries"] == 3
+        assert evt_retry["delay"] == 2.0
+
 
 # ---------------------------------------------------------------------------
 # merge_subagent_metrics

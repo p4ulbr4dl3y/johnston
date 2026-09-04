@@ -154,15 +154,18 @@ class AgentSession:
 
         if etype == MessageType.BOT and last and last.get("type") == MessageType.BOT:
             last["text"] = event.get("text", "")
+            last.pop("delta", None)
             if event.get("final"):
                 last["final"] = True
         elif etype == MessageType.BOT_RESET and last and last.get("type") == MessageType.BOT:
             last["text"] = ""
             last.pop("final", None)
+            last.pop("delta", None)
         elif etype == MessageType.THINKING and last and last.get("type") == MessageType.THINKING and "duration" not in last:
             last["text"] = event.get("text", "")
             if event.get("duration") is not None:
                 last["duration"] = event["duration"]
+            last.pop("phase", None)
         elif etype == MessageType.TOOL and "result_text" in event:
             target_msg = None
             # Tool results always land on the FIRST unmatched TOOL message (no
@@ -186,7 +189,11 @@ class AgentSession:
                     if key in event:
                         target_msg[key] = event[key]
             else:
-                self.messages.append(event)
+                msg_to_store = dict(event)
+                msg_to_store.pop("phase", None)
+                msg_to_store.pop("delta", None)
+                msg_to_store.pop("from_stream_step", None)
+                self.messages.append(msg_to_store)
                 self.updated_at = _now()
         elif (
             etype == MessageType.EVENT_DIVIDER
@@ -198,7 +205,11 @@ class AgentSession:
         else:
             if etype == MessageType.TOOL and last and last.get("type") == MessageType.BOT and not last.get("text", "").strip():
                 self.messages.pop()
-            self.messages.append(event)
+            msg_to_store = dict(event)
+            msg_to_store.pop("phase", None)
+            msg_to_store.pop("delta", None)
+            msg_to_store.pop("from_stream_step", None)
+            self.messages.append(msg_to_store)
             self.updated_at = _now()
 
         if not self.listeners:
