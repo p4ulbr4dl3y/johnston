@@ -973,6 +973,18 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertEqual(widget.status, "cancelled")
         self.assertIn("[interrupted", widget.result_text)
 
+    def test_generating_header_falls_back_to_target_when_args_empty_or_id_only(self):
+        widget = ToolCallWidget("read", "app.py", status="generating")
+        widget.render_header()
+        self.assertIn("○", str(widget.header_label.render()))
+        self.assertIn("app.py", str(widget.header_label.render()))
+
+        # Non-system / MCP tool fallback
+        mcp_widget = ToolCallWidget("mcp_tool", "search_query", status="generating")
+        mcp_widget.render_header()
+        self.assertIn("search_query", str(mcp_widget.header_label.render()))
+        self.assertNotIn("{", str(mcp_widget.header_label.render()))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -63,12 +63,12 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
 
         # 1. Model starts streaming tool call
         await self.driver.consume_stream_step(("tool_generating", "edit", "", {"id": "c1"}))
-        self.chat_view.add_tool_call.assert_awaited_once_with("edit", "", args={"id": "c1"}, status="generating")
+        self.chat_view.add_tool_call.assert_awaited_once_with("edit", "", args={}, status="generating")
         self.assertEqual(len(self.driver.tool_handles), 1)
 
         # 2. Target path streams in
         await self.driver.consume_stream_step(("tool_generating_update", "edit", "file.py", {"id": "c1"}))
-        tool_widget.update_tool_call.assert_called_once_with(target="file.py", args={"id": "c1"})
+        tool_widget.update_tool_call.assert_called_once_with(target="file.py")
 
         # 3. Generation finishes, execution starts
         await self.driver.consume_stream_step(("tool", "edit", "file.py", {"path": "file.py"}))
@@ -79,6 +79,27 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         await self.driver.consume_stream_step(("tool_result", "diff output", "", False, ToolResultStatus.DONE, 0))
         tool_widget.set_result.assert_called_once_with("diff output", is_error=False, status="done", returncode=0)
         self.assertEqual(len(self.driver.tool_handles), 0)
+
+    async def test_stream_parallel_tools_generating_update_by_id(self):
+        tw1 = MagicMock()
+        tw1.status = "generating"
+        tw1.update_tool_call = MagicMock()
+        tw2 = MagicMock()
+        tw2.status = "generating"
+        tw2.update_tool_call = MagicMock()
+        self.chat_view.add_tool_call.side_effect = [tw1, tw2]
+
+        await self.driver.consume_stream_step(("tool_generating", "read", "", {"id": "c1", "index": 0}))
+        await self.driver.consume_stream_step(("tool_generating", "read", "", {"id": "c2", "index": 1}))
+
+        # Update for c2 should update tw2, not tw1
+        await self.driver.consume_stream_step(("tool_generating_update", "read", "b.py", {"id": "c2", "index": 1}))
+        tw2.update_tool_call.assert_called_once_with(target="b.py")
+        tw1.update_tool_call.assert_not_called()
+
+        # Update for c1 should update tw1
+        await self.driver.consume_stream_step(("tool_generating_update", "read", "a.py", {"id": "c1", "index": 0}))
+        tw1.update_tool_call.assert_called_once_with(target="a.py")
 
     async def test_stream_multiple_tools_fifo_order(self):
         tw1 = MagicMock()

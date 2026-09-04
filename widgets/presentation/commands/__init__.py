@@ -32,6 +32,7 @@ from widgets.presentation.commands.tool_commands import (
 from widgets.presentation.commands.ui_commands import (
     CommandsCommand,
     CopyCommand,
+    DemoCommand,
     HelpCommand,
     KeybindsCommand,
     ThemeCommand,
@@ -59,6 +60,7 @@ COMMAND_CLASSES = [
     HelpCommand,
     CommandsCommand,
     KeybindsCommand,
+    DemoCommand,
 ]
 
 __all__ = [
@@ -88,4 +90,5 @@ __all__ = [
     "HelpCommand",
     "CommandsCommand",
     "KeybindsCommand",
+    "DemoCommand",
 ]

@@ -108,17 +108,37 @@ class ChatStreamDriver:
         elif event_type == "tool_generating":
             self.finalize_thinking_stream()
             await self.finalize_bot_stream()
-            targs = val3 if isinstance(val3, dict) else {}
-            tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs, status="generating")
+            meta = val3 if isinstance(val3, dict) else {}
+            tool_handle = await self.chat_view.add_tool_call(val1, val2, args={}, status="generating")
+            if hasattr(tool_handle, "tool_call_id") or isinstance(meta, dict):
+                setattr(tool_handle, "tool_call_id", meta.get("id"))
+                setattr(tool_handle, "tool_call_index", meta.get("index"))
             self.tool_handles.append(tool_handle)
             if self.on_tool_widget:
                 self.on_tool_widget(tool_handle)
         elif event_type == "tool_generating_update":
+            meta = val3 if isinstance(val3, dict) else {}
+            target_id = meta.get("id")
+            target_idx = meta.get("index")
+            matched = False
             for th in self.tool_handles:
                 if getattr(th, "status", None) == "generating":
-                    if hasattr(th, "update_tool_call"):
-                        th.update_tool_call(target=val2, args=val3 if isinstance(val3, dict) else None)
-                    break
+                    if target_id and getattr(th, "tool_call_id", None) == target_id:
+                        if hasattr(th, "update_tool_call"):
+                            th.update_tool_call(target=val2)
+                        matched = True
+                        break
+                    if target_idx is not None and getattr(th, "tool_call_index", None) == target_idx:
+                        if hasattr(th, "update_tool_call"):
+                            th.update_tool_call(target=val2)
+                        matched = True
+                        break
+            if not matched:
+                for th in self.tool_handles:
+                    if getattr(th, "status", None) == "generating":
+                        if hasattr(th, "update_tool_call"):
+                            th.update_tool_call(target=val2)
+                        break
         elif event_type == "tool":
             self.finalize_thinking_stream()
             await self.finalize_bot_stream()
@@ -137,8 +157,8 @@ class ChatStreamDriver:
             else:
                 tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs)
                 self.tool_handles.append(tool_handle)
-            if self.on_tool_widget:
-                self.on_tool_widget(tool_handle)
+                if self.on_tool_widget:
+                    self.on_tool_widget(tool_handle)
         elif event_type == "tool_result":
             parsed_tool_result = parse_tool_result_step(step)
             res_status = parsed_tool_result.status.value if parsed_tool_result.status is not None else None
