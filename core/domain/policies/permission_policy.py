@@ -104,6 +104,7 @@ BUILTIN_TOOLS = frozenset(
         "create",
         "edit",
         "shell",
+        "search",
         "ask_user",
         "web_fetch",
         "invoke_subagent",

@@ -15,6 +15,7 @@ from tools.invoke_subagent import InvokeSubagentTool
 from tools.manage_shell import ManageShellTool
 from tools.manage_subagent import ManageSubagentTool
 from tools.read import ReadTool
+from tools.search import SearchTool
 from tools.shell import ShellTool
 from tools.update_plan import UpdatePlanTool
 from tools.web_fetch import WebFetchTool
@@ -24,6 +25,7 @@ TOOL_CLASSES = [
     CreateTool,
     EditTool,
     ShellTool,
+    SearchTool,
     AskUserTool,
     ManageShellTool,
     InvokeSubagentTool,

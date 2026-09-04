@@ -253,6 +253,19 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
             return truncate(url)
         return ""
 
+    if name == "search":
+        q = str(args.get("query") or "").strip()
+        p = str(args.get("path") or "").strip()
+        mode = str(args.get("mode") or "").strip()
+        parts = []
+        if mode and mode != "content":
+            parts.append(mode)
+        if q:
+            parts.append(f'"{q}"')
+        if p and p != ".":
+            parts.append(f"in {p}")
+        return truncate(" ".join(parts) if parts else "codebase")
+
     return ""
 
 
