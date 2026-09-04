@@ -509,8 +509,8 @@ async def test_subagent_explicit_run_in_background_rejected(tool, make_app_mock,
     ctx = make_tool_context(app=app, is_subagent=True)
 
     with patch.object(ShellTool, "_create_std_process") as mock_create:
-        res = str(await tool.execute({"command": "tail -f log.txt", "background": True}, ctx=ctx))
-        assert "ERR: background 'shell'" in res
+        res = str(await tool.execute({"command": "tail -f log.txt", "wait_seconds": 0}, ctx=ctx))
+        assert "ERR: wait_seconds 'shell'" in res
         mock_create.assert_not_called()
         assert len([t for t in app.task_manager]) == 0
 
@@ -529,7 +529,7 @@ async def test_explicit_run_in_background(tool, make_app_mock, make_tool_context
         patch("tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=p),
     ):
-        res = await tool.execute({"command": "tail -f log.txt", "background": True}, ctx=ctx)
+        res = await tool.execute({"command": "tail -f log.txt", "wait_seconds": 0}, ctx=ctx)
         assert "task started" in res.content
         assert len([t for t in app.task_manager]) == 1
 
@@ -545,7 +545,7 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
 
     mgr = ManageShellTool()
     with patch("tools.shell.shell_executable", return_value="/bin/sh"):
-        res = await tool.execute({"command": "cat", "background": True}, ctx=app)
+        res = await tool.execute({"command": "cat", "wait_seconds": 0}, ctx=app)
     m = re.search(r'(?:Task ID: |id:\s*|id\s+|id=")(shell-[a-f0-9]+)', str(res.content) + " " + str(res.display))
     assert m is not None
     task_id = m.group(1)
@@ -603,7 +603,7 @@ async def test_session_override_allow_shell(tool, make_app_mock):
 def test_shell_get_schema_main(tool):
     schema = tool.get_schema(is_subagent=False)
     params = schema["function"]["parameters"]["properties"]
-    assert "background" in params
+    assert "wait_seconds" in params
     assert "command" in params
     assert "timeout" in params
 
@@ -611,7 +611,7 @@ def test_shell_get_schema_main(tool):
 def test_shell_get_schema_subagent(tool):
     schema = tool.get_schema(is_subagent=True)
     params = schema["function"]["parameters"]["properties"]
-    assert "background" not in params
+    assert "wait_seconds" not in params
     assert "command" in params
     assert "timeout" in params
     assert "synchronous" in schema["function"]["description"].lower()
@@ -1004,31 +1004,31 @@ async def test_shell_subagent_background_does_not_spawn_process(tool, make_tool_
     ctx = _ctx(make_tool_context)
     ctx.is_subagent = True
     with patch.object(tool, "_create_std_process") as mock_create:
-        res = await tool.execute({"command": "echo hello", "background": True}, ctx=ctx)
+        res = await tool.execute({"command": "echo hello", "wait_seconds": 0}, ctx=ctx)
         assert res.is_error
-        assert "background" in res.content
+        assert "wait_seconds" in res.content
         mock_create.assert_not_called()
 
 
-def test_shell_schema_idle_timeout_and_subagent_strip(tool):
+def test_shell_schema_subagent_strip(tool):
     schema = tool.get_schema(is_subagent=False)
     props = schema["function"]["parameters"]["properties"]
-    assert "idle_timeout" in props
-    assert props["idle_timeout"]["default"] == 30
-    assert "background" in props
+    assert "idle_timeout" not in props
+    assert "wait_seconds" in props
 
     sub_schema = tool.get_schema(is_subagent=True)
     sub_props = sub_schema["function"]["parameters"]["properties"]
     assert "idle_timeout" not in sub_props
-    assert "background" not in sub_props
+    assert "wait_seconds" not in sub_props
 
 
-async def test_shell_background_idle_timeout_wired(tool, make_app_mock, make_tool_context):
+async def test_shell_auto_derives_idle_timeout(tool, make_app_mock, make_tool_context):
     app = _app(make_app_mock, task_manager=TaskManager())
     ctx = make_tool_context(app=app, is_subagent=False)
     ctx.host.on_background_shell_completed = MagicMock()
     ctx.host.on_background_shell_progress = MagicMock()
 
+    # 1. wait_seconds=0 -> persistent daemon -> idle_timeout=0 (quiet)
     with (
         patch("tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=_process()),
@@ -1039,19 +1039,36 @@ async def test_shell_background_idle_timeout_wired(tool, make_app_mock, make_too
         mock_task_cls.return_value = mock_task
 
         res = await tool.execute(
-            {"command": "sleep 10", "background": True, "idle_timeout": 45, "timeout": 120},
+            {"command": "sleep 10", "wait_seconds": 0, "timeout": 120},
             ctx=ctx,
         )
         assert not res.is_error
-
         mock_task_cls.assert_called_once()
         _, kwargs = mock_task_cls.call_args
-        assert kwargs["idle_timeout"] == 45
+        assert kwargs["idle_timeout"] == 0
         assert kwargs["hard_timeout"] == 120
-        mock_task.start_reading.assert_called_once_with(
-            on_completed=ctx.host.on_background_shell_completed,
-            on_progress=ctx.host.on_background_shell_progress,
+
+    # 2. wait_seconds=5 -> batch task -> idle_timeout=30 (hang detection)
+    with (
+        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch.object(ShellTool, "_create_std_process", return_value=_process()),
+        patch("tools.shell.ShellTask") as mock_task_cls,
+    ):
+        mock_task = MagicMock()
+        mock_task.log_path = "/tmp/test.log"
+        mock_task.background_event = asyncio.Event()
+        read_fut = asyncio.Future()
+        read_fut.set_result(None)
+        mock_task.start_reading.return_value = read_fut
+        mock_task_cls.return_value = mock_task
+
+        res = await tool.execute(
+            {"command": "pytest", "wait_seconds": 5},
+            ctx=ctx,
         )
+        mock_task_cls.assert_called_once()
+        _, kwargs = mock_task_cls.call_args
+        assert kwargs["idle_timeout"] == 30
 
 
 async def test_shell_sync_wires_hard_timeout_to_task(tool, make_app_mock, make_tool_context):
@@ -1092,8 +1109,59 @@ def test_apply_role_tools_cleans_timeout_description(tool):
 
     shell_tool = next(t for t in sub.tools if t["function"]["name"] == "shell")
     props = shell_tool["function"]["parameters"]["properties"]
-    assert "background" not in props
+    assert "wait_seconds" not in props
     assert "idle_timeout" not in props
     assert "timeout" in props
-    assert "background=true" not in props["timeout"]["description"]
+    assert "wait_seconds" not in props["timeout"]["description"]
+
+
+async def test_shell_wait_seconds_positive_finishes_sync(tool, make_app_mock, make_tool_context):
+    app = _app(make_app_mock, task_manager=TaskManager())
+    ctx = make_tool_context(app=app, is_subagent=False)
+    reader = asyncio.StreamReader()
+    reader.feed_data(b"fast output\n")
+    reader.feed_eof()
+    p = _process(stdout=reader)
+    p.returncode = 0
+
+    with (
+        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch.object(ShellTool, "_create_std_process", return_value=p),
+    ):
+        res = await tool.execute({"command": "echo fast", "wait_seconds": 5}, ctx=ctx)
+        assert not res.is_error
+        assert "fast output" in res.content
+        assert len([t for t in app.task_manager]) == 0
+
+
+async def test_shell_wait_seconds_positive_transitions_to_background(tool, make_app_mock, make_tool_context):
+    app = _app(make_app_mock, task_manager=TaskManager())
+    ctx = make_tool_context(app=app, is_subagent=False)
+
+    class NeverEndingProcess:
+        def __init__(self):
+            self.stdout = asyncio.StreamReader()
+            self.returncode = None
+
+        async def wait(self):
+            try:
+                await asyncio.sleep(100)
+            except asyncio.CancelledError:
+                pass
+            return 0
+
+    p = NeverEndingProcess()
+
+    with (
+        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch.object(ShellTool, "_create_std_process", return_value=p),
+    ):
+        res = await tool.execute({"command": "sleep 100", "wait_seconds": 1}, ctx=ctx)
+        assert not res.is_error
+        assert "task moved to background" in res.content
+        tasks = [t for t in app.task_manager]
+        assert len(tasks) == 1
+        assert tasks[0].is_background
+        p.stdout.feed_eof()
+        await asyncio.sleep(0.05)
 

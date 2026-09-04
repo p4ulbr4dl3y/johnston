@@ -38,4 +38,4 @@ System prompt instructions for the role...
 Subagents are invoked via `invoke_subagent(type="<role_key>", branch="<branch_name>")`:
 - **Branch omitted or same as main tree**: Subagent works directly in the workspace.
 - **Different branch**: Subagent executes inside an isolated Git worktree on that branch and auto-commits on completion.
-- **Subagent Exclusions**: `invoke_subagent`, `manage_subagent`, `manage_shell`, `ask_user`, and `shell(background=true)` are automatically disabled in all subagent roles.
+- **Subagent Exclusions**: `invoke_subagent`, `manage_subagent`, `manage_shell`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in all subagent roles.

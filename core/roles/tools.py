@@ -36,8 +36,7 @@ def _rebuild_tool(t) -> dict:
         t_copy["function"]["description"] = HARDENED_SHELL_DESCRIPTION
         params = t_copy.get("function", {}).get("parameters", {})
         if isinstance(params, dict) and "properties" in params and isinstance(params["properties"], dict):
-            params["properties"].pop("background", None)
-            params["properties"].pop("idle_timeout", None)
+            params["properties"].pop("wait_seconds", None)
             if "timeout" in params["properties"] and isinstance(params["properties"]["timeout"], dict):
                 params["properties"]["timeout"]["description"] = (
                     "Seconds before SIGTERM (defaults to 120s, max 600s)."

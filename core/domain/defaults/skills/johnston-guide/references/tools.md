@@ -10,8 +10,9 @@ Johnston equips the primary agent and subagents with a suite of 10 builtin tools
    - MCP resources can be read via `read(path="resource://...")`.
 2. **`create`**: Atomically create new files or overwrite existing files with full contents (`path`, `content`).
 3. **`edit`**: Apply precise search-and-replace edits (`path`, `old_str`, `new_str`, `replace_all`). Omit `new_str` or set empty to delete `old_str`.
-4. **`shell`**: Execute shell commands (`command`, `timeout`, `background`).
-   - `background=true` spawns async background processes and returns a task ID.
+4. **`shell`**: Execute shell commands (`command`, `timeout`, `wait_seconds`).
+   - `wait_seconds=0` spawns async background processes immediately (servers/daemons) and returns a task ID.
+   - `wait_seconds=N` waits up to N seconds before transitioning to background with hang detection.
 5. **`manage_shell`**: Manage background shell tasks (`action` in `["list", "send_input", "kill"]`, `task_id`, `input`).
 
 ## Delegation & Subagents
@@ -31,7 +32,7 @@ To prevent recursive spawning, interactive stalls, and process collisions, the f
 - `manage_subagent`
 - `manage_shell`
 - `ask_user`
-- `shell(background=true)` (subagents may only run synchronous shell commands)
+- `shell(wait_seconds=...)` (subagents may only run synchronous shell commands)
 
 ## Execution Modes & Permissions
 - **Execution Modes (`permissions.mode`)**:

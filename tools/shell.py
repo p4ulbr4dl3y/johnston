@@ -3,7 +3,7 @@ import logging
 import platform
 import time
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from core.domain.defaults.config import DEFAULT_SHELL_MAX_CAP, DEFAULT_SHELL_TIMEOUT
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
@@ -76,7 +76,7 @@ class ShellTool(BaseTool):
     name = "shell"
     description = (
         "Execute a NON-INTERACTIVE shell command. ALWAYS specify explicit path (e.g. 'rg foo .') "
-        "to avoid stdin hang. Set background=true for servers/long jobs. Use unbuffered output "
+        "to avoid stdin hang. Set wait_seconds=0 for servers/long jobs. Use unbuffered output "
         "(flush/flags) for long scripts, loops, and streaming logs. Manage, send stdin, or kill via 'manage_shell'."
     )
 
@@ -91,7 +91,7 @@ class ShellTool(BaseTool):
                 "Anti-patterns (will hang or fail):\n"
                 "- Interactive REPLs: `python -i`, `node`, `irb`, `psql` without `-c`, etc.\n"
                 "- Pagers: `less`, `more`, `vim`, `nano`. For sync inspection use `cat` or pipe to `head`/`tail`. "
-                "NEVER pipe background commands (`background=true`) to `tail`/`head` — runtime streams full log to disk "
+                "NEVER pipe background commands (`wait_seconds=0`) to `tail`/`head` — runtime streams full log to disk "
                 "and tails notification automatically; piping blocks live stream and triggers false inactivity alerts.\n"
                 "- Commands that read stdin without explicit input: `fzf`, `ssh` without `-o BatchMode=yes`.\n"
                 "- Stdout buffering: pipes and non-Python tools buffer output in 4KB blocks. "
@@ -100,7 +100,7 @@ class ShellTool(BaseTool):
                 "Environment:\n"
                 "- Runs in cwd (from <environment>); subagent cwd is its worktree root.\n"
                 "- `manage_shell` is unavailable in subagents (tool removed).\n"
-                "- `background=true` is rejected in subagents (sync-only).\n"
+                "- `wait_seconds` is rejected in subagents (sync-only).\n"
                 "- If sandbox backend unavailable, runs unsandboxed with `[sandbox unavailable]` banner.\n\n"
                 "Error kinds: `timeout` (process killed, NOT backgrounded), `http_status`/etc. don't apply; "
                 "use `not_found` for `command not found` (exit 127), `permission` for `Permission denied`."
@@ -119,26 +119,19 @@ class ShellTool(BaseTool):
                         "default": int(DEFAULT_SHELL_TIMEOUT),
                         "description": (
                             f"Seconds before SIGTERM. For sync commands: defaults to {int(DEFAULT_SHELL_TIMEOUT)}s. "
-                            "For background=true: hard kill limit (omit or 0 for unlimited runtime)."
+                            "For background commands (wait_seconds specified): hard kill limit (omit or 0 for unlimited runtime)."
                         ),
                     },
-                    "idle_timeout": {
+                    "wait_seconds": {
                         "type": "integer",
                         "minimum": 0,
-                        "default": 30,
                         "description": (
-                            "Seconds of stdout silence in background before sending progress "
-                            "<notification status='running' event='inactivity'>. 0 to disable."
-                        ),
-                    },
-                    "background": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Run as background task (also triggered when user presses Ctrl+B). "
-                            "Returns task_id + log path. Process continues in background. "
-                            "Runtime automatically resumes turn with <notification type='shell'> on finish — "
-                            "NEVER re-run the command, NEVER poll manage_shell(list) to wait. Main agent only."
+                            "Synchronous wait threshold in seconds before moving to background. "
+                            "Omit (or null) to run synchronously up to timeout (never backgrounded). "
+                            "0 = run in background immediately without idle alerts (persistent servers, daemons, watchers). "
+                            "N > 0 = wait up to N seconds (builds, tests, migrations): returns output immediately if finished; "
+                            "otherwise moves to background task with hang detection. "
+                            "Main agent only."
                         ),
                     },
                 },
@@ -187,18 +180,23 @@ class ShellTool(BaseTool):
         except (ValueError, TypeError):
             timeout = default_timeout
 
-        idle_raw = args.get("idle_timeout", 30)
-        try:
-            idle_timeout = max(0, int(idle_raw))
-        except (ValueError, TypeError):
-            idle_timeout = 30
+        wait_seconds_raw = args.get("wait_seconds", None)
+        wait_seconds = None
+        if wait_seconds_raw is not None:
+            try:
+                wait_seconds = max(0, int(wait_seconds_raw))
+            except (ValueError, TypeError):
+                wait_seconds = None
 
-        run_in_bg = bool(args.get("background", False))
-        if run_in_bg and ctx.is_subagent:
-            return ToolResult.error("background", name="shell")
+        if wait_seconds is not None and ctx.is_subagent:
+            return ToolResult.error("wait_seconds", name="shell")
+
+        # Auto-derived idle timeout: 0 for persistent services (wait_seconds=0),
+        # 30s hang-detection heartbeat for batch tasks (wait_seconds > 0) or user Ctrl+B.
+        idle_timeout = 0 if wait_seconds == 0 else 30
 
         hard_timeout = None
-        if run_in_bg and "timeout" in args and args.get("timeout") is not None:
+        if wait_seconds is not None and "timeout" in args and args.get("timeout") is not None:
             try:
                 t_val = int(args["timeout"])
                 if t_val > 0:
@@ -218,62 +216,86 @@ class ShellTool(BaseTool):
             allow_workspace_writes=allow_workspace_writes,
         )
 
-        # Synchronous execution mode (default for main and subagents): stream
-        # output into a bounded tail buffer and wait with a hard timeout. On
-        # timeout the process is terminated (never converted to a background
-        # task), so long-running commands report a truthful error instead of
-        # silently continuing after the agent already returns.
-        if not run_in_bg:
-            res = await self._run_sync(p, ctx, cmd, timeout, idle_timeout=idle_timeout)
-            notice = _sandbox_fallback_notice(ctx)
-            if notice and res.content:
-                res.content = notice + res.content
-            return res
+        if wait_seconds == 0:
+            # Explicit immediate background execution (main agent only).
+            task_id = _new_task_id()
+            task = ShellTask(
+                task_id,
+                cmd,
+                p,
+                session_id=ctx.session_id,
+                idle_timeout=idle_timeout,
+                hard_timeout=hard_timeout,
+            )
+            target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
+            if target_widget is not None:
+                task.add_listener(target_widget.append_shell_output)
+            callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
+            progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
+            task.is_background = True
+            # Open the log BEFORE attaching so the widget/registry receive the real
+            # log path (task.log_path is only populated by open_log()).
+            task.open_log()
+            _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path)
+            ctx.add_background_task(task)
+            task.start_reading(on_completed=callback, on_progress=progress_cb)
 
-        # Explicit background execution (main agent only).
-        task_id = _new_task_id()
-        task = ShellTask(
-            task_id,
-            cmd,
+            plain_content = f"[task started | id {task_id} | log {task.log_path}]"
+            notice = _sandbox_fallback_notice(ctx)
+            if notice:
+                plain_content = notice + plain_content
+            return ToolResult(status=ToolResultStatus.RUNNING, content=plain_content)
+
+        # Synchronous execution mode (default or wait_seconds > 0): stream
+        # output into a bounded tail buffer. If wait_seconds is specified, wait
+        # up to wait_seconds before converting to background; otherwise wait with
+        # a hard timeout. On timeout (when wait_seconds is None) the process is
+        # terminated (never converted to a background task).
+        res = await self._run_sync(
             p,
-            session_id=ctx.session_id,
+            ctx,
+            cmd,
+            timeout,
             idle_timeout=idle_timeout,
+            wait_seconds=wait_seconds,
             hard_timeout=hard_timeout,
         )
-        target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
-        if target_widget is not None:
-            task.add_listener(target_widget.append_shell_output)
-        callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
-        progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
-        task.is_background = True
-        # Open the log BEFORE attaching so the widget/registry receive the real
-        # log path (task.log_path is only populated by open_log()).
-        task.open_log()
-        _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path)
-        ctx.add_background_task(task)
-        task.start_reading(on_completed=callback, on_progress=progress_cb)
-
-        plain_content = f"[task started | id {task_id} | log {task.log_path}]"
         notice = _sandbox_fallback_notice(ctx)
-        if notice:
-            plain_content = notice + plain_content
-        return ToolResult(status=ToolResultStatus.RUNNING, content=plain_content)
+        if notice and res.content:
+            res.content = notice + res.content
+        return res
 
     async def _run_sync(
-        self, p: Any, ctx: Any, cmd: str, timeout: int, idle_timeout: int = 30
+        self,
+        p: Any,
+        ctx: Any,
+        cmd: str,
+        timeout: int,
+        idle_timeout: int = 30,
+        wait_seconds: Optional[int] = None,
+        hard_timeout: Optional[float] = None,
     ) -> ToolResult:
-        """Run a process synchronously: stream output into a bounded tail buffer,
-        wait with a hard timeout, terminate the process on timeout/cancellation.
-        Never converts to a background task unless ctrl+b / background_event is triggered.
+        """Run a process synchronously: stream output into a bounded tail buffer.
+
+        If wait_seconds is None: wait with hard timeout, terminate on timeout/cancellation.
+        Never converts to background task unless ctrl+b / background_event is triggered.
+
+        If wait_seconds is set (N > 0): wait up to wait_seconds; if process doesn't exit,
+        converts to background task and returns RUNNING status.
         """
         task_id = _new_task_id()
+        task_hard_timeout = (
+            float(hard_timeout)
+            if hard_timeout is not None
+            else (float(timeout) if wait_seconds is None else None)
+        )
         task = ShellTask(
             task_id,
             cmd,
             p,
             session_id=ctx.session_id,
             idle_timeout=idle_timeout,
-            hard_timeout=float(timeout) if timeout else None,
+            hard_timeout=task_hard_timeout,
         )
         target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         if target_widget is not None:
@@ -288,16 +310,47 @@ class ShellTool(BaseTool):
         proc_task = asyncio.ensure_future(p.wait())
         bg_task = asyncio.ensure_future(task.background_event.wait())
 
+        if wait_seconds is not None:
+            sync_limit = float(wait_seconds)
+            if hard_timeout is not None:
+                sync_limit = min(sync_limit, float(hard_timeout))
+        else:
+            sync_limit = float(timeout)
+
         try:
             done, pending = await asyncio.wait(
                 [proc_task, bg_task],
-                timeout=float(timeout),
+                timeout=sync_limit,
                 return_when=asyncio.FIRST_COMPLETED,
             )
             for t in pending:
                 t.cancel()
 
             if not done:
+                if wait_seconds is not None:
+                    elapsed = max(0.1, round(time.monotonic() - start_time, 1))
+                    if hard_timeout is not None and elapsed >= hard_timeout:
+                        raise asyncio.TimeoutError()
+                    task.move_to_background()
+                    if target_widget is not None and task.log_path:
+                        setattr(target_widget, "log_path", task.log_path)
+                    raw_out = task.get_formatted_output().strip()
+                    if raw_out:
+                        truncated = truncate_output(
+                            raw_out, max_chars=2000, tool_name="shell", save_log=False, from_end=True
+                        ).strip()
+                        plain_content = (
+                            f"[task moved to background | id {task_id} | log {task.log_path} | elapsed {elapsed}s | wait for notification]\n\n"
+                            f"{truncated}"
+                        )
+                    else:
+                        plain_content = (
+                            f"[task moved to background | id {task_id} | log {task.log_path} | elapsed {elapsed}s | no output yet (buffered) | wait for notification]"
+                        )
+                    return ToolResult(
+                        status=ToolResultStatus.RUNNING,
+                        content=plain_content,
+                    )
                 raise asyncio.TimeoutError()
 
             if task.background_event.is_set() or getattr(task, "is_background", False):
@@ -350,8 +403,9 @@ class ShellTool(BaseTool):
                     pass
             raw_out = _truncate_output(task.get_formatted_output()).strip()
             partial_str = f"\n\n{raw_out}" if raw_out else ""
-            disp = f"ERR: timeout 'shell': timed out after {timeout}s{partial_str}"
-            return ToolResult.error("timeout", f"timed out after {timeout}s{partial_str}", name="shell", display=disp)
+            effective_timeout = hard_timeout if (wait_seconds is not None and hard_timeout is not None) else timeout
+            disp = f"ERR: timeout 'shell': timed out after {effective_timeout}s{partial_str}"
+            return ToolResult.error("timeout", f"timed out after {effective_timeout}s{partial_str}", name="shell", display=disp)
         except asyncio.CancelledError:
             await terminate_process(p)
             raise
