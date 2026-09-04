@@ -450,20 +450,20 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             "ask_user",
         ):
             display_name = self.DISPLAY_NAMES.get(self.canonical_tool, self.tool_type or "Tool")
-            from widgets.presentation.tool_display import extract_tool_display
+            from widgets.presentation.tool_display import extract_tool_display, truncate
 
             if self.canonical_tool == "update_plan":
                 target_str = extract_tool_display(self.canonical_tool, self.args)
             else:
                 extracted = extract_tool_display(self.canonical_tool, self.args) if self.args else ""
-                target_str = extracted or self.target
+                target_str = extracted or (truncate(str(self.target), max_len=60) if self.target else "")
             base_header = f"[{c}]{marker} [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})"
         else:
-            from widgets.presentation.tool_display import format_compact_dict
+            from widgets.presentation.tool_display import format_compact_dict, truncate
 
             compact = format_compact_dict(self.args)
             if self.status == "generating" and not compact:
-                compact = self.target or ""
+                compact = truncate(str(self.target), max_len=60) if self.target else ""
             is_mcp = (self.tool_type or "").startswith("mcp_") or self.is_mcp
             tool_name_display = to_snake_case(self.tool_type) if is_mcp else (self.tool_type or "Tool")
             escaped_compact = escape(str(compact))

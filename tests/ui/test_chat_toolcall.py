@@ -985,6 +985,14 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("search_query", str(mcp_widget.header_label.render()))
         self.assertNotIn("{", str(mcp_widget.header_label.render()))
 
+    def test_generating_header_truncates_long_target(self):
+        long_target = "a" * 100
+        widget = ToolCallWidget("read", long_target, status="generating")
+        widget.render_header()
+        rendered = str(widget.header_label.render())
+        self.assertIn("...", rendered)
+        self.assertNotIn(long_target, rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

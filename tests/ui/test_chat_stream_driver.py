@@ -101,6 +101,57 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         await self.driver.consume_stream_step(("tool_generating_update", "read", "a.py", {"id": "c1", "index": 0}))
         tw1.update_tool_call.assert_called_once_with(target="a.py")
 
+    async def test_stream_tool_matching_by_id_and_calls_on_tool_widget(self):
+        tw1 = MagicMock()
+        tw1.status = "generating"
+        tw1.tool_call_id = "c1"
+        tw1.update_tool_call = MagicMock()
+        tw1.mark_running = MagicMock()
+
+        tw2 = MagicMock()
+        tw2.status = "generating"
+        tw2.tool_call_id = "c2"
+        tw2.update_tool_call = MagicMock()
+        tw2.mark_running = MagicMock()
+
+        self.chat_view.add_tool_call.side_effect = [tw1, tw2]
+        tracked_widgets = []
+        self.driver.on_tool_widget = lambda w: tracked_widgets.append(w)
+
+        await self.driver.consume_stream_step(("tool_generating", "read", "", {"id": "c1", "index": 0}))
+        await self.driver.consume_stream_step(("tool_generating", "read", "", {"id": "c2", "index": 1}))
+
+        # Tool c2 runs first (e.g. concurrent or out-of-order)
+        await self.driver.consume_stream_step(("tool", "read", "b.py", {"path": "b.py"}, "c2"))
+        tw2.mark_running.assert_called_once()
+        tw1.mark_running.assert_not_called()
+        self.assertIn(tw2, tracked_widgets)
+
+    async def test_stream_retry_cleans_up_generating_tool_widgets(self):
+        tw = MagicMock()
+        tw.status = "generating"
+        tw.remove = MagicMock()
+        self.driver.tool_handles.append(tw)
+
+        await self.driver.consume_stream_step(("retry", 1, 3, 1.0, Exception("429")))
+        tw.remove.assert_called_once()
+        self.assertEqual(len(self.driver.tool_handles), 0)
+
+    async def test_cleanup_unfinalized_tools(self):
+        tw_gen = MagicMock()
+        tw_gen.status = "generating"
+        tw_gen.remove = MagicMock()
+
+        tw_run = MagicMock()
+        tw_run.status = "running"
+        tw_run.set_result = MagicMock()
+
+        self.driver.tool_handles.extend([tw_gen, tw_run])
+        self.driver.cleanup_unfinalized_tools("Failed")
+
+        tw_gen.remove.assert_called_once()
+        tw_run.set_result.assert_called_once_with("Failed", is_error=True, status="error")
+
     async def test_stream_multiple_tools_fifo_order(self):
         tw1 = MagicMock()
         tw2 = MagicMock()

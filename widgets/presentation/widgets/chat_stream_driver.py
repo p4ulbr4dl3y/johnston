@@ -6,10 +6,10 @@ subagent screen and history playback) into ChatView widgets without duplication.
 """
 from __future__ import annotations
 
-import collections
 import inspect
 import logging
 import math
+from collections import deque
 from typing import Any, Callable, Optional
 
 from core.domain.defaults.errors import parse_tool_result_step
@@ -37,7 +37,7 @@ class ChatStreamDriver:
         self.notify = notify
         self.bot_handle: Optional[BotMessage] = None
         self.thinking_handle: Optional[ThinkingWidget] = None
-        self.tool_handles: collections.deque[ToolCallWidget] = collections.deque()
+        self.tool_handles: deque[ToolCallWidget] = deque()
 
     def finalize_thinking_stream(self, duration: float = 0.0, content: str = "") -> None:
         """Finalize any in-flight thinking widget."""
@@ -54,6 +54,25 @@ class ChatStreamDriver:
         self.finalize_thinking_stream()
         self.bot_handle = None
         self.tool_handles.clear()
+
+    def cleanup_unfinalized_tools(self, error_message: Optional[str] = None) -> None:
+        """Mark or remove any unfinalized (generating or running) tool widgets."""
+        while self.tool_handles:
+            th = self.tool_handles.popleft()
+            st = getattr(th, "status", None)
+            if st == "generating":
+                try:
+                    th.remove()
+                except Exception:
+                    try:
+                        th.mark_cancelled()
+                    except Exception:
+                        pass
+            elif st == "running" and error_message:
+                try:
+                    th.set_result(error_message, is_error=True, status="error")
+                except Exception:
+                    pass
 
     async def finalize_bot_stream(self) -> None:
         """Finalize or clean up in-flight bot streaming content."""
@@ -120,20 +139,18 @@ class ChatStreamDriver:
             meta = val3 if isinstance(val3, dict) else {}
             target_id = meta.get("id")
             target_idx = meta.get("index")
-            matched = False
-            for th in self.tool_handles:
-                if getattr(th, "status", None) == "generating":
-                    if target_id and getattr(th, "tool_call_id", None) == target_id:
-                        if hasattr(th, "update_tool_call"):
-                            th.update_tool_call(target=val2)
-                        matched = True
-                        break
-                    if target_idx is not None and getattr(th, "tool_call_index", None) == target_idx:
-                        if hasattr(th, "update_tool_call"):
-                            th.update_tool_call(target=val2)
-                        matched = True
-                        break
-            if not matched:
+            if target_id or target_idx is not None:
+                for th in self.tool_handles:
+                    if getattr(th, "status", None) == "generating":
+                        if target_id and getattr(th, "tool_call_id", None) == target_id:
+                            if hasattr(th, "update_tool_call"):
+                                th.update_tool_call(target=val2)
+                            break
+                        if target_idx is not None and getattr(th, "tool_call_index", None) == target_idx:
+                            if hasattr(th, "update_tool_call"):
+                                th.update_tool_call(target=val2)
+                            break
+            else:
                 for th in self.tool_handles:
                     if getattr(th, "status", None) == "generating":
                         if hasattr(th, "update_tool_call"):
@@ -143,11 +160,26 @@ class ChatStreamDriver:
             self.finalize_thinking_stream()
             await self.finalize_bot_stream()
             targs = val3 if isinstance(val3, dict) else {}
+            tool_id = step[4] if len(step) > 4 else None
             gen_handle = None
-            for th in self.tool_handles:
-                if getattr(th, "status", None) == "generating":
-                    gen_handle = th
-                    break
+            if tool_id:
+                for th in self.tool_handles:
+                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_id", None) == tool_id:
+                        gen_handle = th
+                        break
+            if gen_handle is None:
+                for th in self.tool_handles:
+                    if (
+                        getattr(th, "status", None) == "generating"
+                        and getattr(th, "canonical_tool", None) == val1
+                    ):
+                        gen_handle = th
+                        break
+            if gen_handle is None:
+                for th in self.tool_handles:
+                    if getattr(th, "status", None) == "generating":
+                        gen_handle = th
+                        break
             if gen_handle is not None:
                 if hasattr(gen_handle, "update_tool_call"):
                     gen_handle.update_tool_call(target=val2, args=targs)
@@ -156,9 +188,11 @@ class ChatStreamDriver:
                 tool_handle = gen_handle
             else:
                 tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs)
+                if tool_id and hasattr(tool_handle, "tool_call_id"):
+                    tool_handle.tool_call_id = tool_id
                 self.tool_handles.append(tool_handle)
-                if self.on_tool_widget:
-                    self.on_tool_widget(tool_handle)
+            if self.on_tool_widget:
+                self.on_tool_widget(tool_handle)
         elif event_type == "tool_result":
             parsed_tool_result = parse_tool_result_step(step)
             res_status = parsed_tool_result.status.value if parsed_tool_result.status is not None else None
@@ -210,6 +244,18 @@ class ChatStreamDriver:
                         await res
                 except Exception:
                     pass
+            # Clean up zombie generating widgets from failed attempt
+            remaining_handles = deque()
+            while self.tool_handles:
+                th = self.tool_handles.popleft()
+                if getattr(th, "status", None) == "generating":
+                    try:
+                        th.remove()
+                    except Exception:
+                        pass
+                else:
+                    remaining_handles.append(th)
+            self.tool_handles = remaining_handles
             if self.notify:
                 attempt = val1
                 max_retries = val2

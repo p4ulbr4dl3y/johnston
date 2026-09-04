@@ -312,7 +312,17 @@ async def generate_ai_response(
     except Exception as e:  # noqa: BLE001
         logger.exception("AI generation failed: %s", e)
         canvas.notify(f"Generation failed: {e}", severity="error")
+        if hasattr(driver, "cleanup_unfinalized_tools"):
+            try:
+                driver.cleanup_unfinalized_tools(f"Error: {e}")
+            except Exception:  # noqa: BLE001
+                pass
     finally:
+        if hasattr(driver, "cleanup_unfinalized_tools"):
+            try:
+                driver.cleanup_unfinalized_tools()
+            except Exception:  # noqa: BLE001
+                pass
         if driver.thinking_handle is not None and getattr(driver.thinking_handle, "is_thinking", False):
             try:
                 duration = time.time() - start_time

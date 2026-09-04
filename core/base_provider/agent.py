@@ -831,7 +831,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 if isinstance(args, dict)
                                 else ""
                             )
-                            yield ("tool", t_name, str(target), args)
+                            yield ("tool", t_name, str(target), args, tc.get("id"))
 
                         # Execute concurrently and preserve original order
                         batch_results = await asyncio.gather(*(self._execute_single_tool(tc, role_def) for tc, _ in batch))
@@ -855,7 +855,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 if isinstance(args, dict)
                                 else ""
                             )
-                            yield ("tool", t_name, str(target), args)
+                            yield ("tool", t_name, str(target), args, tc.get("id"))
 
                             t_id, display_result, resolved = await self._execute_single_tool(tc, role_def)
                             yield (
