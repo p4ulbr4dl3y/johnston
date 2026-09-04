@@ -90,7 +90,9 @@ class ShellTool(BaseTool):
                 "`[truncated | log <p> | next read(path=<log>, start_line=N)]` footer.\n\n"
                 "Anti-patterns (will hang or fail):\n"
                 "- Interactive REPLs: `python -i`, `node`, `irb`, `psql` without `-c`, etc.\n"
-                "- Pagers: `less`, `more`, `vim`, `nano`. Use `cat` or pipe to `head`/`tail`.\n"
+                "- Pagers: `less`, `more`, `vim`, `nano`. For sync inspection use `cat` or pipe to `head`/`tail`. "
+                "NEVER pipe background commands (`background=true`) to `tail`/`head` — runtime streams full log to disk "
+                "and tails notification automatically; piping blocks live stream and triggers false inactivity alerts.\n"
                 "- Commands that read stdin without explicit input: `fzf`, `ssh` without `-o BatchMode=yes`.\n"
                 "- Stdout buffering: pipes and non-Python tools buffer output in 4KB blocks. "
                 "Use unbuffered flags (e.g. `stdbuf -oL`, `grep --line-buffered`) for live logs. Python is auto-unbuffered.\n"
@@ -115,7 +117,19 @@ class ShellTool(BaseTool):
                         "minimum": 1,
                         "maximum": int(DEFAULT_SHELL_MAX_CAP),
                         "default": int(DEFAULT_SHELL_TIMEOUT),
-                        "description": "Seconds before SIGTERM. Process killed, NOT converted to background.",
+                        "description": (
+                            "Seconds before SIGTERM. For sync commands: defaults to 30s. "
+                            "For background=true: hard kill limit (omit or 0 for unlimited runtime)."
+                        ),
+                    },
+                    "idle_timeout": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 30,
+                        "description": (
+                            "Seconds of stdout silence in background before sending progress "
+                            "<notification status='running' event='inactivity'>. 0 to disable."
+                        ),
                     },
                     "background": {
                         "type": "boolean",
@@ -173,9 +187,24 @@ class ShellTool(BaseTool):
         except (ValueError, TypeError):
             timeout = default_timeout
 
+        idle_raw = args.get("idle_timeout", 30)
+        try:
+            idle_timeout = max(0, int(idle_raw))
+        except (ValueError, TypeError):
+            idle_timeout = 30
+
         run_in_bg = bool(args.get("background", False))
         if run_in_bg and ctx.is_subagent:
             return ToolResult.error("background", name="shell")
+
+        hard_timeout = None
+        if run_in_bg and "timeout" in args and args.get("timeout") is not None:
+            try:
+                t_val = int(args["timeout"])
+                if t_val > 0:
+                    hard_timeout = max(1, min(t_val, max_cap))
+            except (ValueError, TypeError):
+                hard_timeout = None
 
         env = shell_env()
         proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
@@ -195,7 +224,7 @@ class ShellTool(BaseTool):
         # task), so long-running commands report a truthful error instead of
         # silently continuing after the agent already returns.
         if not run_in_bg:
-            res = await self._run_sync(p, ctx, cmd, timeout)
+            res = await self._run_sync(p, ctx, cmd, timeout, idle_timeout=idle_timeout)
             notice = _sandbox_fallback_notice(ctx)
             if notice and res.content:
                 res.content = notice + res.content
@@ -208,18 +237,21 @@ class ShellTool(BaseTool):
             cmd,
             p,
             session_id=ctx.session_id,
+            idle_timeout=idle_timeout,
+            hard_timeout=hard_timeout,
         )
         target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         if target_widget is not None:
             task.add_listener(target_widget.append_shell_output)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
+        progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
         task.is_background = True
         # Open the log BEFORE attaching so the widget/registry receive the real
         # log path (task.log_path is only populated by open_log()).
         task.open_log()
         _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path)
         ctx.add_background_task(task)
-        task.start_reading(on_completed=callback)
+        task.start_reading(on_completed=callback, on_progress=progress_cb)
 
         plain_content = f"[task started | id {task_id} | log {task.log_path}]"
         notice = _sandbox_fallback_notice(ctx)
@@ -227,7 +259,9 @@ class ShellTool(BaseTool):
             plain_content = notice + plain_content
         return ToolResult(status=ToolResultStatus.RUNNING, content=plain_content)
 
-    async def _run_sync(self, p: Any, ctx: Any, cmd: str, timeout: int) -> ToolResult:
+    async def _run_sync(
+        self, p: Any, ctx: Any, cmd: str, timeout: int, idle_timeout: int = 30
+    ) -> ToolResult:
         """Run a process synchronously: stream output into a bounded tail buffer,
         wait with a hard timeout, terminate the process on timeout/cancellation.
         Never converts to a background task unless ctrl+b / background_event is triggered.
@@ -238,14 +272,17 @@ class ShellTool(BaseTool):
             cmd,
             p,
             session_id=ctx.session_id,
+            idle_timeout=idle_timeout,
+            hard_timeout=None,
         )
         target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         if target_widget is not None:
             task.add_listener(target_widget.append_shell_output)
         _attach_shell_widget(ctx.host, task_id, target_widget)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
+        progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
         ctx.add_background_task(task)
-        read_task = task.start_reading(on_completed=callback)
+        read_task = task.start_reading(on_completed=callback, on_progress=progress_cb)
 
         start_time = time.monotonic()
         proc_task = asyncio.ensure_future(p.wait())
@@ -264,8 +301,7 @@ class ShellTool(BaseTool):
                 raise asyncio.TimeoutError()
 
             if task.background_event.is_set() or getattr(task, "is_background", False):
-                task.is_background = True
-                task.open_log()
+                task.move_to_background()
                 if target_widget is not None and task.log_path:
                     setattr(target_widget, "log_path", task.log_path)
                 elapsed = max(0.1, round(time.monotonic() - start_time, 1))
@@ -275,12 +311,12 @@ class ShellTool(BaseTool):
                         raw_out, max_chars=2000, tool_name="shell", save_log=False, from_end=True
                     ).strip()
                     plain_content = (
-                        f"[task backgrounded by user | id {task_id} | log {task.log_path} | elapsed {elapsed}s]\n\n"
+                        f"[task backgrounded by user | id {task_id} | log {task.log_path} | elapsed {elapsed}s | wait for notification]\n\n"
                         f"{truncated}"
                     )
                 else:
                     plain_content = (
-                        f"[task backgrounded by user | id {task_id} | log {task.log_path} | elapsed {elapsed}s | no output yet]"
+                        f"[task backgrounded by user | id {task_id} | log {task.log_path} | elapsed {elapsed}s | no output yet (buffered) | wait for notification]"
                     )
                 return ToolResult(
                     status=ToolResultStatus.RUNNING,

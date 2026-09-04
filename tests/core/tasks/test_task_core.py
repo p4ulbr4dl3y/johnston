@@ -459,3 +459,79 @@ async def test_manager_kill_all():
     mgr.register(task)
     await mgr.kill_all()
     assert task.status == TaskStatus.KILLED
+
+
+@pytest.mark.asyncio
+async def test_shell_task_hard_timeout_terminates_and_marks_error():
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", "import time; time.sleep(30)",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    task = ShellTask(task_id="t_timeout", command="sleep 30", process=proc, hard_timeout=1, idle_timeout=0)
+    task.is_background = True
+    completed_events = []
+    task.start_reading(on_completed=lambda tid, cmd, out: completed_events.append((tid, cmd, out)))
+
+    await asyncio.wait_for(task.wait(), timeout=5.0)
+    assert task.timed_out is True
+    assert task.status == TaskStatus.ERROR
+    assert len(completed_events) == 1
+    assert "Command timed out after 1s" in completed_events[0][2]
+
+
+@pytest.mark.asyncio
+async def test_shell_task_inactivity_progress_callback():
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", "import time; print('start', flush=True); time.sleep(4); print('end', flush=True)",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    task = ShellTask(task_id="t_idle", command="test_idle", process=proc, idle_timeout=1)
+    task.is_background = True
+    progress_events = []
+
+    def on_prog(tid, cmd, out, event=None, idle_seconds=None):
+        progress_events.append((tid, cmd, out, event, idle_seconds))
+
+    task.start_reading(on_progress=on_prog)
+    await asyncio.wait_for(task.wait(), timeout=7.0)
+
+    assert len(progress_events) >= 1
+    assert progress_events[0][0] == "t_idle"
+    assert progress_events[0][3] == "inactivity"
+    assert progress_events[0][4] is not None
+    assert task.status == TaskStatus.COMPLETED
+
+
+def test_format_background_notification_with_event_and_idle_seconds():
+    from core.domain.policies.messages import format_background_notification
+
+    xml = format_background_notification(
+        "shell",
+        "npm run dev",
+        "t1",
+        "Listening on 3000",
+        status="running",
+        event="inactivity",
+        idle_seconds=30,
+    )
+    assert 'status="running"' in xml
+    assert 'event="inactivity"' in xml
+    assert 'idle_seconds="30"' in xml
+    assert "Listening on 3000" in xml
+
+
+def test_shell_task_move_to_background_resets_idle_timer():
+    import time
+
+    task = ShellTask("t_bg_reset", "sleep 10", idle_timeout=45)
+    # Simulate silence in foreground
+    task.last_output_time = time.monotonic() - 100
+    task._current_idle_threshold = 90
+
+    task.move_to_background()
+    assert task.is_background is True
+    assert task.background_event.is_set()
+    assert task._current_idle_threshold == 45
+    assert (time.monotonic() - task.last_output_time) < 1.0

@@ -37,5 +37,6 @@ def _rebuild_tool(t) -> dict:
         params = t_copy.get("function", {}).get("parameters", {})
         if isinstance(params, dict) and "properties" in params and isinstance(params["properties"], dict):
             params["properties"].pop("background", None)
+            params["properties"].pop("idle_timeout", None)
         return t_copy
     return t

@@ -1008,3 +1008,47 @@ async def test_shell_subagent_background_does_not_spawn_process(tool, make_tool_
         assert res.is_error
         assert "background" in res.content
         mock_create.assert_not_called()
+
+
+def test_shell_schema_idle_timeout_and_subagent_strip(tool):
+    schema = tool.get_schema(is_subagent=False)
+    props = schema["function"]["parameters"]["properties"]
+    assert "idle_timeout" in props
+    assert props["idle_timeout"]["default"] == 30
+    assert "background" in props
+
+    sub_schema = tool.get_schema(is_subagent=True)
+    sub_props = sub_schema["function"]["parameters"]["properties"]
+    assert "idle_timeout" not in sub_props
+    assert "background" not in sub_props
+
+
+async def test_shell_background_idle_timeout_wired(tool, make_app_mock, make_tool_context):
+    app = _app(make_app_mock, task_manager=TaskManager())
+    ctx = make_tool_context(app=app, is_subagent=False)
+    ctx.host.on_background_shell_completed = MagicMock()
+    ctx.host.on_background_shell_progress = MagicMock()
+
+    with (
+        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch.object(ShellTool, "_create_std_process", return_value=_process()),
+        patch("tools.shell.ShellTask") as mock_task_cls,
+    ):
+        mock_task = MagicMock()
+        mock_task.log_path = "/tmp/test.log"
+        mock_task_cls.return_value = mock_task
+
+        res = await tool.execute(
+            {"command": "sleep 10", "background": True, "idle_timeout": 45, "timeout": 120},
+            ctx=ctx,
+        )
+        assert not res.is_error
+
+        mock_task_cls.assert_called_once()
+        _, kwargs = mock_task_cls.call_args
+        assert kwargs["idle_timeout"] == 45
+        assert kwargs["hard_timeout"] == 120
+        mock_task.start_reading.assert_called_once_with(
+            on_completed=ctx.host.on_background_shell_completed,
+            on_progress=ctx.host.on_background_shell_progress,
+        )

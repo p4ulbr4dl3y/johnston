@@ -23,8 +23,8 @@ class ManageSubagentTool(BaseTool):
                         "enum": ["list", "kill", "send_message"],
                         "description": (
                             "Action to perform: 'list' (active subagents), 'send_message', 'kill'. "
-                            "NEVER poll 'list' in a loop to wait for completion — the runtime "
-                            "automatically wakes you with <notification type='subagent'> on finish. "
+                            "NEVER poll 'list' to wait for completion, and NEVER call 'list' to verify "
+                            "a subagent completed via <notification> — the runtime notification is authoritative. "
                             "Use 'list' ONLY to recover lost session IDs."
                         ),
                     },
@@ -62,7 +62,7 @@ class ManageSubagentTool(BaseTool):
             fp = [(str(getattr(s, "id", "")), str(getattr(s, "status", ""))) for s in (target_sessions or [])]
             last_fp = getattr(self, "_last_list_fp", None)
             count = getattr(self, "_consecutive_list_count", 0)
-            if last_fp == fp and count >= 2:
+            if last_fp == fp and count >= 1:
                 return ToolResult.error(
                     "execute",
                     detail=(

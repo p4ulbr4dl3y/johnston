@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from textual import events, work
 
@@ -523,13 +523,19 @@ class MessageFlowMixin:
             status_val = task_status.value if hasattr(task_status, "value") else ""
             exit_code = getattr(task, "exit_code", None)
             notif_status = "completed"
-            if status_val in ("error", "killed", "cancelled"):
-                notif_status = status_val
-            if status_val in ("error", "killed") or (exit_code not in (None, 0)):
-                state_hint = (
-                    f"[exit code: {exit_code}]" if exit_code is not None else f"[status: {status_val}]"
-                )
+            if getattr(task, "timed_out", False):
+                notif_status = "error"
+                hard_to = getattr(task, "hard_timeout", "")
+                state_hint = f"[status: error | timed out after {hard_to}s]"
                 body = f"{state_hint}\n{body}"
+            else:
+                if status_val in ("error", "killed", "cancelled"):
+                    notif_status = status_val
+                if status_val in ("error", "killed") or (exit_code not in (None, 0)):
+                    state_hint = (
+                        f"[exit code: {exit_code}]" if exit_code is not None else f"[status: {status_val}]"
+                    )
+                    body = f"{state_hint}\n{body}"
 
             msg = format_background_notification(
                 "shell",
@@ -546,6 +552,63 @@ class MessageFlowMixin:
                 self.generate_ai_response(msg, show_in_ui=False)
         except Exception as e:
             logger.warning("Background completion handling failed: %s", e)
+
+    def on_background_shell_progress(
+        self,
+        task_id: str,
+        command_str: str,
+        result: str,
+        *,
+        event: str = "inactivity",
+        idle_seconds: Optional[int] = None,
+    ) -> None:
+        """Callback when background shell emits a progress notification (e.g. inactivity)."""
+        if not getattr(self, "is_app_active", True):
+            return
+        try:
+            from tools.base import format_background_notification, truncate_output
+
+            mgr = getattr(self, "task_manager", None)
+            task = None
+            if mgr is not None:
+                task = next(
+                    (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
+                    None,
+                )
+            task_log = getattr(task, "log_path", None)
+
+            body = truncate_output(
+                result,
+                max_chars=4000,
+                tool_name="shell",
+                from_end=True,
+                save_log=False,
+                log_path=task_log,
+            )
+            hint = (
+                f"[process running with no output for {idle_seconds}s]"
+                if idle_seconds is not None
+                else "[process still running]"
+            )
+            body = f"{hint}\n{body}"
+
+            msg = format_background_notification(
+                "shell",
+                command_str,
+                task_id,
+                body,
+                status="running",
+                event=event,
+                idle_seconds=idle_seconds,
+                truncated=len(result) > 4000,
+            )
+            curr_sid = getattr(self, "current_session_id", None)
+            if self.is_generating:
+                self.message_queue.append((msg, False, None, curr_sid))
+            else:
+                self.generate_ai_response(msg, show_in_ui=False)
+        except Exception as e:
+            logger.warning("Background progress handling failed: %s", e)
 
     def _update_background_shell_widget(self, task_id: str, result: str) -> None:
         """Repaint the linked shell tool card once a background task finishes.

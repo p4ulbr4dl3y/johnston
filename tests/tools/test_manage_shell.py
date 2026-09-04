@@ -383,21 +383,19 @@ async def test_manage_shell_consecutive_list_polling_circuit_breaker(tool, make_
     t1 = _make_task("t1", "sleep 10", proc=MagicMock())
     app = _app(make_app_mock, [t1])
 
-    # First two list calls succeed
+    # First list call succeeds
     res1 = await tool.execute({"action": "list"}, ctx=app)
     assert not res1.is_error
-    res2 = await tool.execute({"action": "list"}, ctx=app)
-    assert not res2.is_error
 
-    # 3rd consecutive call with identical task state triggers circuit breaker
-    res3 = await tool.execute({"action": "list"}, ctx=app)
-    assert res3.is_error
-    assert "Consecutive polling of" in res3.content and "is blocked" in res3.content
+    # 2nd consecutive call with identical task state triggers circuit breaker
+    res2 = await tool.execute({"action": "list"}, ctx=app)
+    assert res2.is_error
+    assert "Consecutive polling of" in res2.content and "is blocked" in res2.content
 
     # State change resets breaker
     t2 = _make_task("t2", "pytest", proc=MagicMock())
     app2 = _app(make_app_mock, [t1, t2])
-    res4 = await tool.execute({"action": "list"}, ctx=app2)
-    assert not res4.is_error
+    res3 = await tool.execute({"action": "list"}, ctx=app2)
+    assert not res3.is_error
 
 

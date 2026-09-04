@@ -28,6 +28,8 @@ class ShellTask(BaseTask):
         process: Any = None,
         *,
         session_id: Optional[str] = None,
+        idle_timeout: Optional[int] = 30,
+        hard_timeout: Optional[int] = None,
     ) -> None:
         super().__init__(task_id, kind="shell", command=command, status=TaskStatus.RUNNING)
         self.process = process
@@ -35,7 +37,13 @@ class ShellTask(BaseTask):
         self.output = OutputBuffer()
         self.is_background = False
         self.was_killed = False
+        self.timed_out = False
+        self.idle_timeout = idle_timeout
+        self.hard_timeout = hard_timeout
+        self.last_output_time = time.monotonic()
+        self._current_idle_threshold = idle_timeout if (idle_timeout and idle_timeout > 0) else 0
         self.read_task: Optional[asyncio.Task] = None
+        self.watcher_task: Optional[asyncio.Task] = None
         self.background_event = asyncio.Event()
         self._done: Optional[asyncio.Future] = None
         # Output subscribers: each decoded chunk is pushed (ANSI-stripped) to
@@ -95,6 +103,9 @@ class ShellTask(BaseTask):
 
     def move_to_background(self) -> None:
         self.is_background = True
+        self.last_output_time = time.monotonic()
+        if self.idle_timeout and self.idle_timeout > 0:
+            self._current_idle_threshold = self.idle_timeout
         self.background_event.set()
         self.open_log()
 
@@ -128,18 +139,65 @@ class ShellTask(BaseTask):
 
     # -- start --------------------------------------------------------------
 
-    def start_reading(self, on_completed=None) -> asyncio.Task:
+    def start_reading(self, on_completed=None, on_progress=None) -> asyncio.Task:
         """Begin reading the process output in the background.
 
         ``on_completed`` (callable, optional) is fired with (task_id, command,
         formatted_output) when the process exits.
+        ``on_progress`` (callable, optional) is fired with (task_id, command,
+        formatted_output, event, idle_seconds) on inactivity or progress.
         """
 
         def _append_chunk(text: str) -> None:
             self.output.append(text)
+            self.last_output_time = time.monotonic()
+            if self.idle_timeout and self.idle_timeout > 0:
+                self._current_idle_threshold = self.idle_timeout
             if self._log is not None:
                 self._log.append(text)
             self._notify_listeners(text)
+
+        async def _watch():
+            start_time = time.monotonic()
+            while self.is_running:
+                try:
+                    await asyncio.sleep(1.0)
+                except asyncio.CancelledError:
+                    break
+                if not self.is_running:
+                    break
+                if not self.is_background:
+                    continue
+
+                # 1. Hard timeout check
+                if self.hard_timeout and self.hard_timeout > 0:
+                    elapsed = time.monotonic() - start_time
+                    if elapsed >= self.hard_timeout:
+                        self.timed_out = True
+                        if self.process is not None:
+                            try:
+                                await terminate_process(self.process)
+                            except Exception:
+                                pass
+                        break
+
+                # 2. Inactivity check
+                if self._current_idle_threshold > 0 and on_progress is not None:
+                    silence = time.monotonic() - self.last_output_time
+                    if silence >= self._current_idle_threshold:
+                        try:
+                            recent_out = self.output.tail(max_chars=2000)
+                            on_progress(
+                                self.task_id,
+                                self.command,
+                                recent_out,
+                                event="inactivity",
+                                idle_seconds=int(silence),
+                            )
+                        except Exception:
+                            pass
+                        # Backoff: double the threshold up to 300s
+                        self._current_idle_threshold = min(self._current_idle_threshold * 2, 300)
 
         async def _read():
             try:
@@ -158,6 +216,9 @@ class ShellTask(BaseTask):
             except Exception:
                 pass
             finally:
+                if self.watcher_task is not None and not self.watcher_task.done():
+                    self.watcher_task.cancel()
+
                 await self.close_log_async()
 
                 # Reap the process BEFORE publishing the terminal status so a
@@ -191,11 +252,15 @@ class ShellTask(BaseTask):
                 # completion callback observes the real final status (error/killed)
                 # instead of a stale RUNNING state. Previously the callback could
                 # read status= running and repaint a failed task card as "done".
-                self._mark_terminated(
-                    TaskStatus.KILLED
-                    if self.was_killed
-                    else (TaskStatus.COMPLETED if exit_code == 0 else TaskStatus.ERROR)
-                )
+                if self.timed_out:
+                    self.output.append(f"\n[Command timed out after {self.hard_timeout}s]\n")
+                    self._mark_terminated(TaskStatus.ERROR)
+                else:
+                    self._mark_terminated(
+                        TaskStatus.KILLED
+                        if self.was_killed
+                        else (TaskStatus.COMPLETED if exit_code == 0 else TaskStatus.ERROR)
+                    )
 
                 # Background tasks: announce completion via modal notify / callback.
                 if self.is_background and on_completed is not None:
@@ -205,6 +270,7 @@ class ShellTask(BaseTask):
                         pass
 
         self.read_task = asyncio.create_task(_read())
+        self.watcher_task = asyncio.create_task(_watch())
         return self.read_task
 
     def _mark_terminated(self, status: TaskStatus = TaskStatus.COMPLETED) -> None:
@@ -245,6 +311,8 @@ class ShellTask(BaseTask):
 
     async def kill(self) -> None:
         self.was_killed = True
+        if self.watcher_task is not None and not self.watcher_task.done():
+            self.watcher_task.cancel()
         await self.close_log_async()
         if self.process is not None:
             await terminate_process(self.process)
@@ -256,6 +324,8 @@ class ShellTask(BaseTask):
     def kill_sync(self) -> None:
         """Synchronous kill used by exit paths that run outside the event loop."""
         self.was_killed = True
+        if self.watcher_task is not None and not self.watcher_task.done():
+            self.watcher_task.cancel()
         self.close_log()
         if self.process is not None:
             try:

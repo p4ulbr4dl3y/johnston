@@ -169,6 +169,46 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(updated.messages[0]["status"], "done")
             self.assertEqual(updated.messages[0]["result_text"], "done work")
 
+    async def test_progress_generating_queues_running_notification(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = True
+            app.current_session_id = "s1"
+            app.on_background_shell_progress("t1", "make", "compiling...", event="inactivity", idle_seconds=30)
+            self.assertEqual(len(app.message_queue), 1)
+            msg = app.message_queue[0][0]
+            self.assertIn('status="running"', msg)
+            self.assertIn('event="inactivity"', msg)
+            self.assertIn('idle_seconds="30"', msg)
+            self.assertIn("[process running with no output for 30s]", msg)
+
+    async def test_progress_not_generating_triggers_response(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            sent = []
+            with patch.object(app, "generate_ai_response", side_effect=lambda msg, **k: sent.append(msg)):
+                app.on_background_shell_progress("t1", "make", "still working", event="inactivity", idle_seconds=60)
+            self.assertEqual(len(sent), 1)
+            self.assertIn('status="running"', sent[0])
+            self.assertIn('idle_seconds="60"', sent[0])
+
+    async def test_completed_timed_out_adds_state_hint(self):
+        from core.infrastructure.tasks.shell_task import ShellTask
+
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            task = ShellTask("t_to", "long_job", hard_timeout=120)
+            task.timed_out = True
+            app.task_manager.register(task)
+            sent = []
+            with patch.object(app, "generate_ai_response", side_effect=lambda msg, **k: sent.append(msg)):
+                app.on_background_shell_completed("t_to", "long_job", "output before timeout")
+            self.assertEqual(len(sent), 1)
+            self.assertIn("[status: error | timed out after 120s]", sent[0])
+            self.assertIn('status="error"', sent[0])
+
 
 if __name__ == "__main__":
     unittest.main()

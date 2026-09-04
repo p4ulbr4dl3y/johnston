@@ -117,12 +117,14 @@ def format_background_notification(
     status: str = "completed",
     truncated: bool = False,
     duration_ms: Optional[int] = None,
+    event: Optional[str] = None,
+    idle_seconds: Optional[int] = None,
 ) -> str:
     """Build a ``<notification>`` synthetic user message.
 
     Emitted as a synthetic user message when a background shell or
-    subagent finishes. The result body is XML-escaped so a subagent
-    report containing ``</notification>`` cannot truncate the wrapper.
+    subagent finishes or emits progress. The result body is XML-escaped so
+    a subagent report containing ``</notification>`` cannot truncate the wrapper.
 
     Attributes:
         type:   "shell" | "subagent"
@@ -131,6 +133,8 @@ def format_background_notification(
         status: "completed" | "cancelled" | "error" | "running"
         truncated: True iff result was capped; full result in companion log
         duration_ms: optional wall-clock time
+        event: optional progress event ("inactivity", etc.)
+        idle_seconds: optional silence duration in seconds
     """
     t_clean = _xml_escape(type_)
     title_clean = _xml_escape(title)
@@ -138,11 +142,13 @@ def format_background_notification(
     status_clean = _xml_escape(status)
     duration_attr = f' duration_ms="{int(duration_ms)}"' if duration_ms is not None else ""
     trunc_attr = ' truncated="true"' if truncated else ""
+    event_attr = f' event="{_xml_escape(event)}"' if event else ""
+    idle_attr = f' idle_seconds="{int(idle_seconds)}"' if idle_seconds is not None else ""
     body_clean = _xml_escape(result)
     return (
         f'<notification type="{t_clean}" '
         f'id="{id_clean}" title="{title_clean}" '
-        f'status="{status_clean}"{duration_attr}{trunc_attr}>'
+        f'status="{status_clean}"{duration_attr}{trunc_attr}{event_attr}{idle_attr}>'
         f"{body_clean}"
         f"</notification>"
     )

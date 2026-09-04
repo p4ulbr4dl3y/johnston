@@ -160,7 +160,7 @@ def format_subagents_markdown(roles: List[Any], max_concurrent: int = 5) -> str:
         "- merge: on subagent completion, notification provides branch name; parent MUST inspect diff and run `git merge <branch>`.\n"
         f"- concurrency: ≤{max_concurrent} parallel. Hit limit → wait for completion notifications before spawning more; do NOT poll list.\n"
         "- follow-up: use `manage_subagent(send_message, session_id=...)` for refinements, fixes on partial/blocked tasks, or next steps in same scope (restores worktree + history). Spawn NEW subagent for independent tasks or different roles.\n"
-        "- reactive: execution automatically pauses and resumes with <notification> when subagents finish. NEVER poll `list` in a loop; stop calling tools to wait.\n"
+        "- reactive: execution automatically pauses and resumes with <notification> when subagents finish. The notification is authoritative — NEVER call `list` to wait or verify; stop calling tools to wait.\n"
         "- limits: subagents cannot call `invoke_subagent`/`manage_subagent`/`manage_shell`/`ask_user`, cannot run background processes, cannot ask the user. Decisions needing the user go in the subagent's report.\n"
         "- cost: subagent tokens/cost merge into this session's totals on completion.\n\n"
         "Available roles:\n"

@@ -468,22 +468,20 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
         app, _ = self._app_with_widget(sess)
         tool = ManageSubagentTool()
 
-        # First two list calls succeed
+        # First list call succeeds
         res1 = await tool.execute({"action": "list"}, ctx=app)
         self.assertFalse(res1.is_error)
-        res2 = await tool.execute({"action": "list"}, ctx=app)
-        self.assertFalse(res2.is_error)
 
-        # 3rd consecutive call with identical status triggers circuit breaker
-        res3 = await tool.execute({"action": "list"}, ctx=app)
-        self.assertTrue(res3.is_error)
-        self.assertIn("Consecutive polling of", res3.content)
-        self.assertIn("is blocked", res3.content)
+        # 2nd consecutive call with identical status triggers circuit breaker
+        res2 = await tool.execute({"action": "list"}, ctx=app)
+        self.assertTrue(res2.is_error)
+        self.assertIn("Consecutive polling of", res2.content)
+        self.assertIn("is blocked", res2.content)
 
         # Non-list action resets breaker
         await tool.execute({"action": "kill", "session_id": "sub-poll-1"}, ctx=app)
-        res4 = await tool.execute({"action": "list"}, ctx=app)
-        self.assertFalse(res4.is_error)
+        res3 = await tool.execute({"action": "list"}, ctx=app)
+        self.assertFalse(res3.is_error)
 
     async def test_send_message_persists_immediately_and_registers_in_store(self):
         sess = self._mk_subagent("sub-imm-save")

@@ -25,8 +25,8 @@ class ManageShellTool(BaseTool):
                         "enum": ["list", "send_input", "kill"],
                         "description": (
                             "Action to perform: 'list' (check active tasks), 'send_input', 'kill'. "
-                            "NEVER poll 'list' in a loop to wait for task completion — the runtime "
-                            "automatically wakes you with <notification type='shell'> on exit. "
+                            "NEVER poll 'list' to wait for task completion, and NEVER call 'list' to verify "
+                            "a task completed via <notification> — the runtime notification is authoritative. "
                             "Use 'list' ONLY if you lost track of tasks."
                         ),
                     },
@@ -60,7 +60,7 @@ class ManageShellTool(BaseTool):
             fp = [(getattr(t, "id", None), getattr(t, "is_running", None)) for t in (tasks or [])]
             last_fp = getattr(self, "_last_list_fp", None)
             count = getattr(self, "_consecutive_list_count", 0)
-            if last_fp == fp and count >= 2:
+            if last_fp == fp and count >= 1:
                 return ToolResult.error(
                     "execute",
                     detail=(
