@@ -200,17 +200,17 @@ Wire format conventions for ALL tool outputs (apply consistently):
 
 | Status    | Prefix                                                   | Meaning                           |
 |-----------|----------------------------------------------------------|-----------------------------------|
-| DONE      | `[<key> | <key>]` then content                           | Tool succeeded                    |
+| DONE      | `[<action/target> | <metadata>]` then content            | Tool succeeded                    |
 | SHELL     | `[exit N]` then stdout/stderr                            | Process exit code (N!=0 is fail)  |
-| ERROR     | `ERR: <kind> '<name>': <detail>`                         | Tool failed; diagnose from kind   |
+| ERROR     | `ERR: <kind> ['<target>']: <detail>`                     | Tool failed; diagnose from kind   |
 | RUNNING   | `[task started ...]` / `[task moved to background ...]` / `[task backgrounded by user ...]` | Async; running; do not re-run     |
 | CANCELLED | `[cancelled by user]`                                    | User/timeout aborted              |
 
-Errors: prefix `ERR: <kind> '<name>': <detail>`. Common kinds: `not_found`, `params`, `permission`, `match`, `timeout`, `execute`, `unavailable`. Diagnose from `detail`, never retry unchanged.
+Errors: prefix `ERR: <kind> ['<target>']: <detail>` (target is omitted if general). Common kinds: `not_found`, `params`, `permission`, `match`, `timeout`, `execute`, `unavailable`. Diagnose from `detail`, never retry unchanged.
 
 Truncation footer: `[truncated | log <p> | next read(path=<log>, start_line=N)]` — for tracebacks, read ~50 lines around N; for mass output/JSON/lists, filter with `rg`/`jq` on log or re-run with flags (e.g. `pytest -k`, `git log -n 5`). Do NOT paginate large logs via read.
 
-Pagination: `[<p> | lines N..M of T]` then `N|line content`. Use `read(path, start_line=N, end_line=M)` (window ≤800 lines) or `read(path, content_offset=N)` for binary.
+Pagination: `[<p> | lines N..M of T]` then `N|line content`. Use `read(path, start_line=N, end_line=M)` (window up to max lines per call) or `read(path, content_offset=N)` for binary.
 
 Plan progress: `[plan updated | N/M done | <explanation>]`. Plan persists; do not re-emit.
 
