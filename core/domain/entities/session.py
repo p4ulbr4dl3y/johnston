@@ -337,7 +337,20 @@ class AgentSession:
         sess.tokens_cache_read = _coerce_int(data.get("tokens_cache_read"))
         sess.project_dir = data.get("project_dir", "")
         sess.branch_name = data.get("branch_name", "")
+        sess.reconcile_compaction_divider()
         return sess
+
+    def reconcile_compaction_divider(self) -> None:
+        """Ensure sessions with compaction checkpoints have at least one visible event divider."""
+        if not self.agent_history or any(
+            isinstance(m, dict) and m.get("type") == MessageType.EVENT_DIVIDER
+            for m in self.messages
+        ):
+            return
+        for h in self.agent_history:
+            if isinstance(h, dict) and isinstance(h.get("content"), str) and h["content"].startswith("<compaction_checkpoint>"):
+                self.messages.append({"type": MessageType.EVENT_DIVIDER, "text": "Session Compacted"})
+                break
 
     @property
     def title(self) -> str:
@@ -426,6 +439,7 @@ class AgentSession:
                     elif etype == "history":
                         data = entry.get("data")
                         sess.agent_history.append(data if data is not None else {})
+                sess.reconcile_compaction_divider()
                 return sess
         except Exception:
             return None

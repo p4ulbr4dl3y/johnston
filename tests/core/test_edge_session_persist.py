@@ -556,3 +556,24 @@ def test_fork_session_persistence_fields(store):
     assert loaded.auto_titled is False
 
 
+def test_reconcile_compaction_divider_on_load(store):
+    """Sessions with compaction checkpoints but missing event_divider in messages get it synthesized."""
+    sess = store.create_main("compacted_sess")
+    sess.messages = [
+        {"type": "user", "text": "Old prompt"},
+        {"type": "bot", "text": "Old answer"},
+    ]
+    sess.agent_history = [
+        {"role": "user", "content": "<compaction_checkpoint>Summary here</compaction_checkpoint>"},
+        {"role": "assistant", "content": "Recent answer"},
+    ]
+    store.save(sess)
+
+    # Invalidate memory cache and load from file
+    store._sessions.clear()
+    store._disk_cache = None
+    loaded = store.get("compacted_sess")
+    assert loaded is not None
+    assert any(m.get("type") == "event_divider" for m in loaded.messages)
+
+
