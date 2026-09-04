@@ -562,7 +562,7 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         subagent = self._make_agent()
         configure_subagent_agent(subagent, "worker")
         self.assertTrue(getattr(subagent, "is_subagent", False))
-        self.assertEqual(subagent.auto_compact_token_limit, 100_000)
+        self.assertEqual(subagent.auto_compact_token_limit, 200_000)
 
         captured_threshold = None
 
@@ -586,5 +586,5 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                     async for _ in subagent.stream_steps("subagent prompt"):
                         pass
 
-        # 1_000_000 * 0.75 = 750_000, but clipped to subagent default 100_000
-        self.assertEqual(captured_threshold, 100_000)
+        # 1_000_000 * 0.75 = 750_000, but clipped to subagent default 200_000
+        self.assertEqual(captured_threshold, 200_000)

@@ -514,7 +514,7 @@ def test_auto_compact_token_limit_settings(monkeypatch):
     llm = LLMSettings()
     assert llm.auto_compact_token_limit is None
     sub = SubagentsSettings()
-    assert sub.auto_compact_token_limit == 100_000
+    assert sub.auto_compact_token_limit == 200_000
 
     # 2. Dict parsing
     llm_dict = LLMSettings.from_dict({"llm": {"auto_compact_token_limit": 80_000}})
@@ -532,7 +532,7 @@ def test_auto_compact_token_limit_settings(monkeypatch):
     assert llm_invalid.auto_compact_token_limit is None
 
     sub_invalid = SubagentsSettings.from_dict({"subagents": {"auto_compact_token_limit": 500}})
-    assert sub_invalid.auto_compact_token_limit == 100_000
+    assert sub_invalid.auto_compact_token_limit == 200_000
 
     # 3. Env var overrides
     monkeypatch.setenv("JOHNSTON_AUTO_COMPACT_TOKEN_LIMIT", "75000")
