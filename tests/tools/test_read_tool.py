@@ -397,6 +397,69 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         res = await tool.execute({"path": bad_zip})
         self.assertIn("ERR: archive", str(res))
 
+    async def test_read_directory_pagination(self):
+        tool = ReadTool()
+        paged_dir = os.path.join(self.test_dir, "paged_dir")
+        os.makedirs(paged_dir, exist_ok=True)
+        for i in range(25):
+            with open(os.path.join(paged_dir, f"file_{i:02d}.txt"), "w") as f:
+                f.write(f"content {i}")
+
+        # Request first 10 items
+        res1 = await tool.execute({"path": paged_dir, "start_line": 1, "end_line": 10})
+        self.assertIn("entries 1..10 of 25", res1.content)
+        self.assertIn("file_00.txt", res1.content)
+        self.assertNotIn("file_15.txt", res1.content)
+
+        # Request next items
+        res2 = await tool.execute({"path": paged_dir, "start_line": 11, "end_line": 20})
+        self.assertIn("entries 11..20 of 25", res2.content)
+        self.assertIn("file_10.txt", res2.content)
+        self.assertNotIn("file_00.txt", res2.content)
+
+    async def test_read_directory_metadata_and_hidden_order(self):
+        tool = ReadTool()
+        meta_dir = os.path.join(self.test_dir, "meta_dir")
+        os.makedirs(meta_dir, exist_ok=True)
+        # Normal dir and file
+        sub = os.path.join(meta_dir, "my_sub")
+        os.makedirs(sub, exist_ok=True)
+        with open(os.path.join(sub, "child.txt"), "w") as f:
+            f.write("data")
+        with open(os.path.join(meta_dir, "app.py"), "w") as f:
+            f.write("print('hi')")
+        # Hidden dir and file
+        hidden_dir = os.path.join(meta_dir, ".hidden_sub")
+        os.makedirs(hidden_dir, exist_ok=True)
+        with open(os.path.join(meta_dir, ".env"), "w") as f:
+            f.write("SECRET=1")
+
+        res = await tool.execute({"path": meta_dir})
+        self.assertIn("my_sub/ (1 item)", res.content)
+        self.assertIn("app.py (11 B)", res.content)
+        self.assertIn(".hidden_sub/", res.content)
+        self.assertIn(".env (8 B)", res.content)
+
+        # Normal files and dirs must appear BEFORE hidden items
+        lines = res.content.splitlines()
+        app_idx = next(i for i, line in enumerate(lines) if "app.py" in line)
+        env_idx = next(i for i, line in enumerate(lines) if ".env" in line)
+        self.assertLess(app_idx, env_idx)
+
+    async def test_read_archive_pagination(self):
+        import zipfile
+        tool = ReadTool()
+        zip_path = os.path.join(self.test_dir, "paged.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            for i in range(30):
+                zf.writestr(f"archive_file_{i:02d}.txt", f"data {i}")
+
+        res = await tool.execute({"path": zip_path, "start_line": 5, "end_line": 15})
+        self.assertIn("entries 5..15 of 30", res.content)
+        self.assertIn("archive_file_04.txt", res.content)
+        self.assertNotIn("archive_file_25.txt", res.content)
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -234,7 +234,21 @@ def is_archive_file(path: str) -> bool:
     return any(lower.endswith(ext) for ext in ARCHIVE_EXTENSIONS)
 
 
-def _inspect_archive(path: str, max_entries: int) -> ToolResult:
+def _format_entry_size(size_bytes: int) -> str:
+    """Format bytes into a human-readable size string."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    if size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
+def _inspect_archive(
+    path: str,
+    max_entries: int,
+    start_line: int | None = None,
+    end_line: int | None = None,
+) -> ToolResult:
     import tarfile
     import zipfile
 
@@ -252,7 +266,7 @@ def _inspect_archive(path: str, max_entries: int) -> ToolResult:
                     if info.is_dir() or name.endswith("/"):
                         dirs.add(name.rstrip("/") + "/")
                     else:
-                        files.append(name)
+                        files.append(f"{name} ({_format_entry_size(info.file_size)})")
         else:
             with tarfile.open(path, "r:*") as tf:
                 for member in tf.getmembers():
@@ -262,15 +276,25 @@ def _inspect_archive(path: str, max_entries: int) -> ToolResult:
                     if member.isdir() or name.endswith("/"):
                         dirs.add(name.rstrip("/") + "/")
                     else:
-                        files.append(name)
+                        files.append(f"{name} ({_format_entry_size(member.size)})")
 
         entries = sorted(dirs) + sorted(files)
         total_count = len(entries)
         if total_count == 0:
             content_str = f"[archive {path} | total 0]"
-        elif len(entries) > max_entries:
+        elif start_line is not None or end_line is not None:
+            s = max(1, start_line) if start_line else 1
+            e = min(total_count, end_line) if end_line else min(total_count, s + max_entries - 1)
+            sliced = entries[s - 1 : e]
+            body = "\n".join(sliced)
+            content_str = f"[archive {path} | entries {s}..{e} of {total_count}]\n{body}"
+        elif total_count > max_entries:
             body = "\n".join(entries[:max_entries])
-            content_str = f"[archive {path} | total {total_count} | truncated]\n{body}"
+            content_str = (
+                f"[archive {path} | total {total_count} | truncated]\n"
+                f"{body}\n"
+                f"... [truncated | next read(path='{path}', start_line={max_entries + 1})]"
+            )
         else:
             body = "\n".join(entries)
             content_str = f"[archive {path} | total {total_count}]\n{body}"
@@ -394,6 +418,12 @@ class ReadTool(BaseTool):
 
             if not is_path_readable_in_sandbox(path, cwd=ctx.cwd):
                 return ToolResult.error("permission", f"sandbox restriction: read not permitted for sensitive path '{path}'")
+        # Resolve requested line window up front so it applies to files, directories, and archives.
+        start_line = args.get("start_line")
+        end_line = args.get("end_line")
+        start_line_int = try_int(start_line)
+        end_line_int = try_int(end_line)
+
         def _inspect_path() -> ToolResult | tuple[str, str | None]:
             if not os.path.exists(path):
                 parent_dir = os.path.dirname(path) or "."
@@ -416,20 +446,49 @@ class ReadTool(BaseTool):
                     tools = _tools_settings()
                     max_dir_entries = tools.max_dir_entries if tools else 60
 
-                    dirs, files = [], []
+                    normal_dirs, normal_files = [], []
+                    hidden_dirs, hidden_files = [], []
+
                     for entry in raw_entries:
                         full_p = os.path.join(path, entry)
+                        is_hidden = entry.startswith(".") or entry == "__pycache__"
                         if os.path.isdir(full_p):
-                            dirs.append(f"{entry}/")
+                            try:
+                                count = len(os.listdir(full_p))
+                                label = f"{entry}/ ({count} items)" if count != 1 else f"{entry}/ (1 item)"
+                            except Exception:
+                                label = f"{entry}/"
+                            if is_hidden:
+                                hidden_dirs.append(label)
+                            else:
+                                normal_dirs.append(label)
                         else:
-                            files.append(entry)
+                            try:
+                                sz = os.path.getsize(full_p)
+                                label = f"{entry} ({_format_entry_size(sz)})"
+                            except Exception:
+                                label = entry
+                            if is_hidden:
+                                hidden_files.append(label)
+                            else:
+                                normal_files.append(label)
 
-                    entries = dirs + files
+                    entries = normal_dirs + normal_files + hidden_dirs + hidden_files
                     if total_count == 0:
                         content_str = f"[dir {path} | total 0]"
+                    elif start_line_int is not None or end_line_int is not None:
+                        s = max(1, start_line_int) if start_line_int else 1
+                        e = min(total_count, end_line_int) if end_line_int else min(total_count, s + max_dir_entries - 1)
+                        sliced = entries[s - 1 : e]
+                        body = "\n".join(sliced)
+                        content_str = f"[dir {path} | entries {s}..{e} of {total_count}]\n{body}"
                     elif len(entries) > max_dir_entries:
                         body = "\n".join(entries[:max_dir_entries])
-                        content_str = f"[dir {path} | total {total_count} | truncated]\n{body}"
+                        content_str = (
+                            f"[dir {path} | total {total_count} | truncated]\n"
+                            f"{body}\n"
+                            f"... [truncated | next read(path='{path}', start_line={max_dir_entries + 1})]"
+                        )
                     else:
                         body = "\n".join(entries)
                         content_str = f"[dir {path} | total {total_count}]\n{body}"
@@ -444,7 +503,7 @@ class ReadTool(BaseTool):
             if is_archive_file(path):
                 tools = _tools_settings()
                 max_dir_entries = tools.max_dir_entries if tools else 60
-                return _inspect_archive(path, max_dir_entries)
+                return _inspect_archive(path, max_dir_entries, start_line_int, end_line_int)
 
             try:
                 file_size = os.path.getsize(path)
@@ -463,12 +522,6 @@ class ReadTool(BaseTool):
         if isinstance(probe_res, ToolResult):
             return probe_res
         _, ext = probe_res
-
-        # Resolve the requested line window up front so it applies to all read paths.
-        start_line = args.get("start_line")
-        end_line = args.get("end_line")
-        start_line_int = try_int(start_line)
-        end_line_int = try_int(end_line)
 
         # Handle image files
         if ext in IMAGE_EXTENSIONS:
