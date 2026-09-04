@@ -373,6 +373,48 @@ class ChatStreamDriver:
                 if hasattr(self.thinking_handle, "finish_thinking"):
                     self.thinking_handle.finish_thinking(dur, txt)
                 self.thinking_handle = None
+        elif etype == "tool_generating":
+            self.finalize_thinking_stream()
+            await self.finalize_bot_stream()
+            meta = evt.get("meta") if isinstance(evt.get("meta"), dict) else {}
+            tool_handle = await self.chat_view.add_tool_call(
+                evt.get("tool_type", ""),
+                evt.get("target", ""),
+                args={},
+                status="generating",
+            )
+            if hasattr(tool_handle, "tool_call_id") or isinstance(meta, dict):
+                setattr(tool_handle, "tool_call_id", meta.get("id"))
+                setattr(tool_handle, "tool_call_index", meta.get("index"))
+            self.tool_handles.append(tool_handle)
+            if self.on_tool_widget:
+                self.on_tool_widget(tool_handle)
+        elif etype == "tool_generating_update":
+            meta = evt.get("meta") if isinstance(evt.get("meta"), dict) else {}
+            target_id = meta.get("id")
+            target_idx = meta.get("index")
+            target = evt.get("target", "")
+            matched = False
+            if target_id:
+                for th in self.tool_handles:
+                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_id", None) == target_id:
+                        if hasattr(th, "update_tool_call"):
+                            th.update_tool_call(target=target)
+                        matched = True
+                        break
+            if not matched and target_idx is not None:
+                for th in self.tool_handles:
+                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_index", None) == target_idx:
+                        if hasattr(th, "update_tool_call"):
+                            th.update_tool_call(target=target)
+                        matched = True
+                        break
+            if not matched and not target_id and target_idx is None:
+                for th in self.tool_handles:
+                    if getattr(th, "status", None) == "generating":
+                        if hasattr(th, "update_tool_call"):
+                            th.update_tool_call(target=target)
+                        break
         elif etype == "tool":
             self.finalize_thinking_stream()
             # Check if this event is a completion event for an in-flight tool
@@ -404,28 +446,59 @@ class ChatStreamDriver:
                     logger.debug("Received session tool_result event with empty tool_handles queue: %s", evt)
             else:
                 await self.finalize_bot_stream()
-                tool_kw = {"args": evt.get("args", {})}
-                if not evt.get("from_stream_step"):
-                    tool_kw["result_text"] = evt.get("result_text", "")
-                    tool_kw["status"] = evt.get("status")
-                    tool_kw["returncode"] = evt.get("returncode")
-                    tool_kw["animate"] = animate
-                widget = await self.chat_view.add_tool_call(
-                    evt.get("tool_type", ""),
-                    evt.get("target", ""),
-                    **tool_kw,
-                )
+                targs = evt.get("args", {})
+                tool_type = evt.get("tool_type", "")
+                target = evt.get("target", "")
+                tool_id = evt.get("tool_id") or (evt.get("meta", {}).get("id") if isinstance(evt.get("meta"), dict) else None)
+                gen_handle = None
+                if tool_id:
+                    for th in self.tool_handles:
+                        if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_id", None) == tool_id:
+                            gen_handle = th
+                            break
+                if gen_handle is None:
+                    for th in self.tool_handles:
+                        if getattr(th, "status", None) == "generating" and (
+                            getattr(th, "canonical_tool", None) == tool_type
+                            or getattr(th, "tool_type", None) == tool_type
+                        ):
+                            gen_handle = th
+                            break
+                if gen_handle is None:
+                    for th in self.tool_handles:
+                        if getattr(th, "status", None) == "generating":
+                            gen_handle = th
+                            break
+                if gen_handle is not None:
+                    if hasattr(gen_handle, "update_tool_call"):
+                        gen_handle.update_tool_call(target=target, args=targs)
+                    if hasattr(gen_handle, "mark_running"):
+                        gen_handle.mark_running()
+                    widget = gen_handle
+                else:
+                    tool_kw = {"args": targs}
+                    if not evt.get("from_stream_step"):
+                        tool_kw["result_text"] = evt.get("result_text", "")
+                        tool_kw["status"] = evt.get("status")
+                        tool_kw["returncode"] = evt.get("returncode")
+                        tool_kw["animate"] = animate
+                    widget = await self.chat_view.add_tool_call(
+                        tool_type,
+                        target,
+                        **tool_kw,
+                    )
+                    if tool_id:
+                        setattr(widget, "tool_call_id", tool_id)
+                    # Track in tool_handles only if the tool is actively in-flight (uncompleted)
+                    if "result_text" not in evt and evt.get("status") not in ("done", "error", "cancelled"):
+                        self.tool_handles.append(widget)
                 if is_expanded and hasattr(widget, "is_expandable") and widget.is_expandable():
                     widget.is_expanded = True
                 if self.on_tool_widget:
                     self.on_tool_widget(widget)
-                if animate and evt.get("tool_type") == "update_plan" and self.on_plan_update:
-                    args = evt.get("args") or {}
-                    if isinstance(args, dict) and isinstance(args.get("plan"), list):
-                        self.on_plan_update(args.get("plan", []), args.get("explanation", ""))
-                # Track in tool_handles only if the tool is actively in-flight (uncompleted)
-                if "result_text" not in evt and evt.get("status") not in ("done", "error", "cancelled"):
-                    self.tool_handles.append(widget)
+                if animate and tool_type == "update_plan" and self.on_plan_update:
+                    if isinstance(targs, dict) and isinstance(targs.get("plan"), list):
+                        self.on_plan_update(targs.get("plan", []), targs.get("explanation", ""))
         elif etype == "bot":
             self.finalize_thinking_stream()
             txt = evt.get("text", "")

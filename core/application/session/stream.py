@@ -54,11 +54,19 @@ def stream_step_to_session_event(
     elif etype == "thinking":
         # Informational thinking (auto-compaction/retry notices): always final.
         evt = {"type": "thinking", "text": val1, "duration": 0.0, "phase": "end"}
+    elif etype == "tool_generating":
+        meta = val3 if isinstance(val3, dict) else {}
+        evt = {"type": "tool_generating", "tool_type": val1, "target": val2, "meta": meta}
+    elif etype == "tool_generating_update":
+        meta = val3 if isinstance(val3, dict) else {}
+        evt = {"type": "tool_generating_update", "tool_type": val1, "target": val2, "meta": meta}
     elif etype == "tool":
         if text_accumulator:
             text_accumulator[0] = ""
         targs = val3 if isinstance(val3, dict) else {}
         evt = {"type": "tool", "tool_type": val1, "target": val2, "args": targs}
+        if parsed.val4:
+            evt["tool_id"] = parsed.val4
     elif etype == "tool_result":
         parsed_tr = parse_tool_result_step(step)
         evt = {"type": "tool", "result_text": val1 or parsed_tr.content}

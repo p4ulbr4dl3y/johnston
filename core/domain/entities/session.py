@@ -44,6 +44,8 @@ class MessageType(str, Enum):
     BOT_RESET = "bot_reset"
     THINKING = "thinking"
     TOOL = "tool"
+    TOOL_GENERATING = "tool_generating"
+    TOOL_GENERATING_UPDATE = "tool_generating_update"
     STATUS_CHANGE = "status_change"
     EVENT_DIVIDER = "event_divider"
     ERROR = "error"
@@ -151,6 +153,21 @@ class AgentSession:
         """
         etype = event.get("type", "")
         last = self.messages[-1] if self.messages else None
+
+        if etype in (
+            MessageType.TOOL_GENERATING,
+            MessageType.TOOL_GENERATING_UPDATE,
+            "tool_generating",
+            "tool_generating_update",
+        ):
+            if not self.listeners:
+                return
+            for cb in list(self.listeners):
+                try:
+                    cb(event)
+                except Exception:
+                    logger.warning("Session listener callback failed", exc_info=True)
+            return
 
         if etype == MessageType.BOT and last and last.get("type") == MessageType.BOT:
             last["text"] = event.get("text", "")

@@ -141,6 +141,40 @@ class TestUnknownAndSemantics:
         assert evt_retry["max_retries"] == 3
         assert evt_retry["delay"] == 2.0
 
+        # tool_generating & tool_generating_update
+        evt_gen = stream_step_to_session_event(("tool_generating", "read", "", {"id": "c1"}))
+        assert evt_gen == {"type": "tool_generating", "tool_type": "read", "target": "", "meta": {"id": "c1"}}
+        evt_up = stream_step_to_session_event(("tool_generating_update", "read", "foo.py", {"id": "c1"}))
+        assert evt_up == {"type": "tool_generating_update", "tool_type": "read", "target": "foo.py", "meta": {"id": "c1"}}
+
+    def test_record_subagent_step_tool_generating_ephemeral(self):
+        from core.application.session.stream import record_subagent_step
+
+        sess = make_session()
+        received_events = []
+        sess.add_listener(lambda e: received_events.append(e))
+        acc = [""]
+
+        # tool_generating
+        record_subagent_step(("tool_generating", "read", "", {"id": "c1"}), sess, acc)
+        assert len(received_events) == 1
+        assert received_events[0]["type"] == "tool_generating"
+        assert len(sess.messages) == 0  # not persisted to messages
+
+        # tool_generating_update
+        record_subagent_step(("tool_generating_update", "read", "foo.py", {"id": "c1"}), sess, acc)
+        assert len(received_events) == 2
+        assert received_events[1]["type"] == "tool_generating_update"
+        assert len(sess.messages) == 0  # not persisted to messages
+
+        # tool (final)
+        record_subagent_step(("tool", "read", "foo.py", {"path": "foo.py"}, "c1"), sess, acc)
+        assert len(received_events) == 3
+        assert received_events[2]["type"] == "tool"
+        assert received_events[2]["tool_id"] == "c1"
+        assert len(sess.messages) == 1  # now persisted to messages
+
+
 
 # ---------------------------------------------------------------------------
 # merge_subagent_metrics

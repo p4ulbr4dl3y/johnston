@@ -324,3 +324,52 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(plans), 1)
         self.assertEqual(plans[0][0], [{"step": "A", "status": "in_progress"}])
         self.assertEqual(plans[0][1], "test")
+
+    async def test_session_event_tool_generating_to_running_lifecycle(self):
+        tool_widget = MagicMock()
+        tool_widget.status = "generating"
+        tool_widget.update_tool_call = MagicMock()
+        tool_widget.mark_running = MagicMock()
+        tool_widget.set_result = MagicMock()
+        self.chat_view.add_tool_call.return_value = tool_widget
+
+        # 1. tool_generating session event
+        await self.driver.consume_session_event({
+            "type": "tool_generating",
+            "tool_type": "edit",
+            "target": "",
+            "meta": {"id": "c1"},
+        })
+        self.chat_view.add_tool_call.assert_awaited_once_with("edit", "", args={}, status="generating")
+        self.assertEqual(len(self.driver.tool_handles), 1)
+
+        # 2. tool_generating_update session event
+        await self.driver.consume_session_event({
+            "type": "tool_generating_update",
+            "tool_type": "edit",
+            "target": "file.py",
+            "meta": {"id": "c1"},
+        })
+        tool_widget.update_tool_call.assert_called_once_with(target="file.py")
+
+        # 3. Final tool event transitions generating to running
+        await self.driver.consume_session_event({
+            "type": "tool",
+            "tool_type": "edit",
+            "target": "file.py",
+            "args": {"path": "file.py"},
+            "tool_id": "c1",
+        })
+        tool_widget.mark_running.assert_called_once()
+        self.assertEqual(self.chat_view.add_tool_call.await_count, 1)
+
+        # 4. Result arrives
+        await self.driver.consume_session_event({
+            "type": "tool",
+            "result_text": "diff output",
+            "status": "done",
+            "returncode": 0,
+        })
+        tool_widget.set_result.assert_called_once_with("diff output", is_error=False, status="done", returncode=0)
+        self.assertEqual(len(self.driver.tool_handles), 0)
+
