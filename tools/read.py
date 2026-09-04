@@ -304,7 +304,7 @@ class ReadTool(BaseTool):
                 "- `path` to a zip/tar archive: returns `[archive <p> | total N]` + file list.\n"
                 "- `path` containing `://` (when local file doesn't exist): fetches MCP resource.\n"
                 "- PDF/DOCX/XLSX/PPTX/EPUB/IPYNB: converted to Markdown; long output is truncated with log path.\n"
-                "- Image (PNG/JPEG/GIF/WebP): converted to base64 JSON for vision; use `detail` to control size.\n\n"
+                "- Image (PNG/JPEG/GIF/WebP): converted to base64 JSON for vision.\n\n"
                 "Outputs are concurrency-safe: emit multiple `read` calls in one step and the runtime "
                 "runs them in parallel. Long conversions (PDF/DOCX, big images) are cancellable.\n\n"
                 "Errors: `not_found` (with fuzzy-match hint), `is_directory`, `size_exceeded`, `encoding`, "
@@ -336,14 +336,6 @@ class ReadTool(BaseTool):
                         "description": (
                             "Byte offset for minified single-line files or large pastes. "
                             "When set, line numbers are NOT shown."
-                        ),
-                    },
-                    "detail": {
-                        "type": "string",
-                        "enum": ["low", "high", "original"],
-                        "description": (
-                            "Image processing detail. `low`=512px, `high`=2048px (default), "
-                            "`original`=no resize. Ignored for non-image paths."
                         ),
                     },
                 },

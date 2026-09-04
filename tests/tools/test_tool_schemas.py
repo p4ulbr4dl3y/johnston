@@ -57,7 +57,7 @@ class TestToolSchemas(unittest.TestCase):
         props = ReadTool.schema["function"]["parameters"]["properties"]
         self.assertIn("content_offset", props)
         self.assertIn("offset", props["content_offset"]["description"].lower())
-        self.assertIn("detail", props)
+        self.assertNotIn("detail", props)
 
     def test_manage_shell_schema(self):
         from tools.manage_shell import ManageShellTool
