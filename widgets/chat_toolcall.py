@@ -132,6 +132,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.log_path: str | None = None
         self.task_id: str | None = None
         self.subagent_session_id: str | None = None
+        self.tool_call_id: str | None = None
+        self.tool_call_index: int | None = None
         self._shell_update_scheduled = False
         self._shell_update_handle: asyncio.TimerHandle | None = None
         # Incremental shell-stream flush state (see _flush_shell_update).

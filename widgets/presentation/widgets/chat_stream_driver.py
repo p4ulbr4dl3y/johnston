@@ -193,8 +193,8 @@ class ChatStreamDriver:
                 tool_handle = gen_handle
             else:
                 tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs)
-                if tool_id and hasattr(tool_handle, "tool_call_id"):
-                    tool_handle.tool_call_id = tool_id
+                if tool_id:
+                    setattr(tool_handle, "tool_call_id", tool_id)
                 self.tool_handles.append(tool_handle)
             if self.on_tool_widget:
                 self.on_tool_widget(tool_handle)
