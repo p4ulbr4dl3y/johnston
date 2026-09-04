@@ -358,10 +358,42 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
     async def test_ripgrep_failure_falls_back_to_python(self):
         ctx = ToolContext(cwd=self.tmpdir)
         # Mock ripgrep raising an exception to test graceful python fallback
-        with patch("subprocess.run", side_effect=OSError("rg failed")):
+        with patch("subprocess.Popen", side_effect=OSError("rg failed")):
             res = await self.tool.execute({"query": "AppRunner", "path": "."}, ctx=ctx)
             self.assertEqual(res.status, ToolResultStatus.DONE)
             self.assertIn("AppRunner", res.content)
+
+    def test_ripgrep_line_parsing_windows_and_hyphens(self):
+        from tools.search import _search_content_ripgrep
+
+        mock_stdout = (
+            "C:\\repo\\main.py:10:def hello():\n"
+            "test-runner.py-12-    context_call()\n"
+            "test-runner.py:13:    runner_test()\n"
+        )
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = 0
+        mock_proc.returncode = 0
+        mock_proc.communicate.return_value = (mock_stdout, "")
+
+        with patch("subprocess.Popen", return_value=mock_proc):
+            lines, count, files_count = _search_content_ripgrep(
+                target_path=".", query="test", cwd="C:\\repo"
+            )
+            self.assertEqual(count, 2)
+            self.assertEqual(files_count, 2)
+            self.assertTrue(any("main.py:10:def hello():" in ln for ln in lines))
+            self.assertTrue(any("test-runner.py-12-    context_call()" in ln for ln in lines))
+            self.assertTrue(any("test-runner.py:13:    runner_test()" in ln for ln in lines))
+
+    async def test_outline_skips_non_code_files_without_glob(self):
+        txt_file = os.path.join(self.tmpdir, "notes.txt")
+        with open(txt_file, "w", encoding="utf-8") as f:
+            f.write("class FakeNote:\n    def read(self): pass\n")
+        ctx = ToolContext(cwd=self.tmpdir)
+        res = await self.tool.execute({"query": "FakeNote", "path": "notes.txt", "mode": "outline"}, ctx=ctx)
+        self.assertEqual(res.status, ToolResultStatus.DONE)
+        self.assertIn("0 matches found", res.content)
 
     def test_role_policies_allow_search(self):
         from core.domain.policies.role_policy import role_tool_error
@@ -385,4 +417,5 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
 

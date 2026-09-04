@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from core.domain.defaults.errors import ToolResult
@@ -131,7 +132,7 @@ def _outline_python_content(code: str, file_rel_path: str, query: Optional[str] 
     """Parse Python AST and extract classes, methods, and functions matching query."""
     try:
         tree = ast.parse(code, filename=file_rel_path)
-    except SyntaxError:
+    except Exception:
         return []
 
     lines: List[str] = []
@@ -277,16 +278,34 @@ def _search_content_ripgrep(
 
     cmd.extend(["--", query, target_path])
 
+    rg_line_re = re.compile(r"^((?:[a-zA-Z]:)?[^:\r\n]+?)([:-])(\d+)\2(.*)$")
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
             cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=30.0,
-            check=False,
         )
+        deadline = time.time() + 30.0
+        while proc.poll() is None:
+            if cancel_event and cancel_event.is_set():
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1.0)
+                except Exception:
+                    proc.kill()
+                return [], 0, 0
+            if time.time() > deadline:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=1.0)
+                except Exception:
+                    proc.kill()
+                logger.debug("ripgrep timed out after 30s")
+                return None
+            time.sleep(0.05)
+        stdout, stderr = proc.communicate()
     except Exception as e:
         logger.debug("ripgrep invocation failed: %s", e)
         return None
@@ -299,33 +318,29 @@ def _search_content_ripgrep(
         return [], 0, 0
 
     if proc.returncode != 0:
-        logger.debug("ripgrep exited with code %s: %s", proc.returncode, proc.stderr)
+        logger.debug("ripgrep exited with code %s: %s", proc.returncode, stderr)
         return None
 
     output_lines: List[str] = []
     matched_files: Set[str] = set()
     match_count = 0
 
-    for line in proc.stdout.splitlines():
+    for line in stdout.splitlines():
         line = line.strip()
         if not line or line == "--":
             continue
 
-        colon_split = line.split(":", 2)
-        dash_split = line.split("-", 2)
-        fpath = ""
-
-        if len(colon_split) >= 3 and colon_split[1].isdigit():
-            fpath = colon_split[0]
-            match_count += 1
+        m = rg_line_re.match(line)
+        if m:
+            fpath = m.group(1)
+            sep = m.group(2)
+            lineno = m.group(3)
+            rest = m.group(4)
             rel = os.path.relpath(fpath, cwd) if os.path.isabs(fpath) else fpath
             matched_files.add(rel)
-            output_lines.append(f"{rel}:{colon_split[1]}:{colon_split[2]}")
-        elif len(dash_split) >= 3 and dash_split[1].isdigit():
-            fpath = dash_split[0]
-            rel = os.path.relpath(fpath, cwd) if os.path.isabs(fpath) else fpath
-            matched_files.add(rel)
-            output_lines.append(f"{rel}-{dash_split[1]}-{dash_split[2]}")
+            if sep == ":":
+                match_count += 1
+            output_lines.append(f"{rel}{sep}{lineno}{sep}{rest}")
         else:
             output_lines.append(line)
 
@@ -420,6 +435,8 @@ def _search_content_python(
                 if match_count >= max_results:
                     break
                 _process_file(os.path.join(root, fname))
+            if match_count >= max_results:
+                break
 
     return output_lines, match_count, len(matched_files)
 
@@ -496,9 +513,9 @@ def _search_outline(
         fname = os.path.basename(abs_fpath)
         ext = os.path.splitext(fname)[1].lower()
 
-        if ext not in CODE_EXTENSIONS and not _match_glob(rel, fname, glob_pattern):
-            return
         if not _match_glob(rel, fname, glob_pattern):
+            return
+        if not glob_pattern and ext not in CODE_EXTENSIONS:
             return
 
         try:
@@ -537,6 +554,8 @@ def _search_outline(
                     break
                 abs_p = os.path.join(root, fname)
                 _process_file(abs_p)
+            if total_symbols >= max_results:
+                break
 
     return output_lines, total_symbols, len(matched_files)
 

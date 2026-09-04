@@ -283,6 +283,12 @@ def _inspect_archive(
         total_count = len(entries)
         if total_count == 0:
             content_str = f"[archive {path} | total 0]"
+        elif start_line is not None and start_line > total_count:
+            return ToolResult.error(
+                "range",
+                detail=f"start_line ({start_line}) exceeds entry count ({total_count}) in '{path}'. Total entries: {total_count} (range: 1..{total_count}).",
+                name="read",
+            )
         elif start_line is not None or end_line is not None:
             s = max(1, start_line) if start_line else 1
             e = min(total_count, end_line) if end_line else min(total_count, s + max_entries - 1)
@@ -482,6 +488,12 @@ class ReadTool(BaseTool):
                     entries = normal_dirs + normal_files + hidden_dirs + hidden_files
                     if total_count == 0:
                         content_str = f"[dir {path} | total 0]"
+                    elif start_line_int is not None and start_line_int > total_count:
+                        return ToolResult.error(
+                            "range",
+                            detail=f"start_line ({start_line_int}) exceeds entry count ({total_count}) in '{path}'. Total entries: {total_count} (range: 1..{total_count}).",
+                            name="read",
+                        )
                     elif start_line_int is not None or end_line_int is not None:
                         s = max(1, start_line_int) if start_line_int else 1
                         e = min(total_count, end_line_int) if end_line_int else min(total_count, s + max_dir_entries - 1)

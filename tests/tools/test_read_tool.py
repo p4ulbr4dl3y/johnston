@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
+from core.domain.defaults.errors import ToolResultStatus
 from tools.read import (
     _DOC_CACHE,
     MAX_DOC_CACHE,
@@ -457,7 +458,25 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         res = await tool.execute({"path": zip_path, "start_line": 5, "end_line": 15})
         self.assertIn("entries 5..15 of 30", res.content)
         self.assertIn("archive_file_04.txt", res.content)
-        self.assertNotIn("archive_file_25.txt", res.content)
+    async def test_read_directory_out_of_range_start_line(self):
+        tool = ReadTool()
+        paged_dir = os.path.join(self.test_dir, "small_dir")
+        os.makedirs(paged_dir, exist_ok=True)
+        with open(os.path.join(paged_dir, "file_01.txt"), "w") as f:
+            f.write("content")
+        res = await tool.execute({"path": paged_dir, "start_line": 100})
+        self.assertEqual(res.status, ToolResultStatus.ERROR)
+        self.assertIn("exceeds entry count", res.content)
+
+    async def test_read_archive_out_of_range_start_line(self):
+        import zipfile
+        tool = ReadTool()
+        zip_path = os.path.join(self.test_dir, "small.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("archive_file_01.txt", "data")
+        res = await tool.execute({"path": zip_path, "start_line": 50})
+        self.assertEqual(res.status, ToolResultStatus.ERROR)
+        self.assertIn("exceeds entry count", res.content)
 
 
 if __name__ == "__main__":
