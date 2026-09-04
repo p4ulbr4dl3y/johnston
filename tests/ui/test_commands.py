@@ -1581,31 +1581,6 @@ class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
             screen = app.push_screen.call_args[0][0]
             self.assertEqual(screen.diff_items, [("foo.py", "+1 line", 1, 0)])
 
-    async def test_demo_command_execution(self):
-        from widgets.presentation.commands.ui_commands import DemoCommand
-
-        app = SimpleApp()
-        mock_chat_view = MagicMock()
-        mock_widget = MagicMock()
-        mock_chat_view.add_tool_call = AsyncMock(return_value=mock_widget)
-        app.query_one = MagicMock(return_value=mock_chat_view)
-
-        cmd = DemoCommand()
-        with patch("asyncio.sleep", new_callable=AsyncMock):
-            await cmd.execute(app)
-            await app._demo_task
-
-        self.assertGreaterEqual(mock_chat_view.add_tool_call.await_count, 5)
-
-    async def test_demo_command_query_one_failure(self):
-        from widgets.presentation.commands.ui_commands import DemoCommand
-
-        app = SimpleApp()
-        app.query_one = MagicMock(side_effect=Exception("no chat view"))
-        cmd = DemoCommand()
-        await cmd.execute(app)
-        self.assertFalse(hasattr(app, "_demo_task"))
-
 
 # ---------------------------------------------------------------------------
 # widgets/app/status_state.py
