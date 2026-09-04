@@ -53,6 +53,33 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.driver.tool_handles), 0)
         tool_widget.set_result.assert_called_once_with("diff content", is_error=False, status="done", returncode=0)
 
+    async def test_stream_tool_generating_to_running_lifecycle(self):
+        tool_widget = MagicMock()
+        tool_widget.status = "generating"
+        tool_widget.update_tool_call = MagicMock()
+        tool_widget.mark_running = MagicMock()
+        tool_widget.set_result = MagicMock()
+        self.chat_view.add_tool_call.return_value = tool_widget
+
+        # 1. Model starts streaming tool call
+        await self.driver.consume_stream_step(("tool_generating", "edit", "", {"id": "c1"}))
+        self.chat_view.add_tool_call.assert_awaited_once_with("edit", "", args={"id": "c1"}, status="generating")
+        self.assertEqual(len(self.driver.tool_handles), 1)
+
+        # 2. Target path streams in
+        await self.driver.consume_stream_step(("tool_generating_update", "edit", "file.py", {"id": "c1"}))
+        tool_widget.update_tool_call.assert_called_once_with(target="file.py", args={"id": "c1"})
+
+        # 3. Generation finishes, execution starts
+        await self.driver.consume_stream_step(("tool", "edit", "file.py", {"path": "file.py"}))
+        tool_widget.mark_running.assert_called_once()
+        self.assertEqual(self.chat_view.add_tool_call.await_count, 1)
+
+        # 4. Result arrives
+        await self.driver.consume_stream_step(("tool_result", "diff output", "", False, ToolResultStatus.DONE, 0))
+        tool_widget.set_result.assert_called_once_with("diff output", is_error=False, status="done", returncode=0)
+        self.assertEqual(len(self.driver.tool_handles), 0)
+
     async def test_stream_multiple_tools_fifo_order(self):
         tw1 = MagicMock()
         tw2 = MagicMock()

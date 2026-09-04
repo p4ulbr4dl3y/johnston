@@ -154,6 +154,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.scroll_box.display = False
 
     def is_expandable(self) -> bool:
+        if self.status == "generating":
+            return False
         from core.infrastructure.runtime.tool_name import normalize_tool_name
 
         canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
@@ -182,6 +184,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         return bool(getattr(self, "subagent_session_id", None) or self.args.get("session_id"))
 
     def is_clickable_header(self) -> bool:
+        if self.status == "generating":
+            return False
         if self.canonical_tool in ("invoke_subagent", "manage_subagent"):
             if self.has_subagent_session():
                 return True
@@ -369,7 +373,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def mark_cancelled(self) -> None:
         """Mark an interrupted tool call as cancelled."""
-        if self.status != "running":
+        if self.status not in ("running", "generating"):
             return
         self.status = "cancelled"
         clean = (self.result_text or "").strip()
@@ -395,6 +399,18 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.header_label.remove_class(TOOL_HEADER)
         self.render_header()
 
+    def mark_generating(self, text: str = "") -> None:
+        """Mark the tool card as generating (yellow hollow circle) with optional status text."""
+        self.status = "generating"
+        if text:
+            self.result_text = text.strip()
+        self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
+        self.header_label.add_class(TOOL_HEADER)
+        self.scroll_box.display = False
+        self.content_widget.display = False
+        self.md_widget.display = False
+        self.render_header()
+
     def mark_running(self, text: str = "") -> None:
         """Mark the tool card as running (yellow) with optional status text."""
         self.status = "running"
@@ -408,8 +424,25 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.header_label.remove_class(TOOL_HEADER)
         self.render_header()
 
+    def update_tool_call(self, target: str = None, args: dict = None) -> None:
+        """Update target and/or args during streaming and re-render header."""
+        if target is not None:
+            if isinstance(target, str):
+                target = re.sub(r"\s+", " ", target.replace("\n", " ").replace("\r", " ")).strip()
+            self.target = target
+        if args is not None and isinstance(args, dict):
+            self.args.update(args)
+        if not self.is_clickable_header():
+            self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
+            self.header_label.add_class(TOOL_HEADER)
+        else:
+            self.header_label.add_class(TOOL_HEADER_EXPANDABLE)
+            self.header_label.remove_class(TOOL_HEADER)
+        self.render_header()
+
     def render_header(self) -> None:
         c = self._get_status_color()
+        marker = "○" if self.status == "generating" else "●"
         if self.canonical_tool in self.SYSTEM_TOOLS or self.canonical_tool in (
             "invoke_subagent",
             "manage_subagent",
@@ -424,7 +457,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 if (self.args or self.canonical_tool == "update_plan")
                 else self.target
             )
-            base_header = f"[{c}]● [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})"
+            base_header = f"[{c}]{marker} [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})"
         else:
             from widgets.presentation.tool_display import format_compact_dict
 
@@ -432,7 +465,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             is_mcp = (self.tool_type or "").startswith("mcp_") or self.is_mcp
             tool_name_display = to_snake_case(self.tool_type) if is_mcp else (self.tool_type or "Tool")
             escaped_compact = escape(compact)
-            base_header = f"[{c}]● [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})"
+            base_header = f"[{c}]{marker} [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})"
 
         hints: list[str] = []
         if self.status == "running":

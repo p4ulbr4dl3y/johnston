@@ -184,12 +184,24 @@ class GeminiAdapter(BaseApiAdapter):
                             yield ("adapter_text", p["text"])
                         elif "functionCall" in p:
                             fc = p.get("functionCall") or {}
+                            t_id = new_tool_call_id()
+                            t_name = fc.get("name", "")
+                            args_str = normalize_tool_arguments_str(fc.get("args"))
+                            yield (
+                                "adapter_tool_delta",
+                                {
+                                    "index": 0,
+                                    "id": t_id,
+                                    "name": t_name,
+                                    "arguments_delta": args_str,
+                                },
+                            )
                             yield (
                                 "adapter_tool_call",
                                 {
-                                    "id": new_tool_call_id(),
-                                    "name": fc.get("name", ""),
-                                    "arguments": normalize_tool_arguments_str(fc.get("args")),
+                                    "id": t_id,
+                                    "name": t_name,
+                                    "arguments": args_str,
                                 },
                             )
 

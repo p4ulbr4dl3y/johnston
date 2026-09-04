@@ -939,6 +939,40 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("Thought for 1.5 sec", label_done)
         self.assertNotIn("ctrl+o", label_done)
 
+    def test_generating_status_rendering_and_interaction(self):
+        widget = self._widget("edit", "file.py", status="generating")
+        widget.render_header()
+        rendered = str(widget.header_label.render())
+        self.assertIn("○", rendered)
+        self.assertNotIn("●", rendered)
+        self.assertFalse(widget.is_expandable())
+        self.assertFalse(widget.is_clickable_header())
+        self.assertNotIn("ctrl+o", rendered)
+
+        # Update target during streaming
+        widget.update_tool_call(target="src/main.py", args={"path": "src/main.py"})
+        rendered_up = str(widget.header_label.render())
+        self.assertIn("src/main.py", rendered_up)
+        self.assertIn("○", rendered_up)
+
+        # Transition to running
+        widget.mark_running()
+        self.assertEqual(widget.status, "running")
+        rendered_run = str(widget.header_label.render())
+        self.assertIn("●", rendered_run)
+        self.assertNotIn("○", rendered_run)
+
+    def test_mark_generating_and_cancel(self):
+        widget = self._widget("create", "new.txt", status="running")
+        widget.render_header()
+        self.assertIn("●", str(widget.header_label.render()))
+        widget.mark_generating()
+        self.assertEqual(widget.status, "generating")
+        self.assertIn("○", str(widget.header_label.render()))
+        widget.mark_cancelled()
+        self.assertEqual(widget.status, "cancelled")
+        self.assertIn("[interrupted", widget.result_text)
+
 
 if __name__ == "__main__":
     unittest.main()

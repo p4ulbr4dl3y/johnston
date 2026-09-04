@@ -105,12 +105,38 @@ class ChatStreamDriver:
                 if hasattr(self.thinking_handle, "finish_thinking"):
                     self.thinking_handle.finish_thinking(duration, val2)
             self.thinking_handle = None
+        elif event_type == "tool_generating":
+            self.finalize_thinking_stream()
+            await self.finalize_bot_stream()
+            targs = val3 if isinstance(val3, dict) else {}
+            tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs, status="generating")
+            self.tool_handles.append(tool_handle)
+            if self.on_tool_widget:
+                self.on_tool_widget(tool_handle)
+        elif event_type == "tool_generating_update":
+            for th in self.tool_handles:
+                if getattr(th, "status", None) == "generating":
+                    if hasattr(th, "update_tool_call"):
+                        th.update_tool_call(target=val2, args=val3 if isinstance(val3, dict) else None)
+                    break
         elif event_type == "tool":
             self.finalize_thinking_stream()
             await self.finalize_bot_stream()
             targs = val3 if isinstance(val3, dict) else {}
-            tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs)
-            self.tool_handles.append(tool_handle)
+            gen_handle = None
+            for th in self.tool_handles:
+                if getattr(th, "status", None) == "generating":
+                    gen_handle = th
+                    break
+            if gen_handle is not None:
+                if hasattr(gen_handle, "update_tool_call"):
+                    gen_handle.update_tool_call(target=val2, args=targs)
+                if hasattr(gen_handle, "mark_running"):
+                    gen_handle.mark_running()
+                tool_handle = gen_handle
+            else:
+                tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs)
+                self.tool_handles.append(tool_handle)
             if self.on_tool_widget:
                 self.on_tool_widget(tool_handle)
         elif event_type == "tool_result":
@@ -118,7 +144,7 @@ class ChatStreamDriver:
             res_status = parsed_tool_result.status.value if parsed_tool_result.status is not None else None
             while self.tool_handles:
                 st = getattr(self.tool_handles[0], "status", None)
-                if isinstance(st, str) and st not in ("running",):
+                if isinstance(st, str) and st not in ("running", "generating"):
                     self.tool_handles.popleft()
                 else:
                     break
@@ -132,7 +158,7 @@ class ChatStreamDriver:
                 )
             else:
                 for child in reversed(list(getattr(self.chat_view, "children", []))):
-                    if isinstance(child, ToolCallWidget) and getattr(child, "status", None) == "running":
+                    if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
                         child.set_result(
                             val1,
                             is_error=parsed_tool_result.is_error,
@@ -250,7 +276,7 @@ class ChatStreamDriver:
             if "result_text" in evt and not evt.get("tool_type"):
                 while self.tool_handles:
                     st = getattr(self.tool_handles[0], "status", None)
-                    if isinstance(st, str) and st not in ("running",):
+                    if isinstance(st, str) and st not in ("running", "generating"):
                         self.tool_handles.popleft()
                     else:
                         break
@@ -264,7 +290,7 @@ class ChatStreamDriver:
                     )
                 else:
                     for child in reversed(list(getattr(self.chat_view, "children", []))):
-                        if isinstance(child, ToolCallWidget) and getattr(child, "status", None) == "running":
+                        if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
                             child.set_result(
                                 evt.get("result_text", ""),
                                 is_error=bool(evt.get("is_error", False)),

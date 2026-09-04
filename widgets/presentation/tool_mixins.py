@@ -155,7 +155,7 @@ class ParsingMixin:
         except Exception:
             theme = None
 
-        if self.status == "running":
+        if self.status in ("running", "generating"):
             val = getattr(theme, "accent_warning", None) if theme else None
             return val if isinstance(val, str) else COLOR_STATUS_RUNNING
         elif self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0):

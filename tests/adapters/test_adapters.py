@@ -410,6 +410,9 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
         self.assertEqual(tc[0][1]["arguments"], '{"command":"ls"}')
+        deltas = [e for e in events if e[0] == "adapter_tool_delta"]
+        self.assertGreaterEqual(len(deltas), 2)
+        self.assertEqual(deltas[0][1]["name"], "shell")
 
     async def test_stream_max_tokens(self):
         lines = ['data: {"choices":[{"delta":{"content":"x"}}]}']
@@ -456,6 +459,9 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
         self.assertEqual(tc[0][1]["name"], "shell")
+        deltas = [e for e in events if e[0] == "adapter_tool_delta"]
+        self.assertGreaterEqual(len(deltas), 3)
+        self.assertEqual(deltas[0][1]["name"], "shell")
 
     async def test_stream_thinking_delta(self):
         lines = [
