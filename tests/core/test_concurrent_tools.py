@@ -211,6 +211,95 @@ class TestConcurrentToolExecutionInAgent(unittest.IsolatedAsyncioTestCase):
 
 
 class TestConcurrentToolsGeneratorAndSession(unittest.IsolatedAsyncioTestCase):
+    async def test_out_of_order_tool_calls_keep_provider_order(self):
+        """Parallel tool calls that finish out of order must still execute in
+        the provider's declared index order (deltas announce A=0, B=1; final
+        calls arrive B before A)."""
+        agent = BaseAgent(
+            api_key="test",
+            model="test-model",
+            base_url="http://test",
+            system_prompt="test",
+            provider_key="test",
+        )
+        self.addAsyncCleanup(agent.close)
+
+        execution_log = []
+
+        async def mock_executor(name: str, args: dict, agent_ref: Any = None):
+            execution_log.append(args.get("path"))
+            return ToolResult(content=f"Result {args.get('path')}")
+
+        agent.tool_executor = mock_executor
+
+        turn_num = 0
+
+        class MockAdapter:
+            async def stream_chat(self, **kwargs):
+                nonlocal turn_num
+                turn_num += 1
+                if turn_num == 1:
+                    yield ("adapter_tool_delta", {"index": 0, "id": "call_A", "name": "read", "arguments_delta": '{"path": '})
+                    yield ("adapter_tool_delta", {"index": 1, "id": "call_B", "name": "read", "arguments_delta": '{"path": '})
+                    yield ("adapter_tool_delta", {"index": 1, "id": "call_B", "name": "read", "arguments_delta": '"f2.txt"}'})
+                    yield ("adapter_tool_call", {"index": 1, "id": "call_B", "name": "read", "arguments": '{"path": "f2.txt"}'})
+                    yield ("adapter_tool_call", {"index": 0, "id": "call_A", "name": "read", "arguments": '{"path": "f1.txt"}'})
+                else:
+                    yield ("adapter_text", "done")
+
+        events = []
+        with unittest.mock.patch("core.adapters.get_adapter", return_value=MockAdapter()):
+            async for ev in agent.stream_steps("Read files"):
+                events.append(ev)
+
+        # Execution follows provider index order (A then B), not arrival order.
+        self.assertEqual(execution_log, ["f1.txt", "f2.txt"])
+        tool_steps = [ev for ev in events if ev[0] == "tool"]
+        self.assertEqual([t[2] for t in tool_steps], ["f1.txt", "f2.txt"])
+        self.assertEqual([t[4] for t in tool_steps], ["call_A", "call_B"])
+        tool_messages = [m for m in agent.history if m.get("role") == "tool"]
+        self.assertEqual([m["tool_call_id"] for m in tool_messages], ["call_A", "call_B"])
+
+    async def test_tool_call_id_falls_back_to_generating_delta_id(self):
+        """adapter_tool_call without an id must reuse the id announced by its
+        deltas (index now aligns the slots), keeping widget pairing stable."""
+        agent = BaseAgent(
+            api_key="test",
+            model="test-model",
+            base_url="http://test",
+            system_prompt="test",
+            provider_key="test",
+        )
+        self.addAsyncCleanup(agent.close)
+
+        turn_num = 0
+
+        class MockAdapter:
+            async def stream_chat(self, **kwargs):
+                nonlocal turn_num
+                turn_num += 1
+                if turn_num == 1:
+                    yield ("adapter_tool_delta", {"index": 0, "id": "stable_id", "name": "shell", "arguments_delta": '{"command": '})
+                    yield ("adapter_tool_delta", {"index": 0, "id": "stable_id", "name": "shell", "arguments_delta": '"ls"}'})
+                    # Final call omits the id but keeps the index.
+                    yield ("adapter_tool_call", {"index": 0, "name": "shell", "arguments": '{"command": "ls"}'})
+                else:
+                    yield ("adapter_text", "done")
+
+        events = []
+        with unittest.mock.patch("core.adapters.get_adapter") as mock_get_adapter, \
+             unittest.mock.patch.object(agent, "_execute_single_tool") as mock_exec:
+            mock_exec.return_value = ("stable_id", "ls ok", ToolResult.done(content="ls ok"))
+            mock_adapter = unittest.mock.MagicMock()
+            mock_adapter.stream_chat = MockAdapter().stream_chat
+            mock_get_adapter.return_value = mock_adapter
+            async for ev in agent.stream_steps("List"):
+                events.append(ev)
+
+        tool_steps = [ev for ev in events if ev[0] == "tool"]
+        self.assertEqual(len(tool_steps), 1)
+        self.assertEqual(tool_steps[0][4], "stable_id")
+
     async def test_ai_generator_concurrent_tool_ui_handles(self):
         from core.application.generation.ai_generator import GenCanvas, generate_ai_response
         from core.domain.entities.session import AgentSession

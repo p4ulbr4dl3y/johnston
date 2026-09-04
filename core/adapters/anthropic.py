@@ -344,6 +344,7 @@ class AnthropicAdapter(BaseApiAdapter):
                         yield (
                             "adapter_tool_call",
                             {
+                                "index": idx,
                                 "id": tb["id"] or new_tool_call_id(),
                                 "name": tb["name"],
                                 "arguments": "".join(tb["args_parts"]) or "{}",

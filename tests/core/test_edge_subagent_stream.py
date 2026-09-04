@@ -147,6 +147,26 @@ class TestUnknownAndSemantics:
         evt_up = stream_step_to_session_event(("tool_generating_update", "read", "foo.py", {"id": "c1"}))
         assert evt_up == {"type": "tool_generating_update", "tool_type": "read", "target": "foo.py", "meta": {"id": "c1"}}
 
+    def test_stream_step_to_session_event_tool_result_carries_tool_id(self):
+        from core.application.session.stream import stream_step_to_session_event
+        from core.domain.defaults.errors import ToolResultStatus
+
+        # Full 7-tuple form: the tool_call_id must survive canonicalization so
+        # consumers can pair a result with its exact start event.
+        evt = stream_step_to_session_event(("tool_result", "out", "", False, ToolResultStatus.DONE, 0, "c1"))
+        assert evt == {"type": "tool", "result_text": "out", "status": "done", "returncode": 0, "tool_id": "c1"}
+
+        # Error status surfaces both is_error and the id.
+        err = stream_step_to_session_event(("tool_result", "boom", "", True, ToolResultStatus.ERROR, 1, "c9"))
+        assert err["is_error"] is True
+        assert err["status"] == "error"
+        assert err["returncode"] == 1
+        assert err["tool_id"] == "c9"
+
+        # Short form used by test fixtures stays stable (no status/returncode/id).
+        short = stream_step_to_session_event(("tool_result", "out", ""))
+        assert short == {"type": "tool", "result_text": "out"}
+
     def test_record_subagent_step_tool_generating_ephemeral(self):
         from core.application.session.stream import record_subagent_step
 

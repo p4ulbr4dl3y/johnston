@@ -409,11 +409,33 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             ]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
+        self.assertEqual(tc[0][1]["index"], 0)
         self.assertEqual(tc[0][1]["name"], "shell")
         self.assertEqual(tc[0][1]["arguments"], '{"command":"ls"}')
         deltas = [e for e in events if e[0] == "adapter_tool_delta"]
         self.assertGreaterEqual(len(deltas), 2)
         self.assertEqual(deltas[0][1]["name"], "shell")
+
+    async def test_stream_parallel_tool_calls_indices(self):
+        lines = [
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c0","function":{"name":"read","arguments":""}}]}}]}',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":1,"id":"c1","function":{"name":"read","arguments":"{\\"path\\": \\"b.txt\\"}"}}]}}]}',
+            'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"path\\": \\"a.txt\\"}"}}]}}]}',
+            "data: [DONE]",
+        ]
+        with patch("core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+            adapter = OpenAIAdapter()
+            events = [
+                e
+                async for e in adapter.stream_chat(
+                    "http://x", "k", "m", [], tools=[{"type": "function", "function": {"name": "read"}}]
+                )
+            ]
+        calls = [e[1] for e in events if e[0] == "adapter_tool_call"]
+        self.assertEqual([c["index"] for c in calls], [0, 1])
+        self.assertEqual([c["id"] for c in calls], ["c0", "c1"])
+        self.assertEqual(calls[0]["arguments"], '{"path": "a.txt"}')
+        self.assertEqual(calls[1]["arguments"], '{"path": "b.txt"}')
 
     async def test_stream_max_tokens(self):
         lines = ['data: {"choices":[{"delta":{"content":"x"}}]}']
@@ -459,10 +481,36 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             ]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
+        self.assertEqual(tc[0][1]["index"], 0)
         self.assertEqual(tc[0][1]["name"], "shell")
         deltas = [e for e in events if e[0] == "adapter_tool_delta"]
         self.assertGreaterEqual(len(deltas), 3)
         self.assertEqual(deltas[0][1]["name"], "shell")
+
+    async def test_stream_parallel_tool_use_out_of_order_stops(self):
+        """Parallel tool blocks that stop out of order must still carry their
+        block index, so the agent can restore the declared order."""
+        lines = [
+            'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"tu0","name":"read"}}',
+            'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tu1","name":"read"}}',
+            'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"path\\": \\"b.txt\\"}"}}',
+            'data: {"type":"content_block_stop","index":1}',
+            'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"path\\": \\"a.txt\\"}"}}',
+            'data: {"type":"content_block_stop","index":0}',
+            'data: {"type":"message_stop"}',
+        ]
+        with patch("core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+            events = [
+                e
+                async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
+            ]
+        calls = [e[1] for e in events if e[0] == "adapter_tool_call"]
+        # Arrival order is the block-stop order (1 before 0)...
+        self.assertEqual([c["index"] for c in calls], [1, 0])
+        self.assertEqual([c["id"] for c in calls], ["tu1", "tu0"])
+        # ...but each payload preserves its declared index for downstream sorting.
+        self.assertEqual(calls[0]["arguments"], '{"path": "b.txt"}')
+        self.assertEqual(calls[1]["arguments"], '{"path": "a.txt"}')
 
     async def test_stream_thinking_delta(self):
         lines = [
@@ -534,6 +582,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             ]
         tc = [e for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(tc), 1)
+        self.assertEqual(tc[0][1]["index"], 0)
         self.assertEqual(tc[0][1]["name"], "shell")
 
     async def test_stream_thinking(self):

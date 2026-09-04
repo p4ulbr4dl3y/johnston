@@ -1,8 +1,13 @@
 """Unified stream presenter/driver for ChatView.
 
-Provides a single authoritative controller for rendering stream steps (generator-driven,
-e.g. main agent in ai_generator) and session events (listener/history-driven, e.g.
-subagent screen and history playback) into ChatView widgets without duplication.
+Single authoritative controller that renders stream steps, session events and
+history playback through one state machine (``consume_session_event``).
+
+``consume_stream_step`` (generator-driven, e.g. main agent in ai_generator)
+canonicalizes raw step tuples via ``stream_step_to_session_event`` and
+delegates to the same ``consume_session_event`` path used by session listeners
+(subagent screen) and history replay — live streaming and replay can never
+drift apart, and the step protocol is parsed in exactly one place.
 """
 from __future__ import annotations
 
@@ -12,7 +17,7 @@ import math
 from collections import deque
 from typing import Any, Callable, Optional
 
-from core.domain.defaults.errors import parse_tool_result_step
+from core.application.session.stream import stream_step_to_session_event
 from core.domain.policies.messages import is_ui_visible_user_message
 from widgets.chat_toolcall import ToolCallWidget
 from widgets.presentation.widgets.chat_messages import BotMessage, ThinkingWidget
@@ -101,227 +106,67 @@ class ChatStreamDriver:
             self.bot_handle = None
 
     async def consume_stream_step(self, step: tuple) -> None:
-        """Consume a raw generator step tuple from BaseAgent.stream_steps."""
-        if not step:
+        """Consume a raw generator step tuple from BaseAgent.stream_steps.
+
+        Canonicalizes the tuple via :func:`stream_step_to_session_event` and
+        renders through ``consume_session_event`` — the same state machine used
+        for session listeners and history replay.
+        """
+        evt = stream_step_to_session_event(step, from_stream_step=True)
+        if evt is None:
             return
-        event_type = step[0]
-        val1 = step[1] if len(step) > 1 else ""
-        val2 = step[2] if len(step) > 2 else ""
-        val3 = step[3] if len(step) > 3 else None
+        await self.consume_session_event(evt, animate=True, is_active=True)
 
-        if event_type == "thinking_start":
-            self.thinking_handle = await self.chat_view.add_thinking_widget(val1)
-        elif event_type == "thinking_delta":
-            if self.thinking_handle and hasattr(self.thinking_handle, "update_thinking"):
-                self.thinking_handle.update_thinking(val1)
-        elif event_type == "thinking_end":
-            if self.thinking_handle:
-                try:
-                    duration = float(val1)
-                    if not math.isfinite(duration):
-                        duration = 0.0
-                except Exception:
-                    duration = 0.0
-                if hasattr(self.thinking_handle, "finish_thinking"):
-                    self.thinking_handle.finish_thinking(duration, val2)
-            self.thinking_handle = None
-        elif event_type == "tool_generating":
-            self.finalize_thinking_stream()
-            await self.finalize_bot_stream()
-            meta = val3 if isinstance(val3, dict) else {}
-            tool_handle = await self.chat_view.add_tool_call(val1, val2, args={}, status="generating")
-            if hasattr(tool_handle, "tool_call_id") or isinstance(meta, dict):
-                setattr(tool_handle, "tool_call_id", meta.get("id"))
-                setattr(tool_handle, "tool_call_index", meta.get("index"))
-            self.tool_handles.append(tool_handle)
-            if self.on_tool_widget:
-                self.on_tool_widget(tool_handle)
-        elif event_type == "tool_generating_update":
-            meta = val3 if isinstance(val3, dict) else {}
-            target_id = meta.get("id")
-            target_idx = meta.get("index")
-            matched = False
-            if target_id:
-                for th in self.tool_handles:
-                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_id", None) == target_id:
-                        if hasattr(th, "update_tool_call"):
-                            th.update_tool_call(target=val2)
-                        matched = True
-                        break
-            if not matched and target_idx is not None:
-                for th in self.tool_handles:
-                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_index", None) == target_idx:
-                        if hasattr(th, "update_tool_call"):
-                            th.update_tool_call(target=val2)
-                        matched = True
-                        break
-            if not matched and not target_id and target_idx is None:
-                for th in self.tool_handles:
-                    if getattr(th, "status", None) == "generating":
-                        if hasattr(th, "update_tool_call"):
-                            th.update_tool_call(target=val2)
-                        break
-        elif event_type == "tool":
-            self.finalize_thinking_stream()
-            await self.finalize_bot_stream()
-            targs = val3 if isinstance(val3, dict) else {}
-            tool_id = step[4] if len(step) > 4 else None
-            gen_handle = None
-            if tool_id:
-                for th in self.tool_handles:
-                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_id", None) == tool_id:
-                        gen_handle = th
-                        break
-            if gen_handle is None:
-                for th in self.tool_handles:
-                    if getattr(th, "status", None) == "generating" and (
-                        getattr(th, "canonical_tool", None) == val1
-                        or getattr(th, "tool_type", None) == val1
-                    ):
-                        gen_handle = th
-                        break
-            if gen_handle is None:
-                for th in self.tool_handles:
-                    if getattr(th, "status", None) == "generating":
-                        gen_handle = th
-                        break
-            if gen_handle is not None:
-                if hasattr(gen_handle, "update_tool_call"):
-                    gen_handle.update_tool_call(target=val2, args=targs)
-                if hasattr(gen_handle, "mark_running"):
-                    gen_handle.mark_running()
-                tool_handle = gen_handle
+    def _match_tool_result_widget(self, evt: dict) -> Optional[ToolCallWidget]:
+        """Find the tool card a completion event belongs to.
+
+        Resolution order:
+        1. explicit ``tool_id`` match against the in-flight queue;
+        2. FIFO — results arrive in the order the calls were announced;
+        3. mounted children by ``tool_call_id``, then any live child.
+        """
+        tool_id = evt.get("tool_id")
+        if tool_id:
+            for th in self.tool_handles:
+                if getattr(th, "tool_call_id", None) == tool_id:
+                    self.tool_handles.remove(th)
+                    return th
+        while self.tool_handles:
+            st = getattr(self.tool_handles[0], "status", None)
+            if isinstance(st, str) and st not in ("running", "generating"):
+                self.tool_handles.popleft()
             else:
-                tool_handle = await self.chat_view.add_tool_call(val1, val2, args=targs)
-                if tool_id:
-                    setattr(tool_handle, "tool_call_id", tool_id)
-                self.tool_handles.append(tool_handle)
-            if self.on_tool_widget:
-                self.on_tool_widget(tool_handle)
-        elif event_type == "tool_result":
-            parsed_tool_result = parse_tool_result_step(step)
-            res_status = parsed_tool_result.status.value if parsed_tool_result.status is not None else None
-            tool_id = step[6] if len(step) > 6 else None
-            cur_tool_handle = None
+                break
+        if self.tool_handles:
+            return self.tool_handles.popleft()
+        children = list(getattr(self.chat_view, "children", []))
+        if tool_id:
+            for child in reversed(children):
+                if isinstance(child, ToolCallWidget) and getattr(child, "tool_call_id", None) == tool_id:
+                    return child
+        for child in reversed(children):
+            if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
+                return child
+        return None
 
-            if tool_id:
-                for th in self.tool_handles:
-                    if getattr(th, "tool_call_id", None) == tool_id:
-                        cur_tool_handle = th
-                        self.tool_handles.remove(th)
-                        break
+    def _find_shell_output_target(self) -> Optional[ToolCallWidget]:
+        """Locate the tool card that owns a shell output chunk.
 
-            if cur_tool_handle is None:
-                while self.tool_handles:
-                    st = getattr(self.tool_handles[0], "status", None)
-                    if isinstance(st, str) and st not in ("running", "generating"):
-                        self.tool_handles.popleft()
-                    else:
-                        break
-                if self.tool_handles:
-                    cur_tool_handle = self.tool_handles.popleft()
-
-            if cur_tool_handle is not None:
-                cur_tool_handle.set_result(
-                    val1,
-                    is_error=parsed_tool_result.is_error,
-                    status=res_status,
-                    returncode=parsed_tool_result.returncode,
-                )
-            else:
-                if tool_id:
-                    for child in reversed(list(getattr(self.chat_view, "children", []))):
-                        if isinstance(child, ToolCallWidget) and getattr(child, "tool_call_id", None) == tool_id:
-                            cur_tool_handle = child
-                            break
-                if cur_tool_handle is None:
-                    for child in reversed(list(getattr(self.chat_view, "children", []))):
-                        if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
-                            cur_tool_handle = child
-                            break
-                if cur_tool_handle is not None:
-                    cur_tool_handle.set_result(
-                        val1,
-                        is_error=parsed_tool_result.is_error,
-                        status=res_status,
-                        returncode=parsed_tool_result.returncode,
-                    )
-                else:
-                    logger.debug("Received tool_result step with empty tool_handles queue: %s", val1)
-        elif event_type == "bot_delta":
-            self.finalize_thinking_stream()
-            if val1:
-                if self.bot_handle is None:
-                    self.bot_handle = await self.chat_view.add_bot_message()
-                if hasattr(self.bot_handle, "append_stream_content"):
-                    self.bot_handle.append_stream_content(val1)
-        elif event_type == "bot_reset":
-            if self.bot_handle is not None and hasattr(self.bot_handle, "reset_stream"):
-                try:
-                    res = self.bot_handle.reset_stream()
-                    if inspect.isawaitable(res):
-                        await res
-                except Exception:
-                    pass
-        elif event_type == "retry":
-            if self.bot_handle is not None and hasattr(self.bot_handle, "reset_stream"):
-                try:
-                    res = self.bot_handle.reset_stream()
-                    if inspect.isawaitable(res):
-                        await res
-                except Exception:
-                    pass
-            # Clean up zombie generating widgets from failed attempt
-            remaining_handles = deque()
-            while self.tool_handles:
-                th = self.tool_handles.popleft()
-                if getattr(th, "status", None) == "generating":
-                    try:
-                        th.remove()
-                    except Exception:
-                        pass
-                else:
-                    remaining_handles.append(th)
-            self.tool_handles = remaining_handles
-            if self.notify:
-                attempt = val1
-                max_retries = val2
-                delay = val3 or 0.0
-                err = step[4] if len(step) > 4 else None
-                err_msg = str(err).lower() if err else ""
-                is_rate_limit = (
-                    "rate limit" in err_msg
-                    or "429" in err_msg
-                    or getattr(err, "status_code", None) == 429
-                )
-                reason = "Rate limit reached" if is_rate_limit else "Provider error"
-                try:
-                    self.notify(
-                        f"{reason}: retrying in {max(1, int(round(delay)))}s (attempt {attempt}/{max_retries})",
-                        severity="warning",
-                    )
-                except Exception:
-                    pass
-        elif event_type in ("bot_text", "outro"):
-            self.finalize_thinking_stream()
-            if val1.strip():
-                if self.bot_handle is None:
-                    self.bot_handle = await self.chat_view.add_bot_message()
-                if hasattr(self.bot_handle, "finalize_stream"):
-                    res = self.bot_handle.finalize_stream(val1)
-                    if inspect.isawaitable(res):
-                        await res
-                self.bot_handle = None
-            else:
-                await self.finalize_bot_stream()
-        elif event_type == "error":
-            self.finalize_thinking_stream()
-            err_text = val1 or "Error"
-            await self.chat_view.add_error_message(err_text)
-        elif event_type == "event_divider":
-            self.finalize_thinking_stream()
-            div_text = val1 or "Session Compacted"
-            await self.chat_view.add_event_divider(div_text)
+        Prefers the newest live shell card, then any live (running/generating)
+        card, then a live mounted child — never a completed card, so output
+        from a background shell cannot land on a stale neighbour.
+        """
+        for th in reversed(self.tool_handles):
+            st = getattr(th, "status", None)
+            if st in ("running", "generating") and getattr(th, "canonical_tool", None) == "shell":
+                return th
+        for th in reversed(self.tool_handles):
+            if getattr(th, "status", None) in ("running", "generating"):
+                return th
+        for child in reversed(list(getattr(self.chat_view, "children", []))):
+            if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
+                return child
+        return None
 
     async def consume_session_event(
         self,
@@ -417,26 +262,15 @@ class ChatStreamDriver:
                         break
         elif etype == "tool_shell_output":
             txt = evt.get("text", "")
-            target_th = self.tool_handles[-1] if self.tool_handles else None
-            if target_th is None:
-                for child in reversed(list(getattr(self.chat_view, "children", []))):
-                    if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
-                        target_th = child
-                        break
-            if target_th and hasattr(target_th, "append_shell_output"):
+            target_th = self._find_shell_output_target()
+            if target_th is not None and hasattr(target_th, "append_shell_output"):
                 target_th.append_shell_output(txt)
         elif etype == "tool":
             self.finalize_thinking_stream()
             # Check if this event is a completion event for an in-flight tool
             if "result_text" in evt and not evt.get("tool_type"):
-                while self.tool_handles:
-                    st = getattr(self.tool_handles[0], "status", None)
-                    if isinstance(st, str) and st not in ("running", "generating"):
-                        self.tool_handles.popleft()
-                    else:
-                        break
-                if self.tool_handles:
-                    w = self.tool_handles.popleft()
+                w = self._match_tool_result_widget(evt)
+                if w is not None:
                     w.set_result(
                         evt.get("result_text", ""),
                         is_error=bool(evt.get("is_error", False)),
@@ -444,15 +278,6 @@ class ChatStreamDriver:
                         returncode=evt.get("returncode"),
                     )
                 else:
-                    for child in reversed(list(getattr(self.chat_view, "children", []))):
-                        if isinstance(child, ToolCallWidget) and getattr(child, "status", None) in ("running", "generating"):
-                            child.set_result(
-                                evt.get("result_text", ""),
-                                is_error=bool(evt.get("is_error", False)),
-                                status=evt.get("status"),
-                                returncode=evt.get("returncode"),
-                            )
-                            break
                     logger.debug("Received session tool_result event with empty tool_handles queue: %s", evt)
             else:
                 await self.finalize_bot_stream()
@@ -562,6 +387,20 @@ class ChatStreamDriver:
                         await res
                 except Exception:
                     pass
+            # Drop zombie generating cards from the failed attempt; keep
+            # handles that were already running (their results may still be
+            # in flight and matched by the retried turn).
+            remaining_handles = deque()
+            while self.tool_handles:
+                th = self.tool_handles.popleft()
+                if getattr(th, "status", None) == "generating":
+                    try:
+                        th.remove()
+                    except Exception:
+                        pass
+                else:
+                    remaining_handles.append(th)
+            self.tool_handles = remaining_handles
             if self.notify:
                 attempt = evt.get("attempt") or 1
                 max_retries = evt.get("max_retries") or 3

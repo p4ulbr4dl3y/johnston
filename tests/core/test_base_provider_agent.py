@@ -994,6 +994,44 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_extract_streaming_target('{"title": "Auth refactor"}'), "Auth refactor")
         self.assertEqual(_extract_streaming_target('{"path": "unclosed'), "")
 
+    def test_extract_streaming_target_incremental_matches_full_scan(self):
+        """Windowed extraction (one scan per delta chunk) must agree with a
+        full-buffer scan for every split point of realistic argument payloads."""
+        from core.base_provider.agent import _extract_streaming_target
+
+        cases = [
+            ('{"path": "foo/bar.py", "content": "..."}', "foo/bar.py"),
+            ('{"command": "pytest -v && uv build", "cwd": "/tmp/x"}', "pytest -v && uv build"),
+            ('{"url": "https://example.com/api?v=1&k=2", "headers": {}}', "https://example.com/api?v=1&k=2"),
+            ('{"title": "Auth refactor", "prompt": "make it clean"}', "Auth refactor"),
+            ('{"file_path": "app.py", "action": "read"}', "app.py"),
+        ]
+        for full, expected in cases:
+            for chunk_size in range(1, len(full) + 1):
+                buf = ""
+                found = ""
+                for i in range(0, len(full), chunk_size):
+                    prev = len(buf)
+                    buf += full[i : i + chunk_size]
+                    found = _extract_streaming_target(buf, scan_from=prev)
+                self.assertEqual(found, expected, f"chunk={chunk_size} args={full!r}")
+
+    def test_extract_streaming_target_documented_boundary_tradeoff(self):
+        """A target key buried more than the overlap window before the chunk
+        boundary is intentionally not re-scanned (O(n) streaming extraction);
+        the final parsed arguments always carry the target regardless."""
+        from core.base_provider.agent import _TARGET_SCAN_BACKOFF, _extract_streaming_target
+
+        big_value = "x" * (_TARGET_SCAN_BACKOFF + 64)
+        chunk1 = '{"command": "' + big_value
+        chunk2 = '"}'
+        full = chunk1 + chunk2
+
+        # Full-buffer scan still finds the key (legacy semantics).
+        self.assertEqual(_extract_streaming_target(full), big_value)
+        # Windowed scan after chunk1 does not re-cover a key that deep.
+        self.assertEqual(_extract_streaming_target(full, scan_from=len(chunk1)), "")
+
     async def test_stream_steps_tool_generating_events(self):
         agent = BaseAgent(api_key="k", model="m", base_url="http://t", provider_key="p")
         self.addAsyncCleanup(agent.close)

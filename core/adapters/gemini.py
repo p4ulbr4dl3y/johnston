@@ -217,6 +217,7 @@ class GeminiAdapter(BaseApiAdapter):
                             yield (
                                 "adapter_tool_call",
                                 {
+                                    "index": tool_call_index,
                                     "id": t_id,
                                     "name": t_name,
                                     "arguments": args_str,

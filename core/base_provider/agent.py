@@ -37,12 +37,28 @@ _STREAMING_TARGET_RE = re.compile(
     r'"(?:path|command|url|file_path|title|prompt|query|action)"\s*:\s*"((?:[^"\\]|\\.)*?)"'
 )
 
+# Overlap carried into each windowed target scan. A target key can straddle a
+# delta boundary by at most its own (short) length, so scanning only the tail
+# since the previous chunk — plus this overlap — is equivalent to a full-buffer
+# scan for keys not buried behind an extremely long (>overlap) earlier value.
+# The hint is cosmetic anyway: the final "tool" event always carries the parsed
+# target. Keeps streaming extraction O(n) instead of O(n^2) for large arguments.
+_TARGET_SCAN_BACKOFF = 4096
 
-def _extract_streaming_target(buffer: str) -> str:
-    """Extract first known target field from partial/complete tool arguments JSON buffer."""
+
+def _extract_streaming_target(buffer: str, scan_from: int = 0) -> str:
+    """Extract the first known target field from partial/complete tool JSON.
+
+    ``scan_from`` is the buffer length already scanned on the previous chunk;
+    only ``buffer[scan_from - _TARGET_SCAN_BACKOFF:]`` is re-scanned so a
+    growing arguments buffer is processed in O(n) overall instead of O(n^2).
+    A match fully present in an earlier chunk is never re-found (it is not
+    re-scanned), which is fine: only the first complete match matters.
+    """
     if not buffer:
         return ""
-    m = _STREAMING_TARGET_RE.search(buffer)
+    window = buffer[max(0, scan_from - _TARGET_SCAN_BACKOFF) :]
+    m = _STREAMING_TARGET_RE.search(window)
     if not m:
         return ""
     val = m.group(1)
@@ -658,7 +674,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     g["args_buffer"] += delta_args
 
                                 if not g["target"] and g["args_buffer"]:
-                                    g["target"] = _extract_streaming_target(g["args_buffer"])
+                                    g["target"] = _extract_streaming_target(
+                                        g["args_buffer"], scan_from=g.get("args_scan_pos", 0)
+                                    )
+                                g["args_scan_pos"] = len(g["args_buffer"])
 
                                 if g["name"] and not g["announced"]:
                                     g["announced"] = True
@@ -674,7 +693,15 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                     thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
                                     yield ("thinking_end", f"{dt}", thoughts_str)
                                     thinking_started = False
-                                idx = len(tool_calls_dict)
+                                # Key by the provider's delta index (now carried in
+                                # the payload) so the final call maps onto the same
+                                # generating_tools slot its deltas announced — even
+                                # when parallel calls finish out of order. Without an
+                                # index (legacy adapter mocks), fall back to arrival
+                                # order, which is what older adapters guaranteed.
+                                idx = payload.get("index")
+                                if idx is None:
+                                    idx = len(tool_calls_dict)
                                 tc_id = payload.get("id") or (
                                     generating_tools.get(idx, {}).get("id") if idx in generating_tools else None
                                 ) or new_tool_call_id(idx)

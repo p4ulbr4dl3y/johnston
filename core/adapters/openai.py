@@ -277,6 +277,7 @@ class OpenAIAdapter(BaseApiAdapter):
                 yield (
                     "adapter_tool_call",
                     {
+                        "index": idx,
                         "id": tc.get("id") or new_tool_call_id(idx),
                         "name": tc_name,
                         "arguments": args_str,

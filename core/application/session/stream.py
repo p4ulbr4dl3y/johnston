@@ -76,6 +76,10 @@ def stream_step_to_session_event(
             evt["is_error"] = True
         if parsed_tr.returncode is not None:
             evt["returncode"] = parsed_tr.returncode
+        if len(step) > 6 and step[6]:
+            # Carry the tool_call_id so consumers can pair a result with its
+            # exact start event instead of relying on FIFO order alone.
+            evt["tool_id"] = step[6]
     elif etype == "bot_delta":
         if text_accumulator is not None:
             text_accumulator[0] = text_accumulator[0] + val1
