@@ -371,7 +371,17 @@ async def _handle_interruption(
     if hasattr(agent, "history"):
         partial = (getattr(bot_handle, "content", "") if bot_handle else "").strip()
         if partial:
-            agent.history.append({"role": "assistant", "content": partial})
+            last_msg = agent.history[-1] if agent.history else None
+            already_recorded = (
+                isinstance(last_msg, dict)
+                and last_msg.get("role") == "assistant"
+                and (
+                    last_msg.get("content") == partial
+                    or (isinstance(last_msg.get("content"), str) and partial in last_msg.get("content"))
+                )
+            )
+            if not already_recorded:
+                agent.history.append({"role": "assistant", "content": partial})
         # Structured interruption note. The model sees a typed signal with
         # phase info (streaming/bot) so it knows the previous turn was cut
         # short and can decide whether to retry, summarize, or ask the user.

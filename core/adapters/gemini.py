@@ -56,11 +56,20 @@ class GeminiAdapter(BaseApiAdapter):
         system_instruction: Optional[Dict[str, Any]] = None
         contents: List[Dict[str, Any]] = []
         pending_tools: List[Dict[str, Any]] = []
+        tool_call_name_map: Dict[str, str] = {}
 
         def _flush_tools():
             if pending_tools:
-                contents.append({"role": "user", "parts": pending_tools[:]})
+                _append_content("user", pending_tools[:])
                 pending_tools.clear()
+
+        def _append_content(role: str, parts: List[Dict[str, Any]]):
+            if not parts:
+                return
+            if contents and contents[-1].get("role") == role:
+                contents[-1]["parts"].extend(parts)
+            else:
+                contents.append({"role": role, "parts": parts})
 
         for msg in messages:
             role = msg.get("role")
@@ -69,8 +78,16 @@ class GeminiAdapter(BaseApiAdapter):
                 text = content if isinstance(content, str) else json.dumps(content)
                 system_instruction = {"parts": [{"text": text}]}
                 continue
+            if role == "assistant":
+                for tc in msg.get("tool_calls") or []:
+                    tc_id = tc.get("id")
+                    fn_name = tc.get("function", {}).get("name") or tc.get("name")
+                    if tc_id and fn_name:
+                        tool_call_name_map[tc_id] = fn_name
+
             if role == "tool":
-                name = msg.get("name", "tool")
+                tc_id = msg.get("tool_call_id")
+                name = msg.get("name") or (tool_call_name_map.get(tc_id) if tc_id else None) or "tool"
                 img_info = extract_image_details(msg.get("content", ""))
 
                 if img_info:
@@ -103,9 +120,9 @@ class GeminiAdapter(BaseApiAdapter):
             _flush_tools()
 
             if role == "user":
-                contents.append({"role": "user", "parts": self._content_to_parts(content, msg, "user")})
+                _append_content("user", self._content_to_parts(content, msg, "user"))
             elif role == "assistant":
-                contents.append({"role": "model", "parts": self._content_to_parts(content, msg, "model")})
+                _append_content("model", self._content_to_parts(content, msg, "model"))
 
         _flush_tools()
         return system_instruction, contents

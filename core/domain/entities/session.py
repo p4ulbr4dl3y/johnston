@@ -361,8 +361,10 @@ class AgentSession:
             clean = " ".join(str(self._title).split())
             if clean:
                 return clean
+        from core.domain.policies.messages import is_ui_visible_user_message
+
         for m in self.messages:
-            if isinstance(m, dict) and m.get("type") == "user":
+            if isinstance(m, dict) and is_ui_visible_user_message(m):
                 text = str(m.get("display_text") or m.get("text", "")).strip()
                 if text:
                     clean = " ".join(text.split())

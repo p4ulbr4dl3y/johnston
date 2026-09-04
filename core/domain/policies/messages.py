@@ -255,7 +255,15 @@ def is_system_note(msg: Any) -> bool:
     if not isinstance(msg, dict):
         return False
     content = msg.get("content", "")
-    return isinstance(content, str) and content.startswith(HISTORY_NOTE_PREFIX)
+    if isinstance(content, str):
+        return content.startswith(HISTORY_NOTE_PREFIX)
+    if isinstance(content, list):
+        for part in content:
+            if isinstance(part, dict):
+                text = str(part.get("text", ""))
+                if text.startswith(HISTORY_NOTE_PREFIX):
+                    return True
+    return False
 
 
 def is_real_history_user_turn(msg: Any) -> bool:

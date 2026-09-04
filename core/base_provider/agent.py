@@ -844,7 +844,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 resolved.returncode,
                                 t_id,
                             )
-                            messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
+                            messages.append(
+                                {"role": "tool", "name": t_name, "tool_call_id": t_id, "content": resolved.content or ""}
+                            )
                             self._append_history(messages[-1])
                     else:
                         # Sequential execution (single tool or mutating barrier)
@@ -867,7 +869,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 resolved.returncode,
                                 t_id,
                             )
-                            messages.append({"role": "tool", "tool_call_id": t_id, "content": resolved.content or ""})
+                            messages.append(
+                                {"role": "tool", "name": t_name, "tool_call_id": t_id, "content": resolved.content or ""}
+                            )
+                            self._append_history(messages[-1])
 
 
                 # self.history was maintained incrementally via _append_history

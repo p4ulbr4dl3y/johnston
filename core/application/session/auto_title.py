@@ -266,13 +266,15 @@ def _history_user_text(content: Any) -> str:
 
 def _scan_user_text(messages: Any, history: Any) -> str:
     """First non-empty user text across a UI transcript, then its agent history."""
+    from core.domain.policies.messages import is_real_history_user_turn, is_ui_visible_user_message
+
     for m in messages or []:
-        if isinstance(m, dict) and m.get("type") == "user":
+        if isinstance(m, dict) and is_ui_visible_user_message(m):
             txt = str(m.get("display_text") or m.get("text", "")).strip()
             if txt:
                 return txt
     for m in history or []:
-        if isinstance(m, dict) and m.get("role") == "user":
+        if isinstance(m, dict) and is_real_history_user_turn(m):
             txt = _history_user_text(m.get("content", ""))
             if txt:
                 return txt

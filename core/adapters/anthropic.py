@@ -89,9 +89,26 @@ class AnthropicAdapter(BaseApiAdapter):
         final: List[Dict[str, Any]] = []
         pending_tools: List[Dict[str, Any]] = []
 
+        def _append_message(role: str, content: Any):
+            if not content and content != "":
+                return
+            if not final:
+                final.append({"role": role, "content": content})
+                return
+            last = final[-1]
+            if last.get("role") == role:
+                # Merge into existing role turn
+                c1 = last["content"]
+                c2 = content
+                p1 = [{"type": "text", "text": c1}] if isinstance(c1, str) else list(c1)
+                p2 = [{"type": "text", "text": c2}] if isinstance(c2, str) else list(c2)
+                last["content"] = p1 + p2
+            else:
+                final.append({"role": role, "content": content})
+
         def _flush_tools():
             if pending_tools:
-                final.append({"role": "user", "content": pending_tools[:]})
+                _append_message("user", pending_tools[:])
                 pending_tools.clear()
 
         for msg in messages:
@@ -140,7 +157,7 @@ class AnthropicAdapter(BaseApiAdapter):
 
             if role == "user":
                 if isinstance(content, str):
-                    final.append({"role": "user", "content": content})
+                    _append_message("user", content)
                 elif isinstance(content, list):
                     converted_parts = []
                     for p in content:
@@ -162,9 +179,9 @@ class AnthropicAdapter(BaseApiAdapter):
                                 )
                         else:
                             converted_parts.append(p)
-                    final.append({"role": "user", "content": converted_parts})
+                    _append_message("user", converted_parts)
                 else:
-                    final.append({"role": "user", "content": json.dumps(content)})
+                    _append_message("user", json.dumps(content))
             elif role == "assistant":
                 blocks: List[Dict[str, Any]] = []
                 if isinstance(content, str) and content:
@@ -183,7 +200,7 @@ class AnthropicAdapter(BaseApiAdapter):
                             "input": args_obj,
                         }
                     )
-                final.append({"role": "assistant", "content": blocks or [{"type": "text", "text": ""}]})
+                _append_message("assistant", blocks or [{"type": "text", "text": ""}])
 
         _flush_tools()
         apply_anthropic_rolling_cache(final)

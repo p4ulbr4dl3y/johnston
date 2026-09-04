@@ -273,7 +273,7 @@ async def run_subagent_stream_bg(
     store: Any,
     cleanup_fn: Optional[Callable[[list], None]] = None,
     error_prefix: str = "Subagent error",
-    notification_template: str = "",
+    notification_template: bool | str = True,
     session_id: Optional[str] = None,
     truncate_result: bool = False,
 ) -> str:
@@ -337,34 +337,17 @@ async def run_subagent_stream_bg(
             else:
                 result_text = base_text or "Completed with no text output."
 
-            if notification_template is True or (
-                isinstance(notification_template, str) and notification_template.startswith("<notification")
-            ):
-                from core.domain.policies.messages import format_background_notification
+            from core.domain.policies.messages import format_background_notification
 
-                branch = getattr(session, "branch_name", None) or None
-                msg = format_background_notification(
-                    type_="subagent",
-                    title=session.title or "Subagent",
-                    task_id=sid,
-                    result=result_text,
-                    status=status_val,
-                    branch=branch,
-                )
-            else:
-                from core.domain.policies.messages import _xml_escape
-
-                class _SafeDict(dict):
-                    def __missing__(self, key):
-                        return f"{{{key}}}"
-
-                mapping = _SafeDict(
-                    session_id=_xml_escape(sid),
-                    result_text=_xml_escape(result_text),
-                    title=_xml_escape(session.title or ""),
-                    description=_xml_escape(session.title or ""),
-                )
-                msg = str(notification_template).format_map(mapping)
+            branch = getattr(session, "branch_name", None) or None
+            msg = format_background_notification(
+                type_="subagent",
+                title=session.title or "Subagent",
+                task_id=sid,
+                result=result_text,
+                status=status_val,
+                branch=branch,
+            )
             ctx.trigger_ai_response(msg)
 
     return acc[0]

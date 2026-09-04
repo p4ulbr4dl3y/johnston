@@ -352,20 +352,20 @@ class TestRunStream:
         ctx = FakeCtx()
         store = FakeStore()
         await run_subagent_stream_bg(
-            sub, "p", sess, ctx, store, notification_template="notify {result_text}", truncate_result=True
+            sub, "p", sess, ctx, store, notification_template=True, truncate_result=True
         )
-        assert ctx.messages and ctx.messages[0] == "notify Completed with no text output."
+        assert ctx.messages and '<notification type="subagent"' in ctx.messages[0]
+        assert "Completed with no text output." in ctx.messages[0]
 
     @pytest.mark.asyncio
     async def test_notification_template_braces_in_description_safe(self):
-        # .format only interprets braces in the TEMPLATE, not in substituted
-        # values, so braces inside description are safe (no KeyError).
         sub = FakeSubagent(steps=[("bot_text", "hi")])
         sess = make_session(description="has {brace} here")
         ctx = FakeCtx()
         store = FakeStore()
-        await run_subagent_stream_bg(sub, "p", sess, ctx, store, notification_template="{description}: {result_text}")
-        assert ctx.messages and ctx.messages[0] == "has {brace} here: hi"
+        await run_subagent_stream_bg(sub, "p", sess, ctx, store, notification_template=True)
+        assert ctx.messages and 'title="has {brace} here"' in ctx.messages[0]
+        assert "hi" in ctx.messages[0]
 
     @pytest.mark.asyncio
     async def test_metrics_merged_into_parent(self):
@@ -765,11 +765,12 @@ class TestSubagentStepAndErrorHandling:
         ctx = FakeCtx()
         store = FakeStore()
         result = await run_subagent_stream_bg(
-            sub, "initial prompt", sess, ctx, store, notification_template="Result: {result_text}"
+            sub, "initial prompt", sess, ctx, store, notification_template=True
         )
         assert sess.status == STATUS_ERROR
         assert f"[{error_msg}]" in result
         assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
+        assert 'status="error"' in ctx.messages[0]
 
     @pytest.mark.asyncio
     async def test_error_step_marks_status_error_and_returns_error_text(self):
@@ -779,11 +780,12 @@ class TestSubagentStepAndErrorHandling:
         ctx = FakeCtx()
         store = FakeStore()
         result = await run_subagent_stream_bg(
-            sub, "initial prompt", sess, ctx, store, notification_template="Result: {result_text}"
+            sub, "initial prompt", sess, ctx, store, notification_template=True
         )
         assert sess.status == STATUS_ERROR
         assert f"[{error_msg}]" in result
         assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
+        assert 'status="error"' in ctx.messages[0]
 
     @pytest.mark.asyncio
     async def test_notification_template_true_handles_braces_in_title_and_branch(self):

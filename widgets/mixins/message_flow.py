@@ -535,7 +535,10 @@ class MessageFlowMixin:
                     notif_status = "error"
                 elif status_val in ("killed", "cancelled"):
                     notif_status = "cancelled"
-                if status_val in ("error", "killed", "cancelled") or (exit_code not in (None, 0)):
+                elif exit_code not in (None, 0):
+                    notif_status = "error"
+
+                if notif_status in ("error", "cancelled") or (exit_code not in (None, 0)):
                     state_hint = (
                         f"[exit code: {exit_code}]" if exit_code is not None else f"[status: {notif_status}]"
                     )
