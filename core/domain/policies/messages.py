@@ -139,9 +139,9 @@ def format_background_notification(
         branch: optional git worktree branch for subagents
     """
     t_clean = _xml_escape(type_)
-    title_clean = _xml_escape(title)
     id_clean = _xml_escape(task_id)
     status_clean = _xml_escape(status)
+    title_attr = f' title="{_xml_escape(title)}"' if title else ""
     duration_attr = f' duration_ms="{int(duration_ms)}"' if duration_ms is not None else ""
     trunc_attr = ' truncated="true"' if truncated else ""
     event_attr = f' event="{_xml_escape(event)}"' if event else ""
@@ -150,8 +150,9 @@ def format_background_notification(
     body_clean = _xml_escape(result)
     return (
         f'<notification type="{t_clean}" '
-        f'id="{id_clean}" title="{title_clean}" '
-        f'status="{status_clean}"{branch_attr}{duration_attr}{trunc_attr}{event_attr}{idle_attr}>'
+        f'id="{id_clean}"'
+        f'{title_attr}'
+        f' status="{status_clean}"{branch_attr}{duration_attr}{trunc_attr}{event_attr}{idle_attr}>'
         f"{body_clean}"
         f"</notification>"
     )
