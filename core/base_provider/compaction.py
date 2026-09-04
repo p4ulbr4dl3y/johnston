@@ -137,8 +137,17 @@ def _validate_summary_shape(text: str) -> Tuple[bool, str]:
     return True, ""
 
 
-def _summary_signature(text: str) -> str:
+def _summary_signature(text: Any) -> str:
     """Stable hash used to dedupe near-identical summaries across cycles."""
+    if not text:
+        return ""
+    if isinstance(text, list):
+        text = " ".join(
+            p.get("text", "") if isinstance(p, dict) else str(p)
+            for p in text
+        )
+    elif not isinstance(text, str):
+        text = str(text)
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:16]
 
 
@@ -499,7 +508,7 @@ class CompactionMixin:
             previous_summary = None
             for msg in self.history:
                 if isinstance(msg, dict) and msg.get("role") == "user":
-                    content_str = str(msg.get("content", ""))
+                    content_str = str(msg.get("content") or "")
                     if CHECKPOINT_OPEN_TAG in content_str and CHECKPOINT_CLOSE_TAG in content_str:
                         previous_summary = _strip_checkpoint(content_str)
                         break
@@ -624,8 +633,12 @@ class CompactionMixin:
             # Avoid duplicate user messages that are already in recent_tail.
             # Use content signature (not id()) so dedup survives sanitize
             # re-allocation of message dicts.
-            tail_sigs = {_summary_signature(m.get("content", "")) for m in recent_tail}
-            preserved_prefix = [m for m in preserved_users if _summary_signature(m.get("content", "")) not in tail_sigs]
+            tail_sigs = {sig for m in recent_tail if (sig := _summary_signature(m.get("content")))}
+            preserved_prefix = [
+                m
+                for m in preserved_users
+                if not (sig := _summary_signature(m.get("content"))) or sig not in tail_sigs
+            ]
 
             new_history = preserved_prefix + [checkpoint_item] + recent_tail
             sanitized_new_history = await asyncio.to_thread(self.sanitize_history_for_model, new_history)

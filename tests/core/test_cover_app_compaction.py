@@ -393,6 +393,40 @@ async def test_compact_history_adapter_transient_503_retries_and_succeeds():
 
 
 @pytest.mark.asyncio
+async def test_compact_history_with_none_content_messages_succeeds():
+    agent = _agent(
+        [
+            {"role": "user", "content": "Fix bug"},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{"id": "1", "function": {"name": "test", "arguments": "{}"}}],
+            },
+            {"role": "tool", "tool_call_id": "1", "name": "test", "content": "ok"},
+            {"role": "user", "content": "more"},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{"id": "2", "function": {"name": "test", "arguments": "{}"}}],
+            },
+            {"role": "tool", "tool_call_id": "2", "name": "test", "content": "ok"},
+            {"role": "user", "content": "Submit"},
+        ]
+    )
+    agent._last_sys_tokens = 0
+    agent.last_context_tokens = 0
+
+    class _FakeAdapter:
+        async def stream_chat(self, *a, **k):
+            yield ("adapter_text", _SUMMARY)
+
+    with patch("core.adapters.get_adapter", return_value=_FakeAdapter()):
+        success, msg = await agent.compact_history()
+    assert success is True
+    assert any("<compaction_checkpoint>" in (m.get("content") or "") for m in agent.history)
+
+
+@pytest.mark.asyncio
 async def test_compact_history_budget_trim_oldest():
     agent = _agent(
         [
