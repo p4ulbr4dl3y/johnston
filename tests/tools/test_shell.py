@@ -1052,3 +1052,48 @@ async def test_shell_background_idle_timeout_wired(tool, make_app_mock, make_too
             on_completed=ctx.host.on_background_shell_completed,
             on_progress=ctx.host.on_background_shell_progress,
         )
+
+
+async def test_shell_sync_wires_hard_timeout_to_task(tool, make_app_mock, make_tool_context):
+    app = _app(make_app_mock, task_manager=TaskManager())
+    ctx = make_tool_context(app=app, is_subagent=False)
+
+    with (
+        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch.object(ShellTool, "_create_std_process", return_value=_process()),
+        patch("tools.shell.ShellTask") as mock_task_cls,
+    ):
+        mock_task = MagicMock()
+        mock_task.log_path = "/tmp/test.log"
+        mock_task.background_event = asyncio.Event()
+        mock_task.is_background = False
+        mock_task.get_formatted_output.return_value = "ok"
+        read_fut = asyncio.Future()
+        read_fut.set_result(None)
+        mock_task.start_reading.return_value = read_fut
+        mock_task_cls.return_value = mock_task
+
+        res = await tool.execute({"command": "echo 1", "timeout": 42}, ctx=ctx)
+        assert not res.is_error
+
+        mock_task_cls.assert_called_once()
+        _, kwargs = mock_task_cls.call_args
+        assert kwargs["hard_timeout"] == 42.0
+
+
+def test_apply_role_tools_cleans_timeout_description(tool):
+    from core.domain.policies.role_policy import AgentRole
+    from core.roles.tools import apply_role_tools
+
+    sub = MagicMock()
+    sub.tools = [tool.get_schema()]
+    role = AgentRole(key="worker", name="worker", description="worker role")
+    apply_role_tools(sub, role)
+
+    shell_tool = next(t for t in sub.tools if t["function"]["name"] == "shell")
+    props = shell_tool["function"]["parameters"]["properties"]
+    assert "background" not in props
+    assert "idle_timeout" not in props
+    assert "timeout" in props
+    assert "background=true" not in props["timeout"]["description"]
+

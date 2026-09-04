@@ -38,10 +38,12 @@ class ShellTask(BaseTask):
         self.is_background = False
         self.was_killed = False
         self.timed_out = False
+        self.suppress_notification = False
         self.idle_timeout = idle_timeout
         self.hard_timeout = hard_timeout
         self.last_output_time = time.monotonic()
         self._current_idle_threshold = idle_timeout if (idle_timeout and idle_timeout > 0) else 0
+        self._inactivity_pings = 0
         self.read_task: Optional[asyncio.Task] = None
         self.watcher_task: Optional[asyncio.Task] = None
         self.background_event = asyncio.Event()
@@ -104,6 +106,7 @@ class ShellTask(BaseTask):
     def move_to_background(self) -> None:
         self.is_background = True
         self.last_output_time = time.monotonic()
+        self._inactivity_pings = 0
         if self.idle_timeout and self.idle_timeout > 0:
             self._current_idle_threshold = self.idle_timeout
         self.background_event.set()
@@ -151,6 +154,7 @@ class ShellTask(BaseTask):
         def _append_chunk(text: str) -> None:
             self.output.append(text)
             self.last_output_time = time.monotonic()
+            self._inactivity_pings = 0
             if self.idle_timeout and self.idle_timeout > 0:
                 self._current_idle_threshold = self.idle_timeout
             if self._log is not None:
@@ -182,7 +186,7 @@ class ShellTask(BaseTask):
                         break
 
                 # 2. Inactivity check
-                if self._current_idle_threshold > 0 and on_progress is not None:
+                if self._current_idle_threshold > 0 and on_progress is not None and self._inactivity_pings < 3:
                     silence = time.monotonic() - self.last_output_time
                     if silence >= self._current_idle_threshold:
                         try:
@@ -194,6 +198,7 @@ class ShellTask(BaseTask):
                                 event="inactivity",
                                 idle_seconds=int(silence),
                             )
+                            self._inactivity_pings += 1
                         except Exception:
                             pass
                         # Backoff: double the threshold up to 300s
@@ -263,7 +268,7 @@ class ShellTask(BaseTask):
                     )
 
                 # Background tasks: announce completion via modal notify / callback.
-                if self.is_background and on_completed is not None:
+                if self.is_background and on_completed is not None and not self.suppress_notification:
                     try:
                         on_completed(self.task_id, self.command, self.output.formatted())
                     except Exception:

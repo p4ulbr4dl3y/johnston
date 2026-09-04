@@ -194,6 +194,17 @@ class BackgroundNotificationFormatTests(unittest.TestCase):
         out = format_background_notification("shell", "t", "i", "b")
         self.assertNotIn("duration_ms=", out)
 
+    def test_branch_attribute(self):
+        out = format_background_notification(
+            NOTIFICATION_KIND_SUBAGENT, "feature", "sub_1", "done", branch="feature/auth-flow"
+        )
+        self.assertIn('branch="feature/auth-flow"', out)
+
+        out_no_branch = format_background_notification(
+            NOTIFICATION_KIND_SUBAGENT, "feature", "sub_1", "done", branch=None
+        )
+        self.assertNotIn("branch=", out_no_branch)
+
 
 class VisionSanitizationInjectionTests(unittest.TestCase):
     """Vision sanitization concatenates user-supplied text with a synthetic

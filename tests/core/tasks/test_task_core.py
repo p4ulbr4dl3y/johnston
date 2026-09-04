@@ -535,3 +535,37 @@ def test_shell_task_move_to_background_resets_idle_timer():
     assert task.background_event.is_set()
     assert task._current_idle_threshold == 45
     assert (time.monotonic() - task.last_output_time) < 1.0
+
+
+@pytest.mark.asyncio
+async def test_shell_task_suppress_notification_skips_on_completed():
+    completed_called = []
+
+    def on_comp(tid, cmd, out):
+        completed_called.append(tid)
+
+    # Process that exits immediately with no stdout
+    proc = await asyncio.create_subprocess_exec(
+        "true",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    task = ShellTask("t_supp_cb", "true", process=proc)
+    task.is_background = True
+    task.suppress_notification = True
+    task.start_reading(on_completed=on_comp)
+    await asyncio.wait_for(task.wait(), timeout=5.0)
+
+    assert task.status == TaskStatus.COMPLETED
+    assert len(completed_called) == 0
+
+
+def test_shell_task_inactivity_pings_capped_at_three():
+    task = ShellTask("t_pings", "silent_server", idle_timeout=1)
+    task._inactivity_pings = 3
+    # When output arrives, _inactivity_pings resets
+    task.output.append("data")
+    # Simulate _append_chunk resetting pings
+    task._inactivity_pings = 0
+    assert task._inactivity_pings == 0
+

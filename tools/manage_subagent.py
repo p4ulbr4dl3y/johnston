@@ -72,11 +72,8 @@ class ManageSubagentTool(BaseTool):
                     ),
                     name="manage_subagent",
                 )
-            if last_fp == fp:
-                self._consecutive_list_count = count + 1
-            else:
-                self._last_list_fp = fp
-                self._consecutive_list_count = 1
+            self._last_list_fp = fp
+            self._consecutive_list_count = count + 1 if last_fp == fp else 1
 
             if not target_sessions:
                 return ToolResult.done(
@@ -131,6 +128,7 @@ class ManageSubagentTool(BaseTool):
             return ToolResult.error("notfound", name=session_id)
 
         if action == "kill":
+            setattr(session, "suppress_notification", True)
             if session.status != "running":
                 msg = f"[killed {session.id}]"
                 return ToolResult.done(content=msg, display="")

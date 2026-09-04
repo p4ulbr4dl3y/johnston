@@ -38,5 +38,9 @@ def _rebuild_tool(t) -> dict:
         if isinstance(params, dict) and "properties" in params and isinstance(params["properties"], dict):
             params["properties"].pop("background", None)
             params["properties"].pop("idle_timeout", None)
+            if "timeout" in params["properties"] and isinstance(params["properties"]["timeout"], dict):
+                params["properties"]["timeout"]["description"] = (
+                    "Seconds before SIGTERM (defaults to 120s, max 600s)."
+                )
         return t_copy
     return t

@@ -209,6 +209,58 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertIn("[status: error | timed out after 120s]", sent[0])
             self.assertIn('status="error"', sent[0])
 
+    async def test_completed_killed_normalizes_to_cancelled(self):
+        from core.infrastructure.tasks.shell_task import ShellTask
+        from core.infrastructure.tasks.task import TaskStatus
+
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            task = ShellTask("t_kill", "sleep 100")
+            task.status = TaskStatus.KILLED
+            task.was_killed = True
+            app.task_manager.register(task)
+            sent = []
+            with patch.object(app, "generate_ai_response", side_effect=lambda msg, **k: sent.append(msg)):
+                app.on_background_shell_completed("t_kill", "sleep 100", "killed output")
+            self.assertEqual(len(sent), 1)
+            self.assertIn('status="cancelled"', sent[0])
+            self.assertNotIn('status="killed"', sent[0])
+
+    async def test_completed_suppressed_notification_skips_ai(self):
+        from core.infrastructure.tasks.shell_task import ShellTask
+        from core.infrastructure.tasks.task import TaskStatus
+
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            task = ShellTask("t_supp", "sleep 100")
+            task.status = TaskStatus.KILLED
+            task.suppress_notification = True
+            app.task_manager.register(task)
+            sent = []
+            with patch.object(app, "generate_ai_response", side_effect=lambda msg, **k: sent.append(msg)):
+                app.on_background_shell_completed("t_supp", "sleep 100", "killed output")
+            self.assertEqual(len(sent), 0)
+            self.assertEqual(len(app.message_queue), 0)
+
+    async def test_completed_cross_session_queues_to_task_session(self):
+        from core.infrastructure.tasks.shell_task import ShellTask
+        from core.infrastructure.tasks.task import TaskStatus
+
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = False
+            app.current_session_id = "sess_B"
+            task = ShellTask("t_diff", "ls", session_id="sess_A")
+            task.status = TaskStatus.COMPLETED
+            app.task_manager.register(task)
+            with patch.object(app, "generate_ai_response") as mock_gen:
+                app.on_background_shell_completed("t_diff", "ls", "ok")
+                mock_gen.assert_not_called()
+            self.assertEqual(len(app.message_queue), 1)
+            self.assertEqual(app.message_queue[0][3], "sess_A")
+
 
 if __name__ == "__main__":
     unittest.main()

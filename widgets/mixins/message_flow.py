@@ -505,6 +505,8 @@ class MessageFlowMixin:
                     (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
                     None,
                 )
+            if getattr(task, "suppress_notification", False):
+                return
             task_log = getattr(task, "log_path", None)
 
             body = truncate_output(
@@ -529,11 +531,13 @@ class MessageFlowMixin:
                 state_hint = f"[status: error | timed out after {hard_to}s]"
                 body = f"{state_hint}\n{body}"
             else:
-                if status_val in ("error", "killed", "cancelled"):
-                    notif_status = status_val
-                if status_val in ("error", "killed") or (exit_code not in (None, 0)):
+                if status_val == "error":
+                    notif_status = "error"
+                elif status_val in ("killed", "cancelled"):
+                    notif_status = "cancelled"
+                if status_val in ("error", "killed", "cancelled") or (exit_code not in (None, 0)):
                     state_hint = (
-                        f"[exit code: {exit_code}]" if exit_code is not None else f"[status: {status_val}]"
+                        f"[exit code: {exit_code}]" if exit_code is not None else f"[status: {notif_status}]"
                     )
                     body = f"{state_hint}\n{body}"
 
@@ -545,9 +549,10 @@ class MessageFlowMixin:
                 status=notif_status,
                 truncated=len(result) > 4000,
             )
+            target_sid = getattr(task, "session_id", None) or getattr(self, "current_session_id", None)
             curr_sid = getattr(self, "current_session_id", None)
-            if self.is_generating:
-                self.message_queue.append((msg, False, None, curr_sid))
+            if self.is_generating or (target_sid and curr_sid and target_sid != curr_sid):
+                self.message_queue.append((msg, False, None, target_sid))
             else:
                 self.generate_ai_response(msg, show_in_ui=False)
         except Exception as e:
@@ -575,6 +580,8 @@ class MessageFlowMixin:
                     (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
                     None,
                 )
+            if getattr(task, "suppress_notification", False):
+                return
             task_log = getattr(task, "log_path", None)
 
             body = truncate_output(
@@ -602,9 +609,10 @@ class MessageFlowMixin:
                 idle_seconds=idle_seconds,
                 truncated=len(result) > 4000,
             )
+            target_sid = getattr(task, "session_id", None) or getattr(self, "current_session_id", None)
             curr_sid = getattr(self, "current_session_id", None)
-            if self.is_generating:
-                self.message_queue.append((msg, False, None, curr_sid))
+            if self.is_generating or (target_sid and curr_sid and target_sid != curr_sid):
+                self.message_queue.append((msg, False, None, target_sid))
             else:
                 self.generate_ai_response(msg, show_in_ui=False)
         except Exception as e:

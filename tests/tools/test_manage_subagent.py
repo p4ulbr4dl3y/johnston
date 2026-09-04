@@ -66,6 +66,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         res = await tool.execute({"action": "kill", "session_id": "sub-kill"})
         self.assertEqual(res.content, "[killed sub-kill]")
         self.assertEqual(sess.status, "cancelled")
+        self.assertTrue(getattr(sess, "suppress_notification", False))
         mock_task.cancel.assert_called_once()
 
     def test_agent_session_deserialization(self):

@@ -177,6 +177,7 @@ async def test_kill_running_task(tool, make_app_mock):
     assert "t-kill" in res.content
     assert "killed" in res.content
     assert not t.is_running
+    assert getattr(t, "suppress_notification", False) is True
 
 
 async def test_kill_not_running_task(tool, make_app_mock):

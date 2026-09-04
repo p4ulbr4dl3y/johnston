@@ -19,7 +19,7 @@ attribute, no legacy variants:
   system_note as informational. The body and all attributes are XML-escaped
   so a tool result containing literal ``</system_note>`` cannot truncate the
   wrapper.
-- ``<notification type="shell|subagent" id="..." title="..." status="..." truncated="..." duration_ms="...">...</notification>`` —
+- ``<notification type="shell|subagent" id="..." title="..." status="..." [branch="..."] truncated="..." duration_ms="...">...</notification>`` —
   background-task completions. The body is XML-escaped to prevent wrapper
   truncation by injection.
 - ``<compaction_checkpoint>...</compaction_checkpoint>`` — historical context
@@ -119,6 +119,7 @@ def format_background_notification(
     duration_ms: Optional[int] = None,
     event: Optional[str] = None,
     idle_seconds: Optional[int] = None,
+    branch: Optional[str] = None,
 ) -> str:
     """Build a ``<notification>`` synthetic user message.
 
@@ -135,6 +136,7 @@ def format_background_notification(
         duration_ms: optional wall-clock time
         event: optional progress event ("inactivity", etc.)
         idle_seconds: optional silence duration in seconds
+        branch: optional git worktree branch for subagents
     """
     t_clean = _xml_escape(type_)
     title_clean = _xml_escape(title)
@@ -144,11 +146,12 @@ def format_background_notification(
     trunc_attr = ' truncated="true"' if truncated else ""
     event_attr = f' event="{_xml_escape(event)}"' if event else ""
     idle_attr = f' idle_seconds="{int(idle_seconds)}"' if idle_seconds is not None else ""
+    branch_attr = f' branch="{_xml_escape(branch)}"' if branch else ""
     body_clean = _xml_escape(result)
     return (
         f'<notification type="{t_clean}" '
         f'id="{id_clean}" title="{title_clean}" '
-        f'status="{status_clean}"{duration_attr}{trunc_attr}{event_attr}{idle_attr}>'
+        f'status="{status_clean}"{branch_attr}{duration_attr}{trunc_attr}{event_attr}{idle_attr}>'
         f"{body_clean}"
         f"</notification>"
     )

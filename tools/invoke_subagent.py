@@ -183,16 +183,6 @@ class InvokeSubagentTool(BaseTool):
             project_dir, wt_path, wt_branch, is_followup=False
         )
 
-        from tools.base import format_background_notification
-
-        notification_hdr = format_background_notification(
-            "subagent",
-            title,
-            session_id,
-            "{result_text}",
-            status="completed",
-        )
-
         bg_task = asyncio.create_task(
             run_subagent_stream_bg(
                 subagent,
@@ -202,7 +192,7 @@ class InvokeSubagentTool(BaseTool):
                 store,
                 cleanup_fn=cleanup_fn,
                 error_prefix="Subagent error",
-                notification_template=notification_hdr,
+                notification_template=True,
                 session_id=session_id,
                 truncate_result=True,
             )

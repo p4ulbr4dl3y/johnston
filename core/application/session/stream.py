@@ -315,9 +315,16 @@ async def run_subagent_stream_bg(
         ctx.refresh_status()
         ctx.mark_subagent_status(session_id or session.id, session.status, acc[0])
 
-        if notification_template:
+        if notification_template and not getattr(session, "suppress_notification", False):
             sid = session_id or session.id
-            is_cancelled = str(getattr(session, "status", "")).lower() == "cancelled"
+            sess_status = str(getattr(session, "status", "")).lower()
+            if "cancel" in sess_status:
+                status_val = "cancelled"
+            elif "error" in sess_status:
+                status_val = "error"
+            else:
+                status_val = "completed"
+
             if truncate_result:
                 from core.infrastructure.tasks.output import truncate_subagent_result
 
@@ -325,19 +332,39 @@ async def run_subagent_stream_bg(
             else:
                 base_text = acc[0].strip()
 
-            if is_cancelled:
+            if status_val == "cancelled":
                 result_text = f"{base_text}\n\n[Subagent cancelled by user]" if base_text else "[Subagent cancelled by user]"
             else:
                 result_text = base_text or "Completed with no text output."
 
-            from core.domain.policies.messages import _xml_escape
+            if notification_template is True or (
+                isinstance(notification_template, str) and notification_template.startswith("<notification")
+            ):
+                from core.domain.policies.messages import format_background_notification
 
-            msg = notification_template.format(
-                session_id=_xml_escape(sid),
-                result_text=_xml_escape(result_text),
-                title=_xml_escape(session.title or ""),
-                description=_xml_escape(session.title or ""),
-            )
+                branch = getattr(session, "branch_name", None) or None
+                msg = format_background_notification(
+                    type_="subagent",
+                    title=session.title or "Subagent",
+                    task_id=sid,
+                    result=result_text,
+                    status=status_val,
+                    branch=branch,
+                )
+            else:
+                from core.domain.policies.messages import _xml_escape
+
+                class _SafeDict(dict):
+                    def __missing__(self, key):
+                        return f"{{{key}}}"
+
+                mapping = _SafeDict(
+                    session_id=_xml_escape(sid),
+                    result_text=_xml_escape(result_text),
+                    title=_xml_escape(session.title or ""),
+                    description=_xml_escape(session.title or ""),
+                )
+                msg = str(notification_template).format_map(mapping)
             ctx.trigger_ai_response(msg)
 
     return acc[0]
@@ -451,20 +478,11 @@ async def send_subagent_followup(
                 store._sessions[session.id] = session
             await _safe_save(store, session)
 
-        from core.domain.policies.messages import format_background_notification
         from core.infrastructure.runtime.subagent_tracker import _mark_subagent_running
         from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
         cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
             ctx.project_dir, session.project_dir, session.branch_name, is_followup=True
-        )
-
-        notification_hdr = format_background_notification(
-            "subagent",
-            session.title,
-            session.id,
-            "{result_text}",
-            status="completed",
         )
 
         # The stream drains session.pending_messages inline, so only the
@@ -479,7 +497,7 @@ async def send_subagent_followup(
                 store,
                 cleanup_fn=cleanup_fn,
                 error_prefix="Subagent message error",
-                notification_template=notification_hdr,
+                notification_template=True,
                 session_id=session.id,
                 truncate_result=True,
             )

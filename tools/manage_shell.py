@@ -70,11 +70,8 @@ class ManageShellTool(BaseTool):
                     ),
                     name="manage_shell",
                 )
-            if last_fp == fp:
-                self._consecutive_list_count = count + 1
-            else:
-                self._last_list_fp = fp
-                self._consecutive_list_count = 1
+            self._last_list_fp = fp
+            self._consecutive_list_count = count + 1 if last_fp == fp else 1
 
             content_plain = format_tasks_plain(tasks)
             return ToolResult.done(content=content_plain, display="")
@@ -111,6 +108,7 @@ class ManageShellTool(BaseTool):
                 return ToolResult(content=not_found_message(task_id, tasks, "background"), display="", status=ToolResultStatus.ERROR)
             if getattr(t, "is_running", False):
                 try:
+                    setattr(t, "suppress_notification", True)
                     if hasattr(t, "kill"):
                         await t.kill()
                     elif getattr(t, "process", None) and t.process.returncode is None:

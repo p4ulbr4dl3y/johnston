@@ -118,7 +118,7 @@ class ShellTool(BaseTool):
                         "maximum": int(DEFAULT_SHELL_MAX_CAP),
                         "default": int(DEFAULT_SHELL_TIMEOUT),
                         "description": (
-                            "Seconds before SIGTERM. For sync commands: defaults to 30s. "
+                            f"Seconds before SIGTERM. For sync commands: defaults to {int(DEFAULT_SHELL_TIMEOUT)}s. "
                             "For background=true: hard kill limit (omit or 0 for unlimited runtime)."
                         ),
                     },
@@ -273,7 +273,7 @@ class ShellTool(BaseTool):
             p,
             session_id=ctx.session_id,
             idle_timeout=idle_timeout,
-            hard_timeout=None,
+            hard_timeout=float(timeout) if timeout else None,
         )
         target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
         if target_widget is not None:

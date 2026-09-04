@@ -785,3 +785,49 @@ class TestSubagentStepAndErrorHandling:
         assert f"[{error_msg}]" in result
         assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
 
+    @pytest.mark.asyncio
+    async def test_notification_template_true_handles_braces_in_title_and_branch(self):
+        sub = FakeSubagent(steps=[("bot_delta", "finished task")])
+        sess = make_session(description="Task with {curly_braces} and {result_text}")
+        sess.branch_name = "subagent/task-123"
+        ctx = FakeCtx()
+        store = FakeStore()
+        result = await run_subagent_stream_bg(
+            sub, "initial prompt", sess, ctx, store, notification_template=True
+        )
+        assert sess.status == STATUS_COMPLETED
+        assert result == "finished task"
+        assert len(ctx.messages) == 1
+        notif = ctx.messages[0]
+        assert '<notification type="subagent"' in notif
+        assert 'branch="subagent/task-123"' in notif
+        assert 'status="completed"' in notif
+        assert 'title="Task with {curly_braces} and {result_text}"' in notif
+
+    @pytest.mark.asyncio
+    async def test_notification_template_dynamic_status_error(self):
+        sub = FakeSubagent(steps=[("error", "API failure", "")])
+        sess = make_session(description="Broken task")
+        ctx = FakeCtx()
+        store = FakeStore()
+        await run_subagent_stream_bg(
+            sub, "initial prompt", sess, ctx, store, notification_template=True
+        )
+        assert sess.status == STATUS_ERROR
+        assert len(ctx.messages) == 1
+        notif = ctx.messages[0]
+        assert 'status="error"' in notif
+
+    @pytest.mark.asyncio
+    async def test_subagent_suppress_notification_skips_trigger_ai(self):
+        sub = FakeSubagent(steps=[("bot_delta", "ok")])
+        sess = make_session()
+        sess.suppress_notification = True
+        ctx = FakeCtx()
+        store = FakeStore()
+        await run_subagent_stream_bg(
+            sub, "initial prompt", sess, ctx, store, notification_template=True
+        )
+        assert len(ctx.messages) == 0
+
+
