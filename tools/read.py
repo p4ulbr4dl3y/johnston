@@ -292,6 +292,7 @@ def _inspect_archive(
         elif start_line is not None or end_line is not None:
             s = max(1, start_line) if start_line else 1
             e = min(total_count, end_line) if end_line else min(total_count, s + max_entries - 1)
+            e = max(s, e)
             sliced = entries[s - 1 : e]
             body = "\n".join(sliced)
             content_str = f"[archive {path} | entries {s}..{e} of {total_count}]\n{body}"
@@ -497,6 +498,7 @@ class ReadTool(BaseTool):
                     elif start_line_int is not None or end_line_int is not None:
                         s = max(1, start_line_int) if start_line_int else 1
                         e = min(total_count, end_line_int) if end_line_int else min(total_count, s + max_dir_entries - 1)
+                        e = max(s, e)
                         sliced = entries[s - 1 : e]
                         body = "\n".join(sliced)
                         content_str = f"[dir {path} | entries {s}..{e} of {total_count}]\n{body}"

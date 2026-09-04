@@ -125,7 +125,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("case_sensitive", params["properties"])
         self.assertIn("max_results", params["properties"])
         self.assertIn("context_lines", params["properties"])
-        self.assertEqual(params["required"], ["query"])
+        self.assertEqual(params["required"], [])
 
     def test_binary_file_detection(self):
         self.assertTrue(is_binary_file(self.binary_bin))
@@ -366,15 +366,16 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
     def test_ripgrep_line_parsing_windows_and_hyphens(self):
         from tools.search import _search_content_ripgrep
 
-        mock_stdout = (
-            "C:\\repo\\main.py:10:def hello():\n"
-            "test-runner.py-12-    context_call()\n"
-            "test-runner.py:13:    runner_test()\n"
-        )
+        mock_lines = [
+            "C:\\repo\\main.py\x0010:def hello():\n",
+            "test-runner.py\x0012-    context_call()\n",
+            "test-runner.py\x0013:    runner_test()\n",
+        ]
         mock_proc = MagicMock()
+        mock_proc.stdout = iter(mock_lines)
         mock_proc.poll.return_value = 0
         mock_proc.returncode = 0
-        mock_proc.communicate.return_value = (mock_stdout, "")
+        mock_proc.communicate.return_value = ("", "")
 
         with patch("subprocess.Popen", return_value=mock_proc):
             lines, count, files_count = _search_content_ripgrep(

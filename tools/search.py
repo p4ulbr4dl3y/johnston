@@ -6,7 +6,6 @@ import re
 import shutil
 import subprocess
 import threading
-import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from core.domain.defaults.errors import ToolResult
@@ -93,6 +92,16 @@ CODE_EXTENSIONS: Set[str] = {
     ".md",
     ".mdx",
 }
+
+MAX_SEARCH_FILE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def _safe_relpath(path: str, cwd: str) -> str:
+    """Compute relative path safely; on Windows cross-drive ValueError returns path as-is."""
+    try:
+        return os.path.relpath(path, cwd)
+    except (ValueError, Exception):
+        return path
 
 
 def is_binary_file(filepath: str) -> bool:
@@ -215,19 +224,20 @@ def _match_glob(rel_path: str, filename: str, glob_pattern: Optional[str]) -> bo
     if not glob_pattern:
         return True
 
+    norm_rel = rel_path.replace("\\", "/")
     patterns = [p.strip() for p in glob_pattern.split(",") if p.strip()]
     positive_pats = [p for p in patterns if not p.startswith("!")]
     negative_pats = [p[1:] for p in patterns if p.startswith("!")]
 
     for neg in negative_pats:
-        if fnmatch.fnmatch(filename, neg) or fnmatch.fnmatch(rel_path, neg):
+        if fnmatch.fnmatch(filename, neg) or fnmatch.fnmatch(norm_rel, neg):
             return False
 
     if not positive_pats:
         return True
 
     for pos in positive_pats:
-        if fnmatch.fnmatch(filename, pos) or fnmatch.fnmatch(rel_path, pos):
+        if fnmatch.fnmatch(filename, pos) or fnmatch.fnmatch(norm_rel, pos):
             return True
 
     return False
@@ -254,7 +264,8 @@ def _search_content_ripgrep(
     cmd = [
         rg_bin,
         "--color=never",
-        "--with-filename",
+        "--null",
+        "-H",
         "--line-number",
         "--no-heading",
         "--max-columns=300",
@@ -278,7 +289,7 @@ def _search_content_ripgrep(
 
     cmd.extend(["--", query, target_path])
 
-    rg_line_re = re.compile(r"^((?:[a-zA-Z]:)?[^:\r\n]+?)([:-])(\d+)\2(.*)$")
+    rg_rest_re = re.compile(r"^(\d+)([:-])(.*)$")
     try:
         proc = subprocess.Popen(
             cmd,
@@ -286,66 +297,62 @@ def _search_content_ripgrep(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            bufsize=1,
         )
-        deadline = time.time() + 30.0
-        while proc.poll() is None:
-            if cancel_event and cancel_event.is_set():
-                proc.terminate()
-                try:
-                    proc.wait(timeout=1.0)
-                except Exception:
-                    proc.kill()
-                return [], 0, 0
-            if time.time() > deadline:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=1.0)
-                except Exception:
-                    proc.kill()
-                logger.debug("ripgrep timed out after 30s")
-                return None
-            time.sleep(0.05)
-        stdout, stderr = proc.communicate()
     except Exception as e:
         logger.debug("ripgrep invocation failed: %s", e)
-        return None
-
-    if cancel_event and cancel_event.is_set():
-        return [], 0, 0
-
-    # Returncode 0: matches; returncode 1: no matches
-    if proc.returncode == 1:
-        return [], 0, 0
-
-    if proc.returncode != 0:
-        logger.debug("ripgrep exited with code %s: %s", proc.returncode, stderr)
         return None
 
     output_lines: List[str] = []
     matched_files: Set[str] = set()
     match_count = 0
 
-    for line in stdout.splitlines():
-        line = line.strip()
-        if not line or line == "--":
-            continue
+    try:
+        if proc.stdout is not None:
+            for raw_line in proc.stdout:
+                if cancel_event and cancel_event.is_set():
+                    break
+                line = raw_line.rstrip("\r\n")
+                if not line or line == "--":
+                    continue
 
-        m = rg_line_re.match(line)
-        if m:
-            fpath = m.group(1)
-            sep = m.group(2)
-            lineno = m.group(3)
-            rest = m.group(4)
-            rel = os.path.relpath(fpath, cwd) if os.path.isabs(fpath) else fpath
-            matched_files.add(rel)
-            if sep == ":":
-                match_count += 1
-            output_lines.append(f"{rel}{sep}{lineno}{sep}{rest}")
-        else:
-            output_lines.append(line)
+                if "\x00" in line:
+                    fpath, rest = line.split("\x00", 1)
+                    m = rg_rest_re.match(rest)
+                    if m:
+                        lineno = m.group(1)
+                        sep = m.group(2)
+                        text = m.group(3)
+                        rel = _safe_relpath(fpath, cwd) if os.path.isabs(fpath) else fpath
+                        matched_files.add(rel)
+                        if sep == ":":
+                            match_count += 1
+                        output_lines.append(f"{rel}{sep}{lineno}{sep}{text}")
+                    else:
+                        output_lines.append(line)
+                else:
+                    output_lines.append(line)
 
-        if match_count >= max_results:
-            break
+                if match_count >= max_results:
+                    break
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=1.0)
+            except Exception:
+                proc.kill()
+        try:
+            proc.communicate()
+        except Exception:
+            pass
+
+    if cancel_event and cancel_event.is_set():
+        return [], 0, 0
+
+    if proc.returncode not in (0, 1, -15, -9) and match_count == 0:
+        logger.debug("ripgrep exited with code %s", proc.returncode)
+        return None
 
     return output_lines, match_count, len(matched_files)
 
@@ -380,7 +387,13 @@ def _search_content_python(
         if is_binary_file(abs_fpath):
             return
 
-        rel_path = os.path.relpath(abs_fpath, cwd)
+        try:
+            if os.path.getsize(abs_fpath) > MAX_SEARCH_FILE_BYTES:
+                return
+        except Exception:
+            return
+
+        rel_path = _safe_relpath(abs_fpath, cwd)
         filename = os.path.basename(abs_fpath)
         if not _match_glob(rel_path, filename, glob_pattern):
             return
@@ -462,7 +475,7 @@ def _search_filename(
         return q.lower() in fname.lower() or q.lower() in rel.lower()
 
     if os.path.isfile(target_path):
-        rel = os.path.relpath(target_path, cwd)
+        rel = _safe_relpath(target_path, cwd)
         fname = os.path.basename(target_path)
         if _matches_query(rel, fname) and _match_glob(rel, fname, glob_pattern):
             matched_paths.append(rel)
@@ -479,7 +492,7 @@ def _search_filename(
             if len(matched_paths) >= max_results:
                 break
             abs_p = os.path.join(root, fname)
-            rel = os.path.relpath(abs_p, cwd)
+            rel = _safe_relpath(abs_p, cwd)
             if _matches_query(rel, fname) and _match_glob(rel, fname, glob_pattern):
                 matched_paths.append(rel)
 
@@ -509,7 +522,13 @@ def _search_outline(
         if cancel_event and cancel_event.is_set():
             return
 
-        rel = os.path.relpath(abs_fpath, cwd)
+        try:
+            if os.path.getsize(abs_fpath) > MAX_SEARCH_FILE_BYTES:
+                return
+        except Exception:
+            return
+
+        rel = _safe_relpath(abs_fpath, cwd)
         fname = os.path.basename(abs_fpath)
         ext = os.path.splitext(fname)[1].lower()
 
@@ -637,12 +656,9 @@ def search_sync(
         )
 
     header_kv: Dict[str, Any] = {"search": mode}
-    try:
-        rel_p = os.path.relpath(path, cwd)
-        if rel_p not in (".", ""):
-            header_kv["path"] = rel_p
-    except Exception:
-        pass
+    rel_p = _safe_relpath(path, cwd)
+    if rel_p not in (".", ""):
+        header_kv["path"] = rel_p
     if query.strip():
         header_kv["query"] = query
     if glob_pattern:
@@ -714,7 +730,7 @@ class SearchTool(BaseTool):
                         "description": "Context lines before and after matches (for mode='content', default: 1).",
                     },
                 },
-                "required": ["query"],
+                "required": [],
             },
         },
     }
