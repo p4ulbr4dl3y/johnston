@@ -7,8 +7,9 @@ import shutil
 import subprocess
 import threading
 import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple
 
 from core.domain.defaults.errors import ToolResult
 from core.domain.defaults.git_excludes import DEFAULT_BINARY_EXTENSIONS, DEFAULT_IGNORE_DIRS
@@ -26,6 +27,51 @@ from tools.base import (
 from tools.cancel import run_cancellable
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# LRU Cache with mtime invalidation
+# ---------------------------------------------------------------------------
+
+class _OutlineCache:
+    """Thread-safe LRU cache for outline results with mtime-based invalidation."""
+
+    def __init__(self, max_size: int = 100):
+        self._cache: "OrderedDict[str, Tuple[float, List[str]]]" = OrderedDict()
+        self._lock = threading.Lock()
+        self._max_size = max_size
+
+    def get(self, key: str, file_mtime: float) -> Optional[List[str]]:
+        """Get cached outline if mtime matches."""
+        with self._lock:
+            if key in self._cache:
+                cached_mtime, result = self._cache[key]
+                if cached_mtime == file_mtime:
+                    # Move to end (most recently used)
+                    self._cache.move_to_end(key)
+                    return result
+                else:
+                    # Mtime changed, invalidate
+                    del self._cache[key]
+            return None
+
+    def put(self, key: str, file_mtime: float, result: List[str]) -> None:
+        """Store outline in cache."""
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+            self._cache[key] = (file_mtime, result)
+            # Evict oldest if over capacity
+            while len(self._cache) > self._max_size:
+                self._cache.popitem(last=False)
+
+    def clear(self) -> None:
+        """Clear all cached entries."""
+        with self._lock:
+            self._cache.clear()
+
+
+# Global outline cache (100 entries max)
+_OUTLINE_CACHE = _OutlineCache(max_size=100)
 
 DEFAULT_EXCLUDE_DIRS: Set[str] = set(DEFAULT_IGNORE_DIRS) | {
     ".hg",
@@ -323,6 +369,72 @@ class _GitignoreMatcher:
 def _build_gitignore_matcher(cwd: str) -> Optional[_GitignoreMatcher]:
     """Build gitignore matcher for the project, cached per-thread via thread-local."""
     return _load_gitignore_spec(cwd)
+
+
+# ---------------------------------------------------------------------------
+# git check-ignore integration for 100% compatibility
+# ---------------------------------------------------------------------------
+
+def _git_check_ignore_batch(
+    paths: List[str],
+    cwd: str,
+    cancel_event: Optional[threading.Event] = None,
+) -> Set[str]:
+    """Use git check-ignore to filter paths. Returns set of ignored paths.
+
+    Falls back gracefully if git is not available or not in a git repo.
+    """
+    if not paths:
+        return set()
+
+    git_bin = shutil.which("git")
+    if not git_bin:
+        return set()
+
+    ignored_paths: Set[str] = set()
+
+    # Process in batches to avoid command line length limits
+    batch_size = 1000
+    for i in range(0, len(paths), batch_size):
+        if cancel_event and cancel_event.is_set():
+            break
+
+        batch = paths[i:i + batch_size]
+        try:
+            result = subprocess.run(
+                [git_bin, "check-ignore", "--stdin", "--no-index"],
+                cwd=cwd,
+                input="\n".join(batch),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=10.0,
+            )
+            # git check-ignore returns 0 if any path is ignored, 1 if none
+            # Output contains the ignored paths, one per line
+            for line in result.stdout.strip().split("\n"):
+                if line:
+                    ignored_paths.add(line)
+        except Exception as e:
+            logger.debug("git check-ignore failed: %s", e)
+            # If git check-ignore fails, assume no paths are ignored
+            break
+
+    return ignored_paths
+
+
+def _is_git_repo(path: str) -> bool:
+    """Check if path is inside a git repository."""
+    git_dir = os.path.join(path, ".git")
+    if os.path.isdir(git_dir):
+        return True
+    # Check if we're in a git repo by walking up
+    current = os.path.abspath(path)
+    while current != os.path.dirname(current):
+        if os.path.isdir(os.path.join(current, ".git")):
+            return True
+        current = os.path.dirname(current)
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -649,7 +761,7 @@ def _match_glob(rel_path: str, filename: str, glob_pattern: Optional[str]) -> bo
 
 
 # ---------------------------------------------------------------------------
-# Directory walker with gitignore support
+# Directory walker with gitignore support (generator-based)
 # ---------------------------------------------------------------------------
 
 def _walk_filtered(
@@ -657,13 +769,14 @@ def _walk_filtered(
     include_hidden: bool = False,
     gitignore_matcher: Optional[_GitignoreMatcher] = None,
     cancel_event: Optional[threading.Event] = None,
-) -> List[str]:
-    """Walk a directory tree yielding absolute file paths, respecting exclusions and gitignore."""
-    files: List[str] = []
+) -> Generator[str, None, None]:
+    """Walk a directory tree yielding absolute file paths, respecting exclusions and gitignore.
 
+    This is a generator to reduce memory footprint for large repositories.
+    """
     for root, dirs, filenames in os.walk(target_path, topdown=True):
         if cancel_event and cancel_event.is_set():
-            break
+            return
 
         # Filter excluded directories
         filtered_dirs = []
@@ -682,7 +795,7 @@ def _walk_filtered(
 
         for fname in sorted(filenames):
             if cancel_event and cancel_event.is_set():
-                break
+                return
             if not include_hidden and fname.startswith("."):
                 continue
             abs_p = os.path.join(root, fname)
@@ -692,9 +805,20 @@ def _walk_filtered(
                 rel = _safe_relpath(abs_p, base)
                 if gitignore_matcher.is_ignored(rel):
                     continue
-            files.append(abs_p)
+            yield abs_p
 
-    return files
+
+def _walk_filtered_list(
+    target_path: str,
+    include_hidden: bool = False,
+    gitignore_matcher: Optional[_GitignoreMatcher] = None,
+    cancel_event: Optional[threading.Event] = None,
+) -> List[str]:
+    """Walk a directory tree returning a list of absolute file paths.
+
+    Convenience wrapper around _walk_filtered for cases where we need random access or length.
+    """
+    return list(_walk_filtered(target_path, include_hidden, gitignore_matcher, cancel_event))
 
 
 # ---------------------------------------------------------------------------
@@ -908,7 +1032,7 @@ def _search_content_python(
     if os.path.isfile(target_path):
         files_to_process = [target_path]
     elif os.path.isdir(target_path):
-        files_to_process = _walk_filtered(target_path, include_hidden, gitignore_matcher, cancel_event)
+        files_to_process = _walk_filtered_list(target_path, include_hidden, gitignore_matcher, cancel_event)
     else:
         files_to_process = []
 
@@ -1076,9 +1200,8 @@ def _search_filename_python(
             matched_paths.append(rel)
         return matched_paths, len(matched_paths)
 
-    all_files = _walk_filtered(target_path, include_hidden, gitignore_matcher, cancel_event)
-
-    for abs_p in all_files:
+    # Use generator for streaming file enumeration
+    for abs_p in _walk_filtered(target_path, include_hidden, gitignore_matcher, cancel_event):
         if cancel_event and cancel_event.is_set():
             break
         if len(matched_paths) >= max_results:
@@ -1141,8 +1264,13 @@ def _outline_file(
     cwd: str,
     query: Optional[str],
     glob_pattern: Optional[str],
+    use_cache: bool = True,
 ) -> Optional[Tuple[str, List[str], int]]:
-    """Process a single file for outline extraction. Returns (rel_path, symbols, count) or None."""
+    """Process a single file for outline extraction with optional caching.
+
+    Returns (rel_path, symbols, count) or None.
+    Uses LRU cache with mtime invalidation for repeated calls.
+    """
     try:
         if os.path.getsize(abs_fpath) > MAX_OUTLINE_FILE_BYTES:
             return None
@@ -1158,6 +1286,17 @@ def _outline_file(
     if not glob_pattern and ext not in CODE_EXTENSIONS:
         return None
 
+    # Check cache first
+    if use_cache:
+        try:
+            file_mtime = os.path.getmtime(abs_fpath)
+            cache_key = f"{abs_fpath}:{query}:{glob_pattern}"
+            cached = _OUTLINE_CACHE.get(cache_key, file_mtime)
+            if cached is not None:
+                return rel, cached, len(cached)
+        except Exception:
+            pass
+
     try:
         with open(abs_fpath, "r", encoding="utf-8", errors="replace") as f:
             content = f.read()
@@ -1170,6 +1309,14 @@ def _outline_file(
         file_symbols = _outline_generic_content(content, query)
 
     if file_symbols:
+        # Store in cache
+        if use_cache:
+            try:
+                file_mtime = os.path.getmtime(abs_fpath)
+                cache_key = f"{abs_fpath}:{query}:{glob_pattern}"
+                _OUTLINE_CACHE.put(cache_key, file_mtime, file_symbols)
+            except Exception:
+                pass
         return rel, file_symbols, len(file_symbols)
     return None
 
@@ -1182,6 +1329,7 @@ def _search_outline(
     max_results: int = 50,
     include_hidden: bool = False,
     gitignore_matcher: Optional[_GitignoreMatcher] = None,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_event: Optional[threading.Event] = None,
 ) -> Tuple[List[str], int, int]:
     """Extract AST/regex outline symbols from files matching path and optional query.
@@ -1196,13 +1344,19 @@ def _search_outline(
     if os.path.isfile(target_path):
         files_to_process = [target_path]
     elif os.path.isdir(target_path):
-        files_to_process = _walk_filtered(target_path, include_hidden, gitignore_matcher, cancel_event)
+        files_to_process = _walk_filtered_list(target_path, include_hidden, gitignore_matcher, cancel_event)
     else:
         return [], 0, 0
 
     if len(files_to_process) > 20:
         # Parallel processing for large directories
         results: List[Tuple[str, List[str], int]] = []
+        total_files = len(files_to_process)
+        processed_files = 0
+
+        if progress_callback:
+            progress_callback({"stage": "outline_parallel", "total_files": total_files})
+
         with ThreadPoolExecutor(max_workers=OUTLINE_WORKERS) as executor:
             futures = {}
             for f in files_to_process:
@@ -1217,8 +1371,19 @@ def _search_outline(
                     result = future.result(timeout=5.0)
                     if result:
                         results.append(result)
+                    processed_files += 1
+                    # Report progress every 10% or every 50 files
+                    if progress_callback and (processed_files % max(1, total_files // 10) == 0 or processed_files % 50 == 0):
+                        progress_callback({
+                            "stage": "outline_progress",
+                            "processed": processed_files,
+                            "total": total_files,
+                        })
                 except Exception:
                     continue
+
+        if progress_callback:
+            progress_callback({"stage": "outline_complete", "results": len(results)})
 
         # Sort results by path for deterministic output
         results.sort(key=lambda x: x[0])
@@ -1264,6 +1429,7 @@ def search_sync(
     after_lines: int = 0,
     context_lines: int = 1,
     include_hidden: bool = False,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_event: Optional[threading.Event] = None,
 ) -> ToolResult:
     """Synchronous CPU/IO worker executed in a worker thread via run_cancellable."""
@@ -1295,11 +1461,17 @@ def search_sync(
         before_lines = context_lines
         after_lines = context_lines
 
+    # Report start
+    if progress_callback:
+        progress_callback({"stage": "start", "mode": mode})
+
     # Build gitignore matcher for Python fallbacks
     gitignore_matcher = None
     if os.path.isdir(path):
         try:
             gitignore_matcher = _build_gitignore_matcher(path)
+            if progress_callback and gitignore_matcher:
+                progress_callback({"stage": "gitignore_loaded"})
         except Exception:
             pass
 
@@ -1352,10 +1524,15 @@ def search_sync(
             max_results=max_results,
             include_hidden=include_hidden,
             gitignore_matcher=gitignore_matcher,
+            progress_callback=progress_callback,
             cancel_event=cancel_event,
         )
 
     elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+    # Report completion
+    if progress_callback:
+        progress_callback({"stage": "done", "elapsed_ms": elapsed_ms, "matches": match_count})
 
     header_kv: Dict[str, Any] = {"search": mode}
     rel_p = _safe_relpath(path, cwd)

@@ -9,10 +9,12 @@ from core.domain.defaults.errors import ToolResultStatus
 from tools.context import ToolContext
 from tools.registry import REGISTRY, execute_tool
 from tools.search import (
+    _OUTLINE_CACHE,
     SearchTool,
     _GitignoreMatcher,
     _glob_to_regex,
     _match_glob,
+    _walk_filtered_list,
     is_binary_file,
     search_sync,
 )
@@ -700,6 +702,165 @@ class TestGitignoreMatcher(unittest.TestCase):
         self.assertTrue(matcher.is_ignored("src/file.bak"))
         self.assertTrue(matcher.is_ignored("src/sub/file.bak"))
         self.assertTrue(matcher.is_ignored("src/sub/deep/file.bak"))
+
+
+class TestLRUCache(unittest.TestCase):
+    """Tests for outline LRU cache with mtime invalidation."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        _OUTLINE_CACHE.clear()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+        _OUTLINE_CACHE.clear()
+
+    def test_cache_hit(self):
+        """Test that repeated outline calls use cache."""
+        test_file = os.path.join(self.tmpdir, "test.py")
+        with open(test_file, "w") as f:
+            f.write("def func1():\n    pass\n")
+
+        from tools.search import _outline_file
+
+        # First call
+        result1 = _outline_file(test_file, self.tmpdir, "*", None, use_cache=True)
+        self.assertIsNotNone(result1)
+
+        # Second call should use cache
+        result2 = _outline_file(test_file, self.tmpdir, "*", None, use_cache=True)
+        self.assertIsNotNone(result2)
+        self.assertEqual(result1[1], result2[1])
+
+    def test_cache_invalidation(self):
+        """Test that cache invalidates on mtime change."""
+        test_file = os.path.join(self.tmpdir, "test.py")
+        with open(test_file, "w") as f:
+            f.write("def func1():\n    pass\n")
+
+        from tools.search import _outline_file
+
+        # First call
+        result1 = _outline_file(test_file, self.tmpdir, "*", None, use_cache=True)
+        self.assertIsNotNone(result1)
+        self.assertTrue(any("func1" in line for line in result1[1]))
+
+        # Modify file
+        import time
+
+        time.sleep(0.1)  # Ensure mtime changes
+        with open(test_file, "w") as f:
+            f.write("def func2():\n    pass\n")
+
+        # Should get updated result
+        result2 = _outline_file(test_file, self.tmpdir, "*", None, use_cache=True)
+        self.assertIsNotNone(result2)
+        self.assertTrue(any("func2" in line for line in result2[1]))
+
+    def test_cache_clear(self):
+        """Test cache clearing."""
+        test_file = os.path.join(self.tmpdir, "test.py")
+        with open(test_file, "w") as f:
+            f.write("def func1():\n    pass\n")
+
+        from tools.search import _outline_file
+
+        _outline_file(test_file, self.tmpdir, "*", None, use_cache=True)
+        self.assertGreater(len(_OUTLINE_CACHE._cache), 0)
+
+        _OUTLINE_CACHE.clear()
+        self.assertEqual(len(_OUTLINE_CACHE._cache), 0)
+
+
+class TestGeneratorWalk(unittest.TestCase):
+    """Tests for generator-based file walk."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_generator_yields_files(self):
+        """Test that generator yields all files."""
+        for i in range(5):
+            with open(os.path.join(self.tmpdir, f"file{i}.py"), "w") as f:
+                f.write("pass\n")
+
+        files = list(_walk_filtered_list(self.tmpdir))
+        self.assertEqual(len(files), 5)
+
+    def test_early_termination(self):
+        """Test that generator supports early termination."""
+        from tools.search import _walk_filtered
+
+        for i in range(10):
+            with open(os.path.join(self.tmpdir, f"file{i}.py"), "w") as f:
+                f.write("pass\n")
+
+        count = 0
+        for f in _walk_filtered(self.tmpdir):
+            count += 1
+            if count >= 3:
+                break
+
+        self.assertEqual(count, 3)
+
+
+class TestProgressCallback(unittest.TestCase):
+    """Tests for progress callback functionality."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_progress_events_emitted(self):
+        """Test that progress events are emitted during outline search."""
+        for i in range(30):
+            with open(os.path.join(self.tmpdir, f"file{i:03d}.py"), "w") as f:
+                f.write(f"def func{i}():\n    pass\n")
+
+        progress_events = []
+
+        def callback(event):
+            progress_events.append(event)
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="*.py",
+            max_results=500,
+            progress_callback=callback,
+        )
+
+        self.assertEqual(result.status.value, "done")
+        self.assertGreater(len(progress_events), 0)
+
+    def test_start_and_done_events(self):
+        """Test that start and done events are always emitted."""
+        with open(os.path.join(self.tmpdir, "test.py"), "w") as f:
+            f.write("def func():\n    pass\n")
+
+        progress_events = []
+
+        def callback(event):
+            progress_events.append(event)
+
+        search_sync(
+            query="func",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="content",
+            progress_callback=callback,
+        )
+
+        stages = [e.get("stage") for e in progress_events]
+        self.assertIn("start", stages)
+        self.assertIn("done", stages)
 
 
 if __name__ == "__main__":
