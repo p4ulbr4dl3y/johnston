@@ -6,6 +6,13 @@ from textual import events, work
 
 from widgets.app.dispatch import handle_slash_command
 from widgets.chat_input import DEFAULT_PLACEHOLDER, ChatInput
+from widgets.mixins.message_flow_background import (
+    on_background_shell_completed,
+    on_background_shell_progress,
+    on_subagent_tool_completed,
+    schedule_session_save,
+    update_background_shell_widget,
+)
 from widgets.presentation.widgets.chat_container import ChatView
 from widgets.status_footer import StatusFooter
 
@@ -23,6 +30,7 @@ def _register_tool_widget(mixin):
 
 
 class MessageFlowMixin:
+
     """Chat input handling, AI response generation and message queueing for JohnstonApp."""
 
     async def on_paste(self, event: events.Paste) -> None:
@@ -487,79 +495,8 @@ class MessageFlowMixin:
         self.trigger_ai_response(prompt, show_in_ui=show_in_ui, attachments=attachments, **kwargs)
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:
-        """Callback when background shell command finishes.
-
-        Updates the linked tool widget's status (spinner -> done/error) so the
-        card no longer stays yellow after the process exits.
-        """
-        if not getattr(self, "is_app_active", True):
-            return
-        try:
-            self._update_background_shell_widget(task_id, result)
-            from tools.base import format_background_notification, truncate_output
-
-            mgr = getattr(self, "task_manager", None)
-            task = None
-            if mgr is not None:
-                task = next(
-                    (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
-                    None,
-                )
-            if getattr(task, "suppress_notification", False):
-                return
-            task_log = getattr(task, "log_path", None)
-
-            body = truncate_output(
-                result,
-                max_chars=4000,
-                tool_name="shell",
-                from_end=True,
-                save_log=False,
-                log_path=task_log,
-            )
-
-            # Surface the terminal state so the model can distinguish a failed or
-            # aborted background command from a successful one (the raw output
-            # alone is ambiguous — e.g. a command that exits 3 with clean stdout).
-            task_status = getattr(task, "status", None)
-            status_val = task_status.value if hasattr(task_status, "value") else ""
-            exit_code = getattr(task, "exit_code", None)
-            notif_status = "completed"
-            if getattr(task, "timed_out", False):
-                notif_status = "error"
-                hard_to = getattr(task, "hard_timeout", "")
-                state_hint = f"[status: error | timed out after {hard_to}s]"
-                body = f"{state_hint}\n{body}"
-            else:
-                if status_val == "error":
-                    notif_status = "error"
-                elif status_val in ("killed", "cancelled"):
-                    notif_status = "cancelled"
-                elif exit_code not in (None, 0):
-                    notif_status = "error"
-
-                if notif_status in ("error", "cancelled") or (exit_code not in (None, 0)):
-                    state_hint = (
-                        f"[exit code: {exit_code}]" if exit_code is not None else f"[status: {notif_status}]"
-                    )
-                    body = f"{state_hint}\n{body}"
-
-            msg = format_background_notification(
-                "shell",
-                command_str,
-                task_id,
-                body,
-                status=notif_status,
-                truncated=len(result) > 4000,
-            )
-            target_sid = getattr(task, "session_id", None) or getattr(self, "current_session_id", None)
-            curr_sid = getattr(self, "current_session_id", None)
-            if self.is_generating or (target_sid and curr_sid and target_sid != curr_sid):
-                self.message_queue.append((msg, False, None, target_sid))
-            else:
-                self.generate_ai_response(msg, show_in_ui=False)
-        except Exception as e:
-            logger.warning("Background completion handling failed: %s", e)
+        """Callback when background shell command finishes."""
+        on_background_shell_completed(self, task_id, command_str, result)
 
     def on_background_shell_progress(
         self,
@@ -571,161 +508,24 @@ class MessageFlowMixin:
         idle_seconds: Optional[int] = None,
     ) -> None:
         """Callback when background shell emits a progress notification (e.g. inactivity)."""
-        if not getattr(self, "is_app_active", True):
-            return
-        try:
-            from tools.base import format_background_notification, truncate_output
-
-            mgr = getattr(self, "task_manager", None)
-            task = None
-            if mgr is not None:
-                task = next(
-                    (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
-                    None,
-                )
-            if getattr(task, "suppress_notification", False):
-                return
-            task_log = getattr(task, "log_path", None)
-
-            body = truncate_output(
-                result,
-                max_chars=4000,
-                tool_name="shell",
-                from_end=True,
-                save_log=False,
-                log_path=task_log,
-            )
-            hint = (
-                f"[process running with no output for {idle_seconds}s]"
-                if idle_seconds is not None
-                else "[process still running]"
-            )
-            body = f"{hint}\n{body}"
-
-            msg = format_background_notification(
-                "shell",
-                command_str,
-                task_id,
-                body,
-                status="running",
-                event=event,
-                idle_seconds=idle_seconds,
-                truncated=len(result) > 4000,
-            )
-            target_sid = getattr(task, "session_id", None) or getattr(self, "current_session_id", None)
-            curr_sid = getattr(self, "current_session_id", None)
-            if self.is_generating or (target_sid and curr_sid and target_sid != curr_sid):
-                self.message_queue.append((msg, False, None, target_sid))
-            else:
-                self.generate_ai_response(msg, show_in_ui=False)
-        except Exception as e:
-            logger.warning("Background progress handling failed: %s", e)
+        on_background_shell_progress(
+            self,
+            task_id,
+            command_str,
+            result,
+            event=event,
+            idle_seconds=idle_seconds,
+        )
 
     def _update_background_shell_widget(self, task_id: str, result: str) -> None:
-        """Repaint the linked shell tool card once a background task finishes.
-
-        The widget keeps the ``running`` (yellow) status until here; we flip it
-        based on the shell task's terminal status. No-op when the task or its
-        widget is unavailable.
-        """
-        mgr = getattr(self, "task_manager", None)
-        task = None
-        if mgr is not None:
-            task = next(
-                (t for t in mgr if getattr(t, "task_id", None) == task_id and getattr(t, "kind", "") == "shell"),
-                None,
-            )
-        task_log = getattr(task, "log_path", None)
-
-        from tools.base import truncate_output
-
-        final_result = truncate_output(
-            result or "(no output)",
-            max_chars=4000,
-            tool_name="shell",
-            from_end=True,
-            save_log=False,
-            log_path=task_log,
-        )
-        reg = getattr(self, "_background_shell_widgets", None)
-        widget = (reg or {}).pop(task_id, None)
-        task_status = (getattr(getattr(task, "status", None), "value", None) or "").lower() if task is not None else ""
-        status = "error" if task_status == "error" else ("done" if task_status in ("completed", "killed", "timeout") else "done")
-
-        if widget is not None:
-            try:
-                widget.set_result(final_result, status=status)
-            except Exception as e:
-                logger.warning("Background shell widget update failed: %s", e)
-
-        sid = getattr(self, "current_session_id", None)
-        if sid and hasattr(self, "sm"):
-            try:
-                session = self.sm.get(sid, reload=False)
-                if session:
-                    for msg in session.messages:
-                        if isinstance(msg, dict) and msg.get("type") == "tool" and task_id in msg.get("result_text", ""):
-                            msg["result_text"] = final_result
-                            msg["status"] = status
-                            break
-                    self._schedule_session_save(session)
-            except Exception as e:
-                logger.warning("Failed to update session for background shell %s: %s", task_id, e)
+        """Repaint the linked shell tool card once a background task finishes."""
+        update_background_shell_widget(self, task_id, result)
 
     def _schedule_session_save(self, session: Any) -> None:
-        """Persist a session off the event loop, holding the shared write lock.
-
-        Prefers the app's tracked-task scheduler so writes are awaited; falls back
-        to spawning a task on the running loop, or to a direct save when no loop
-        is running. Shared by the background-shell and subagent completion paths.
-        """
-        from widgets.mixins.session_persistence import _global_session_write_lock
-
-        def _save_locked(s: Any) -> None:
-            with _global_session_write_lock:
-                self.sm.save(s)
-
-        save_coro = asyncio.to_thread(_save_locked, session)
-        if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
-            self.create_tracked_task(save_coro)
-        else:
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(save_coro)
-            except RuntimeError:
-                _save_locked(session)
+        """Persist a session off the event loop, holding the shared write lock."""
+        schedule_session_save(self, session)
 
     def on_subagent_tool_completed(self, session_id: str, status: str, result: str = "") -> None:
-        """Callback when a background subagent finishes.
+        """Callback when a background subagent finishes."""
+        on_subagent_tool_completed(self, session_id, status, result)
 
-        Repaints the linked invoke_subagent tool card (yellow running) to its
-        terminal color: green (done), red (error), or red/struck (cancelled).
-        """
-        if not getattr(self, "is_app_active", True):
-            return
-        try:
-            reg = getattr(self, "_subagent_tools", None)
-            widget = reg.pop(session_id, None) if isinstance(reg, dict) else None
-            status_clean = (status or "").lower()
-            if widget is not None:
-                if status_clean == "cancelled":
-                    widget.mark_cancelled()
-                elif status_clean == "error":
-                    widget.set_result(result or "(no output)", status="error")
-                else:
-                    widget.set_result(result or "(no output)", status="done")
-
-            final_status = "error" if status_clean == "error" else ("cancelled" if status_clean == "cancelled" else "done")
-            sid = getattr(self, "current_session_id", None)
-            if sid and hasattr(self, "sm"):
-                session = self.sm.get(sid, reload=False)
-                if session:
-                    for msg in session.messages:
-                        if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "invoke_subagent":
-                            if session_id in msg.get("result_text", "") or session_id in str(msg.get("args", {})):
-                                msg["result_text"] = result or "(no output)"
-                                msg["status"] = final_status
-                                break
-                    self._schedule_session_save(session)
-        except Exception as e:
-            logger.warning("Subagent tool completion handling failed: %s", e)

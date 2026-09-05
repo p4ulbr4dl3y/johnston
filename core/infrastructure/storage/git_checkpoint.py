@@ -1,9 +1,6 @@
-import hashlib
 import os
-import re
 import threading
 import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import Generator, Optional
@@ -12,6 +9,15 @@ from core.domain.defaults.git_excludes import DEFAULT_EXCLUDES
 from core.domain.ports.checkpoint import set_default_checkpoint_manager
 from core.infrastructure.platform.paths import SHADOW_REPOS_DIR
 from core.infrastructure.runtime.git_utils import is_git_repository, run_git
+from core.infrastructure.storage.git_diff_parser import parse_numstat, split_git_diff
+from core.infrastructure.storage.git_shadow_env import (
+    base_shadow_env,
+    ensure_shadow_exclude,
+    get_shadow_dir,
+    shadow_index_env,
+)
+
+__all__ = ["GitCheckpointManager", "SHADOW_REPOS_DIR"]
 
 
 class GitCheckpointManager:
@@ -53,99 +59,27 @@ class GitCheckpointManager:
 
     @classmethod
     def _ensure_shadow_exclude(cls, shadow_dir: str) -> None:
-        info_dir = os.path.join(shadow_dir, "info")
-        exclude_file = os.path.join(info_dir, "exclude")
-        try:
-            os.makedirs(info_dir, exist_ok=True)
-            existing = ""
-            if os.path.exists(exclude_file):
-                with open(exclude_file, "r", encoding="utf-8") as f:
-                    existing = f.read()
-
-            lines = set(line.strip() for line in existing.splitlines() if line.strip())
-            new_lines = []
-            for pattern in cls.DEFAULT_EXCLUDES.strip().splitlines():
-                if pattern not in lines:
-                    new_lines.append(pattern)
-
-            if new_lines:
-                with open(exclude_file, "a", encoding="utf-8") as f:
-                    if existing and not existing.endswith("\n"):
-                        f.write("\n")
-                    f.write("\n".join(new_lines) + "\n")
-        except Exception:
-            pass
-
-        # Clean a stale index.lock in the shadow repo if left over from a killed
-        # process. Age-checked: a fresh lock may belong to another concurrently
-        # running Johnston process on the same project — removing it would corrupt
-        # that process's staging. If it is fresh, our own git calls fail with
-        # "index.lock exists" and degrade gracefully to None/[] results.
-        try:
-            lock_file = os.path.join(shadow_dir, "index.lock")
-            if os.path.exists(lock_file) and time.time() - os.path.getmtime(lock_file) > cls.STALE_LOCK_SECONDS:
-                os.remove(lock_file)
-        except Exception:
-            pass
+        ensure_shadow_exclude(shadow_dir, cls.DEFAULT_EXCLUDES, cls.STALE_LOCK_SECONDS)
 
     @staticmethod
     def _parse_numstat(output: str) -> tuple[int, int, list[str]]:
-        """Parses `git diff --numstat` output into (added, deleted, changed_files)."""
-        added, deleted = 0, 0
-        changed_files: list[str] = []
-        for line in output.splitlines():
-            parts = line.split(maxsplit=2)
-            if len(parts) >= 3:
-                raw_path = parts[2].strip()
-                if raw_path.startswith('"') and raw_path.endswith('"'):
-                    raw_path = raw_path[1:-1]
-                if parts[0].isdigit() and parts[1].isdigit():
-                    added += int(parts[0])
-                    deleted += int(parts[1])
-                    changed_files.append(raw_path)
-                elif parts[0] == "-" and parts[1] == "-":
-                    # Binary file change (e.g. images, compiled assets)
-                    added += 1
-                    changed_files.append(raw_path)
-        return added, deleted, changed_files
+        return parse_numstat(output)
 
-    # Cache of the baseline shadow env (GIT_DIR + GIT_WORK_TREE) keyed by (shadow_dir, cwd).
-    # Built once via a single os.environ.copy() per key; each invocation copies only this
-    # small cached dict instead of the whole process environment.
     _base_shadow_env_cache: dict[tuple[str, str], dict] = {}
 
     @classmethod
     def _base_shadow_env(cls, shadow_dir: str, cwd: str) -> dict:
-        key = (shadow_dir, cwd)
-        env = cls._base_shadow_env_cache.get(key)
-        if env is None:
-            env = os.environ.copy()
-            env["GIT_DIR"] = shadow_dir
-            env["GIT_WORK_TREE"] = cwd
-            cls._base_shadow_env_cache[key] = env
-        return env.copy()
+        return base_shadow_env(shadow_dir, cwd, cls._base_shadow_env_cache)
 
     @classmethod
     @contextmanager
     def _shadow_index_env(cls, shadow_dir: str, cwd: str) -> Generator[dict, None, None]:
-        tmp_index = os.path.join(shadow_dir, f"johnston_tmp_index_{os.getpid()}_{uuid.uuid4().hex[:8]}")
-        env = cls._base_shadow_env(shadow_dir, cwd)
-        env["GIT_INDEX_FILE"] = tmp_index
-        try:
+        with shadow_index_env(shadow_dir, cwd, cls._base_shadow_env) as env:
             yield env
-        finally:
-            if os.path.exists(tmp_index):
-                try:
-                    os.remove(tmp_index)
-                except Exception:
-                    pass
 
     @classmethod
     def _get_shadow_dir(cls, project_path: Optional[str] = None) -> tuple[str, str]:
-        cwd = os.path.realpath(os.path.abspath(project_path or os.getcwd()))
-        hash_id = hashlib.md5(cwd.encode("utf-8")).hexdigest()
-        shadow_dir = os.path.join(SHADOW_REPOS_DIR, f"{hash_id}.git")
-        return shadow_dir, cwd
+        return get_shadow_dir(project_path)
 
     _initialized_repos: set[str] = set()
 
@@ -714,47 +648,7 @@ class GitCheckpointManager:
 
     @classmethod
     def _split_git_diff(cls, diff_output: str) -> list[tuple[str, str, int, int]]:
-        """Splits full unified git diff into per-file chunks: (file_path, diff_text, added, deleted)."""
-        if not diff_output or not diff_output.strip():
-            return []
-
-        chunks = re.split(r"(?=^diff --git )", diff_output.strip(), flags=re.MULTILINE)
-        results: list[tuple[str, str, int, int]] = []
-        for chunk in chunks:
-            chunk = chunk.strip()
-            if not chunk:
-                continue
-
-            file_path = ""
-            match = re.search(r"^diff --git a/(.*?) b/(.*)$", chunk, re.MULTILINE)
-            if match:
-                file_path = match.group(2)
-            else:
-                plus_match = re.search(r"^\+\+\+ b/(.*)$", chunk, re.MULTILINE)
-                if plus_match:
-                    file_path = plus_match.group(1)
-                else:
-                    minus_match = re.search(r"^--- a/(.*)$", chunk, re.MULTILINE)
-                    file_path = minus_match.group(1) if minus_match else "unknown"
-
-            if file_path.startswith('"') and file_path.endswith('"'):
-                file_path = file_path[1:-1]
-
-            added = 0
-            deleted = 0
-            in_hunk = False
-            for line in chunk.splitlines():
-                if line.startswith("@@"):
-                    in_hunk = True
-                    continue
-                if in_hunk:
-                    if line.startswith("+") and not line.startswith("+++"):
-                        added += 1
-                    elif line.startswith("-") and not line.startswith("---"):
-                        deleted += 1
-
-            results.append((file_path, chunk, added, deleted))
-        return results
+        return split_git_diff(diff_output)
 
     @classmethod
     def get_checkpoint_diff(

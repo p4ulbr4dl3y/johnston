@@ -3,7 +3,6 @@ import hashlib
 import json
 import logging
 import os
-import re
 import time
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optional, Tuple
 
@@ -13,7 +12,21 @@ from core.base_provider.compaction import (
     should_compact,
 )
 from core.base_provider.errors import ErrorHandlingMixin, format_api_error
+from core.base_provider.history_cache import (
+    _SANITIZE_CACHE,
+    _SANITIZE_CACHE_MAX,
+    _STREAMING_TARGET_RE,
+    _TARGET_SCAN_BACKOFF,
+    _cache_sanitize_get,
+    _cache_sanitize_put,
+    _extract_streaming_target,
+    _get_tools_digest,
+    sanitize_history_cached,
+    serialize_messages_key,
+)
+from core.base_provider.message_queue import drain_queued_messages, has_queued_messages
 from core.base_provider.tools import ToolMixin
+from core.base_provider.usage import accumulate_usage
 from core.domain.defaults.config import DEFAULT_MAX_TOKENS, ESCALATED_MAX_TOKENS
 from core.domain.defaults.errors import ToolResult
 from core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT
@@ -25,123 +38,27 @@ from core.infrastructure.adapters.base import (
     normalize_tool_arguments_str,
     parse_tool_call_args,
 )
-from core.infrastructure.runtime.lru import LruCache
 from core.infrastructure.runtime.thinking_effort import normalize_thinking_effort
 from core.infrastructure.runtime.token_util import estimate_message_tokens, estimate_tokens
-from core.models_catalog import catalog
-from core.provider_manager import is_local_provider
+
+__all__ = [
+    "BaseAgent",
+    "_extract_streaming_target",
+    "_TARGET_SCAN_BACKOFF",
+    "serialize_messages_key",
+    "_get_tools_digest",
+    "sanitize_history_cached",
+    "_SANITIZE_CACHE",
+    "_SANITIZE_CACHE_MAX",
+    "_STREAMING_TARGET_RE",
+    "_cache_sanitize_get",
+    "_cache_sanitize_put",
+    "estimate_tokens",
+    "estimate_message_tokens",
+    "format_api_error",
+]
 
 logger = logging.getLogger(__name__)
-
-_STREAMING_TARGET_RE = re.compile(
-    r'"(?:path|command|url|file_path|title|prompt|query|action)"\s*:\s*"((?:[^"\\]|\\.)*?)"'
-)
-
-# Overlap carried into each windowed target scan. A target key can straddle a
-# delta boundary by at most its own (short) length, so scanning only the tail
-# since the previous chunk — plus this overlap — is equivalent to a full-buffer
-# scan for keys not buried behind an extremely long (>overlap) earlier value.
-# The hint is cosmetic anyway: the final "tool" event always carries the parsed
-# target. Keeps streaming extraction O(n) instead of O(n^2) for large arguments.
-_TARGET_SCAN_BACKOFF = 4096
-
-
-def _extract_streaming_target(buffer: str, scan_from: int = 0) -> str:
-    """Extract the first known target field from partial/complete tool JSON.
-
-    ``scan_from`` is the buffer length already scanned on the previous chunk;
-    only ``buffer[scan_from - _TARGET_SCAN_BACKOFF:]`` is re-scanned so a
-    growing arguments buffer is processed in O(n) overall instead of O(n^2).
-    A match fully present in an earlier chunk is never re-found (it is not
-    re-scanned), which is fine: only the first complete match matters.
-    """
-    if not buffer:
-        return ""
-    window = buffer[max(0, scan_from - _TARGET_SCAN_BACKOFF) :]
-    m = _STREAMING_TARGET_RE.search(window)
-    if not m:
-        return ""
-    val = m.group(1)
-    try:
-        val = json.loads(f'"{val}"')
-    except Exception:
-        val = val.replace('\\"', '"').replace("\\\\", "\\").replace("\\n", " ")
-    return str(val).strip()
-
-
-def _get_tools_digest(tools: Optional[List[Dict[str, Any]]]) -> str:
-    if not tools:
-        return ""
-    return hashlib.sha256(repr(tools).encode("utf-8")).hexdigest()
-
-
-def serialize_messages_key(msgs: List[Dict[str, Any]]) -> bytes:
-    """Return a stable memoization key for a message list.
-
-    Built only from the operationally-meaningful fields (role, content,
-    tool_call_id, tool_calls), so two distinct histories can't alias a cache
-    entry without also having identical payloads.
-    """
-    out = []
-    for m in msgs:
-        out.append(str(m.get("role")))
-        c = m.get("content")
-        if isinstance(c, str):
-            out.append(c)
-        elif c is None:
-            out.append("")
-        else:
-            out.append(str(c))
-        out.append(str(m.get("tool_call_id") or ""))
-        tc = m.get("tool_calls")
-        if tc and isinstance(tc, list):
-            tc_parts = []
-            for item in tc:
-                if isinstance(item, dict):
-                    fn = item.get("function") or {}
-                    tc_parts.append(f"{item.get('id')}:{fn.get('name')}:{fn.get('arguments')}")
-                else:
-                    tc_parts.append(str(item))
-            out.append("|".join(tc_parts))
-        elif tc:
-            out.append(str(tc))
-        else:
-            out.append("")
-    return ("\x1f".join(out)).encode("utf-8")
-
-
-# LRU memo cache for sanitize_history_for_model. The key is a compact serialized
-# snapshot of the history and stores only the sanitized messages (never the deep
-# input). Multi-tool turns call sanitize once per step with only a couple of
-# messages appended per step, so the cached tail is reused and the O(history)
-# pass runs once per turn instead of once per tool_result.
-_SANITIZE_CACHE_MAX = 64
-_SANITIZE_CACHE: "LruCache[bytes, List[Dict[str, Any]]]" = LruCache(_SANITIZE_CACHE_MAX)
-
-
-def _cache_sanitize_get(encoded_history: bytes) -> Optional[List[Dict[str, Any]]]:
-    return _SANITIZE_CACHE.get(encoded_history)
-
-
-def _cache_sanitize_put(encoded_history: bytes, sanitized: List[Dict[str, Any]]) -> None:
-    _SANITIZE_CACHE.put(encoded_history, sanitized)
-
-
-async def sanitize_history_cached(agent: Any, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Memoized, event-loop-friendly ``sanitize_history_for_model``.
-
-    Returns the cached result when the history is unchanged since the last call
-    (the common case inside a multi-tool turn). On a miss, the O(history)
-    sanitize pass is offloaded to a worker thread so it never blocks the UI
-    event loop; the result (not the input) is stored in the LRU cache.
-    """
-    key = serialize_messages_key(history)
-    cached = _cache_sanitize_get(key)
-    if cached is not None:
-        return cached
-    sanitized = await asyncio.to_thread(agent.sanitize_history_for_model, history)
-    _cache_sanitize_put(key, sanitized)
-    return sanitized
 
 
 
@@ -297,56 +214,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         prompt_tokens_est: int = 0,
         output_tokens_est: int = 0,
     ) -> None:
-        """Accumulates input/output/cache tokens and estimates USD cost based on API reporting or model pricing."""
-        is_local = is_local_provider(
-            self.provider_key, getattr(self, "api_type", ""), getattr(self, "base_url", "")
-        )
-        is_free_model = catalog.is_free_model(self.model)
-
-        pricing = catalog.get_model_pricing(self.provider_key, self.model)
-        p_prompt = pricing.get("prompt", 0.0)
-        p_comp = pricing.get("completion", 0.0)
-        p_cr = pricing.get("cache_read")
-        p_cw = pricing.get("cache_write")
-
-        if step_usage and step_usage.get("total_tokens", 0) > 0:
-            in_tok = step_usage.get("prompt_tokens", 0)
-            out_tok = step_usage.get("completion_tokens", 0)
-            cache_read_tok = step_usage.get("cache_read_tokens", 0)
-            cache_write_tok = step_usage.get("cache_write_tokens", 0)
-            uncached_in = max(0, in_tok - cache_read_tok - cache_write_tok)
-
-            # 1. Native cost reported by API provider (e.g. OpenRouter, LiteLLM, AI gateway)
-            api_cost = step_usage.get("cost")
-            if api_cost is not None:
-                cost = float(api_cost)
-            elif is_local or is_free_model:
-                cost = 0.0
-            else:
-                # 2. Granular formula calculation
-                if p_cr is not None:
-                    cr_rate = p_cr
-                else:
-                    cache_mult = 0.1 if getattr(self, "api_type", "openai") == "anthropic" else 0.5
-                    cr_rate = p_prompt * cache_mult
-
-                cw_rate = p_cw if p_cw is not None else (p_prompt * 1.25 if p_prompt > 0 else 0.0)
-
-                cost = uncached_in * p_prompt + cache_read_tok * cr_rate + cache_write_tok * cw_rate + out_tok * p_comp
-
-            self.tokens_input += in_tok
-            self.tokens_output += out_tok
-            self.tokens_cache_read += cache_read_tok
-            self.last_context_tokens = in_tok
-            self.total_tokens += step_usage.get("total_tokens", in_tok + out_tok)
-            self.cost_usd += cost
-        else:
-            self.tokens_input += prompt_tokens_est
-            self.tokens_output += output_tokens_est
-            self.last_context_tokens = prompt_tokens_est
-            self.total_tokens += prompt_tokens_est + output_tokens_est
-            if not is_local and not is_free_model:
-                self.cost_usd += prompt_tokens_est * p_prompt + output_tokens_est * p_comp
+        accumulate_usage(self, step_usage, prompt_tokens_est, output_tokens_est)
 
     async def _execute_single_tool(self, tc: dict, role_def: Any) -> tuple[str, Any, Any]:
         """Execute a single tool call and return (tool_call_id, display_result, resolved_tool_result)."""
@@ -400,77 +268,10 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         return None
 
     def _has_queued_messages(self) -> bool:
-        """True if the queue has a message for the current session/agent."""
-        session = getattr(self, "session", None)
-        if session is not None and getattr(session, "pending_messages", None):
-            return True
-        if getattr(self, "pending_messages", None):
-            return True
-        if getattr(self, "is_subagent", False):
-            return False
-        app = getattr(self, "app", None)
-        if app is None:
-            return False
-        mq = getattr(app, "message_queue", None)
-        if not mq:
-            return False
-        sid = getattr(app, "current_session_id", None)
-        for item in mq:
-            item_sid = item[3] if len(item) > 3 else None
-            if item_sid is None or sid is None or item_sid == sid:
-                return True
-        return False
+        return has_queued_messages(self)
 
     def _drain_queued_messages(self) -> List[Tuple[str, Any, bool, Any]]:
-        """Drain queued user messages for this agent across session, self, or app queue.
-
-        Yields/returns normalized tuples: (prompt, attachments, show_in_ui, display_text)
-        """
-        drained: List[Tuple[str, Any, bool, Any]] = []
-        session = getattr(self, "session", None)
-        pending_list = None
-        if session is not None and getattr(session, "pending_messages", None):
-            pending_list = session.pending_messages
-        elif getattr(self, "pending_messages", None):
-            pending_list = self.pending_messages
-
-        if pending_list:
-            while pending_list:
-                item = pending_list.pop(0)
-                if isinstance(item, str):
-                    drained.append((item, None, True, None))
-                elif isinstance(item, (list, tuple)):
-                    msg = item[0]
-                    show = item[1] if len(item) > 1 else True
-                    atts = item[2] if len(item) > 2 else None
-                    disp = item[4] if len(item) > 4 else None
-                    drained.append((msg, atts, show, disp))
-            return drained
-
-        if getattr(self, "is_subagent", False):
-            return drained
-
-        app = getattr(self, "app", None)
-        if app is not None:
-            mq = getattr(app, "message_queue", None)
-            if mq:
-                sid = getattr(app, "current_session_id", None)
-                kept = []
-                for item in mq:
-                    item_sid = item[3] if len(item) > 3 else None
-                    if item_sid is not None and sid is not None and item_sid != sid:
-                        kept.append(item)
-                        continue
-                    drained.append(
-                        (
-                            item[0],
-                            item[2] if len(item) > 2 else None,
-                            item[1] if len(item) > 1 else True,
-                            item[4] if len(item) > 4 else None,
-                        )
-                    )
-                mq[:] = kept
-        return drained
+        return drain_queued_messages(self)
 
     async def stream_steps(
         self, user_text: str, attachments: Optional[List[Any]] = None
