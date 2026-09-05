@@ -1,3 +1,4 @@
+import asyncio
 import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -65,9 +66,97 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         res = await tool.execute({"action": "kill", "session_id": "sub-kill"})
         self.assertEqual(res.content, "[killed sub-kill]")
-        self.assertEqual(sess.status, "cancelled")
+        # M6 single-writer: the sync path only cancels + suppresses; the
+        # cancelled task's own teardown owns the terminal finish + save, so
+        # status stays live ("running") and no duplicate save happens here.
+        self.assertEqual(sess.status, "running")
         self.assertTrue(getattr(sess, "suppress_notification", False))
         mock_task.cancel.assert_called_once()
+
+    async def test_kill_stale_session_finalizes_and_persists(self):
+        """A6: a session whose async_task already finished (crashed/completed
+        without follow-up) but whose status is still "running" is a kill
+        target too: kill returns [killed ...], flips the status to cancelled
+        and persists the session (previously the is_active_subagent bailout
+        returned before the status flip / save)."""
+        tool = ManageSubagentTool()
+        sess = self._mk_subagent("sub-stale", "Stale task", "prompt", status="running")
+        done_task = MagicMock()
+        done_task.done.return_value = True
+        sess.async_task = done_task
+
+        res = await tool.execute({"action": "kill", "session_id": "sub-stale"})
+        self.assertEqual(res.content, "[killed sub-stale]")
+        self.assertEqual(sess.status, "cancelled")
+        self.assertTrue(getattr(sess, "suppress_notification", False))
+        done_task.cancel.assert_not_called()  # done tasks are not re-cancelled
+
+        # The fallback save persisted the finalized session to disk (A6).
+        persisted = AgentSession.from_file(self.store._subagent_path("sess-main", "sub-stale"))
+        self.assertIsNotNone(persisted)
+        self.assertEqual(persisted.status, "cancelled")
+
+    async def test_kill_running_task_atomic_disk_state(self):
+        """M6: killing a session with a live async_task must NOT double-write.
+        The sync path only cancels + suppresses; the cancelled task's own
+        teardown (run_subagent_stream_bg -> execute_session_turn CancelledError
+        handler) owns the terminal finish + save. Exactly one status_change and
+        one divider must land in the persisted file."""
+        from core.application.session.stream import run_subagent_stream_bg
+        from core.domain.entities.session import SessionStatus
+
+        sess = self.store.create_subagent(
+            parent_id="sess-main",
+            subagent_id="sub-atomic",
+            role="worker",
+            title="Atomic task",
+            prompt="prompt",
+            status=SessionStatus.RUNNING,
+        )
+        sess.add_event({"type": "user", "text": "prompt"})
+
+        class SuspendingSubagent:
+            """Streams one step then blocks so the task can be cancelled mid-run."""
+
+            is_subagent = True
+
+            async def stream_steps(self, message):
+                yield ("thinking_start", "Thinking...", "")
+                await asyncio.sleep(30)
+
+        sess.agent = SuspendingSubagent()
+        ctx = MagicMock()
+
+        bg_task = asyncio.create_task(run_subagent_stream_bg(sess.agent, "prompt", sess, ctx, self.store))
+        await asyncio.sleep(0)  # let the stream start
+        sess.async_task = bg_task
+
+        tool = ManageSubagentTool()
+        res = await tool.execute({"action": "kill", "session_id": "sub-atomic"})
+        self.assertEqual(res.content, "[killed sub-atomic]")
+        self.assertTrue(getattr(sess, "suppress_notification", False))
+
+        # Teardown runs to completion: the CancelledError handler owns the
+        # terminal finish + save (exactly-once on disk). The task either ends
+        # normally (swallowed cancellation) or cancelled (A7 re-raise).
+        try:
+            await asyncio.wait_for(bg_task, timeout=10)
+        except asyncio.CancelledError:
+            pass
+        self.assertTrue(bg_task.cancelled() or bg_task.done())
+
+        persisted = AgentSession.from_file(self.store._subagent_path("sess-main", "sub-atomic"))
+        self.assertIsNotNone(persisted)
+        self.assertEqual(persisted.status, "cancelled")
+
+        status_changes = [m for m in persisted.messages if m.get("type") == "status_change"]
+        self.assertEqual(len(status_changes), 1, persisted.messages)
+        self.assertEqual(status_changes[0]["status"], "cancelled")
+
+        dividers = [
+            m for m in persisted.messages if m.get("type") == "event_divider" and m.get("text") == "Response Interrupted"
+        ]
+        self.assertEqual(len(dividers), 1, persisted.messages)
 
     def test_agent_session_deserialization(self):
         data = {

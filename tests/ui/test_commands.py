@@ -382,7 +382,9 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(bg_task.is_running)
         self.assertTrue(subagent.async_task.cancel.called)
-        subagent.finish.assert_called_once()
+        # M6 single-writer: for a live async_task the sync path only cancels;
+        # the cancelled task's own teardown owns the terminal finish + save.
+        subagent.finish.assert_not_called()
         app.sm.delete.assert_called()
 
     async def test_rewind_awaits_generation_worker_before_rollback(self):

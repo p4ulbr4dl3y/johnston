@@ -946,19 +946,26 @@ class FakeTask:
 class TestCancelRunning:
     def test_parent_id_none_lists_all_subagents(self):
         sess = make_session()
+        sess.add_event({"type": "user", "text": "prompt"})
         store = FakeCancelStore(sessions=[sess])
         n = cancel_running_subagents(store)
         assert n == 1
         assert sess.status == STATUS_CANCELLED
+        # Fallback path: no live async_task -> sync finish + save persists.
+        assert store.saved == [sess]
 
     def test_done_task_not_cancelled_but_session_marked(self):
         sess = make_session()
+        sess.add_event({"type": "user", "text": "prompt"})
         sess.async_task = FakeTask(done=True)
         store = FakeCancelStore(sessions=[sess])
         n = cancel_running_subagents(store)
         assert n == 1
         assert not hasattr(sess.async_task, "cancelled")
         assert sess.status == STATUS_CANCELLED
+        # A6 fallback: a done (stale) task cannot run its teardown, so the
+        # sync finish + save finalizes and persists the session.
+        assert store.saved == [sess]
 
     def test_non_running_status_skipped(self):
         sess = make_session(status="completed")
@@ -966,14 +973,19 @@ class TestCancelRunning:
         n = cancel_running_subagents(store)
         assert n == 0
         assert sess.status == "completed"
+        assert store.saved == []
 
     def test_async_task_none_skipped_cancel_but_marks(self):
         sess = make_session()
+        sess.add_event({"type": "user", "text": "prompt"})
         sess.async_task = None
         store = FakeCancelStore(sessions=[sess])
         n = cancel_running_subagents(store)
         assert n == 1
         assert sess.status == STATUS_CANCELLED
+        # A6/M6 fallback: without a live task no teardown will persist the
+        # session, so the sync finish + save is the only writer.
+        assert store.saved == [sess]
 
     def test_returns_counter(self):
         a = make_session()
@@ -1109,21 +1121,6 @@ class TestSubagentStepAndErrorHandling:
 # ---------------------------------------------------------------------------
 
 
-class _PendingTask:
-    """Minimal async_task stand-in: pending until explicitly finished."""
-
-    def __init__(self):
-        self._done = False
-        self.cancelled = False
-
-    def done(self):
-        return self._done
-
-    def cancel(self):
-        self.cancelled = True
-        self._done = True
-
-
 class TestParentInterruptCancelsSubagents:
     """Parent generation cancelled mid-stream -> subagent children cancelled."""
 
@@ -1141,13 +1138,24 @@ class TestParentInterruptCancelsSubagents:
         parent_session_id = "s_parent_main"
         session = AgentSession(session_id=parent_session_id, role="assistant")
 
-        # Pending subagent child of this parent session.
+        # Live subagent child of this parent session: a REAL streaming task
+        # suspended mid-run (so cancel() delivers CancelledError to its own
+        # teardown, whose handler owns the terminal finish + save — M6).
+        async def suspending_stream(*a, **k):
+            yield ("thinking_start", "Thinking...", "")
+            await asyncio.sleep(30)
+
+        sub_agent = FakeSubagent()
+        sub_agent.is_subagent = True
+        sub_agent.stream_steps = suspending_stream
         child = AgentSession(
             session_id="sub-1", kind="subagent", parent_id=parent_session_id, status="running"
         )
-        child.async_task = _PendingTask()
-
+        child_ctx = MagicMock()
         store = FakeCancelStore(sessions=[child])
+        child_task = asyncio.create_task(run_subagent_stream_bg(sub_agent, "Do work", child, child_ctx, store))
+        await asyncio.sleep(0)  # let the child stream start and suspend
+        child.async_task = child_task
         cancelled_parent_ids = []
 
         # Mirrors the production wiring from widgets/mixins/message_flow.py:
@@ -1184,10 +1192,21 @@ class TestParentInterruptCancelsSubagents:
 
         # (a) The canvas cancellation hook fired with the parent session id.
         assert cancelled_parent_ids == [parent_session_id]
-        # (b) The pending subagent task received cancel() and the session was
-        # finished via the existing cancel_running_subagents semantics.
-        assert child.async_task.cancelled is True
+        # (b) The child task received cancel() — NO sync write (M6); the
+        # cancelled task's own teardown owns the terminal finish + save, so
+        # status is still live at this instant (no duplicate status_change).
+        assert child.status == SessionStatus.RUNNING
+        assert store.saved == []
+
+        # Drive the child teardown to completion: its CancelledError handler
+        # records the interruption, finishes CANCELLED and saves exactly once.
+        try:
+            await asyncio.wait_for(child_task, timeout=5)
+        except asyncio.CancelledError:
+            pass  # A7: a real pending cancellation may re-raise through teardown
+        assert child_task.cancelled() or child_task.done()
         assert child.status == STATUS_CANCELLED
+        # Exactly one writer persisted the terminal state.
         assert store.saved == [child]
 
 

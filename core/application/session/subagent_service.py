@@ -202,7 +202,16 @@ class SubagentService:
 
     @classmethod
     def cancel_running_subagents(cls, store: Any, parent_id: Optional[str] = None) -> int:
-        """Cancels running subagent asyncio tasks and marks their sessions cancelled."""
+        """Cancels running subagent asyncio tasks and marks their sessions cancelled.
+
+        Single-writer principle (audit M6): the cancelled task's own teardown
+        (``execute_session_turn``'s CancelledError handler inside
+        ``run_subagent_stream_bg``) owns the terminal ``finish(CANCELLED)`` +
+        save. The sync writer here only takes over when no task teardown will
+        run (async_task missing or already done) so finished-but-stale
+        sessions are still finalized (audit A6) and cancellation can never
+        leave a session unpersisted.
+        """
         if not store:
             return 0
         if parent_id:
@@ -212,8 +221,12 @@ class SubagentService:
 
         cancelled = 0
         for sess in sessions:
+            # Finalize finished-but-stale sessions too (A6): a session whose
+            # async_task already finished (crashed/completed without follow-up)
+            # but whose status is still "running" still gets finalized here.
             if not is_active_subagent(sess):
                 continue
+            cancelled += 1
             setattr(sess, "suppress_notification", True)
             async_task = getattr(sess, "async_task", None)
             if async_task and not async_task.done():
@@ -221,20 +234,31 @@ class SubagentService:
                     async_task.cancel()
                 except Exception:
                     pass
+                # The cancelled task's handler owns the terminal finish+save
+                # (it also sees suppress_notification and skips notification).
+                continue
+            # Fallback (no live task teardown): sync finish + save.
             sess.finish(SessionStatus.CANCELLED, "Cancelled")
-            store.save(sess)
-            cancelled += 1
+            if store:
+                store.save(sess)
         return cancelled
 
     @classmethod
     def kill_subagent(cls, session: AgentSession, store: Any) -> ToolResult:
-        """Terminate a running subagent session and cancel its background task."""
+        """Terminate a running subagent session and cancel its background task.
+
+        Single-writer principle (audit M6): for a live async_task the sync
+        path only cancels + sets ``suppress_notification`` — the cancelled
+        task's own teardown (``run_subagent_stream_bg`` /
+        ``execute_session_turn`` CancelledError handler) owns the terminal
+        ``finish(CANCELLED)`` + save, so exactly one status_change and one
+        divider land in the persisted file. When no task teardown can run
+        (async_task missing or already done — the finished-but-stale case,
+        audit A6) the sync finish+save finalizes the session as a fallback.
+        """
         setattr(session, "suppress_notification", True)
         if hasattr(session, "pending_messages") and session.pending_messages:
             session.pending_messages.clear()
-
-        if not is_active_subagent(session):
-            return ToolResult.done(content=f"[killed {session.id}]", display="")
 
         async_task = getattr(session, "async_task", None)
         if async_task and not async_task.done():
@@ -242,10 +266,18 @@ class SubagentService:
                 async_task.cancel()
             except Exception:
                 pass
-
-        session.finish(SessionStatus.CANCELLED, "Cancelled via subagent tool")
-        if store:
-            store.save(session)
+            # M6: the live task's own teardown
+            # (``execute_session_turn``'s CancelledError handler inside
+            # ``run_subagent_stream_bg``) owns the terminal finish + save.
+        else:
+            # A6: no live task teardown will run. Finalize finished-but-stale
+            # sessions (async_task done/missing while status is still
+            # active/"running") here; already-terminal sessions (completed /
+            # error / cancelled) keep their status — a kill is a no-op there.
+            if is_active_subagent(session):
+                session.finish(SessionStatus.CANCELLED, "Cancelled via subagent tool")
+                if store:
+                    store.save(session)
         return ToolResult.done(content=f"[killed {session.id}]", display="")
 
     @classmethod

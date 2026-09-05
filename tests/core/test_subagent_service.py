@@ -88,10 +88,13 @@ class TestSubagentServiceOperations(unittest.IsolatedAsyncioTestCase):
 
         res = SubagentService.kill_subagent(sess, store)
         self.assertTrue(task.cancelled)
-        self.assertEqual(sess.status, SessionStatus.CANCELLED)
         self.assertEqual(sess.pending_messages, [])
-        store.save.assert_called_once_with(sess)
         self.assertEqual(res.content, "[killed sub-1]")
+        # M6 single-writer: the sync path only cancels; the cancelled task's
+        # own teardown owns the terminal finish + save. Status stays live
+        # ("running") until that teardown runs and no sync save happens here.
+        self.assertEqual(sess.status, SessionStatus.RUNNING)
+        store.save.assert_not_called()
 
     def test_resolve_status_cancelled_with_undone_task(self):
         sess = AgentSession(session_id="sub-c", status=SessionStatus.CANCELLED)
@@ -105,6 +108,36 @@ class TestSubagentServiceOperations(unittest.IsolatedAsyncioTestCase):
         res = SubagentService.kill_subagent(sess, store)
         self.assertEqual(res.content, "[killed sub-2]")
         store.save.assert_not_called()
+
+    def test_kill_subagent_stale_done_task_still_finalized(self):
+        """A6: a session whose async_task already finished (crashed/completed
+        without follow-up) but whose status is still "running" is a kill
+        target too: it must be finalized (status flipped + saved) instead of
+        being bailed out of before the status flip. task.cancel() is not
+        called on a done task."""
+        store = MagicMock()
+        sess = AgentSession(session_id="sub-stale", status=SessionStatus.RUNNING)
+        task = FakeTask(done=True)
+        sess.async_task = task
+
+        res = SubagentService.kill_subagent(sess, store)
+        self.assertEqual(res.content, "[killed sub-stale]")
+        self.assertFalse(task.cancelled)
+        self.assertEqual(sess.status, SessionStatus.CANCELLED)
+        store.save.assert_called_once_with(sess)
+        status_changes = [m for m in sess.messages if m.get("type") == "status_change"]
+        self.assertEqual(len(status_changes), 1)
+        self.assertEqual(status_changes[0]["error"], "Cancelled via subagent tool")
+
+    def test_kill_subagent_no_task_finalizes(self):
+        """A6/M6 fallback: without an async_task no task teardown can run, so
+        the sync finish+save must finalize the session."""
+        store = MagicMock()
+        sess = AgentSession(session_id="sub-no-task", status=SessionStatus.RUNNING)
+        res = SubagentService.kill_subagent(sess, store)
+        self.assertEqual(res.content, "[killed sub-no-task]")
+        self.assertEqual(sess.status, SessionStatus.CANCELLED)
+        store.save.assert_called_once_with(sess)
 
     def test_cancel_running_subagents(self):
         store = MagicMock()
@@ -123,8 +156,27 @@ class TestSubagentServiceOperations(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(count, 2)
         self.assertTrue(t1.cancelled)
         self.assertTrue(t2.cancelled)
-        self.assertEqual(s1.status, SessionStatus.CANCELLED)
-        self.assertEqual(s2.status, SessionStatus.CANCELLED)
+        # M6 single-writer: live cancelled tasks own the terminal finish+save;
+        # the sync path does not write (status stays live until teardown).
+        self.assertEqual(s1.status, SessionStatus.RUNNING)
+        self.assertEqual(s2.status, "active")
+        store.save.assert_not_called()
+
+    def test_cancel_running_subagents_stale_task_fallback_finalizes(self):
+        """A6/M6 fallback: a session whose async_task already finished but
+        whose status is still "running" is cancelled too — the sync finish+save
+        finalizes it since no task teardown can run."""
+        store = MagicMock()
+        sess = AgentSession(session_id="sub-stale", status=SessionStatus.RUNNING)
+        t = FakeTask(done=True)
+        sess.async_task = t
+
+        store.children.return_value = [sess]
+        count = SubagentService.cancel_running_subagents(store, parent_id="parent-1")
+        self.assertEqual(count, 1)
+        self.assertFalse(t.cancelled)
+        self.assertEqual(sess.status, SessionStatus.CANCELLED)
+        store.save.assert_called_once_with(sess)
 
     def test_cancel_running_subagents_none_store(self):
         self.assertEqual(SubagentService.cancel_running_subagents(None), 0)
