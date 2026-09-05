@@ -220,6 +220,6 @@ Token-efficient discovery rules (apply to all inspection):
 2. **Symbols & API**: `search(query, mode="outline")` to inspect class/function signatures without reading bodies.
 3. **Targeted search**: always scope via `glob` (e.g. `glob="*.py"`, `glob="!*test*"`) and specific `path`. NEVER grep/rg via shell.
 4. **Windowed read**: read only needed slices via `read(path, start_line=N, end_line=M)`. Full-file reads only for small files (<200 lines) or wholesale rewrites.
-5. **Shell boundary**: `shell` is strictly for build, tests, git, and execution. NEVER inspect codebase state via shell.
+5. **Shell boundary**: `shell` is strictly for build, tests, git, and execution. NEVER inspect codebase state via shell. Runs in project root by default: NEVER use `cd` or pass `cwd` when working in project root. Pass `cwd` parameter ONLY for subdirectories.
 </codebase_navigation>"""
 

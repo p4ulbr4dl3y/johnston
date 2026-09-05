@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import os
 import platform
+import re
 import time
 import uuid
 from typing import Any, Dict, Optional
@@ -15,7 +17,7 @@ from core.infrastructure.platform.platform_utils import (
     terminate_process,
 )
 from core.infrastructure.tasks.shell_task import ShellTask
-from tools.base import BaseTool, truncate_output
+from tools.base import BaseTool, resolve_path, truncate_output
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +74,51 @@ def _truncate_output(res: str) -> str:
     )
 
 
+_REDUNDANT_CD_PATTERN = re.compile(r"^\s*cd\s+(?:\"([^\"]+)\"|'([^']+)'|([^\s;&|]+))\s*(?:&&|;)\s*")
+_STANDALONE_CD_PATTERN = re.compile(r"^\s*cd(?:\s+(?:\"([^\"]+)\"|'([^']+)'|([^\s;&|]+)))?\s*$")
+
+
+def _clean_cd_command(cmd: str, workspace_dir: str) -> tuple[str, Optional[str]]:
+    """Clean redundant cd commands and catch unsupported standalone cd calls.
+
+    Returns:
+        (cleaned_cmd, error_message_or_none)
+    """
+    cleaned = cmd.strip()
+    norm_ws = os.path.normcase(workspace_dir)
+
+    while True:
+        m = _REDUNDANT_CD_PATTERN.match(cleaned)
+        if not m:
+            break
+        target = m.group(1) or m.group(2) or m.group(3)
+        norm_target = os.path.normpath(target.replace("\\", "/"))
+        if norm_target == ".":
+            cleaned = cleaned[m.end():].strip()
+            continue
+        try:
+            abs_target = os.path.realpath(os.path.abspath(os.path.join(workspace_dir, target)))
+            if os.path.normcase(abs_target) == norm_ws:
+                cleaned = cleaned[m.end():].strip()
+                continue
+        except Exception:
+            pass
+        break
+
+    m_alone = _STANDALONE_CD_PATTERN.match(cleaned)
+    if m_alone:
+        target = m_alone.group(1) or m_alone.group(2) or m_alone.group(3)
+        # Standalone `cd .` or `cd .\` is allowed as no-op (used on Windows/tests)
+        if target is not None and os.path.normpath(target.replace("\\", "/")) == ".":
+            return (cleaned, None)
+        return (
+            cleaned,
+            "Directory changes via 'cd' do not persist across shell calls. Shell runs in project root by default. Use 'cwd' parameter to run in a subdirectory.",
+        )
+
+    return (cleaned, None)
+
+
 class ShellTool(BaseTool):
     name = "shell"
     description = (
@@ -84,7 +131,7 @@ class ShellTool(BaseTool):
         "function": {
             "name": "shell",
             "description": (
-                "Execute a non-interactive shell command. Command runs in project cwd. "
+                "Execute a non-interactive shell command. Runs in project root by default. "
                 "Always use non-interactive flags (e.g. -y, --batch) and avoid interactive REPLs/paginators."
             ),
             "parameters": {
@@ -92,7 +139,18 @@ class ShellTool(BaseTool):
                 "properties": {
                     "command": {
                         "type": "string",
-                        "description": "Non-interactive shell command. NO interactive REPLs or paginators.",
+                        "description": (
+                            "Non-interactive shell command. Runs in project root by default. "
+                            "NEVER use 'cd' — state does not persist across calls. "
+                            "NO interactive REPLs or paginators."
+                        ),
+                    },
+                    "cwd": {
+                        "type": "string",
+                        "description": (
+                            "Directory to run command in (default: current workspace root). "
+                            "Omit if working in project root."
+                        ),
                     },
                     "timeout": {
                         "type": "integer",
@@ -154,6 +212,59 @@ class ShellTool(BaseTool):
         if not cmd:
             return ToolResult.error("params", name="command", detail="missing or empty")
 
+        workspace_dir = (
+            ctx.cwd
+            if isinstance(getattr(ctx, "cwd", None), str) and ctx.cwd
+            else os.getcwd()
+        )
+        workspace_dir = os.path.realpath(os.path.abspath(workspace_dir))
+
+        cmd, cd_err = _clean_cd_command(cmd, workspace_dir)
+        if cd_err:
+            return ToolResult.error("params", name="command", detail=cd_err)
+        if not cmd:
+            return ToolResult.error("params", name="command", detail="missing or empty")
+
+        raw_cwd = args.get("cwd")
+        if raw_cwd is not None and str(raw_cwd).strip() not in (".", "./", ".\\", ""):
+            resolved_cwd = resolve_path(str(raw_cwd).strip(), cwd=workspace_dir)
+            if not os.path.exists(resolved_cwd):
+                return ToolResult.error(
+                    "not_found",
+                    name=str(raw_cwd),
+                    detail=f"directory '{raw_cwd}' does not exist",
+                )
+            if not os.path.isdir(resolved_cwd):
+                return ToolResult.error(
+                    "params",
+                    name=str(raw_cwd),
+                    detail=f"path '{raw_cwd}' is not a directory",
+                )
+            proc_cwd = resolved_cwd
+        else:
+            proc_cwd = workspace_dir
+
+        allow_workspace_writes = not bool(getattr(ctx, "is_read_only", False))
+        sandbox_enabled = bool(getattr(ctx, "sandbox_enabled", False))
+        if sandbox_enabled:
+            from core.infrastructure.platform.sandbox import (
+                is_path_readable_in_sandbox,
+                is_path_writable_in_sandbox,
+            )
+
+            if not is_path_readable_in_sandbox(proc_cwd, cwd=workspace_dir):
+                return ToolResult.error(
+                    "permission",
+                    name=str(raw_cwd or proc_cwd),
+                    detail=f"sandbox restriction: cannot read '{raw_cwd or proc_cwd}'",
+                )
+            if allow_workspace_writes and not is_path_writable_in_sandbox(proc_cwd, cwd=workspace_dir):
+                return ToolResult.error(
+                    "permission",
+                    name=str(raw_cwd or proc_cwd),
+                    detail=f"sandbox restriction: cannot write to '{raw_cwd or proc_cwd}'",
+                )
+
         default_timeout = settings.tools.shell_default_timeout
         max_cap = settings.tools.shell_max_cap
         raw_timeout = args.get("timeout", default_timeout)
@@ -187,13 +298,11 @@ class ShellTool(BaseTool):
                 hard_timeout = None
 
         env = shell_env()
-        proc_cwd = ctx.cwd if isinstance(getattr(ctx, "cwd", None), str) else None
-        sandbox_enabled = bool(getattr(ctx, "sandbox_enabled", False))
-        allow_workspace_writes = not bool(getattr(ctx, "is_read_only", False))
         p = await self._create_std_process(
             cmd,
             env,
             cwd=proc_cwd,
+            workspace_dir=workspace_dir,
             sandbox_enabled=sandbox_enabled,
             allow_workspace_writes=allow_workspace_writes,
         )
@@ -411,6 +520,7 @@ class ShellTool(BaseTool):
         command: str,
         env: dict[str, str],
         cwd: str = None,
+        workspace_dir: str = None,
         sandbox_enabled: bool = False,
         allow_workspace_writes: bool = True,
     ):
@@ -418,7 +528,10 @@ class ShellTool(BaseTool):
             from core.infrastructure.platform.sandbox import build_sandboxed_command
 
             exe, args, is_sandboxed = build_sandboxed_command(
-                command, cwd=cwd, allow_workspace_writes=allow_workspace_writes
+                command,
+                cwd=cwd,
+                workspace_dir=workspace_dir,
+                allow_workspace_writes=allow_workspace_writes,
             )
             if is_sandboxed:
                 return await asyncio.create_subprocess_exec(

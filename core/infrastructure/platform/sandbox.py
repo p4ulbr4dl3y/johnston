@@ -549,13 +549,14 @@ def build_sandboxed_command(
     extra_writable_roots: Optional[List[str]] = None,
     extra_deny_read_paths: Optional[List[str]] = None,
     allow_workspace_writes: bool = True,
+    workspace_dir: Optional[str] = None,
 ) -> Tuple[str, List[str], bool]:
     """Wrap command with platform-specific sandbox if available.
 
     Returns:
         (executable, args_list, is_sandboxed)
     """
-    workspace = cwd or os.getcwd()
+    workspace = workspace_dir or cwd or os.getcwd()
     workspace_abs = os.path.realpath(os.path.abspath(workspace))
     shell = shell_executable() or "/bin/sh"
 

@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.infrastructure.tasks.manager import TaskManager
+from tools.base import resolve_path
 from tools.shell import ShellTool, _new_task_id
 
 
@@ -1196,5 +1197,125 @@ async def test_shell_subagent_routes_output_to_session_not_host_widget(tool, mak
         shell_events = [e for e in events if e.get("type") == "tool_shell_output"]
         assert len(shell_events) > 0
         assert "subagent output line 1" in "".join(e.get("text", "") for e in shell_events)
+
+
+# --------------------------------------------------------------------------- #
+# CWD parameter & CD normalization tests
+# --------------------------------------------------------------------------- #
+
+
+async def test_shell_cwd_nonexistent_returns_error(tool, make_tool_context):
+    ctx = make_tool_context()
+    res = await tool.execute({"command": "echo test", "cwd": "/nonexistent_path_xyz_123"}, ctx=ctx)
+    assert res.is_error
+    assert "ERR: not_found" in str(res)
+
+
+async def test_shell_cwd_valid_directory(tool, make_tool_context):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ctx = make_tool_context()
+        p = _process(wait_result=0)
+        with patch.object(ShellTool, "_create_std_process", return_value=p) as mock_create:
+            res = await tool.execute({"command": "echo test", "cwd": tmpdir}, ctx=ctx)
+            assert not res.is_error
+            mock_create.assert_called_once()
+            _, kwargs = mock_create.call_args
+            assert kwargs.get("cwd") == resolve_path(tmpdir)
+
+
+async def test_shell_strip_redundant_cd_dots(tool, make_tool_context):
+    ctx = make_tool_context()
+    p = _process(wait_result=0)
+    with patch.object(ShellTool, "_create_std_process", return_value=p) as mock_create:
+        res = await tool.execute({"command": "cd . && echo stripped"}, ctx=ctx)
+        assert not res.is_error
+        mock_create.assert_called_once()
+        args, _ = mock_create.call_args
+        assert args[0] == "echo stripped"
+
+
+async def test_shell_strip_redundant_cd_workspace_dir(tool, make_tool_context):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ctx = make_tool_context(cwd=tmpdir)
+        p = _process(wait_result=0)
+        with patch.object(ShellTool, "_create_std_process", return_value=p) as mock_create:
+            res = await tool.execute({"command": f"cd {tmpdir} && echo ok"}, ctx=ctx)
+            assert not res.is_error
+            args, _ = mock_create.call_args
+            assert args[0] == "echo ok"
+
+
+async def test_shell_standalone_cd_error(tool, make_tool_context):
+    ctx = make_tool_context()
+    res = await tool.execute({"command": "cd somedir"}, ctx=ctx)
+    assert res.is_error
+    assert "do not persist across shell calls" in str(res)
+
+
+async def test_shell_bare_cd_error(tool, make_tool_context):
+    ctx = make_tool_context()
+    res = await tool.execute({"command": "cd"}, ctx=ctx)
+    assert res.is_error
+    assert "do not persist across shell calls" in str(res)
+
+
+async def test_shell_strip_redundant_cd_windows_slash(tool, make_tool_context):
+    ctx = make_tool_context()
+    p = _process(wait_result=0)
+    with patch.object(ShellTool, "_create_std_process", return_value=p) as mock_create:
+        res = await tool.execute({"command": r"cd .\ && echo ok"}, ctx=ctx)
+        assert not res.is_error
+        args, _ = mock_create.call_args
+        assert args[0] == "echo ok"
+
+
+async def test_shell_nested_repo_cd_not_stripped(tool, make_tool_context):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        base = os.path.basename(tmpdir)
+        ctx = make_tool_context(cwd=tmpdir)
+        p = _process(wait_result=0)
+        with patch.object(ShellTool, "_create_std_process", return_value=p) as mock_create:
+            res = await tool.execute({"command": f"cd {base} && python app.py"}, ctx=ctx)
+            assert not res.is_error
+            args, _ = mock_create.call_args
+            # Subfolder matching repo name MUST NOT be stripped
+            assert args[0] == f"cd {base} && python app.py"
+
+
+async def test_shell_cwd_is_file_returns_params_error(tool, make_tool_context):
+    with tempfile.NamedTemporaryFile() as tmpfile:
+        ctx = make_tool_context()
+        res = await tool.execute({"command": "echo ok", "cwd": tmpfile.name}, ctx=ctx)
+        assert res.is_error
+        assert "is not a directory" in str(res)
+
+
+async def test_shell_cwd_sandbox_read_blocked(tool, make_app_mock, make_tool_context):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        app = make_app_mock()
+        app.sandbox_enabled = True
+        ctx = make_tool_context(app=app, cwd=tmpdir)
+        with patch("core.infrastructure.platform.sandbox.is_path_readable_in_sandbox", return_value=False):
+            res = await tool.execute({"command": "echo ok", "cwd": tmpdir}, ctx=ctx)
+            assert res.is_error
+            assert "cannot read" in str(res)
+
+
+async def test_shell_cwd_sandbox_write_blocked(tool, make_app_mock, make_tool_context):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        app = make_app_mock()
+        app.sandbox_enabled = True
+        app.is_read_only = False
+        ctx = make_tool_context(app=app, cwd=tmpdir)
+        with (
+            patch("core.infrastructure.platform.sandbox.is_path_readable_in_sandbox", return_value=True),
+            patch("core.infrastructure.platform.sandbox.is_path_writable_in_sandbox", return_value=False),
+        ):
+            res = await tool.execute({"command": "echo ok", "cwd": tmpdir}, ctx=ctx)
+            assert res.is_error
+            assert "cannot write" in str(res)
+
+
+
 
 
