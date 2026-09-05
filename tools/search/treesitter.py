@@ -1,4 +1,5 @@
 import logging
+import re
 import threading
 from typing import Dict, List, Optional, Tuple
 
@@ -288,7 +289,7 @@ class TreeSitterExtractor:
                         name = trait_name
                     elif not name:
                         impl_text = node.text.decode("utf-8", errors="replace").split("{")[0].strip()
-                        name = impl_text.replace("impl", "").strip()
+                        name = re.sub(r"^impl\b\s*", "", impl_text).strip()
                 if not name:
                     name = node.type
 
@@ -298,7 +299,7 @@ class TreeSitterExtractor:
                 parent = node.parent
                 depth = 0
                 while parent:
-                    if parent.type in ("class_definition", "class_declaration", "impl_item"):
+                    if parent.type in ("class_definition", "class_declaration", "abstract_class_declaration", "impl_item"):
                         depth += 1
                     parent = parent.parent
                 indent = "  " * (1 + depth)

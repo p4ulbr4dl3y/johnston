@@ -656,6 +656,58 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             self.assertIn("search_000.txt", res.content)
             self.assertIn("search_024.txt", res.content)
 
+    async def test_python_fallback_max_results_cap(self):
+        fpath = os.path.join(self.tmpdir, "many_matches.txt")
+        with open(fpath, "w") as f:
+            for i in range(20):
+                f.write(f"needle {i}\n")
+
+        ctx = ToolContext(cwd=self.tmpdir)
+        with patch("shutil.which", return_value=None):  # Force Python fallback
+            res = await self.tool.execute({"query": "needle", "max_results": 5}, ctx=ctx)
+            self.assertEqual(res.status, ToolResultStatus.DONE)
+            self.assertIn("matches=5", res.content)
+            match_lines = [line for line in res.content.splitlines() if ":" in line and "needle" in line]
+            self.assertEqual(len(match_lines), 5)
+
+    async def test_single_file_zero_matches_header_has_path(self):
+        fpath = os.path.join(self.tmpdir, "sample.py")
+        with open(fpath, "w") as f:
+            f.write("def sample(): pass\n")
+        ctx = ToolContext(cwd=self.tmpdir)
+        res = await self.tool.execute({"query": "nonexistent", "path": "sample.py"}, ctx=ctx)
+        self.assertEqual(res.status, ToolResultStatus.DONE)
+        self.assertIn("path=sample.py", res.content)
+        self.assertIn("0 matches found", res.content)
+
+    async def test_context_lines_override_precedence(self):
+        fpath = os.path.join(self.tmpdir, "ctx.txt")
+        with open(fpath, "w") as f:
+            f.write("line 1\nline 2\nTARGET\nline 4\nline 5\n")
+        ctx = ToolContext(cwd=self.tmpdir)
+        res = await self.tool.execute({"query": "TARGET", "before": 1, "context_lines": 2, "path": "ctx.txt"}, ctx=ctx)
+        self.assertEqual(res.status, ToolResultStatus.DONE)
+        self.assertNotIn("line 1", res.content)
+        self.assertIn("line 2", res.content)
+        self.assertIn("TARGET", res.content)
+        self.assertIn("line 4", res.content)
+        self.assertIn("line 5", res.content)
+
+    def test_cancellation_header(self):
+        import threading
+        cancel_evt = threading.Event()
+        cancel_evt.set()
+        res = search_sync(
+            query="test",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="content",
+            cancel_event=cancel_evt,
+        )
+        self.assertEqual(res.status, ToolResultStatus.DONE)
+        self.assertIn("0 matches found", res.content)
+        self.assertNotIn("query=", res.content)
+
 
 class TestGitignoreMatcher(unittest.TestCase):
     def setUp(self):
@@ -1053,6 +1105,44 @@ impl RealStruct {
         self.assertIn("inner_method", result.content)
         self.assertNotIn("FakeStruct", result.content)
         self.assertNotIn("fake_func", result.content)
+
+    def test_rust_impl_word_in_name(self):
+        """Test tree-sitter correctly preserves struct name containing 'impl' (e.g. Simple)."""
+        with open(os.path.join(self.tmpdir, "impl_test.rs"), "w") as f:
+            f.write("""
+struct Simple;
+impl Simple {
+    fn test_method() {}
+}
+""")
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="impl_test.rs",
+        )
+        self.assertIn("impl Simple", result.content)
+        self.assertNotIn("impl S e", result.content)
+
+    def test_typescript_abstract_class_depth(self):
+        """Test tree-sitter properly indents methods inside abstract class."""
+        with open(os.path.join(self.tmpdir, "abstract.ts"), "w") as f:
+            f.write("""
+abstract class BaseService {
+    run(): void {}
+}
+""")
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="abstract.ts",
+        )
+        self.assertIn("class BaseService", result.content)
+        # Indent should be depth 1 (4 spaces) with line number prefix
+        self.assertIn("    3: run()", result.content)
 
     def test_cache_hit_on_different_query(self):
         """Test that changing query reuses cached file symbols without re-parsing."""

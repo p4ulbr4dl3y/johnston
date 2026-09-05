@@ -48,8 +48,11 @@ def search_sync(
 
     if cancel_event and cancel_event.is_set():
         header_kv = {"search": (mode or "content").strip().lower()}
-        if query and query.strip():
-            header_kv["query"] = query
+        rel_p = _safe_relpath(path, cwd)
+        if rel_p not in (".", ""):
+            header_kv["path"] = rel_p
+        if glob_pattern:
+            header_kv["glob"] = glob_pattern
         header_kv["status"] = "0 matches found"
         return done(content="", **header_kv)
 
@@ -67,9 +70,11 @@ def search_sync(
     if mode == "content" and not query.strip():
         return fail(ERROR_KIND_PARAMS, "query parameter is required for content search", name="query")
 
-    if before_lines == 0 and after_lines == 0 and context_lines > 0:
-        before_lines = context_lines
-        after_lines = context_lines
+    if context_lines > 0:
+        if before_lines == 0:
+            before_lines = context_lines
+        if after_lines == 0:
+            after_lines = context_lines
 
     if progress_callback:
         progress_callback({"stage": "start", "mode": mode})
@@ -144,7 +149,7 @@ def search_sync(
 
     header_kv: Dict[str, Any] = {"search": mode}
     rel_p = _safe_relpath(path, cwd)
-    if os.path.isdir(path) and rel_p not in (".", ""):
+    if rel_p not in (".", "") and (os.path.isdir(path) or match_count == 0):
         header_kv["path"] = rel_p
     if glob_pattern:
         header_kv["glob"] = glob_pattern

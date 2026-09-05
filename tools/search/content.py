@@ -102,6 +102,7 @@ def _search_content_ripgrep(
     match_count = 0
     stopping = False
     after_remaining = 0
+    last_matched_rel: Optional[str] = None
 
     try:
         if proc.stdout is not None:
@@ -121,20 +122,31 @@ def _search_content_ripgrep(
                         lineno = m.group(1)
                         sep = m.group(2)
                         text = m.group(3)
-                        rel = _safe_relpath(fpath, cwd) if os.path.isabs(fpath) else fpath
+                        if os.path.isabs(fpath):
+                            rel = _safe_relpath(fpath, cwd)
+                        else:
+                            rel = fpath.replace("\\", "/")
+                            if rel.startswith("./"):
+                                rel = rel[2:]
                         if sep == ":":
                             if stopping:
                                 break
                             matched_files.add(rel)
                             match_count += 1
+                            last_matched_rel = rel
+                            grouped_results.setdefault(rel, []).append((lineno, sep, text))
                             if match_count >= max_results:
                                 stopping = True
                                 after_remaining = after_lines
+                                if after_remaining <= 0:
+                                    break
                         elif stopping:
-                            if after_remaining <= 0:
+                            if after_remaining <= 0 or rel != last_matched_rel:
                                 break
                             after_remaining -= 1
-                        grouped_results.setdefault(rel, []).append((lineno, sep, text))
+                            grouped_results.setdefault(rel, []).append((lineno, sep, text))
+                        else:
+                            grouped_results.setdefault(rel, []).append((lineno, sep, text))
                     else:
                         output_lines.append(line)
                 else:
@@ -237,9 +249,13 @@ def _search_content_python(
         if not local_matches:
             return None
 
+        entries = _build_entries(file_lines, local_matches)
+        return entries, rel_path, len(local_matches), file_lines, local_matches
+
+    def _build_entries(file_lines: List[str], matches: List[int]) -> List[Tuple[int, str, str]]:
         entries: List[Tuple[int, str, str]] = []
         ctx_set: Set[int] = set()
-        for idx in local_matches:
+        for idx in matches:
             start_ctx = max(0, idx - before_lines)
             end_ctx = min(len(file_lines), idx + after_lines + 1)
             for c in range(start_ctx, end_ctx):
@@ -248,10 +264,9 @@ def _search_content_python(
         for ctx_idx in sorted(ctx_set):
             lineno = ctx_idx + 1
             raw_line = file_lines[ctx_idx].rstrip("\r\n")
-            sep = ":" if ctx_idx in local_matches else "-"
+            sep = ":" if ctx_idx in matches else "-"
             entries.append((lineno, sep, raw_line))
-
-        return entries, rel_path, len(local_matches)
+        return entries
 
     def _append_file_results(rel_p: str, entries: List[Tuple[int, str, str]]) -> None:
         if output_lines:
@@ -289,7 +304,7 @@ def _search_content_python(
                     break
                 batch = files_to_process[i : i + batch_size]
                 futures = {executor.submit(_process_file, f): f for f in batch}
-                batch_results: Dict[str, Tuple[List[Tuple[int, str, str]], int]] = {}
+                batch_results: Dict[str, Tuple[List[Tuple[int, str, str]], int, List[str], List[int]]] = {}
                 for future in as_completed(futures):
                     if cancel_event and cancel_event.is_set():
                         for fut in futures:
@@ -298,8 +313,8 @@ def _search_content_python(
                     try:
                         res = future.result(timeout=5.0)
                         if res:
-                            entries, rel_p, n_matches = res
-                            batch_results[rel_p] = (entries, n_matches)
+                            entries, rel_p, n_matches, flines, lmatches = res
+                            batch_results[rel_p] = (entries, n_matches, flines, lmatches)
                     except Exception:
                         continue
 
@@ -307,7 +322,11 @@ def _search_content_python(
                 for rel_p in sorted(batch_results.keys()):
                     if match_count >= max_results:
                         break
-                    entries, n_matches = batch_results[rel_p]
+                    entries, n_matches, flines, lmatches = batch_results[rel_p]
+                    avail = max_results - match_count
+                    if n_matches > avail:
+                        entries = _build_entries(flines, lmatches[:avail])
+                        n_matches = avail
                     _append_file_results(rel_p, entries)
                     matched_files.add(rel_p)
                     match_count += n_matches
@@ -319,7 +338,11 @@ def _search_content_python(
                 break
             res = _process_file(abs_fpath)
             if res:
-                entries, rel_p, n_matches = res
+                entries, rel_p, n_matches, flines, lmatches = res
+                avail = max_results - match_count
+                if n_matches > avail:
+                    entries = _build_entries(flines, lmatches[:avail])
+                    n_matches = avail
                 _append_file_results(rel_p, entries)
                 matched_files.add(rel_p)
                 match_count += n_matches
