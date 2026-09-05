@@ -5,21 +5,33 @@ Handles global (~/.johnston/mcp.json) and project (.johnston/mcp.json) MCP serve
 
 import asyncio
 import atexit
-import json
 import logging
 import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.domain.defaults.config import DEFAULT_MCP_CALL_TIMEOUT
+from core.infrastructure.mcp.config import (
+    GLOBAL_MCP_FILE,
+    PROJECT_MCP_FILE,
+    command_parts_valid,
+    ensure_global_config,
+    load_config_file,
+    server_enabled,
+    servers_signature,
+    update_server_config,
+    warn_broken_config,
+)
 from core.infrastructure.mcp.process_client import MCPProcessClient
+from core.infrastructure.mcp.schema import (
+    format_system_prompt_snippet,
+    format_tool_schema,
+    get_capabilities_for_exposed_tool,
+    get_tool_capabilities,
+)
 from core.infrastructure.platform.paths import CONFIG_DIR
-from core.infrastructure.platform.platform_utils import update_json_config
 
 logger = logging.getLogger(__name__)
-
-GLOBAL_MCP_FILE = os.path.join(CONFIG_DIR, "mcp.json")
-PROJECT_MCP_FILE = os.path.join(".johnston", "mcp.json")
 
 _mcp_manager_instance: Optional["MCPManager"] = None
 _atexit_registered = False
@@ -170,133 +182,37 @@ class MCPManager:
         self._servers_cache = []
 
     def _ensure_global_config(self) -> None:
-        """Lazily materialize the default global config, only once per manager.
-
-        Doing this at construction time wrote `~/.johnston/mcp.json` as a side
-        effect of merely instantiating the manager (and polluted test runs with
-        real user-config writes); deferring to first use keeps the constructor
-        side-effect free while preserving prod behavior.
-        """
-        try:
-            from core.infrastructure.config.config_helpers import ensure_json_config
-
-            ensure_json_config(self.global_file, {"mcpServers": {}})
-        except Exception:
-            logger.debug("Failed to ensure default global MCP config", exc_info=True)
+        ensure_global_config(self.global_file)
         self._global_config_ensured = True
 
     def _warn_once(self, key: Tuple[str, str], message: str) -> None:
-        """Log *message* once per unique key so repeated loads don't spam."""
         if key in self._warned_broken_config_files:
             return
         self._warned_broken_config_files.add(key)
         logger.warning("%s", message)
 
     def _warn_broken_config(self, path: str, reason: str = "") -> None:
-        """Log a broken-config warning once per (file, reason), not per call."""
-        base = f"Failed to load MCP servers config {path}"
-        self._warn_once((path, reason), f"{base}: {reason}" if reason else f"{base}: invalid JSON")
+        warn_broken_config(self._warned_broken_config_files, path, reason)
 
     @staticmethod
     def server_enabled(server: Dict[str, Any]) -> bool:
-        """True if the server entry is enabled.
-
-        ``enabled`` is the canonical config key; an absent key means enabled.
-        """
-        return bool(server.get("enabled", True))
+        return server_enabled(server)
 
     @staticmethod
     def _command_parts_valid(cmd: Any) -> bool:
-        """Validate a server command before it reaches subprocess launch.
-
-        Accepts a single string (binary name) or a non-empty list of strings;
-        anything else (int, None, mixed types) fails validation so the server is
-        skipped with a warning instead of crashing on a later ``list(cmd)``.
-        """
-        if isinstance(cmd, str):
-            return True
-        return isinstance(cmd, list) and bool(cmd) and all(isinstance(c, str) for c in cmd)
+        return command_parts_valid(cmd)
 
     def _servers_signature(self) -> Tuple:
-        """Returns (path, mtime_ns, size) for both config files to detect changes."""
-        sig = []
-        for path in (self.global_file, self.project_file):
-            try:
-                st = os.stat(path)
-                sig.append((path, st.st_mtime_ns, st.st_size))
-            except OSError:
-                sig.append((path, None, None))
-        return tuple(sig)
+        return servers_signature(self.global_file, self.project_file)
 
     def _tools_fetch_stale(self, server_name: str, ttl: float = 300.0) -> bool:
-        """True if this server's cached tools list is stale, based on last fetch time."""
         client = self.clients.get(server_name)
         if client is None:
             return False
         return bool(client.is_tools_stale(ttl=ttl))
 
     def _load_config_file(self, path: str, scope: str, servers: Dict[str, Dict[str, Any]]) -> None:
-        """Parse one MCP config file into ``servers``, validating entries.
-
-        Invalid entries (broken command/env/args types) are skipped with a
-        one-time warning; a malformed file logs a one-time warning and yields
-        nothing rather than spamming WARNING+traceback on every call.
-        """
-        if not os.path.exists(path):
-            return
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            self._warn_broken_config(path)
-            return
-
-        mcp_servers = data.get("mcpServers") or {}
-        if not isinstance(mcp_servers, dict):
-            self._warn_broken_config(path, reason="'mcpServers' must be an object")
-            return
-
-        for k, v in mcp_servers.items():
-            if not isinstance(v, dict):
-                self._warn_broken_config(path, reason=f"server '{k}': entry must be an object")
-                continue
-            v_copy = dict(v)
-            url = v_copy.get("url")
-            cmd = v_copy.get("command")
-            if url:
-                if not isinstance(url, str) or not (url.startswith("http://") or url.startswith("https://")):
-                    self._warn_broken_config(path, reason=f"server '{k}': invalid url {url!r}")
-                    continue
-                v_copy["type"] = "sse"
-                headers = v_copy.get("headers")
-                if headers is not None and not isinstance(headers, dict):
-                    self._warn_broken_config(path, reason=f"server '{k}': 'headers' must be an object")
-                    headers = None
-                v_copy["headers"] = headers or {}
-            else:
-                if not self._command_parts_valid(cmd):
-                    self._warn_broken_config(path, reason=f"server '{k}': invalid command {cmd!r}")
-                    continue
-                args = v_copy.get("args")
-                if args is not None and not isinstance(args, list):
-                    self._warn_broken_config(path, reason=f"server '{k}': 'args' must be an array")
-                    args = None
-                v_copy["args"] = args or []
-                v_copy["type"] = "stdio"
-
-            env = v_copy.get("env")
-            if env is not None and not isinstance(env, dict):
-                self._warn_broken_config(path, reason=f"server '{k}': 'env' must be an object")
-                env = None
-            v_copy["env"] = env
-            cwd = v_copy.get("cwd")
-            if cwd is not None and not isinstance(cwd, str):
-                self._warn_broken_config(path, reason=f"server '{k}': 'cwd' must be a string")
-                cwd = None
-            v_copy["cwd"] = cwd
-            v_copy["name"] = k
-            v_copy["scope"] = scope
-            servers[k] = v_copy
+        load_config_file(path, scope, servers, self._warned_broken_config_files)
 
     def load_servers(self) -> List[Dict[str, Any]]:
         """
@@ -341,62 +257,15 @@ class MCPManager:
         target = next((s for s in servers if s["name"] == name), None)
         if not target:
             return None
-
-        file_to_update = (
-            self.project_file
-            if target["scope"] == "project" and os.path.exists(self.project_file)
-            else self.global_file
-        )
-
         try:
-            def _mutate(cfg: Dict[str, Any]) -> None:
-                cfg.setdefault("mcpServers", {})
-                if name in cfg["mcpServers"]:
-                    entry = cfg["mcpServers"][name]
-                    entry.update(key_updates)
-                else:
-                    entry = {
-                        "command": target.get("command"),
-                        "args": target.get("args"),
-                        "env": target.get("env"),
-                        "url": target.get("url"),
-                    }
-                    entry.update(key_updates)
-                    cfg["mcpServers"][name] = entry
-
-                # A missing "enabled" means enabled, so only "enabled": false is
-                # stored; (re-)enabling drops the key.
-                if entry.get("enabled", True) is not False:
-                    entry.pop("enabled", None)
-
-            update_json_config(file_to_update, _mutate, indent=2)
+            update_server_config(self.global_file, self.project_file, target, name, key_updates)
         except Exception as e:
             logger.warning("Failed to update config for MCP server %s: %s", name, e)
-
         return target
 
     def _format_tool_schema(self, tool: Dict[str, Any], server_name: str, seen_names: Dict[str, str]) -> Optional[Dict[str, Any]]:
         """Formats tool dict to OpenAI function format and handles name collisions across servers."""
-        t_name = tool.get("name")
-        if not t_name:
-            return None
-
-        exposed_name = t_name
-        if t_name in seen_names and seen_names[t_name] != server_name:
-            exposed_name = f"{server_name}__{t_name}"
-        else:
-            seen_names[t_name] = server_name
-
-        return {
-            "type": "function",
-            "function": {
-                "name": exposed_name,
-                "description": tool.get("description", ""),
-                "parameters": tool.get("inputSchema", {"type": "object", "properties": {}}),
-            },
-            "_mcp_server": server_name,
-            "_mcp_tool_name": t_name,
-        }
+        return format_tool_schema(tool, server_name, seen_names)
 
     def toggle_server(self, name: str) -> bool:
         """
@@ -742,37 +611,10 @@ class MCPManager:
         return self._tools_refresh_task is not None and not self._tools_refresh_task.done()
 
     def get_tool_capabilities(self, server_name: str, tool_name: str) -> List[str]:
-        """Returns configured capabilities for an MCP tool.
-
-        Unknown MCP tools intentionally return an empty list; policy treats that
-        as blocked until the project/global MCP config classifies the tool.
-        """
-        for server in self.load_servers():
-            if server.get("name") != server_name:
-                continue
-            caps_cfg = server.get("capabilities") or {}
-            caps = caps_cfg.get(tool_name)
-            if caps is None:
-                caps = caps_cfg.get(f"{server_name}__{tool_name}")
-            if isinstance(caps, list):
-                return [str(c) for c in caps if str(c).strip()]
-            if isinstance(caps, str) and caps.strip():
-                return [caps.strip()]
-            return []
-        return []
+        return get_tool_capabilities(self.load_servers(), server_name, tool_name)
 
     def get_capabilities_for_exposed_tool(self, exposed_name: str) -> List[str]:
-        if "__" in exposed_name:
-            server_name, tool_name = exposed_name.split("__", 1)
-            return self.get_tool_capabilities(server_name, tool_name)
-
-        matches: List[str] = []
-        for server in self.load_servers():
-            server_name = server.get("name", "")
-            caps = self.get_tool_capabilities(server_name, exposed_name)
-            if caps:
-                matches.extend(caps)
-        return sorted(set(matches))
+        return get_capabilities_for_exposed_tool(self.load_servers(), exposed_name)
 
     def _resolve_target_client_and_tool(
         self, tool_name: str, active_tools: List[Dict[str, Any]], target_server: Optional[str] = None
@@ -939,25 +781,4 @@ class MCPManager:
         return None
 
     def get_system_prompt_snippet(self) -> str:
-        """Returns a prompt snippet listing enabled MCP tools grouped by server.
-
-        Kept minimal: full tool schemas (names, descriptions, parameters) are
-        already provided to the model via the function-call declaration. This
-        snippet only carries the server->tools grouping that the schema lacks.
-        """
-        cached_tools = self.get_cached_tools()
-        if not cached_tools:
-            return ""
-
-        by_server: Dict[str, List[str]] = {}
-        for t in cached_tools:
-            fn = t.get("function", {})
-            server = t.get("_mcp_server", "")
-            name = fn.get("name")
-            if not name:
-                continue
-            by_server.setdefault(server, []).append(name)
-
-        from core.infrastructure.runtime.prompt_markdown import format_mcp_servers_markdown
-
-        return format_mcp_servers_markdown(by_server)
+        return format_system_prompt_snippet(self.get_cached_tools())
