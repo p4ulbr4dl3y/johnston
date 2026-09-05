@@ -18,6 +18,7 @@ from widgets.presentation.commands import (
     SubagentsCommand,
     ThinkingEffortCommand,
 )
+from widgets.presentation.screens.constants import MESSAGE_INPUT
 from widgets.presentation.screens.rewind import RewindSelection
 from widgets.presentation.widgets.chat_container import ChatView
 
@@ -1398,21 +1399,220 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
         class Worker:
             is_running = True
+            is_finished = False
 
             def cancel(self):
                 raise Exception("cancel-boom")
 
         app.workers = [Worker()]
 
-        def push_screen(screen, callback=None):
+        async def push_screen(screen, callback=None):
             if callback:
-                callback("s1")
+                await callback("s1")
 
         app.push_screen = push_screen
         await ResumeCommand().execute(app)
         app.load_session_ui.assert_called_once_with("s1")
         self.assertFalse(app.is_generating)
         app.message_queue.clear.assert_called_once()
+
+    async def test_resume_waits_for_worker_teardown_before_switching_view(self):
+        """/resume during active generation must not let the cancelled
+        worker's "Response Interrupted" divider land in the resumed view."""
+        from widgets.presentation.commands import ResumeCommand
+
+        teardown_done = asyncio.Event()
+        divider_mounted = []
+
+        class SlowWorker:
+            is_running = True
+            is_finished = False
+
+            def cancel(self):
+                pass
+
+            async def wait(self):
+                # Generation worker teardown takes time (divider mount); block
+                # until the deferred divider mount completes.
+                await teardown_done.wait()
+
+        class ResumeChat:
+            def __init__(self):
+                self.children = []
+
+            async def remove_children(self):
+                self.children.clear()
+
+            def _mount_and_scroll(self, widget, **kwargs):
+                # Old-session view; the interrupting worker's teardown mounts
+                # the divider here racing the /resume switch.
+                divider_mounted.append("Response Interrupted")
+                teardown_done.set()
+
+            async def add_event_divider(self, text):
+                divider_mounted.append(text)
+                teardown_done.set()
+
+            async def load_session(self, session):
+                # Resumed session view under construction.
+                self.children.append(("msg",))
+
+            def focus(self):
+                pass
+
+        app = SimpleApp()
+        app.workers = [SlowWorker()]
+        app.current_session_id = "old-id"
+        app.is_generating = True
+        app.sm = MagicMock()
+        app.sm.list_main_sessions.return_value = [{"id": "new-id"}]
+        app.message_queue = MagicMock()
+        app.task_manager = SimpleNamespace(kill_all=AsyncMock())
+        restore_tasks = []
+
+        def load_session_ui(sid):
+            restore_tasks.append(asyncio.create_task(chat.load_session(sid)))
+
+        app.load_session_ui = load_session_ui
+        app.run_worker = lambda coro: asyncio.create_task(coro)
+        app.query_one = lambda target, default=None: chat
+        app.refresh_status_footer = MagicMock()
+        app.push_screen = lambda screen, callback=None: callback("new-id")
+
+        chat = ResumeChat()
+        # Deferred teardown from the cancelled worker, racing the /resume sequence.
+        asyncio.create_task(chat.add_event_divider("Response Interrupted"))
+
+        await ResumeCommand().execute(app)
+        for t in restore_tasks:
+            await t
+
+        # The cancelled worker's teardown (divider) completes before the view
+        # switch, so it does not leak into the resumed view's children.
+        self.assertEqual(divider_mounted, ["Response Interrupted"])
+        self.assertEqual(chat.children, [("msg",)])
+
+    async def test_resume_teardown_scoped_to_old_session_subagents(self):
+        """/resume must cancel subagents scoped to the OLD session being left."""
+        from widgets.presentation.commands import ResumeCommand
+
+        app = SimpleApp()
+        app.workers = []
+        app.current_session_id = "old-id"
+        app.sm = MagicMock()
+        app.sm.list_main_sessions.return_value = [{"id": "new-id"}]
+        app.message_queue = MagicMock()
+        app.task_manager = SimpleNamespace(kill_all=AsyncMock())
+        app.load_session_ui = MagicMock()
+        mock_input = MagicMock()
+        app.query_one = lambda target, default=None: mock_input
+        app.refresh_status_footer = MagicMock()
+        app.push_screen = lambda screen, callback=None: callback("new-id")
+
+        with patch("widgets.presentation.commands.session_commands.cancel_active_workers_and_tasks") as m_cancel:
+            await ResumeCommand().execute(app)
+        m_cancel.assert_awaited_once()
+        self.assertEqual(m_cancel.call_args.kwargs["session_id"], "old-id")
+        self.assertEqual(m_cancel.call_args.kwargs["wait_workers"], True)
+        self.assertEqual(m_cancel.call_args.kwargs["timeout"], 2.0)
+
+    async def test_fork_waits_for_worker_teardown_before_resetting_view(self):
+        """/fork during active generation must not let the cancelled worker's
+        "Response Interrupted" divider land in the forked view."""
+        from widgets.presentation.commands import ForkCommand
+
+        teardown_done = asyncio.Event()
+        divider_mounted = []
+        reset_done = asyncio.Event()
+
+        class SlowWorker:
+            is_running = True
+            is_finished = False
+
+            def cancel(self):
+                pass
+
+            async def wait(self):
+                await teardown_done.wait()
+
+        class ForkChat:
+            def __init__(self):
+                self.children = []
+
+            async def remove_children(self):
+                self.children.clear()
+
+            def _mount_and_scroll(self, widget, **kwargs):
+                divider_mounted.append("Response Interrupted")
+                teardown_done.set()
+
+            async def add_event_divider(self, text):
+                divider_mounted.append(text)
+                teardown_done.set()
+
+            async def reset_to_messages(self, messages, task_manager=None):
+                self.children.clear()
+                for m in messages or []:
+                    self.children.append(m)
+                reset_done.set()
+
+        chat = ForkChat()
+        app = SimpleApp()
+        app.workers = [SlowWorker()]  # deferred teardown racing the fork
+        app.current_session_id = "old-id"
+        app.is_generating = True
+        app.sm = MagicMock()
+        app.sm.get.return_value = SimpleNamespace(messages=[{"type": "user", "text": "Prompt one"}])
+        app.message_queue = MagicMock()
+        app.task_manager = SimpleNamespace(kill_all=AsyncMock())
+        app.pending_fork = None
+
+        def query_one(target, default=None):
+            if target == MESSAGE_INPUT:
+                return app.input
+            return chat
+
+        app.query_one = query_one
+        app.refresh_status_footer = MagicMock()
+        app.input = MockInput()
+        app.agent = SimpleNamespace()
+        app.push_screen = lambda screen, callback=None: callback(0)
+
+        asyncio.create_task(chat.add_event_divider("Response Interrupted"))
+
+        await ForkCommand().execute(app)
+        await reset_done.wait()
+
+        # Teardown completed before reset_to_messages ran; no divider leaks.
+        self.assertEqual(divider_mounted, ["Response Interrupted"])
+        self.assertEqual(app.pending_fork["parent_session_id"], "old-id")
+
+    async def test_fork_teardown_scoped_to_old_session_subagents(self):
+        """/fork must cancel subagents scoped to the OLD session being forked."""
+        from widgets.presentation.commands import ForkCommand
+
+        chat = MagicMock()
+        chat.get_user_messages.return_value = [(0, "Prompt one")]
+        app = SimpleApp()
+        app.current_session_id = "old-id"
+        app.is_generating = True
+        app.sm = MagicMock()
+        app.sm.get.return_value = MagicMock()
+        app.message_queue = MagicMock()
+        app.task_manager = SimpleNamespace(kill_all=AsyncMock())
+        app.pending_fork = None
+        app.query_one = lambda target, default=None: chat
+        app.refresh_status_footer = MagicMock()
+        app.input = MockInput()
+        app.agent = SimpleNamespace()
+        app.push_screen = lambda screen, callback=None: callback(0)
+
+        with patch("widgets.presentation.commands.session_commands.cancel_active_workers_and_tasks") as m_cancel:
+            await ForkCommand().execute(app)
+        m_cancel.assert_awaited_once()
+        self.assertEqual(m_cancel.call_args.kwargs["session_id"], "old-id")
+        self.assertEqual(m_cancel.call_args.kwargs["wait_workers"], True)
+        self.assertEqual(m_cancel.call_args.kwargs["timeout"], 2.0)
 
     async def test_subagents_no_store(self):
         app = SimpleApp()

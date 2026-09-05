@@ -50,17 +50,25 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         app.push_screen.assert_called()
         resume_callback = app.push_screen.call_args[1]["callback"]
 
+        # On-screen callbacks are now async; await the coroutine.
+        import inspect
+
+        async def invoke(result):
+            res = resume_callback(result)
+            if inspect.isawaitable(res):
+                await res
+
         # 1. Test Steal
-        resume_callback("steal:s_locked")
+        await invoke("steal:s_locked")
         app.sm.steal_session_lock.assert_called_with("s_locked")
         app.load_session_ui.assert_called_with("s_locked")
 
         # 2. Test ReadOnly
-        resume_callback("readonly:s_locked")
+        await invoke("readonly:s_locked")
         app.load_session_ui.assert_called_with("s_locked", read_only=True)
 
         # 3. Test Normal Unlocked Session
-        resume_callback("s_normal")
+        await invoke("s_normal")
         app.load_session_ui.assert_called_with("s_normal")
 
     async def test_new_command_resets_read_only_and_manages_locks(self):

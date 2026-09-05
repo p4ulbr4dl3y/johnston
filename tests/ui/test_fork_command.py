@@ -5,6 +5,15 @@ from widgets.presentation.commands import ForkCommand
 
 
 class TestForkCommand(unittest.IsolatedAsyncioTestCase):
+    async def _apply_selection(self, app, child_idx):
+        """Invoke the pushed screen's callback, awaiting the async handler."""
+        import inspect
+
+        cb = app.push_screen.call_args[1]["callback"]
+        res = cb(child_idx)
+        if inspect.isawaitable(res):
+            await res
+
     async def test_fork_command_empty_history(self):
         app = MagicMock()
         chat_view = MagicMock()
@@ -36,13 +45,10 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
 
         app.query_one = query_one_mock
 
-        def push_screen_mock(screen, callback):
-            callback(10)
-
-        app.push_screen = push_screen_mock
-
         cmd = ForkCommand()
         await cmd.execute(app)
+
+        await self._apply_selection(app, 10)
 
         app.sm.fork_session.assert_not_called()
         self.assertEqual(
@@ -70,13 +76,9 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
 
         app.query_one = query_one_mock
 
-        def push_screen_mock(screen, callback):
-            callback(20)
-
-        app.push_screen = push_screen_mock
-
         cmd = ForkCommand()
         await cmd.execute(app)
+        await self._apply_selection(app, 20)
 
         app.sm.fork_session.assert_not_called()
         self.assertEqual(
@@ -106,13 +108,9 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
 
         app.query_one = query_one_mock
 
-        def push_screen_mock(screen, callback):
-            callback(20)
-
-        app.push_screen = push_screen_mock
-
         cmd = ForkCommand()
         await cmd.execute(app)
+        await self._apply_selection(app, 20)
 
         base = app.pending_fork["title"]
         self.assertLessEqual(len(base), FORK_BASE_MAX_LEN)
@@ -141,13 +139,9 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
 
         app.query_one = query_one_mock
 
-        def push_screen_mock(screen, callback):
-            callback(FORK_CURRENT_STATE)
-
-        app.push_screen = push_screen_mock
-
         cmd = ForkCommand()
         await cmd.execute(app)
+        await self._apply_selection(app, FORK_CURRENT_STATE)
 
         app.sm.fork_session.assert_not_called()
         self.assertEqual(
@@ -304,14 +298,9 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
 
         app.query_one = query_one_mock
 
-        def push_screen_mock(screen, callback):
-            # Select turn 2 (index 2)
-            callback(2)
-
-        app.push_screen = push_screen_mock
-
         cmd = ForkCommand()
         await cmd.execute(app)
+        await self._apply_selection(app, 2)
 
         # reset_to_messages must receive only messages before turn 2 (turns 0 and 1)
         chat_view.reset_to_messages.assert_called_once()

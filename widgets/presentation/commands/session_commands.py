@@ -19,7 +19,6 @@ from widgets.chat_input import ChatInput
 from widgets.presentation.commands.base import BaseCommand
 from widgets.presentation.commands.helpers import (
     await_workers_finished,
-    cancel_active_workers,
     cancel_active_workers_and_tasks,
     reset_app_state,
 )
@@ -114,8 +113,18 @@ class ResumeCommand(BaseCommand):
                 if task_count:
                     s["task_count"] = task_count
 
-        def _apply_selected(sid: str, read_only: bool = False) -> None:
-            cancel_active_workers(app)
+        async def _apply_selected(sid: str, read_only: bool = False) -> None:
+            # Wait out cancelled-worker teardown (the "Response Interrupted"
+            # divider) before switching views, so it cannot land in the
+            # resumed session; only old-session subagents are cancelled.
+            await cancel_active_workers_and_tasks(
+                app,
+                wait_workers=True,
+                timeout=2.0,
+                kill_tasks=True,
+                cancel_subagents=True,
+                session_id=curr_sid,
+            )
             reset_app_state(app, is_generating=False, clear_queue=True)
             if read_only:
                 app.load_session_ui(sid, read_only=True)
@@ -123,7 +132,7 @@ class ResumeCommand(BaseCommand):
                 app.load_session_ui(sid)
             app.query_one(MESSAGE_INPUT, ChatInput).focus()
 
-        def on_resume_selected(result: str | None) -> None:
+        async def on_resume_selected(result: str | None) -> None:
             if not result:
                 app.query_one(MESSAGE_INPUT, ChatInput).focus()
                 return
@@ -133,15 +142,17 @@ class ResumeCommand(BaseCommand):
                 if choice == "steal":
                     if hasattr(app, "sm"):
                         app.sm.steal_session_lock(sid)
-                    _apply_selected(sid)
+                    await _apply_selected(sid)
                 elif choice == "readonly":
-                    _apply_selected(sid, read_only=True)
+                    await _apply_selected(sid, read_only=True)
                 return
 
-            _apply_selected(result)
+            await _apply_selected(result)
 
         curr_sid = getattr(app, "current_session_id", None)
-        app.push_screen(ResumeScreen(sessions, current_session_id=curr_sid), callback=on_resume_selected)
+        result = app.push_screen(ResumeScreen(sessions, current_session_id=curr_sid), callback=on_resume_selected)
+        if asyncio.iscoroutine(result):
+            await result
 
 
 class CompactCommand(BaseCommand):
@@ -406,7 +417,7 @@ class ForkCommand(BaseCommand):
             app.notify("History is empty: no messages to fork", severity="warning")
             return
 
-        def on_fork_selected(selected_child_idx: int | None) -> None:
+        async def on_fork_selected(selected_child_idx: int | None) -> None:
             if selected_child_idx is None:
                 app.query_one(MESSAGE_INPUT).focus()
                 return
@@ -428,7 +439,17 @@ class ForkCommand(BaseCommand):
                 # fork among its siblings and appends the "(fork N)" marker.
                 fork_base = clean_heuristic_title(msg_text, max_len=FORK_BASE_MAX_LEN) or None
 
-            cancel_active_workers(app)
+            # Wait out cancelled-worker teardown (the "Response Interrupted"
+            # divider) before re-rendering the view, so it cannot land
+            # mid-fork-render; only old-session subagents are cancelled.
+            await cancel_active_workers_and_tasks(
+                app,
+                wait_workers=True,
+                timeout=2.0,
+                kill_tasks=True,
+                cancel_subagents=True,
+                session_id=curr_sid,
+            )
             reset_app_state(app, is_generating=False, clear_queue=True)
 
             app.pending_fork = {
