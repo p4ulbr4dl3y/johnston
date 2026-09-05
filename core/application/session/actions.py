@@ -187,9 +187,17 @@ async def compact_session(
             refresh_footer_cb()
         else:
             outcome = CompactionOutcome(status=CompactionStatus.FAILED, message=msg)
+            if session is not None:
+                from core.domain.entities.session import record_session_compaction
+
+                record_session_compaction(session, "Compaction Failed")
             on_divider_update("Compaction Failed")
         return outcome
     except asyncio.CancelledError:
+        if session is not None:
+            from core.domain.entities.session import record_session_compaction
+
+            record_session_compaction(session, "Compaction Cancelled")
         on_divider_update("Compaction Cancelled")
         raise
     finally:

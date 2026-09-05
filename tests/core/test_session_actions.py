@@ -181,6 +181,42 @@ class TestCompactSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved, [True])
         self.assertEqual(footer, [])
 
+    async def test_compact_failure_records_divider_to_session(self):
+        class FailAgent(MockAgent):
+            async def compact_history(self):
+                return False, "Compaction failed (some err)"
+        mock_sess = MagicMock()
+
+        outcome = await compact_session(
+            FailAgent(),
+            save_session_cb=lambda: None,
+            on_begin=lambda: None,
+            on_divider_update=lambda _t: None,
+            refresh_footer_cb=lambda: None,
+            session=mock_sess,
+        )
+
+        self.assertFalse(outcome.success)
+        mock_sess.add_event.assert_called_once_with({"type": "event_divider", "text": "Compaction Failed"})
+
+    async def test_compact_cancelled_records_divider_to_session(self):
+        class CancelAgent(MockAgent):
+            async def compact_history(self):
+                raise asyncio.CancelledError()
+        mock_sess = MagicMock()
+
+        with self.assertRaises(asyncio.CancelledError):
+            await compact_session(
+                CancelAgent(),
+                save_session_cb=lambda: None,
+                on_begin=lambda: None,
+                on_divider_update=lambda _t: None,
+                refresh_footer_cb=lambda: None,
+                session=mock_sess,
+            )
+
+        mock_sess.add_event.assert_called_once_with({"type": "event_divider", "text": "Compaction Cancelled"})
+
     async def test_compact_no_agent(self):
         divider = []
         outcome = await compact_session(
