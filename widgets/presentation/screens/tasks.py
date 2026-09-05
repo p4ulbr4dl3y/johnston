@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 import time
 from typing import Any, Optional
@@ -6,13 +5,9 @@ from typing import Any, Optional
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList, RichLog
+from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from core.infrastructure.platform.platform_utils import is_windows
-from core.infrastructure.tasks.manage import extract_task_status_details
-from core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
-from widgets.chat_toolcall import ToolScrollBox
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from widgets.presentation.screens.constants import (
@@ -21,6 +16,17 @@ from widgets.presentation.screens.constants import (
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
     TAB_KEYS,
+)
+from widgets.presentation.screens.task_console import (
+    TaskConsoleScreen,
+    TaskStdinInput,
+)
+from widgets.presentation.screens.tasks_formatting import (
+    _filter_and_sort_tasks,
+    _safe_timestamp,
+    extract_shell_task_progress,
+    format_shell_task_row,
+    format_subagent_task_row,
 )
 from widgets.presentation.tool_display import (
     extract_subagent_progress,
@@ -32,352 +38,21 @@ from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import fit_modal_dialog
 from widgets.utils.row_format import (
     MODAL_WIDE_ROW_WIDTH,
-    format_badge_row,
     option_list_row_width,
 )
 
-
-def extract_shell_task_progress(task: Any) -> str:
-    """Extract a short, human-like activity/status badge for a background shell task.
-
-    Thin wrapper over :func:`core.infrastructure.tasks.manage.extract_task_status_details`
-    (single source of truth for status/duration), converting the canonical
-    ``(status, duration)`` pair into the row badge format.
-    """
-    if task is None:
-        return ""
-
-    status, dur = extract_task_status_details(task)
-
-    if status == "running":
-        return dur if dur and dur != "-" else "running..."
-
-    if status == "killed":
-        return "killed"
-    if status == "timeout":
-        return "timeout"
-
-    if status.startswith("exit:"):
-        code = status.split(":", 1)[1]
-        dur_suffix = f" • {dur}" if dur and dur != "-" else ""
-        return f"exit {code}{dur_suffix}"
-
-    # Terminal fallback (e.g. canonical "finished" for unknown statuses).
-    return status or "done"
-
-
-def format_shell_task_row(
-    cmd: str, task: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_WIDE_ROW_WIDTH
-) -> str:
-    """Format a shell task row with human-like activity/status badge on the right."""
-    clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(shell task)"
-    badge_plain = (
-        extract_shell_task_progress(task)
-        if task is not None
-        else ("running..." if is_running else "done")
-    )
-    return format_badge_row(clean, badge_plain, target_width=target_width)
-
-
-def format_subagent_task_row(
-    cmd: str, session: Optional[object] = None, is_running: bool = False, target_width: int = MODAL_WIDE_ROW_WIDTH
-) -> str:
-    """Format a subagent row with role prefix and human-like activity/status badge on the right."""
-    clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(subagent task)"
-    role_str = "Worker"
-    if session is not None:
-        agent = getattr(session, "agent", None)
-        raw_rn = getattr(agent, "role_name", None) or getattr(session, "role_name", None)
-        if isinstance(raw_rn, str) and raw_rn.strip():
-            role_str = raw_rn
-        else:
-            role = getattr(agent, "role", None) if agent else getattr(session, "role", None)
-            if isinstance(role, str) and role.strip():
-                from core.role_registry import get_role_display_name
-
-                role_str = get_role_display_name(role)
-    if not clean.lower().startswith(f"{role_str.lower()}:"):
-        clean = f"{role_str}: {clean}"
-    else:
-        clean = f"{role_str}:{clean[len(role_str)+1:]}"
-    badge_plain = (
-        extract_subagent_progress(session)
-        if session is not None
-        else ("running..." if is_running else "done")
-    )
-    return format_badge_row(clean, badge_plain, target_width=target_width)
-
-
-def _safe_timestamp(val: Any) -> float:
-    if isinstance(val, (int, float)):
-        return float(val)
-    if isinstance(val, str):
-        try:
-            return float(val)
-        except Exception:
-            pass
-    return 0.0
-
-
-def _filter_and_sort_tasks(items: list, search_query: str) -> list:
-    """Apply text search filter and running-first, newest-first ordering to task rows."""
-    q = search_query.strip().lower()
-    if q:
-        items = [it for it in items if q in it["command"].lower() or q in it["id"].lower()]
-    return sorted(
-        items,
-        key=lambda item: (not item.get("is_running", False), -_safe_timestamp(item.get("created_at"))),
-    )
-
-
-class TaskStdinInput(Input):
-    """Input widget for task stdin that routes scroll keys to the screen's log."""
-
-    async def _on_key(self, event: events.Key) -> None:
-        key = (event.key or "").lower()
-        if key in ("pageup", "page_up"):
-            if self.screen and hasattr(self.screen, "action_scroll_page_up"):
-                getattr(self.screen, "action_scroll_page_up")()
-                event.stop()
-                event.prevent_default()
-                return
-        elif key in ("pagedown", "page_down"):
-            if self.screen and hasattr(self.screen, "action_scroll_page_down"):
-                getattr(self.screen, "action_scroll_page_down")()
-                event.stop()
-                event.prevent_default()
-                return
-        elif key in ("shift+up", "ctrl+up"):
-            if self.screen and hasattr(self.screen, "action_scroll_up"):
-                getattr(self.screen, "action_scroll_up")()
-                event.stop()
-                event.prevent_default()
-                return
-        elif key in ("shift+down", "ctrl+down"):
-            if self.screen and hasattr(self.screen, "action_scroll_down"):
-                getattr(self.screen, "action_scroll_down")()
-                event.stop()
-                event.prevent_default()
-                return
-        await super()._on_key(event)
-
-
-class TaskConsoleScreen(BaseModalScreen[None]):
-    """Modal screen for viewing console output of a specific task in real-time, with stdin and kill.
-
-    Push-based: subscribes to the task's output listeners on mount, backfills
-    the buffered history once, then renders live chunks as they arrive.
-    """
-
-    BINDINGS = expand_bindings([
-        ("escape", "back", "Back to list"),
-        ("ctrl+k", "kill_task", "Kill Task"),
-        ("pageup", "scroll_page_up", "Page Up"),
-        ("pagedown", "scroll_page_down", "Page Down"),
-        ("ctrl+c", "quit_app", "Quit"),
-        ("ctrl+q", "quit_app", "Quit"),
-    ])
-
-    def __init__(self, bg_task):
-        super().__init__()
-        self.bg_task = bg_task
-        self.log_widget: Optional[RichLog] = None
-        self._pending_line = ""
-
-    def compose(self) -> ComposeResult:
-        cmd = getattr(self.bg_task, "command", "") or "(shell task)"
-        is_running = getattr(self.bg_task, "is_running", False)
-        lang = "powershell" if is_windows() else "bash"
-
-        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide task-console-dialog"):
-            yield ModalHeader("### **Shell Task**", esc_hint="")
-            with ToolScrollBox(classes="tool-scroll-box"):
-                yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
-            yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
-            yield TaskStdinInput(placeholder="Send input to stdin (Enter)...", id="shell-stdin-input", classes="modal-input")
-            yield ModalHint(
-                "enter Stdin • pgup/dn Scroll • ctrl+k Kill • esc Back"
-                if is_running
-                else "pgup/dn Scroll • esc Back",
-                id=MODAL_HINT_ID,
-            )
-
-    def _apply_dynamic_log_height(self) -> None:
-        if not self.log_widget:
-            return
-        try:
-            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-        except Exception:
-            dialog = None
-
-        screen_h = self.app.size.height if getattr(self, "app", None) else 24
-        if not isinstance(screen_h, int) or screen_h <= 0:
-            screen_h = 24
-
-        is_running = getattr(self.bg_task, "is_running", False)
-
-        cmd = getattr(self.bg_task, "command", "") or ""
-        cmd_lines = max(1, len(cmd.strip().splitlines()))
-        cmd_h = min(4, cmd_lines)
-
-        try:
-            cmd_box = self.query_one(".tool-scroll-box")
-            cmd_box.styles.max_height = cmd_h
-        except Exception:
-            pass
-
-        usable_h = fit_modal_dialog(dialog, screen_h)
-        if screen_h < 18:
-            overhead = 8 + cmd_h + (2 if is_running else 0)
-        else:
-            overhead = 11 + cmd_h + (2 if is_running else 0)
-
-        target_h = max(2, min(14, usable_h - overhead))
-
-        if is_running:
-            self.log_widget.styles.height = target_h
-        else:
-            self.log_widget.styles.height = "auto"
-        self.log_widget.styles.max_height = target_h
-
-    def _update_hint(self) -> None:
-        try:
-            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
-
-            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
-            hint = self.query_one(f"#{MODAL_HINT_ID}", Label)
-            is_running = getattr(self.bg_task, "is_running", False)
-            if is_running:
-                hint_str = (
-                    "enter Stdin • ctrl+k Kill • esc"
-                    if is_compact
-                    else "enter Stdin • pgup/dn Scroll • ctrl+k Kill • esc Back"
-                )
-            else:
-                hint_str = "pgup/dn • esc" if is_compact else "pgup/dn Scroll • esc Back"
-            hint.update(hint_str)
-        except Exception:
-            pass
-
-    def on_mount(self) -> None:
-        self.log_widget = self.query_one("#console-log", RichLog)
-        self._apply_dynamic_log_height()
-        self.log_widget.auto_scroll = False
-
-        self._update_state()
-
-        has_history = False
-        for chunk in getattr(getattr(self.bg_task, "output", None), "history", []):
-            if chunk.strip():
-                has_history = True
-            self._consume(strip_ansi(chunk))
-        if not has_history:
-            if getattr(self.bg_task, "is_running", False):
-                self.log_widget.write("(Waiting for command output...)")
-            else:
-                self.log_widget.write("(No output produced)")
-        self.log_widget.scroll_end(animate=False)
-        if hasattr(self.bg_task, "add_listener"):
-            self.bg_task.add_listener(self._on_output)
-
-    def _update_state(self) -> None:
-        self._apply_dynamic_log_height()
-        is_running = getattr(self.bg_task, "is_running", False)
-        try:
-            stdin_inp = self.query_one("#shell-stdin-input", Input)
-            if is_running:
-                stdin_inp.display = True
-                stdin_inp.focus()
-            else:
-                stdin_inp.display = False
-                if self.log_widget:
-                    self.log_widget.focus()
-        except Exception:
-            pass
-        self._update_hint()
-
-    def on_resize(self, event: events.Resize) -> None:
-        self._apply_dynamic_log_height()
-        self._update_hint()
-
-    def on_unmount(self) -> None:
-        if self.bg_task is not None and hasattr(self.bg_task, "remove_listener"):
-            self.bg_task.remove_listener(self._on_output)
-
-    def _is_at_bottom(self, threshold: int = 2) -> bool:
-        if not self.log_widget:
-            return True
-        return (self.log_widget.max_scroll_y - self.log_widget.scroll_y) <= threshold
-
-    def _on_output(self, text: str) -> None:
-        """Live chunk from the task; the final empty signal flushes the tail."""
-        if hasattr(self, "app") and self.app and self.is_mounted:
-            try:
-                self.app.call_from_thread(self._handle_live_chunk, text)
-            except Exception:
-                try:
-                    self._handle_live_chunk(text)
-                except Exception:
-                    pass
-        else:
-            self._handle_live_chunk(text)
-
-    def _handle_live_chunk(self, text: str) -> None:
-        if text:
-            self._consume(text)
-        else:
-            self._flush_pending()
-            self._update_state()
-
-    def _consume(self, text: str) -> None:
-        if not self.log_widget:
-            return
-        combined = self._pending_line + text
-        parts = combined.split("\n")
-        self._pending_line = parts.pop()
-        at_bottom = self._is_at_bottom()
-        for line in parts:
-            self.log_widget.write(process_carriage_returns(line), scroll_end=at_bottom)
-
-    def _flush_pending(self) -> None:
-        if self._pending_line and self.log_widget:
-            at_bottom = self._is_at_bottom()
-            self.log_widget.write(process_carriage_returns(self._pending_line), scroll_end=at_bottom)
-            self._pending_line = ""
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "shell-stdin-input":
-            val = event.value
-            event.input.value = ""
-            if self.bg_task and getattr(self.bg_task, "is_running", False):
-                if hasattr(self.bg_task, "send_input"):
-                    asyncio.create_task(self.bg_task.send_input(val))
-
-    def action_scroll_page_up(self) -> None:
-        if self.log_widget:
-            self.log_widget.scroll_page_up(animate=False)
-
-    def action_scroll_page_down(self) -> None:
-        if self.log_widget:
-            self.log_widget.scroll_page_down(animate=False)
-
-    def action_scroll_up(self) -> None:
-        if self.log_widget:
-            self.log_widget.scroll_up(animate=False)
-
-    def action_scroll_down(self) -> None:
-        if self.log_widget:
-            self.log_widget.scroll_down(animate=False)
-
-    async def action_kill_task(self) -> None:
-        if self.bg_task and getattr(self.bg_task, "is_running", False):
-            res = self.bg_task.kill()
-            if inspect.isawaitable(res):
-                await res
-            self._update_state()
-
-    def action_back(self) -> None:
-        self.dismiss()
+__all__ = [
+    "extract_shell_task_progress",
+    "format_shell_task_row",
+    "format_subagent_task_row",
+    "_safe_timestamp",
+    "_filter_and_sort_tasks",
+    "TaskStdinInput",
+    "TaskConsoleScreen",
+    "BaseTasksListScreen",
+    "ShellTasksScreen",
+    "SubagentsScreen",
+]
 
 
 class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
