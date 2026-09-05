@@ -46,23 +46,34 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             return
         self.is_generating = generating
         if generating:
-            if not self._spinner_timer:
-                self._spinner_timer = self.set_interval(0.2, self._spin)
+            if not self._spinner_timer and self.is_mounted:
+                try:
+                    self._spinner_timer = self.set_interval(0.15, self._spin)
+                except Exception:
+                    self._spinner_timer = None
         else:
             if self._spinner_timer:
-                self._spinner_timer.stop()
+                try:
+                    self._spinner_timer.stop()
+                except Exception:
+                    pass
                 self._spinner_timer = None
             self._spinner_idx = 0
         self.refresh_footer()
 
     def _spin(self) -> None:
         self._spinner_idx = (self._spinner_idx + 1) % len(SPINNER_FRAMES)
-        if hasattr(self, "_last_status_args"):
+        if getattr(self, "_last_grid_rows", None):
             self._render_stream_frame()
         else:
             self.refresh_footer()
 
     def on_mount(self) -> None:
+        if self.is_generating and not self._spinner_timer:
+            try:
+                self._spinner_timer = self.set_interval(0.15, self._spin)
+            except Exception:
+                self._spinner_timer = None
         self.refresh_footer()
         try:
             from core.infrastructure.mcp import get_mcp_manager

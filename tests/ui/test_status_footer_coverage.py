@@ -242,11 +242,11 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
     def test_render_stream_frame_only_animates_bottom_row(self):
         footer = SubagentStatusFooter()
         footer.is_generating = True
-        footer._spinner_idx = 1  # SPINNER_FRAMES[1] == "⠙"
+        footer._spinner_idx = 1  # SPINNER_FRAMES[1] == "◓"
         footer._last_grid_rows = [
             ("[bold #ffffff]Project structure[/]", "esc Back"),
             ("", ""),
-            ("[#a1a1aa]⠋ Explorer[/]", "[#a1a1aa]cost[/]"),
+            ("[#a1a1aa]◐ Explorer[/]", "[#a1a1aa]cost[/]"),
         ]
         with patch.object(footer, "update") as mock_update:
             footer._render_stream_frame()
@@ -256,11 +256,11 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
 
         # Direct swap_frame tests
         # Title with brackets has no spinner -> returns untouched
-        untouched = footer._swap_frame("[bold #ffffff]Project structure[/]", "⠙")
+        untouched = footer._swap_frame("[bold #ffffff]Project structure[/]", "◓")
         self.assertEqual(untouched, "[bold #ffffff]Project structure[/]")
         # Role with existing spinner -> correctly swaps
-        swapped = footer._swap_frame("[#a1a1aa]⠋ Explorer[/]", "⠙")
-        self.assertEqual(swapped, "[#a1a1aa]⠙ Explorer[/]")
+        swapped = footer._swap_frame("[#a1a1aa]◐ Explorer[/]", "◓")
+        self.assertEqual(swapped, "[#a1a1aa]◓ Explorer[/]")
 
     def test_render_footer_provider_active_and_pricing(self):
         footer = SubagentStatusFooter()
