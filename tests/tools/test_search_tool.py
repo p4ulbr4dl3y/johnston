@@ -623,10 +623,10 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         res2 = await self.tool.execute({"query": "SECRET_KEY", "include_hidden": True}, ctx=ctx)
         self.assertIn(".hidden_config.py", res2.content)
 
-    async def test_elapsed_time_in_header(self):
+    async def test_lean_header_no_elapsed_ms(self):
         ctx = ToolContext(cwd=self.tmpdir)
         res = await self.tool.execute({"query": "AppRunner"}, ctx=ctx)
-        self.assertIn("elapsed_ms=", res.content)
+        self.assertNotIn("elapsed_ms=", res.content)
 
     async def test_parallel_outline_processing(self):
         # Create many files to trigger parallel processing

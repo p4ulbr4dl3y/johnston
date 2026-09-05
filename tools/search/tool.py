@@ -144,24 +144,21 @@ def search_sync(
 
     header_kv: Dict[str, Any] = {"search": mode}
     rel_p = _safe_relpath(path, cwd)
-    if rel_p not in (".", ""):
+    if os.path.isdir(path) and rel_p not in (".", ""):
         header_kv["path"] = rel_p
-    if query.strip():
-        header_kv["query"] = query
     if glob_pattern:
         header_kv["glob"] = glob_pattern
 
     if match_count == 0:
         header_kv["status"] = "0 matches found"
-        header_kv["elapsed_ms"] = str(elapsed_ms)
         return done(content="", **header_kv)
 
     if mode == "filename":
         header_kv["files"] = str(file_count)
     else:
         header_kv["matches"] = str(match_count)
-        header_kv["files"] = str(file_count)
-    header_kv["elapsed_ms"] = str(elapsed_ms)
+        if file_count > 1 or os.path.isdir(path):
+            header_kv["files"] = str(file_count)
 
     body = "\n".join(raw_lines).strip()
     full_output = truncate_output(body, tool_name="search")
