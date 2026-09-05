@@ -600,6 +600,13 @@ ModalScreen {
     max-width: 104;
 }
 
+SessionChatScreen,
+SubagentViewScreen {
+    background: $bg-app;
+    align: left top;
+    overflow: hidden;
+}
+
 #subagent-container {
     width: 100%;
     height: 100%;
@@ -609,6 +616,7 @@ ModalScreen {
 
 #subagent-chat-view {
     height: 1fr;
+    min-height: 3;
     padding: 1 2 1 2;
     background: $bg-app;
     scrollbar-size: 0 0;

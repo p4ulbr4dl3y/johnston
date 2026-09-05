@@ -520,7 +520,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         is_subagent = False
         if self.status == "running":
             try:
-                if self.screen and type(self.screen).__name__ == "SubagentViewScreen":
+                if self.screen and type(self.screen).__name__ in ("SubagentViewScreen", "SessionChatScreen"):
                     is_subagent = True
             except Exception:
                 pass
@@ -529,7 +529,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     for node in getattr(self, "ancestors_with_self", []):
                         if (
                             getattr(node, "id", None) == "subagent-chat-view"
-                            or type(node).__name__ == "SubagentViewScreen"
+                            or type(node).__name__ in ("SubagentViewScreen", "SessionChatScreen")
                         ):
                             is_subagent = True
                             break

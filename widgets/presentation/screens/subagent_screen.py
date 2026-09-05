@@ -26,6 +26,14 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         ("ctrl+p", "toggle_plan", "Toggle Plan"),
         ("ctrl+h", "toggle_plan_hidden", "Hide/Show Plan"),
         ("ctrl+o", "toggle_expand", "Toggle Expand"),
+        ("pageup", "scroll_page_up", "Page Up"),
+        ("pagedown", "scroll_page_down", "Page Down"),
+        ("shift+pageup", "scroll_top", "Scroll Top"),
+        ("shift+pagedown", "scroll_bottom", "Scroll Bottom"),
+        ("home", "scroll_top", "Scroll Top"),
+        ("end", "scroll_bottom", "Scroll Bottom"),
+        ("up", "scroll_up", "Scroll Up"),
+        ("down", "scroll_down", "Scroll Down"),
         ("ctrl+c", "quit_app", "Quit"),
         ("ctrl+q", "quit_app", "Quit"),
     ])
@@ -390,6 +398,48 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
             chat_view = self.query_one("#subagent-chat-view", ChatView)
             chat_view.toggle_expand("all")
             self._save_expand_state()
+        except Exception:
+            pass
+
+    def action_scroll_page_up(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_page_up()
+        except Exception:
+            pass
+
+    def action_scroll_page_down(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_down_page()
+        except Exception:
+            pass
+
+    def action_scroll_up(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_up(animate=False)
+        except Exception:
+            pass
+
+    def action_scroll_down(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_down(animate=False)
+        except Exception:
+            pass
+
+    def action_scroll_top(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_to_top()
+        except Exception:
+            pass
+
+    def action_scroll_bottom(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_to_bottom()
         except Exception:
             pass
 

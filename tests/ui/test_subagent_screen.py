@@ -806,6 +806,48 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(screen.show_input)
         self.assertEqual(screen.session_id_or_desc, "task-123")
 
+    async def test_session_chat_screen_scroll_actions(self):
+        sess = self._mk("task-scroll", "Scroll Task", "prompt")
+        for i in range(20):
+            sess.add_event({"type": "user", "text": f"Msg {i}"})
+            sess.add_event({"type": "bot", "text": f"Reply {i}"})
+
+        screen = SubagentViewScreen("task-scroll")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            if getattr(screen, "_history_worker", None):
+                await screen._history_worker.wait()
+            await pilot.pause(0.1)
+
+            from unittest.mock import MagicMock
+
+            chat = screen.query_one(ChatView)
+            chat.scroll_page_up = MagicMock()
+            chat.scroll_down_page = MagicMock()
+            chat.scroll_up = MagicMock()
+            chat.scroll_down = MagicMock()
+            chat.scroll_to_top = MagicMock()
+            chat.scroll_to_bottom = MagicMock()
+
+            screen.action_scroll_page_up()
+            chat.scroll_page_up.assert_called_once()
+
+            screen.action_scroll_page_down()
+            chat.scroll_down_page.assert_called_once()
+
+            screen.action_scroll_up()
+            chat.scroll_up.assert_called_once_with(animate=False)
+
+            screen.action_scroll_down()
+            chat.scroll_down.assert_called_once_with(animate=False)
+
+            screen.action_scroll_top()
+            chat.scroll_to_top.assert_called_once()
+
+            screen.action_scroll_bottom()
+            chat.scroll_to_bottom.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
