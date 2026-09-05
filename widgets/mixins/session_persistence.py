@@ -66,6 +66,8 @@ class SessionPersistenceMixin:
                 except Exception:
                     pass
 
+            # Delay plan notch appearance so dialogue renders first
+            await asyncio.sleep(0.15)
             try:
                 from widgets.presentation.widgets.plan_notch import PlanNotch
 

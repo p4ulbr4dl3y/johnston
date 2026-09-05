@@ -707,6 +707,30 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
         hidden_msg = await chat_view.restore_message({"type": "user", "text": "hi", "show_in_ui": False})
         self.assertIsNone(hidden_msg)
 
+    async def test_restore_invoke_subagent_resolves_session_from_store(self):
+        chat_view = ChatView()
+        chat_view._wait_until_attached = AsyncMock()
+        chat_view.mount = AsyncMock()
+
+        mock_session = MagicMock(id="sub_xyz", status="error")
+        mock_store = MagicMock()
+        mock_store.find_session_by_title_or_id.return_value = mock_session
+
+        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
+            tool = await chat_view.restore_message({
+                "type": "tool",
+                "tool_type": "invoke_subagent",
+                "target": "",
+                "args": {"title": "Sub Task", "prompt": "do something"},
+                "status": "running",
+                "result_text": "",
+            })
+            self.assertIsInstance(tool, ToolCallWidget)
+            self.assertEqual(tool.subagent_session_id, "sub_xyz")
+            self.assertEqual(tool.status, "error")
+            self.assertTrue(tool.is_clickable_header())
+            self.assertIn("tool-header-expandable", tool.header_label.classes)
+
     async def test_load_all_older_messages_and_count(self):
         app = JohnstonApp()
         async with app.run_test() as pilot:

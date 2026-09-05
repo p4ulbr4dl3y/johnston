@@ -82,8 +82,48 @@ async def restore_message_item(
             is_live = bool(task_id and mgr is not None and getattr(mgr, "_tasks", {}).get(task_id) is not None)
             if not is_live:
                 status = "done" if rtext else "cancelled"
-        elif not status and not rtext:
-            status = "cancelled"
+        sub_id = msg.get("subagent_session_id") or (targs.get("session_id") if isinstance(targs, dict) else None)
+        if not sub_id and rtext:
+            m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", rtext, re.IGNORECASE)
+            if m:
+                sub_id = m.group(1)
+        if not sub_id and ttype in ("invoke_subagent", "manage_subagent"):
+            title = targs.get("title") or targs.get("prompt")
+            if title:
+                app = None
+                try:
+                    app = chat_view.app
+                except Exception:
+                    pass
+                store = getattr(app, "sm", None) if app else None
+                if store is None:
+                    try:
+                        from core.infrastructure.storage.session_store import SessionStore
+
+                        store = SessionStore.get_instance()
+                    except Exception:
+                        store = None
+                if store is not None and hasattr(store, "find_session_by_title_or_id"):
+                    try:
+                        curr_sid = getattr(app, "current_session_id", None) if app else None
+                        found = store.find_session_by_title_or_id(str(title), parent_id=curr_sid)
+                        if not found:
+                            found = store.find_session_by_title_or_id(str(title))
+                        if found and getattr(found, "id", None):
+                            sub_id = str(found.id)
+                            f_status = getattr(found, "status", None)
+                            if status in ("running", "cancelled") and f_status in (
+                                "error",
+                                "cancelled",
+                                "done",
+                                "completed",
+                            ):
+                                status = "error" if f_status == "error" else ("cancelled" if f_status == "cancelled" else "done")
+                    except Exception:
+                        pass
+        if sub_id:
+            msg["subagent_session_id"] = str(sub_id)
+
         widget = await chat_view.add_tool_call(
             ttype,
             target,
@@ -92,16 +132,9 @@ async def restore_message_item(
             status=status,
             returncode=msg.get("returncode"),
             animate=False,
+            subagent_session_id=sub_id,
             **kw,
         )
-        if widget is not None:
-            sub_id = msg.get("subagent_session_id") or (targs.get("session_id") if isinstance(targs, dict) else None)
-            if not sub_id and msg.get("result_text"):
-                m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", msg.get("result_text") or "", re.IGNORECASE)
-                if m:
-                    sub_id = m.group(1)
-            if sub_id:
-                setattr(widget, "subagent_session_id", str(sub_id))
         return widget
     elif mtype == "event_divider":
         ctxt = msg.get("text", "Session Compacted")
@@ -707,6 +740,7 @@ class ChatView(VerticalScroll):
         status: str = None,
         returncode: int = None,
         before: Any = None,
+        subagent_session_id: str = None,
     ) -> ToolCallWidget:
         last_child = None
         children_to_check = self.children if before is None else [c for c in self.children if c != before]
@@ -744,6 +778,7 @@ class ChatView(VerticalScroll):
             status=status,
             returncode=returncode,
             is_mcp=is_mcp,
+            subagent_session_id=subagent_session_id,
         )
         if self.auto_expand_all and widget.is_expandable():
             widget.is_expanded = True

@@ -235,37 +235,38 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
 
             await ChatView.load_session(chat_view, self.session, driver=self.driver, is_running=is_running)
 
-            # Restore active plan from transcript or session object if present
-            plan_data = extract_active_plan_from_messages(self.session.messages)
-            p_items = None
-            p_expl = ""
-            if plan_data and plan_data[0]:
-                p_items, p_expl = plan_data
-            elif getattr(self.session, "current_plan", None):
-                p_items = self.session.current_plan
-                p_expl = getattr(self.session, "current_plan_explanation", "")
+            # Restore active plan from transcript or session object if present, delayed so dialogue renders first
+            async def _restore_notch_delayed() -> None:
+                await asyncio.sleep(0.15)
+                try:
+                    plan_data = extract_active_plan_from_messages(self.session.messages) if self.session else None
+                    p_items = None
+                    p_expl = ""
+                    if plan_data and plan_data[0]:
+                        p_items, p_expl = plan_data
+                    elif self.session and getattr(self.session, "current_plan", None):
+                        p_items = self.session.current_plan
+                        p_expl = getattr(self.session, "current_plan_explanation", "")
 
-            if p_items:
-                self.current_plan = p_items
-                self.current_plan_explanation = p_expl
-                try:
-                    notch = self.query_one(PlanNotch)
-                    notch.set_plan(p_items, p_expl)
-                    if app and hasattr(app, "_subagent_plan_state") and isinstance(app._subagent_plan_state, dict):
-                        p_state = app._subagent_plan_state.get(self.session.id)
-                        if isinstance(p_state, dict):
-                            if p_state.get("is_expanded") and not notch.is_expanded:
-                                notch.toggle_expanded()
-                            if "display" in p_state:
-                                notch.display = bool(p_state["display"])
-                                notch.refresh_notch()
+                    if p_items:
+                        self.current_plan = p_items
+                        self.current_plan_explanation = p_expl
+                        notch = self.query_one(PlanNotch)
+                        notch.set_plan(p_items, p_expl)
+                        if app and hasattr(app, "_subagent_plan_state") and isinstance(app._subagent_plan_state, dict):
+                            p_state = app._subagent_plan_state.get(self.session.id)
+                            if isinstance(p_state, dict):
+                                if p_state.get("is_expanded") and not notch.is_expanded:
+                                    notch.toggle_expanded()
+                                if "display" in p_state:
+                                    notch.display = bool(p_state["display"])
+                                    notch.refresh_notch()
+                    else:
+                        self.query_one(PlanNotch).clear_plan()
                 except Exception:
                     pass
-            else:
-                try:
-                    self.query_one(PlanNotch).clear_plan()
-                except Exception:
-                    pass
+
+            asyncio.create_task(_restore_notch_delayed())
 
             if not self.queue_task or self.queue_task.done():
                 self.queue_task = asyncio.create_task(self._process_queue())

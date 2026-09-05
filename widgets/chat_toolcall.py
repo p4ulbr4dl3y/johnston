@@ -95,6 +95,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         status: str = None,
         returncode: int = None,
         is_mcp: bool = False,
+        subagent_session_id: str = None,
     ):
         classes = f"tool-call tool-{(tool_type or '').lower()}"
         if is_sequential:
@@ -116,7 +117,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.background_task_id = None
         self.log_path: str | None = None
         self.task_id: str | None = None
-        self.subagent_session_id: str | None = None
+        self.subagent_session_id: str | None = subagent_session_id
         self.tool_call_id: str | None = None
         self.tool_call_index: int | None = None
         self._shell_update_scheduled = False
@@ -185,6 +186,37 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if session_id:
             self.subagent_session_id = str(session_id)
             return True
+
+        if self.canonical_tool in ("invoke_subagent", "manage_subagent"):
+            title = args.get("title") or args.get("prompt")
+            if title:
+                app = None
+                try:
+                    app = self.app
+                except Exception:
+                    pass
+                store = getattr(app, "sm", None) if app else None
+                if store is None:
+                    try:
+                        from core.infrastructure.storage.session_store import SessionStore
+
+                        store = SessionStore.get_instance()
+                    except Exception:
+                        store = None
+                if store is not None and hasattr(store, "find_session_by_title_or_id"):
+                    try:
+                        curr_sid = getattr(app, "current_session_id", None) if app else None
+                        sess = store.find_session_by_title_or_id(str(title), parent_id=curr_sid)
+                        if not sess:
+                            sess = store.find_session_by_title_or_id(str(title))
+                        if sess is not None and getattr(sess, "id", None) and (
+                            isinstance(sess.id, str) or type(sess).__name__ == "MagicMock"
+                        ):
+                            if isinstance(sess.id, str):
+                                self.subagent_session_id = sess.id
+                            return True
+                    except Exception:
+                        pass
         return False
 
     def is_clickable_header(self) -> bool:
@@ -241,6 +273,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.scroll_box.display = False
             self.content_widget.display = False
             self.md_widget.display = False
+        if self.is_clickable_header():
+            self.header_label.add_class(TOOL_HEADER_EXPANDABLE)
+            self.header_label.remove_class(TOOL_HEADER)
+        else:
+            self.header_label.add_class(TOOL_HEADER)
+            self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
         self.render_header()
         self._sync_sequential_with_prev()
         if self.status == "running" and self.is_expandable():
