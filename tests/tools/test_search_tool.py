@@ -863,5 +863,105 @@ class TestProgressCallback(unittest.TestCase):
         self.assertIn("done", stages)
 
 
+class TestTreeSitter(unittest.TestCase):
+    """Tests for tree-sitter integration (optional dependency)."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def test_tree_sitter_available(self):
+        """Test that tree-sitter availability is detected."""
+        from tools.search import TREE_SITTER_AVAILABLE
+        # Just check it's a boolean
+        self.assertIsInstance(TREE_SITTER_AVAILABLE, bool)
+
+    def test_python_perfect_accuracy(self):
+        """Test tree-sitter ignores comments and strings in Python."""
+        from tools.search import TREE_SITTER_AVAILABLE
+        if not TREE_SITTER_AVAILABLE:
+            self.skipTest("Tree-sitter not available")
+
+        with open(os.path.join(self.tmpdir, "test.py"), "w") as f:
+            f.write("""
+# Comment: class FakeClass
+\"\"\"Docstring: class AnotherFake\"\"\"
+class RealClass:
+    def real_method(self):
+        pass
+x = "string: class YetAnotherFake"
+""")
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="*.py",
+        )
+
+        self.assertIn("RealClass", result.content)
+        self.assertIn("real_method", result.content)
+        self.assertNotIn("FakeClass", result.content)
+        self.assertNotIn("AnotherFake", result.content)
+        self.assertNotIn("YetAnotherFake", result.content)
+
+    def test_javascript_perfect_accuracy(self):
+        """Test tree-sitter ignores comments and strings in JavaScript."""
+        from tools.search import TREE_SITTER_AVAILABLE
+        if not TREE_SITTER_AVAILABLE:
+            self.skipTest("Tree-sitter not available")
+
+        with open(os.path.join(self.tmpdir, "test.js"), "w") as f:
+            f.write("""
+// Comment: class FakeClass
+/* Block comment: class AnotherFake */
+function realFunc() {}
+class RealClass {}
+const x = "string: class YetAnotherFake";
+""")
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="*.js",
+        )
+
+        self.assertIn("realFunc", result.content)
+        self.assertIn("RealClass", result.content)
+        self.assertNotIn("FakeClass", result.content)
+        self.assertNotIn("AnotherFake", result.content)
+
+    def test_typescript_perfect_accuracy(self):
+        """Test tree-sitter ignores comments and strings in TypeScript."""
+        from tools.search import TREE_SITTER_AVAILABLE
+        if not TREE_SITTER_AVAILABLE:
+            self.skipTest("Tree-sitter not available")
+
+        with open(os.path.join(self.tmpdir, "test.ts"), "w") as f:
+            f.write("""
+// Comment: class FakeClass
+interface RealInterface {}
+class RealClass {}
+export function helper() {}
+""")
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="*.ts",
+        )
+
+        self.assertIn("RealClass", result.content)
+        self.assertIn("helper", result.content)
+        self.assertNotIn("FakeClass", result.content)
+
+
 if __name__ == "__main__":
     unittest.main()
