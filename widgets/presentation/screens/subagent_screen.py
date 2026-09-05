@@ -151,30 +151,43 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
             app._subagent_expand_state = {}
         if not hasattr(app, "_subagent_plan_state") or not isinstance(app._subagent_plan_state, dict):
             app._subagent_plan_state = {}
-        try:
-            chat_view = getattr(self, "_chat_view", None)
-            if chat_view is None:
+
+        chat_view = getattr(self, "_chat_view", None)
+        if chat_view is None:
+            try:
                 chat_view = self.query_one("#subagent-chat-view", ChatView)
-            expanded_indices = set()
-            for idx, child in enumerate(chat_view.children):
-                if getattr(child, "is_expanded", False):
-                    expanded_indices.add(idx)
-            app._subagent_expand_state[self.session.id] = expanded_indices
+            except Exception:
+                chat_view = None
+        if chat_view and getattr(chat_view, "_is_loading_session", False):
+            return
+
+        try:
+            if chat_view:
+                expanded_indices = set()
+                for idx, child in enumerate(chat_view.children):
+                    if getattr(child, "is_expanded", False):
+                        expanded_indices.add(idx)
+                app._subagent_expand_state[self.session.id] = expanded_indices
         except Exception:
             pass
         try:
             notch = getattr(self, "_notch", None)
             if notch is None:
                 notch = self.query_one(PlanNotch)
-            app._subagent_plan_state[self.session.id] = {
-                "is_expanded": getattr(notch, "is_expanded", False),
-                "display": getattr(notch, "display", False),
-            }
+            if notch and getattr(notch, "plan_items", None):
+                app._subagent_plan_state[self.session.id] = {
+                    "is_expanded": getattr(notch, "is_expanded", False),
+                    "display": getattr(notch, "display", True),
+                }
         except Exception:
             pass
 
     def _on_plan_update(self, plan: list, explanation: str) -> None:
         self.on_plan_update(plan, explanation)
+        if self.session:
+            setattr(self.session, "current_plan", plan)
+            setattr(self.session, "current_plan_explanation", explanation)
+        self._save_expand_state()
 
     async def _load_history_session(self) -> None:
         chat_view = self.query_one("#subagent-chat-view", ChatView)
@@ -188,7 +201,7 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         self.driver = ChatStreamDriver(
             chat_view,
             on_tool_widget=lambda w: setattr(self, "_last_tool_widget", w),
-            on_plan_update=self.on_plan_update,
+            on_plan_update=self._on_plan_update,
         )
 
         is_running = bool(self.session and getattr(self.session, "status", "") == "running")
@@ -211,10 +224,19 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
 
             await ChatView.load_session(chat_view, self.session, driver=self.driver, is_running=is_running)
 
-            # Restore active plan from transcript if present
+            # Restore active plan from transcript or session object if present
             plan_data = extract_active_plan_from_messages(self.session.messages)
-            if plan_data:
+            p_items = None
+            p_expl = ""
+            if plan_data and plan_data[0]:
                 p_items, p_expl = plan_data
+            elif getattr(self.session, "current_plan", None):
+                p_items = self.session.current_plan
+                p_expl = getattr(self.session, "current_plan_explanation", "")
+
+            if p_items:
+                self.current_plan = p_items
+                self.current_plan_explanation = p_expl
                 try:
                     notch = self.query_one(PlanNotch)
                     notch.set_plan(p_items, p_expl)
@@ -226,6 +248,11 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
                             if "display" in p_state:
                                 notch.display = bool(p_state["display"])
                                 notch.refresh_notch()
+                except Exception:
+                    pass
+            else:
+                try:
+                    self.query_one(PlanNotch).clear_plan()
                 except Exception:
                     pass
 
@@ -332,8 +359,14 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         super().action_toggle_plan_hidden()
         self._save_expand_state()
 
+    def on_click(self, event) -> None:
+        target = getattr(event, "widget", None) or getattr(event, "target", None)
+        if isinstance(target, PlanNotch) or getattr(target, "id", None) in ("plan-notch", "plan-notch-container"):
+            self._save_expand_state()
+
     def action_kill_subagent(self) -> None:
         """Kill the current subagent if running."""
+        self._save_expand_state()
         if self.session and getattr(self.session, "status", "") == "running":
             if getattr(self.session, "async_task", None) and not self.session.async_task.done():
                 try:
@@ -361,6 +394,7 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
 
     def action_quit_app(self) -> None:
         """Quit the application."""
+        self._save_expand_state()
         if self.app:
             self.app.exit()
 

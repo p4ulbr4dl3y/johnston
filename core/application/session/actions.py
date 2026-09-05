@@ -429,6 +429,8 @@ def _touched_files(user_events: list[dict], seq_idx: int) -> Optional[list[str]]
 
 def restore_plan_from_messages(messages: list[dict] | None) -> tuple[list[dict] | None, str]:
     """Extract the latest active plan and explanation from a list of messages."""
+    import json
+
     restored_plan = None
     restored_explanation = ""
     if not messages:
@@ -440,22 +442,34 @@ def restore_plan_from_messages(messages: list[dict] | None) -> tuple[list[dict] 
         m_type = msg.get("type")
         if m_type == "user":
             has_subsequent_user_msg = True
-        elif m_type == "tool" and msg.get("tool_type") == "update_plan":
+        elif m_type == "tool" and (msg.get("tool_type") == "update_plan" or msg.get("name") == "update_plan"):
             args = msg.get("args") or {}
-            if isinstance(args, dict) and isinstance(args.get("plan"), list):
-                candidate_plan = [p for p in args.get("plan") if isinstance(p, dict)]
-                candidate_explanation = str(args.get("explanation") or "").strip()
-                if (
-                    candidate_plan
-                    and all(p.get("status") == "completed" for p in candidate_plan)
-                    and has_subsequent_user_msg
-                ):
-                    restored_plan = None
-                    restored_explanation = ""
-                else:
-                    restored_plan = candidate_plan
-                    restored_explanation = candidate_explanation
-                break
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except Exception:
+                    args = {}
+            if isinstance(args, dict):
+                plan_raw = args.get("plan")
+                if isinstance(plan_raw, str):
+                    try:
+                        plan_raw = json.loads(plan_raw)
+                    except Exception:
+                        plan_raw = []
+                if isinstance(plan_raw, list):
+                    candidate_plan = [p for p in plan_raw if isinstance(p, dict)]
+                    candidate_explanation = str(args.get("explanation") or "").strip()
+                    if (
+                        candidate_plan
+                        and all(p.get("status") == "completed" for p in candidate_plan)
+                        and has_subsequent_user_msg
+                    ):
+                        restored_plan = None
+                        restored_explanation = ""
+                    else:
+                        restored_plan = candidate_plan
+                        restored_explanation = candidate_explanation
+                    break
     return restored_plan, restored_explanation
 
 

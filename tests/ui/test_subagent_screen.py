@@ -532,6 +532,67 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(notch2.is_expanded)
             self.assertFalse(notch2.display)
 
+    async def test_subagent_screen_reopen_plan_display_when_plan_added_later(self):
+        from widgets.presentation.widgets.plan_notch import PlanNotch
+
+        # Session initially has NO plan
+        sess = self._mk("task-reopen-plan", "Reopen Agent", "Prompt")
+        sess.add_event({"type": "bot", "text": "Starting work"})
+
+        screen = SubagentViewScreen("task-reopen-plan")
+        app = DummyHostApp(screen, store=self.store)
+
+        # First visit: notch has no items, screen closes
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            notch = screen.query_one(PlanNotch)
+            self.assertFalse(notch.display)
+            screen.action_close()
+            await pilot.pause(0.1)
+
+        # Ensure empty notch did NOT save display=False poison
+        self.assertNotIn("task-reopen-plan", getattr(app, "_subagent_plan_state", {}))
+
+        # Later, subagent adds a plan
+        sess.add_event({
+            "type": "tool",
+            "tool_type": "update_plan",
+            "args": {
+                "plan": [{"step": "Created later", "status": "in_progress"}],
+                "explanation": "Later expl",
+            },
+        })
+
+        # Reopen screen: plan must be visible!
+        screen2 = SubagentViewScreen("task-reopen-plan")
+        app2 = DummyHostApp(screen2, store=self.store)
+        app2._subagent_plan_state = dict(getattr(app, "_subagent_plan_state", {}))
+
+        async with app2.run_test() as pilot:
+            await pilot.pause(0.2)
+            notch2 = screen2.query_one(PlanNotch)
+            self.assertTrue(notch2.display)
+            self.assertEqual(len(notch2.plan_items), 1)
+            self.assertEqual(notch2.plan_items[0]["step"], "Created later")
+
+    async def test_subagent_screen_plan_fallback_to_session_current_plan(self):
+        from widgets.presentation.widgets.plan_notch import PlanNotch
+
+        sess = self._mk("task-fallback-plan", "Fallback Agent", "Prompt")
+        sess.current_plan = [{"step": "Fallback step", "status": "in_progress"}]
+        sess.current_plan_explanation = "Fallback expl"
+
+        screen = SubagentViewScreen("task-fallback-plan")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            await pilot.pause(0.2)
+            notch = screen.query_one(PlanNotch)
+            self.assertTrue(notch.display)
+            self.assertEqual(len(notch.plan_items), 1)
+            self.assertEqual(notch.plan_items[0]["step"], "Fallback step")
+            self.assertEqual(notch.plan_explanation, "Fallback expl")
+
     async def test_subagent_screen_active_streaming_not_finalized(self):
         sess = self._mk("task-active-stream", "Stream Agent", "Subagent Prompt")
         sess.status = "running"
