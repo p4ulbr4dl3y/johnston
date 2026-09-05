@@ -84,9 +84,9 @@ def truncate_path(path: str, max_len: int = 60) -> str:
         return path[:head] + "..." + path[-tail:]
     filename = parts[-1]
     if len(filename) >= max_len - 4:
-        half = max(4, (max_len - 3) // 2)
-        tail = max_len - 3 - half
-        return filename[:half] + "..." + filename[-tail:]
+        half = max(1, (max_len - 3) // 2)
+        tail = max(0, max_len - 3 - half)
+        return filename[:half] + "..." + (filename[-tail:] if tail > 0 else "")
     res = filename
     for p in reversed(parts[:-1]):
         if not p:
@@ -119,9 +119,9 @@ def truncate(target: str, max_len: int = 60, mode: str = "middle") -> str:
         if max_len == 60:
             target = target[:25] + "..." + target[-32:]
         else:
-            head = max(10, (max_len - 3) * 2 // 5)
-            tail = max_len - 3 - head
-            target = target[:head] + "..." + target[-tail:]
+            head = max(1, min(len(target), (max_len - 3) * 2 // 5))
+            tail = max(0, max_len - 3 - head)
+            target = target[:head] + "..." + (target[-tail:] if tail > 0 else "")
     return escape_markup(target)
 
 
@@ -139,31 +139,24 @@ def _canonical_args(args: Dict[str, Any]) -> tuple:
         return (type(args).__name__, repr(args))
 
 
-def _display_cache_key(tool_name: str, args: Dict[str, Any]) -> tuple:
-    return (str(tool_name), _canonical_args(args))
+def _display_cache_key(tool_name: str, args: Dict[str, Any], max_len: int = 60, mode: str = "middle") -> tuple:
+    return (str(tool_name), _canonical_args(args), max_len, mode)
 
 
-def extract_tool_display(tool_name: str, args: Dict[str, Any]) -> str:
-    """Build a short, human-readable label describing what a tool call targets.
-
-    This is presentation-only metadata for the chat tool chip and is intentionally
-    kept out of the core agent loop so business logic stays free of rendering
-    concerns. Tool names are matched case-insensitively against the canonical
-    lowercase registry names. Results are memoized by (tool_name, args) so the
-    agent loop doesn't rebuild identical labels on every tool call.
-    """
-    key = _display_cache_key(tool_name, args)
+def extract_tool_display(tool_name: str, args: Dict[str, Any], max_len: int = 60, mode: str = "middle") -> str:
+    """Build a short, human-readable label describing what a tool call targets."""
+    key = _display_cache_key(tool_name, args, max_len, mode)
     hit = _DISPLAY_CACHE.get(key)
     if hit is not None:
         return hit
 
-    result = _extract_tool_display_inner(tool_name, args)
+    result = _extract_tool_display_inner(tool_name, args, max_len=max_len, mode=mode)
 
     _DISPLAY_CACHE.put(key, result)
     return result
 
 
-def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
+def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: int = 60, mode: str = "middle") -> str:
     from core.infrastructure.runtime.tool_name import normalize_tool_name as _normalize
     from tools.registry import REGISTRY
 
@@ -174,7 +167,7 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
     if not is_builtin:
         # MCP/custom tools: single predefined format — compact ``{k: v, ...}``
         # args label (empty parens when no args).
-        return format_compact_dict(args)
+        return format_compact_dict(args, max_total_len=max_len + 10)
 
     if name == "ask_user":
         qs = args.get("questions")
@@ -183,9 +176,9 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
             for q in qs:
                 q_text = q.get("question") if isinstance(q, dict) else ""
                 if q_text:
-                    formatted.append(truncate(q_text))
+                    formatted.append(truncate(q_text, max_len=max_len, mode=mode))
             if formatted:
-                return truncate(", ".join(f'"{t}"' for t in formatted))
+                return truncate(", ".join(f'"{t}"' for t in formatted), max_len=max_len, mode=mode)
         return ""
 
     if name == "invoke_subagent":
@@ -195,20 +188,20 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
 
         role_cap = get_role_display_name(role)
         if title:
-            return truncate(f'{role_cap}: "{title}"')
-        return truncate(role_cap)
+            return truncate(f'{role_cap}: "{title}"', max_len=max_len, mode=mode)
+        return truncate(role_cap, max_len=max_len, mode=mode)
     if name in ("manage_shell", "manage_subagent"):
         act = args.get("action") or ""
         tid = args.get("session_id" if name == "manage_subagent" else "task_id") or ""
         if act and tid:
             if act in ("send_input", "send_message"):
                 verb = "send message to" if act == "send_message" else "send input to"
-                return truncate(f"{verb} {tid}")
-            return truncate(f"{act} {tid}")
+                return truncate(f"{verb} {tid}", max_len=max_len, mode=mode)
+            return truncate(f"{act} {tid}", max_len=max_len, mode=mode)
         if tid:
-            return truncate(tid)
+            return truncate(tid, max_len=max_len, mode=mode)
         if act:
-            return truncate(act)
+            return truncate(act, max_len=max_len, mode=mode)
         return ""
 
     if name == "update_plan":
@@ -234,9 +227,11 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
                         break
 
             if active_step:
-                return truncate(f"{completed}/{total}: {active_step}")
+                return truncate(f"{completed}/{total}: {active_step}", max_len=max_len, mode=mode)
             return f"{completed}/{total} done"
         return ""
+
+    file_mode = "path" if mode in ("middle", "path") else mode
 
     if name == "read":
         val = args.get("path")
@@ -274,25 +269,25 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
                     suffix = f":+{offset}B"
             else:
                 suffix = ""
-            return truncate(f"{path_str}{suffix}")
+            return truncate(f"{path_str}{suffix}", max_len=max_len, mode=file_mode)
         return ""
 
     if name in ("create", "edit"):
         val = args.get("path")
         if isinstance(val, str) and val:
-            return truncate(val.strip())
+            return truncate(val.strip(), max_len=max_len, mode=file_mode)
         return ""
 
     if name == "shell":
         cmd = args.get("command")
         if isinstance(cmd, str) and cmd:
-            return truncate(cmd)
+            return truncate(cmd, max_len=max_len, mode=mode)
         return ""
 
     if name == "web_fetch":
         url = args.get("url")
         if isinstance(url, str) and url:
-            return truncate(url)
+            return truncate(url, max_len=max_len, mode=mode)
         return ""
 
     if name == "search":

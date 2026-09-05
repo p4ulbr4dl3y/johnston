@@ -1054,6 +1054,22 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         rendered = str(widget.header_label.render())
         self.assertIn("long_target_file.py", rendered)
 
+    def test_path_truncation_preserves_filename_with_args(self):
+        path = "deeply/nested/dir/structure/sub/long_target_file.py"
+        widget = ToolCallWidget("read", path, args={"path": path}, status="done")
+        widget.render_header(max_len=35)
+        rendered = str(widget.header_label.render())
+        self.assertIn("long_target_file.py", rendered)
+        self.assertIn(".../", rendered)
+
+    def test_toolcall_header_no_double_escaping(self):
+        path = "src/[glob]/file.py"
+        widget = ToolCallWidget("read", path, args={"path": path}, status="done")
+        widget.render_header()
+        rendered = str(widget.header_label.render())
+        self.assertNotIn(r"\\[", rendered)
+        self.assertIn("[glob", rendered)
+
     def test_on_resize_adapts_header_width(self):
         long_cmd = "uv run pytest tests/ui/test_chat_toolcall.py -m not_slow"
         widget = ToolCallWidget("shell", long_cmd, status="done")

@@ -36,16 +36,16 @@ def build_toolcall_header(
     ):
         display_name = display_names.get(canonical_tool, tool_type or "Tool")
         if canonical_tool == "update_plan":
-            target_str = extract_tool_display(canonical_tool, args) if args else ""
+            target_str = extract_tool_display(canonical_tool, args, max_len=max_len, mode=trunc_mode) if args else ""
             if not target_str and is_generating and target and target != "plan":
                 target_str = truncate(str(target), max_len=max_len, mode=trunc_mode)
         else:
-            extracted = extract_tool_display(canonical_tool, args) if args else ""
+            extracted = extract_tool_display(canonical_tool, args, max_len=max_len, mode=trunc_mode) if args else ""
             target_str = extracted or (truncate(str(target), max_len=max_len, mode=trunc_mode) if target else "")
         if is_generating and not target_str:
             arg_suffix = "(...)"
         else:
-            arg_suffix = f"({escape(str(target_str))})"
+            arg_suffix = f"({target_str})"
         base_header = f"[{status_color}]{marker} [bold]{display_name}[/bold][/{status_color}]{arg_suffix}"
     else:
         compact = format_compact_dict(args, max_total_len=max_len + 10)
@@ -55,6 +55,8 @@ def build_toolcall_header(
         tool_name_display = to_snake_case(tool_type) if mcp_flag else (tool_type or "Tool")
         if is_generating and not compact:
             arg_suffix = "(...)"
+        elif is_generating and not args:
+            arg_suffix = f"({compact})"
         else:
             arg_suffix = f"({escape(str(compact))})"
         base_header = f"[{status_color}]{marker} [bold]{tool_name_display}[/bold][/{status_color}]{arg_suffix}"
