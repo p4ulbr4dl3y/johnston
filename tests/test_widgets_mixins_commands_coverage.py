@@ -686,8 +686,29 @@ def test_lifecycle_on_mount_resume_session_locked_steal_and_readonly():
                     callback("readonly")
                     mock_load_ui.assert_called_with("res_1", read_only=True)
 
-                    # 3. None / other choice
+                    # 3. None / other choice (cancel/esc)
+                    app.notify = MagicMock()
+                    app.sm.generate_session_id.return_value = "new_sess_fallback"
                     callback(None)
+                    assert app.current_session_id == "new_sess_fallback"
+                    assert app.is_read_only is False
+                    app.sm.acquire_session_lock.assert_called_with("new_sess_fallback")
+                    app.sm.set_active_session_id.assert_called_with("new_sess_fallback")
+
+
+def test_lifecycle_on_mount_resume_session_empty_picker():
+    app = DummyLifecycleApp()
+    app.resume_session_id = ""
+    app.current_session_id = "curr_1"
+
+    with patch("widgets.presentation.commands.ResumeCommand.execute") as mock_resume_exec:
+        with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
+            with patch("core.models_catalog.catalog.load_cache"):
+                with patch("core.infrastructure.mcp.get_mcp_manager"):
+                    app.on_mount()
+                    app.sm.acquire_session_lock.assert_called_with("curr_1")
+                    assert len(app._tracked_tasks) >= 1
+                    mock_resume_exec.assert_called_once_with(app)
 
 
 def test_lifecycle_on_mount_resume_session_unlocked():

@@ -75,13 +75,33 @@ class LifecycleMixin:
                         self.load_session_ui(res_id)
                     elif choice == "readonly":
                         self.load_session_ui(res_id, read_only=True)
+                    else:
+                        new_id = self.sm.generate_session_id() if hasattr(self.sm, "generate_session_id") else ""
+                        self.current_session_id = new_id
+                        if hasattr(self.sm, "acquire_session_lock"):
+                            self.sm.acquire_session_lock(new_id)
+                        if hasattr(self.sm, "set_active_session_id"):
+                            self.sm.set_active_session_id(new_id)
+                        self.is_read_only = False
+                        if hasattr(self, "notify"):
+                            self.notify("Resume cancelled. Started new session.", severity="information")
+                        if hasattr(self, "refresh_status_footer"):
+                            self.refresh_status_footer()
 
                 self.push_screen(SessionConflictScreen(res_id), callback=on_init_conflict)
             else:
                 self.load_session_ui(res_id)
-        elif getattr(self, "current_session_id", None) and hasattr(self, "sm"):
-            if hasattr(self.sm, "acquire_session_lock"):
-                self.sm.acquire_session_lock(self.current_session_id)
+        else:
+            if getattr(self, "current_session_id", None) and hasattr(self, "sm"):
+                if hasattr(self.sm, "acquire_session_lock"):
+                    self.sm.acquire_session_lock(self.current_session_id)
+            if getattr(self, "resume_session_id", None) == "":
+                from widgets.presentation.commands import ResumeCommand
+
+                if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
+                    self.create_tracked_task(ResumeCommand().execute(self))
+                else:
+                    asyncio.create_task(ResumeCommand().execute(self))
         from core.infrastructure.mcp import get_mcp_manager
 
         catalog.load_cache()
@@ -107,7 +127,7 @@ class LifecycleMixin:
     async def _check_initial_setup(self) -> None:
         """Auto-prompt for provider/model selection on first launch if unconfigured"""
         if (
-            getattr(self, "resume_session_id", None)
+            getattr(self, "resume_session_id", None) is not None
             or os.environ.get("PYTEST_CURRENT_TEST")
             or not getattr(self, "is_app_active", True)
         ):

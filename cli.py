@@ -234,7 +234,13 @@ def main():
         prog="johnston",
         description="Johnston Coding Agent",
     )
-    parser.add_argument("--resume", help="Resume specific session ID")
+    parser.add_argument(
+        "--resume",
+        nargs="?",
+        const="",
+        default=None,
+        help="Resume specific session ID (or pick from list if ID omitted)",
+    )
     parser.add_argument("--models", action="store_true", help="List available providers and models")
     parser.add_argument("--skills", action="store_true", help="List available skills")
     parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")

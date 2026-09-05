@@ -113,3 +113,48 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         test_app.notify.assert_called_with("Session forked", severity="information", timeout=1.5)
         test_app.refresh_status_footer.assert_called_once()
         test_app.trigger_ai_response.assert_called_with("hello from readonly", show_in_ui=True)
+
+    async def test_lifecycle_resume_conflict_cancel_starts_new_session(self):
+        from widgets.mixins.lifecycle import LifecycleMixin
+
+        class TestLifecycleApp(LifecycleMixin):
+            def __init__(self):
+                self.resume_session_id = "locked_sess"
+                self.current_session_id = "locked_sess"
+                self.sm = MagicMock()
+                self.sm.is_session_locked.return_value = True
+                self.sm.generate_session_id.return_value = "fresh_fallback_sess"
+                self.is_read_only = True
+                self.is_app_active = True
+                self.notify = MagicMock()
+                self.refresh_status_footer = MagicMock()
+                self._pushed_screen = None
+                self._screen_callback = None
+
+            def query_one(self, target, default=None):
+                return MagicMock()
+
+            def push_screen(self, screen, callback=None):
+                self._pushed_screen = screen
+                self._screen_callback = callback
+
+            def create_tracked_task(self, coro):
+                if hasattr(coro, "close"):
+                    coro.close()
+                return coro
+
+        app = TestLifecycleApp()
+        with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
+            with patch("core.models_catalog.catalog.load_cache"):
+                with patch("core.infrastructure.mcp.get_mcp_manager"):
+                    app.on_mount()
+
+        self.assertIsInstance(app._pushed_screen, SessionConflictScreen)
+        # Simulate user pressing Esc (choice is None)
+        app._screen_callback(None)
+        self.assertEqual(app.current_session_id, "fresh_fallback_sess")
+        self.assertFalse(app.is_read_only)
+        app.sm.acquire_session_lock.assert_called_with("fresh_fallback_sess")
+        app.sm.set_active_session_id.assert_called_with("fresh_fallback_sess")
+        app.notify.assert_called_with("Resume cancelled. Started new session.", severity="information")
+

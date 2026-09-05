@@ -105,6 +105,19 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(cm.exception.code, 0)
         self.assertTrue(mock_app_run.called)
 
+    @patch("sys.argv", ["johnston", "--resume"])
+    @patch("app.JohnstonApp.run")
+    def test_main_app_start_resume_no_arg(self, mock_app_run):
+        with patch("app.JohnstonApp") as mock_app_cls:
+            mock_app_cls.return_value.run = mock_app_run
+            with self.assertRaises(SystemExit) as cm:
+                from cli import main
+
+                main()
+            self.assertEqual(cm.exception.code, 0)
+            mock_app_cls.assert_called_once_with(resume_session_id="")
+            self.assertTrue(mock_app_run.called)
+
 
 class TestCLIAdvanced(unittest.TestCase):
     def test_get_version_fallback_to_pyproject(self):
