@@ -257,6 +257,8 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
         q = str(args.get("query") or "").strip()
         p = str(args.get("path") or "").strip()
         mode = str(args.get("mode") or "").strip()
+        glob_pat = str(args.get("glob") or "").strip()
+        include_hidden = bool(args.get("include_hidden", False))
         parts = []
         if mode and mode != "content":
             parts.append(mode)
@@ -264,6 +266,10 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any]) -> str:
             parts.append(f'"{q}"')
         if p and p != ".":
             parts.append(f"in {p}")
+        if glob_pat:
+            parts.append(f"[{glob_pat}]")
+        if include_hidden:
+            parts.append("(+hidden)")
         return truncate(" ".join(parts) if parts else "codebase")
 
     return ""

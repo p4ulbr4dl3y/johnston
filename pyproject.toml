@@ -24,6 +24,14 @@ dependencies = [
     "pypdf>=5.0.0",
 ]
 
+[project.optional-dependencies]
+search-enhanced = [
+    "tree-sitter>=0.23.0",
+    "tree-sitter-python>=0.23.0",
+    "tree-sitter-javascript>=0.23.0",
+    "tree-sitter-typescript>=0.23.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/p4ulbr4dl3y/johnston"
 Repository = "https://github.com/p4ulbr4dl3y/johnston"

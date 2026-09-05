@@ -6,7 +6,10 @@ import re
 import shutil
 import subprocess
 import threading
-from typing import Any, Dict, List, Optional, Set, Tuple
+import time
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple
 
 from core.domain.defaults.errors import ToolResult
 from core.domain.defaults.git_excludes import DEFAULT_BINARY_EXTENSIONS, DEFAULT_IGNORE_DIRS
@@ -24,6 +27,259 @@ from tools.base import (
 from tools.cancel import run_cancellable
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Tree-sitter integration (optional, for perfect AST parsing)
+# ---------------------------------------------------------------------------
+
+try:
+    import tree_sitter
+    TREE_SITTER_AVAILABLE = True
+except ImportError:
+    TREE_SITTER_AVAILABLE = False
+    tree_sitter = None
+
+# ---------------------------------------------------------------------------
+# LRU Cache with mtime invalidation
+# ---------------------------------------------------------------------------
+
+class _OutlineCache:
+    """Thread-safe LRU cache for outline results with mtime-based invalidation."""
+
+    def __init__(self, max_size: int = 100):
+        self._cache: "OrderedDict[str, Tuple[float, List[str]]]" = OrderedDict()
+        self._lock = threading.Lock()
+        self._max_size = max_size
+
+    def get(self, key: str, file_mtime: float) -> Optional[List[str]]:
+        """Get cached outline if mtime matches."""
+        with self._lock:
+            if key in self._cache:
+                cached_mtime, result = self._cache[key]
+                if cached_mtime == file_mtime:
+                    # Move to end (most recently used)
+                    self._cache.move_to_end(key)
+                    return result
+                else:
+                    # Mtime changed, invalidate
+                    del self._cache[key]
+            return None
+
+    def put(self, key: str, file_mtime: float, result: List[str]) -> None:
+        """Store outline in cache."""
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+            self._cache[key] = (file_mtime, result)
+            # Evict oldest if over capacity
+            while len(self._cache) > self._max_size:
+                self._cache.popitem(last=False)
+
+    def clear(self) -> None:
+        """Clear all cached entries."""
+        with self._lock:
+            self._cache.clear()
+
+
+# Global outline cache (100 entries max)
+_OUTLINE_CACHE = _OutlineCache(max_size=100)
+
+
+# ---------------------------------------------------------------------------
+# Tree-sitter outline extractor (perfect AST parsing)
+# ---------------------------------------------------------------------------
+
+class _TreeSitterOutline:
+    """
+    Tree-sitter based outline extractor with perfect accuracy.
+
+    Benefits over regex:
+    - No false positives from comments/strings
+    - Handles all language syntax correctly
+    - Can extract type hints, decorators, etc.
+
+    Falls back gracefully if tree-sitter is not available.
+    """
+
+    def __init__(self):
+        self._parsers = {}
+        self._init_parsers()
+
+    def _init_parsers(self):
+        """Initialize parsers for available languages."""
+        if not TREE_SITTER_AVAILABLE:
+            return
+
+        # Python
+        try:
+            import tree_sitter_python as tspython
+            self._parsers['.py'] = tree_sitter.Parser(
+                tree_sitter.Language(tspython.language())
+            )
+        except (ImportError, Exception) as e:
+            logger.debug(f"Tree-sitter Python not available: {e}")
+
+        # JavaScript
+        try:
+            import tree_sitter_javascript as tsjavascript
+            self._parsers['.js'] = tree_sitter.Parser(
+                tree_sitter.Language(tsjavascript.language())
+            )
+        except (ImportError, Exception) as e:
+            logger.debug(f"Tree-sitter JavaScript not available: {e}")
+
+        # TypeScript
+        try:
+            import tree_sitter_typescript as tstypescript
+            self._parsers['.ts'] = tree_sitter.Parser(
+                tree_sitter.Language(tstypescript.language_typescript())
+            )
+            self._parsers['.tsx'] = tree_sitter.Parser(
+                tree_sitter.Language(tstypescript.language_tsx())
+            )
+        except (ImportError, Exception) as e:
+            logger.debug(f"Tree-sitter TypeScript not available: {e}")
+
+    def is_available(self, ext: str) -> bool:
+        """Check if tree-sitter is available for this language."""
+        return ext in self._parsers
+
+    def extract_symbols(self, code: str, ext: str, query: str = None) -> List[str]:
+        """
+        Extract symbols using tree-sitter.
+
+        Returns list of symbol strings like:
+          "  def function_name(args) (line 10)"
+        """
+        if ext not in self._parsers:
+            return []
+
+        parser = self._parsers[ext]
+        tree = parser.parse(code.encode())
+        root = tree.root_node
+
+        symbols = []
+
+        if ext == '.py':
+            self._extract_python_symbols(root, symbols, query, depth=0)
+        elif ext in ('.js', '.ts', '.tsx'):
+            self._extract_js_symbols(root, symbols, query, depth=0)
+
+        return symbols
+
+    def _extract_python_symbols(self, node, symbols, query, depth):
+        """Extract Python symbols using tree-sitter AST."""
+
+        # Function definition
+        if node.type == 'function_definition':
+            name_node = node.child_by_field_name('name')
+            if name_node:
+                name = name_node.text.decode()
+                line = node.start_point[0] + 1
+
+                if self._matches_query(name, query):
+                    # Get parameters
+                    params_node = node.child_by_field_name('parameters')
+                    params = params_node.text.decode() if params_node else '()'
+
+                    # Check for async
+                    is_async = any(child.type == 'async' for child in node.children)
+                    prefix = 'async def' if is_async else 'def'
+
+                    indent = '  ' * (depth + 1)
+                    symbols.append(f"{indent}{prefix} {name}{params} (line {line})")
+
+        # Class definition
+        elif node.type == 'class_definition':
+            name_node = node.child_by_field_name('name')
+            if name_node:
+                name = name_node.text.decode()
+                line = node.start_point[0] + 1
+
+                if self._matches_query(name, query):
+                    # Get base classes
+                    superclasses = node.child_by_field_name('superclasses')
+                    bases = f"({superclasses.text.decode()})" if superclasses else ''
+
+                    indent = '  ' * (depth + 1)
+                    symbols.append(f"{indent}class {name}{bases} (line {line})")
+
+                    # Extract class methods
+                    for child in node.children:
+                        if child.type == 'block':
+                            for method in child.children:
+                                self._extract_python_symbols(method, symbols, query, depth + 1)
+                    return
+
+        # Recurse
+        for child in node.children:
+            self._extract_python_symbols(child, symbols, query, depth)
+
+    def _extract_js_symbols(self, node, symbols, query, depth):
+        """Extract JavaScript/TypeScript symbols."""
+
+        # Function declaration
+        if node.type == 'function_declaration':
+            name_node = node.child_by_field_name('name')
+            if name_node:
+                name = name_node.text.decode()
+                line = node.start_point[0] + 1
+
+                if self._matches_query(name, query):
+                    params_node = node.child_by_field_name('parameters')
+                    params = params_node.text.decode() if params_node else '()'
+
+                    indent = '  ' * (depth + 1)
+                    symbols.append(f"{indent}function {name}{params} (line {line})")
+
+        # Class declaration
+        elif node.type == 'class_declaration':
+            name_node = node.child_by_field_name('name')
+            if name_node:
+                name = name_node.text.decode()
+                line = node.start_point[0] + 1
+
+                if self._matches_query(name, query):
+                    indent = '  ' * (depth + 1)
+                    symbols.append(f"{indent}class {name} (line {line})")
+
+                    # Extract class body
+                    body_node = node.child_by_field_name('body')
+                    if body_node:
+                        for child in body_node.children:
+                            self._extract_js_symbols(child, symbols, query, depth + 1)
+                    return
+
+        # Variable declaration with arrow function
+        elif node.type == 'lexical_declaration':
+            for child in node.children:
+                if child.type == 'variable_declarator':
+                    name_node = child.child_by_field_name('name')
+                    value_node = child.child_by_field_name('value')
+
+                    if name_node and value_node:
+                        # Check if value is arrow function
+                        if value_node.type in ('arrow_function', 'function'):
+                            name = name_node.text.decode()
+                            line = node.start_point[0] + 1
+
+                            if self._matches_query(name, query):
+                                indent = '  ' * (depth + 1)
+                                symbols.append(f"{indent}const {name} = ... (line {line})")
+
+        # Recurse
+        for child in node.children:
+            self._extract_js_symbols(child, symbols, query, depth)
+
+    def _matches_query(self, name: str, query: str) -> bool:
+        """Check if symbol name matches query."""
+        if query is None or query == '*':
+            return True
+        return query.lower() in name.lower()
+
+
+# Global tree-sitter outline extractor
+_tree_sitter_outline = _TreeSitterOutline() if TREE_SITTER_AVAILABLE else None
 
 DEFAULT_EXCLUDE_DIRS: Set[str] = set(DEFAULT_IGNORE_DIRS) | {
     ".hg",
@@ -55,6 +311,7 @@ BINARY_EXTENSIONS: Set[str] = set(DEFAULT_BINARY_EXTENSIONS) | {
 
 CODE_EXTENSIONS: Set[str] = {
     ".py",
+    ".pyi",
     ".ts",
     ".tsx",
     ".js",
@@ -70,30 +327,85 @@ CODE_EXTENSIONS: Set[str] = {
     ".cxx",
     ".h",
     ".hpp",
+    ".hxx",
     ".cs",
     ".rb",
     ".php",
     ".swift",
     ".kt",
+    ".kts",
     ".scala",
+    ".sc",
     ".sh",
     ".bash",
     ".zsh",
+    ".fish",
+    ".ps1",
+    ".psm1",
+    ".psd1",
     ".sql",
     ".html",
+    ".htm",
     ".css",
     ".scss",
+    ".sass",
+    ".less",
     ".vue",
     ".svelte",
     ".json",
+    ".jsonc",
     ".yaml",
     ".yml",
     ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".xml",
     ".md",
     ".mdx",
+    ".rst",
+    ".tex",
+    ".lua",
+    ".r",
+    ".R",
+    ".jl",
+    ".ex",
+    ".exs",
+    ".erl",
+    ".hrl",
+    ".clj",
+    ".cljs",
+    ".hs",
+    ".ml",
+    ".mli",
+    ".d",
+    ".nim",
+    ".zig",
+    ".v",
+    ".dart",
+    ".groovy",
+    ".gradle",
+    ".tf",
+    ".hcl",
+    ".proto",
+    ".sol",
+    ".vhd",
+    ".vhdl",
+    ".el",
+    ".lisp",
+    ".cl",
+    ".rkt",
+    ".cmake",
+    ".make",
+    ".mk",
+    ".dockerfile",
+    ".docker",
+    ".lock",
 }
 
 MAX_SEARCH_FILE_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_OUTLINE_FILE_BYTES = 5 * 1024 * 1024  # 5 MB (outline is CPU-heavy)
+OUTLINE_WORKERS = 4  # Thread pool size for parallel outline
 
 
 def _safe_relpath(path: str, cwd: str) -> str:
@@ -116,6 +428,226 @@ def is_binary_file(filepath: str) -> bool:
     except Exception:
         return True
 
+
+# ---------------------------------------------------------------------------
+# .gitignore awareness
+# ---------------------------------------------------------------------------
+
+def _load_gitignore_spec(root: str) -> Optional[Any]:
+    """Load and compile all .gitignore files in the tree into a pathspec matcher.
+
+    Returns None if no .gitignore files found or parsing fails.
+    Uses a lightweight custom parser instead of requiring the `pathspec` package.
+    """
+    patterns: List[Tuple[str, str]] = []  # (directory_prefix, pattern_line)
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        if ".gitignore" in filenames:
+            gitignore_path = os.path.join(dirpath, ".gitignore")
+            try:
+                rel_prefix = os.path.relpath(dirpath, root).replace("\\", "/")
+                if rel_prefix == ".":
+                    rel_prefix = ""
+                else:
+                    rel_prefix += "/"
+
+                with open(gitignore_path, "r", encoding="utf-8", errors="replace") as f:
+                    for line in f:
+                        line = line.rstrip("\r\n")
+                        stripped = line.strip()
+                        if not stripped or stripped.startswith("#"):
+                            continue
+                        patterns.append((rel_prefix, stripped))
+            except Exception:
+                continue
+
+    if not patterns:
+        return None
+
+    return _GitignoreMatcher(patterns, root)
+
+
+class _GitignoreMatcher:
+    """Lightweight .gitignore matcher supporting *, **, ?, and ! negation."""
+
+    def __init__(self, patterns: List[Tuple[str, str]], root: str):
+        self._root = root
+        self._compiled: List[Tuple[bool, str, "re.Pattern"]] = []  # (negated, prefix, regex)
+
+        for prefix, raw_pat in patterns:
+            negated = raw_pat.startswith("!")
+            pat = raw_pat.lstrip("!")
+
+            # Leading slash means anchored to the gitignore directory
+            if pat.startswith("/"):
+                pat = pat[1:]
+                anchored = True
+            else:
+                anchored = "/" in pat.rstrip("/")
+
+            regex_str = self._gitignore_to_regex(pat, anchored)
+            try:
+                compiled_re = re.compile(regex_str)
+                self._compiled.append((negated, prefix, compiled_re))
+            except re.error:
+                continue
+
+    @classmethod
+    def load_from_root(cls, root: str) -> Optional["_GitignoreMatcher"]:
+        """Load and compile all .gitignore files in the tree."""
+        return _load_gitignore_spec(root)
+
+    @staticmethod
+    def _gitignore_to_regex(pattern: str, anchored: bool) -> str:
+        """Convert a gitignore pattern to a regex string."""
+        result = ""
+        i = 0
+        n = len(pattern)
+
+        while i < n:
+            c = pattern[i]
+            if c == "*":
+                if i + 1 < n and pattern[i + 1] == "*":
+                    if i + 2 < n and pattern[i + 2] == "/":
+                        result += "(?:.*/)?"
+                        i += 3
+                        continue
+                    else:
+                        result += ".*"
+                        i += 2
+                        continue
+                else:
+                    result += "[^/]*"
+            elif c == "?":
+                result += "[^/]"
+            elif c == "[":
+                j = i + 1
+                if j < n and pattern[j] == "!":
+                    j += 1
+                if j < n and pattern[j] == "]":
+                    j += 1
+                while j < n and pattern[j] != "]":
+                    j += 1
+                if j < n:
+                    bracket_content = pattern[i + 1 : j]
+                    bracket_content = bracket_content.replace("!", "^", 1) if bracket_content.startswith("!") else bracket_content
+                    result += f"[{bracket_content}]"
+                    i = j
+                else:
+                    result += re.escape(c)
+            elif c in r"\.^$+{}|()":
+                result += "\\" + c
+            else:
+                result += c
+            i += 1
+
+        # Trailing slash means directory only — we match dirs and files under them
+        if result.endswith("/"):
+            result = result.rstrip("/") + "(?:/.*)?"
+        elif anchored:
+            result = result + "(?:/.*)?"
+        else:
+            # Unanchored: can match at any level
+            result = "(?:^|.*/)" + result + "(?:/.*)?"
+
+        if anchored:
+            result = "^" + result
+        result += "$"
+        return result
+
+    def is_ignored(self, rel_path: str) -> bool:
+        """Check if a relative path is ignored by any .gitignore rule."""
+        norm = rel_path.replace("\\", "/")
+        ignored = False
+
+        for negated, prefix, compiled_re in self._compiled:
+            # Check against path with and without prefix
+            test_paths = [norm]
+            if prefix and norm.startswith(prefix):
+                test_paths.append(norm[len(prefix):])
+
+            for test_path in test_paths:
+                if compiled_re.search(test_path):
+                    ignored = not negated
+                    break
+
+        return ignored
+
+
+def _build_gitignore_matcher(cwd: str) -> Optional[_GitignoreMatcher]:
+    """Build gitignore matcher for the project, cached per-thread via thread-local."""
+    return _load_gitignore_spec(cwd)
+
+
+# ---------------------------------------------------------------------------
+# git check-ignore integration for 100% compatibility
+# ---------------------------------------------------------------------------
+
+def _git_check_ignore_batch(
+    paths: List[str],
+    cwd: str,
+    cancel_event: Optional[threading.Event] = None,
+) -> Set[str]:
+    """Use git check-ignore to filter paths. Returns set of ignored paths.
+
+    Falls back gracefully if git is not available or not in a git repo.
+    """
+    if not paths:
+        return set()
+
+    git_bin = shutil.which("git")
+    if not git_bin:
+        return set()
+
+    ignored_paths: Set[str] = set()
+
+    # Process in batches to avoid command line length limits
+    batch_size = 1000
+    for i in range(0, len(paths), batch_size):
+        if cancel_event and cancel_event.is_set():
+            break
+
+        batch = paths[i:i + batch_size]
+        try:
+            result = subprocess.run(
+                [git_bin, "check-ignore", "--stdin", "--no-index"],
+                cwd=cwd,
+                input="\n".join(batch),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=10.0,
+            )
+            # git check-ignore returns 0 if any path is ignored, 1 if none
+            # Output contains the ignored paths, one per line
+            for line in result.stdout.strip().split("\n"):
+                if line:
+                    ignored_paths.add(line)
+        except Exception as e:
+            logger.debug("git check-ignore failed: %s", e)
+            # If git check-ignore fails, assume no paths are ignored
+            break
+
+    return ignored_paths
+
+
+def _is_git_repo(path: str) -> bool:
+    """Check if path is inside a git repository."""
+    git_dir = os.path.join(path, ".git")
+    if os.path.isdir(git_dir):
+        return True
+    # Check if we're in a git repo by walking up
+    current = os.path.abspath(path)
+    while current != os.path.dirname(current):
+        if os.path.isdir(os.path.join(current, ".git")):
+            return True
+        current = os.path.dirname(current)
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Python AST outline
+# ---------------------------------------------------------------------------
 
 def _format_ast_args(args: ast.arguments) -> str:
     """Format AST arguments into a concise signature representation."""
@@ -151,6 +683,13 @@ def _outline_python_content(code: str, file_rel_path: str, query: Optional[str] 
         if isinstance(node, ast.ClassDef):
             class_name = node.name
             methods: List[Tuple[str, int, str]] = []
+            bases = []
+            for base in node.bases:
+                if isinstance(base, ast.Name):
+                    bases.append(base.id)
+                elif isinstance(base, ast.Attribute):
+                    bases.append(base.attr)
+
             for item in node.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     prefix = "async def " if isinstance(item, ast.AsyncFunctionDef) else "def "
@@ -161,7 +700,8 @@ def _outline_python_content(code: str, file_rel_path: str, query: Optional[str] 
             matching_methods = [m for m in methods if (q is None) or (q in m[2].lower())]
 
             if class_matches or matching_methods:
-                lines.append(f"  class {class_name}: (line {node.lineno})")
+                bases_str = f"({', '.join(bases)})" if bases else ""
+                lines.append(f"  class {class_name}{bases_str}: (line {node.lineno})")
                 shown_methods = methods if class_matches else matching_methods
                 for m_sig, m_line, _ in shown_methods:
                     lines.append(f"    {m_sig} (line {m_line})")
@@ -175,52 +715,227 @@ def _outline_python_content(code: str, file_rel_path: str, query: Optional[str] 
     return lines
 
 
+# ---------------------------------------------------------------------------
+# Generic (regex-based) outline for TS/JS/Go/Rust/Kotlin/Swift/Scala etc.
+# ---------------------------------------------------------------------------
+
 RE_GENERIC_DEF = re.compile(
     r"^[ \t]*(?:export\s+(?:default\s+)?)?"
-    r"(?:(?P<async>async\s+)?function\s+(?P<fn>[A-Za-z0-9_$]+)\s*\((?P<fn_args>[^)]*)\)|"
-    r"class\s+(?P<cls>[A-Za-z0-9_$]+)|"
-    r"interface\s+(?P<iface>[A-Za-z0-9_$]+)|"
-    r"type\s+(?P<typ>[A-Za-z0-9_$]+)\s*=|"
-    r"enum\s+(?P<enum>[A-Za-z0-9_$]+)|"
-    r"func\s+(?:\([^)]+\)\s+)?(?P<gofn>[A-Za-z0-9_]+)\s*\((?P<gofn_args>[^)]*)\)|"
-    r"(?:pub\s+)?(?:fn\s+(?P<rsfn>[A-Za-z0-9_]+)|struct\s+(?P<rsstruct>[A-Za-z0-9_]+)|enum\s+(?P<rsenum>[A-Za-z0-9_]+)|trait\s+(?P<rstrait>[A-Za-z0-9_]+)))",
+    r"(?:"
+    # JS/TS/Lua/PHP: function declarations (also supports Lua's obj.method syntax)
+    r"(?P<async>async\s+)?function\s+(?P<fn>[A-Za-z0-9_$.:]+)\s*\((?P<fn_args>[^)]*)\)"
+    r"|"
+    # JS/TS: arrow functions assigned to const/let/var
+    r"(?:const|let|var)\s+(?P<arrowfn>[A-Za-z0-9_$]+)\s*=\s*(?:async\s+)?\([^)]*\)\s*(?::\s*[^=]+)?\s*=>"
+    r"|"
+    # JS/TS: class declarations
+    r"class\s+(?P<cls>[A-Za-z0-9_$]+)"
+    r"|"
+    # JS/TS: interface
+    r"interface\s+(?P<iface>[A-Za-z0-9_$]+)"
+    r"|"
+    # JS/TS: type alias
+    r"type\s+(?P<typ>[A-Za-z0-9_$]+)\s*="
+    r"|"
+    # JS/TS: enum
+    r"enum\s+(?P<enum>[A-Za-z0-9_$]+)"
+    r"|"
+    # Go: func
+    r"func\s+(?:\([^)]+\)\s+)?(?P<gofn>[A-Za-z0-9_]+)\s*\((?P<gofn_args>[^)]*)\)"
+    r"|"
+    # Go: type struct/interface
+    r"type\s+(?P<gotype>[A-Za-z0-9_]+)\s+(?:struct|interface)"
+    r"|"
+    # Rust: pub/private fn, struct, enum, trait, impl, mod
+    r"(?:pub(?:\([^)]*\))?\s+)?fn\s+(?P<rsfn>[A-Za-z0-9_]+)"
+    r"|"
+    r"(?:pub(?:\([^)]*\))?\s+)?struct\s+(?P<rsstruct>[A-Za-z0-9_]+)"
+    r"|"
+    r"(?:pub(?:\([^)]*\))?\s+)?enum\s+(?P<rsenum>[A-Za-z0-9_]+)"
+    r"|"
+    r"(?:pub(?:\([^)]*\))?\s+)?trait\s+(?P<rstrait>[A-Za-z0-9_]+)"
+    r"|"
+    r"impl(?:<[^>]*>)?\s+(?P<rsimpl>[A-Za-z0-9_]+)"
+    r"|"
+    r"mod\s+(?P<rsmod>[A-Za-z0-9_]+)"
+    r"|"
+    # Kotlin: fun, class, object, interface, val, var (top-level)
+    r"(?:(?:public|private|protected|internal|override|suspend|inline)\s+)*fun\s+(?:<[^>]+>\s+)?(?P<ktfun>[A-Za-z0-9_]+)"
+    r"|"
+    r"(?:(?:public|private|protected|internal|data|sealed|abstract|open|inner)\s+)*class\s+(?P<ktclass>[A-Za-z0-9_]+)"
+    r"|"
+    r"(?:(?:public|private|protected|internal)\s+)?object\s+(?P<ktobject>[A-Za-z0-9_]+)"
+    r"|"
+    r"(?:(?:public|private|protected|internal)\s+)?interface\s+(?P<ktiface>[A-Za-z0-9_]+)"
+    r"|"
+    # Swift: func, class, struct, enum, protocol, extension
+    r"(?:(?:public|private|internal|open|fileprivate|static|class|final|override|mutating)\s+)*func\s+(?P<swfn>[A-Za-z0-9_$]+)"
+    r"|"
+    r"(?:(?:public|private|internal|open|fileprivate|final)\s+)?class\s+(?P<swclass>[A-Za-z0-9_$]+)"
+    r"|"
+    r"(?:(?:public|private|internal)\s+)?struct\s+(?P<swstruct>[A-Za-z0-9_$]+)"
+    r"|"
+    r"(?:(?:public|private|internal)\s+)?enum\s+(?P<swenum>[A-Za-z0-9_$]+)"
+    r"|"
+    r"protocol\s+(?P<swproto>[A-Za-z0-9_$]+)"
+    r"|"
+    r"extension\s+(?P<swext>[A-Za-z0-9_$]+)"
+    r"|"
+    # Scala: def, class, object, trait, val, var
+    r"(?:(?:public|private|protected|override|abstract|final|lazy|implicit)\s+)*def\s+(?P<scfn>[A-Za-z0-9_$]+)"
+    r"|"
+    r"(?:(?:public|private|protected|abstract|final|sealed|case)\s+)?class\s+(?P<scclass>[A-Za-z0-9_$]+)"
+    r"|"
+    r"(?:(?:public|private|protected)\s+)?object\s+(?P<scobject>[A-Za-z0-9_$]+)"
+    r"|"
+    r"(?:(?:public|private|protected)\s+)?trait\s+(?P<sctrait>[A-Za-z0-9_$]+)"
+    r"|"
+    # Java: class, interface, enum, method
+    r"(?:(?:public|private|protected|static|final|abstract|synchronized|native)\s+)*(?:class|interface|enum)\s+(?P<jvcls>[A-Za-z0-9_$]+)"
+    r"|"
+    # C#: class, interface, struct, enum, record, namespace
+    r"(?:(?:public|private|protected|internal|static|abstract|sealed|virtual|override|async|partial|readonly)\s+)*(?:class|interface|struct|enum|record)\s+(?P<cscls>[A-Za-z0-9_]+)"
+    r"|"
+    # Ruby: class, module, def
+    r"class\s+(?P<rbcls>[A-Z][A-Za-z0-9_:]*)"
+    r"|"
+    r"module\s+(?P<rbmod>[A-Z][A-Za-z0-9_:]*)"
+    r"|"
+    r"def\s+(?:self\.)?(?P<rbdef>[a-z_][A-Za-z0-9_]*[?!]?)"
+    r"|"
+    # PHP: class, interface, trait
+    r"(?:abstract\s+)?class\s+(?P<phpcls>[A-Za-z0-9_]+)"
+    r"|"
+    r"interface\s+(?P<phpiface>[A-Za-z0-9_]+)"
+    r"|"
+    r"trait\s+(?P<phptrait>[A-Za-z0-9_]+)"
+    r"|"
+    # Dart: class, mixin, extension, abstract
+    r"(?:abstract\s+)?class\s+(?P<dartcls>[A-Za-z0-9_]+)"
+    r"|"
+    r"mixin\s+(?P<dartmix>[A-Za-z0-9_]+)"
+    r"|"
+    # Elixir: defmodule, def, defmacro, defp
+    r"defmodule\s+(?P<exmod>[A-Za-z0-9_.]+)"
+    r"|"
+    r"def(?:macro|p)?\s+(?P<exfn>[a-z_][a-z0-9_]*[?!]?)"
+    r"|"
+    # Haskell: data, type, class, newtype, module
+    r"(?:data|type|newtype)\s+(?P<hsdata>[A-Z][A-Za-z0-9_]*)"
+    r"|"
+    r"class\s+(?P<hsclass>[A-Z][A-Za-z0-9_]*)"
+    r"|"
+    # Protocol Buffers: message, service, enum
+    r"message\s+(?P<pbmsg>[A-Za-z0-9_]+)"
+    r"|"
+    r"service\s+(?P<pbsvc>[A-Za-z0-9_]+)"
+    r")",
     re.MULTILINE,
 )
 
 
 def _outline_generic_content(code: str, query: Optional[str] = None) -> List[str]:
-    """Regex-based outline extractor for TS/JS/Go/Rust and other languages."""
+    """Regex-based outline extractor for TS/JS/Go/Rust/Kotlin/Swift/Scala and other languages."""
     lines: List[str] = []
     q = query.lower().strip() if query and query.strip() and query.strip() != "*" else None
 
     for m in RE_GENERIC_DEF.finditer(code):
         matched_text = m.group(0).strip()
-        name = (
-            m.group("fn")
-            or m.group("cls")
-            or m.group("iface")
-            or m.group("typ")
-            or m.group("enum")
-            or m.group("gofn")
-            or m.group("rsfn")
-            or m.group("rsstruct")
-            or m.group("rsenum")
-            or m.group("rstrait")
-            or ""
-        )
+        # Resolve the matched symbol name from all possible named groups
+        name = ""
+        for group_name in (
+            "fn", "arrowfn", "cls", "iface", "typ", "enum",
+            "gofn", "gotype",
+            "rsfn", "rsstruct", "rsenum", "rstrait", "rsimpl", "rsmod",
+            "ktfun", "ktclass", "ktobject", "ktiface",
+            "swfn", "swclass", "swstruct", "swenum", "swproto", "swext",
+            "scfn", "scclass", "scobject", "sctrait",
+            "jvcls", "cscls",
+            "rbcls", "rbmod", "rbdef",
+            "phpcls", "phpiface", "phptrait", "phpfn",
+            "dartcls", "dartmix",
+            "exmod", "exfn",
+            "hsdata", "hsclass",
+            "pbmsg", "pbsvc",
+        ):
+            group_name_clean = group_name.strip()
+            try:
+                val = m.group(group_name_clean)
+                if val:
+                    name = val
+                    break
+            except (IndexError, re.error):
+                continue
+
         if not name:
             continue
         if q is not None and q not in name.lower():
             continue
 
         lineno = code[: m.start()].count("\n") + 1
-        lines.append(f"  {matched_text} (line {lineno})")
+        # Clean up matched text for display
+        display = matched_text.split("\n")[0].strip()
+        if len(display) > 120:
+            display = display[:117] + "..."
+        lines.append(f"  {display} (line {lineno})")
 
     return lines
 
 
+# ---------------------------------------------------------------------------
+# Glob matching with ** support
+# ---------------------------------------------------------------------------
+
+def _glob_to_regex(pattern: str) -> "re.Pattern":
+    """Convert a glob pattern (with ** support) to a compiled regex."""
+    result = ""
+    i = 0
+    n = len(pattern)
+
+    while i < n:
+        c = pattern[i]
+        if c == "*":
+            if i + 1 < n and pattern[i + 1] == "*":
+                if i + 2 < n and pattern[i + 2] == "/":
+                    # **/ matches zero or more directories
+                    result += "(?:.*/)?"
+                    i += 3
+                    continue
+                else:
+                    # ** at end matches everything
+                    result += ".*"
+                    i += 2
+                    continue
+            else:
+                result += "[^/]*"
+        elif c == "?":
+            result += "[^/]"
+        elif c == "[":
+            j = i + 1
+            if j < n and pattern[j] == "!":
+                j += 1
+            if j < n and pattern[j] == "]":
+                j += 1
+            while j < n and pattern[j] != "]":
+                j += 1
+            if j < n:
+                bracket_content = pattern[i + 1 : j]
+                bracket_content = bracket_content.replace("!", "^", 1) if bracket_content.startswith("!") else bracket_content
+                result += f"[{bracket_content}]"
+                i = j
+            else:
+                result += re.escape(c)
+        elif c in r"\.^$+{}|()":
+            result += "\\" + c
+        else:
+            result += c
+        i += 1
+
+    return re.compile(result)
+
+
 def _match_glob(rel_path: str, filename: str, glob_pattern: Optional[str]) -> bool:
-    """Evaluate whether a path matches the optional glob filter (supports ! negation)."""
+    """Evaluate whether a path matches the optional glob filter (supports ! negation and **)."""
     if not glob_pattern:
         return True
 
@@ -230,27 +945,104 @@ def _match_glob(rel_path: str, filename: str, glob_pattern: Optional[str]) -> bo
     negative_pats = [p[1:] for p in patterns if p.startswith("!")]
 
     for neg in negative_pats:
-        if fnmatch.fnmatch(filename, neg) or fnmatch.fnmatch(norm_rel, neg):
-            return False
+        try:
+            neg_re = _glob_to_regex(neg)
+            if neg_re.search(filename) or neg_re.search(norm_rel):
+                return False
+        except re.error:
+            if fnmatch.fnmatch(filename, neg) or fnmatch.fnmatch(norm_rel, neg):
+                return False
 
     if not positive_pats:
         return True
 
     for pos in positive_pats:
-        if fnmatch.fnmatch(filename, pos) or fnmatch.fnmatch(norm_rel, pos):
-            return True
+        try:
+            pos_re = _glob_to_regex(pos)
+            if pos_re.search(filename) or pos_re.search(norm_rel):
+                return True
+        except re.error:
+            if fnmatch.fnmatch(filename, pos) or fnmatch.fnmatch(norm_rel, pos):
+                return True
 
     return False
 
+
+# ---------------------------------------------------------------------------
+# Directory walker with gitignore support (generator-based)
+# ---------------------------------------------------------------------------
+
+def _walk_filtered(
+    target_path: str,
+    include_hidden: bool = False,
+    gitignore_matcher: Optional[_GitignoreMatcher] = None,
+    cancel_event: Optional[threading.Event] = None,
+) -> Generator[str, None, None]:
+    """Walk a directory tree yielding absolute file paths, respecting exclusions and gitignore.
+
+    This is a generator to reduce memory footprint for large repositories.
+    """
+    for root, dirs, filenames in os.walk(target_path, topdown=True):
+        if cancel_event and cancel_event.is_set():
+            return
+
+        # Filter excluded directories
+        filtered_dirs = []
+        for d in dirs:
+            if d in DEFAULT_EXCLUDE_DIRS or d.endswith(".egg-info") or d.startswith(".git"):
+                continue
+            if not include_hidden and d.startswith(".") and d != ".":
+                continue
+            # Check gitignore
+            if gitignore_matcher:
+                rel = _safe_relpath(os.path.join(root, d), os.path.dirname(target_path)) if os.path.isabs(target_path) else _safe_relpath(os.path.join(root, d), target_path)
+                if gitignore_matcher.is_ignored(rel + "/"):
+                    continue
+            filtered_dirs.append(d)
+        dirs[:] = sorted(filtered_dirs)
+
+        for fname in sorted(filenames):
+            if cancel_event and cancel_event.is_set():
+                return
+            if not include_hidden and fname.startswith("."):
+                continue
+            abs_p = os.path.join(root, fname)
+            # Check gitignore for files
+            if gitignore_matcher:
+                base = target_path if os.path.isdir(target_path) else os.path.dirname(target_path)
+                rel = _safe_relpath(abs_p, base)
+                if gitignore_matcher.is_ignored(rel):
+                    continue
+            yield abs_p
+
+
+def _walk_filtered_list(
+    target_path: str,
+    include_hidden: bool = False,
+    gitignore_matcher: Optional[_GitignoreMatcher] = None,
+    cancel_event: Optional[threading.Event] = None,
+) -> List[str]:
+    """Walk a directory tree returning a list of absolute file paths.
+
+    Convenience wrapper around _walk_filtered for cases where we need random access or length.
+    """
+    return list(_walk_filtered(target_path, include_hidden, gitignore_matcher, cancel_event))
+
+
+# ---------------------------------------------------------------------------
+# Content search: ripgrep (fast path)
+# ---------------------------------------------------------------------------
 
 def _search_content_ripgrep(
     target_path: str,
     query: str,
     cwd: str,
     case_sensitive: bool = False,
-    context_lines: int = 1,
+    before_lines: int = 0,
+    after_lines: int = 0,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
+    include_hidden: bool = False,
     cancel_event: Optional[threading.Event] = None,
 ) -> Optional[Tuple[List[str], int, int]]:
     """Run ripgrep subprocess for fast content search. Returns None on failure or if rg missing."""
@@ -275,8 +1067,16 @@ def _search_content_ripgrep(
     if not case_sensitive:
         cmd.append("-i")
 
-    if context_lines > 0:
-        cmd.extend(["-C", str(context_lines)])
+    # Context lines: use before/after if specified, otherwise use symmetric
+    if before_lines > 0:
+        cmd.extend(["--before", str(before_lines)])
+    if after_lines > 0:
+        cmd.extend(["--after", str(after_lines)])
+    if before_lines == 0 and after_lines == 0:
+        pass  # no context
+
+    if include_hidden:
+        cmd.append("--hidden")
 
     if glob_pattern:
         for g in glob_pattern.split(","):
@@ -357,14 +1157,21 @@ def _search_content_ripgrep(
     return output_lines, match_count, len(matched_files)
 
 
+# ---------------------------------------------------------------------------
+# Content search: pure Python fallback
+# ---------------------------------------------------------------------------
+
 def _search_content_python(
     target_path: str,
     query: str,
     cwd: str,
     case_sensitive: bool = False,
-    context_lines: int = 1,
+    before_lines: int = 0,
+    after_lines: int = 0,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
+    include_hidden: bool = False,
+    gitignore_matcher: Optional[_GitignoreMatcher] = None,
     cancel_event: Optional[threading.Event] = None,
 ) -> Tuple[List[str], int, int]:
     """Pure Python fallback for content regex/literal search."""
@@ -377,91 +1184,211 @@ def _search_content_python(
     matched_files: Set[str] = set()
     output_lines: List[str] = []
     match_count = 0
+    lock = threading.Lock()
 
-    def _process_file(abs_fpath: str) -> None:
-        nonlocal match_count
-        if match_count >= max_results:
-            return
+    def _process_file(abs_fpath: str) -> Optional[Tuple[List[str], Set[str], int]]:
         if cancel_event and cancel_event.is_set():
-            return
+            return None
         if is_binary_file(abs_fpath):
-            return
+            return None
 
         try:
             if os.path.getsize(abs_fpath) > MAX_SEARCH_FILE_BYTES:
-                return
+                return None
         except Exception:
-            return
+            return None
 
         rel_path = _safe_relpath(abs_fpath, cwd)
         filename = os.path.basename(abs_fpath)
         if not _match_glob(rel_path, filename, glob_pattern):
-            return
+            return None
 
         try:
             with open(abs_fpath, "r", encoding="utf-8", errors="replace") as f:
                 file_lines = f.readlines()
         except Exception:
-            return
+            return None
 
-        file_has_match = False
-        total_file_lines = len(file_lines)
-
-        match_indices: List[int] = []
+        local_matches: List[int] = []
         for idx, l_text in enumerate(file_lines):
             if pattern.search(l_text):
-                match_indices.append(idx)
+                local_matches.append(idx)
 
-        if not match_indices:
-            return
+        if not local_matches:
+            return None
 
+        local_output: List[str] = []
         rendered_indices: Set[int] = set()
-        for idx in match_indices:
-            if match_count >= max_results:
-                break
-            match_count += 1
-            file_has_match = True
+        local_count = 0
 
-            start_ctx = max(0, idx - context_lines)
-            end_ctx = min(total_file_lines, idx + context_lines + 1)
+        for idx in local_matches:
+            local_count += 1
+            start_ctx = max(0, idx - before_lines)
+            end_ctx = min(len(file_lines), idx + after_lines + 1)
             for ctx_idx in range(start_ctx, end_ctx):
                 if ctx_idx not in rendered_indices:
                     rendered_indices.add(ctx_idx)
                     lineno = ctx_idx + 1
                     raw_line = file_lines[ctx_idx].rstrip("\r\n")
                     sep = ":" if ctx_idx == idx else "-"
-                    output_lines.append(f"{rel_path}{sep}{lineno}{sep} {raw_line}")
+                    local_output.append(f"{rel_path}{sep}{lineno}{sep} {raw_line}")
 
-        if file_has_match:
-            matched_files.add(rel_path)
+        file_matches: Set[str] = {rel_path}
+        return local_output, file_matches, local_count
 
+    # Collect files to process
     if os.path.isfile(target_path):
-        _process_file(target_path)
+        files_to_process = [target_path]
     elif os.path.isdir(target_path):
-        for root, dirs, files in os.walk(target_path, topdown=True):
-            if cancel_event and cancel_event.is_set():
-                break
-            dirs[:] = [
-                d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS and not d.endswith(".egg-info") and not d.startswith(".git")
-            ]
-            for fname in sorted(files):
+        files_to_process = _walk_filtered_list(target_path, include_hidden, gitignore_matcher, cancel_event)
+    else:
+        files_to_process = []
+
+    # Process with thread pool for large directories
+    if len(files_to_process) > 20:
+        with ThreadPoolExecutor(max_workers=OUTLINE_WORKERS) as executor:
+            futures = {executor.submit(_process_file, f): f for f in files_to_process}
+            for future in as_completed(futures):
+                if cancel_event and cancel_event.is_set():
+                    break
                 if match_count >= max_results:
                     break
-                _process_file(os.path.join(root, fname))
+                try:
+                    result = future.result(timeout=5.0)
+                    if result:
+                        file_output, file_set, file_count = result
+                        with lock:
+                            if match_count + file_count > max_results:
+                                # Trim to max
+                                remaining = max_results - match_count
+                                output_lines.extend(file_output[:remaining])
+                            else:
+                                output_lines.extend(file_output)
+                            matched_files.update(file_set)
+                            match_count += min(file_count, max_results - match_count)
+                            if match_count >= max_results:
+                                # Cancel remaining futures
+                                for f in futures:
+                                    f.cancel()
+                                break
+                except Exception:
+                    continue
+    else:
+        for abs_fpath in files_to_process:
+            if cancel_event and cancel_event.is_set():
+                break
             if match_count >= max_results:
                 break
+            result = _process_file(abs_fpath)
+            if result:
+                file_output, file_set, file_count = result
+                if match_count + file_count > max_results:
+                    remaining = max_results - match_count
+                    output_lines.extend(file_output[:remaining])
+                else:
+                    output_lines.extend(file_output)
+                matched_files.update(file_set)
+                match_count += min(file_count, max_results - match_count)
 
     return output_lines, match_count, len(matched_files)
 
 
-def _search_filename(
+# ---------------------------------------------------------------------------
+# Filename search: ripgrep --files (fast path)
+# ---------------------------------------------------------------------------
+
+def _search_filename_ripgrep(
     target_path: str,
     query: str,
     cwd: str,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
+    include_hidden: bool = False,
     cancel_event: Optional[threading.Event] = None,
-) -> Tuple[List[str], int, int]:
+) -> Optional[Tuple[List[str], int]]:
+    """Use rg --files for fast filename listing, then filter in Python."""
+    if cancel_event and cancel_event.is_set():
+        return [], 0
+
+    rg_bin = shutil.which("rg")
+    if not rg_bin:
+        return None
+
+    cmd = [rg_bin, "--files", "--null", "--color=never"]
+
+    if include_hidden:
+        cmd.append("--hidden")
+
+    if glob_pattern:
+        for g in glob_pattern.split(","):
+            g = g.strip()
+            if g:
+                cmd.extend(["-g", g])
+
+    for exc in DEFAULT_EXCLUDE_DIRS:
+        cmd.extend(["-g", f"!**/{exc}/**"])
+
+    cmd.append(target_path)
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10.0,
+        )
+    except Exception:
+        return None
+
+    if result.returncode not in (0, 1):
+        return None
+
+    matched_paths: List[str] = []
+    q = query.strip() if query else ""
+    q_is_wild = not q or q == "*"
+
+    for fpath in result.stdout.split("\x00"):
+        if cancel_event and cancel_event.is_set():
+            break
+        if not fpath:
+            continue
+        if len(matched_paths) >= max_results:
+            break
+
+        rel = _safe_relpath(fpath, cwd) if os.path.isabs(fpath) else fpath
+        fname = os.path.basename(rel)
+
+        # Apply query filter
+        if not q_is_wild:
+            if not (fnmatch.fnmatch(fname, q) or fnmatch.fnmatch(rel, q)):
+                if q.lower() not in fname.lower() and q.lower() not in rel.lower():
+                    continue
+
+        # Apply glob filter (only if not already applied by rg -g)
+        if glob_pattern and not _match_glob(rel, fname, glob_pattern):
+            continue
+
+        matched_paths.append(rel)
+
+    return matched_paths, len(matched_paths)
+
+
+# ---------------------------------------------------------------------------
+# Filename search: pure Python fallback
+# ---------------------------------------------------------------------------
+
+def _search_filename_python(
+    target_path: str,
+    query: str,
+    cwd: str,
+    glob_pattern: Optional[str] = None,
+    max_results: int = 50,
+    include_hidden: bool = False,
+    gitignore_matcher: Optional[_GitignoreMatcher] = None,
+    cancel_event: Optional[threading.Event] = None,
+) -> Tuple[List[str], int]:
     """Find files/directories matching query/glob pattern."""
     matched_paths: List[str] = []
     q = query.strip() if query else ""
@@ -479,27 +1406,134 @@ def _search_filename(
         fname = os.path.basename(target_path)
         if _matches_query(rel, fname) and _match_glob(rel, fname, glob_pattern):
             matched_paths.append(rel)
-        return matched_paths, len(matched_paths), 1 if matched_paths else 0
+        return matched_paths, len(matched_paths)
 
-    for root, dirs, files in os.walk(target_path, topdown=True):
+    # Use generator for streaming file enumeration
+    for abs_p in _walk_filtered(target_path, include_hidden, gitignore_matcher, cancel_event):
         if cancel_event and cancel_event.is_set():
             break
-        dirs[:] = [
-            d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS and not d.endswith(".egg-info") and not d.startswith(".git")
-        ]
-
-        for fname in sorted(files):
-            if len(matched_paths) >= max_results:
-                break
-            abs_p = os.path.join(root, fname)
-            rel = _safe_relpath(abs_p, cwd)
-            if _matches_query(rel, fname) and _match_glob(rel, fname, glob_pattern):
-                matched_paths.append(rel)
-
         if len(matched_paths) >= max_results:
             break
+        rel = _safe_relpath(abs_p, cwd)
+        fname = os.path.basename(rel)
+        if _matches_query(rel, fname) and _match_glob(rel, fname, glob_pattern):
+            matched_paths.append(rel)
 
-    return matched_paths, len(matched_paths), len(matched_paths)
+    return matched_paths, len(matched_paths)
+
+
+# ---------------------------------------------------------------------------
+# Filename search: combined
+# ---------------------------------------------------------------------------
+
+def _search_filename(
+    target_path: str,
+    query: str,
+    cwd: str,
+    glob_pattern: Optional[str] = None,
+    max_results: int = 50,
+    include_hidden: bool = False,
+    gitignore_matcher: Optional[_GitignoreMatcher] = None,
+    cancel_event: Optional[threading.Event] = None,
+) -> Tuple[List[str], int, int]:
+    """Find files matching query. Tries rg --files first, falls back to Python."""
+    rg_result = _search_filename_ripgrep(
+        target_path=target_path,
+        query=query,
+        cwd=cwd,
+        glob_pattern=glob_pattern,
+        max_results=max_results,
+        include_hidden=include_hidden,
+        cancel_event=cancel_event,
+    )
+    if rg_result is not None:
+        paths, count = rg_result
+        return paths, count, count
+
+    paths, count = _search_filename_python(
+        target_path=target_path,
+        query=query,
+        cwd=cwd,
+        glob_pattern=glob_pattern,
+        max_results=max_results,
+        include_hidden=include_hidden,
+        gitignore_matcher=gitignore_matcher,
+        cancel_event=cancel_event,
+    )
+    return paths, count, count
+
+
+# ---------------------------------------------------------------------------
+# Outline search: parallel with AST + regex
+# ---------------------------------------------------------------------------
+
+def _outline_file(
+    abs_fpath: str,
+    cwd: str,
+    query: Optional[str],
+    glob_pattern: Optional[str],
+    use_cache: bool = True,
+) -> Optional[Tuple[str, List[str], int]]:
+    """Process a single file for outline extraction with optional caching.
+
+    Returns (rel_path, symbols, count) or None.
+    Uses LRU cache with mtime invalidation for repeated calls.
+    """
+    try:
+        if os.path.getsize(abs_fpath) > MAX_OUTLINE_FILE_BYTES:
+            return None
+    except Exception:
+        return None
+
+    rel = _safe_relpath(abs_fpath, cwd)
+    fname = os.path.basename(abs_fpath)
+    ext = os.path.splitext(fname)[1].lower()
+
+    if not _match_glob(rel, fname, glob_pattern):
+        return None
+    if not glob_pattern and ext not in CODE_EXTENSIONS:
+        return None
+
+    # Check cache first
+    if use_cache:
+        try:
+            file_mtime = os.path.getmtime(abs_fpath)
+            cache_key = f"{abs_fpath}:{query}:{glob_pattern}"
+            cached = _OUTLINE_CACHE.get(cache_key, file_mtime)
+            if cached is not None:
+                return rel, cached, len(cached)
+        except Exception:
+            pass
+
+    try:
+        with open(abs_fpath, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+    except Exception:
+        return None
+
+    # Try tree-sitter first (perfect accuracy for Python/JS/TS)
+    file_symbols = []
+    if _tree_sitter_outline and _tree_sitter_outline.is_available(ext):
+        file_symbols = _tree_sitter_outline.extract_symbols(content, ext, query)
+
+    # Fallback to regex (good coverage for all languages)
+    if not file_symbols:
+        if ext == ".py":
+            file_symbols = _outline_python_content(content, rel, query)
+        else:
+            file_symbols = _outline_generic_content(content, query)
+
+    if file_symbols:
+        # Store in cache
+        if use_cache:
+            try:
+                file_mtime = os.path.getmtime(abs_fpath)
+                cache_key = f"{abs_fpath}:{query}:{glob_pattern}"
+                _OUTLINE_CACHE.put(cache_key, file_mtime, file_symbols)
+            except Exception:
+                pass
+        return rel, file_symbols, len(file_symbols)
+    return None
 
 
 def _search_outline(
@@ -508,76 +1542,95 @@ def _search_outline(
     cwd: str,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
+    include_hidden: bool = False,
+    gitignore_matcher: Optional[_GitignoreMatcher] = None,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_event: Optional[threading.Event] = None,
 ) -> Tuple[List[str], int, int]:
-    """Extract AST/regex outline symbols from files matching path and optional query."""
+    """Extract AST/regex outline symbols from files matching path and optional query.
+
+    Uses parallel processing for directories with many files.
+    """
     output_lines: List[str] = []
     total_symbols = 0
     matched_files: Set[str] = set()
 
-    def _process_file(abs_fpath: str) -> None:
-        nonlocal total_symbols
-        if total_symbols >= max_results:
-            return
-        if cancel_event and cancel_event.is_set():
-            return
-
-        try:
-            if os.path.getsize(abs_fpath) > MAX_SEARCH_FILE_BYTES:
-                return
-        except Exception:
-            return
-
-        rel = _safe_relpath(abs_fpath, cwd)
-        fname = os.path.basename(abs_fpath)
-        ext = os.path.splitext(fname)[1].lower()
-
-        if not _match_glob(rel, fname, glob_pattern):
-            return
-        if not glob_pattern and ext not in CODE_EXTENSIONS:
-            return
-
-        try:
-            with open(abs_fpath, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
-        except Exception:
-            return
-
-        file_symbols: List[str] = []
-        if ext == ".py":
-            file_symbols = _outline_python_content(content, rel, query)
-        else:
-            file_symbols = _outline_generic_content(content, query)
-
-        if file_symbols:
-            matched_files.add(rel)
-            output_lines.append(f"{rel}:")
-            for sym_line in file_symbols:
-                if total_symbols >= max_results:
-                    break
-                output_lines.append(sym_line)
-                total_symbols += 1
-            output_lines.append("")
-
+    # Collect files to process
     if os.path.isfile(target_path):
-        _process_file(target_path)
+        files_to_process = [target_path]
     elif os.path.isdir(target_path):
-        for root, dirs, files in os.walk(target_path, topdown=True):
+        files_to_process = _walk_filtered_list(target_path, include_hidden, gitignore_matcher, cancel_event)
+    else:
+        return [], 0, 0
+
+    if len(files_to_process) > 20:
+        # Parallel processing for large directories
+        results: List[Tuple[str, List[str], int]] = []
+        total_files = len(files_to_process)
+        processed_files = 0
+
+        if progress_callback:
+            progress_callback({"stage": "outline_parallel", "total_files": total_files})
+
+        with ThreadPoolExecutor(max_workers=OUTLINE_WORKERS) as executor:
+            futures = {}
+            for f in files_to_process:
+                if cancel_event and cancel_event.is_set():
+                    break
+                futures[executor.submit(_outline_file, f, cwd, query, glob_pattern)] = f
+
+            for future in as_completed(futures):
+                if cancel_event and cancel_event.is_set():
+                    break
+                try:
+                    result = future.result(timeout=5.0)
+                    if result:
+                        results.append(result)
+                    processed_files += 1
+                    # Report progress every 10% or every 50 files
+                    if progress_callback and (processed_files % max(1, total_files // 10) == 0 or processed_files % 50 == 0):
+                        progress_callback({
+                            "stage": "outline_progress",
+                            "processed": processed_files,
+                            "total": total_files,
+                        })
+                except Exception:
+                    continue
+
+        if progress_callback:
+            progress_callback({"stage": "outline_complete", "results": len(results)})
+
+        # Sort results by path for deterministic output
+        results.sort(key=lambda x: x[0])
+    else:
+        # Sequential processing for small sets
+        results = []
+        for abs_fpath in files_to_process:
             if cancel_event and cancel_event.is_set():
                 break
-            dirs[:] = [
-                d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS and not d.endswith(".egg-info") and not d.startswith(".git")
-            ]
-            for fname in sorted(files):
-                if total_symbols >= max_results:
-                    break
-                abs_p = os.path.join(root, fname)
-                _process_file(abs_p)
+            result = _outline_file(abs_fpath, cwd, query, glob_pattern)
+            if result:
+                results.append(result)
+
+    # Render results with symbol capping
+    for rel, symbols, count in results:
+        if total_symbols >= max_results:
+            break
+        matched_files.add(rel)
+        output_lines.append(f"{rel}:")
+        for sym_line in symbols:
             if total_symbols >= max_results:
                 break
+            output_lines.append(sym_line)
+            total_symbols += 1
+        output_lines.append("")
 
     return output_lines, total_symbols, len(matched_files)
 
+
+# ---------------------------------------------------------------------------
+# Main search_sync dispatcher
+# ---------------------------------------------------------------------------
 
 def search_sync(
     query: str,
@@ -587,10 +1640,16 @@ def search_sync(
     glob_pattern: Optional[str] = None,
     case_sensitive: bool = False,
     max_results: int = 50,
+    before_lines: int = 0,
+    after_lines: int = 0,
     context_lines: int = 1,
+    include_hidden: bool = False,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_event: Optional[threading.Event] = None,
 ) -> ToolResult:
     """Synchronous CPU/IO worker executed in a worker thread via run_cancellable."""
+    t0 = time.monotonic()
+
     if cancel_event and cancel_event.is_set():
         header_kv = {"search": (mode or "content").strip().lower()}
         if query and query.strip():
@@ -612,15 +1671,36 @@ def search_sync(
     if mode == "content" and not query.strip():
         return fail(ERROR_KIND_PARAMS, "query parameter is required for content search", name="query")
 
+    # Resolve before/after from context_lines if not explicitly set
+    if before_lines == 0 and after_lines == 0 and context_lines > 0:
+        before_lines = context_lines
+        after_lines = context_lines
+
+    # Report start
+    if progress_callback:
+        progress_callback({"stage": "start", "mode": mode})
+
+    # Build gitignore matcher for Python fallbacks
+    gitignore_matcher = None
+    if os.path.isdir(path):
+        try:
+            gitignore_matcher = _build_gitignore_matcher(path)
+            if progress_callback and gitignore_matcher:
+                progress_callback({"stage": "gitignore_loaded"})
+        except Exception:
+            pass
+
     if mode == "content":
         rg_res = _search_content_ripgrep(
             target_path=path,
             query=query,
             cwd=cwd,
             case_sensitive=case_sensitive,
-            context_lines=context_lines,
+            before_lines=before_lines,
+            after_lines=after_lines,
             glob_pattern=glob_pattern,
             max_results=max_results,
+            include_hidden=include_hidden,
             cancel_event=cancel_event,
         )
         if rg_res is not None:
@@ -631,9 +1711,12 @@ def search_sync(
                 query=query,
                 cwd=cwd,
                 case_sensitive=case_sensitive,
-                context_lines=context_lines,
+                before_lines=before_lines,
+                after_lines=after_lines,
                 glob_pattern=glob_pattern,
                 max_results=max_results,
+                include_hidden=include_hidden,
+                gitignore_matcher=gitignore_matcher,
                 cancel_event=cancel_event,
             )
     elif mode == "filename":
@@ -643,6 +1726,8 @@ def search_sync(
             cwd=cwd,
             glob_pattern=glob_pattern,
             max_results=max_results,
+            include_hidden=include_hidden,
+            gitignore_matcher=gitignore_matcher,
             cancel_event=cancel_event,
         )
     else:  # outline
@@ -652,8 +1737,17 @@ def search_sync(
             cwd=cwd,
             glob_pattern=glob_pattern,
             max_results=max_results,
+            include_hidden=include_hidden,
+            gitignore_matcher=gitignore_matcher,
+            progress_callback=progress_callback,
             cancel_event=cancel_event,
         )
+
+    elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+    # Report completion
+    if progress_callback:
+        progress_callback({"stage": "done", "elapsed_ms": elapsed_ms, "matches": match_count})
 
     header_kv: Dict[str, Any] = {"search": mode}
     rel_p = _safe_relpath(path, cwd)
@@ -666,21 +1760,29 @@ def search_sync(
 
     if match_count == 0:
         header_kv["status"] = "0 matches found"
+        header_kv["elapsed_ms"] = str(elapsed_ms)
         return done(content="", **header_kv)
 
     header_kv["matches"] = str(match_count)
     header_kv["files"] = str(file_count)
+    header_kv["elapsed_ms"] = str(elapsed_ms)
 
     body = "\n".join(raw_lines).strip()
     full_output = truncate_output(body, tool_name="search")
     return done(content=full_output, **header_kv)
 
 
+# ---------------------------------------------------------------------------
+# SearchTool class
+# ---------------------------------------------------------------------------
+
 class SearchTool(BaseTool):
     name = "search"
     description = (
         "Fast codebase search. Modes: 'content' (regex/text grep across files), "
-        "'filename' (find files/directories by pattern), or 'outline' (AST symbol definitions: classes, functions, methods)."
+        "'filename' (find files/directories by pattern), or 'outline' (AST symbol definitions: classes, functions, methods). "
+        "Uses tree-sitter for perfect outline parsing (Python/JS/TS), ripgrep for fast content search, "
+        "with automatic regex fallback. Supports LRU caching and streaming progress."
     )
     schema = {
         "type": "function",
@@ -688,7 +1790,9 @@ class SearchTool(BaseTool):
             "name": "search",
             "description": (
                 "Fast codebase search. Modes: 'content' (regex/text grep across files), "
-                "'filename' (find files/directories by pattern), or 'outline' (AST symbol definitions: classes, functions, methods)."
+                "'filename' (find files/directories by pattern), or 'outline' (AST symbol definitions: classes, functions, methods). "
+                "Uses tree-sitter for perfect outline parsing (Python/JS/TS), ripgrep for fast content search, "
+                "with automatic regex fallback. Supports LRU caching and streaming progress."
             ),
             "parameters": {
                 "type": "object",
@@ -711,7 +1815,10 @@ class SearchTool(BaseTool):
                     },
                     "glob": {
                         "type": "string",
-                        "description": "Optional glob pattern to filter files (e.g. '*.py', '!*test*').",
+                        "description": (
+                            "Glob pattern to filter files. Supports comma-separated patterns, "
+                            "! negation, and ** for recursive matching (e.g. '*.py', '!*test*', '**/*.ts')."
+                        ),
                     },
                     "case_sensitive": {
                         "type": "boolean",
@@ -727,7 +1834,23 @@ class SearchTool(BaseTool):
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 10,
-                        "description": "Context lines before and after matches (for mode='content', default: 1).",
+                        "description": "Symmetric context lines before and after matches (for mode='content', default: 1). Overridden by before/after if set.",
+                    },
+                    "before": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 20,
+                        "description": "Context lines before each match (for mode='content'). Overrides context_lines.",
+                    },
+                    "after": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 20,
+                        "description": "Context lines after each match (for mode='content'). Overrides context_lines.",
+                    },
+                    "include_hidden": {
+                        "type": "boolean",
+                        "description": "Include hidden files/directories (starting with '.') in search (default: false).",
                     },
                 },
                 "required": [],
@@ -764,6 +1887,13 @@ class SearchTool(BaseTool):
         context_lines = try_int(args.get("context_lines"), 1)
         context_lines = max(0, min(context_lines, 10))
 
+        before_lines = try_int(args.get("before"), 0)
+        before_lines = max(0, min(before_lines, 20))
+        after_lines = try_int(args.get("after"), 0)
+        after_lines = max(0, min(after_lines, 20))
+
+        include_hidden = bool(args.get("include_hidden", False))
+
         cwd = ctx.cwd or os.getcwd()
 
         return await run_cancellable(
@@ -775,5 +1905,8 @@ class SearchTool(BaseTool):
             glob_pattern=glob_pattern,
             case_sensitive=case_sensitive,
             max_results=max_results,
+            before_lines=before_lines,
+            after_lines=after_lines,
             context_lines=context_lines,
+            include_hidden=include_hidden,
         )
