@@ -91,6 +91,16 @@ def apply_prompt(
     safe_model_label = escape_xml(model_label)
     base_prompt = SUBAGENT_DEFAULT_SYSTEM_PROMPT if is_subagent else DEFAULT_SYSTEM_PROMPT
     prompt = base_prompt.replace("{model_name}", safe_model_label)
+    if "{compaction_ratio}" in prompt:
+        try:
+            from core.infrastructure.config.settings import get_settings
+
+            ratio = int(get_settings().llm.compaction_threshold_ratio * 100)
+        except Exception:
+            from core.domain.defaults.config import DEFAULT_COMPACTION_THRESHOLD_RATIO
+
+            ratio = int(DEFAULT_COMPACTION_THRESHOLD_RATIO * 100)
+        prompt = prompt.replace("{compaction_ratio}", str(ratio))
     body = getattr(definition, "prompt", "")
     parts = [prompt]
     if isinstance(body, str) and body.strip():

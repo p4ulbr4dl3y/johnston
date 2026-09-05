@@ -26,7 +26,10 @@ class RoleScope(str, Enum):
 
 def normalize_role_scope(scope: str) -> str:
     """Normalize a role scope value to its canonical short name."""
-    return (scope or "").strip().lower() or "any"
+    clean = (scope or "").strip().lower()
+    if clean in ("both", "all"):
+        return "any"
+    return clean or "any"
 
 
 class AgentRole:

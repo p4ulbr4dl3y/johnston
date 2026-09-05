@@ -136,14 +136,17 @@ class RoleRegistry:
                 return self.roles[key_lower]
             return self.roles.get("worker") or BUILTIN_ROLES["worker"]
 
-    def list_roles(self, scope: Optional[str] = None) -> Dict[str, AgentRole]:
-        if not scope:
-            return self.roles
-        clean_scope = normalize_role_scope(scope)
-        return {k: v for k, v in self.roles.items() if v.scope in (RoleScope.BOTH, clean_scope)}
+    def list_roles(self, scope: Optional[str] = None, project_dir: Optional[str] = None) -> Dict[str, AgentRole]:
+        with _registry_lock:
+            if project_dir is not None:
+                self.load_roles(project_dir=project_dir)
+            if not scope:
+                return dict(self.roles)
+            clean_scope = normalize_role_scope(scope)
+            return {k: v for k, v in self.roles.items() if v.scope in (RoleScope.BOTH, clean_scope)}
 
-    def list_subagent_roles(self) -> Dict[str, AgentRole]:
-        return {k: v for k, v in self.roles.items() if v.scope in (RoleScope.BOTH, RoleScope.SUBAGENT)}
+    def list_subagent_roles(self, project_dir: Optional[str] = None) -> Dict[str, AgentRole]:
+        return self.list_roles(scope=RoleScope.SUBAGENT, project_dir=project_dir)
 
     def get_system_prompt_snippet(self, project_dir: Optional[str] = None) -> str:
         with _registry_lock:
@@ -182,6 +185,7 @@ class RoleRegistry:
             key = meta.get("key") or base_key
             name = meta.get("name") or key.replace("_", " ").replace("-", " ").title()
             desc = meta.get("description", "")
+            provider = meta.get("provider", "")
             model = meta.get("model", "")
             scope = meta.get("scope", "any")
 
@@ -201,6 +205,7 @@ class RoleRegistry:
                 disallowed_tools=disallowed_tools,
                 allowed_tools=allowed_tools,
                 model=model,
+                provider=provider,
                 scope=scope,
                 source=source,
                 tool_name_normalizer=self.tool_name_normalizer,

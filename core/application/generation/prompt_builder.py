@@ -437,7 +437,7 @@ class PromptBuilder:
                 ratio = int(DEFAULT_COMPACTION_THRESHOLD_RATIO * 100)
             sys_prompt = sys_prompt.replace("{compaction_ratio}", str(ratio))
 
-        if self.is_subagent and self.worktree_branch and "<worktree_guidelines>" not in sys_prompt:
+        if self.is_subagent and self.worktree_branch and "<worktree>" not in sys_prompt:
             # Branch name is user-controlled and gets interpolated into the
             # system prompt. Escape it so a name containing literal
             # `</worktree>` cannot truncate the wrapper and inject
@@ -540,15 +540,9 @@ class PromptBuilder:
             role_def = RoleRegistry.get_instance().get_role(
                 self.role, project_dir=self.cwd or os.getcwd()
             )
-        # Read-only role: explicit "read-only" hint so the model is aware
-        # the tool set has been filtered (the filter itself is enforced
-        # in build_tools via role_policy).
-        if getattr(role_def, "read_only", False) and "<role" in base and "mode=" not in base:
-            # Cheap indicator; the full tool filter is the actual enforcement.
-            pass  # marker is added via the role block below if applicable
 
         role_block = ""
-        if getattr(role_def, "prompt", None) and not self.is_subagent:
+        if getattr(role_def, "prompt", None) and not self.is_subagent and "<role" not in base:
             from core.roles.prompt import format_role_prompt
 
             formatted_role = format_role_prompt(self.role, role_def.prompt)
@@ -632,6 +626,7 @@ class PromptBuilder:
             not self.is_subagent
             and self.allow_task
             and self.subagent_schema
+            and role_tool_error(role_def, "invoke_subagent", is_subagent=self.is_subagent) is None
             and not any(
                 t.get("function", {}).get("name", "").lower() == "invoke_subagent"
                 for t in filtered_base

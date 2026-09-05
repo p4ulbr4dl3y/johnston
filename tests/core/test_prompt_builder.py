@@ -225,6 +225,29 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertIn('mode="outline"', prompt)
         self.assertIn("NEVER grep/rg via shell", prompt)
 
+    def test_build_tools_disallowed_subagent_schema_not_appended(self):
+        from unittest.mock import patch
+
+        from core.domain.policies.role_policy import AgentRole
+        from core.role_registry import RoleRegistry
+
+        reg = RoleRegistry.get_instance()
+        role = AgentRole(
+            key="no_sub",
+            name="No Sub",
+            disallowed_tools=["invoke_subagent"],
+        )
+        with patch.object(reg, "get_role", return_value=role):
+            builder = PromptBuilder(
+                "Test",
+                [],
+                role="no_sub",
+                subagent_schema={"type": "function", "function": {"name": "invoke_subagent"}},
+            )
+            tools = builder.build_tools()
+            names = [t.get("function", {}).get("name") for t in tools]
+            self.assertNotIn("invoke_subagent", names)
+
 
 if __name__ == "__main__":
     unittest.main()

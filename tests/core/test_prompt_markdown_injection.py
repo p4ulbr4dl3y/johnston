@@ -444,9 +444,7 @@ class RolePromptInjectionTests(unittest.TestCase):
         # The legit close tag from the worktree prompt is still present at
         # the very end (un-escaped).
         self.assertTrue(sub.system_prompt.rstrip().endswith("</worktree>"))
-        # The legit close tag from the subagent default system prompt
-        # section is also preserved.
-        self.assertIn("</worktree>\n", sub.system_prompt)
+        self.assertEqual(sub.system_prompt.count("</worktree>"), 1)
 
     def test_role_model_label_escaped(self):
         """apply_prompt interpolates the role's model name into the
@@ -481,9 +479,9 @@ class RolePromptInjectionTests(unittest.TestCase):
         self.assertNotIn("<system_note", sub.system_prompt)
         # Escaped form is present.
         self.assertIn("&lt;system_note", sub.system_prompt)
-        # The legit close tags from the subagent system prompt remain
-        # (default subagent prompt has 1 </worktree> in <worktree if-applicable>).
-        self.assertEqual(sub.system_prompt.count("</worktree>"), 1)
+        # No worktree tag when worktree_branch is not set
+        self.assertEqual(sub.system_prompt.count("</worktree>"), 0)
+        self.assertEqual(sub.system_prompt.count("</identity>"), 1)
 
 
 if __name__ == "__main__":

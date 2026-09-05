@@ -691,4 +691,37 @@ class TestRoleDisplayAndInjection:
         agent.role_name = "Cached Agent Role"
         assert agent.role_name == "Cached Agent Role"
 
+    def test_normalize_role_scope_aliases(self):
+        assert normalize_role_scope("both") == "any"
+        assert normalize_role_scope("all") == "any"
+        assert normalize_role_scope("MAIN") == "main"
+        assert normalize_role_scope("SUBAGENT") == "subagent"
+
+    def test_parse_role_separate_provider_field(self):
+        reg = RoleRegistry.get_instance()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write("---\nname: Test Provider\nprovider: anthropic\nmodel: claude-3-5\n---\nPrompt")
+            f_name = f.name
+        try:
+            role = reg._parse_md_role(f_name, "test")
+            assert role is not None
+            assert role.provider == "anthropic"
+            assert role.model == "claude-3-5"
+        finally:
+            os.remove(f_name)
+
+    def test_apply_role_sets_read_only_and_default_not_subagent(self):
+        from core.roles.apply import apply_role
+
+        class MockAgent:
+            def __init__(self):
+                self.role = ""
+                self.tools = []
+
+        agent = MockAgent()
+        apply_role(agent, "explorer")
+        assert agent.read_only is True
+        assert getattr(agent, "is_subagent", False) is False
+
+
 

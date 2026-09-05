@@ -25,7 +25,7 @@ def apply_role(
     from core.role_registry import RoleRegistry
 
     if is_subagent is None:
-        is_subagent = getattr(agent, "is_subagent", True)
+        is_subagent = getattr(agent, "is_subagent", False)
 
     registry = RoleRegistry.get_instance()
     definition = resolve_role(registry, role_key, project_dir=project_dir, is_subagent=is_subagent)
@@ -35,6 +35,7 @@ def apply_role(
         else:
             agent.role = role_key or definition.key
         agent.role_name = definition.name
+        agent.read_only = getattr(definition, "read_only", False)
     except Exception:
         pass
 

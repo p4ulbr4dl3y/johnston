@@ -35,7 +35,7 @@ System prompt instructions for the role...
 - `model`: Specific model or `provider/model` override. If provider omitted, defaults to parent's active provider.
 
 ## Tool Isolation & Worktree Modes
-Subagents are invoked via `invoke_subagent(type="<role_key>", branch="<branch_name>")`:
-- **Branch omitted or same as main tree**: Subagent works directly in the workspace.
-- **Different branch**: Subagent executes inside an isolated Git worktree on that branch and auto-commits on completion.
+Subagents are invoked via `invoke_subagent(title="...", prompt="...", type="<role_key>")`:
+- **Write roles (e.g. `worker`)**: automatically execute inside an isolated Git worktree on an auto-generated branch (`subagent/<title>-<id>`) and auto-commit on completion.
+- **Read-only roles (e.g. `explorer`)**: execute directly in the main workspace without worktree isolation.
 - **Subagent Exclusions**: `invoke_subagent`, `manage_subagent`, `manage_shell`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in all subagent roles.
