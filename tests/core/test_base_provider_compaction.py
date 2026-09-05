@@ -463,10 +463,10 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 async for evt in agent.stream_steps("run tool"):
                     events.append(evt)
 
-        notices = [e for e in events if e[0] == "thinking" and "Context budget reached" in e[1]]
         dividers = [e for e in events if e[0] == "event_divider" and e[1] == "Session Compacted"]
-        self.assertEqual(len(notices), 1)
+        notices = [e for e in events if e[0] == "thinking" and "Context budget reached" in e[1]]
         self.assertEqual(len(dividers), 1)
+        self.assertEqual(len(notices), 0)
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
 
     async def test_model_downshift_triggers_auto_compaction(self):

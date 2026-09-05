@@ -739,7 +739,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     if "(" in compact_msg and ")" in compact_msg:
                         divider_text = f"Session Compacted ({compact_msg[compact_msg.find('(') + 1: compact_msg.rfind(')')]})"
                     yield ("event_divider", divider_text, "")
-                    yield ("thinking", "Context budget reached; compacted earlier tool history before continuing.", "")
 
         except Exception as err:
             logger.exception("API request failed: %s", err)

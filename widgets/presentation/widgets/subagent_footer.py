@@ -289,7 +289,7 @@ class SubagentHeader(ResizeDebounceMixin, Static):
                 else ("esc" if is_compact else "esc Close")
             )
             if is_running and not is_compact:
-                row_right = format_hint(f"{esc_label} • ctrl+k Kill")
+                row_right = format_hint(f"ctrl+k Kill • {esc_label}")
             else:
                 row_right = format_hint(esc_label)
 

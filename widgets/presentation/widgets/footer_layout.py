@@ -180,9 +180,9 @@ def _build_subagent_grid(
     # Row 1: Left [Title (primary)] | Right [Bindings]
     esc_label = "esc Back" if from_tasks else "esc Close"
     if is_compact:
-        raw_hints = f"{esc_label.split(' ')[0]} • ctrl+k" if is_running else esc_label.split(' ')[0]
+        raw_hints = f"ctrl+k • {esc_label.split(' ')[0]}" if is_running else esc_label.split(' ')[0]
     else:
-        raw_hints = f"{esc_label} • ctrl+k Kill" if is_running else esc_label
+        raw_hints = f"ctrl+k Kill • {esc_label}" if is_running else esc_label
     row1_right = format_hint(raw_hints)
 
     clean_title = " ".join(title.split()) if title else "(subagent task)"
