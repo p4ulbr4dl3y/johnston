@@ -293,6 +293,27 @@ class TestAdapterMessageNormalization(unittest.TestCase):
         self.assertEqual(formatted[4]["role"], "user")
         self.assertIn("data:image/png;base64,SU1H", formatted[4]["content"][1]["image_url"]["url"])
 
+    def test_openai_reasoning_content_cleared_to_empty_string(self):
+        from core.adapters import format_messages_for_openai
+
+        messages = [
+            {"role": "user", "content": "hello"},
+            {
+                "role": "assistant",
+                "content": "thinking output",
+                "reasoning_content": "Super long historical thoughts that shouldn't be echoed into context...",
+            },
+            {
+                "role": "assistant",
+                "content": "tool call",
+                "tool_calls": [{"id": "c1", "function": {"name": "read", "arguments": "{}"}}],
+            },
+        ]
+        formatted = format_messages_for_openai(messages)
+        self.assertEqual(formatted[1]["reasoning_content"], "")
+        self.assertEqual(formatted[2]["reasoning_content"], "")
+
+
 
 class _MockUsage:
     def __init__(self, pt, ct, tt):

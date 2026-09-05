@@ -64,7 +64,9 @@ def format_messages_for_openai(messages: List[Dict[str, Any]]) -> List[Dict[str,
 
         if role == "assistant":
             cleaned_msg = dict(msg)
-            if "reasoning_content" not in cleaned_msg or cleaned_msg.get("reasoning_content") is None:
+            # Compatible providers (DeepSeek, OpenCode) require reasoning_content key,
+            # but echoing back previous turns' thought chains inflates input context by tens of thousands of tokens.
+            if "reasoning_content" in cleaned_msg or cleaned_msg.get("reasoning_content") is None or msg.get("tool_calls"):
                 cleaned_msg["reasoning_content"] = ""
             if msg.get("tool_calls"):
                 cleaned_calls = []
