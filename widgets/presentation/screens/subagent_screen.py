@@ -162,7 +162,7 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
             return
 
         try:
-            if chat_view:
+            if chat_view and chat_view.children:
                 expanded_indices = set()
                 for idx, child in enumerate(chat_view.children):
                     if getattr(child, "is_expanded", False):
@@ -175,9 +175,12 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
             if notch is None:
                 notch = self.query_one(PlanNotch)
             if notch and getattr(notch, "plan_items", None):
+                # Textual's Widget.display property evaluates to False during unmount/closing
+                # because `_closing` is True. Check `styles.display != "none"` instead.
+                is_visible = getattr(getattr(notch, "styles", None), "display", "") != "none"
                 app._subagent_plan_state[self.session.id] = {
                     "is_expanded": getattr(notch, "is_expanded", False),
-                    "display": getattr(notch, "display", True),
+                    "display": is_visible,
                 }
         except Exception:
             pass
