@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import asyncio
 
+# How long to wait for cancelled workers to finish teardown (e.g. the
+# "Response Interrupted" divider) before commands re-render a session view.
+WORKER_TEARDOWN_TIMEOUT = 2.0
+
 
 def cancel_active_workers(app) -> None:
     """Cancel any running Textual background workers on the app."""
@@ -14,7 +18,7 @@ def cancel_active_workers(app) -> None:
         pass
 
 
-async def await_workers_finished(app, timeout: float = 2.0) -> None:
+async def await_workers_finished(app, timeout: float = WORKER_TEARDOWN_TIMEOUT) -> None:
     """Wait until cancelled workers have completed their cleanup.
 
     A cancelled generation worker still runs its finally/teardown (e.g. the
@@ -37,7 +41,7 @@ async def cancel_active_workers_and_tasks(
     app,
     *,
     wait_workers: bool = False,
-    timeout: float = 1.0,
+    timeout: float = WORKER_TEARDOWN_TIMEOUT,
     kill_tasks: bool = True,
     cancel_subagents: bool = True,
     session_id: str | None = None,

@@ -18,6 +18,7 @@ from core.domain.policies.session_naming import FORK_BASE_MAX_LEN
 from widgets.chat_input import ChatInput
 from widgets.presentation.commands.base import BaseCommand
 from widgets.presentation.commands.helpers import (
+    WORKER_TEARDOWN_TIMEOUT,
     await_workers_finished,
     cancel_active_workers_and_tasks,
     reset_app_state,
@@ -120,7 +121,7 @@ class ResumeCommand(BaseCommand):
             await cancel_active_workers_and_tasks(
                 app,
                 wait_workers=True,
-                timeout=2.0,
+                timeout=WORKER_TEARDOWN_TIMEOUT,
                 kill_tasks=True,
                 cancel_subagents=True,
                 session_id=curr_sid,
@@ -304,7 +305,7 @@ class RewindCommand(BaseCommand):
                 await cancel_active_workers_and_tasks(
                     app,
                     wait_workers=True,
-                    timeout=1.0,
+                    timeout=WORKER_TEARDOWN_TIMEOUT,
                     kill_tasks=True,
                     cancel_subagents=True,
                     session_id=curr_sid,
@@ -445,7 +446,7 @@ class ForkCommand(BaseCommand):
             await cancel_active_workers_and_tasks(
                 app,
                 wait_workers=True,
-                timeout=2.0,
+                timeout=WORKER_TEARDOWN_TIMEOUT,
                 kill_tasks=True,
                 cancel_subagents=True,
                 session_id=curr_sid,
