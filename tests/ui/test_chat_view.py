@@ -857,6 +857,33 @@ class TestChatViewDividerSpacing(unittest.IsolatedAsyncioTestCase):
             # Verify all mounted widgets have visible styles restored
             for child in chat_view.children:
                 self.assertNotEqual(child.styles.visibility, "hidden")
+                self.assertNotEqual(child.styles.display, "none")
             self.assertEqual(len(chat_view._unloaded_messages), 0)
+
+    @pytest.mark.slow
+    async def test_older_messages_first_prompt_does_not_flash_during_scroll(self):
+        app = JohnstonApp()
+        async with app.run_test(size=(120, 20)) as pilot:
+            chat_view = app.query_one(ChatView)
+            chat_view.PAGE_SIZE = 15
+            session = MagicMock()
+            msgs = [{"type": "user", "text": "PROMPT_SHOULD_NOT_FLASH"}]
+            for i in range(1, 35):
+                msgs.append({"type": "tool", "tool_type": "shell", "target": f"echo {i}", "result_text": f"out {i}"})
+            session.messages = msgs
+            session.prompt = "PROMPT_SHOULD_NOT_FLASH"
+            await chat_view.load_session(session)
+            await pilot.pause(0.2)
+
+            # Trigger pagination near top
+            chat_view.scroll_to(y=0, animate=False)
+            await pilot.pause(0.05)
+            chat_view.scroll_page_up()
+
+            # Verify prompt message does not flash on screen during mount ticks
+            for _ in range(10):
+                await pilot.pause(0.02)
+                shot = app.export_screenshot()
+                self.assertNotIn("PROMPT_SHOULD_NOT_FLASH", shot)
 
 

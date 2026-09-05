@@ -144,12 +144,11 @@ class ChatView(VerticalScroll):
         if self._pagination_anchor is not None:
             try:
                 v_region = getattr(self._pagination_anchor, "virtual_region", None)
-                if v_region is not None:
+                if v_region is not None and v_region.y >= 0:
                     target_y = max(0, v_region.y - self._pagination_anchor_offset)
                     self.scroll_y = target_y
             except Exception:
                 pass
-            self._pagination_anchor = None
         super()._scroll_update(virtual_size)
 
     def activate_hint(self, widget: Any) -> None:
@@ -245,6 +244,27 @@ class ChatView(VerticalScroll):
         """Returns True if scroll position is at or near the bottom of the container."""
         return (self.max_scroll_y - self.scroll_y) <= threshold
 
+    def scroll_up(self, *args, **kwargs) -> None:
+        """Scroll chat up and trigger pagination near top."""
+        if self.max_scroll_y > 0:
+            self._auto_follow = False
+        if self._is_loading_older or self._is_loading_session:
+            return
+        if self.scroll_y <= self.PAGINATION_THRESHOLD and self.has_older_messages():
+            self.load_older_messages()
+        super().scroll_up(*args, **kwargs)
+
+    def scroll_page_up(self, *args, **kwargs) -> None:
+        """Scroll page up, pausing auto-follow and triggering pagination near top."""
+        if self.max_scroll_y > 0:
+            self._auto_follow = False
+        if self._is_loading_older or self._is_loading_session:
+            return
+        if self.scroll_y <= self.PAGINATION_THRESHOLD and self.has_older_messages():
+            self.load_older_messages()
+            return
+        super().scroll_page_up(*args, **kwargs)
+
     def scroll_up_page(self) -> None:
         """Scroll chat up by one page and pause auto-follow."""
         if self.max_scroll_y > 0:
@@ -253,6 +273,7 @@ class ChatView(VerticalScroll):
             return
         if self.scroll_y <= self.PAGINATION_THRESHOLD and self.has_older_messages():
             self.load_older_messages()
+            return
         self.scroll_page_up(animate=False)
 
     def scroll_down_page(self) -> None:
@@ -268,6 +289,7 @@ class ChatView(VerticalScroll):
             return
         if self.has_older_messages():
             self.load_older_messages()
+            return
         self.scroll_home(animate=False)
 
     def scroll_to_bottom(self) -> None:
@@ -384,6 +406,7 @@ class ChatView(VerticalScroll):
             return
         self._is_loading_older = True
         self._auto_follow = False
+        new_widgets: list[Any] = []
         try:
             chunk = self._unloaded_messages[-self.PAGE_SIZE :]
             self._unloaded_messages = self._unloaded_messages[: -self.PAGE_SIZE]
@@ -392,48 +415,60 @@ class ChatView(VerticalScroll):
             old_max_y = self.max_scroll_y
             old_scroll_y = self.scroll_y
 
-            if anchor is not None:
+            if anchor is None:
+                for msg in chunk:
+                    await self.restore_message(msg, task_manager=task_mgr)
+            else:
+                for msg in chunk:
+                    w = await self.restore_message(msg, before=anchor, task_manager=task_mgr)
+                    if w is not None:
+                        new_widgets.append(w)
+
+                anchor_vy = getattr(getattr(anchor, "virtual_region", None), "y", 0)
                 self._pagination_anchor = anchor
-                self._pagination_anchor_offset = getattr(getattr(anchor, "region", None), "y", 0)
+                self._pagination_anchor_offset = anchor_vy - int(self.scroll_y)
 
-            app = getattr(self, "app", None)
-            batch_ctx = app.batch_update() if (app is not None and hasattr(app, "batch_update")) else nullcontext()
+                app = getattr(self, "app", None)
+                batch_ctx = app.batch_update() if (app is not None and hasattr(app, "batch_update")) else nullcontext()
+                with batch_ctx:
+                    for w in new_widgets:
+                        try:
+                            w.styles.display = "block"
+                        except Exception:
+                            pass
 
-            with batch_ctx:
-                if anchor is None:
-                    for msg in chunk:
-                        await self.restore_message(msg, task_manager=task_mgr)
-                else:
-                    for msg in chunk:
-                        await self.restore_message(msg, before=anchor, task_manager=task_mgr)
-
-                    def _compensate_scroll():
-                        if self._pagination_anchor is not None:
-                            try:
-                                v_region = getattr(self._pagination_anchor, "virtual_region", None)
-                                if v_region is not None:
-                                    target_y = max(0, v_region.y - self._pagination_anchor_offset)
-                                else:
-                                    delta = max(0, self.max_scroll_y - old_max_y)
-                                    target_y = old_scroll_y + delta
-                                self.scroll_to(y=target_y, animate=False, immediate=True)
-                            except Exception:
-                                pass
-                            self._pagination_anchor = None
-                        elif self.max_scroll_y != old_max_y:
-                            try:
+                def _compensate_scroll():
+                    if self._pagination_anchor is not None:
+                        try:
+                            v_region = getattr(self._pagination_anchor, "virtual_region", None)
+                            if v_region is not None:
+                                target_y = max(0, v_region.y - self._pagination_anchor_offset)
+                            else:
                                 delta = max(0, self.max_scroll_y - old_max_y)
                                 target_y = old_scroll_y + delta
-                                self.scroll_to(y=target_y, animate=False, immediate=True)
-                            except Exception:
-                                pass
+                            self.scroll_to(y=target_y, animate=False, immediate=True)
+                        except Exception:
+                            pass
+                        self._pagination_anchor = None
+                    elif self.max_scroll_y != old_max_y:
+                        try:
+                            delta = max(0, self.max_scroll_y - old_max_y)
+                            target_y = old_scroll_y + delta
+                            self.scroll_to(y=target_y, animate=False, immediate=True)
+                        except Exception:
+                            pass
 
-                    if hasattr(self, "call_after_refresh"):
-                        self.call_after_refresh(_compensate_scroll)
-                    else:
-                        _compensate_scroll()
+                if hasattr(self, "call_after_refresh"):
+                    self.call_after_refresh(_compensate_scroll)
+                else:
+                    _compensate_scroll()
         except Exception as e:
             logger.warning("Failed loading older chat messages: %s", e)
+            for w in new_widgets:
+                try:
+                    w.styles.display = "block"
+                except Exception:
+                    pass
             self._pagination_anchor = None
         finally:
             self._is_loading_older = False
@@ -551,6 +586,11 @@ class ChatView(VerticalScroll):
             self.clear_welcome()
         if not self.is_attached:
             await self._wait_until_attached()
+        if before is not None and self._is_loading_older:
+            try:
+                widget.styles.display = "none"
+            except Exception:
+                pass
         if before is not None:
             await self.mount(widget, before=before)
         else:
