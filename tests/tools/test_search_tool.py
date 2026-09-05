@@ -1222,8 +1222,8 @@ impl RealStruct {
             mode="outline",
             glob_pattern="types.go",
         )
-        self.assertIn("type User struct (line 4)", result.content)
-        self.assertIn("type ID int (line 5)", result.content)
+        self.assertIn("4: type User struct", result.content)
+        self.assertIn("5: type ID int", result.content)
 
 
 if __name__ == "__main__":

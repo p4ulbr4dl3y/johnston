@@ -113,16 +113,16 @@ def _outline_python_content(
 
             if class_matches or matching_methods:
                 bases_str = f"({', '.join(bases)})" if bases else ""
-                symbols.append((f"  class {class_name}{bases_str}: (line {node.lineno})", node.lineno, class_name))
+                symbols.append((f"  {node.lineno}: class {class_name}{bases_str}:", node.lineno, class_name))
                 shown_methods = methods if class_matches else matching_methods
                 for m_sig, m_line, m_name in shown_methods:
-                    symbols.append((f"    {m_sig} (line {m_line})", m_line, m_name))
+                    symbols.append((f"    {m_line}: {m_sig}", m_line, m_name))
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             fn_name = node.name
             if (q is None) or (q in fn_name.lower()):
                 prefix = "async def " if isinstance(node, ast.AsyncFunctionDef) else "def "
                 args_s = _format_ast_args(node.args)
-                symbols.append((f"  {prefix}{fn_name}({args_s}) (line {node.lineno})", node.lineno, fn_name))
+                symbols.append((f"  {node.lineno}: {prefix}{fn_name}({args_s})", node.lineno, fn_name))
 
     return symbols
 
@@ -268,7 +268,7 @@ def _outline_generic_symbols(code: str) -> List[Tuple[str, int, str]]:
         display = m.group(0).strip().split("\n")[0].strip()
         if len(display) > 120:
             display = display[:117] + "..."
-        symbols.append((f"  {display} (line {lineno})", lineno, name))
+        symbols.append((f"  {lineno}: {display}", lineno, name))
 
     return symbols
 

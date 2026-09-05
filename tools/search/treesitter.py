@@ -308,48 +308,48 @@ class TreeSitterExtractor:
                         bases = ""
                         if "cls.bases" in captures:
                             bases = captures["cls.bases"][0].text.decode("utf-8", errors="replace")
-                        return f"{indent}class {name}{bases}: (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: class {name}{bases}:", lineno, name, start_byte
                     if key == "fn":
                         params_node = captures.get("fn.params", [None])[0]
                         params = self._format_python_params(params_node)
                         is_async = any(c.type == "async" for c in node.children)
                         prefix = "async def" if is_async else "def"
-                        return f"{indent}{prefix} {name}{params} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: {prefix} {name}{params}", lineno, name, start_byte
 
                 elif ext in (".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"):
                     if key == "cls":
-                        return f"{indent}class {name} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: class {name}", lineno, name, start_byte
                     if key == "iface":
-                        return f"{indent}interface {name} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: interface {name}", lineno, name, start_byte
                     if key == "type":
-                        return f"{indent}type {name} = ... (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: type {name} = ...", lineno, name, start_byte
                     if key == "enum":
-                        return f"{indent}enum {name} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: enum {name}", lineno, name, start_byte
                     if key == "fn":
                         params = "()"
                         if "fn.params" in captures:
                             params = captures["fn.params"][0].text.decode("utf-8", errors="replace")
                         is_async = any(c.type == "async" for c in node.children)
                         prefix = "async function" if is_async else "function"
-                        return f"{indent}{prefix} {name}{params} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: {prefix} {name}{params}", lineno, name, start_byte
                     if key == "method":
                         params = "()"
                         if "method.params" in captures:
                             params = captures["method.params"][0].text.decode("utf-8", errors="replace")
-                        return f"{indent}{name}{params} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: {name}{params}", lineno, name, start_byte
                     if key == "arrow":
-                        return f"{indent}const {name} = (...) => (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: const {name} = (...) =>", lineno, name, start_byte
 
                 elif ext == ".go":
                     if key == "type":
                         type_node = captures.get("type.spec", [node])[0]
                         type_text = type_node.text.decode("utf-8", errors="replace").split("{")[0].strip()
-                        return f"{indent}type {type_text} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: type {type_text}", lineno, name, start_byte
                     if key == "fn":
                         params = "()"
                         if "fn.params" in captures:
                             params = captures["fn.params"][0].text.decode("utf-8", errors="replace")
-                        return f"{indent}func {name}{params} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: func {name}{params}", lineno, name, start_byte
                     if key == "method":
                         rcvr = ""
                         if "method.rcvr" in captures:
@@ -357,26 +357,26 @@ class TreeSitterExtractor:
                         params = "()"
                         if "method.params" in captures:
                             params = captures["method.params"][0].text.decode("utf-8", errors="replace")
-                        return f"{indent}func {rcvr}{name}{params} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: func {rcvr}{name}{params}", lineno, name, start_byte
 
                 elif ext == ".rs":
                     if key == "struct":
-                        return f"{indent}struct {name} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: struct {name}", lineno, name, start_byte
                     if key == "enum":
-                        return f"{indent}enum {name} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: enum {name}", lineno, name, start_byte
                     if key == "trait":
-                        return f"{indent}trait {name} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: trait {name}", lineno, name, start_byte
                     if key == "impl":
-                        return f"{indent}impl {name} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: impl {name}", lineno, name, start_byte
                     if key == "fn":
                         params = "()"
                         if "fn.params" in captures:
                             params = captures["fn.params"][0].text.decode("utf-8", errors="replace")
-                        return f"{indent}fn {name}{params} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: fn {name}{params}", lineno, name, start_byte
                     if key == "mod":
-                        return f"{indent}mod {name} (line {lineno})", lineno, name, start_byte
+                        return f"{indent}{lineno}: mod {name}", lineno, name, start_byte
 
-                return f"{indent}{name} (line {lineno})", lineno, name, start_byte
+                return f"{indent}{lineno}: {name}", lineno, name, start_byte
 
         return None
 
