@@ -798,6 +798,82 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             tc = screen.query_one(ToolCallWidget)
             self.assertEqual(tc.status, "cancelled")
 
+    async def test_subagent_kill_sets_suppress_notification_and_clears_async_task(self):
+        """Audit A5: killing from the screen must suppress the background
+        notification BEFORE the cancel (mirroring subagent_service.kill_subagent)
+        and null the async_task reference so late probes see a dead task."""
+        from unittest.mock import MagicMock
+
+        sess = self._mk("task-kill-order", "Kill Order", "prompt")
+        sess.status = "running"
+        async_task = MagicMock()
+        async_task.done.return_value = False
+        sess.async_task = async_task
+        sess.suppress_notification = False
+        sess.pending_messages = [{"type": "user", "text": "queued"}]
+        sess.messages = [{"type": "bot", "text": "in progress"}]
+
+        screen = SubagentViewScreen("task-kill-order")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            if getattr(screen, "_history_worker", None):
+                await screen._history_worker.wait()
+            await pilot.pause(0.1)
+            screen.session = sess
+            screen.action_kill_subagent()
+            await pilot.pause(0.05)
+
+            # Cancelled FIRST (notification suppressed before the cancel decision)
+            async_task.cancel.assert_called_once()
+            # Screen-local finalization flag set
+            self.assertTrue(screen._kill_finalized)
+            # suppress_notification set, exactly like kill_subagent
+            self.assertTrue(getattr(sess, "suppress_notification", False))
+            # async_task reference nulled (pending-cancelled task gone)
+            self.assertIsNone(sess.async_task)
+            # Status flip preserved ("Terminated from subagent view" message)
+            self.assertEqual(sess.status, "cancelled")
+            status_change = [m for m in sess.messages if m.get("type") == "status_change"]
+            self.assertEqual(len(status_change), 1)
+            self.assertEqual(status_change[0]["status"], "cancelled")
+            self.assertEqual(status_change[0]["error"], "Terminated from subagent view")
+
+    async def test_subagent_kill_drops_late_listener_events_from_chat_view(self):
+        """Audit A5: events emitted by the cancelled task's teardown AFTER the
+        screen-local finalization (interruption divider, status_change) must be
+        dropped, not rendered into the chat view."""
+        from widgets.presentation.widgets.chat_messages import EventDivider
+
+        sess = self._mk("task-kill-late", "Kill Late", "prompt")
+        sess.status = "running"
+        sess.messages = [{"type": "bot", "text": "in progress"}]
+
+        screen = SubagentViewScreen("task-kill-late")
+        app = DummyHostApp(screen, store=self.store)
+
+        async with app.run_test() as pilot:
+            if getattr(screen, "_history_worker", None):
+                await screen._history_worker.wait()
+            await pilot.pause(0.1)
+            screen.session = sess
+
+            screen.action_kill_subagent()
+            await pilot.pause(0.05)
+
+            # The cancelled task's teardown emits these through the session listener
+            # (mirrors execute_session_turn's CancelledError handler).
+            sess.record_interruption("Response Interrupted")
+            sess.finish("cancelled", "Cancelled by user")
+            await pilot.pause(0.15)
+
+            chat_view = screen.query_one("#subagent-chat-view", ChatView)
+            dividers = list(chat_view.query(EventDivider))
+            # Late teardown events were dropped by the kill-finalized guard.
+            self.assertEqual(dividers, [])
+            # No running status lingering in the footer chrome.
+            self.assertEqual(sess.status, "cancelled")
+
     async def test_session_chat_screen_alias_and_init(self):
         from widgets.presentation.screens.subagent_screen import SessionChatScreen, SubagentViewScreen
 

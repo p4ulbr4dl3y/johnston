@@ -98,6 +98,7 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
             yield SubagentStatusFooter(from_tasks=self.from_tasks, id="subagent-status-footer")
 
     def on_mount(self) -> None:
+        self._kill_finalized = False
         self._chat_view = self.query_one("#subagent-chat-view", ChatView)
         try:
             self._notch = self.query_one(PlanNotch)
@@ -311,6 +312,11 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
             self.session.remove_listener(self._on_live_event)
 
     def _on_live_event(self, evt: dict) -> None:
+        # Audit A5: after action_kill_subagent has finalized the screen, any
+        # late events emitted by the cancelled task's teardown (interruption
+        # divider, status_change) must be dropped, not re-rendered.
+        if getattr(self, "_kill_finalized", False):
+            return
         if self.is_mounted and hasattr(self, "event_queue"):
             self.event_queue.put_nowait(evt)
 
@@ -378,11 +384,23 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         """Kill the current subagent if running."""
         self._save_expand_state()
         if self.session and getattr(self.session, "status", "") == "running":
-            if getattr(self.session, "async_task", None) and not self.session.async_task.done():
+            # Audit A5: suppress the background notification FIRST (before the
+            # cancel) so the still-running task's finally cannot notify, and
+            # set the screen-local finalized flag so the cancelled task's
+            # teardown events can no longer re-render the chat view.
+            self._kill_finalized = True
+            setattr(self.session, "suppress_notification", True)
+            async_task = getattr(self.session, "async_task", None)
+            if async_task and not async_task.done():
                 try:
-                    self.session.async_task.cancel()
+                    async_task.cancel()
                 except Exception:
                     pass
+            # Null the reference so late probes of async_task.done()
+            # (screen refresh, list rendering) see a dead task instead of a
+            # pending-cancelled one, and the cancelled task's own teardown
+            # cannot be double-cancelled or re-polled.
+            self.session.async_task = None
             if hasattr(self.session, "finish"):
                 self.session.finish("cancelled", "Terminated from subagent view")
             if self.driver:
