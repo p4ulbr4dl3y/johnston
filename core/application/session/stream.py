@@ -432,71 +432,71 @@ async def run_subagent_stream_bg(
             except Exception:
                 pass
 
-            # A cancelled/error run must not re-enter the main chat (audit A2):
+            # A cancelled run must not re-enter the main chat (audit A2):
             # /new cancels the child via task.cancel(); streaming a completion
             # notification (or a toolcard status repaint) into a fresh session
-            # would echo the old run's message into the new chat. Suppress BOTH
-            # the notification (trigger re-enters generate_ai_response) and the
-            # toolcard repaint; keep refresh_status, a footer-only repaint.
-            run_ended_cancelled_or_error = session.status in (
-                SessionStatus.CANCELLED,
-                SessionStatus.ERROR,
-                "cancelled",
-                "error",
-            )
-            if run_ended_cancelled_or_error:
+            # would echo the old run's message into the new chat.
+            if session.status in (SessionStatus.CANCELLED, "cancelled"):
                 setattr(session, "suppress_notification", True)
-            else:
+
+            is_suppressed = getattr(session, "suppress_notification", False)
+
+            # Prevent cross-session leaks: if the UI switched active sessions,
+            # do not inject notifications or repaints into the fresh session.
+            curr_sid = getattr(getattr(ctx, "host", None), "current_session_id", None)
+            session_switched = (
+                curr_sid is not None
+                and getattr(session, "parent_id", None)
+                and curr_sid != session.parent_id
+            )
+
+            if not is_suppressed and not session_switched:
                 try:
                     ctx.mark_subagent_status(session_id or session.id, session.status, acc[0])
                 except Exception:
                     pass
 
-            if (
-                notification_template
-                and not run_ended_cancelled_or_error
-                and not getattr(session, "suppress_notification", False)
-            ):
-                try:
-                    sid = session_id or session.id
-                    sess_status = str(getattr(session, "status", "")).lower()
-                    if "cancel" in sess_status:
-                        status_val = "cancelled"
-                    elif "error" in sess_status:
-                        status_val = "error"
-                    else:
-                        status_val = "completed"
+                if notification_template:
+                    try:
+                        sid = session_id or session.id
+                        sess_status = str(getattr(session, "status", "")).lower()
+                        if "cancel" in sess_status:
+                            status_val = "cancelled"
+                        elif "error" in sess_status:
+                            status_val = "error"
+                        else:
+                            status_val = "completed"
 
-                    if truncate_result:
-                        from core.infrastructure.tasks.output import truncate_subagent_result
+                        if truncate_result:
+                            from core.infrastructure.tasks.output import truncate_subagent_result
 
-                        base_text = truncate_subagent_result(acc[0], sid)
-                    else:
-                        base_text = acc[0].strip()
+                            base_text = truncate_subagent_result(acc[0], sid)
+                        else:
+                            base_text = acc[0].strip()
 
-                    if status_val == "cancelled":
-                        result_text = (
-                            f"{base_text}\n\n[Subagent cancelled by user]"
-                            if base_text
-                            else "[Subagent cancelled by user]"
+                        if status_val == "cancelled":
+                            result_text = (
+                                f"{base_text}\n\n[Subagent cancelled by user]"
+                                if base_text
+                                else "[Subagent cancelled by user]"
+                            )
+                        else:
+                            result_text = base_text or "Completed with no text output."
+
+                        from core.domain.policies.messages import format_background_notification
+
+                        branch = getattr(session, "branch_name", None) or None
+                        msg = format_background_notification(
+                            type_="subagent",
+                            title=session.title or "Subagent",
+                            task_id=sid,
+                            result=result_text,
+                            status=status_val,
+                            branch=branch,
                         )
-                    else:
-                        result_text = base_text or "Completed with no text output."
-
-                    from core.domain.policies.messages import format_background_notification
-
-                    branch = getattr(session, "branch_name", None) or None
-                    msg = format_background_notification(
-                        type_="subagent",
-                        title=session.title or "Subagent",
-                        task_id=sid,
-                        result=result_text,
-                        status=status_val,
-                        branch=branch,
-                    )
-                    ctx.trigger_ai_response(msg)
-                except Exception:
-                    pass
+                        ctx.trigger_ai_response(msg)
+                    except Exception:
+                        pass
         except asyncio.CancelledError:
             raise
 

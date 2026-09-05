@@ -214,6 +214,7 @@ class SubagentService:
         for sess in sessions:
             if not is_active_subagent(sess):
                 continue
+            setattr(sess, "suppress_notification", True)
             async_task = getattr(sess, "async_task", None)
             if async_task and not async_task.done():
                 try:

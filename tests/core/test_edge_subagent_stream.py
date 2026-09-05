@@ -469,11 +469,11 @@ class TestRunStream:
         assert getattr(sess, "suppress_notification", False) is True
 
     @pytest.mark.asyncio
-    async def test_error_run_does_not_reenter_main_chat(self):
-        """A2 error path: a failed subagent must not stream an error
-        notification into a fresh session either (same leak as /new)."""
+    async def test_error_run_with_suppress_notification_does_not_reenter_main_chat(self):
+        """A2 error path: a failed subagent with suppress_notification must not stream an error notification."""
         sub = FakeSubagent(exc=RuntimeError("boom"))
         sess = make_session()
+        sess.suppress_notification = True
         ctx = FakeCtx()
         store = FakeStore()
         result = await run_subagent_stream_bg(sub, "p", sess, ctx, store, notification_template=True)
@@ -482,6 +482,25 @@ class TestRunStream:
         assert ctx.messages == []
         assert ctx.subagent_statuses == []
         assert ctx.refreshed == 1
+
+    @pytest.mark.asyncio
+    async def test_error_run_with_switched_session_does_not_leak_into_active_chat(self):
+        """A2 error path: a failed subagent from an old session must not stream into a newly switched session."""
+        from unittest.mock import MagicMock
+
+        sub = FakeSubagent(exc=RuntimeError("boom"))
+        sess = make_session()
+        sess.parent_id = "old-session"
+        host = MagicMock()
+        host.current_session_id = "new-session"
+        ctx = FakeCtx()
+        ctx.host = host
+        store = FakeStore()
+        result = await run_subagent_stream_bg(sub, "p", sess, ctx, store, notification_template=True)
+        assert result == "[Subagent error: boom]"
+        assert sess.status == STATUS_ERROR
+        assert ctx.messages == []
+        assert ctx.subagent_statuses == []
 
     @pytest.mark.asyncio
     async def test_generic_exception_sets_error_status_with_prefix(self):
@@ -493,9 +512,9 @@ class TestRunStream:
         assert result == "[MyPrefix: boom]"
         assert sess.status == STATUS_ERROR
         assert store.saved == [sess]
-        # A2: error runs stay out of the main chat — no toolcard repaint.
-        assert ctx.subagent_statuses == []
-        assert ctx.messages == []
+        assert ctx.subagent_statuses
+        assert ctx.subagent_statuses[0][1] == STATUS_ERROR
+        assert ctx.messages and 'status="error"' in ctx.messages[0]
 
     @pytest.mark.asyncio
     async def test_cleanup_fn_raises_does_not_mask_result(self):
@@ -992,9 +1011,10 @@ class TestSubagentStepAndErrorHandling:
         )
         assert sess.status == STATUS_ERROR
         assert f"[{error_msg}]" in result
-        # A2: no error notification into the main chat from a failed run.
-        assert ctx.messages == []
-        assert ctx.subagent_statuses == []
+        assert ctx.subagent_statuses
+        assert ctx.subagent_statuses[0][1] == STATUS_ERROR
+        assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
+        assert 'status="error"' in ctx.messages[0]
 
     @pytest.mark.asyncio
     async def test_error_step_marks_status_error_and_returns_error_text(self):
@@ -1008,9 +1028,10 @@ class TestSubagentStepAndErrorHandling:
         )
         assert sess.status == STATUS_ERROR
         assert f"[{error_msg}]" in result
-        # A2: no error notification into the main chat from a failed run.
-        assert ctx.messages == []
-        assert ctx.subagent_statuses == []
+        assert ctx.subagent_statuses
+        assert ctx.subagent_statuses[0][1] == STATUS_ERROR
+        assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
+        assert 'status="error"' in ctx.messages[0]
 
     @pytest.mark.asyncio
     async def test_notification_template_true_handles_braces_in_title_and_branch(self):
@@ -1041,9 +1062,11 @@ class TestSubagentStepAndErrorHandling:
             sub, "initial prompt", sess, ctx, store, notification_template=True
         )
         assert sess.status == STATUS_ERROR
-        # A2: no error notification into the main chat from a failed run.
-        assert ctx.messages == []
-        assert ctx.subagent_statuses == []
+        assert len(ctx.messages) == 1
+        notif = ctx.messages[0]
+        assert 'status="error"' in notif
+        assert ctx.subagent_statuses
+        assert ctx.subagent_statuses[0][1] == STATUS_ERROR
 
     @pytest.mark.asyncio
     async def test_subagent_suppress_notification_skips_trigger_ai(self):

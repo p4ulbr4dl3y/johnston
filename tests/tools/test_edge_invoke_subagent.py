@@ -366,9 +366,8 @@ async def test_stream_throws_propagates_to_notification_not_caller():
     try:
         _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
         assert sess.status == STATUS_ERROR
-        # A2: failed subagent runs no longer notify the main chat (the error
-        # text is captured in the session itself). The caller got no exception.
-        assert app.trigger_ai_response.call_args is None
+        msg = app.trigger_ai_response.call_args.args[0]
+        assert "Subagent error: provider exploded" in msg
     finally:
         tmp.cleanup()
 
