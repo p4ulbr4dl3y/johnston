@@ -111,6 +111,7 @@ class TestCoverEnsureAvailable:
         session = SimpleNamespace(project_dir=missing, branch_name="b", id="s")
         with patch.object(SubagentWorktreeManager, "attach_worktree", return_value="/reattached"):
             assert SubagentWorktreeManager.ensure_worktree_available(session, parent_dir="/parent") == "/reattached"
+            assert session.project_dir == "/reattached"
 
     def test_ensure_reattach_fails_returns_project_dir(self):
         missing = os.path.join(self.tmp, "missing")

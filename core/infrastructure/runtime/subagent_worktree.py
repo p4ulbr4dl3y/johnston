@@ -87,10 +87,17 @@ class SubagentWorktreeManager:
         if os.path.exists(wt_path):
             return wt_path
 
+        # Clean up any leftover worktree registration with same session_id (keep branch)
+        SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=True)
+
         from core.infrastructure.config.settings import get_settings
 
         wt_timeout = get_settings().subagents.worktree_timeout
-        res = run_git(["worktree", "add", wt_path, branch_name], cwd=project_dir, timeout=wt_timeout)
+        exists = run_git(["rev-parse", "--verify", f"refs/heads/{branch_name}"], cwd=project_dir, timeout=5)
+        if exists.returncode == 0:
+            res = run_git(["worktree", "add", wt_path, branch_name], cwd=project_dir, timeout=wt_timeout)
+        else:
+            res = run_git(["worktree", "add", "-b", branch_name, wt_path, "HEAD"], cwd=project_dir, timeout=wt_timeout)
         if res.returncode == 0 and os.path.exists(wt_path):
             return wt_path
 
@@ -207,6 +214,7 @@ class SubagentWorktreeManager:
         if parent_dir:
             reattached = SubagentWorktreeManager.attach_worktree(parent_dir, session.id, branch_name)
         if reattached:
+            session.project_dir = reattached
             return reattached
         return project_dir
 

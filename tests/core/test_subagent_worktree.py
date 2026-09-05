@@ -206,9 +206,11 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         self.assertIsNone(branch_name)
 
     def test_attach_worktree_non_git(self):
-        non_git = os.path.join(self.temp_dir.name, "not-a-repo")
-        os.makedirs(non_git, exist_ok=True)
-        self.assertIsNone(SubagentWorktreeManager.attach_worktree(non_git, "s1", "branch-x"))
+        non_git_dir = tempfile.TemporaryDirectory()
+        try:
+            self.assertIsNone(SubagentWorktreeManager.attach_worktree(non_git_dir.name, "s1", "branch-x"))
+        finally:
+            non_git_dir.cleanup()
 
     def test_attach_worktree_existing_path_returns_it(self):
         from core.infrastructure.platform.paths import WORKTREES_DIR
@@ -257,6 +259,72 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
             import shutil
 
             shutil.rmtree(wt_path, ignore_errors=True)
+
+    def test_attach_worktree_recreates_branch_if_missing(self):
+        from unittest.mock import patch
+
+        from core.infrastructure.platform.paths import WORKTREES_DIR
+
+        wt_path = os.path.join(WORKTREES_DIR, "attach-recreate")
+        calls = []
+
+        def fake_run_git(args, **kwargs):
+            calls.append(args)
+            if args[0] == "rev-parse":
+                return subprocess.CompletedProcess([], returncode=1, stdout="", stderr="not found")
+            if args[0] == "worktree" and args[1] == "add":
+                os.makedirs(wt_path, exist_ok=True)
+                return subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")
+            return subprocess.CompletedProcess([], returncode=0, stdout="", stderr="")
+
+        try:
+            with (
+                patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
+                patch("core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake_run_git),
+            ):
+                result = SubagentWorktreeManager.attach_worktree(self.repo_dir, "attach-recreate", "missing-b")
+            self.assertEqual(result, wt_path)
+            self.assertTrue(any(c[:3] == ["worktree", "add", "-b"] for c in calls))
+        finally:
+            import shutil
+            shutil.rmtree(wt_path, ignore_errors=True)
+
+    def test_attach_worktree_live_git_recreates_deleted_branch(self):
+        session_id = "test-wt-recreate-live"
+        branch_name = "branch-to-delete"
+        wt_path, b_name = SubagentWorktreeManager.create_worktree(self.repo_dir, session_id, branch_name)
+        self.assertIsNotNone(wt_path)
+        self.assertTrue(os.path.exists(wt_path))
+
+        # Cleanup with keep_branch=False (simulating failure without changes)
+        SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=False)
+        self.assertFalse(os.path.exists(wt_path))
+
+        # Verify branch is gone
+        check = subprocess.run(
+            ["git", "rev-parse", "--verify", f"refs/heads/{branch_name}"],
+            cwd=self.repo_dir,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(check.returncode, 0)
+
+        # Follow-up attach should recreate branch and worktree
+        reattached = SubagentWorktreeManager.attach_worktree(self.repo_dir, session_id, branch_name)
+        self.assertIsNotNone(reattached)
+        self.assertTrue(os.path.exists(reattached))
+
+        # Branch exists again
+        check_after = subprocess.run(
+            ["git", "rev-parse", "--verify", f"refs/heads/{branch_name}"],
+            cwd=self.repo_dir,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(check_after.returncode, 0)
+
+        # Final cleanup
+        SubagentWorktreeManager.cleanup_worktree(self.repo_dir, reattached, branch_name, keep_branch=False)
 
     def test_get_worktree_diff_summary_missing_path(self):
         diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
