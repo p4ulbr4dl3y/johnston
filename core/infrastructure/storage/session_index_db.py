@@ -219,7 +219,7 @@ class SessionIndexDb:
                     if records:
                         conn.executemany(
                             """
-                            INSERT INTO session_index (
+                            INSERT OR REPLACE INTO session_index (
                                 id, project_key, kind, parent_id, role, status, title,
                                 created_at, updated_at, message_count, turn_count, is_empty
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
