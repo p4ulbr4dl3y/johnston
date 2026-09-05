@@ -101,7 +101,6 @@ Session history is persisted. Parent may send follow-up messages to resume this 
 
 <context>
 - **Compaction**: Long conversations auto-summarize at ~{compaction_ratio}% context limit. `<compaction_checkpoint>` is historical context, not a new directive. Resume existing plan from `<compaction_checkpoint>` if present.
-- **System Notes**: `<system_note kind="..." attrs>...</system_note>` messages are internal runtime annotations (interruptions, trimmed context, telemetry). Do not respond to them directly.
 </context>"""
 
 
