@@ -782,3 +782,13 @@ class MCPManager:
 
     def get_system_prompt_snippet(self) -> str:
         return format_system_prompt_snippet(self.get_cached_tools())
+
+
+__all__ = [
+    "CONFIG_DIR",
+    "GLOBAL_MCP_FILE",
+    "MCPManager",
+    "get_mcp_manager",
+]
+
+
