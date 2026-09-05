@@ -48,6 +48,17 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("/compact", COMMAND_REGISTRY)
 
+    def test_format_compaction_title(self):
+        from core.base_provider.compaction import format_compaction_title
+
+        msg = "History compacted successfully (10,000 → 4,000 tokens)"
+        self.assertEqual(format_compaction_title(msg), "Session Compacted (10,000 → 4,000 tokens)")
+
+        # Without parentheses or tokens
+        self.assertEqual(format_compaction_title("Compacted"), "Session Compacted")
+        self.assertEqual(format_compaction_title(""), "Session Compacted")
+        self.assertEqual(format_compaction_title(None, default="Custom"), "Custom")
+
     async def test_compact_history_short(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
         self.addAsyncCleanup(agent.close)
@@ -477,6 +488,50 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         warnings = [e for e in events if e[0] == "thinking" and "Auto-compaction warning" in e[1]]
         self.assertEqual(len(warnings), 1)
         self.assertIn("ctx overflow", warnings[0][1])
+
+    async def test_auto_compaction_failure_yields_failed_divider(self):
+        agent = self._make_agent()
+        agent.history = [
+            {"role": "user", "content": "a"},
+            {"role": "assistant", "content": "b"},
+            {"role": "user", "content": "c"},
+            {"role": "assistant", "content": "d"},
+            {"role": "user", "content": "e"},
+        ]
+
+        def fake_estimate(val):
+            if isinstance(val, str):
+                return 100
+            if isinstance(val, list):
+                first = val[0] if val else None
+                if isinstance(first, dict) and first.get("type") == "function":
+                    return 0
+                return 10
+            return 0
+
+        with unittest.mock.patch("core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
+            with unittest.mock.patch(
+                "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+            ) as mock_limit:
+                mock_limit.return_value = 100
+                with unittest.mock.patch.object(
+                    agent, "compact_history", new_callable=unittest.mock.AsyncMock
+                ) as mock_comp:
+                    mock_comp.return_value = (False, "Summary generation failed")
+                    with unittest.mock.patch.object(
+                        agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+                    ) as mock_create:
+                        mock_create.side_effect = Exception("Stop stream")
+                        events = []
+                        try:
+                            async for evt in agent.stream_steps("trigger"):
+                                events.append(evt)
+                        except Exception:
+                            pass
+
+        dividers = [e for e in events if e[0] == "event_divider"]
+        self.assertEqual(len(dividers), 1)
+        self.assertEqual(dividers[0][1], "Compaction Failed")
 
     async def test_compaction_in_loop_after_tool_turn(self):
         agent = self._make_agent()

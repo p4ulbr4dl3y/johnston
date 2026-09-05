@@ -549,6 +549,27 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(app.chat_view.dividers), 1)
         self.assertEqual(app.chat_view.dividers[0].divider_title, "Compaction Cancelled")
 
+    async def test_compact_command_when_is_generating_queues(self):
+        app = MockApp()
+        app.is_generating = True
+        queued = []
+        app._queue_message_ui = lambda prompt, **kwargs: queued.append((prompt, kwargs))
+
+        handled = await handle_slash_command(app, "/compact")
+        self.assertTrue(handled)
+        self.assertFalse(app.agent.compact_called)
+        self.assertEqual(len(queued), 1)
+        self.assertEqual(queued[0][0], "/compact")
+
+    async def test_compact_command_when_is_generating_notifies_if_no_queue(self):
+        app = MockApp()
+        app.is_generating = True
+
+        handled = await handle_slash_command(app, "/compact")
+        self.assertTrue(handled)
+        self.assertFalse(app.agent.compact_called)
+        self.assertTrue(any("generating" in msg.lower() for msg, _ in app.notified))
+
     async def test_johnston_guide_skill_slash_command(self):
         app = MockApp()
         handled = await handle_slash_command(app, "/johnston-guide")

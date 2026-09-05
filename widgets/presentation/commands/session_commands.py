@@ -150,43 +150,51 @@ class CompactCommand(BaseCommand):
     description = "Compact session conversation history"
 
     async def execute(self, app) -> None:
-        if not hasattr(app, "agent") or not app.agent:
-            app.notify("No active agent found", severity="error")
+        if getattr(app, "is_generating", False):
+            if hasattr(app, "_queue_message_ui"):
+                app._queue_message_ui(self.name, show_in_ui=True)
+            elif hasattr(app, "notify"):
+                app.notify("Model is generating. Compaction deferred.", severity="warning")
             return
 
-        divider = None
+        app.is_generating = True
+        try:
+            if not hasattr(app, "agent") or not app.agent:
+                app.notify("No active agent found", severity="error")
+                return
 
-        if hasattr(app, "query_one"):
-            try:
-                cv = app.query_one(ChatView)
-                if cv and hasattr(cv, "add_event_divider"):
-                    divider = await cv.add_event_divider("Compacting session...")
-            except Exception:
-                pass
+            divider = None
 
-        def save_cb() -> None:
-            if hasattr(app, "save_current_session"):
+            if hasattr(app, "query_one"):
                 try:
-                    app.save_current_session()
+                    cv = app.query_one(ChatView)
+                    if cv and hasattr(cv, "add_event_divider"):
+                        divider = await cv.add_event_divider("Compacting session...")
                 except Exception:
                     pass
 
-        def on_begin() -> None:
-            app.is_generating = True
+            def save_cb() -> None:
+                if hasattr(app, "save_current_session"):
+                    try:
+                        app.save_current_session()
+                    except Exception:
+                        pass
 
-        def on_divider_update(title: str) -> None:
-            nonlocal divider
-            if divider and hasattr(divider, "update_title"):
-                divider.update_title(title)
+            def on_begin() -> None:
+                app.is_generating = True
 
-        sess = None
-        if hasattr(app, "sm") and hasattr(app, "current_session_id") and app.current_session_id:
-            try:
-                sess = app.sm.get(app.current_session_id, reload=False)
-            except Exception:
-                pass
+            def on_divider_update(title: str) -> None:
+                nonlocal divider
+                if divider and hasattr(divider, "update_title"):
+                    divider.update_title(title)
 
-        try:
+            sess = None
+            if hasattr(app, "sm") and hasattr(app, "current_session_id") and app.current_session_id:
+                try:
+                    sess = app.sm.get(app.current_session_id, reload=False)
+                except Exception:
+                    pass
+
             outcome = await compact_session(
                 app.agent,
                 save_session_cb=save_cb,
@@ -199,29 +207,36 @@ class CompactCommand(BaseCommand):
                 app.notify(outcome.message or "Context compaction failed", severity="warning")
         finally:
             app.is_generating = False
-            if hasattr(app, "_pop_queued_for_current_session") and hasattr(app, "_process_queued_message"):
-                next_item = app._pop_queued_for_current_session()
-                if next_item is not None:
-                    kw = {}
-                    if len(next_item) > 4 and next_item[4]:
-                        kw["display_text"] = next_item[4]
-                    asyncio.create_task(
-                        app._process_queued_message(
-                            next_item[0],
-                            next_item[1],
-                            next_item[2],
-                            **kw,
+            is_active = bool(
+                getattr(app, "is_app_active", True)
+                and not getattr(app, "_exit", False)
+                and not getattr(app, "_closing", False)
+                and not getattr(app, "_closed", False)
+            )
+            if is_active:
+                if hasattr(app, "_pop_queued_for_current_session") and hasattr(app, "_process_queued_message"):
+                    next_item = app._pop_queued_for_current_session()
+                    if next_item is not None:
+                        kw = {}
+                        if len(next_item) > 4 and next_item[4]:
+                            kw["display_text"] = next_item[4]
+                        asyncio.create_task(
+                            app._process_queued_message(
+                                next_item[0],
+                                next_item[1],
+                                next_item[2],
+                                **kw,
+                            )
                         )
-                    )
-            elif getattr(app, "message_queue", None):
-                next_item = app.message_queue.pop(0)
-                prompt = next_item[0]
-                show_in_ui = next_item[1] if len(next_item) > 1 else True
-                kwargs = {"attachments": next_item[2]} if len(next_item) > 2 else {}
-                if len(next_item) > 4 and next_item[4]:
-                    kwargs["display_text"] = next_item[4]
-                if hasattr(app, "trigger_ai_response"):
-                    app.trigger_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
+                elif getattr(app, "message_queue", None):
+                    next_item = app.message_queue.pop(0)
+                    prompt = next_item[0]
+                    show_in_ui = next_item[1] if len(next_item) > 1 else True
+                    kwargs = {"attachments": next_item[2]} if len(next_item) > 2 else {}
+                    if len(next_item) > 4 and next_item[4]:
+                        kwargs["display_text"] = next_item[4]
+                    if hasattr(app, "trigger_ai_response"):
+                        app.trigger_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
 
 
 def _extract_user_messages(app, session=None) -> list[tuple[int, str]]:

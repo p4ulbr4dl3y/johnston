@@ -168,6 +168,15 @@ def resolve_auto_compact_limit(agent: Any) -> Optional[int]:
         return None
 
 
+def format_compaction_title(msg: str, default: str = "Session Compacted") -> str:
+    """Format canonical divider title from compaction outcome message."""
+    if msg and "(" in msg and ")" in msg:
+        tokens_part = msg[msg.find("(") + 1 : msg.rfind(")")].strip()
+        if tokens_part:
+            return f"Session Compacted ({tokens_part})"
+    return default
+
+
 def collect_user_messages(
     history: List[Dict[str, Any]],
     max_tokens: Optional[int] = None,

@@ -261,3 +261,36 @@ class TestShellModeFlow(unittest.IsolatedAsyncioTestCase):
             await app._process_queued_message("!pytest")
             await asyncio.sleep(0.01)
             app._exec_shell_command.assert_awaited_once_with("pytest", user_text="!pytest")
+
+
+class TestCompactSlashCommandFlow(unittest.IsolatedAsyncioTestCase):
+    async def test_compact_command_generating_queues(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = True
+            app._queue_message_ui = MagicMock()
+            event = MagicMock()
+            event.value = "/compact"
+            event.attachments = []
+            await app.on_chat_input_submitted(event)
+            app._queue_message_ui.assert_called_once_with("/compact", show_in_ui=True, attachments=[])
+
+    async def test_compact_command_homoglyph_generating_queues(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.is_generating = True
+            app._queue_message_ui = MagicMock()
+            event = MagicMock()
+            # Cyrillic 'с' and 'о' and 'а' in /соmpact
+            event.value = "/\u0441\u043emp\u0430ct"
+            event.attachments = []
+            await app.on_chat_input_submitted(event)
+            app._queue_message_ui.assert_called_once_with("/\u0441\u043emp\u0430ct", show_in_ui=True, attachments=[])
+
+    async def test_process_queued_message_slash_command(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app._exec_slash_command = unittest.mock.AsyncMock()
+            await app._process_queued_message("/compact")
+            await asyncio.sleep(0.01)
+            app._exec_slash_command.assert_awaited_once_with("/compact", attachments=None)

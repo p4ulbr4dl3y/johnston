@@ -8,6 +8,7 @@ from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Optiona
 
 from core.base_provider.compaction import (
     CompactionMixin,
+    format_compaction_title,
     resolve_auto_compact_limit,
     should_compact,
 )
@@ -331,10 +332,9 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
             try:
                 success, msg = await self.compact_history()
                 if success:
-                    divider_text = "Session Compacted"
-                    if "(" in msg and ")" in msg:
-                        divider_text = f"Session Compacted ({msg[msg.find('(') + 1: msg.rfind(')')]})"
-                    yield ("event_divider", divider_text, "")
+                    yield ("event_divider", format_compaction_title(msg), "")
+                else:
+                    yield ("event_divider", "Compaction Failed", "")
             except Exception as compact_err:
                 yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
 
@@ -736,10 +736,7 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     # it); resync the accumulator so self.history == messages[1:]
                     # holds for the next step's estimate.
                     self._set_history(messages[1:])
-                    divider_text = "Session Compacted"
-                    if "(" in compact_msg and ")" in compact_msg:
-                        divider_text = f"Session Compacted ({compact_msg[compact_msg.find('(') + 1: compact_msg.rfind(')')]})"
-                    yield ("event_divider", divider_text, "")
+                    yield ("event_divider", format_compaction_title(compact_msg), "")
 
         except Exception as err:
             logger.exception("API request failed: %s", err)

@@ -15,6 +15,38 @@ import os
 
 from core.application.skills.manager import get_skill_manager
 
+CYRILLIC_HOMOGLYPHS: dict[str, str] = {
+    "а": "a",
+    "в": "b",
+    "е": "e",
+    "к": "k",
+    "м": "m",
+    "н": "h",
+    "о": "o",
+    "р": "p",
+    "с": "c",
+    "т": "t",
+    "у": "y",
+    "х": "x",
+    "А": "A",
+    "В": "B",
+    "Е": "E",
+    "К": "K",
+    "М": "M",
+    "Н": "H",
+    "О": "O",
+    "Р": "P",
+    "С": "C",
+    "Т": "T",
+    "У": "Y",
+    "Х": "X",
+}
+
+
+def normalize_homoglyphs(text: str) -> str:
+    """Normalize Cyrillic homoglyphs to Latin ASCII equivalents."""
+    return "".join(CYRILLIC_HOMOGLYPHS.get(c, c) for c in text)
+
 
 def _resolve_skills(sm, norm_skill_words):
     """(sync, thread-safe) Resolve slash args into Skill objects; returns (skills, unresolved)."""
@@ -79,23 +111,7 @@ async def handle_slash_command(app, command_text: str, attachments: list | None 
         return False
 
     cmd_name = words[0].lower()
-
-    # Normalization of Cyrillic homoglyphs to Latin (to handle layout errors)
-    homoglyphs = {
-        "а": "a",
-        "в": "b",
-        "е": "e",
-        "к": "k",
-        "м": "m",
-        "н": "h",
-        "о": "o",
-        "р": "p",
-        "с": "c",
-        "т": "t",
-        "у": "y",
-        "х": "x",
-    }
-    normalized_name = "".join(homoglyphs.get(c, c) for c in cmd_name)
+    normalized_name = normalize_homoglyphs(cmd_name)
 
     if command_text.strip().startswith("/") and normalized_name in registry:
         cmd_instance = registry[normalized_name]()
@@ -116,7 +132,7 @@ async def handle_slash_command(app, command_text: str, attachments: list | None 
             other_words.append(w)
 
     skill_words = [w[1:].lower() for w in words if w.startswith("/")]
-    norm_skill_words = ["".join(homoglyphs.get(c, c) for c in raw) for raw in skill_words]
+    norm_skill_words = [normalize_homoglyphs(raw) for raw in skill_words]
     if norm_skill_words:
         loaded_skills, unresolved = await asyncio.to_thread(_resolve_skills, get_skill_manager(), norm_skill_words)
         other_words.extend(f"/{norm}" for norm in unresolved)
@@ -142,7 +158,7 @@ async def handle_slash_command(app, command_text: str, attachments: list | None 
     # MCP prompt execution fallback (e.g. /simple-prompt or /args-prompt topic=Python)
     if words and words[0].startswith("/"):
         raw_mcp_name = words[0][1:]
-        clean_mcp_name = "".join(homoglyphs.get(c, c) for c in raw_mcp_name.lower())
+        clean_mcp_name = normalize_homoglyphs(raw_mcp_name.lower())
         try:
             from core.infrastructure.mcp import get_mcp_manager
 

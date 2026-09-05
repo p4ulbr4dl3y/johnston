@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from textual import events, work
 
-from widgets.app.dispatch import handle_slash_command
+from widgets.app.dispatch import COMMAND_REGISTRY, handle_slash_command, normalize_homoglyphs
 from widgets.chat_input import DEFAULT_PLACEHOLDER, ChatInput
 from widgets.mixins.message_flow_background import (
     on_background_shell_completed,
@@ -288,6 +288,13 @@ class MessageFlowMixin:
             return
 
         if user_text and user_text.startswith("/"):
+            first_word = user_text.split()[0].lower()
+            norm_word = normalize_homoglyphs(first_word)
+            from widgets.presentation.commands.session_commands import CompactCommand
+
+            if self.is_generating and COMMAND_REGISTRY.get(norm_word) is CompactCommand:
+                self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
+                return
             asyncio.create_task(self._exec_slash_command(user_text, attachments=attachments))
             return
 
@@ -520,6 +527,9 @@ class MessageFlowMixin:
             if cmd:
                 asyncio.create_task(self._exec_shell_command(cmd, user_text=user_text))
                 return
+        if user_text.startswith("/"):
+            await self._exec_slash_command(user_text, attachments=attachments)
+            return
         self.trigger_ai_response(prompt, show_in_ui=show_in_ui, attachments=attachments, **kwargs)
 
     def on_background_shell_completed(self, task_id: str, command_str: str, result: str) -> None:

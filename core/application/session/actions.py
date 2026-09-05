@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Optional
 
+from core.base_provider.compaction import format_compaction_title
 from core.domain.policies.messages import (
     count_history_user_turns,
     drop_stale_system_notes,
@@ -173,9 +174,7 @@ async def compact_session(
         success, msg = await agent.compact_history()
         if success:
             tokens = _parse_compaction_tokens(msg)
-            title = "Session Compacted"
-            if tokens.after is not None:
-                title = f"Session Compacted ({msg[msg.find('(') + 1: msg.rfind(')')]})"
+            title = format_compaction_title(msg)
             outcome = CompactionOutcome(
                 status=CompactionStatus.COMPLETED, message=msg, title=title, tokens=tokens
             )
