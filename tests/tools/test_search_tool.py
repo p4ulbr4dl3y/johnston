@@ -1070,6 +1070,158 @@ impl RealStruct {
         self.assertTrue(any("beta" in line for line in res2[1]))
         self.assertFalse(any("alpha" in line for line in res2[1]))
 
+    def test_subfolder_gitignore_isolation(self):
+        """Test that a nested .gitignore does not leak rules to the parent directory."""
+        sub_dir = os.path.join(self.tmpdir, "isolated_sub")
+        os.makedirs(sub_dir, exist_ok=True)
+        with open(os.path.join(sub_dir, ".gitignore"), "w") as f:
+            f.write("secret.txt\n")
+
+        # secret.txt in sub should be ignored
+        with open(os.path.join(sub_dir, "secret.txt"), "w") as f:
+            f.write("sub secret")
+
+        # secret.txt in root should NOT be ignored by sub's gitignore
+        root_secret = os.path.join(self.tmpdir, "secret.txt")
+        with open(root_secret, "w") as f:
+            f.write("root secret")
+
+        matcher = _GitignoreMatcher.load_from_root(self.tmpdir)
+        self.assertIsNotNone(matcher)
+        self.assertTrue(matcher.is_ignored("isolated_sub/secret.txt"))
+        self.assertFalse(matcher.is_ignored("secret.txt"))
+
+    def test_windows_backslash_glob(self):
+        """Test that Windows-style backslash glob patterns match normalized paths."""
+        self.assertTrue(_match_glob("src/main.py", "main.py", "src\\*.py"))
+        self.assertTrue(_match_glob("src/utils/math.py", "math.py", "src\\**\\*.py"))
+
+    def test_generic_outline_no_false_positive_on_line_query(self):
+        """Test that query='line' does not match every symbol line from regex display."""
+        sample_code = "class Greeter {\n    void sayHello() {}\n}\n"
+        from tools.search.outline import _outline_generic_content
+        # Should not match unless symbol name literally contains 'line'
+        res = _outline_generic_content(sample_code, query="line")
+        self.assertEqual(len(res), 0)
+
+    def test_c_cpp_outline(self):
+        """Test outline extraction for C/C++ functions and structs."""
+        sample_cpp = (
+            "struct Point { int x; int y; };\n"
+            "inline int computeDistance(Point a, Point b) { return 0; }\n"
+        )
+        from tools.search.outline import _outline_generic_content
+        res = _outline_generic_content(sample_cpp)
+        self.assertTrue(any("computeDistance" in line for line in res))
+        self.assertTrue(any("Point" in line for line in res))
+
+    def test_typescript_abstract_class(self):
+        """Test that Tree-sitter captures TypeScript abstract classes."""
+        ts_code = "abstract class BaseService {\n    abstract execute(): void;\n}\n"
+        with open(os.path.join(self.tmpdir, "abstract.ts"), "w") as f:
+            f.write(ts_code)
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="abstract.ts",
+        )
+        self.assertIn("class BaseService", result.content)
+
+    def test_rust_impl_trait_for_struct(self):
+        """Test that Tree-sitter captures Rust 'impl Trait for Struct'."""
+        rs_code = "trait Display {}\nstruct Widget;\nimpl Display for Widget {}\n"
+        with open(os.path.join(self.tmpdir, "impl.rs"), "w") as f:
+            f.write(rs_code)
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="impl.rs",
+        )
+        self.assertIn("impl Display for Widget", result.content)
+
+    def test_python_variadic_typed_params(self):
+        """Test that Tree-sitter captures *args: int, **kwargs: str correctly."""
+        py_code = "def variadic_typed(x: int, *args: int, **kwargs: str): pass\n"
+        with open(os.path.join(self.tmpdir, "variadic.py"), "w") as f:
+            f.write(py_code)
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="variadic.py",
+        )
+        self.assertIn("def variadic_typed(x, *args, **kwargs)", result.content)
+
+    def test_binary_file_outline_skipped(self):
+        """Test that binary files are skipped by outline extraction."""
+        bin_file = os.path.join(self.tmpdir, "compiled.py")
+        with open(bin_file, "wb") as f:
+            f.write(b"def dummy(): pass\n\x00\x00\xff\xfe binary stuff")
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="compiled.py",
+        )
+        self.assertNotIn("def dummy", result.content)
+
+    def test_protobuf_outline_generic(self):
+        """Test that protobuf message and service definitions are extracted."""
+        proto_file = os.path.join(self.tmpdir, "service.proto")
+        with open(proto_file, "w") as f:
+            f.write("message UserProfile {\n  string name = 1;\n}\nservice UserService {\n  rpc GetUser();\n}\n")
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="service.proto",
+        )
+        self.assertIn("message UserProfile", result.content)
+        self.assertIn("service UserService", result.content)
+
+    def test_python_pos_and_kw_separators(self):
+        """Test that Python posonly and kwonly separators are captured."""
+        py_code = "def complex_sig(a: int, /, b: str, *, c: bool): pass\n"
+        with open(os.path.join(self.tmpdir, "sig.py"), "w") as f:
+            f.write(py_code)
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="sig.py",
+        )
+        self.assertIn("def complex_sig(a, /, b, *, c)", result.content)
+
+    def test_go_grouped_types_lines(self):
+        """Test that Go grouped type declarations have correct distinct line numbers."""
+        go_code = "package main\n\ntype (\n\tUser struct {}\n\tID int\n)\n"
+        with open(os.path.join(self.tmpdir, "types.go"), "w") as f:
+            f.write(go_code)
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="types.go",
+        )
+        self.assertIn("type User struct (line 4)", result.content)
+        self.assertIn("type ID int (line 5)", result.content)
+
 
 if __name__ == "__main__":
     unittest.main()

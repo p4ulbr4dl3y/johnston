@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from tools.search.common import (
     DEFAULT_EXCLUDE_DIRS,
@@ -88,6 +88,8 @@ def _search_content_ripgrep(
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
         )
     except Exception as e:
@@ -98,6 +100,7 @@ def _search_content_ripgrep(
     matched_files: Set[str] = set()
     match_count = 0
     stopping = False
+    after_remaining = 0
 
     try:
         if proc.stdout is not None:
@@ -106,7 +109,7 @@ def _search_content_ripgrep(
                     break
                 line = raw_line.rstrip("\r\n")
                 if not line or line == "--":
-                    if stopping:
+                    if stopping and after_remaining <= 0:
                         break
                     continue
 
@@ -118,13 +121,18 @@ def _search_content_ripgrep(
                         sep = m.group(2)
                         text = m.group(3)
                         rel = _safe_relpath(fpath, cwd) if os.path.isabs(fpath) else fpath
-                        matched_files.add(rel)
                         if sep == ":":
                             if stopping:
                                 break
+                            matched_files.add(rel)
                             match_count += 1
                             if match_count >= max_results:
                                 stopping = True
+                                after_remaining = after_lines
+                        elif stopping:
+                            if after_remaining <= 0:
+                                break
+                            after_remaining -= 1
                         output_lines.append(f"{rel}{sep}{lineno}{sep}{text}")
                     else:
                         output_lines.append(line)
@@ -175,13 +183,21 @@ def _search_content_python(
     matched_files: Set[str] = set()
     output_lines: List[str] = []
     match_count = 0
-    lock = threading.Lock()
 
-    def _process_file(abs_fpath: str) -> Optional[Tuple[List[str], Set[str], int]]:
+    def _process_file(abs_fpath: str) -> Optional[Tuple[List[List[str]], str]]:
         if cancel_event and cancel_event.is_set():
             return None
         if is_binary_file(abs_fpath):
             return None
+
+        # Guard against symlinks pointing to inaccessible/special files
+        if os.path.islink(abs_fpath):
+            try:
+                real_p = os.path.realpath(abs_fpath)
+                if not os.path.isfile(real_p):
+                    return None
+            except OSError:
+                return None
 
         try:
             if os.path.getsize(abs_fpath) > get_max_search_bytes():
@@ -208,72 +224,85 @@ def _search_content_python(
         if not local_matches:
             return None
 
-        local_output: List[str] = []
-        rendered_indices: Set[int] = set()
-        local_count = 0
-
+        records: List[List[str]] = []
         for idx in local_matches:
-            local_count += 1
+            rec: List[str] = []
             start_ctx = max(0, idx - before_lines)
             end_ctx = min(len(file_lines), idx + after_lines + 1)
             for ctx_idx in range(start_ctx, end_ctx):
-                if ctx_idx not in rendered_indices:
-                    rendered_indices.add(ctx_idx)
-                    lineno = ctx_idx + 1
-                    raw_line = file_lines[ctx_idx].rstrip("\r\n")
-                    sep = ":" if ctx_idx == idx else "-"
-                    local_output.append(f"{rel_path}{sep}{lineno}{sep}{raw_line}")
+                lineno = ctx_idx + 1
+                raw_line = file_lines[ctx_idx].rstrip("\r\n")
+                sep = ":" if ctx_idx == idx else "-"
+                rec.append(f"{rel_path}{sep}{lineno}{sep}{raw_line}")
+            records.append(rec)
 
-        return local_output, {rel_path}, local_count
+        return records, rel_path
+
+    if cancel_event and cancel_event.is_set():
+        return [], 0, 0
 
     if os.path.isfile(target_path):
         files_to_process = [target_path]
     elif os.path.isdir(target_path):
         files_to_process = _walk_filtered_list(target_path, include_hidden, gitignore_matcher, cancel_event)
+        files_to_process.sort()
     else:
         files_to_process = []
 
+    if cancel_event and cancel_event.is_set():
+        return [], 0, 0
+
     if len(files_to_process) > 20:
+        batch_size = 50
         with ThreadPoolExecutor(max_workers=OUTLINE_WORKERS) as executor:
-            futures = {executor.submit(_process_file, f): f for f in files_to_process}
-            for future in as_completed(futures):
+            for i in range(0, len(files_to_process), batch_size):
                 if cancel_event and cancel_event.is_set():
                     break
                 if match_count >= max_results:
                     break
-                try:
-                    result = future.result(timeout=5.0)
-                    if result:
-                        file_output, file_set, file_count = result
-                        with lock:
-                            if match_count + file_count > max_results:
-                                remaining = max_results - match_count
-                                output_lines.extend(file_output[:remaining])
-                            else:
-                                output_lines.extend(file_output)
-                            matched_files.update(file_set)
-                            match_count += min(file_count, max_results - match_count)
-                            if match_count >= max_results:
-                                for f in futures:
-                                    f.cancel()
-                                break
-                except Exception:
-                    continue
+                batch = files_to_process[i : i + batch_size]
+                futures = {executor.submit(_process_file, f): f for f in batch}
+                batch_results: Dict[str, List[List[str]]] = {}
+                for future in as_completed(futures):
+                    if cancel_event and cancel_event.is_set():
+                        for fut in futures:
+                            fut.cancel()
+                        break
+                    try:
+                        res = future.result(timeout=5.0)
+                        if res:
+                            records, rel_p = res
+                            batch_results[rel_p] = records
+                    except Exception:
+                        continue
+
+                # Deterministic accumulation in sorted file order for this batch
+                for rel_p in sorted(batch_results.keys()):
+                    for rec in batch_results[rel_p]:
+                        if match_count >= max_results:
+                            break
+                        output_lines.extend(rec)
+                        matched_files.add(rel_p)
+                        match_count += 1
+                    if match_count >= max_results:
+                        break
     else:
         for abs_fpath in files_to_process:
             if cancel_event and cancel_event.is_set():
                 break
             if match_count >= max_results:
                 break
-            result = _process_file(abs_fpath)
-            if result:
-                file_output, file_set, file_count = result
-                if match_count + file_count > max_results:
-                    remaining = max_results - match_count
-                    output_lines.extend(file_output[:remaining])
-                else:
-                    output_lines.extend(file_output)
-                matched_files.update(file_set)
-                match_count += min(file_count, max_results - match_count)
+            res = _process_file(abs_fpath)
+            if res:
+                records, rel_p = res
+                for rec in records:
+                    if match_count >= max_results:
+                        break
+                    output_lines.extend(rec)
+                    matched_files.add(rel_p)
+                    match_count += 1
+
+    if cancel_event and cancel_event.is_set():
+        return [], 0, 0
 
     return output_lines, match_count, len(matched_files)

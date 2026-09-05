@@ -16,6 +16,7 @@ from tools.search.common import (
     _walk_filtered_list,
     compute_line_offsets,
     get_line_number,
+    is_binary_file,
 )
 from tools.search.treesitter import GLOBAL_TREE_SITTER
 
@@ -216,6 +217,12 @@ RE_GENERIC_DEF = re.compile(
     r"message\s+(?P<pbmsg>[A-Za-z0-9_]+)"
     r"|"
     r"service\s+(?P<pbsvc>[A-Za-z0-9_]+)"
+    r"|"
+    # C/C++ functions and structs
+    r"|"
+    r"(?:(?:inline|static|virtual|extern|constexpr)\s+)*(?:[A-Za-z0-9_:<>&*]+\s+)+(?P<cfn>[A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)\s*(?:const)?\s*[{;]"
+    r"|"
+    r"struct\s+(?P<cstruct>[A-Za-z_][A-Za-z0-9_]*)\s*[{;]"
     r")",
     re.MULTILINE,
 )
@@ -234,13 +241,13 @@ GENERIC_GROUP_NAMES = (
     "exmod", "exfn",
     "hsdata", "hsclass",
     "pbmsg", "pbsvc",
+    "cfn", "cstruct",
 )
 
 
-def _outline_generic_content(code: str, query: Optional[str] = None) -> List[str]:
-    """Regex-based outline extractor for languages without Tree-sitter."""
-    lines: List[str] = []
-    q = query.lower().strip() if query and query.strip() and query.strip() != "*" else None
+def _outline_generic_symbols(code: str) -> List[Tuple[str, int, str]]:
+    """Extract (display, lineno, name) tuples for languages without Tree-sitter."""
+    symbols: List[Tuple[str, int, str]] = []
     line_offsets = compute_line_offsets(code)
 
     for m in RE_GENERIC_DEF.finditer(code):
@@ -256,16 +263,23 @@ def _outline_generic_content(code: str, query: Optional[str] = None) -> List[str
 
         if not name:
             continue
-        if q is not None and q not in name.lower():
-            continue
 
         lineno = get_line_number(line_offsets, m.start())
         display = m.group(0).strip().split("\n")[0].strip()
         if len(display) > 120:
             display = display[:117] + "..."
-        lines.append(f"  {display} (line {lineno})")
+        symbols.append((f"  {display} (line {lineno})", lineno, name))
 
-    return lines
+    return symbols
+
+
+def _outline_generic_content(code: str, query: Optional[str] = None) -> List[str]:
+    """Regex-based outline extractor for languages without Tree-sitter."""
+    symbols = _outline_generic_symbols(code)
+    q = query.lower().strip() if query and query.strip() and query.strip() != "*" else None
+    if q is None:
+        return [s[0] for s in symbols]
+    return [s[0] for s in symbols if q in s[2].lower()]
 
 
 def _outline_file(
@@ -289,6 +303,8 @@ def _outline_file(
     if not _match_glob(rel, fname, glob_pattern):
         return None
     if not glob_pattern and ext not in CODE_EXTENSIONS:
+        return None
+    if is_binary_file(abs_fpath):
         return None
 
     all_symbols: Optional[List[Tuple[str, int, str]]] = None
@@ -319,8 +335,7 @@ def _outline_file(
 
         # 3. Regex fallback (non-Python files only)
         if not all_symbols and ext not in (".py", ".pyi"):
-            regex_lines = _outline_generic_content(content)
-            all_symbols = [(line, 0, "") for line in regex_lines]
+            all_symbols = _outline_generic_symbols(content)
 
         if use_cache and all_symbols is not None:
             try:
@@ -359,6 +374,9 @@ def _search_outline(
     total_symbols = 0
     matched_files: Set[str] = set()
 
+    if cancel_event and cancel_event.is_set():
+        return [], 0, 0
+
     if os.path.isfile(target_path):
         files_to_process = [target_path]
     elif os.path.isdir(target_path):
@@ -366,43 +384,53 @@ def _search_outline(
     else:
         return [], 0, 0
 
+    if cancel_event and cancel_event.is_set():
+        return [], 0, 0
+
     if len(files_to_process) > 20:
         results: List[Tuple[str, List[str], int]] = []
         total_files = len(files_to_process)
         processed_files = 0
+        batch_size = 50
 
         if progress_callback:
             progress_callback({"stage": "outline_parallel", "total_files": total_files})
 
         with ThreadPoolExecutor(max_workers=OUTLINE_WORKERS) as executor:
-            futures = {
-                executor.submit(_outline_file, f, cwd, query, glob_pattern): f
-                for f in files_to_process
-            }
-
-            for future in as_completed(futures):
+            for i in range(0, len(files_to_process), batch_size):
                 if cancel_event and cancel_event.is_set():
-                    for fut in futures:
-                        fut.cancel()
-                    executor.shutdown(wait=False, cancel_futures=True)
                     break
-                try:
-                    res = future.result(timeout=5.0)
-                    if res:
-                        results.append(res)
-                    processed_files += 1
-                    if progress_callback and (
-                        processed_files % max(1, total_files // 10) == 0 or processed_files % 50 == 0
-                    ):
-                        progress_callback(
-                            {
-                                "stage": "outline_progress",
-                                "processed": processed_files,
-                                "total": total_files,
-                            }
-                        )
-                except Exception:
-                    continue
+                if total_symbols >= max_results:
+                    break
+                batch = files_to_process[i : i + batch_size]
+                futures = {
+                    executor.submit(_outline_file, f, cwd, query, glob_pattern): f
+                    for f in batch
+                }
+
+                for future in as_completed(futures):
+                    if cancel_event and cancel_event.is_set():
+                        for fut in futures:
+                            fut.cancel()
+                        break
+                    try:
+                        res = future.result(timeout=5.0)
+                        if res:
+                            results.append(res)
+                            total_symbols += res[2]
+                        processed_files += 1
+                        if progress_callback and (
+                            processed_files % max(1, total_files // 10) == 0 or processed_files % 50 == 0
+                        ):
+                            progress_callback(
+                                {
+                                    "stage": "outline_progress",
+                                    "processed": processed_files,
+                                    "total": total_files,
+                                }
+                            )
+                    except Exception:
+                        continue
 
         if progress_callback:
             progress_callback({"stage": "outline_complete", "results": len(results)})
@@ -417,16 +445,20 @@ def _search_outline(
             if res:
                 results.append(res)
 
+    if cancel_event and cancel_event.is_set():
+        return [], 0, 0
+
+    total_rendered = 0
     for rel, symbols, _ in results:
-        if total_symbols >= max_results:
+        if total_rendered >= max_results:
             break
         matched_files.add(rel)
         output_lines.append(f"{rel}:")
         for sym_line in symbols:
-            if total_symbols >= max_results:
+            if total_rendered >= max_results:
                 break
             output_lines.append(sym_line)
-            total_symbols += 1
+            total_rendered += 1
         output_lines.append("")
 
-    return output_lines, total_symbols, len(matched_files)
+    return output_lines, total_rendered, len(matched_files)

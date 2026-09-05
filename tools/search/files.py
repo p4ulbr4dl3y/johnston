@@ -48,7 +48,7 @@ def _search_filename_ripgrep(
     for exc in DEFAULT_EXCLUDE_DIRS:
         cmd.extend(["-g", f"!**/{exc}/**"])
 
-    cmd.append(target_path)
+    cmd.extend(["--", target_path])
 
     try:
         proc = subprocess.Popen(
@@ -140,6 +140,9 @@ def _search_filename_python(
             return True
         return q.lower() in fname.lower() or q.lower() in rel.lower()
 
+    if cancel_event and cancel_event.is_set():
+        return [], 0
+
     if os.path.isfile(target_path):
         rel = _safe_relpath(target_path, cwd)
         fname = os.path.basename(target_path)
@@ -156,6 +159,9 @@ def _search_filename_python(
         fname = os.path.basename(rel)
         if _matches_query(rel, fname) and _match_glob(rel, fname, glob_pattern):
             matched_paths.append(rel)
+
+    if cancel_event and cancel_event.is_set():
+        return [], 0
 
     return matched_paths, len(matched_paths)
 

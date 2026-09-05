@@ -107,6 +107,9 @@ class TreeSitterExtractor:
                 (class_declaration
                   name: (type_identifier) @cls.name) @cls
 
+                (abstract_class_declaration
+                  name: (type_identifier) @cls.name) @cls
+
                 (interface_declaration
                   name: (type_identifier) @iface.name) @iface
 
@@ -138,7 +141,7 @@ class TreeSitterExtractor:
                 """
                 (type_declaration
                   (type_spec
-                    name: (type_identifier) @type.name) @type.spec) @type
+                    name: (type_identifier) @type.name) @type)
 
                 (function_declaration
                   name: (identifier) @fn.name
@@ -237,8 +240,10 @@ class TreeSitterExtractor:
             if c.type == "identifier":
                 names.append(c.text.decode("utf-8", errors="replace"))
             elif c.type in ("typed_parameter", "typed_default_parameter"):
-                if c.children and c.children[0].type == "identifier":
-                    names.append(c.children[0].text.decode("utf-8", errors="replace"))
+                if c.children:
+                    first = c.children[0]
+                    if first.type in ("identifier", "list_splat_pattern", "dictionary_splat_pattern"):
+                        names.append(first.text.decode("utf-8", errors="replace"))
             elif c.type == "default_parameter":
                 name_node = c.child_by_field_name("name")
                 if name_node:
@@ -247,6 +252,8 @@ class TreeSitterExtractor:
                     names.append(c.children[0].text.decode("utf-8", errors="replace"))
             elif c.type in ("list_splat_pattern", "dictionary_splat_pattern"):
                 names.append(c.text.decode("utf-8", errors="replace"))
+            elif c.type in ("positional_separator", "keyword_separator", "/", "*"):
+                names.append(c.text.decode("utf-8", errors="replace") if c.text else c.type)
         return "(" + ", ".join(names) + ")"
 
     def _format_capture(
@@ -269,9 +276,19 @@ class TreeSitterExtractor:
                     if name_key in captures
                     else ""
                 )
-                if not name and key == "impl":
-                    impl_text = node.text.decode("utf-8", errors="replace").split("{")[0].strip()
-                    name = impl_text.replace("impl", "").strip()
+                if key == "impl":
+                    trait_name = (
+                        captures["impl.trait"][0].text.decode("utf-8", errors="replace")
+                        if "impl.trait" in captures
+                        else ""
+                    )
+                    if trait_name and name:
+                        name = f"{trait_name} for {name}"
+                    elif trait_name:
+                        name = trait_name
+                    elif not name:
+                        impl_text = node.text.decode("utf-8", errors="replace").split("{")[0].strip()
+                        name = impl_text.replace("impl", "").strip()
                 if not name:
                     name = node.type
 

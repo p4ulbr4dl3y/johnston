@@ -145,9 +145,12 @@ def get_max_search_bytes() -> int:
 def _safe_relpath(path: str, cwd: str) -> str:
     """Compute relative path safely; on Windows cross-drive ValueError returns path as-is."""
     try:
-        return os.path.relpath(path, cwd)
+        rel = os.path.relpath(path, cwd).replace("\\", "/")
+        if rel.startswith("./"):
+            rel = rel[2:]
+        return rel
     except (ValueError, Exception):
-        return path
+        return path.replace("\\", "/")
 
 
 def is_binary_file(filepath: str) -> bool:
@@ -233,7 +236,10 @@ def _match_glob(rel_path: str, filename: str, glob_pattern: Optional[str]) -> bo
         return True
 
     norm_rel = rel_path.replace("\\", "/")
-    patterns = [p.strip() for p in glob_pattern.split(",") if p.strip()]
+    if norm_rel.startswith("./"):
+        norm_rel = norm_rel[2:]
+    norm_glob = glob_pattern.replace("\\", "/")
+    patterns = [p.strip() for p in norm_glob.split(",") if p.strip()]
     positive_pats = [p for p in patterns if not p.startswith("!")]
     negative_pats = [p[1:] for p in patterns if p.startswith("!")]
 
@@ -336,31 +342,37 @@ class _GitignoreMatcher:
                 result += c
             i += 1
 
-        if result.endswith("/"):
-            result = result.rstrip("/") + "(?:/.*)?"
-        elif anchored:
-            result = result + "(?:/.*)?"
-        else:
-            result = "(?:^|.*/)" + result + "(?:/.*)?"
+        dir_only = False
+        if pattern.endswith("/"):
+            dir_only = True
+            result = result.rstrip("/")
 
         if anchored:
-            result = "^" + result
-        result += "$"
+            prefix_re = "^"
+        else:
+            prefix_re = "(?:^|.*/)"
+
+        if dir_only:
+            result = prefix_re + result + "/(?:.*)?$"
+        else:
+            result = prefix_re + result + "(?:/.*)?$"
         return result
 
     def is_ignored(self, rel_path: str) -> bool:
         norm = rel_path.replace("\\", "/")
+        if norm.startswith("./"):
+            norm = norm[2:]
         ignored = False
 
         for negated, prefix, compiled_re in self._compiled:
-            test_paths = [norm]
-            if prefix and norm.startswith(prefix):
-                test_paths.append(norm[len(prefix):])
-
-            for test_path in test_paths:
-                if compiled_re.search(test_path):
+            if prefix:
+                if norm.startswith(prefix):
+                    test_path = norm[len(prefix):]
+                    if compiled_re.search(test_path):
+                        ignored = not negated
+            else:
+                if compiled_re.search(norm):
                     ignored = not negated
-                    break
 
         return ignored
 
@@ -408,7 +420,13 @@ def _walk_filtered(
     gitignore_matcher: Optional[_GitignoreMatcher] = None,
     cancel_event: Optional[threading.Event] = None,
 ) -> Generator[str, None, None]:
-    base = target_path if os.path.isdir(target_path) else os.path.dirname(target_path)
+    import stat
+
+    base = (
+        gitignore_matcher._root
+        if gitignore_matcher
+        else (target_path if os.path.isdir(target_path) else os.path.dirname(target_path))
+    )
     for root, dirs, filenames in os.walk(target_path, topdown=True):
         if cancel_event and cancel_event.is_set():
             return
@@ -432,6 +450,13 @@ def _walk_filtered(
             if not include_hidden and fname.startswith("."):
                 continue
             abs_p = os.path.join(root, fname)
+            # Guard against special non-regular files (FIFOs, sockets, character devices)
+            try:
+                st = os.stat(abs_p, follow_symlinks=False)
+                if not (stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode)):
+                    continue
+            except OSError:
+                continue
             if gitignore_matcher:
                 rel = _safe_relpath(abs_p, base)
                 if gitignore_matcher.is_ignored(rel):

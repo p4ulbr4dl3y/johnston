@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 from typing import Any, Callable, Dict, Optional
 
@@ -74,9 +75,10 @@ def search_sync(
         progress_callback({"stage": "start", "mode": mode})
 
     gitignore_matcher = None
-    if os.path.isdir(path):
+    if os.path.isdir(path) and (mode == "outline" or not shutil.which("rg")):
         try:
-            gitignore_matcher = _build_gitignore_matcher(path)
+            gi_root = cwd if (cwd and os.path.isdir(cwd) and path.startswith(cwd)) else path
+            gitignore_matcher = _build_gitignore_matcher(gi_root)
             if progress_callback and gitignore_matcher:
                 progress_callback({"stage": "gitignore_loaded"})
         except Exception:
