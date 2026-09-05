@@ -308,10 +308,10 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             {"query": "def run", "path": "main.py", "context_lines": 1},
             ctx=ctx,
         )
-        self.assertIn("main.py:7:", res.content)
-        self.assertIn("def run(self)", res.content)
-        self.assertIn("main.py-6-", res.content)
-        self.assertIn("main.py-8-", res.content)
+        self.assertIn("main.py:", res.content)
+        self.assertIn("7:     def run(self)", res.content)
+        self.assertIn("6-", res.content)
+        self.assertIn("8-", res.content)
 
     async def test_content_search_before_after(self):
         ctx = ToolContext(cwd=self.tmpdir)
@@ -320,11 +320,12 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             {"query": "def run", "path": "main.py", "before": 2, "after": 1},
             ctx=ctx,
         )
-        self.assertIn("main.py:7:", res.content)
+        self.assertIn("main.py:", res.content)
+        self.assertIn("7:     def run(self)", res.content)
         # Should have 2 lines before and 1 after
-        self.assertIn("main.py-5-", res.content)
-        self.assertIn("main.py-6-", res.content)
-        self.assertIn("main.py-8-", res.content)
+        self.assertIn("5-", res.content)
+        self.assertIn("6-", res.content)
+        self.assertIn("8-", res.content)
 
     async def test_content_search_regex_and_invalid_regex_fallback(self):
         ctx = ToolContext(cwd=self.tmpdir)
@@ -573,9 +574,11 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(count, 2)
             self.assertEqual(files_count, 2)
-            self.assertTrue(any("main.py:10:def hello():" in line for line in lines))
-            self.assertTrue(any("test-runner.py-12-    context_call()" in line for line in lines))
-            self.assertTrue(any("test-runner.py:13:    runner_test()" in line for line in lines))
+            self.assertTrue(any("main.py:" in line for line in lines))
+            self.assertTrue(any("10: def hello():" in line for line in lines))
+            self.assertTrue(any("test-runner.py:" in line for line in lines))
+            self.assertTrue(any("12-     context_call()" in line for line in lines))
+            self.assertTrue(any("13:     runner_test()" in line for line in lines))
 
     async def test_outline_skips_non_code_files_without_glob(self):
         txt_file = os.path.join(self.tmpdir, "notes.txt")

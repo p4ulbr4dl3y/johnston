@@ -97,6 +97,7 @@ def _search_content_ripgrep(
         return None
 
     output_lines: List[str] = []
+    grouped_results: Dict[str, List[Tuple[str, str, str]]] = {}
     matched_files: Set[str] = set()
     match_count = 0
     stopping = False
@@ -133,7 +134,7 @@ def _search_content_ripgrep(
                             if after_remaining <= 0:
                                 break
                             after_remaining -= 1
-                        output_lines.append(f"{rel}{sep}{lineno}{sep}{text}")
+                        grouped_results.setdefault(rel, []).append((lineno, sep, text))
                     else:
                         output_lines.append(line)
                 else:
@@ -156,6 +157,18 @@ def _search_content_ripgrep(
     if proc.returncode not in (0, 1, -15, -9) and match_count == 0:
         logger.debug("ripgrep exited with code %s", proc.returncode)
         return None
+
+    for rel, entries in grouped_results.items():
+        if output_lines:
+            output_lines.append("")
+        output_lines.append(f"{rel}:")
+        prev_empty = False
+        for lineno, sep, text in entries:
+            is_empty = (sep == "-" and not text.strip())
+            if is_empty and prev_empty:
+                continue
+            prev_empty = is_empty
+            output_lines.append(f"  {lineno}{sep} {text}" if text else f"  {lineno}{sep}")
 
     return output_lines, match_count, len(matched_files)
 
@@ -224,19 +237,33 @@ def _search_content_python(
         if not local_matches:
             return None
 
-        records: List[List[str]] = []
+        entries: List[Tuple[int, str, str]] = []
+        ctx_set: Set[int] = set()
         for idx in local_matches:
-            rec: List[str] = []
             start_ctx = max(0, idx - before_lines)
             end_ctx = min(len(file_lines), idx + after_lines + 1)
-            for ctx_idx in range(start_ctx, end_ctx):
-                lineno = ctx_idx + 1
-                raw_line = file_lines[ctx_idx].rstrip("\r\n")
-                sep = ":" if ctx_idx == idx else "-"
-                rec.append(f"{rel_path}{sep}{lineno}{sep}{raw_line}")
-            records.append(rec)
+            for c in range(start_ctx, end_ctx):
+                ctx_set.add(c)
 
-        return records, rel_path
+        for ctx_idx in sorted(ctx_set):
+            lineno = ctx_idx + 1
+            raw_line = file_lines[ctx_idx].rstrip("\r\n")
+            sep = ":" if ctx_idx in local_matches else "-"
+            entries.append((lineno, sep, raw_line))
+
+        return entries, rel_path, len(local_matches)
+
+    def _append_file_results(rel_p: str, entries: List[Tuple[int, str, str]]) -> None:
+        if output_lines:
+            output_lines.append("")
+        output_lines.append(f"{rel_p}:")
+        prev_empty = False
+        for lineno, sep, raw_line in entries:
+            is_empty = (sep == "-" and not raw_line.strip())
+            if is_empty and prev_empty:
+                continue
+            prev_empty = is_empty
+            output_lines.append(f"  {lineno}{sep} {raw_line}" if raw_line else f"  {lineno}{sep}")
 
     if cancel_event and cancel_event.is_set():
         return [], 0, 0
@@ -262,7 +289,7 @@ def _search_content_python(
                     break
                 batch = files_to_process[i : i + batch_size]
                 futures = {executor.submit(_process_file, f): f for f in batch}
-                batch_results: Dict[str, List[List[str]]] = {}
+                batch_results: Dict[str, Tuple[List[Tuple[int, str, str]], int]] = {}
                 for future in as_completed(futures):
                     if cancel_event and cancel_event.is_set():
                         for fut in futures:
@@ -271,21 +298,19 @@ def _search_content_python(
                     try:
                         res = future.result(timeout=5.0)
                         if res:
-                            records, rel_p = res
-                            batch_results[rel_p] = records
+                            entries, rel_p, n_matches = res
+                            batch_results[rel_p] = (entries, n_matches)
                     except Exception:
                         continue
 
                 # Deterministic accumulation in sorted file order for this batch
                 for rel_p in sorted(batch_results.keys()):
-                    for rec in batch_results[rel_p]:
-                        if match_count >= max_results:
-                            break
-                        output_lines.extend(rec)
-                        matched_files.add(rel_p)
-                        match_count += 1
                     if match_count >= max_results:
                         break
+                    entries, n_matches = batch_results[rel_p]
+                    _append_file_results(rel_p, entries)
+                    matched_files.add(rel_p)
+                    match_count += n_matches
     else:
         for abs_fpath in files_to_process:
             if cancel_event and cancel_event.is_set():
@@ -294,13 +319,10 @@ def _search_content_python(
                 break
             res = _process_file(abs_fpath)
             if res:
-                records, rel_p = res
-                for rec in records:
-                    if match_count >= max_results:
-                        break
-                    output_lines.extend(rec)
-                    matched_files.add(rel_p)
-                    match_count += 1
+                entries, rel_p, n_matches = res
+                _append_file_results(rel_p, entries)
+                matched_files.add(rel_p)
+                match_count += n_matches
 
     if cancel_event and cancel_event.is_set():
         return [], 0, 0

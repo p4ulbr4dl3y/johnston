@@ -38,7 +38,7 @@ def search_sync(
     max_results: int = 50,
     before_lines: int = 0,
     after_lines: int = 0,
-    context_lines: int = 1,
+    context_lines: int = 0,
     include_hidden: bool = False,
     progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     cancel_event: Optional[Any] = None,
@@ -223,7 +223,7 @@ class SearchTool(BaseTool):
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 10,
-                        "description": "Symmetric context lines before and after matches (for mode='content', default: 1). Overridden by before/after if set.",
+                        "description": "Symmetric context lines before and after matches (for mode='content', default: 0). Overridden by before/after if set.",
                     },
                     "before": {
                         "type": "integer",
@@ -273,7 +273,7 @@ class SearchTool(BaseTool):
         case_sensitive = bool(args.get("case_sensitive", False))
         max_results = try_int(args.get("max_results"), 50)
         max_results = max(1, min(max_results, 500))
-        context_lines = try_int(args.get("context_lines"), 1)
+        context_lines = try_int(args.get("context_lines"), 0)
         context_lines = max(0, min(context_lines, 10))
 
         before_lines = try_int(args.get("before"), 0)
