@@ -419,6 +419,7 @@ class ThinkingWidget(Vertical):
 
     can_focus = False
     ALLOW_SELECT = False
+    HINT_DEBOUNCE_SECONDS: float = 0.25
 
     def __init__(self, thinking_text: str = ""):
         super().__init__(classes="thinking-widget thinking-active")
@@ -430,11 +431,36 @@ class ThinkingWidget(Vertical):
         self.is_expanded = False
         self._update_scheduled = False
         self._update_handle: asyncio.TimerHandle | None = None
+        self._show_hints = False
+        self._hint_handle: asyncio.TimerHandle | None = None
+        self._schedule_hint_timer()
 
         self.header_label = Label("", classes="thinking-header")
         self.content_widget = Static("", markup=False, classes="thinking-content")
         self.render_header()
 
+    def _schedule_hint_timer(self) -> None:
+        self._cancel_hint_timer()
+        self._show_hints = False
+        try:
+            loop = asyncio.get_running_loop()
+            self._hint_handle = loop.call_later(self.HINT_DEBOUNCE_SECONDS, self._on_hint_timer)
+        except RuntimeError:
+            self._show_hints = True
+
+    def _on_hint_timer(self) -> None:
+        self._hint_handle = None
+        if self.is_thinking:
+            self._show_hints = True
+            self.render_header()
+
+    def _cancel_hint_timer(self) -> None:
+        if getattr(self, "_hint_handle", None) is not None:
+            try:
+                self._hint_handle.cancel()
+            except Exception:
+                pass
+            self._hint_handle = None
 
     @property
     def thinking_text(self) -> str:
@@ -499,6 +525,8 @@ class ThinkingWidget(Vertical):
     def finish_thinking(self, duration: float, thinking_content: str = "") -> None:
         self.is_thinking = False
         self.duration_seconds = duration
+        self._cancel_hint_timer()
+        self._show_hints = False
         if thinking_content and thinking_content != "Thinking...":
             self._thinking_parts = [thinking_content]
             self._cached_thinking_text = thinking_content
@@ -514,12 +542,15 @@ class ThinkingWidget(Vertical):
 
     def render_header(self) -> None:
         if self.is_thinking:
-            from widgets.presentation.widgets.footer_layout import get_theme_colors
+            if getattr(self, "_show_hints", False):
+                from widgets.presentation.widgets.footer_layout import get_theme_colors
 
-            _, _, t_muted, _ = get_theme_colors()
-            action = "to collapse" if self.is_expanded else "to expand"
-            hint_str = f"[{t_muted}](ctrl+o {action})[/]"
-            self.header_label.update(f"Thinking... {hint_str}")
+                _, _, t_muted, _ = get_theme_colors()
+                action = "to collapse" if self.is_expanded else "to expand"
+                hint_str = f" [{t_muted}](ctrl+o {action})[/]"
+            else:
+                hint_str = ""
+            self.header_label.update(f"Thinking...{hint_str}")
         else:
             dur_str = "<0.1" if self.duration_seconds < 0.1 else f"{self.duration_seconds:.1f}"
             self.header_label.update(f"Thought for {dur_str} sec")
@@ -563,6 +594,7 @@ class ThinkingWidget(Vertical):
         self.set_expanded(not self.is_expanded, scroll=scroll)
 
     def on_unmount(self) -> None:
+        self._cancel_hint_timer()
         if self._update_handle is not None:
             self._update_handle.cancel()
             self._update_handle = None

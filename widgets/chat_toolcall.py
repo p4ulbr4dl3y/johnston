@@ -78,6 +78,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     DISPLAY_NAMES = DISPLAY_NAMES
     SYSTEM_TOOLS = SYSTEM_TOOLS
+    HINT_DEBOUNCE_SECONDS: float = 0.25
     _RAW_BASH_TRUNC = "[…[truncated]]\n"
 
     @property
@@ -120,6 +121,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.tool_call_index: int | None = None
         self._shell_update_scheduled = False
         self._shell_update_handle: asyncio.TimerHandle | None = None
+        self._show_hints = False
+        self._hint_handle: asyncio.TimerHandle | None = None
         # Incremental shell-stream flush state (see _flush_shell_update).
         self._bash_processed_len = 0
         self._bash_needs_resync = False
@@ -130,6 +133,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.status = status
         else:
             self.status = "running" if not result_text else "done"
+        if self.status == "running":
+            self._schedule_hint_timer()
 
         is_clickable = self.is_clickable_header()
         header_cls = f"{TOOL_HEADER} {TOOL_HEADER_EXPANDABLE}" if is_clickable else TOOL_HEADER
@@ -228,7 +233,31 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.render_header()
         self._sync_sequential_with_prev()
 
+    def _schedule_hint_timer(self) -> None:
+        self._cancel_hint_timer()
+        self._show_hints = False
+        try:
+            loop = asyncio.get_running_loop()
+            self._hint_handle = loop.call_later(self.HINT_DEBOUNCE_SECONDS, self._on_hint_timer)
+        except RuntimeError:
+            self._show_hints = True
+
+    def _on_hint_timer(self) -> None:
+        self._hint_handle = None
+        if self.status == "running":
+            self._show_hints = True
+            self.render_header()
+
+    def _cancel_hint_timer(self) -> None:
+        if getattr(self, "_hint_handle", None) is not None:
+            try:
+                self._hint_handle.cancel()
+            except Exception:
+                pass
+            self._hint_handle = None
+
     def on_unmount(self) -> None:
+        self._cancel_hint_timer()
         if getattr(self, "_shell_update_handle", None) is not None:
             try:
                 self._shell_update_handle.cancel()
@@ -322,6 +351,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.status = "done"
 
+        if self.status != "running":
+            self._cancel_hint_timer()
+            self._show_hints = False
+        else:
+            self._schedule_hint_timer()
+
         if self.canonical_tool == "shell":
             if status == "running":
                 bg_m = re.search(r"(?:Background Task ID:|id:)\s*([^\s\]\|]+)", cleaned, re.IGNORECASE)
@@ -371,6 +406,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if self.status not in ("running", "generating"):
             return
         self.status = "cancelled"
+        self._cancel_hint_timer()
+        self._show_hints = False
         clean = (self.result_text or "").strip()
         if not clean:
             self.result_text = "[interrupted | tool cancelled]"
@@ -397,6 +434,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def mark_generating(self, text: str = "") -> None:
         """Mark the tool card as generating (yellow hollow circle) with optional status text."""
         self.status = "generating"
+        self._cancel_hint_timer()
+        self._show_hints = False
         if text:
             self.result_text = text.strip()
         self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
@@ -409,6 +448,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def mark_running(self, text: str = "") -> None:
         """Mark the tool card as running (yellow) with optional status text."""
         self.status = "running"
+        self._schedule_hint_timer()
         if text:
             self.result_text = text.strip()
         if not self.is_clickable_header():
@@ -475,6 +515,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             background_task_id=getattr(self, "background_task_id", None),
             is_expandable=self.is_expandable(),
             is_expanded=self.is_expanded,
+            show_hints=getattr(self, "_show_hints", False),
         )
         self.header_label.update(header_text)
 

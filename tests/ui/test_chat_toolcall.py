@@ -1,3 +1,4 @@
+import asyncio
 import os
 import tempfile
 import unittest
@@ -1022,6 +1023,61 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         w1.set_result("--- a.py\n+++ a.py\n@@ -1 +1 @@\n-1\n+2\n")
         self.assertTrue(w1.is_expanded)
         self.assertNotIn("tool-sequential", w2.classes)
+
+
+class TestHintDebounce(unittest.IsolatedAsyncioTestCase):
+    async def test_toolcall_hints_debounce_fast_command(self):
+        w = ToolCallWidget("shell", "echo 1")
+        w.HINT_DEBOUNCE_SECONDS = 0.05
+        w.mark_running()
+        # Fast command finishes before debounce timer fires
+        rendered_init = str(w.header_label.render())
+        self.assertNotIn("ctrl+o", rendered_init)
+        self.assertNotIn("ctrl+b", rendered_init)
+        w.set_result("1")
+        await asyncio.sleep(0.08)
+        rendered_done = str(w.header_label.render())
+        self.assertNotIn("ctrl+o", rendered_done)
+        self.assertNotIn("ctrl+b", rendered_done)
+
+    async def test_toolcall_hints_debounce_slow_command(self):
+        w = ToolCallWidget("shell", "sleep 1")
+        w.HINT_DEBOUNCE_SECONDS = 0.05
+        w.mark_running()
+        rendered_init = str(w.header_label.render())
+        self.assertNotIn("ctrl+o", rendered_init)
+        self.assertNotIn("ctrl+b", rendered_init)
+        await asyncio.sleep(0.08)
+        rendered_after = str(w.header_label.render())
+        self.assertIn("ctrl+o", rendered_after)
+        self.assertIn("ctrl+b", rendered_after)
+        w.on_unmount()
+
+    async def test_thinking_hints_debounce_fast(self):
+        from widgets.presentation.widgets.chat_messages import ThinkingWidget
+
+        tw = ThinkingWidget()
+        tw.HINT_DEBOUNCE_SECONDS = 0.05
+        tw._schedule_hint_timer()
+        rendered_init = str(tw.header_label.render())
+        self.assertNotIn("ctrl+o", rendered_init)
+        tw.finish_thinking(0.02, "done")
+        await asyncio.sleep(0.08)
+        rendered_done = str(tw.header_label.render())
+        self.assertNotIn("ctrl+o", rendered_done)
+
+    async def test_thinking_hints_debounce_slow(self):
+        from widgets.presentation.widgets.chat_messages import ThinkingWidget
+
+        tw = ThinkingWidget()
+        tw.HINT_DEBOUNCE_SECONDS = 0.05
+        tw._schedule_hint_timer()
+        rendered_init = str(tw.header_label.render())
+        self.assertNotIn("ctrl+o", rendered_init)
+        await asyncio.sleep(0.08)
+        rendered_after = str(tw.header_label.render())
+        self.assertIn("ctrl+o", rendered_after)
+        tw.on_unmount()
 
 
 if __name__ == "__main__":

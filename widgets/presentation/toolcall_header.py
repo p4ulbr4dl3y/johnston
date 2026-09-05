@@ -21,6 +21,7 @@ def build_toolcall_header(
     background_task_id: Optional[str],
     is_expandable: bool,
     is_expanded: bool,
+    show_hints: bool = True,
 ) -> str:
     """Builds rich markup string for toolcall header label."""
     marker = "○" if status == "generating" else "●"
@@ -47,7 +48,7 @@ def build_toolcall_header(
         base_header = f"[{status_color}]{marker} [bold]{tool_name_display}[/bold][/{status_color}]({escaped_compact})"
 
     hints: List[str] = []
-    if status == "running":
+    if show_hints and status == "running":
         if not is_subagent and canonical_tool == "shell" and not background_task_id:
             hints.append("ctrl+b to bg")
         if is_expandable:
