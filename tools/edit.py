@@ -324,14 +324,16 @@ def apply_edit(
 class EditTool(BaseTool):
     name = "edit"
     description = (
-        "Replace text in an existing file via exact-match. Provide 2-4 lines of surrounding context to ensure uniqueness."
+        "Replace text in an existing file via exact-match. Always specify `path` first before `old_str` and `new_str`. "
+        "Provide 2-4 lines of surrounding context to ensure uniqueness."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "edit",
             "description": (
-                "Replace text in an existing file via exact-match. Provide 2-4 lines of surrounding context to ensure uniqueness."
+                "Replace text in an existing file via exact-match. Always specify `path` first before `old_str` and `new_str`. "
+                "Provide 2-4 lines of surrounding context to ensure uniqueness."
             ),
             "parameters": {
                 "type": "object",

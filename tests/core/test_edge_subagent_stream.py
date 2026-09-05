@@ -1,6 +1,7 @@
 """Edge-case tests for the stream helpers in core/application/session/stream.py."""
 
 import asyncio
+import sys
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -698,6 +699,7 @@ class TestSafeSaves:
         assert "failed to save cancelled session" in result
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(sys.version_info < (3, 11), reason="Task.cancelling() requires Python 3.11+")
     async def test_cancelled_task_save_failure_propagates_cancelled_error(self):
         """A7: a storage failure inside a cancelled task's teardown must
         leave the pending CancelledError intact — the save error is noted on
@@ -727,6 +729,7 @@ class TestSafeSaves:
         assert ctx.messages == []
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(sys.version_info < (3, 11), reason="Task.cancelling() requires Python 3.11+")
     async def test_execute_session_turn_save_failure_cancelled_propagates(self):
         """A7 (execute_session_turn level): FailureStore.save raises OSError
         and the task is cancelled mid-stream -> asyncio.CancelledError

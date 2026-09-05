@@ -33,19 +33,28 @@ def build_toolcall_header(
     ):
         display_name = display_names.get(canonical_tool, tool_type or "Tool")
         if canonical_tool == "update_plan":
-            target_str = extract_tool_display(canonical_tool, args)
+            target_str = extract_tool_display(canonical_tool, args) if args else ""
+            if not target_str and status == "generating" and target and target != "plan":
+                target_str = truncate(str(target), max_len=60)
         else:
             extracted = extract_tool_display(canonical_tool, args) if args else ""
             target_str = extracted or (truncate(str(target), max_len=60) if target else "")
-        base_header = f"[{status_color}]{marker} [bold]{display_name}[/bold][/{status_color}]({escape(str(target_str))})"
+        if status == "generating" and not target_str:
+            arg_suffix = "(...)"
+        else:
+            arg_suffix = f"({escape(str(target_str))})"
+        base_header = f"[{status_color}]{marker} [bold]{display_name}[/bold][/{status_color}]{arg_suffix}"
     else:
         compact = format_compact_dict(args)
         if status == "generating" and not compact:
             compact = truncate(str(target), max_len=60) if target else ""
         mcp_flag = (tool_type or "").startswith("mcp_") or is_mcp
         tool_name_display = to_snake_case(tool_type) if mcp_flag else (tool_type or "Tool")
-        escaped_compact = escape(str(compact))
-        base_header = f"[{status_color}]{marker} [bold]{tool_name_display}[/bold][/{status_color}]({escaped_compact})"
+        if status == "generating" and not compact:
+            arg_suffix = "(...)"
+        else:
+            arg_suffix = f"({escape(str(compact))})"
+        base_header = f"[{status_color}]{marker} [bold]{tool_name_display}[/bold][/{status_color}]{arg_suffix}"
 
     hints: List[str] = []
     if show_hints and status == "running":

@@ -476,20 +476,19 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 if delta_args:
                                     g["args_buffer"] += delta_args
 
-                                if not g["target"] and g["args_buffer"]:
-                                    g["target"] = _extract_streaming_target(
-                                        g["args_buffer"], scan_from=g.get("args_scan_pos", 0)
+                                if g["args_buffer"]:
+                                    new_target = _extract_streaming_target(
+                                        g["args_buffer"], scan_from=g.get("args_scan_pos", 0), tool_name=g.get("name", "")
                                     )
+                                    if new_target and new_target != g["target"]:
+                                        g["target"] = new_target
+                                        if g["announced"]:
+                                            yield ("tool_generating_update", g["name"], g["target"], {"id": g["id"], "index": idx})
                                 g["args_scan_pos"] = len(g["args_buffer"])
 
                                 if g["name"] and not g["announced"]:
                                     g["announced"] = True
-                                    if g["target"]:
-                                        g["target_announced"] = True
                                     yield ("tool_generating", g["name"], g["target"], {"id": g["id"], "index": idx})
-                                elif g["announced"] and g["target"] and not g["target_announced"]:
-                                    g["target_announced"] = True
-                                    yield ("tool_generating_update", g["name"], g["target"], {"id": g["id"], "index": idx})
                             elif tag == "adapter_tool_call":
                                 if thinking_started:
                                     dt = time.time() - thinking_t0

@@ -991,6 +991,23 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("search_query", str(mcp_widget.header_label.render()))
         self.assertNotIn("{", str(mcp_widget.header_label.render()))
 
+    def test_generating_header_shows_ellipsis_when_target_empty(self):
+        widget = ToolCallWidget("edit", "", status="generating")
+        widget.render_header()
+        rendered = str(widget.header_label.render())
+        self.assertIn("Edit(...)", rendered)
+        self.assertNotIn("Edit()", rendered)
+
+        mcp_widget = ToolCallWidget("mcp_tool", "", status="generating")
+        mcp_widget.render_header()
+        rendered_mcp = str(mcp_widget.header_label.render())
+        self.assertIn("mcp_tool(...)", rendered_mcp)
+        self.assertNotIn("mcp_tool()", rendered_mcp)
+
+        plan_widget = ToolCallWidget("update_plan", "Refactor auth", status="generating")
+        plan_widget.render_header()
+        self.assertIn("UpdatePlan(Refactor auth)", str(plan_widget.header_label.render()))
+
     def test_generating_header_truncates_long_target(self):
         long_target = "a" * 100
         widget = ToolCallWidget("read", long_target, status="generating")

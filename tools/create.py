@@ -12,12 +12,18 @@ DEFAULT_MAX_PAYLOAD_MB = DEFAULT_TOOL_PAYLOAD_BYTES // (1024 * 1024)
 
 class CreateTool(BaseTool):
     name = "create"
-    description = "Create a new file or completely overwrite an existing file. Parent directories created automatically."
+    description = (
+        "Create a new file or completely overwrite an existing file. Always specify `path` first before `content`. "
+        "Parent directories created automatically."
+    )
     schema = {
         "type": "function",
         "function": {
             "name": "create",
-            "description": "Create a new file or completely overwrite an existing file. Parent directories created automatically.",
+            "description": (
+                "Create a new file or completely overwrite an existing file. Always specify `path` first before `content`. "
+                "Parent directories created automatically."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {

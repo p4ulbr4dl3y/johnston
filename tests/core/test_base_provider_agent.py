@@ -1011,6 +1011,12 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_extract_streaming_target('{"command": "pytest -v"}'), "pytest -v")
         self.assertEqual(_extract_streaming_target('{"url": "https://example.com/api"}'), "https://example.com/api")
         self.assertEqual(_extract_streaming_target('{"title": "Auth refactor"}'), "Auth refactor")
+        self.assertEqual(_extract_streaming_target('{"question": "Continue?"}'), "Continue?")
+        self.assertEqual(_extract_streaming_target('{"step": "Refactor auth"}'), "Refactor auth")
+        self.assertEqual(_extract_streaming_target('{"action": "kill", "task_id": "t1"}', tool_name="manage_shell"), "kill t1")
+        self.assertEqual(_extract_streaming_target('{"action": "send_message", "session_id": "s1"}', tool_name="manage_subagent"), "send message to s1")
+        self.assertEqual(_extract_streaming_target('{"query": "", "path": "src/main.py"}'), "src/main.py")
+        self.assertEqual(_extract_streaming_target('{"file": "data.csv"}'), "data.csv")
         self.assertEqual(_extract_streaming_target('{"path": "unclosed'), "")
 
     def test_extract_streaming_target_incremental_matches_full_scan(self):
