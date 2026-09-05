@@ -511,12 +511,15 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             screen.action_toggle_plan_hidden()
             self.assertFalse(notch.display)
 
-            # Trigger saving expand and plan state
-            screen._save_expand_state()
+            # Verify immediate saving upon actions and closing screen
             self.assertIn("task-plan-persist", getattr(app, "_subagent_plan_state", {}))
             plan_state = app._subagent_plan_state["task-plan-persist"]
             self.assertTrue(plan_state["is_expanded"])
             self.assertFalse(plan_state["display"])
+
+            screen.action_close()
+            await pilot.pause(0.1)
+            self.assertEqual(app._subagent_plan_state["task-plan-persist"], plan_state)
 
         # Reopen screen and verify restored plan state
         screen2 = SubagentViewScreen("task-plan-persist")
