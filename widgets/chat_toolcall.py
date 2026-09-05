@@ -6,7 +6,6 @@ import json
 import re
 from typing import Any
 
-from rich.markup import escape
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
@@ -16,10 +15,15 @@ from core.infrastructure.tasks.output import strip_ansi
 from widgets.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 from widgets.presentation.tool_mixins import FormattingMixin, ParsingMixin
 from widgets.presentation.tool_renderers import compute_tool_call_content, format_truncation_for_ui
+from widgets.presentation.toolcall_header import build_toolcall_header
+from widgets.presentation.toolcall_shell import (
+    bash_ends_with_spinner,
+    bash_safe_boundary,
+    compose_bash_result,
+)
 from widgets.presentation.widgets.chat_markdown import (
     TransparentSyntax,
     safe_update_markdown,
-    to_snake_case,
 )
 
 DISPLAY_NAMES: dict[str, str] = {
@@ -38,40 +42,18 @@ DISPLAY_NAMES: dict[str, str] = {
 
 SYSTEM_TOOLS: frozenset[str] = frozenset(DISPLAY_NAMES.keys())
 
-# Start of a truncation banner like "[Output truncated: ...]" — the same
-# pattern ``clean_truncation_for_ui`` rewrites. Used to keep an unterminated
-# banner out of the committed tail so it is only rewritten once complete.
-_TRUNC_BANNER_START = re.compile(r"(?:\.\.\.\s*)?\[(?:Output\s+truncated|Truncated)", re.IGNORECASE)
+_bash_safe_boundary = bash_safe_boundary
+_bash_ends_with_spinner = bash_ends_with_spinner
 
-
-def _bash_safe_boundary(examine: str) -> int:
-    """Byte offset in ``examine`` up to which the flush can commit safely.
-
-    The committed prefix must end at a ``\\n`` line boundary (a carriage-return
-    sequence may span the boundary, so the trailing partial line is carried into
-    the next flush) and must not stop inside an unterminated truncation banner
-    (``[Output truncated ...`` without a closing ``]``), which is only rewritten
-    once complete. Returns the offset of the carry region start.
-    """
-    boundary = examine.rfind("\n") + 1
-    committed = examine[:boundary]
-    last_close = committed.rfind("]")
-    for m in _TRUNC_BANNER_START.finditer(committed):
-        if m.start() > last_close:
-            # Banner is unterminated inside the committed prefix: carry from it
-            # (plus any mid-line text before it back to the previous newline).
-            boundary = examine.rfind("\n", 0, m.start()) + 1
-            break
-    return boundary
-
-
-def _bash_ends_with_spinner(text: str) -> bool:
-    """True when the last line of ``text`` is a single spinner character."""
-    from core.infrastructure.tasks.output import is_spinner_line
-
-    if not text:
-        return False
-    return is_spinner_line(text.rsplit("\n", 1)[-1])
+__all__ = [
+    "ToolCallWidget",
+    "ToolScrollBox",
+    "DISPLAY_NAMES",
+    "SYSTEM_TOOLS",
+    "_bash_safe_boundary",
+    "_bash_ends_with_spinner",
+    "format_truncation_for_ui",
+]
 
 
 class ToolScrollBox(Vertical):
@@ -460,36 +442,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def render_header(self) -> None:
         c = self._get_status_color()
-        marker = "○" if self.status == "generating" else "●"
-        if self.canonical_tool in self.SYSTEM_TOOLS or self.canonical_tool in (
-            "invoke_subagent",
-            "manage_subagent",
-            "manage_shell",
-            "ask_user",
-        ):
-            display_name = self.DISPLAY_NAMES.get(self.canonical_tool, self.tool_type or "Tool")
-            from widgets.presentation.tool_display import extract_tool_display, truncate
-
-            if self.canonical_tool == "update_plan":
-                target_str = extract_tool_display(self.canonical_tool, self.args)
-            else:
-                extracted = extract_tool_display(self.canonical_tool, self.args) if self.args else ""
-                target_str = extracted or (truncate(str(self.target), max_len=60) if self.target else "")
-            base_header = f"[{c}]{marker} [bold]{display_name}[/bold][/{c}]({escape(str(target_str))})"
-        else:
-            from widgets.presentation.tool_display import format_compact_dict, truncate
-
-            compact = format_compact_dict(self.args)
-            if self.status == "generating" and not compact:
-                compact = truncate(str(self.target), max_len=60) if self.target else ""
-            is_mcp = (self.tool_type or "").startswith("mcp_") or self.is_mcp
-            tool_name_display = to_snake_case(self.tool_type) if is_mcp else (self.tool_type or "Tool")
-            escaped_compact = escape(str(compact))
-            base_header = f"[{c}]{marker} [bold]{tool_name_display}[/bold][/{c}]({escaped_compact})"
-
-        hints: list[str] = []
+        is_subagent = False
         if self.status == "running":
-            is_subagent = False
             try:
                 if self.screen and type(self.screen).__name__ == "SubagentViewScreen":
                     is_subagent = True
@@ -507,20 +461,22 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 except Exception:
                     pass
 
-            if not is_subagent and self.canonical_tool == "shell" and not getattr(self, "background_task_id", None):
-                hints.append("ctrl+b to bg")
-            if self.is_expandable():
-                action = "to collapse" if self.is_expanded else "to expand"
-                hints.append(f"ctrl+o {action}")
-
-        if hints:
-            from widgets.presentation.widgets.footer_layout import get_theme_colors
-
-            _, _, t_muted, _ = get_theme_colors()
-            hints_str = ", ".join(hints)
-            self.header_label.update(f"{base_header} [{t_muted}]({hints_str})[/]")
-        else:
-            self.header_label.update(base_header)
+        header_text = build_toolcall_header(
+            canonical_tool=self.canonical_tool,
+            tool_type=self.tool_type,
+            args=self.args or {},
+            target=self.target,
+            status=self.status,
+            status_color=c,
+            system_tools=self.SYSTEM_TOOLS,
+            display_names=self.DISPLAY_NAMES,
+            is_mcp=self.is_mcp,
+            is_subagent=is_subagent,
+            background_task_id=getattr(self, "background_task_id", None),
+            is_expandable=self.is_expandable(),
+            is_expanded=self.is_expanded,
+        )
+        self.header_label.update(header_text)
 
 
 
@@ -744,36 +700,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self._scroll_if_needed()
 
     def _bash_compose_result(self, carry_raw: str) -> str:
-        """Reconstruct ``result_text`` from the committed tail + carried remainder.
-
-        The carried remainder (an unterminated line or a truncation banner
-        awaiting its closing ``]``) starts at a line boundary and is only
-        collapsed for display, never committed — so a ``\\r`` sequence split
-        across flushes is not corrupted. Edge whitespace is trimmed exactly like
-        the legacy ``clean_bash_output`` did for the whole buffer (leading once,
-        trailing at the current buffer end only).
-        """
-        from core.infrastructure.tasks.output import is_spinner_line, process_carriage_returns
-
-        tail = getattr(self, "_rendered_bash_tail", "")
-        if carry_raw:
-            # Legacy order: clean (banner regex) -> strip buffer edges -> collapse.
-            part = process_carriage_returns(
-                format_truncation_for_ui(carry_raw, strip_edges=False).rstrip()
-            )
-            if (
-                tail
-                and getattr(self, "_bash_tail_line_is_spinner", False)
-                and "\n" not in part
-                and is_spinner_line(part)
-            ):
-                nl = tail.rfind("\n")
-                tail = (tail[: nl + 1] if nl != -1 else "") + part
-            else:
-                tail = f"{tail}\n{part}" if tail else part
-        if getattr(self, "_bash_leading_stripped", False):
-            return tail.rstrip()
-        return tail.strip()
+        return compose_bash_result(
+            tail=getattr(self, "_rendered_bash_tail", ""),
+            carry_raw=carry_raw,
+            tail_line_is_spinner=getattr(self, "_bash_tail_line_is_spinner", False),
+            leading_stripped=getattr(self, "_bash_leading_stripped", False),
+        )
 
     def _compute_content(self) -> tuple[str, Any]:
         """Pure content computation (safe to run in a thread); returns (kind, value)."""
