@@ -160,13 +160,5 @@ def format_line_pagination(
         meta_parts.append(f"converted {converted_path}")
 
     header = f"[{' | '.join(meta_parts)}]"
-    footer = ""
-    if (is_truncated or actual_end < total_lines) and path:
-        next_line = actual_end + 1
-        footer = f"\n... [truncated | next read(path='{path}', start_line={next_line})]"
-    elif is_truncated or actual_end < total_lines:
-        next_line = actual_end + 1
-        footer = f"\n... [truncated | next start_line={next_line}]"
-
-    content_str = (f"{header}\n" + "\n".join(out_lines) + footer) if out_lines else header
+    content_str = f"{header}\n" + "\n".join(out_lines) if out_lines else header
     return ToolResult.done(content=content_str, display="")
