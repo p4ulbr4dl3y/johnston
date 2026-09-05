@@ -52,7 +52,13 @@ class ChatStreamDriver:
     def finalize_thinking_stream(self, duration: float = 0.0, content: str = "") -> None:
         """Finalize any in-flight thinking widget."""
         if self.thinking_handle is not None:
-            if hasattr(self.thinking_handle, "finish_thinking"):
+            full_txt = content or getattr(self.thinking_handle, "thinking_text", "")
+            if not (full_txt or "").strip():
+                try:
+                    self.thinking_handle.remove()
+                except Exception:
+                    pass
+            elif hasattr(self.thinking_handle, "finish_thinking"):
                 try:
                     self.thinking_handle.finish_thinking(duration, content)
                 except Exception:
@@ -226,6 +232,9 @@ class ChatStreamDriver:
             phase = evt.get("phase")
             dur = evt.get("duration")
 
+            if (dur is not None or phase == "end") and not (txt or "").strip() and self.thinking_handle is None:
+                return
+
             if self.thinking_handle is None:
                 if evt.get("from_stream_step"):
                     self.thinking_handle = await self.chat_view.add_thinking_widget(txt)
@@ -244,7 +253,13 @@ class ChatStreamDriver:
             if dur is not None or phase == "end" or (not is_active and not animate):
                 if dur is None or not math.isfinite(dur):
                     dur = 0.0
-                if hasattr(self.thinking_handle, "finish_thinking"):
+                full_txt = txt or getattr(self.thinking_handle, "thinking_text", "")
+                if not (full_txt or "").strip():
+                    try:
+                        self.thinking_handle.remove()
+                    except Exception:
+                        pass
+                elif hasattr(self.thinking_handle, "finish_thinking"):
                     self.thinking_handle.finish_thinking(dur, txt)
                 self.thinking_handle = None
         elif etype == "tool_generating":

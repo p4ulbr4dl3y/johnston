@@ -719,6 +719,25 @@ class TestAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(thinking_ends[0][2], "deep thought")
         self.assertEqual(events[-1], ("bot_text", "", ""))
 
+    async def test_empty_or_whitespace_thoughts_do_not_start_thinking(self):
+        agent = self._make_agent()
+        chunk1 = _Chunk(choices=[unittest.mock.MagicMock(delta=_delta(reasoning_content=""))])
+        chunk2 = _Chunk(choices=[unittest.mock.MagicMock(delta=_delta(reasoning_content="   "))])
+        chunk3 = _Chunk(choices=[unittest.mock.MagicMock(delta=_delta(content="answer"))])
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = _MockStream([chunk1, chunk2, chunk3])
+            events = []
+            async for evt in agent.stream_steps("hi"):
+                events.append(evt)
+
+        thinking_starts = [e for e in events if e[0] == "thinking_start"]
+        thinking_ends = [e for e in events if e[0] == "thinking_end"]
+        self.assertEqual(len(thinking_starts), 0)
+        self.assertEqual(len(thinking_ends), 0)
+        self.assertEqual(events[-1], ("bot_text", "answer", ""))
+
     async def test_invalid_json_tool_arguments(self):
         # Malformed tool-call JSON is normalized to {} by parse_tool_call_args
         # and the tool executes with empty args (invalid-arguments surfacing was

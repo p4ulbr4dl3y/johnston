@@ -943,6 +943,54 @@ class TestGeminiThoughtStreaming(unittest.IsolatedAsyncioTestCase):
         calls = [e[1] for e in events if e[0] == "adapter_tool_call"]
         self.assertEqual(len(calls), 2)
 
+    async def test_gemini_thought_streaming_ignores_empty_or_whitespace_thought(self):
+        import json
+        adapter = GeminiAdapter()
+        sse_data = (
+            "data: "
+            + json.dumps({
+                "candidates": [{
+                    "content": {
+                        "parts": [
+                            {"thought": True, "text": ""},
+                            {"thought": True, "text": "   "},
+                            {"thought": True},
+                            {"text": "answer"},
+                        ]
+                    }
+                }]
+            })
+            + "\n\n"
+        )
+
+        class FakeStreamResponse:
+            def __init__(self, text):
+                self.text = text
+
+            async def aiter_lines(self):
+                for line in self.text.splitlines():
+                    yield line
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+        class FakeClient:
+            def stream(self, *args, **kwargs):
+                return FakeStreamResponse(sse_data)
+
+        with patch.object(adapter, "_get_client", return_value=FakeClient()):
+            with patch("core.adapters.gemini.check_httpx_response_status", return_value=None):
+                events = [e async for e in adapter.stream_chat(
+                    base_url="http://test", api_key="k", model="gemini-2.5-flash", messages=[]
+                )]
+
+        tags = [e[0] for e in events]
+        self.assertNotIn("adapter_thought", tags)
+        self.assertIn("adapter_text", tags)
+
 
 if __name__ == "__main__":
     unittest.main()

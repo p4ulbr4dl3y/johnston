@@ -236,6 +236,25 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         bm.remove.assert_called_once()
         self.assertIsNone(self.driver.bot_handle)
 
+    async def test_finalize_thinking_stream_removes_empty(self):
+        tw = MagicMock()
+        tw.thinking_text = "   "
+        tw.remove = MagicMock()
+        self.driver.thinking_handle = tw
+
+        self.driver.finalize_thinking_stream()
+        tw.remove.assert_called_once()
+        self.assertIsNone(self.driver.thinking_handle)
+
+    async def test_consume_session_event_drops_empty_thinking(self):
+        await self.driver.consume_session_event({
+            "type": "thinking",
+            "text": "   ",
+            "duration": 0.0,
+            "phase": "end",
+        })
+        self.chat_view.add_thinking_widget.assert_not_called()
+
     async def test_session_event_tool_start_and_result(self):
         tool_widget = MagicMock()
         self.chat_view.add_tool_call.return_value = tool_widget

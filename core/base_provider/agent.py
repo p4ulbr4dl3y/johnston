@@ -443,6 +443,8 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                                 full_assistant_parts.append(payload)
                                 yield ("bot_delta", payload, "")
                             elif tag == "adapter_thought":
+                                if not payload or (isinstance(payload, str) and not payload.strip()):
+                                    continue
                                 if not thinking_started:
                                     yield ("thinking_start", "Thinking...", "")
                                     thinking_started = True
