@@ -9,11 +9,22 @@ WORKER_TEARDOWN_TIMEOUT = 2.0
 
 
 def cancel_active_workers(app) -> None:
-    """Cancel any running Textual background workers on the app."""
+    """Cancel any running Textual background workers on the app.
+
+    Also cancels the registered compaction task (``app._compact_task``): /compact
+    runs in a plain ``asyncio.create_task`` (not a Textual worker), so Esc and
+    command-level cancellation reach it only through this explicit hook.
+    """
     try:
         if hasattr(app, "workers"):
             for w in [w for w in app.workers if getattr(w, "is_running", False)]:
                 w.cancel()
+    except Exception:
+        pass
+    try:
+        compact_task = getattr(app, "_compact_task", None)
+        if compact_task is not None and not compact_task.done():
+            compact_task.cancel()
     except Exception:
         pass
 

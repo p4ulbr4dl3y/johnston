@@ -77,6 +77,15 @@ class MockBotMessage:
         self.content = content
 
 
+async def _fake_new_session_compact_wait(sm, agent, **cb):
+    """new_session fake for /new tests: invokes the callbacks like the real
+    core implementation, so cancellation of the compact task is exercised."""
+    cb["cancel_workers"]()
+    await cb["kill_all_tasks"]()
+    cb["cancel_subagents"]()
+    return "new-id"
+
+
 class MockApp:
     def __init__(self, agent=None):
         self.agent = agent or MockAgent()
@@ -570,6 +579,113 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(handled)
         self.assertFalse(app.agent.compact_called)
         self.assertTrue(any("generating" in msg.lower() for msg, _ in app.notified))
+
+    async def test_compact_cancelled_by_escape_records_divider_and_clears_task(self):
+        """Esc during /compact cancels the registered compact task: the session
+        records a "Compaction Cancelled" divider, is_generating resets, and
+        _compact_task is cleared so a stale reference never cancels a later run."""
+        from core.domain.entities.session import AgentSession
+
+        entered = asyncio.Event()
+        block = asyncio.Event()
+
+        class BlockingMockAgent(MockAgent):
+            async def compact_history(self):
+                entered.set()
+                await block.wait()
+                return True, "History compacted"
+
+        agent = BlockingMockAgent()
+        app = MockApp(agent=agent)
+        session = AgentSession(session_id="sess-cancel", role="action")
+        app.sm = SimpleNamespace(get=lambda sid, reload=False: session)
+        app.current_session_id = "sess-cancel"
+
+        task = asyncio.create_task(handle_slash_command(app, "/compact"))
+        async with asyncio.timeout(5):
+            await entered.wait()
+
+        # Esc reaches the compact task through the same hook chat_input uses
+        # (cancels _compact_task exactly like the escape handler does).
+        compact_task = app._compact_task
+        self.assertIsNotNone(compact_task)
+        self.assertFalse(compact_task.done())
+        compact_task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        self.assertFalse(app.is_generating)
+        self.assertIsNone(app._compact_task)
+        self.assertEqual(
+            [m for m in session.messages if m.get("type") == "event_divider" and m.get("text") == "Compaction Cancelled"],
+            [{"type": "event_divider", "text": "Compaction Cancelled"}],
+        )
+
+    async def test_compact_cancelled_by_new_command_clears_task(self):
+        """/new's cancel path (cancel_active_workers_and_tasks) must cancel a
+        running compact task the same way Esc does."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from widgets.presentation.commands.session_commands import NewCommand
+
+        entered = asyncio.Event()
+        block = asyncio.Event()
+
+        class BlockingMockAgent(MockAgent):
+            async def compact_history(self):
+                entered.set()
+                await block.wait()
+                return True, "History compacted"
+
+        app = MockApp(agent=BlockingMockAgent())
+        app.message_queue = MagicMock()
+        app.sm = MagicMock()
+        app.sm.generate_session_id.return_value = "new-id"
+        mock_chat = MagicMock()
+        mock_chat.remove_children = AsyncMock()
+        app.query_one = MagicMock(return_value=mock_chat)
+
+        compact_task = asyncio.create_task(handle_slash_command(app, "/compact"))
+        async with asyncio.timeout(5):
+            await entered.wait()
+        self.assertIsNotNone(app._compact_task)
+        self.assertFalse(app._compact_task.done())
+
+        with patch(
+            "widgets.presentation.commands.session_commands.new_session", new=_fake_new_session_compact_wait
+        ), patch("core.application.session.stream.cancel_running_subagents"):
+            await NewCommand().execute(app)
+
+        try:
+            await compact_task
+        except asyncio.CancelledError:
+            pass
+        self.assertIsNone(app._compact_task)
+
+    async def test_compact_cancellation_noop_after_finish(self):
+        """A completed compaction is never cancellable: execute clears
+        _compact_task in finally, so cancellation after finish is a no-op."""
+        app = MockApp()
+        app.sm = MagicMock()
+        app.sm.get.return_value = None
+
+        handled = await handle_slash_command(app, "/compact")
+        self.assertTrue(handled)
+        self.assertTrue(app.agent.compact_called)
+        self.assertFalse(app.is_generating)
+        self.assertIsNone(app._compact_task)
+
+        # cancel_active_workers (the Esc / command-level hook) after completion
+        # finds no live compact task and no workers: nothing to cancel.
+        from widgets.presentation.commands.helpers import cancel_active_workers
+
+        before = list(app.ai_prompts)
+        cancel_active_workers(app)
+        self.assertEqual(list(app.ai_prompts), before)
+        self.assertFalse(app.is_generating)
+        self.assertIsNone(app._compact_task)
 
     async def test_johnston_guide_skill_slash_command(self):
         app = MockApp()

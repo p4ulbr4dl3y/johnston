@@ -41,6 +41,11 @@ class NewCommand(BaseCommand):
         def cancel_workers():
             for w in [w for w in getattr(app, "workers", []) if w.is_running]:
                 w.cancel()
+            # /compact runs as a plain asyncio task tracked on the app, so
+            # cancel it alongside the workers (mirrors helpers.cancel_active_workers).
+            compact_task = getattr(app, "_compact_task", None)
+            if compact_task is not None and not compact_task.done():
+                compact_task.cancel()
 
         async def kill_all_tasks():
             # Cancelled generation workers still run teardown (interruption
@@ -169,6 +174,19 @@ class CompactCommand(BaseCommand):
                 app.notify("Model is generating. Compaction deferred.", severity="warning")
             return
 
+        # The slash-command dispatch runs compaction in a plain asyncio task
+        # (not a Textual worker), so Esc / cancel_active_workers cannot reach
+        # it. Register the running compaction on the app so Esc, /new and
+        # resume/fork/rewind can cancel it; cleared in finally so a stale
+        # reference never cancels a later run.
+        app._compact_task = asyncio.create_task(self._run_compaction(app))
+        try:
+            await app._compact_task
+        finally:
+            app._compact_task = None
+
+    async def _run_compaction(self, app) -> None:
+        """Run the compaction body; cancellation is recorded, never leaks state."""
         app.is_generating = True
         try:
             if not hasattr(app, "agent") or not app.agent:

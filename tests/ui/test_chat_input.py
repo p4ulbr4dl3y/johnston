@@ -450,6 +450,47 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                     event.prevent_default.assert_not_called()
                     event.stop.assert_not_called()
 
+    async def test_escape_cancels_registered_compact_task(self):
+        """Esc must cancel a running /compact (tracked as app._compact_task).
+        Mirrors the subagent extension: the plain-asyncio-task compaction is
+        only reachable through this explicit app-level registration."""
+        ci = ChatInput()
+        app = DummyChatApp(ci)
+        app.sm = MagicMock()
+        compact_task = MagicMock()
+        compact_task.done.return_value = False
+        app._compact_task = compact_task
+        async with app.run_test():
+            with patch.object(App, "workers", new_callable=PropertyMock, return_value=[]):
+                with patch("core.application.session.stream.cancel_running_subagents", return_value=0):
+                    event = Key("escape", "escape")
+                    event.prevent_default = MagicMock()
+                    event.stop = MagicMock()
+                    await ci._on_key(event)
+                    compact_task.cancel.assert_called_once()
+                    event.prevent_default.assert_called_once()
+                    event.stop.assert_called_once()
+
+    async def test_escape_does_not_consume_event_when_compact_task_finished(self):
+        """Esc must not consume the event when the compact task already
+        finished (stale _compact_task reference is ignored)."""
+        ci = ChatInput()
+        app = DummyChatApp(ci)
+        app.sm = MagicMock()
+        compact_task = MagicMock()
+        compact_task.done.return_value = True
+        app._compact_task = compact_task
+        async with app.run_test():
+            with patch.object(App, "workers", new_callable=PropertyMock, return_value=[]):
+                with patch("core.application.session.stream.cancel_running_subagents", return_value=0):
+                    event = Key("escape", "escape")
+                    event.prevent_default = MagicMock()
+                    event.stop = MagicMock()
+                    await ci._on_key(event)
+                    compact_task.cancel.assert_not_called()
+                    event.prevent_default.assert_not_called()
+                    event.stop.assert_not_called()
+
     async def test_enter_submits_message(self):
         ci = ChatInput()
         app = DummyChatApp(ci)
