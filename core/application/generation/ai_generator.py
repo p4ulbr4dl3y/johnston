@@ -312,6 +312,11 @@ async def generate_ai_response(
             start_time=start_time,
             tool_handles=driver.tool_handles,
         )
+        # _handle_interruption has already finished (attempted) the thinking
+        # widget; drop the handle so the finally block cannot call
+        # finish_thinking a second time when the widget leaves is_thinking
+        # set (double-invoke, audit M7).
+        driver.thinking_handle = None
         raise
     except Exception as e:  # noqa: BLE001
         logger.exception("AI generation failed: %s", e)

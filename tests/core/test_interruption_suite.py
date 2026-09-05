@@ -484,10 +484,11 @@ class TestGeneratorStreamInterruptionFlow:
         mock_thinking = MagicMock()
         mock_thinking.is_thinking = True
 
-        def finish_t(duration):
-            mock_thinking.is_thinking = False
-
-        mock_thinking.finish_thinking = MagicMock(side_effect=finish_t)
+        # Note: finish_thinking deliberately does NOT clear is_thinking — the
+        # regression guard for M7. The engine must not call finish_thinking a
+        # second time (hardened finally block), even when the widget leaves
+        # is_thinking True after finishing.
+        mock_thinking.finish_thinking = MagicMock()
 
         canvas = _make_canvas(
             add_thinking_widget=AsyncMock(return_value=mock_thinking),
