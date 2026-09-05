@@ -658,8 +658,8 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
     async def test_subagent_screen_pagination_and_plan(self):
         sess = self._mk("task-paginated-plan", "Paginated Agent", "Subagent Prompt")
         sess.status = "completed"
-        # Add 60 tool events to trigger pagination (PAGE_SIZE default is 50)
-        for i in range(60):
+        # Add 120 tool events to trigger pagination (PAGE_SIZE default is 100)
+        for i in range(120):
             sess.add_event({
                 "type": "tool",
                 "tool_type": "shell",

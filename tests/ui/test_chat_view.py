@@ -886,4 +886,25 @@ class TestChatViewDividerSpacing(unittest.IsolatedAsyncioTestCase):
                 shot = app.export_screenshot()
                 self.assertNotIn("PROMPT_SHOULD_NOT_FLASH", shot)
 
+    async def test_arrange_synchronous_pagination_anchor_scroll(self):
+        app = JohnstonApp()
+        async with app.run_test(size=(120, 20)) as pilot:
+            chat_view = app.query_one(ChatView)
+            from widgets.presentation.widgets.chat_messages import UserMessage
+
+            anchor = await chat_view.add_user_message("Anchor message")
+            await pilot.pause()
+            chat_view.scroll_to(y=0, animate=False, immediate=True)
+            await pilot.pause()
+
+            chat_view._pagination_anchor = anchor
+            chat_view._pagination_anchor_offset = 0
+
+            for i in range(5):
+                await chat_view.mount(UserMessage(f"Prepended {i}"), before=anchor)
+
+            await pilot.pause()
+            self.assertGreater(chat_view.scroll_y, 0)
+            self.assertEqual(chat_view.scroll_y, chat_view.scroll_target_y)
+
 

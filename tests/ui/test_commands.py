@@ -602,8 +602,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.current_session_id = "sess-cancel"
 
         task = asyncio.create_task(handle_slash_command(app, "/compact"))
-        async with asyncio.timeout(5):
-            await entered.wait()
+        await asyncio.wait_for(entered.wait(), timeout=5)
 
         # Esc reaches the compact task through the same hook chat_input uses
         # (cancels _compact_task exactly like the escape handler does).
@@ -648,8 +647,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.query_one = MagicMock(return_value=mock_chat)
 
         compact_task = asyncio.create_task(handle_slash_command(app, "/compact"))
-        async with asyncio.timeout(5):
-            await entered.wait()
+        await asyncio.wait_for(entered.wait(), timeout=5)
         self.assertIsNotNone(app._compact_task)
         self.assertFalse(app._compact_task.done())
 

@@ -140,6 +140,20 @@ class ChatView(VerticalScroll):
         self._hint_fade_handle: asyncio.TimerHandle | None = None
         self.HINT_FADE_SECONDS: float = 1.5
 
+    def arrange(self, size: Size):
+        result = super().arrange(size)
+        if self._pagination_anchor is not None:
+            try:
+                for p in result.placements:
+                    if p.widget == self._pagination_anchor:
+                        target_y = max(0, p.region.y - self._pagination_anchor_offset)
+                        self.scroll_y = target_y
+                        self.scroll_target_y = target_y
+                        break
+            except Exception:
+                pass
+        return result
+
     def _scroll_update(self, virtual_size: Size) -> None:
         if self._pagination_anchor is not None:
             try:
@@ -147,6 +161,7 @@ class ChatView(VerticalScroll):
                 if v_region is not None and v_region.y >= 0:
                     target_y = max(0, v_region.y - self._pagination_anchor_offset)
                     self.scroll_y = target_y
+                    self.scroll_target_y = target_y
             except Exception:
                 pass
         super()._scroll_update(virtual_size)
@@ -419,14 +434,14 @@ class ChatView(VerticalScroll):
                 for msg in chunk:
                     await self.restore_message(msg, task_manager=task_mgr)
             else:
+                anchor_vy = getattr(getattr(anchor, "virtual_region", None), "y", 0)
+                self._pagination_anchor = anchor
+                self._pagination_anchor_offset = anchor_vy - int(self.scroll_y)
+
                 for msg in chunk:
                     w = await self.restore_message(msg, before=anchor, task_manager=task_mgr)
                     if w is not None:
                         new_widgets.append(w)
-
-                anchor_vy = getattr(getattr(anchor, "virtual_region", None), "y", 0)
-                self._pagination_anchor = anchor
-                self._pagination_anchor_offset = anchor_vy - int(self.scroll_y)
 
                 app = getattr(self, "app", None)
                 batch_ctx = app.batch_update() if (app is not None and hasattr(app, "batch_update")) else nullcontext()
@@ -490,66 +505,84 @@ class ChatView(VerticalScroll):
         """
         self.loading = True
         self._is_loading_session = True
-        for child in list(self.children):
+        styles = getattr(self, "styles", None)
+        if styles is not None:
             try:
-                child.remove()
+                styles.visibility = "hidden"
             except Exception:
                 pass
-
-        raw_msgs = getattr(session, "messages", []) if session else []
-        msg_list = [dict(m) for m in raw_msgs if isinstance(m, dict)]
-
-        from core.domain.policies.messages import is_ui_visible_user_message
-
-        has_user_msg = any(
-            isinstance(m, dict) and m.get("type") == "user" and is_ui_visible_user_message(m)
-            for m in msg_list
-        )
-        if not has_user_msg and getattr(session, "prompt", None):
-            msg_list.insert(0, {"type": "user", "text": session.prompt})
-
-        raw_page_size = getattr(self, "PAGE_SIZE", 50)
-        page_size = raw_page_size if isinstance(raw_page_size, int) else 50
-        if len(msg_list) > page_size:
-            self._unloaded_messages = msg_list[:-page_size]
-            msgs_to_render = msg_list[-page_size:]
-        else:
-            self._unloaded_messages = []
-            msgs_to_render = msg_list
-
-        if driver is not None:
-            for idx, evt in enumerate(msgs_to_render):
-                is_last_running = is_running and (idx == len(msgs_to_render) - 1)
-                await driver.consume_session_event(
-                    evt,
-                    animate=is_last_running,
-                    is_active=is_last_running,
-                )
-            if not is_running and hasattr(driver, "finalize_thinking_stream"):
-                driver.finalize_thinking_stream()
-        else:
-            for msg in msgs_to_render:
-                if not isinstance(msg, dict):
-                    continue
+        if hasattr(self, "anchor") and callable(self.anchor):
+            try:
+                self.anchor(True)
+            except Exception:
+                pass
+        try:
+            for child in list(self.children):
                 try:
-                    await restore_message_item(self, msg, task_manager=task_manager)
-                    if len(getattr(self, "children", [])) % 5 == 0:
-                        await asyncio.sleep(0)
-                except Exception as err:
-                    logger.warning("Error restoring UI message item: %s", err)
+                    child.remove()
+                except Exception:
+                    pass
 
-        if hasattr(self, "check_welcome") and callable(self.check_welcome):
-            self.check_welcome()
+            raw_msgs = getattr(session, "messages", []) if session else []
+            msg_list = [dict(m) for m in raw_msgs if isinstance(m, dict)]
 
-        self._is_loading_session = False
-        self.loading = False
+            from core.domain.policies.messages import is_ui_visible_user_message
+
+            has_user_msg = any(
+                isinstance(m, dict) and m.get("type") == "user" and is_ui_visible_user_message(m)
+                for m in msg_list
+            )
+            if not has_user_msg and getattr(session, "prompt", None):
+                msg_list.insert(0, {"type": "user", "text": session.prompt})
+
+            raw_page_size = getattr(self, "PAGE_SIZE", 50)
+            page_size = raw_page_size if isinstance(raw_page_size, int) else 50
+            if len(msg_list) > page_size:
+                self._unloaded_messages = msg_list[:-page_size]
+                msgs_to_render = msg_list[-page_size:]
+            else:
+                self._unloaded_messages = []
+                msgs_to_render = msg_list
+
+            if driver is not None:
+                for idx, evt in enumerate(msgs_to_render):
+                    is_last_running = is_running and (idx == len(msgs_to_render) - 1)
+                    await driver.consume_session_event(
+                        evt,
+                        animate=is_last_running,
+                        is_active=is_last_running,
+                    )
+                if not is_running and hasattr(driver, "finalize_thinking_stream"):
+                    driver.finalize_thinking_stream()
+            else:
+                for msg in msgs_to_render:
+                    if not isinstance(msg, dict):
+                        continue
+                    try:
+                        await restore_message_item(self, msg, task_manager=task_manager)
+                        if len(getattr(self, "children", [])) % 5 == 0:
+                            await asyncio.sleep(0)
+                    except Exception as err:
+                        logger.warning("Error restoring UI message item: %s", err)
+
+            if hasattr(self, "check_welcome") and callable(self.check_welcome):
+                self.check_welcome()
+        finally:
+            self._is_loading_session = False
+            self.loading = False
 
         def _scroll():
             try:
                 if hasattr(self, "scroll_end"):
                     self.scroll_end(animate=False)
-            except Exception:
-                pass
+                if hasattr(self, "release_anchor") and callable(self.release_anchor):
+                    self.release_anchor()
+            finally:
+                if styles is not None:
+                    try:
+                        styles.visibility = "visible"
+                    except Exception:
+                        pass
 
         if hasattr(self, "call_after_refresh") and callable(self.call_after_refresh):
             try:
