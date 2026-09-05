@@ -554,7 +554,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(files_count, 2)
             self.assertTrue(any("main.py:10:def hello():" in line for line in lines))
             self.assertTrue(any("test-runner.py-12-    context_call()" in line for line in lines))
-            self.assertTrue(any("test-runner.py:13:    runner_test():" in line for line in lines))
+            self.assertTrue(any("test-runner.py:13:    runner_test()" in line for line in lines))
 
     async def test_outline_skips_non_code_files_without_glob(self):
         txt_file = os.path.join(self.tmpdir, "notes.txt")
@@ -614,9 +614,9 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         ctx = ToolContext(cwd=self.tmpdir)
         res = await self.tool.execute({"query": "*", "mode": "outline", "glob": "file_*.py"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
-        # Should find all functions
-        self.assertIn("function_000", res.content)
-        self.assertIn("function_024", res.content)
+        # Should find all functions (function_0 .. function_24)
+        self.assertIn("function_0", res.content)
+        self.assertIn("function_24", res.content)
 
     async def test_parallel_content_search(self):
         # Create many files to trigger parallel processing
