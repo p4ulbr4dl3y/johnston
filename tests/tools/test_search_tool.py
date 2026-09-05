@@ -693,6 +693,53 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("line 4", res.content)
         self.assertIn("line 5", res.content)
 
+    async def test_context_lines_override_zero_before(self):
+        fpath = os.path.join(self.tmpdir, "zero_before.txt")
+        with open(fpath, "w") as f:
+            f.write("line 1\nline 2\nTARGET\nline 4\nline 5\n")
+        ctx = ToolContext(cwd=self.tmpdir)
+        res = await self.tool.execute({"query": "TARGET", "before": 0, "context_lines": 2, "path": "zero_before.txt"}, ctx=ctx)
+        self.assertEqual(res.status, ToolResultStatus.DONE)
+        self.assertNotIn("line 1", res.content)
+        self.assertNotIn("line 2", res.content)
+        self.assertIn("TARGET", res.content)
+        self.assertIn("line 4", res.content)
+        self.assertIn("line 5", res.content)
+
+    def test_ripgrep_delimiter_during_stopping(self):
+        import unittest.mock as mock
+
+        from tools.search.content import _search_content_ripgrep
+
+        mock_proc = mock.MagicMock()
+        mock_proc.stdout = [
+            "file.py\x0010:first match\n",
+            "--\n",
+            "file.py\x0050-wrong context\n",
+            "file.py\x0051:second match\n",
+        ]
+        mock_proc.returncode = 0
+        mock_proc.poll.return_value = 0
+        mock_proc.wait.return_value = 0
+
+        with mock.patch("subprocess.Popen", return_value=mock_proc):
+            res = _search_content_ripgrep(
+                target_path=self.tmpdir,
+                query="match",
+                cwd=self.tmpdir,
+                case_sensitive=False,
+                before_lines=0,
+                after_lines=2,
+                max_results=1,
+            )
+            self.assertIsNotNone(res)
+            lines, match_count, file_count = res
+            self.assertEqual(match_count, 1)
+            content = "\n".join(lines)
+            self.assertIn("first match", content)
+            self.assertNotIn("wrong context", content)
+            self.assertNotIn("second match", content)
+
     def test_cancellation_header(self):
         import threading
         cancel_evt = threading.Event()
@@ -1143,6 +1190,24 @@ abstract class BaseService {
         self.assertIn("class BaseService", result.content)
         # Indent should be depth 1 (4 spaces) with line number prefix
         self.assertIn("    3: run()", result.content)
+
+    def test_rust_impl_generic_trait(self):
+        """Test tree-sitter captures trait implementation on generic struct."""
+        with open(os.path.join(self.tmpdir, "generic.rs"), "w") as f:
+            f.write("""
+struct Widget<T>(T);
+impl<T> Display for Widget<T> {
+    fn fmt() {}
+}
+""")
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="generic.rs",
+        )
+        self.assertIn("impl Display for Widget<T>", result.content)
 
     def test_cache_hit_on_different_query(self):
         """Test that changing query reuses cached file symbols without re-parsing."""

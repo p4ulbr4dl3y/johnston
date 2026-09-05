@@ -111,7 +111,7 @@ def _search_content_ripgrep(
                     break
                 line = raw_line.rstrip("\r\n")
                 if not line or line == "--":
-                    if stopping and after_remaining <= 0:
+                    if stopping:
                         break
                     continue
 
@@ -209,7 +209,9 @@ def _search_content_python(
     output_lines: List[str] = []
     match_count = 0
 
-    def _process_file(abs_fpath: str) -> Optional[Tuple[List[List[str]], str]]:
+    def _process_file(
+        abs_fpath: str,
+    ) -> Optional[Tuple[List[Tuple[int, str, str]], str, int, List[str], List[int]]]:
         if cancel_event and cancel_event.is_set():
             return None
         if is_binary_file(abs_fpath):

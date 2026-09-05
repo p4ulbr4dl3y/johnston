@@ -381,6 +381,7 @@ def _search_outline(
         files_to_process = [target_path]
     elif os.path.isdir(target_path):
         files_to_process = _walk_filtered_list(target_path, include_hidden, gitignore_matcher, cancel_event)
+        files_to_process.sort()
     else:
         return [], 0, 0
 

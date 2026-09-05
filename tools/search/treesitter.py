@@ -278,15 +278,24 @@ class TreeSitterExtractor:
                     else ""
                 )
                 if key == "impl":
+                    trait_node = node.child_by_field_name("trait")
+                    type_node = node.child_by_field_name("type")
                     trait_name = (
-                        captures["impl.trait"][0].text.decode("utf-8", errors="replace")
-                        if "impl.trait" in captures
-                        else ""
+                        trait_node.text.decode("utf-8", errors="replace")
+                        if trait_node
+                        else (captures.get("impl.trait", [None])[0].text.decode("utf-8", errors="replace") if "impl.trait" in captures else "")
                     )
-                    if trait_name and name:
-                        name = f"{trait_name} for {name}"
+                    type_name = (
+                        type_node.text.decode("utf-8", errors="replace")
+                        if type_node
+                        else name
+                    )
+                    if trait_name and type_name:
+                        name = f"{trait_name} for {type_name}"
                     elif trait_name:
                         name = trait_name
+                    elif type_name:
+                        name = type_name
                     elif not name:
                         impl_text = node.text.decode("utf-8", errors="replace").split("{")[0].strip()
                         name = re.sub(r"^impl\b\s*", "", impl_text).strip()

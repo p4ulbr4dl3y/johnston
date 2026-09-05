@@ -36,8 +36,8 @@ def search_sync(
     glob_pattern: Optional[str] = None,
     case_sensitive: bool = False,
     max_results: int = 50,
-    before_lines: int = 0,
-    after_lines: int = 0,
+    before_lines: Optional[int] = None,
+    after_lines: Optional[int] = None,
     context_lines: int = 0,
     include_hidden: bool = False,
     progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
@@ -70,11 +70,10 @@ def search_sync(
     if mode == "content" and not query.strip():
         return fail(ERROR_KIND_PARAMS, "query parameter is required for content search", name="query")
 
-    if context_lines > 0:
-        if before_lines == 0:
-            before_lines = context_lines
-        if after_lines == 0:
-            after_lines = context_lines
+    if before_lines is None:
+        before_lines = context_lines
+    if after_lines is None:
+        after_lines = context_lines
 
     if progress_callback:
         progress_callback({"stage": "start", "mode": mode})
@@ -281,10 +280,10 @@ class SearchTool(BaseTool):
         context_lines = try_int(args.get("context_lines"), 0)
         context_lines = max(0, min(context_lines, 10))
 
-        before_lines = try_int(args.get("before"), 0)
-        before_lines = max(0, min(before_lines, 20))
-        after_lines = try_int(args.get("after"), 0)
-        after_lines = max(0, min(after_lines, 20))
+        before_val = try_int(args.get("before"), None)
+        before_lines = max(0, min(before_val, 20)) if before_val is not None else None
+        after_val = try_int(args.get("after"), None)
+        after_lines = max(0, min(after_val, 20)) if after_val is not None else None
 
         include_hidden = bool(args.get("include_hidden", False))
 
