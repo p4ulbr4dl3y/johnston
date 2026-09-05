@@ -56,8 +56,23 @@ def _serialize_session_jsonl(sess: AgentSession) -> str:
 
     One line per entry: meta first, then one ``{"_type": "msg", ...}`` per
     message and one ``{"_type": "history", ...}`` per agent-history entry.
+    Falls back per corrupted entry to guarantee the rest of the session is preserved.
     """
-    return "".join(json.dumps(item, ensure_ascii=False, default=str) + "\n" for item in sess.to_jsonl_lines())
+    lines: List[str] = []
+    for item in sess.to_jsonl_lines():
+        try:
+            lines.append(json.dumps(item, ensure_ascii=False, default=str) + "\n")
+        except Exception:
+            safe_type = item.get("_type", "msg") if isinstance(item, dict) else "msg"
+            lines.append(
+                json.dumps(
+                    {"_type": safe_type, "corrupted": True, "repr": str(item)},
+                    ensure_ascii=False,
+                    default=str,
+                )
+                + "\n"
+            )
+    return "".join(lines)
 
 
 def get_session_store(ctx_or_app: Any) -> "SessionStore":
@@ -368,7 +383,7 @@ class SessionStore:
                 content = _serialize_session_jsonl(sess)
                 if state["content_hash"] == hashlib.md5(content.encode("utf-8")).hexdigest():
                     self._sessions[sess.id] = sess
-                    return
+                    return True
 
             if content is None:
                 content = _serialize_session_jsonl(sess)
@@ -382,12 +397,14 @@ class SessionStore:
                 self._disk_cache[sess.id] = sess
                 self._disk_cache_signature = self._disk_signature()
                 self._disk_cache_ts = time.time()
+            return True
         except Exception:
             logger.exception("Failed to save session %s", sess.id)
+            return False
 
-    async def save_async(self, sess: AgentSession) -> None:
+    async def save_async(self, sess: AgentSession) -> bool:
         """Asynchronously save session off the event loop thread."""
-        await asyncio.to_thread(self.save, sess)
+        return await asyncio.to_thread(self.save, sess)
 
     def delete(self, session_id: str) -> None:
         sess = self.get(session_id)

@@ -76,6 +76,30 @@ def _now() -> float:
     return time.time()
 
 
+def sanitize_session_event(obj: Any, depth: int = 0, seen: Optional[set] = None) -> Any:
+    """Sanitize event payload recursively to guarantee JSON serializability."""
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if depth > 50:
+        return str(obj)
+    if isinstance(obj, BaseException):
+        return str(obj)
+    if seen is None:
+        seen = set()
+    obj_id = id(obj)
+    if obj_id in seen:
+        return "<circular>"
+    seen.add(obj_id)
+    try:
+        if isinstance(obj, dict):
+            return {str(k): sanitize_session_event(v, depth + 1, seen) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple, set)):
+            return [sanitize_session_event(x, depth + 1, seen) for x in obj]
+        return str(obj)
+    finally:
+        seen.remove(obj_id)
+
+
 class AgentSession:
     """Unified session model for main chat sessions and subagent task sessions.
 
@@ -153,6 +177,7 @@ class AgentSession:
         - "tool": tool call, with "result_text" merged into the same message
         """
         etype = event.get("type", "")
+        event = sanitize_session_event(event)
         last = self.messages[-1] if self.messages else None
 
         if etype in (
@@ -339,9 +364,9 @@ class AgentSession:
         meta = {"_type": "meta", **self._persistent_fields()}
         lines: List[Dict[str, Any]] = [meta]
         for m in self.messages:
-            lines.append({"_type": "msg", "data": m})
+            lines.append({"_type": "msg", "data": sanitize_session_event(m) if isinstance(m, dict) else str(m)})
         for h in self._history():
-            lines.append({"_type": "history", "data": h})
+            lines.append({"_type": "history", "data": sanitize_session_event(h) if isinstance(h, dict) else str(h)})
         return lines
 
     @classmethod

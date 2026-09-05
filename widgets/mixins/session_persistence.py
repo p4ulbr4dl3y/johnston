@@ -147,13 +147,15 @@ class SessionPersistenceMixin:
         """Save complete UI element state to ~/.johnston/projects/<project>/sessions"""
         session_data = self._get_current_session_data()
         if session_data is not None:
-            self._write_session_data(session_data)
+            ok = self._write_session_data(session_data)
+            if ok is False and hasattr(self, "notify"):
+                self.notify("Failed to save session to disk", severity="error", timeout=4.0)
             self.refresh_status_footer()
 
-    def _write_session_data(self, session_data: dict) -> None:
+    def _write_session_data(self, session_data: dict) -> bool:
         """Write collected session data into the store (no UI access — safe for threads)."""
         if getattr(self, "is_read_only", False):
-            return
+            return True
         with _global_session_write_lock:
             existing = self.sm.get(self.current_session_id, reload=False)
             is_new = existing is None
@@ -185,10 +187,12 @@ class SessionPersistenceMixin:
                     setattr(session, attr, new_value)
                     changed = True
 
+            saved = True
             if changed:
                 session.touch()
-                self.sm.save(session)
+                saved = self.sm.save(session)
             self.sm.set_active_session_id(self.current_session_id)
+            return bool(saved)
 
     async def save_current_session_async(self, force: bool = False) -> None:
         """Collect session data on main UI thread, then save to disk in background thread."""
@@ -199,7 +203,9 @@ class SessionPersistenceMixin:
         self._last_session_save_time = now
         session_data = self._get_current_session_data()
         if session_data is not None:
-            await asyncio.to_thread(self._write_session_data, session_data)
+            ok = await asyncio.to_thread(self._write_session_data, session_data)
+            if ok is False and hasattr(self, "notify"):
+                self.notify("Failed to save session to disk", severity="error", timeout=4.0)
             self.refresh_status_footer()
 
     def get_resume_hint(self) -> Optional[str]:

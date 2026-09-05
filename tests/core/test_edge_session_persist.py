@@ -602,4 +602,47 @@ def test_save_session_with_non_serializable_objects(store):
     assert any(m.get("type") == "retry" for m in loaded.messages)
 
 
+def test_sanitize_session_event():
+    from core.domain.entities.session import sanitize_session_event
+
+    data = {
+        "str": "ok",
+        "int": 42,
+        "exc": RuntimeError("fail"),
+        "nested": {"err": ValueError("bad"), "items": [KeyError("k")]},
+    }
+    cleaned = sanitize_session_event(data)
+    assert cleaned["str"] == "ok"
+    assert cleaned["int"] == 42
+    assert cleaned["exc"] == "fail"
+    assert cleaned["nested"]["err"] == "bad"
+    assert cleaned["nested"]["items"] == ["'k'"]
+
+
+def test_serialize_session_jsonl_corrupted_fallback(store):
+    from core.infrastructure.storage.session_store import _serialize_session_jsonl
+
+    sess = store.create_main("fallback_sess")
+    sess.messages = [{"type": "good", "text": "hello"}]
+
+    # A broken object whose dumps will raise
+    class Unserializable:
+        def __repr__(self):
+            return "<unserializable>"
+
+    # Inject into to_jsonl_lines
+    sess.to_jsonl_lines = lambda: [
+        {"_type": "meta", "id": "fallback_sess"},
+        {"_type": "msg", "bad": Unserializable()},
+        {"_type": "msg", "good": "preserved"},
+    ]
+
+    serialized = _serialize_session_jsonl(sess)
+    lines = [line for line in serialized.split("\n") if line.strip()]
+    assert len(lines) == 3
+    assert "fallback_sess" in lines[0]
+    assert "preserved" in lines[2]
+
+
+
 
