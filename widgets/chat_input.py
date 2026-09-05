@@ -489,10 +489,28 @@ class ChatInput(TextArea):
             except Exception:
                 pass
 
+            # Stop generation: Textual workers AND subagent tasks of the current
+            # session. Subagents run outside the Textual worker pool, so they are
+            # cancelled via the session store (mirrors /new). Scoping to
+            # current_session_id leaves OTHER sessions' subagents untouched; when
+            # no session id is set, None cancels all subagents (matches /new).
+            # Esc is consumed only when it actually stopped generation work, so
+            # plain-typing Esc still falls through to the other key handlers.
             active_workers = [w for w in self.app.workers if w.is_running]
-            if active_workers:
-                for w in active_workers:
-                    w.cancel()
+            for w in active_workers:
+                w.cancel()
+            cancelled_subagents = 0
+            try:
+                if getattr(self.app, "sm", None) is not None:
+                    from core.application.session.stream import cancel_running_subagents
+
+                    cancelled_subagents = cancel_running_subagents(
+                        self.app.sm,
+                        parent_id=getattr(self.app, "current_session_id", None) or None,
+                    )
+            except Exception:
+                pass
+            if active_workers or cancelled_subagents > 0:
                 event.prevent_default()
                 event.stop()
                 return
