@@ -59,3 +59,28 @@ def test_session_store_with_sqlite_reindex():
         store.delete("s2")
         sessions_after_delete = store.list_main_sessions()
         assert [s["id"] for s in sessions_after_delete] == ["s1"]
+
+
+def test_empty_sessions_and_signature_sync():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        store = SessionStore(project_path=tmpdir)
+        # 1. Empty session (no messages)
+        s_empty = store.create_main("empty1")
+        store.save(s_empty)
+
+        store._sessions.clear()
+        store._invalidate_disk_cache()
+
+        # list_main_sessions should return empty without endless reindex
+        sessions = store.list_main_sessions()
+        assert sessions == []
+
+        # 2. Add message to session externally
+        s_empty.messages = [{"type": "user", "text": "not empty"}]
+        store.save(s_empty)
+        store._sessions.clear()
+        store._invalidate_disk_cache()
+
+        sessions2 = store.list_main_sessions()
+        assert len(sessions2) == 1
+        assert sessions2[0]["id"] == "empty1"

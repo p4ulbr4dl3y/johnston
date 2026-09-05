@@ -50,6 +50,9 @@ class SkillManager:
         self._scan_signature: Optional[tuple] = None
         self._scan_cache: Optional[List[Skill]] = None
         self._scan_ts: float = 0.0
+        # Cache of parsed (Skill, mtime_ns, size) keyed by filepath so file contents
+        # are only read/parsed once unless the file itself changed.
+        self._parsed_file_cache: Dict[str, tuple[Skill, int, int]] = {}
 
     def list_skills(
         self,
@@ -133,7 +136,24 @@ class SkillManager:
                         except OSError:
                             pass
 
+            parsed_cache = getattr(self, "_parsed_file_cache", None)
+            if parsed_cache is None:
+                parsed_cache = {}
+                self._parsed_file_cache = parsed_cache
+
             for filepath in sorted(md_files):
+                try:
+                    st = os.stat(filepath)
+                    mtime_ns, size = st.st_mtime_ns, st.st_size
+                except OSError:
+                    mtime_ns, size = 0, 0
+
+                cached_entry = parsed_cache.get(filepath)
+                if cached_entry and cached_entry[1] == mtime_ns and cached_entry[2] == size:
+                    skill = cached_entry[0]
+                    skills_map[skill.name] = skill
+                    continue
+
                 try:
                     with open(filepath, "r", encoding="utf-8") as file:
                         raw_content = file.read()
@@ -161,7 +181,7 @@ class SkillManager:
 
                 is_hidden = str(fm.get("hidden", "")).lower() in ("true", "1", "yes")
 
-                skills_map[name] = Skill(
+                skill = Skill(
                     name=name,
                     description=desc,
                     location=filepath,
@@ -169,6 +189,8 @@ class SkillManager:
                     scope=SkillScope(scope),
                     hidden=is_hidden,
                 )
+                parsed_cache[filepath] = (skill, mtime_ns, size)
+                skills_map[name] = skill
 
         skills = list(skills_map.values())
         return skills, tuple(signature_entries)

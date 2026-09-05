@@ -238,6 +238,19 @@ class SessionStore:
     def _subagent_path_from_scan(self, subagent_id: str) -> Optional[str]:
         if not os.path.isdir(self.sessions_dir):
             return None
+        # Fast SQLite check for parent_id
+        try:
+            with self.index_db._connection() as conn:
+                cursor = conn.execute("SELECT parent_id FROM session_index WHERE id = ?", (subagent_id,))
+                row = cursor.fetchone()
+                if row and row["parent_id"]:
+                    fpath = self._subagent_path(row["parent_id"], subagent_id)
+                    if os.path.exists(fpath):
+                        return fpath
+        except Exception:
+            pass
+
+        # Fallback directory scan
         for fname in os.listdir(self.sessions_dir):
             if not fname.endswith(".subagents"):
                 continue
@@ -322,17 +335,17 @@ class SessionStore:
         Uses SQLite session_index for fast lookup (~1ms); falls back to disk scan
         and populates SQLite on cold start or when external JSONL files change.
         """
-        # 1. Query SQLite index
+        current_sig = str(self._disk_signature() or 0)
+        stored_sig = self.index_db.get_meta("signature")
+
+        # Re-index if signature mismatch (external change) or never indexed
+        if stored_sig != current_sig and os.path.isdir(self.sessions_dir):
+            disk_sessions = list(self._load_disk_sessions().values())
+            self.index_db.bulk_reindex(self.project_key, disk_sessions, signature=current_sig)
+
         rows = self.index_db.query_main_sessions(self.project_key)
 
-        # 2. If SQLite index has no rows but disk has sessions, do a one-time disk sync
-        if not rows and os.path.isdir(self.sessions_dir):
-            disk_sessions = list(self._load_disk_sessions().values())
-            if disk_sessions:
-                self.index_db.bulk_reindex(disk_sessions)
-                rows = self.index_db.query_main_sessions(self.project_key)
-
-        # 3. Merge with live uncommitted/in-memory sessions
+        # Merge with live uncommitted/in-memory sessions
         index_sessions: Dict[str, Dict[str, Any]] = {r["id"]: r for r in rows}
         for sid, sess in self._sessions.items():
             if sess.project_key == self.project_key and sess.kind == SessionKind.MAIN:
@@ -346,7 +359,10 @@ class SessionStore:
             sid = summary.get("id")
             summary["is_locked"] = self.is_session_locked(sid) if sid else False
 
-        sessions.sort(key=lambda s: (s.get("updated_at", 0), s.get("created_at", 0), s.get("id", "")), reverse=True)
+        sessions.sort(
+            key=lambda s: (float(s.get("updated_at") or 0.0), float(s.get("created_at") or 0.0), str(s.get("id") or "")),
+            reverse=True,
+        )
         return sessions
 
     def children(self, parent_id: str) -> List[AgentSession]:
