@@ -146,7 +146,9 @@ class ShellTool(BaseTool):
                         "description": (
                             "Non-interactive shell command. Runs in project root by default. "
                             "NEVER use 'cd' — state does not persist across calls. "
-                            "NO interactive REPLs or paginators."
+                            "NO interactive REPLs or paginators. "
+                            "Do not pipe to tail/head/less (runtime auto-truncates; "
+                            "piping breaks streaming, swallows exit codes, and causes idle timeouts)."
                         ),
                     },
                     "cwd": {
