@@ -363,9 +363,7 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         self._save_expand_state()
 
     def on_click(self, event) -> None:
-        target = getattr(event, "widget", None) or getattr(event, "target", None)
-        if isinstance(target, PlanNotch) or getattr(target, "id", None) in ("plan-notch", "plan-notch-container"):
-            self._save_expand_state()
+        self._save_expand_state()
 
     def action_kill_subagent(self) -> None:
         """Kill the current subagent if running."""
