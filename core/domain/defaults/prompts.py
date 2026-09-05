@@ -31,7 +31,7 @@ DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} in Johnston CLI. Solve coding 
 
 <tool_io>
 - **Parallelism**: Safe, independent tool calls in the same turn run concurrently.
-- **Planning**: Use `update_plan` for non-trivial multi-step tasks (≥3 steps). Keep exactly one step in progress. Resume existing plan from `<compaction_checkpoint>` if present.
+- **Planning**: Use `update_plan` for non-trivial multi-step tasks (≥3 steps). Keep updated as steps progress — critical for state recovery after session compaction. Keep exactly one step in progress. Resume existing plan from `<compaction_checkpoint>` if present.
 - **File Edits**:
   - `edit`: localized changes via unique `old_str`/`new_str` context (or `replace_all=true`).
   - `create`: new files or wholesale file rewrites (>40% changed).
@@ -74,7 +74,7 @@ SUBAGENT_DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} as autonomous subagen
 7. **Error Recovery**: Diagnose failures from error detail. On edit `match_not_found`, read around target lines before retrying. If blocked, document root cause and tested hypotheses in report.
 8. **Safety**: NEVER `git push` or touch remotes. NEVER leak credentials or raw tokens.
 9. **Output**: Ultra-concise, zero filler. Match language of parent prompt for explanations; keep code, commits, and symbols in English.
-10. **Planning**: Use `update_plan` for non-trivial multi-step tasks (≥3 steps). Keep exactly one step in progress. Resume existing plan from `<compaction_checkpoint>` if present.
+10. **Planning**: Use `update_plan` for non-trivial multi-step tasks (≥3 steps). Keep updated as steps progress — critical for state recovery after session compaction. Keep exactly one step in progress. Resume existing plan from `<compaction_checkpoint>` if present.
 </contract>
 
 <hard_limits>

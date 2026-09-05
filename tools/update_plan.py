@@ -7,14 +7,14 @@ from tools.base import BaseTool
 class UpdatePlanTool(BaseTool):
     name = "update_plan"
     description = (
-        "Update multi-step task checklist. Exactly one step must be 'in_progress'. Update before taking actions."
+        "Update multi-step task checklist. Critical for session compaction recovery. Exactly one step must be 'in_progress'. Update before/after taking actions."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "update_plan",
             "description": (
-                "Update multi-step task checklist. Exactly one step must be 'in_progress'. Update before taking actions."
+                "Update multi-step task checklist. Critical for session compaction recovery. Exactly one step must be 'in_progress'. Update before/after taking actions."
             ),
             "parameters": {
                 "type": "object",
