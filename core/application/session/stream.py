@@ -237,14 +237,42 @@ def merge_subagent_metrics(subagent: Any, context: Any) -> None:
 
 
 async def _safe_save(store: Any, session: AgentSession) -> None:
-    """Persist a session, logging and re-raising on storage failure."""
+    """Persist a session, logging and re-raising on storage failure.
+
+    A raised ``asyncio.CancelledError`` (save step interrupted mid-teardown)
+    must propagate unpolluted so a task cancelled during teardown stays
+    cancelled instead of dying with a secondary RuntimeError/OSError.
+    """
     if store is None:
         return
     try:
         await asyncio.to_thread(store.save, session)
+    except asyncio.CancelledError:
+        raise
     except Exception:
         logger.exception("Failed to save subagent session %s", session.id)
         raise
+
+
+def _is_real_cancellation() -> bool:
+    """True when the current task was cancelled via ``task.cancel()`` rather
+    than by a CancelledError raised from the coroutine itself.
+
+    asyncio (3.11+) tracks pending cancellations with ``Task.cancelling()``:
+    while a CancelledError handler runs, a real cancellation still has count
+    > 0 and will NOT be re-delivered automatically once the handler returns —
+    re-raising is what keeps the task actually cancelled. On 3.10 (no
+    ``cancelling()`` API) the delivered cancellation has already cleared
+    ``_must_cancel``, so this returns False and the pre-existing graceful
+    conversion behavior is preserved.
+    """
+    task = asyncio.current_task()
+    if task is None:
+        return False
+    cancelling = getattr(task, "cancelling", None)
+    if cancelling is not None:
+        return task.cancelling() > 0
+    return False
 
 
 async def execute_session_turn(
@@ -295,7 +323,16 @@ async def execute_session_turn(
         session.finish(SessionStatus.CANCELLED, "Cancelled by user")
         try:
             await _safe_save(store, session)
+        except asyncio.CancelledError:
+            raise  # never swallow the pending cancellation
         except Exception as err:
+            # Failures may not replace a pending task cancellation (audit A7):
+            # re-raise as a CancelledError so the task ends cancelled, keeping
+            # the save failure note for diagnostics.
+            if _is_real_cancellation():
+                raise asyncio.CancelledError(
+                    f"[{err_prefix}: failed to save cancelled session: {err}]"
+                ) from err
             acc[0] = f"[{err_prefix}: failed to save cancelled session: {err}]"
     except Exception as err:
         acc[0] = f"[{err_prefix}: {err}]"
@@ -371,52 +408,97 @@ async def run_subagent_stream_bg(
                 continue
             break
     finally:
-        if cleanup_fn:
+        # A7 shutdown-failure shield: a task cancelled mid-teardown must stay
+        # cancelled. Every fallible cleanup/store/UI step is guarded with a
+        # narrow `except Exception: pass` (which never swallows
+        # asyncio.CancelledError on Py3.8+), and the top-level guard re-raises
+        # a CancelledError occurring during the finally itself, so teardown
+        # failures can never replace the pending cancellation.
+        try:
+            if cleanup_fn:
+                try:
+                    if asyncio.iscoroutinefunction(cleanup_fn):
+                        await cleanup_fn(acc)
+                    else:
+                        await asyncio.to_thread(cleanup_fn, acc)
+                except Exception:
+                    pass
             try:
-                if asyncio.iscoroutinefunction(cleanup_fn):
-                    await cleanup_fn(acc)
-                else:
-                    await asyncio.to_thread(cleanup_fn, acc)
+                merge_subagent_metrics(subagent, ctx)
             except Exception:
                 pass
-        merge_subagent_metrics(subagent, ctx)
-        ctx.refresh_status()
-        ctx.mark_subagent_status(session_id or session.id, session.status, acc[0])
+            try:
+                ctx.refresh_status()
+            except Exception:
+                pass
 
-        if notification_template and not getattr(session, "suppress_notification", False):
-            sid = session_id or session.id
-            sess_status = str(getattr(session, "status", "")).lower()
-            if "cancel" in sess_status:
-                status_val = "cancelled"
-            elif "error" in sess_status:
-                status_val = "error"
-            else:
-                status_val = "completed"
-
-            if truncate_result:
-                from core.infrastructure.tasks.output import truncate_subagent_result
-
-                base_text = truncate_subagent_result(acc[0], sid)
-            else:
-                base_text = acc[0].strip()
-
-            if status_val == "cancelled":
-                result_text = f"{base_text}\n\n[Subagent cancelled by user]" if base_text else "[Subagent cancelled by user]"
-            else:
-                result_text = base_text or "Completed with no text output."
-
-            from core.domain.policies.messages import format_background_notification
-
-            branch = getattr(session, "branch_name", None) or None
-            msg = format_background_notification(
-                type_="subagent",
-                title=session.title or "Subagent",
-                task_id=sid,
-                result=result_text,
-                status=status_val,
-                branch=branch,
+            # A cancelled/error run must not re-enter the main chat (audit A2):
+            # /new cancels the child via task.cancel(); streaming a completion
+            # notification (or a toolcard status repaint) into a fresh session
+            # would echo the old run's message into the new chat. Suppress BOTH
+            # the notification (trigger re-enters generate_ai_response) and the
+            # toolcard repaint; keep refresh_status, a footer-only repaint.
+            run_ended_cancelled_or_error = session.status in (
+                SessionStatus.CANCELLED,
+                SessionStatus.ERROR,
+                "cancelled",
+                "error",
             )
-            ctx.trigger_ai_response(msg)
+            if run_ended_cancelled_or_error:
+                setattr(session, "suppress_notification", True)
+            else:
+                try:
+                    ctx.mark_subagent_status(session_id or session.id, session.status, acc[0])
+                except Exception:
+                    pass
+
+            if (
+                notification_template
+                and not run_ended_cancelled_or_error
+                and not getattr(session, "suppress_notification", False)
+            ):
+                try:
+                    sid = session_id or session.id
+                    sess_status = str(getattr(session, "status", "")).lower()
+                    if "cancel" in sess_status:
+                        status_val = "cancelled"
+                    elif "error" in sess_status:
+                        status_val = "error"
+                    else:
+                        status_val = "completed"
+
+                    if truncate_result:
+                        from core.infrastructure.tasks.output import truncate_subagent_result
+
+                        base_text = truncate_subagent_result(acc[0], sid)
+                    else:
+                        base_text = acc[0].strip()
+
+                    if status_val == "cancelled":
+                        result_text = (
+                            f"{base_text}\n\n[Subagent cancelled by user]"
+                            if base_text
+                            else "[Subagent cancelled by user]"
+                        )
+                    else:
+                        result_text = base_text or "Completed with no text output."
+
+                    from core.domain.policies.messages import format_background_notification
+
+                    branch = getattr(session, "branch_name", None) or None
+                    msg = format_background_notification(
+                        type_="subagent",
+                        title=session.title or "Subagent",
+                        task_id=sid,
+                        result=result_text,
+                        status=status_val,
+                        branch=branch,
+                    )
+                    ctx.trigger_ai_response(msg)
+                except Exception:
+                    pass
+        except asyncio.CancelledError:
+            raise
 
     return acc[0]
 

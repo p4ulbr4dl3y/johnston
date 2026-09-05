@@ -366,8 +366,9 @@ async def test_stream_throws_propagates_to_notification_not_caller():
     try:
         _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
         assert sess.status == STATUS_ERROR
-        msg = app.trigger_ai_response.call_args.args[0]
-        assert "Subagent error: provider exploded" in msg
+        # A2: failed subagent runs no longer notify the main chat (the error
+        # text is captured in the session itself). The caller got no exception.
+        assert app.trigger_ai_response.call_args is None
     finally:
         tmp.cleanup()
 
@@ -412,8 +413,8 @@ async def test_cancel_mid_stream_marks_cancelled():
         except asyncio.CancelledError:
             pass  # task swallowed or propagated; either way it must finish
         assert sess.status == STATUS_CANCELLED
-        # Notification should have been produced for the cancelled tail.
-        assert "[Subagent cancelled]" in app.trigger_ai_response.call_args.args[0]
+        # A2: cancelled runs no longer notify the main chat.
+        assert app.trigger_ai_response.call_args is None
     finally:
         tmp.cleanup()
 

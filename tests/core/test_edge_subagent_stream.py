@@ -445,8 +445,42 @@ class TestRunStream:
         assert result == "[Subagent cancelled]"
         assert sess.status == STATUS_CANCELLED
         assert store.saved == [sess]
-        assert ctx.subagent_statuses
-        assert ctx.subagent_statuses[0][1] == STATUS_CANCELLED
+        # A2: cancelled runs stay out of the main chat — no toolcard repaint.
+        assert ctx.subagent_statuses == []
+        assert ctx.messages == []
+
+    @pytest.mark.asyncio
+    async def test_cancelled_run_does_not_reenter_main_chat(self):
+        """A2: after /new-style cancel the child's finally must not call
+        ctx.trigger_ai_response nor ctx.mark_subagent_status — the cancelled
+        run must not echo a notification (or toolcard repaint) into the fresh
+        main chat. refresh_status (footer-only repaint) is still allowed."""
+        sub = FakeSubagent(exc=asyncio.CancelledError())
+        sess = make_session()
+        ctx = FakeCtx()
+        store = FakeStore()
+        result = await run_subagent_stream_bg(sub, "p", sess, ctx, store, notification_template=True)
+        assert result == "[Subagent cancelled]"
+        assert sess.status == STATUS_CANCELLED
+        assert ctx.messages == []  # no trigger_ai_response re-entry
+        assert ctx.subagent_statuses == []  # no mark_subagent_status call
+        assert ctx.refreshed == 1  # footer-only repaint kept
+        assert getattr(sess, "suppress_notification", False) is True
+
+    @pytest.mark.asyncio
+    async def test_error_run_does_not_reenter_main_chat(self):
+        """A2 error path: a failed subagent must not stream an error
+        notification into a fresh session either (same leak as /new)."""
+        sub = FakeSubagent(exc=RuntimeError("boom"))
+        sess = make_session()
+        ctx = FakeCtx()
+        store = FakeStore()
+        result = await run_subagent_stream_bg(sub, "p", sess, ctx, store, notification_template=True)
+        assert result == "[Subagent error: boom]"
+        assert sess.status == STATUS_ERROR
+        assert ctx.messages == []
+        assert ctx.subagent_statuses == []
+        assert ctx.refreshed == 1
 
     @pytest.mark.asyncio
     async def test_generic_exception_sets_error_status_with_prefix(self):
@@ -458,8 +492,9 @@ class TestRunStream:
         assert result == "[MyPrefix: boom]"
         assert sess.status == STATUS_ERROR
         assert store.saved == [sess]
-        assert ctx.subagent_statuses
-        assert ctx.subagent_statuses[0][1] == STATUS_ERROR
+        # A2: error runs stay out of the main chat — no toolcard repaint.
+        assert ctx.subagent_statuses == []
+        assert ctx.messages == []
 
     @pytest.mark.asyncio
     async def test_cleanup_fn_raises_does_not_mask_result(self):
@@ -661,6 +696,61 @@ class TestSafeSaves:
         result = await run_subagent_stream_bg(sub, "p", sess, ctx, FailingStore())
         assert sess.status == STATUS_CANCELLED
         assert "failed to save cancelled session" in result
+
+    @pytest.mark.asyncio
+    async def test_cancelled_task_save_failure_propagates_cancelled_error(self):
+        """A7: a storage failure inside a cancelled task's teardown must
+        leave the pending CancelledError intact — the save error is noted on
+        the cancellation but never replaces it. Uses the execute_session_turn
+        level (clean real task.cancel() while the stream is suspended)."""
+        async def stream_with_suspend(*a, **k):
+            yield ("thinking_start", "Thinking...", "")
+            await asyncio.sleep(30)
+
+        agent = FakeSubagent()
+        agent.is_subagent = True
+        agent.stream_steps = stream_with_suspend
+        sess = make_session()
+        ctx = FakeCtx()
+
+        task = asyncio.create_task(run_subagent_stream_bg(agent, "p", sess, ctx, FailingStore()))
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError) as excinfo:
+            await task
+        assert task.cancelled()  # task ends cancelled, not RuntimeError/OSError
+        assert sess.status == STATUS_CANCELLED
+        # The save failure was still recorded on the cancellation note before
+        # re-raising.
+        assert "failed to save cancelled session" in excinfo.value.args[0]
+        # A2: cancelled runs stay out of the main chat even with the failure.
+        assert ctx.messages == []
+
+    @pytest.mark.asyncio
+    async def test_execute_session_turn_save_failure_cancelled_propagates(self):
+        """A7 (execute_session_turn level): FailureStore.save raises OSError
+        and the task is cancelled mid-stream -> asyncio.CancelledError
+        propagates, never the OSError."""
+        from core.application.session.stream import execute_session_turn
+
+        async def stream_with_suspend(*a, **k):
+            yield ("thinking_start", "Thinking...", "")
+            await asyncio.sleep(30)
+
+        agent = FakeSubagent()
+        agent.is_subagent = True
+        agent.stream_steps = stream_with_suspend
+        sess = make_session()
+        task = asyncio.create_task(execute_session_turn(agent, "p", sess, FailingStore()))
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError) as excinfo:
+            await task
+        assert task.cancelled()  # not RuntimeError/OSError
+        assert sess.status == STATUS_CANCELLED
+        # The save failure was still recorded on the cancellation note before
+        # re-raising.
+        assert "failed to save cancelled session" in excinfo.value.args[0]
 
     @pytest.mark.asyncio
     async def test_cancelled_subagent_adds_interrupted_event_divider(self):
@@ -899,8 +989,9 @@ class TestSubagentStepAndErrorHandling:
         )
         assert sess.status == STATUS_ERROR
         assert f"[{error_msg}]" in result
-        assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
-        assert 'status="error"' in ctx.messages[0]
+        # A2: no error notification into the main chat from a failed run.
+        assert ctx.messages == []
+        assert ctx.subagent_statuses == []
 
     @pytest.mark.asyncio
     async def test_error_step_marks_status_error_and_returns_error_text(self):
@@ -914,8 +1005,9 @@ class TestSubagentStepAndErrorHandling:
         )
         assert sess.status == STATUS_ERROR
         assert f"[{error_msg}]" in result
-        assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
-        assert 'status="error"' in ctx.messages[0]
+        # A2: no error notification into the main chat from a failed run.
+        assert ctx.messages == []
+        assert ctx.subagent_statuses == []
 
     @pytest.mark.asyncio
     async def test_notification_template_true_handles_braces_in_title_and_branch(self):
@@ -946,9 +1038,9 @@ class TestSubagentStepAndErrorHandling:
             sub, "initial prompt", sess, ctx, store, notification_template=True
         )
         assert sess.status == STATUS_ERROR
-        assert len(ctx.messages) == 1
-        notif = ctx.messages[0]
-        assert 'status="error"' in notif
+        # A2: no error notification into the main chat from a failed run.
+        assert ctx.messages == []
+        assert ctx.subagent_statuses == []
 
     @pytest.mark.asyncio
     async def test_subagent_suppress_notification_skips_trigger_ai(self):
