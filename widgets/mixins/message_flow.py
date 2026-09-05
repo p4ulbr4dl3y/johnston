@@ -29,6 +29,27 @@ def _register_tool_widget(mixin):
     return _cb
 
 
+def _cancel_parent_subagents(mixin):
+    """Return a sync callback cancelling subagents spawned by this parent session.
+
+    Used as the engine canvas ``cancel_subagents`` hook on interruption (Esc,
+    /stop). Lazily imports the core helper (avoiding any import cycle) and
+    swallows failures; cancellation must never raise.
+    """
+
+    def _cancel(session_id: str) -> None:
+        try:
+            from core.application.session.stream import cancel_running_subagents
+
+            store = getattr(mixin, "sm", None)
+            if store is not None:
+                cancel_running_subagents(store, parent_id=session_id)
+        except Exception:  # noqa: BLE001
+            logger.debug("Subagent cancellation on interrupt failed", exc_info=True)
+
+    return _cancel
+
+
 class MessageFlowMixin:
 
     """Chat input handling, AI response generation and message queueing for JohnstonApp."""
@@ -362,6 +383,7 @@ class MessageFlowMixin:
             refresh_status_footer=self.refresh_status_footer,
             notify=self.notify,
             save_session=lambda: self.save_current_session_async(),
+            cancel_subagents=_cancel_parent_subagents(self),
         )
 
         # ---- pre-stream footer & CancelledError guard ----

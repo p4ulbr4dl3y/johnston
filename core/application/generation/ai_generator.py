@@ -109,6 +109,10 @@ class GenCanvas:
     refresh_status_footer: Callable[[], Any] = field(default=None)
     notify: Callable[[str, str], Any] = field(default=None)
     save_session: Callable[..., Any] = field(default=None)
+    # Optional cancellation hook bound by the app layer: invoked with the
+    # parent session id when this generation is interrupted, so any subagent
+    # tasks spawned by the parent session get cancelled too. None = no-op.
+    cancel_subagents: Optional[Callable[[str], None]] = field(default=None)
 
 
 def ensure_provider_ready(pm: Any, agent: Any) -> Optional[ProviderReadyState]:

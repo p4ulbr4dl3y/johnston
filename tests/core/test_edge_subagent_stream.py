@@ -1,9 +1,11 @@
 """Edge-case tests for the stream helpers in core/application/session/stream.py."""
 
 import asyncio
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from core.application.generation.ai_generator import GenCanvas
 from core.application.session.stream import (
     cancel_running_subagents,
     configure_subagent_agent,
@@ -981,6 +983,94 @@ class TestSubagentStepAndErrorHandling:
         assert sess.status == SessionStatus.COMPLETED
         assert len(captured) == 1
         assert store.saved == [sess]
+
+
+# ---------------------------------------------------------------------------
+# Parent interruption propagates cancellation to running subagent children
+# (audit A1: Esc//stop on the parent generation must not orphan subagents)
+# ---------------------------------------------------------------------------
+
+
+class _PendingTask:
+    """Minimal async_task stand-in: pending until explicitly finished."""
+
+    def __init__(self):
+        self._done = False
+        self.cancelled = False
+
+    def done(self):
+        return self._done
+
+    def cancel(self):
+        self.cancelled = True
+        self._done = True
+
+
+class TestParentInterruptCancelsSubagents:
+    """Parent generation cancelled mid-stream -> subagent children cancelled."""
+
+    @pytest.mark.asyncio
+    async def test_cancel_parent_generation_cancels_pending_subagent_task(self):
+        async def mock_stream(prompt, attachments=None):
+            yield ("thinking_start", "Thinking...", "")
+            raise asyncio.CancelledError()
+
+        agent = MagicMock()
+        agent.stream_steps = mock_stream
+        agent.history = [{"role": "user", "content": "Do work"}]
+        agent._last_sys_tokens = 0
+
+        parent_session_id = "s_parent_main"
+        session = AgentSession(session_id=parent_session_id, role="assistant")
+
+        # Pending subagent child of this parent session.
+        child = AgentSession(
+            session_id="sub-1", kind="subagent", parent_id=parent_session_id, status="running"
+        )
+        child.async_task = _PendingTask()
+
+        store = FakeCancelStore(sessions=[child])
+        cancelled_parent_ids = []
+
+        # Mirrors the production wiring from widgets/mixins/message_flow.py:
+        # the canvas hook ends in cancel_running_subagents(store, parent_id=sid).
+        def cancel_cb(sid):
+            cancelled_parent_ids.append(sid)
+            cancel_running_subagents(store, parent_id=sid)
+
+        canvas = GenCanvas(
+            add_user_message=AsyncMock(),
+            add_thinking_widget=AsyncMock(return_value=MagicMock(is_thinking=True)),
+            add_tool_call=AsyncMock(),
+            add_bot_message=AsyncMock(return_value=MagicMock(content="", finalize_stream=AsyncMock())),
+            add_event_divider=AsyncMock(),
+            get_user_messages=MagicMock(return_value=[]),
+            get_user_messages_count=MagicMock(return_value=1),
+            refresh_status_footer=MagicMock(),
+            notify=MagicMock(),
+            save_session=AsyncMock(),
+            cancel_subagents=cancel_cb,
+        )
+
+        from widgets.app.ai_controller import run_ai_generation
+
+        with pytest.raises(asyncio.CancelledError):
+            await run_ai_generation(
+                agent=agent,
+                session=session,
+                canvas=canvas,
+                session_id=parent_session_id,
+                user_text="Do work",
+                show_in_ui=True,
+            )
+
+        # (a) The canvas cancellation hook fired with the parent session id.
+        assert cancelled_parent_ids == [parent_session_id]
+        # (b) The pending subagent task received cancel() and the session was
+        # finished via the existing cancel_running_subagents semantics.
+        assert child.async_task.cancelled is True
+        assert child.status == STATUS_CANCELLED
+        assert store.saved == [child]
 
 
 
