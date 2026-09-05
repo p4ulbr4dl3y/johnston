@@ -1,7 +1,5 @@
 import asyncio
 import os
-import re
-import urllib.parse
 
 from textual import events
 from textual.message import Message
@@ -11,6 +9,32 @@ from core.infrastructure.config.settings import get_settings
 from core.infrastructure.platform import paths as config
 from core.infrastructure.platform.paths import IMAGE_EXTENSIONS
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from widgets.presentation.chat_input_history import (
+    add_to_history,
+    handle_history_navigation,
+    load_prompt_history,
+    save_prompt_history,
+    save_prompt_history_to_disk,
+)
+from widgets.presentation.chat_input_paste import (
+    ClipboardAttachment,
+    decode_pasted_path,
+    format_pasted_file_path,
+    handle_tag_deletion,
+    sanitize_mouse_artifacts,
+    try_paste_clipboard_image,
+)
+from widgets.presentation.chat_input_placeholders import (
+    COMPACT_PLACEHOLDER,
+    COMPACT_SHELL_PLACEHOLDER,
+    DEFAULT_PLACEHOLDER,
+    DEFAULT_SHELL_PLACEHOLDER,
+    FORK_PLACEHOLDER,
+    NARROW_PLACEHOLDER,
+    NARROW_SHELL_PLACEHOLDER,
+    get_placeholder_for_width,
+    get_shell_placeholder_for_width,
+)
 from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
 from widgets.utils.key_aliases import (
     KEY_CUT,
@@ -25,44 +49,7 @@ from widgets.utils.key_aliases import (
     KEY_TOGGLE_MODE,
     KEY_TOGGLE_ROLE,
 )
-from widgets.utils.responsive import BREAKPOINT_BANNER, BREAKPOINT_COMPACT, resolve_width
-
-MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
-
-
-class ClipboardAttachment:
-    """Represents a clipboard image attachment"""
-
-    def __init__(self, path: str):
-        self.path = path
-
-
-DEFAULT_PLACEHOLDER = "Type a message (? help, / cmds)..."
-COMPACT_PLACEHOLDER = "Type message (? help, / cmds)..."
-NARROW_PLACEHOLDER = "Type a message..."
-FORK_PLACEHOLDER = "Type a message to fork & continue..."
-
-DEFAULT_SHELL_PLACEHOLDER = "! git status, pytest (esc to exit)..."
-COMPACT_SHELL_PLACEHOLDER = "! command (esc to exit)..."
-NARROW_SHELL_PLACEHOLDER = "! (esc to exit)..."
-
-
-def get_placeholder_for_width(width: int) -> str:
-    """Return responsive placeholder text based on width."""
-    if width < BREAKPOINT_BANNER:
-        return NARROW_PLACEHOLDER
-    if width < BREAKPOINT_COMPACT:
-        return COMPACT_PLACEHOLDER
-    return DEFAULT_PLACEHOLDER
-
-
-def get_shell_placeholder_for_width(width: int) -> str:
-    """Return responsive shell mode placeholder text based on width."""
-    if width < BREAKPOINT_BANNER:
-        return NARROW_SHELL_PLACEHOLDER
-    if width < BREAKPOINT_COMPACT:
-        return COMPACT_SHELL_PLACEHOLDER
-    return DEFAULT_SHELL_PLACEHOLDER
+from widgets.utils.responsive import resolve_width
 
 
 class ChatInput(TextArea):
@@ -116,33 +103,15 @@ class ChatInput(TextArea):
 
     def load_prompt_history(self) -> list[str]:
         """Load global prompt history from disk"""
-        data = read_json(config.PROMPT_HISTORY_FILE, default=[])
-        if isinstance(data, list):
-            return [str(item) for item in data][-self.MAX_PROMPT_HISTORY :]
-        return []
+        return load_prompt_history(self.MAX_PROMPT_HISTORY)
 
     def _save_prompt_history_to_disk(self, history: list[str]) -> None:
-        try:
-            atomic_write_json(config.PROMPT_HISTORY_FILE, history[-self.MAX_PROMPT_HISTORY :], indent=2)
-        except Exception:
-            pass
+        save_prompt_history_to_disk(history, self.MAX_PROMPT_HISTORY)
 
     def save_prompt_history(self) -> None:
         """Save global prompt history to disk asynchronously off the event loop."""
-        history_copy = list(self.prompt_history)
-        self._pending_prompt_history = history_copy
-        try:
-            loop = asyncio.get_running_loop()
-            if getattr(self, "_save_task", None) is None or self._save_task.done():
-                async def _do_save():
-                    while getattr(self, "_pending_prompt_history", None) is not None:
-                        to_save = self._pending_prompt_history
-                        self._pending_prompt_history = None
-                        await asyncio.to_thread(self._save_prompt_history_to_disk, to_save)
+        save_prompt_history(self)
 
-                self._save_task = loop.create_task(_do_save())
-        except RuntimeError:
-            self._save_prompt_history_to_disk(history_copy)
 
     def update_placeholder(self, width: int | None = None) -> None:
         """Update placeholder responsively unless a custom placeholder is set."""
@@ -270,16 +239,8 @@ class ChatInput(TextArea):
 
     def sanitize_mouse_artifacts(self) -> None:
         """Strips accidental raw ANSI mouse tracking escape sequences from the text buffer"""
-        text = self.text
-        if MOUSE_ARTIFACT_REGEX.search(text):
-            clean_text = MOUSE_ARTIFACT_REGEX.sub("", text)
-            row, col = self.cursor_location
-            self.load_text(clean_text)
-            lines = clean_text.split("\n")
-            max_row = max(0, len(lines) - 1)
-            target_row = min(row, max_row)
-            target_col = min(col, len(lines[target_row]))
-            self.move_cursor((target_row, target_col))
+        sanitize_mouse_artifacts(self)
+
 
     def _has_suggestion_trigger(self) -> bool:
         """Return True when the cursor line carries an active /command or @file trigger.
@@ -340,47 +301,13 @@ class ChatInput(TextArea):
                 self.app.copy_to_clipboard(selected)
             self.selection = self.selection.__class__.cursor(self.cursor_location)
 
+
     def _decode_pasted_path(self, text: str) -> str:
-        """Decode a pasted file path: strip quotes, unquote file:/// URLs, expand user dirs."""
-        text_strip = text.strip().strip("'\"")
-        if text_strip.startswith("file://"):
-            text_strip = urllib.parse.unquote(text_strip[7:])
-        else:
-            text_strip = urllib.parse.unquote(text_strip)
-        return os.path.expanduser(text_strip.replace("\\ ", " "))
+        return decode_pasted_path(text)
 
     def format_pasted_file_path(self, pasted_text: str) -> str:
         """Automatically formats pasted file paths as @file"""
-        if pasted_text is None:
-            return None
-        lines = pasted_text.strip().splitlines()
-        if not lines:
-            return pasted_text
-
-        new_lines = []
-        modified = False
-
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                new_lines.append(line)
-                continue
-
-            if stripped.startswith("@"):
-                if not stripped.endswith(" "):
-                    stripped = stripped + " "
-                    modified = True
-                new_lines.append(stripped)
-            else:
-                clean = self._decode_pasted_path(stripped)
-                ext = os.path.splitext(clean)[1].lower()
-                is_explicit_path = clean.startswith("/") or clean.startswith("~/") or clean.startswith("./")
-                if is_explicit_path or ((bool(ext) or "/" in clean) and os.path.exists(clean)):
-                    line = f"@{clean} "
-                    modified = True
-                new_lines.append(line)
-
-        return "\n".join(new_lines) if modified else pasted_text
+        return format_pasted_file_path(pasted_text)
 
     def update_attachment_bar(self) -> None:
         try:
@@ -411,32 +338,7 @@ class ChatInput(TextArea):
 
     async def try_paste_clipboard_image(self) -> bool:
         """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
-        import time
-
-        from core.infrastructure.platform.paths import TEMP_IMAGES_DIR
-        from core.infrastructure.platform.platform_utils import get_clipboard_image_or_file
-
-        file_path, img = await asyncio.to_thread(get_clipboard_image_or_file)
-
-        if file_path:
-            self.insert(f"@{file_path} ")
-            self._on_input_change()
-            return True
-
-        if img:
-            out_dir = TEMP_IMAGES_DIR
-            os.makedirs(out_dir, exist_ok=True)
-            final_path = os.path.join(out_dir, f"clip_{int(time.time())}.png")
-            if img.mode not in ("RGB", "RGBA"):
-                img = img.convert("RGB")
-
-            await asyncio.to_thread(img.save, final_path, format="PNG")
-            att = ClipboardAttachment(final_path)
-            self.clipboard_attachments.append(att)
-            self.update_attachment_bar()
-            return True
-
-        return False
+        return await try_paste_clipboard_image(self)
 
     async def on_paste(self, event: events.Paste) -> None:
         event.prevent_default()
@@ -471,41 +373,12 @@ class ChatInput(TextArea):
 
     def add_to_history(self, text: str) -> None:
         """Save submitted message to query history"""
-        if text and text.strip() and (not self.prompt_history or self.prompt_history[-1] != text):
-            self.prompt_history.append(text)
-            if len(self.prompt_history) > self.MAX_PROMPT_HISTORY:
-                self.prompt_history = self.prompt_history[-self.MAX_PROMPT_HISTORY :]
-            self.save_prompt_history()
-        self.prompt_history_index = len(self.prompt_history)
-        self.prompt_draft = ""
+        add_to_history(self, text)
 
     def _handle_tag_deletion(self, event_key: str) -> bool:
         """Atomic deletion of [Pasted text #N +X lines] block on Backspace or Delete"""
-        if not self.pasted_texts or not self.selection.is_empty:
-            return False
+        return handle_tag_deletion(self, event_key)
 
-        row, col = self.cursor_location
-        line_str = self.document.get_line(row)
-
-        for tag in list(self.pasted_texts.keys()):
-            start_col = line_str.find(tag)
-            while start_col != -1:
-                end_col = start_col + len(tag)
-                if event_key == "backspace" and start_col < col <= end_col:
-                    self.delete((row, start_col), (row, end_col))
-                    self.move_cursor((row, start_col))
-                    self.pasted_texts.pop(tag, None)
-                    self._on_input_change()
-                    return True
-                elif event_key == "delete" and start_col <= col < end_col:
-                    self.delete((row, start_col), (row, end_col))
-                    self.move_cursor((row, start_col))
-                    self.pasted_texts.pop(tag, None)
-                    self._on_input_change()
-                    return True
-                start_col = line_str.find(tag, start_col + 1)
-
-        return False
 
     def _accept_active_suggestion(self) -> bool:
         """Apply active suggestion if suggestion menu is visible."""
@@ -555,43 +428,8 @@ class ChatInput(TextArea):
 
     def _handle_history_navigation(self, key: str) -> bool:
         """Navigate prompt history when cursor is at the top/bottom boundary."""
-        lines = self.text.split("\n")
-        if key == "up" and self.cursor_location[0] == 0:
-            if not self.prompt_history:
-                return False
-            if self.prompt_history_index == len(self.prompt_history):
-                self.prompt_draft = self.text
+        return handle_history_navigation(self, key)
 
-            if self.prompt_history_index == 0:
-                self.prompt_history_index = len(self.prompt_history)
-                self.load_text(self.prompt_draft)
-            else:
-                self.prompt_history_index -= 1
-                self.load_text(self.prompt_history[self.prompt_history_index])
-
-            new_lines = self.text.split("\n")
-            self.move_cursor((len(new_lines) - 1, len(new_lines[-1])))
-            return True
-
-        if key == "down" and self.cursor_location[0] == len(lines) - 1:
-            if not self.prompt_history:
-                return False
-            if self.prompt_history_index == len(self.prompt_history):
-                self.prompt_draft = self.text
-                self.prompt_history_index = 0
-                self.load_text(self.prompt_history[0])
-            else:
-                self.prompt_history_index += 1
-                if self.prompt_history_index == len(self.prompt_history):
-                    self.load_text(self.prompt_draft)
-                else:
-                    self.load_text(self.prompt_history[self.prompt_history_index])
-
-            new_lines = self.text.split("\n")
-            self.move_cursor((len(new_lines) - 1, len(new_lines[-1])))
-            return True
-
-        return False
 
     async def _on_key(self, event: events.Key) -> None:
         if event.key in KEY_PASTE:
@@ -770,3 +608,23 @@ class ChatInput(TextArea):
             event.prevent_default()
             event.stop()
             self.insert("\n")
+
+
+__all__ = [
+    "ChatInput",
+    "ClipboardAttachment",
+    "COMPACT_PLACEHOLDER",
+    "COMPACT_SHELL_PLACEHOLDER",
+    "DEFAULT_PLACEHOLDER",
+    "DEFAULT_SHELL_PLACEHOLDER",
+    "FORK_PLACEHOLDER",
+    "NARROW_PLACEHOLDER",
+    "NARROW_SHELL_PLACEHOLDER",
+    "get_placeholder_for_width",
+    "get_shell_placeholder_for_width",
+    "KEY_QUIT",
+    "config",
+    "read_json",
+    "atomic_write_json",
+]
+
