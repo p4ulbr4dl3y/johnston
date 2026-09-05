@@ -1191,6 +1191,71 @@ class TestHintCoordination(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(cv._active_hint_widget)
         cv.on_unmount()
 
+    async def test_non_expandable_slow_tool_does_not_hijack_hint(self):
+        from widgets.presentation.widgets.chat_container import ChatView
+
+        cv = ChatView()
+        cv.HINT_FADE_SECONDS = 0.5
+
+        t1 = ToolCallWidget("edit", "file.py")
+        t1._parent = cv
+        cv.activate_hint(t1)
+        t1.set_result("Done", status="done")
+        self.assertIn("ctrl+o", str(t1.header_label.render()))
+
+        # Non-expandable tool runs slowly
+        t2 = ToolCallWidget("read", "file.py")
+        t2.HINT_DEBOUNCE_SECONDS = 0.02
+        t2._parent = cv
+        t2.mark_running()
+
+        await asyncio.sleep(0.04)
+        # t2 must NOT hijack hint state or clear t1's lingering hint
+        self.assertNotIn("ctrl+o", str(t2.header_label.render()))
+        self.assertIn("ctrl+o", str(t1.header_label.render()))
+        self.assertIs(cv._active_hint_widget, t1)
+        cv.on_unmount()
+
+    async def test_dynamic_expandable_read_dir_lingers(self):
+        from widgets.presentation.widgets.chat_container import ChatView
+
+        cv = ChatView()
+        cv.HINT_FADE_SECONDS = 0.5
+
+        t1 = ToolCallWidget("read", "src/")
+        t1._parent = cv
+        cv.activate_hint(t1)
+
+        # Dynamic expansion via result_text starting with [dir
+        t1.set_result("[dir listing:\nfile1.py\nfile2.py]", status="done")
+        self.assertTrue(t1.is_expandable())
+        self.assertIn("ctrl+o", str(t1.header_label.render()))
+        self.assertIs(cv._active_hint_widget, t1)
+        cv.on_unmount()
+
+    async def test_mark_cancelled_and_unmount_cleanup(self):
+        from widgets.presentation.widgets.chat_container import ChatView
+
+        cv = ChatView()
+        t1 = ToolCallWidget("shell", "pytest")
+        t1._parent = cv
+        cv.activate_hint(t1)
+        self.assertIn("ctrl+o", str(t1.header_label.render()))
+
+        # Cancelled tool immediately clears active hint
+        t1.mark_cancelled()
+        self.assertNotIn("ctrl+o", str(t1.header_label.render()))
+        self.assertIsNone(cv._active_hint_widget)
+
+        # Unmount widget clears ref if it was active
+        t2 = ToolCallWidget("edit", "b.py")
+        t2._parent = cv
+        cv.activate_hint(t2)
+        self.assertIs(cv._active_hint_widget, t2)
+        t2.on_unmount()
+        self.assertIsNone(cv._active_hint_widget)
+        cv.on_unmount()
+
 
 if __name__ == "__main__":
     unittest.main()

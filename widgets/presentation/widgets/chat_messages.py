@@ -620,6 +620,10 @@ class ThinkingWidget(Vertical):
 
     def on_unmount(self) -> None:
         self._cancel_hint_timer()
+        parent = getattr(self, "parent", None)
+        if parent is not None and getattr(parent, "_active_hint_widget", None) is self:
+            if hasattr(parent, "clear_active_hints"):
+                parent.clear_active_hints(immediate=True)
         if self._update_handle is not None:
             self._update_handle.cancel()
             self._update_handle = None

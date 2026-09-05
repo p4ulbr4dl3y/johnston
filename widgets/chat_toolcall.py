@@ -247,8 +247,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def _schedule_hint_timer(self) -> None:
         self._cancel_hint_timer()
+        if not self.is_expandable():
+            self._show_hints = False
+            return
         parent = getattr(self, "parent", None)
-        if parent is not None and getattr(parent, "_has_active_hints", False) and self.is_expandable():
+        if parent is not None and getattr(parent, "_has_active_hints", False):
             if hasattr(parent, "activate_hint"):
                 parent.activate_hint(self)
                 return
@@ -261,7 +264,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def _on_hint_timer(self) -> None:
         self._hint_handle = None
-        if self.status == "running":
+        if self.status == "running" and self.is_expandable():
             parent = getattr(self, "parent", None)
             if parent is not None and hasattr(parent, "activate_hint"):
                 parent.activate_hint(self)
@@ -279,6 +282,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def on_unmount(self) -> None:
         self._cancel_hint_timer()
+        parent = getattr(self, "parent", None)
+        if parent is not None and getattr(parent, "_active_hint_widget", None) is self:
+            if hasattr(parent, "clear_active_hints"):
+                parent.clear_active_hints(immediate=True)
         if getattr(self, "_shell_update_handle", None) is not None:
             try:
                 self._shell_update_handle.cancel()
@@ -372,16 +379,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.status = "done"
 
-        if self.status != "running":
-            self._cancel_hint_timer()
-            parent = getattr(self, "parent", None)
-            if parent is not None and hasattr(parent, "on_widget_finished"):
-                parent.on_widget_finished(self)
-            else:
-                self._show_hints = False
-        else:
-            self._schedule_hint_timer()
-
         if self.canonical_tool == "shell":
             if status == "running":
                 bg_m = re.search(r"(?:Background Task ID:|id:)\s*([^\s\]\|]+)", cleaned, re.IGNORECASE)
@@ -401,6 +398,16 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 self.result_text = cleaned
         else:
             self.result_text = cleaned
+
+        if self.status != "running":
+            self._cancel_hint_timer()
+            parent = getattr(self, "parent", None)
+            if parent is not None and hasattr(parent, "on_widget_finished"):
+                parent.on_widget_finished(self)
+            else:
+                self._show_hints = False
+        else:
+            self._schedule_hint_timer()
 
         if not self.is_clickable_header():
             was_expanded = self.is_expanded
