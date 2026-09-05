@@ -221,9 +221,9 @@ Subagent notify: body is the subagent report. id attribute is correlation sessio
 
 CODEBASE_NAVIGATION_SNIPPET = """<codebase_navigation>
 Token-efficient discovery rules (apply to all inspection):
-1. **Directories**: `read(dir_path)` to inspect folder structure. NEVER run `ls`, `dir`, or `find` in shell.
+1. **Directories & Files**: `search(query, mode="filename")` to locate files by name/glob; `read(dir_path)` to inspect folder structure. NEVER run `ls`, `dir`, or `find` in shell.
 2. **Symbols & API**: `search(query, mode="outline")` to inspect class/function signatures without reading bodies.
-3. **Targeted search**: always scope via `glob` (e.g. `glob="*.py"`, `glob="!*test*"`) and specific `path`. NEVER grep/rg via shell.
+3. **Content search**: `search(query)` scoped via `glob` (e.g. `glob="*.py"`, `glob="!*test*"`) and specific `path`. NEVER grep/rg via shell.
 4. **Windowed read**: read only needed slices via `read(path, start_line=N, end_line=M)`. Full-file reads only for small files (<200 lines) or wholesale rewrites.
 5. **Shell boundary**: `shell` is strictly for build, tests, git, and execution. NEVER inspect codebase state via shell. Runs in project root by default: NEVER use `cd` or pass `cwd` when working in project root. Pass `cwd` parameter ONLY for subdirectories.
 </codebase_navigation>"""

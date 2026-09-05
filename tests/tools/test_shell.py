@@ -1049,7 +1049,7 @@ async def test_shell_auto_derives_idle_timeout(tool, make_app_mock, make_tool_co
         assert kwargs["idle_timeout"] == 0
         assert kwargs["hard_timeout"] == 120
 
-    # 2. wait_seconds=5 -> batch task -> idle_timeout=30 (hang detection)
+    # 2. wait_seconds=5 -> batch task -> idle_timeout=60 (hang detection)
     with (
         patch("tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=_process()),
@@ -1069,7 +1069,7 @@ async def test_shell_auto_derives_idle_timeout(tool, make_app_mock, make_tool_co
         )
         mock_task_cls.assert_called_once()
         _, kwargs = mock_task_cls.call_args
-        assert kwargs["idle_timeout"] == 30
+        assert kwargs["idle_timeout"] == 60
 
 
 async def test_shell_sync_wires_hard_timeout_to_task(tool, make_app_mock, make_tool_context):

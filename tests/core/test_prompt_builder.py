@@ -222,6 +222,7 @@ class TestPromptBuilder(unittest.TestCase):
         prompt = builder.build_system_prompt()
         self.assertIn("<codebase_navigation>", prompt)
         self.assertIn("read(dir_path)", prompt)
+        self.assertIn('mode="filename"', prompt)
         self.assertIn('mode="outline"', prompt)
         self.assertIn("NEVER grep/rg via shell", prompt)
 

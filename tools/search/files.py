@@ -21,6 +21,7 @@ def _search_filename_ripgrep(
     target_path: str,
     query: str,
     cwd: str,
+    case_sensitive: bool = False,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
     include_hidden: bool = False,
@@ -85,9 +86,14 @@ def _search_filename_ripgrep(
                     fname = os.path.basename(rel)
 
                     if not q_is_wild:
-                        if not (fnmatch.fnmatch(fname, q) or fnmatch.fnmatch(rel, q)):
-                            if q.lower() not in fname.lower() and q.lower() not in rel.lower():
-                                continue
+                        if case_sensitive:
+                            if not (fnmatch.fnmatchcase(fname, q) or fnmatch.fnmatchcase(rel, q)):
+                                if q not in fname and q not in rel:
+                                    continue
+                        else:
+                            if not (fnmatch.fnmatch(fname, q) or fnmatch.fnmatch(rel, q)):
+                                if q.lower() not in fname.lower() and q.lower() not in rel.lower():
+                                    continue
 
                     if glob_pattern and not _match_glob(rel, fname, glob_pattern):
                         continue
@@ -122,6 +128,7 @@ def _search_filename_python(
     target_path: str,
     query: str,
     cwd: str,
+    case_sensitive: bool = False,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
     include_hidden: bool = False,
@@ -136,6 +143,10 @@ def _search_filename_python(
     def _matches_query(rel: str, fname: str) -> bool:
         if q_is_wild:
             return True
+        if case_sensitive:
+            if fnmatch.fnmatchcase(fname, q) or fnmatch.fnmatchcase(rel, q):
+                return True
+            return q in fname or q in rel
         if fnmatch.fnmatch(fname, q) or fnmatch.fnmatch(rel, q):
             return True
         return q.lower() in fname.lower() or q.lower() in rel.lower()
@@ -170,6 +181,7 @@ def _search_filename(
     target_path: str,
     query: str,
     cwd: str,
+    case_sensitive: bool = False,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
     include_hidden: bool = False,
@@ -180,6 +192,7 @@ def _search_filename(
         target_path=target_path,
         query=query,
         cwd=cwd,
+        case_sensitive=case_sensitive,
         glob_pattern=glob_pattern,
         max_results=max_results,
         include_hidden=include_hidden,
@@ -193,6 +206,7 @@ def _search_filename(
         target_path=target_path,
         query=query,
         cwd=cwd,
+        case_sensitive=case_sensitive,
         glob_pattern=glob_pattern,
         max_results=max_results,
         include_hidden=include_hidden,

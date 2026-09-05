@@ -52,6 +52,7 @@ from core.domain.defaults.config import (
     DEFAULT_READ_LINE_WINDOW,
     DEFAULT_RETRY_BACKOFF,
     DEFAULT_RETRY_DELAY,
+    DEFAULT_SHELL_IDLE_TIMEOUT,
     DEFAULT_SHELL_MAX_CAP,
     DEFAULT_SHELL_OUTPUT_CHARS,
     DEFAULT_SHELL_STREAM_BUFFER_BYTES,
@@ -287,6 +288,7 @@ class LLMSettings:
 class ToolsSettings:
     shell_default_timeout: float = DEFAULT_SHELL_TIMEOUT
     shell_max_cap: float = DEFAULT_SHELL_MAX_CAP
+    shell_idle_timeout: int = DEFAULT_SHELL_IDLE_TIMEOUT
     max_shell_output_chars: int = DEFAULT_SHELL_OUTPUT_CHARS
     max_tool_output_chars: int = DEFAULT_TOOL_OUTPUT_CHARS
     max_tool_payload_bytes: int = DEFAULT_TOOL_PAYLOAD_BYTES
@@ -327,6 +329,11 @@ class ToolsSettings:
                 "JOHNSTON_SHELL_MAX_CAP",
                 _safe_float(sec.get("shell_max_cap"), DEFAULT_SHELL_MAX_CAP, min_val=0.1),
                 min_val=0.1,
+            ),
+            shell_idle_timeout=_env_int(
+                "JOHNSTON_SHELL_IDLE_TIMEOUT",
+                _safe_int(sec.get("shell_idle_timeout"), DEFAULT_SHELL_IDLE_TIMEOUT, min_val=0),
+                min_val=0,
             ),
             max_shell_output_chars=_env_int(
                 "JOHNSTON_SHELL_OUTPUT_CHARS",

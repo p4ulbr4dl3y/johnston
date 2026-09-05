@@ -122,6 +122,7 @@ def search_sync(
             target_path=path,
             query=query,
             cwd=cwd,
+            case_sensitive=case_sensitive,
             glob_pattern=glob_pattern,
             max_results=max_results,
             include_hidden=include_hidden,
@@ -133,6 +134,7 @@ def search_sync(
             target_path=path,
             query=query,
             cwd=cwd,
+            case_sensitive=case_sensitive,
             glob_pattern=glob_pattern,
             max_results=max_results,
             include_hidden=include_hidden,
@@ -157,12 +159,9 @@ def search_sync(
         header_kv["status"] = "0 matches found"
         return done(content="", **header_kv)
 
-    if mode == "filename":
+    header_kv["matches"] = str(match_count)
+    if file_count > 1 or os.path.isdir(path):
         header_kv["files"] = str(file_count)
-    else:
-        header_kv["matches"] = str(match_count)
-        if file_count > 1 or os.path.isdir(path):
-            header_kv["files"] = str(file_count)
 
     body = "\n".join(raw_lines).strip()
     full_output = truncate_output(body, tool_name="search")
@@ -193,8 +192,8 @@ class SearchTool(BaseTool):
                     "query": {
                         "type": "string",
                         "description": (
-                            "Search query: regex or text for 'content', filename/path pattern for 'filename', "
-                            "or symbol name for 'outline' (empty/omitted in outline/filename matches all)."
+                            "Search query: required for 'content' (regex or text); "
+                            "optional for 'filename' (filepath pattern) and 'outline' (symbol name, empty matches all)."
                         ),
                     },
                     "path": {
@@ -215,7 +214,7 @@ class SearchTool(BaseTool):
                     },
                     "case_sensitive": {
                         "type": "boolean",
-                        "description": "Whether search is case-sensitive (default: false).",
+                        "description": "Whether search is case-sensitive across all modes (default: false).",
                     },
                     "max_results": {
                         "type": "integer",
@@ -227,19 +226,19 @@ class SearchTool(BaseTool):
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 10,
-                        "description": "Symmetric context lines before and after matches (for mode='content', default: 0). Overridden by before/after if set.",
+                        "description": "Symmetric context lines before and after matches (mode='content' only, default: 0). Overridden by before/after if set.",
                     },
                     "before": {
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 20,
-                        "description": "Context lines before each match (for mode='content'). Overrides context_lines.",
+                        "description": "Context lines before each match (mode='content' only). Overrides context_lines.",
                     },
                     "after": {
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 20,
-                        "description": "Context lines after each match (for mode='content'). Overrides context_lines.",
+                        "description": "Context lines after each match (mode='content' only). Overrides context_lines.",
                     },
                     "include_hidden": {
                         "type": "boolean",

@@ -350,6 +350,16 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("helper.py", res.content)
         self.assertNotIn("hidden.py", res.content)
+        self.assertIn("matches=1", res.content)
+
+    async def test_filename_mode_case_sensitive(self):
+        ctx = ToolContext(cwd=self.tmpdir)
+        res_ci = await self.tool.execute({"query": "HELPER", "mode": "filename", "case_sensitive": False}, ctx=ctx)
+        self.assertIn("helper.py", res_ci.content)
+        self.assertIn("matches=1", res_ci.content)
+
+        res_cs = await self.tool.execute({"query": "HELPER", "mode": "filename", "case_sensitive": True}, ctx=ctx)
+        self.assertIn("0 matches found", res_cs.content)
 
     async def test_filename_mode_wildcard(self):
         ctx = ToolContext(cwd=self.tmpdir)
@@ -379,6 +389,17 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         res = await self.tool.execute({"query": "calculate_total", "mode": "outline"}, ctx=ctx)
         self.assertIn("def calculate_total", res.content)
         self.assertNotIn("helper_func", res.content)
+
+    async def test_outline_mode_case_sensitive(self):
+        ctx = ToolContext(cwd=self.tmpdir)
+        res_ci = await self.tool.execute({"query": "apprunner", "mode": "outline", "case_sensitive": False}, ctx=ctx)
+        self.assertIn("class AppRunner:", res_ci.content)
+
+        res_cs = await self.tool.execute({"query": "apprunner", "mode": "outline", "case_sensitive": True}, ctx=ctx)
+        self.assertIn("0 matches found", res_cs.content)
+
+        res_cs_match = await self.tool.execute({"query": "AppRunner", "mode": "outline", "case_sensitive": True}, ctx=ctx)
+        self.assertIn("class AppRunner:", res_cs_match.content)
 
     async def test_outline_mode_generic_ts(self):
         ctx = ToolContext(cwd=self.tmpdir)

@@ -287,6 +287,7 @@ def _outline_file(
     cwd: str,
     query: Optional[str],
     glob_pattern: Optional[str],
+    case_sensitive: bool = False,
     use_cache: bool = True,
 ) -> Optional[Tuple[str, List[str], int]]:
     """Process a single file for outline extraction with LRU caching."""
@@ -346,13 +347,21 @@ def _outline_file(
     if not all_symbols:
         return None
 
-    q_clean = query.lower().strip() if query and query.strip() and query.strip() != "*" else None
+    q_str = query.strip() if query and query.strip() and query.strip() != "*" else None
+    if q_str and not case_sensitive:
+        q_str = q_str.lower()
 
     # Filter symbols by query in memory
     filtered_lines: List[str] = []
     for display, _, name in all_symbols:
-        if q_clean is None or (name and q_clean in name.lower()) or (not name and q_clean in display.lower()):
+        if q_str is None:
             filtered_lines.append(display)
+        elif case_sensitive:
+            if (name and q_str in name) or (not name and q_str in display):
+                filtered_lines.append(display)
+        else:
+            if (name and q_str in name.lower()) or (not name and q_str in display.lower()):
+                filtered_lines.append(display)
 
     if filtered_lines:
         return rel, filtered_lines, len(filtered_lines)
@@ -363,6 +372,7 @@ def _search_outline(
     target_path: str,
     query: str,
     cwd: str,
+    case_sensitive: bool = False,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
     include_hidden: bool = False,
@@ -405,7 +415,7 @@ def _search_outline(
                     break
                 batch = files_to_process[i : i + batch_size]
                 futures = {
-                    executor.submit(_outline_file, f, cwd, query, glob_pattern): f
+                    executor.submit(_outline_file, f, cwd, query, glob_pattern, case_sensitive): f
                     for f in batch
                 }
 
@@ -442,7 +452,7 @@ def _search_outline(
         for abs_fpath in files_to_process:
             if cancel_event and cancel_event.is_set():
                 break
-            res = _outline_file(abs_fpath, cwd, query, glob_pattern)
+            res = _outline_file(abs_fpath, cwd, query, glob_pattern, case_sensitive=case_sensitive)
             if res:
                 results.append(res)
 

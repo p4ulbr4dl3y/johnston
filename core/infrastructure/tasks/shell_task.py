@@ -10,6 +10,7 @@ import signal
 import time
 from typing import Any, Callable, Optional
 
+from core.domain.defaults.config import DEFAULT_SHELL_IDLE_TIMEOUT
 from core.domain.defaults.errors import format_tool_error
 from core.infrastructure.platform.platform_utils import decode_output, terminate_process
 from core.infrastructure.tasks.output import OutputBuffer, OutputLog, strip_ansi
@@ -28,7 +29,7 @@ class ShellTask(BaseTask):
         process: Any = None,
         *,
         session_id: Optional[str] = None,
-        idle_timeout: Optional[int] = 30,
+        idle_timeout: Optional[int] = int(DEFAULT_SHELL_IDLE_TIMEOUT),
         hard_timeout: Optional[int] = None,
     ) -> None:
         super().__init__(task_id, kind="shell", command=command, status=TaskStatus.RUNNING)

@@ -7,7 +7,11 @@ import time
 import uuid
 from typing import Any, Dict, Optional
 
-from core.domain.defaults.config import DEFAULT_SHELL_MAX_CAP, DEFAULT_SHELL_TIMEOUT
+from core.domain.defaults.config import (
+    DEFAULT_SHELL_IDLE_TIMEOUT,
+    DEFAULT_SHELL_MAX_CAP,
+    DEFAULT_SHELL_TIMEOUT,
+)
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from core.infrastructure.platform.platform_utils import (
     is_windows,
@@ -285,8 +289,9 @@ class ShellTool(BaseTool):
             return ToolResult.error("wait_seconds", name="shell")
 
         # Auto-derived idle timeout: 0 for persistent services (wait_seconds=0),
-        # 30s hang-detection heartbeat for batch tasks (wait_seconds > 0) or user Ctrl+B.
-        idle_timeout = 0 if wait_seconds == 0 else 30
+        # hang-detection heartbeat for batch tasks (wait_seconds > 0) or user Ctrl+B.
+        default_idle = getattr(settings.tools, "shell_idle_timeout", DEFAULT_SHELL_IDLE_TIMEOUT)
+        idle_timeout = 0 if wait_seconds == 0 else int(default_idle)
 
         hard_timeout = None
         if wait_seconds is not None and "timeout" in args and args.get("timeout") is not None:
@@ -365,7 +370,7 @@ class ShellTool(BaseTool):
         ctx: Any,
         cmd: str,
         timeout: int,
-        idle_timeout: int = 30,
+        idle_timeout: int = int(DEFAULT_SHELL_IDLE_TIMEOUT),
         wait_seconds: Optional[int] = None,
         hard_timeout: Optional[float] = None,
     ) -> ToolResult:
