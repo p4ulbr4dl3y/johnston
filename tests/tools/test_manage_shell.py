@@ -400,3 +400,24 @@ async def test_manage_shell_consecutive_list_polling_circuit_breaker(tool, make_
     assert not res3.is_error
 
 
+async def test_manage_shell_circuit_breaker_reset_and_session_isolation(tool, make_app_mock):
+    t1 = _make_task("t1", "sleep 10", proc=MagicMock())
+    app_s1 = _app(make_app_mock, [t1], session_id="session-1")
+    app_s2 = _app(make_app_mock, [t1], session_id="session-2")
+
+    # Call on s1 twice -> triggers breaker on s1
+    res1 = await tool.execute({"action": "list"}, ctx=app_s1)
+    assert not res1.is_error
+    res2 = await tool.execute({"action": "list"}, ctx=app_s1)
+    assert res2.is_error
+
+    # Session s2 is isolated and succeeds on first call despite same task fp
+    res_s2 = await tool.execute({"action": "list"}, ctx=app_s2)
+    assert not res_s2.is_error
+
+    # Resetting s1 allows s1 to call list again
+    tool.reset_circuit_breaker("session-1")
+    res_s1_after = await tool.execute({"action": "list"}, ctx=app_s1)
+    assert not res_s1_after.is_error
+
+

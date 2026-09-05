@@ -29,6 +29,10 @@ class ToolRegistryPort(Protocol):
         """Check if a tool call is safe to run concurrently with other safe tools."""
         ...
 
+    def reset_circuit_breakers(self, session_id: Optional[str] = None) -> None:
+        """Reset polling circuit breakers across instantiated tools."""
+        ...
+
 
 _default_tool_registry: Optional[ToolRegistryPort] = None
 
@@ -52,3 +56,13 @@ def get_default_tool_registry() -> Optional[ToolRegistryPort]:
         except Exception:
             pass
     return _default_tool_registry
+
+
+def reset_tool_circuit_breakers(session_id: Optional[str] = None) -> None:
+    """Reset tool circuit breakers on default registry if available."""
+    reg = get_default_tool_registry()
+    if reg is not None and hasattr(reg, "reset_circuit_breakers"):
+        try:
+            reg.reset_circuit_breakers(session_id)
+        except Exception:
+            pass

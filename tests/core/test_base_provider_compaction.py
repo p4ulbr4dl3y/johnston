@@ -91,6 +91,38 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             self.assertIn("### Objective", agent.history[1]["content"])
             self.assertIn("auth.py", agent.history[1]["content"])
 
+    async def test_compact_history_resets_tool_circuit_breakers(self):
+        from tools.manage_shell import ManageShellTool
+        from tools.registry import _get_tool_instance
+
+        shell_tool = _get_tool_instance(ManageShellTool)
+        shell_tool._breaker_state["test-sess-compact"] = ([(1, True)], 2)
+
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
+        agent.session_id = "test-sess-compact"
+        agent.history = [
+            {"role": "user", "content": "Fix bug in auth.py"},
+            {"role": "assistant", "content": "Checking auth.py"},
+            {"role": "tool", "content": "def login(): return False"},
+            {"role": "user", "content": "Change to return True"},
+            {"role": "assistant", "content": "Updated auth.py"},
+            {"role": "user", "content": "Run tests"},
+        ]
+
+        mock_response = unittest.mock.MagicMock()
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.message.content = SAMPLE_VALID_SUMMARY
+        mock_response.choices = [mock_choice]
+
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = mock_response
+            success, _ = await agent.compact_history()
+            self.assertTrue(success)
+            self.assertNotIn("test-sess-compact", shell_tool._breaker_state)
+
     async def test_compact_history_subagent_root_prompt_anchoring(self):
         agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
         self.addAsyncCleanup(agent.close)

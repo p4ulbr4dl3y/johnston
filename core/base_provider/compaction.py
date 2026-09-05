@@ -657,6 +657,15 @@ class CompactionMixin:
             tokens_after = max(1, round(raw_tokens_after * scale_factor))
             self.last_context_tokens = tokens_after
 
+            from core.domain.ports.tool_registry import reset_tool_circuit_breakers
+
+            sid = (
+                getattr(self, "session_id", None)
+                or getattr(getattr(self, "session", None), "id", None)
+                or getattr(getattr(self, "host", None), "current_session_id", None)
+            )
+            reset_tool_circuit_breakers(sid)
+
             from core.models_catalog import format_context_tokens
 
             def _fmt(t: int) -> str:

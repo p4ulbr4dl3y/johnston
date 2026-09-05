@@ -36,6 +36,23 @@ class ManageSubagentTool(BaseTool):
         },
     }
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._breaker_state: Dict[str, tuple[Any, int]] = {}
+        self._last_list_fp = None
+        self._consecutive_list_count = 0
+
+    def reset_circuit_breaker(self, session_id: str | None = None) -> None:
+        """Reset consecutive polling circuit breaker for session or globally."""
+        if not hasattr(self, "_breaker_state"):
+            self._breaker_state = {}
+        if session_id:
+            self._breaker_state.pop(session_id, None)
+        else:
+            self._breaker_state.clear()
+        self._last_list_fp = None
+        self._consecutive_list_count = 0
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
@@ -46,15 +63,17 @@ class ManageSubagentTool(BaseTool):
         from core.infrastructure.storage.session_store import get_session_store
 
         store = get_session_store(ctx.host)
-        curr_session_id = ctx.session_id
+        curr_session_id = ctx.session_id or ""
+
+        if not hasattr(self, "_breaker_state"):
+            self._breaker_state = {}
 
         from core.application.session.subagent_service import SubagentService
 
         if action == "list":
             target_sessions = SubagentService.list_subagents(store, curr_session_id)
             fp = [(str(getattr(s, "id", "")), str(getattr(s, "status", ""))) for s in (target_sessions or [])]
-            last_fp = getattr(self, "_last_list_fp", None)
-            count = getattr(self, "_consecutive_list_count", 0)
+            last_fp, count = self._breaker_state.get(curr_session_id, (None, 0))
             if last_fp == fp and count >= 1:
                 return ToolResult.error(
                     "execute",
@@ -65,12 +84,15 @@ class ManageSubagentTool(BaseTool):
                     ),
                     name="manage_subagent",
                 )
+            new_count = count + 1 if last_fp == fp else 1
+            self._breaker_state[curr_session_id] = (fp, new_count)
             self._last_list_fp = fp
-            self._consecutive_list_count = count + 1 if last_fp == fp else 1
+            self._consecutive_list_count = new_count
 
             content_txt = SubagentService.format_subagents_list(target_sessions)
             return ToolResult.done(content=content_txt, display="")
 
+        self._breaker_state[curr_session_id] = (None, 0)
         self._consecutive_list_count = 0
 
         if not session_id:

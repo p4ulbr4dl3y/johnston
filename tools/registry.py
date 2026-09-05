@@ -191,6 +191,16 @@ async def aclose_tools() -> None:
     _TOOL_INSTANCES.clear()
 
 
+def reset_tool_circuit_breakers(session_id: str | None = None) -> None:
+    """Reset polling circuit breakers across all instantiated tools."""
+    for inst in list(_TOOL_INSTANCES.values()):
+        if hasattr(inst, "reset_circuit_breaker"):
+            try:
+                inst.reset_circuit_breaker(session_id)
+            except Exception:
+                pass
+
+
 def is_tool_concurrency_safe(name: str, args: dict | None = None) -> bool:
     """Check if a tool call is safe to run concurrently with other safe tools."""
     raw_name = (name or "").strip()
@@ -355,6 +365,9 @@ class DefaultToolRegistry:
 
     def is_tool_concurrency_safe(self, name: str, args: dict | None = None) -> bool:
         return is_tool_concurrency_safe(name, args)
+
+    def reset_circuit_breakers(self, session_id: str | None = None) -> None:
+        reset_tool_circuit_breakers(session_id)
 
 
 

@@ -42,6 +42,23 @@ class ManageShellTool(BaseTool):
         },
     }
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._breaker_state: Dict[str, tuple[Any, int]] = {}
+        self._last_list_fp = None
+        self._consecutive_list_count = 0
+
+    def reset_circuit_breaker(self, session_id: str | None = None) -> None:
+        """Reset consecutive polling circuit breaker for session or globally."""
+        if not hasattr(self, "_breaker_state"):
+            self._breaker_state = {}
+        if session_id:
+            self._breaker_state.pop(session_id, None)
+        else:
+            self._breaker_state.clear()
+        self._last_list_fp = None
+        self._consecutive_list_count = 0
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
@@ -51,13 +68,15 @@ class ManageShellTool(BaseTool):
         tasks = ctx.background_tasks
         if not tasks and not ctx.host:
             return ToolResult.error("manager", name="none", detail="available")
-        curr_sid = ctx.session_id
+        curr_sid = ctx.session_id or ""
         tasks = filter_to_session(tasks, curr_sid)
+
+        if not hasattr(self, "_breaker_state"):
+            self._breaker_state = {}
 
         if action == "list":
             fp = [(getattr(t, "id", None), getattr(t, "is_running", None)) for t in (tasks or [])]
-            last_fp = getattr(self, "_last_list_fp", None)
-            count = getattr(self, "_consecutive_list_count", 0)
+            last_fp, count = self._breaker_state.get(curr_sid, (None, 0))
             if last_fp == fp and count >= 1:
                 return ToolResult.error(
                     "execute",
@@ -68,12 +87,15 @@ class ManageShellTool(BaseTool):
                     ),
                     name="manage_shell",
                 )
+            new_count = count + 1 if last_fp == fp else 1
+            self._breaker_state[curr_sid] = (fp, new_count)
             self._last_list_fp = fp
-            self._consecutive_list_count = count + 1 if last_fp == fp else 1
+            self._consecutive_list_count = new_count
 
             content_plain = format_tasks_plain(tasks)
             return ToolResult.done(content=content_plain, display="")
 
+        self._breaker_state[curr_sid] = (None, 0)
         self._consecutive_list_count = 0
 
         if action == "send_input":
