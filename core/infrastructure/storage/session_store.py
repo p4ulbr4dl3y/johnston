@@ -22,6 +22,7 @@ from core.infrastructure.platform.paths import PROJECTS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_text, update_json_config
 from core.infrastructure.platform.session_lock import SessionLock
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_hash
+from core.infrastructure.storage.session_index_db import SessionIndexDb
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,8 @@ class SessionStore:
         self.project_dir = os.path.join(PROJECTS_DIR, self.project_key)
         self.sessions_dir = os.path.join(self.project_dir, "sessions")
         self.config_file = os.path.join(self.project_dir, "config.json")
+        self.index_db_file = os.path.join(self.project_dir, "sessions_index.db")
+        self.index_db = SessionIndexDb(self.index_db_file)
 
         self._sessions: Dict[str, AgentSession] = {}
         self._active_locks: Dict[str, SessionLock] = {}
@@ -316,27 +319,34 @@ class SessionStore:
     def list_main_sessions(self) -> List[Dict[str, Any]]:
         """Return NON-EMPTY main sessions sorted by updated time (for /resume UI).
 
-        Reads through the shared disk cache (signature-invalidated) instead of
-        re-parsing every JSONL file on each call; live in-memory sessions win
-        over their disk copies.
+        Uses SQLite session_index for fast lookup (~1ms); falls back to disk scan
+        and populates SQLite on cold start or when external JSONL files change.
         """
-        merged: Dict[str, AgentSession] = dict(self._load_disk_sessions())
-        for sid, sess in self._sessions.items():
-            if sess.project_key == self.project_key:
-                merged[sid] = sess
+        # 1. Query SQLite index
+        rows = self.index_db.query_main_sessions(self.project_key)
 
-        sessions = []
-        for sess in merged.values():
-            if sess.kind != SessionKind.MAIN:
-                continue
-            if not sess.messages and not sess.agent_history:
-                continue
-            summary = sess.to_summary_dict()
+        # 2. If SQLite index has no rows but disk has sessions, do a one-time disk sync
+        if not rows and os.path.isdir(self.sessions_dir):
+            disk_sessions = list(self._load_disk_sessions().values())
+            if disk_sessions:
+                self.index_db.bulk_reindex(disk_sessions)
+                rows = self.index_db.query_main_sessions(self.project_key)
+
+        # 3. Merge with live uncommitted/in-memory sessions
+        index_sessions: Dict[str, Dict[str, Any]] = {r["id"]: r for r in rows}
+        for sid, sess in self._sessions.items():
+            if sess.project_key == self.project_key and sess.kind == SessionKind.MAIN:
+                if not sess.messages and not sess.agent_history:
+                    index_sessions.pop(sid, None)
+                else:
+                    index_sessions[sid] = sess.to_summary_dict()
+
+        sessions = list(index_sessions.values())
+        for summary in sessions:
             sid = summary.get("id")
             summary["is_locked"] = self.is_session_locked(sid) if sid else False
-            sessions.append(summary)
 
-        sessions.sort(key=lambda s: (s["updated_at"], s["created_at"], s["id"]), reverse=True)
+        sessions.sort(key=lambda s: (s.get("updated_at", 0), s.get("created_at", 0), s.get("id", "")), reverse=True)
         return sessions
 
     def children(self, parent_id: str) -> List[AgentSession]:
@@ -397,6 +407,7 @@ class SessionStore:
                 self._disk_cache[sess.id] = sess
                 self._disk_cache_signature = self._disk_signature()
                 self._disk_cache_ts = time.time()
+            self.index_db.upsert_session(sess)
             return True
         except Exception:
             logger.exception("Failed to save session %s", sess.id)
@@ -438,6 +449,7 @@ class SessionStore:
             self._session_write_state.pop(fpath, None)
         self._sessions.pop(session_id, None)
         self._invalidate_disk_cache()
+        self.index_db.delete_session(session_id)
 
     def set_active_session_id(self, session_id: str) -> None:
         # Skip the config rewrite when unchanged: saves call this on every write.
