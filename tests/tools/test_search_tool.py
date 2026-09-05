@@ -151,6 +151,10 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(_match_glob("notes.txt", "notes.txt", "*.py,*.txt"))
         self.assertFalse(_match_glob("sub/test.py", "test.py", "*.py,!*test*"))
         self.assertTrue(_match_glob("sub/helper.py", "helper.py", "*.py,!*test*"))
+        # Negative extension matching should not match substrings
+        self.assertFalse(_match_glob("file.pyc", "file.pyc", "*.py"))
+        self.assertFalse(_match_glob("file.py.bak", "file.py.bak", "*.py"))
+        self.assertFalse(_match_glob("config.json", "config.json", "*.js"))
 
     def test_match_glob_recursive(self):
         # Test ** glob patterns
@@ -263,6 +267,23 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("AppRunner", res.content)
         self.assertNotIn(".git", res.content)
         self.assertNotIn("node_modules", res.content)
+
+    def test_direct_ripgrep_with_context(self):
+        """Verify _search_content_ripgrep executes with -B and -A flags successfully."""
+        from tools.search import _search_content_ripgrep
+        if not shutil.which("rg"):
+            self.skipTest("rg not available")
+        res = _search_content_ripgrep(
+            target_path=self.tmpdir,
+            query="AppRunner",
+            cwd=self.tmpdir,
+            before_lines=1,
+            after_lines=1,
+        )
+        self.assertIsNotNone(res)
+        lines, count, files = res
+        self.assertGreaterEqual(count, 1)
+        self.assertTrue(any("AppRunner" in line for line in lines))
 
     async def test_content_search_case_sensitivity(self):
         ctx = ToolContext(cwd=self.tmpdir)
@@ -908,6 +929,21 @@ x = "string: class YetAnotherFake"
         self.assertNotIn("AnotherFake", result.content)
         self.assertNotIn("YetAnotherFake", result.content)
 
+    def test_python_typed_parameter_extraction(self):
+        """Test tree-sitter extracts parameter names when type annotations and defaults are used."""
+        with open(os.path.join(self.tmpdir, "typed.py"), "w") as f:
+            f.write("def complex_func(x: int, y: str = 'hello', *args, **kwargs): pass\n")
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="typed.py",
+        )
+
+        self.assertIn("def complex_func(x, y, *args, **kwargs)", result.content)
+
     def test_javascript_perfect_accuracy(self):
         """Test tree-sitter ignores comments and strings in JavaScript."""
         from tools.search import TREE_SITTER_AVAILABLE
@@ -961,6 +997,78 @@ export function helper() {}
         self.assertIn("RealClass", result.content)
         self.assertIn("helper", result.content)
         self.assertNotIn("FakeClass", result.content)
+
+    def test_go_perfect_accuracy(self):
+        """Test tree-sitter ignores comments and extracts Go symbols."""
+        with open(os.path.join(self.tmpdir, "test.go"), "w") as f:
+            f.write("""
+// Comment: type FakeType struct {}
+package main
+type RealType struct {}
+func RealFunc() {}
+func (r *RealType) RealMethod() {}
+""")
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="*.go",
+        )
+
+        self.assertIn("RealType", result.content)
+        self.assertIn("RealFunc", result.content)
+        self.assertIn("RealMethod", result.content)
+        self.assertNotIn("FakeType", result.content)
+
+    def test_rust_perfect_accuracy(self):
+        """Test tree-sitter ignores comments and extracts Rust symbols."""
+        with open(os.path.join(self.tmpdir, "test.rs"), "w") as f:
+            f.write("""
+// Comment: struct FakeStruct;
+/* fn fake_func() {} */
+struct RealStruct;
+enum RealEnum {}
+fn real_func() {}
+impl RealStruct {
+    fn inner_method() {}
+}
+""")
+
+        result = search_sync(
+            query="*",
+            path=self.tmpdir,
+            cwd=self.tmpdir,
+            mode="outline",
+            glob_pattern="*.rs",
+        )
+
+        self.assertIn("RealStruct", result.content)
+        self.assertIn("RealEnum", result.content)
+        self.assertIn("real_func", result.content)
+        self.assertIn("inner_method", result.content)
+        self.assertNotIn("FakeStruct", result.content)
+        self.assertNotIn("fake_func", result.content)
+
+    def test_cache_hit_on_different_query(self):
+        """Test that changing query reuses cached file symbols without re-parsing."""
+        from tools.search import _outline_file
+
+        test_file = os.path.join(self.tmpdir, "cache_query_test.py")
+        with open(test_file, "w") as f:
+            f.write("def alpha(): pass\ndef beta(): pass\n")
+
+        res1 = _outline_file(test_file, self.tmpdir, "alpha", None, use_cache=True)
+        self.assertIsNotNone(res1)
+        self.assertTrue(any("alpha" in line for line in res1[1]))
+        self.assertFalse(any("beta" in line for line in res1[1]))
+
+        # Second query: 'beta' should hit cache and extract 'beta'
+        res2 = _outline_file(test_file, self.tmpdir, "beta", None, use_cache=True)
+        self.assertIsNotNone(res2)
+        self.assertTrue(any("beta" in line for line in res2[1]))
+        self.assertFalse(any("alpha" in line for line in res2[1]))
 
 
 if __name__ == "__main__":

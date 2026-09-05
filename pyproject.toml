@@ -22,14 +22,12 @@ dependencies = [
     "pillow>=12.3.0,<13",
     "tomli>=2.0,<3; python_version < '3.11'",
     "pypdf>=5.0.0",
-]
-
-[project.optional-dependencies]
-search-enhanced = [
     "tree-sitter>=0.23.0",
     "tree-sitter-python>=0.23.0",
     "tree-sitter-javascript>=0.23.0",
     "tree-sitter-typescript>=0.23.0",
+    "tree-sitter-go>=0.23.0",
+    "tree-sitter-rust>=0.23.0",
 ]
 
 [project.urls]
