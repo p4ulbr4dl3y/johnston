@@ -564,7 +564,32 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.header_label.remove_class(TOOL_HEADER)
         self.render_header()
 
-    def render_header(self) -> None:
+    def _get_target_max_len(self) -> int:
+        """Calculate dynamic max length for header target based on container width."""
+        w = 0
+        try:
+            if getattr(self, "is_mounted", False):
+                val = getattr(getattr(self, "size", None), "width", 0)
+                if isinstance(val, int) and not isinstance(val, bool) and val > 0:
+                    w = val
+                elif self.app:
+                    app_val = getattr(getattr(self.app, "size", None), "width", 0)
+                    if isinstance(app_val, int) and not isinstance(app_val, bool) and app_val > 0:
+                        w = app_val
+        except Exception:
+            w = 0
+        if isinstance(w, int) and w > 0:
+            return max(35, w - 35)
+        return 60
+
+    def on_resize(self, event: Any) -> None:
+        val = getattr(getattr(event, "size", None), "width", None)
+        if isinstance(val, int) and not isinstance(val, bool) and val > 0:
+            self.render_header(max_len=max(35, val - 35))
+        else:
+            self.render_header()
+
+    def render_header(self, max_len: int | None = None) -> None:
         c = self._get_status_color()
         is_subagent = False
         if self.status == "running":
@@ -585,6 +610,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 except Exception:
                     pass
 
+        if max_len is None:
+            max_len = self._get_target_max_len()
+
         header_text = build_toolcall_header(
             canonical_tool=self.canonical_tool,
             tool_type=self.tool_type,
@@ -600,6 +628,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             is_expandable=self.is_expandable(),
             is_expanded=self.is_expanded,
             show_hints=getattr(self, "_show_hints", False),
+            max_len=max_len,
         )
         self.header_label.update(header_text)
 

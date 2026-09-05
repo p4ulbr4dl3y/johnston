@@ -30,7 +30,7 @@ def escape_markup(target: str) -> str:
     return _ESCAPE_RE.sub(r"\\\1", target)
 
 
-def format_compact_dict(d: dict) -> str:
+def format_compact_dict(d: dict, max_total_len: int = 70) -> str:
     """Render a tool-args dict as a compact ``{k: v, ...}`` chip label.
 
     Single format for every non-builtin (MCP/custom) tool: keys are clipped to
@@ -59,7 +59,7 @@ def format_compact_dict(d: dict) -> str:
                 v_str = v_str[:32] + "..."
 
         item_str = f"{k_str}: {v_str}"
-        if total_len + len(item_str) > 70:
+        if total_len + len(item_str) > max_total_len:
             overflow = True
             break
         items.append(item_str)
@@ -73,13 +73,55 @@ def format_compact_dict(d: dict) -> str:
         return "{...}"
 
 
-def truncate(target: str, max_len: int = 60) -> str:
-    """Collapse whitespace and clip a display label to a UI-friendly length."""
+def truncate_path(path: str, max_len: int = 60) -> str:
+    """Truncate path preserving filename and innermost directories."""
+    if not isinstance(path, str) or len(path) <= max_len:
+        return path
+    parts = path.replace("\\", "/").split("/")
+    if len(parts) <= 1:
+        head = max(10, (max_len - 3) * 2 // 5)
+        tail = max_len - 3 - head
+        return path[:head] + "..." + path[-tail:]
+    filename = parts[-1]
+    if len(filename) >= max_len - 4:
+        half = max(4, (max_len - 3) // 2)
+        tail = max_len - 3 - half
+        return filename[:half] + "..." + filename[-tail:]
+    res = filename
+    for p in reversed(parts[:-1]):
+        if not p:
+            continue
+        candidate = f"{p}/{res}"
+        if len(candidate) + 4 > max_len:
+            break
+        res = candidate
+    return f".../{res}"
+
+
+def truncate(target: str, max_len: int = 60, mode: str = "middle") -> str:
+    """Collapse whitespace and clip a display label to a UI-friendly length.
+
+    Modes:
+    - 'middle': preserves head and tail (default for general finished strings).
+    - 'right': preserves head and truncates tail (best for live streaming).
+    - 'path': preserves filename and innermost directories.
+    """
     if not isinstance(target, str):
         return escape_markup(str(target)) if target else ""
     target = re.sub(r"\s+", " ", target).strip()
-    if len(target) > max_len:
-        target = target[:25] + "..." + target[-32:]
+    if len(target) <= max_len:
+        return escape_markup(target)
+    if mode == "right":
+        target = target[: max(0, max_len - 3)] + "..."
+    elif mode == "path":
+        target = truncate_path(target, max_len)
+    else:
+        if max_len == 60:
+            target = target[:25] + "..." + target[-32:]
+        else:
+            head = max(10, (max_len - 3) * 2 // 5)
+            tail = max_len - 3 - head
+            target = target[:head] + "..." + target[-tail:]
     return escape_markup(target)
 
 

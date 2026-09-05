@@ -7,8 +7,12 @@ from typing import Any, Dict, List, Optional
 from core.infrastructure.runtime.lru import LruCache
 
 _STREAMING_TARGET_RE = re.compile(
-    r'"(?:path|command|url|file_path|file|uri|title|prompt|query|action|question|step|task_id|session_id|message)"\s*:\s*"((?:[^"\\]|\\.)*?)"'
+    r'"(?:path|command|url|file_path|file|uri|title|prompt|query|action|question|step|task_id|session_id|message|pattern|regex|instruction|tool_name|name|filter)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)'
 )
+_STREAMING_FALLBACK_RE = re.compile(
+    r'"([a-zA-Z0-9_]+)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)'
+)
+_FALLBACK_IGNORE_KEYS = frozenset({"id", "type", "tool", "status", "action"})
 
 _TARGET_SCAN_BACKOFF = 4096
 
@@ -22,8 +26,8 @@ def _extract_streaming_target(buffer: str, scan_from: int = 0, tool_name: str = 
 
     canonical = normalize_tool_name(tool_name) if tool_name else ""
     if canonical in ("manage_shell", "manage_subagent"):
-        act_m = re.search(r'"action"\s*:\s*"((?:[^"\\]|\\.)+?)"', buffer)
-        tid_m = re.search(r'"(?:task_id|session_id)"\s*:\s*"((?:[^"\\]|\\.)+?)"', buffer)
+        act_m = re.search(r'"action"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
+        tid_m = re.search(r'"(?:task_id|session_id)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
         act = act_m.group(1).strip() if act_m else ""
         tid = tid_m.group(1).strip() if tid_m else ""
         if act and tid:
@@ -39,13 +43,29 @@ def _extract_streaming_target(buffer: str, scan_from: int = 0, tool_name: str = 
     window = buffer[max(0, scan_from - _TARGET_SCAN_BACKOFF) :]
     for m in _STREAMING_TARGET_RE.finditer(window):
         val = m.group(1)
+        val_clean = val[:-1] if val.endswith("\\") and not val.endswith("\\\\") else val
         try:
-            val = json.loads(f'"{val}"')
+            val = json.loads(f'"{val_clean}"')
         except Exception:
-            val = val.replace('\\"', '"').replace("\\\\", "\\").replace("\\n", " ")
+            val = val_clean.replace('\\"', '"').replace("\\\\", "\\").replace("\\n", " ")
         cleaned = str(val).strip()
         if cleaned:
             return cleaned
+
+    if canonical not in ("read", "edit", "create", "shell", "search", "update_plan"):
+        for m in _STREAMING_FALLBACK_RE.finditer(window):
+            k = m.group(1).lower()
+            if k not in _FALLBACK_IGNORE_KEYS:
+                val = m.group(2)
+                val_clean = val[:-1] if val.endswith("\\") and not val.endswith("\\\\") else val
+                try:
+                    val = json.loads(f'"{val_clean}"')
+                except Exception:
+                    val = val_clean.replace('\\"', '"').replace("\\\\", "\\").replace("\\n", " ")
+                cleaned = str(val).strip()
+                if cleaned:
+                    return f"{k}={cleaned}" if "=" not in cleaned else cleaned
+
     return ""
 
 

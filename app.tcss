@@ -261,6 +261,9 @@ WelcomeWidget {
     margin: 0;
     padding: 0;
     color: $fg-secondary;
+    text-wrap: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 .tool-header-expandable:hover {

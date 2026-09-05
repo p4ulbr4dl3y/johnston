@@ -1017,7 +1017,10 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_extract_streaming_target('{"action": "send_message", "session_id": "s1"}', tool_name="manage_subagent"), "send message to s1")
         self.assertEqual(_extract_streaming_target('{"query": "", "path": "src/main.py"}'), "src/main.py")
         self.assertEqual(_extract_streaming_target('{"file": "data.csv"}'), "data.csv")
-        self.assertEqual(_extract_streaming_target('{"path": "unclosed'), "")
+        self.assertEqual(_extract_streaming_target('{"path": "unclosed'), "unclosed")
+        self.assertEqual(_extract_streaming_target('{"command": "pytest -k test_foo'), "pytest -k test_foo")
+        self.assertEqual(_extract_streaming_target('{"pattern": "def foo('), "def foo(")
+        self.assertEqual(_extract_streaming_target('{"custom_arg": "in_progress', tool_name="custom_mcp"), "custom_arg=in_progress")
 
     def test_extract_streaming_target_incremental_matches_full_scan(self):
         """Windowed extraction (one scan per delta chunk) must agree with a

@@ -378,8 +378,9 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         sub_session.id = "sub-k"
         sub_session.status = "running"
         sub_session.title = "subagent to kill"
-        sub_session.async_task = MagicMock()
-        sub_session.async_task.done.return_value = False
+        task_mock = MagicMock()
+        task_mock.done.return_value = False
+        sub_session.async_task = task_mock
         sub_session.messages = []
         sub_session.finish = MagicMock(side_effect=lambda st, desc: setattr(sub_session, "status", st))
 
@@ -395,9 +396,10 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             # Press ctrl+k to kill subagent
             await pilot.press("ctrl+k")
             await pilot.pause()
-            sub_session.async_task.cancel.assert_called_once()
+            task_mock.cancel.assert_called_once()
             sub_session.finish.assert_called_once_with("cancelled", "Terminated from subagent view")
             self.assertEqual(sub_session.status, "cancelled")
+            self.assertIsNone(sub_session.async_task)
 
     async def test_help_screen_pilot(self):
         screen = HelpScreen()

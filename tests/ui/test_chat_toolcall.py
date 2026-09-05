@@ -1038,6 +1038,37 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("...", rendered)
         self.assertNotIn(long_target, rendered)
 
+    def test_generating_header_right_truncates_without_middle_split(self):
+        target = "very_long_command_prefix_" + "x" * 60 + "_tail_suffix"
+        widget = ToolCallWidget("shell", target, status="generating")
+        widget.render_header()
+        rendered = str(widget.header_label.render())
+        # In-flight generating mode must right-truncate (preserve prefix, cut tail with ...)
+        self.assertIn("very_long_command_prefix_", rendered)
+        self.assertNotIn("_tail_suffix", rendered)
+
+    def test_path_truncation_preserves_filename(self):
+        path = "deeply/nested/dir/structure/sub/long_target_file.py"
+        widget = ToolCallWidget("read", path, status="done")
+        widget.render_header()
+        rendered = str(widget.header_label.render())
+        self.assertIn("long_target_file.py", rendered)
+
+    def test_on_resize_adapts_header_width(self):
+        long_cmd = "uv run pytest tests/ui/test_chat_toolcall.py -m not_slow"
+        widget = ToolCallWidget("shell", long_cmd, status="done")
+        # Narrow width: truncate
+        event_narrow = MagicMock(size=MagicMock(width=45))
+        widget.on_resize(event_narrow)
+        narrow_rendered = str(widget.header_label.render())
+        self.assertIn("...", narrow_rendered)
+
+        # Wide width: full command fits
+        event_wide = MagicMock(size=MagicMock(width=160))
+        widget.on_resize(event_wide)
+        wide_rendered = str(widget.header_label.render())
+        self.assertIn("test_chat_toolcall.py", wide_rendered)
+
     def test_mark_running_auto_expands_when_parent_auto_expand_all(self):
         widget = ToolCallWidget("shell", "echo hello", status="generating")
         parent = MagicMock(auto_expand_all=True)
