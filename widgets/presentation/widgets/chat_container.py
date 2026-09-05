@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from contextlib import nullcontext
 from typing import Any
 
@@ -74,8 +75,6 @@ async def restore_message_item(
         if status == "running":
             task_id = None
             if "[Background Task ID:" in (rtext or ""):
-                import re
-
                 bg_m = re.search(r"Background Task ID:\s*([^\s\]]+)", rtext)
                 if bg_m:
                     task_id = bg_m.group(1)

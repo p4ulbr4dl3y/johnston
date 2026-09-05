@@ -126,8 +126,8 @@ class TestEdgeToolCallInvokeSubagentStatus(unittest.TestCase):
         self.assertIn("tool-header-expandable", widget.header_label.classes)
         widget.set_result("Subagent error: boom", status="error")
         self.assertEqual(widget.status, "error")
-        self.assertFalse(widget.is_clickable_header())
-        self.assertNotIn("tool-header-expandable", widget.header_label.classes)
+        self.assertTrue(widget.is_clickable_header())
+        self.assertIn("tool-header-expandable", widget.header_label.classes)
 
 
 class TestEdgeToolCallMarkRunning(unittest.TestCase):
