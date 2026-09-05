@@ -18,6 +18,7 @@ from core.domain.policies.session_naming import FORK_BASE_MAX_LEN
 from widgets.chat_input import ChatInput
 from widgets.presentation.commands.base import BaseCommand
 from widgets.presentation.commands.helpers import (
+    await_workers_finished,
     cancel_active_workers,
     cancel_active_workers_and_tasks,
     reset_app_state,
@@ -42,6 +43,10 @@ class NewCommand(BaseCommand):
                 w.cancel()
 
         async def kill_all_tasks():
+            # Cancelled generation workers still run teardown (interruption
+            # divider, tool cancellation) after cancel_workers() above. Wait
+            # for it here so none of that lands in the fresh chat view.
+            await await_workers_finished(app)
             await app.task_manager.kill_all()
 
         def cancel_subagents():

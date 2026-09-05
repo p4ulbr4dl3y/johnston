@@ -14,6 +14,25 @@ def cancel_active_workers(app) -> None:
         pass
 
 
+async def await_workers_finished(app, timeout: float = 2.0) -> None:
+    """Wait until cancelled workers have completed their cleanup.
+
+    A cancelled generation worker still runs its finally/teardown (e.g. the
+    "Response Interrupted" divider). Unless callers wait, that teardown can
+    mount messages into a chat view the command just cleared for a session.
+    """
+    try:
+        from textual.worker import WorkerCancelled, WorkerFailed
+
+        for w in [w for w in getattr(app, "workers", []) if not getattr(w, "is_finished", True)]:
+            try:
+                await asyncio.wait_for(w.wait(), timeout=timeout)
+            except (WorkerCancelled, WorkerFailed, TimeoutError, asyncio.TimeoutError):
+                pass
+    except Exception:
+        pass
+
+
 async def cancel_active_workers_and_tasks(
     app,
     *,

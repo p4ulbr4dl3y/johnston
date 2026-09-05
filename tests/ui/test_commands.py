@@ -1073,6 +1073,74 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.task_manager.kill_all.assert_awaited_once()
         app.message_queue.clear.assert_called_once()
 
+    async def test_new_command_waits_for_worker_teardown_before_clearing_chat(self):
+        """/new must not let an interrupted generation worker's teardown
+        (e.g. the "Response Interrupted" divider) land in the fresh chat."""
+        from widgets.presentation.commands import NewCommand
+
+        teardown_done = asyncio.Event()
+        divider_mounted = []
+
+        class SlowWorker:
+            is_running = True
+            is_finished = False
+
+            def cancel(self):
+                pass
+
+            async def wait(self):
+                # Generation worker teardown takes time (git checkpoint, save);
+                # block until the deferred divider mount completes.
+                await teardown_done.wait()
+
+        async def fake_new_session(sm, agent, **cb):
+            cb["cancel_workers"]()
+            await cb["kill_all_tasks"]()
+            cb["cancel_subagents"]()
+            return "new-id"
+
+        class Chat:
+            def __init__(self):
+                self.children = []
+                self._unloaded_messages = []
+                self._is_loading_older = False
+
+            async def remove_children(self):
+                self.children.clear()
+
+            def check_welcome(self):
+                self.children.append("welcome")
+
+            async def add_event_divider(self, text):
+                # Simulates _handle_interruption mounting the divider after the
+                # generation worker was cancelled (the original race).
+                divider_mounted.append(text)
+                teardown_done.set()
+
+        chat = Chat()
+        app = SimpleApp()
+        app.agent = SimpleNamespace()
+        app.workers = [SlowWorker()]
+        app.sm = MagicMock()
+        app.sm.generate_session_id = lambda: "new-id"
+        app.message_queue = MagicMock()
+        app.task_manager = SimpleNamespace(kill_all=AsyncMock())
+        app.query_one = lambda target, default=None: chat
+        app.current_session_id = "old-id"
+
+        # Deferred teardown from the cancelled worker, racing the /new sequence.
+        asyncio.create_task(chat.add_event_divider("Response Interrupted"))
+
+        with patch(
+            "widgets.presentation.commands.session_commands.new_session", new=fake_new_session
+        ), patch("core.application.session.stream.cancel_running_subagents"):
+            await NewCommand().execute(app)
+
+        # The divider mounts (teardown finished) *before* the view is cleared,
+        # so none of it leaks into the welcome screen.
+        self.assertEqual(divider_mounted, ["Response Interrupted"])
+        self.assertEqual(chat.children, ["welcome"])
+
     async def test_providers_command_load_raises_then_notifies(self):
         app = SimpleApp()
         cm = MagicMock()
