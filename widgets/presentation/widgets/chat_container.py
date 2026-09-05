@@ -524,7 +524,11 @@ class ChatView(VerticalScroll):
                     continue
             last_child = child
             break
-        is_seq = bool(last_child and isinstance(last_child, ToolCallWidget))
+        is_seq = bool(
+            last_child
+            and isinstance(last_child, ToolCallWidget)
+            and not getattr(last_child, "is_expanded", False)
+        )
         # MCP tool names aren't in the builtin registry; mark the widget so the
         # header display can snake_case them (e.g. "get-file-info").
         is_mcp = mcp_tool_is_known(tool_type)

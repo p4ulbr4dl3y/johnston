@@ -328,7 +328,10 @@ class ChatStreamDriver:
                     if "result_text" not in evt and evt.get("status") not in ("done", "error", "cancelled"):
                         self.tool_handles.append(widget)
                 if is_expanded and hasattr(widget, "is_expandable") and widget.is_expandable():
-                    widget.is_expanded = True
+                    if hasattr(widget, "set_expanded"):
+                        widget.set_expanded(True, scroll=False)
+                    else:
+                        widget.is_expanded = True
                 if self.on_tool_widget:
                     self.on_tool_widget(widget)
                 if animate and tool_type == "update_plan" and self.on_plan_update:

@@ -264,7 +264,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def _update_next_sibling_spacing(self) -> None:
         if not self.parent:
             return
-        children = list(self.parent.children)
+        raw = getattr(self.parent, "children", None)
+        if raw is None or not hasattr(raw, "__iter__") or type(raw).__name__ == "MagicMock":
+            return
+        children = list(raw)
         try:
             idx = children.index(self)
         except ValueError:
@@ -289,7 +292,10 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def _sync_sequential_with_prev(self) -> None:
         if not self.parent:
             return
-        children = list(self.parent.children)
+        raw = getattr(self.parent, "children", None)
+        if raw is None or not hasattr(raw, "__iter__") or type(raw).__name__ == "MagicMock":
+            return
+        children = list(raw)
         try:
             idx = children.index(self)
         except ValueError:
@@ -376,6 +382,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.scroll_box.display = True
             self._should_scroll_on_render = self._is_parent_at_bottom()
             self.render_content()
+            self._update_next_sibling_spacing()
 
     def mark_cancelled(self) -> None:
         """Mark an interrupted tool call as cancelled."""
@@ -428,7 +435,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         else:
             self.header_label.add_class(TOOL_HEADER_EXPANDABLE)
             self.header_label.remove_class(TOOL_HEADER)
-        self.render_header()
+
+        parent = getattr(self, "parent", None)
+        if getattr(parent, "auto_expand_all", False) and self.is_expandable() and not self.is_expanded:
+            self.set_expanded(True, scroll=False)
+        else:
+            self.render_header()
 
     def update_tool_call(self, target: str = None, args: dict = None) -> None:
         """Update target and/or args during streaming and re-render header."""

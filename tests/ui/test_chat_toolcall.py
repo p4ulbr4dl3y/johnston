@@ -998,6 +998,31 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("...", rendered)
         self.assertNotIn(long_target, rendered)
 
+    def test_mark_running_auto_expands_when_parent_auto_expand_all(self):
+        widget = ToolCallWidget("shell", "echo hello", status="generating")
+        parent = MagicMock(auto_expand_all=True)
+        parent._parent = None
+        parent.children = [widget]
+        widget._parent = parent
+        widget.mark_running()
+        self.assertEqual(widget.status, "running")
+        self.assertTrue(widget.is_expanded)
+        self.assertTrue(widget.scroll_box.display)
+
+    def test_set_result_updates_next_sibling_spacing(self):
+        parent = MagicMock(auto_expand_all=True)
+        parent._parent = None
+        w1 = ToolCallWidget("edit", "a.py", args={"path": "a.py"})
+        w2 = ToolCallWidget("edit", "b.py", args={"path": "b.py"}, is_sequential=True)
+        parent.children = [w1, w2]
+        w1._parent = parent
+        w2._parent = parent
+        self.assertIn("tool-sequential", w2.classes)
+
+        w1.set_result("--- a.py\n+++ a.py\n@@ -1 +1 @@\n-1\n+2\n")
+        self.assertTrue(w1.is_expanded)
+        self.assertNotIn("tool-sequential", w2.classes)
+
 
 if __name__ == "__main__":
     unittest.main()
