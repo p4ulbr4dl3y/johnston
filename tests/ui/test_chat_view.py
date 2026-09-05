@@ -626,13 +626,13 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
         chat_view.scroll_page_up = MagicMock()
         chat_view.scroll_home = MagicMock()
 
-        # scroll_y > 2 does not trigger
-        with patch.object(type(chat_view), "scroll_y", new_callable=PropertyMock, return_value=10):
+        # scroll_y > PAGINATION_THRESHOLD does not trigger
+        with patch.object(type(chat_view), "scroll_y", new_callable=PropertyMock, return_value=15):
             with patch.object(type(chat_view), "max_scroll_y", new_callable=PropertyMock, return_value=20):
                 chat_view.on_mouse_scroll_up(MagicMock())
                 chat_view.load_older_messages.assert_not_called()
 
-        # scroll_y <= 2 triggers load_older_messages on scroll up
+        # scroll_y <= PAGINATION_THRESHOLD triggers load_older_messages on scroll up
         with patch.object(type(chat_view), "scroll_y", new_callable=PropertyMock, return_value=1):
             with patch.object(type(chat_view), "max_scroll_y", new_callable=PropertyMock, return_value=20):
                 chat_view.on_mouse_scroll_up(MagicMock())
@@ -649,6 +649,26 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
             with patch.object(type(chat_view), "max_scroll_y", new_callable=PropertyMock, return_value=20):
                 chat_view.scroll_to_top()
                 chat_view.load_older_messages.assert_called_once()
+
+    async def test_scroll_up_blocked_during_older_loading(self):
+        chat_view = ChatView()
+        chat_view._unloaded_messages = [{"type": "user", "text": "older"}]
+        chat_view._is_loading_older = True
+        chat_view.load_older_messages = MagicMock()
+        chat_view.scroll_page_up = MagicMock()
+        chat_view.scroll_home = MagicMock()
+
+        mock_event = MagicMock()
+        with patch.object(type(chat_view), "scroll_y", new_callable=PropertyMock, return_value=1):
+            chat_view.on_mouse_scroll_up(mock_event)
+            mock_event.prevent_default.assert_called_once()
+            chat_view.load_older_messages.assert_not_called()
+
+            chat_view.scroll_up_page()
+            chat_view.scroll_page_up.assert_not_called()
+
+            chat_view.scroll_to_top()
+            chat_view.scroll_home.assert_not_called()
 
     async def test_restore_message_all_types(self):
         chat_view = ChatView()
@@ -818,6 +838,7 @@ class TestChatViewDividerSpacing(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test(size=(120, 40)) as pilot:
             chat_view = app.query_one(ChatView)
+            chat_view.PAGE_SIZE = 50
             session = MagicMock()
             msgs = [{"type": "user", "text": "PROMPT_FIRST_MSG"}]
             for i in range(1, 60):

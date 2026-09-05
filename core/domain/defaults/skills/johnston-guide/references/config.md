@@ -111,7 +111,7 @@ Credential resolution precedence (`get_secret`):
     "max_prompt_history": 500,
     "max_chat_input_lines": 6,
     "stream_flush_interval": 0.05,
-    "chat_page_size": 50,
+    "chat_page_size": 25,
     "paste_line_threshold": 10,
     "autocomplete_max_files": 1000
   },
