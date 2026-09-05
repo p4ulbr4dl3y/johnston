@@ -85,7 +85,7 @@ async def restore_message_item(
                 status = "done" if rtext else "cancelled"
         elif not status and not rtext:
             status = "cancelled"
-        return await chat_view.add_tool_call(
+        widget = await chat_view.add_tool_call(
             ttype,
             target,
             result_text=rtext,
@@ -95,6 +95,15 @@ async def restore_message_item(
             animate=False,
             **kw,
         )
+        if widget is not None:
+            sub_id = msg.get("subagent_session_id") or (targs.get("session_id") if isinstance(targs, dict) else None)
+            if not sub_id and msg.get("result_text"):
+                m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", msg.get("result_text") or "", re.IGNORECASE)
+                if m:
+                    sub_id = m.group(1)
+            if sub_id:
+                setattr(widget, "subagent_session_id", str(sub_id))
+        return widget
     elif mtype == "event_divider":
         ctxt = msg.get("text", "Session Compacted")
         return await chat_view.add_event_divider(ctxt, animate=False, **kw)

@@ -483,6 +483,28 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         screen_cls.assert_not_called()
         event.stop.assert_not_called()
 
+    def test_on_click_invoke_subagent_error_with_subagent_session_id_is_clickable(self):
+        widget = self._widget("invoke_subagent", "prompt", args={"title": "Sub 1"})
+        widget.subagent_session_id = "sess_err_123"
+        widget.set_result("Subagent error: failed after starting", status="error")
+        self.assertTrue(widget.is_clickable_header())
+        self.assertIn("tool-header-expandable", widget.header_label.classes)
+        event = MagicMock()
+        mock_store = MagicMock()
+        mock_store.find_session_by_title_or_id.return_value = MagicMock(id="sess_err_123", status="error")
+        with (
+            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
+        ):
+            app = MagicMock()
+            app.sm = mock_store
+            app.current_session_id = None
+            app_prop.return_value = app
+            widget.on_click(event)
+        screen_cls.assert_called_once_with("sess_err_123")
+        app.push_screen.assert_called_once()
+        event.stop.assert_called_once()
+
     def test_manage_shell_not_clickable_and_not_expandable(self):
         for action in ("list", "kill", "send_input", "status"):
             widget = self._widget("manage_shell", action, args={"action": action})

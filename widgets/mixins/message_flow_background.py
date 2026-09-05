@@ -232,6 +232,9 @@ def on_subagent_tool_completed(app: Any, session_id: str, status: str, result: s
                         if session_id in msg.get("result_text", "") or session_id in str(msg.get("args", {})):
                             msg["result_text"] = result or "(no output)"
                             msg["status"] = final_status
+                            msg["subagent_session_id"] = session_id
+                            if isinstance(msg.get("args"), dict):
+                                msg["args"]["session_id"] = session_id
                             break
                 schedule_session_save(app, session)
     except Exception as e:

@@ -174,7 +174,18 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     def has_subagent_session(self) -> bool:
         """Check whether this toolcall is associated with an existing subagent session."""
-        return bool(getattr(self, "subagent_session_id", None) or self.args.get("session_id"))
+        if getattr(self, "subagent_session_id", None):
+            return True
+        args = self.args if isinstance(self.args, dict) else {}
+        session_id = args.get("session_id")
+        if not session_id and self.result_text:
+            m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", self.result_text, re.IGNORECASE)
+            if m:
+                session_id = m.group(1)
+        if session_id:
+            self.subagent_session_id = str(session_id)
+            return True
+        return False
 
     def is_clickable_header(self) -> bool:
         if self.status == "generating":
@@ -567,8 +578,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             pass
 
         if self.canonical_tool == "invoke_subagent":
-            args = self.args
+            args = self.args if isinstance(self.args, dict) else {}
             session_id = getattr(self, "subagent_session_id", None)
+            if not session_id and self.result_text:
+                m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", self.result_text, re.IGNORECASE)
+                if m:
+                    session_id = m.group(1)
             identifier = session_id or args.get("session_id") or args.get("title") or args.get("prompt") or self.target
             store = getattr(app, "sm", None) if app else None
             if store is None:
@@ -576,9 +591,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
                 store = SessionStore.get_instance()
             curr_session_id = getattr(app, "current_session_id", None) if app else None
-            session = store.find_session_by_title_or_id(identifier, parent_id=curr_session_id) if store else None
+            session = store.find_session_by_title_or_id(str(identifier), parent_id=curr_session_id) if store else None
             if not session and store:
-                session = store.find_session_by_title_or_id(identifier)
+                session = store.find_session_by_title_or_id(str(identifier))
             if not session:
                 if app and hasattr(app, "notify"):
                     app.notify("Subagent session not found", severity="warning")
@@ -589,7 +604,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
                 if app:
-                    app.push_screen(SubagentViewScreen(identifier))
+                    target_id = (
+                        identifier
+                        if session_id or (isinstance(args, dict) and args.get("session_id"))
+                        else (getattr(session, "id", None) or str(identifier))
+                    )
+                    app.push_screen(SubagentViewScreen(target_id))
             except Exception:
                 pass
             return
