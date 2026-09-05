@@ -856,6 +856,7 @@ class TestChatViewDividerSpacing(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertEqual(chat_view.get_total_user_message_count(), 1)
             self.assertFalse(chat_view.loading)
+            self.assertEqual(chat_view.scroll_y, 0)
 
     @pytest.mark.slow  # timing-sensitive (run_test + pilot.pause) — flaky under -n auto
     async def test_older_messages_pagination_hidden_during_mount(self):

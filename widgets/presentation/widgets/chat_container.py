@@ -554,7 +554,7 @@ class ChatView(VerticalScroll):
                 pass
         if hasattr(self, "anchor") and callable(self.anchor):
             try:
-                self.anchor(True)
+                self.anchor(False)
             except Exception:
                 pass
         try:
@@ -616,8 +616,6 @@ class ChatView(VerticalScroll):
             try:
                 if hasattr(self, "scroll_end"):
                     self.scroll_end(animate=False)
-                if hasattr(self, "release_anchor") and callable(self.release_anchor):
-                    self.release_anchor()
             finally:
                 if styles is not None:
                     try:
