@@ -156,8 +156,11 @@ def search_sync(
         header_kv["elapsed_ms"] = str(elapsed_ms)
         return done(content="", **header_kv)
 
-    header_kv["matches"] = str(match_count)
-    header_kv["files"] = str(file_count)
+    if mode == "filename":
+        header_kv["files"] = str(file_count)
+    else:
+        header_kv["matches"] = str(match_count)
+        header_kv["files"] = str(file_count)
     header_kv["elapsed_ms"] = str(elapsed_ms)
 
     body = "\n".join(raw_lines).strip()
