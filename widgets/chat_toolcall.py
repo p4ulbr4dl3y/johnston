@@ -110,7 +110,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             target = re.sub(r"\s+", " ", target.replace("\n", " ").replace("\r", " ")).strip()
         self.target = target
         self.result_text = result_text
-        self.args = args if isinstance(args, dict) else {}
+        self.args = dict(args) if isinstance(args, dict) else {}
         self.returncode = returncode
         self.is_mcp = is_mcp
         self.is_expanded = False

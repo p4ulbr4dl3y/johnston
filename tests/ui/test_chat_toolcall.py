@@ -1070,6 +1070,39 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertNotIn(r"\\[", rendered)
         self.assertIn("[glob", rendered)
 
+    def test_ask_user_no_double_escaping(self):
+        widget = ToolCallWidget(
+            "ask_user",
+            "",
+            args={"questions": [{"question": "Choose [option A] or [option B]"}]},
+            status="running",
+        )
+        widget.render_header()
+        rendered = str(widget.header_label.render())
+        self.assertNotIn(r"\\[", rendered)
+        self.assertIn("[option A", rendered)
+
+    def test_search_tool_adapts_to_max_len_and_mode(self):
+        long_q = "very_long_search_query_" + "x" * 60
+        widget = ToolCallWidget("search", long_q, args={"query": long_q, "mode": "content"}, status="generating")
+        # In-flight search generating should right-truncate with ...
+        widget.render_header(max_len=40)
+        rendered = str(widget.header_label.render())
+        self.assertIn("very_long_search_query_", rendered)
+        self.assertIn("...", rendered)
+
+    def test_truncate_path_small_max_len_no_slashes(self):
+        from widgets.presentation.tool_display import truncate_path
+        res = truncate_path("single_long_filename_without_slashes.txt", max_len=10)
+        self.assertLessEqual(len(res), 10)
+        self.assertIn("...", res)
+
+    def test_args_dict_is_copied(self):
+        original = {"command": "pytest"}
+        widget = ToolCallWidget("shell", "pytest", args=original)
+        widget.update_tool_call(args={"extra": "val"})
+        self.assertNotIn("extra", original)
+
     def test_on_resize_adapts_header_width(self):
         long_cmd = "uv run pytest tests/ui/test_chat_toolcall.py -m not_slow"
         widget = ToolCallWidget("shell", long_cmd, status="done")

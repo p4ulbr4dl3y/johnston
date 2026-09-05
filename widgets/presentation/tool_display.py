@@ -79,9 +79,9 @@ def truncate_path(path: str, max_len: int = 60) -> str:
         return path
     parts = path.replace("\\", "/").split("/")
     if len(parts) <= 1:
-        head = max(10, (max_len - 3) * 2 // 5)
-        tail = max_len - 3 - head
-        return path[:head] + "..." + path[-tail:]
+        head = max(1, min(len(path), (max_len - 3) * 2 // 5))
+        tail = max(0, max_len - 3 - head)
+        return path[:head] + "..." + (path[-tail:] if tail > 0 else "")
     filename = parts[-1]
     if len(filename) >= max_len - 4:
         half = max(1, (max_len - 3) // 2)
@@ -176,7 +176,7 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: i
             for q in qs:
                 q_text = q.get("question") if isinstance(q, dict) else ""
                 if q_text:
-                    formatted.append(truncate(q_text, max_len=max_len, mode=mode))
+                    formatted.append(str(q_text).strip())
             if formatted:
                 return truncate(", ".join(f'"{t}"' for t in formatted), max_len=max_len, mode=mode)
         return ""
@@ -293,12 +293,12 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: i
     if name == "search":
         q = str(args.get("query") or "").strip()
         p = str(args.get("path") or "").strip()
-        mode = str(args.get("mode") or "").strip()
+        search_mode = str(args.get("mode") or "").strip()
         glob_pat = str(args.get("glob") or "").strip()
         include_hidden = bool(args.get("include_hidden", False))
         parts = []
-        if mode and mode != "content":
-            parts.append(mode)
+        if search_mode and search_mode != "content":
+            parts.append(search_mode)
         if q:
             parts.append(f'"{q}"')
         if p and p != ".":
@@ -307,7 +307,7 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: i
             parts.append(f"[{glob_pat}]")
         if include_hidden:
             parts.append("(+hidden)")
-        return truncate(" ".join(parts) if parts else "codebase")
+        return truncate(" ".join(parts) if parts else "codebase", max_len=max_len, mode=mode)
 
     return ""
 

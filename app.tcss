@@ -256,7 +256,7 @@ WelcomeWidget {
     color: $fg-secondary;
 }
 
-.tool-header {
+.tool-header, .tool-header-expandable {
     height: auto;
     margin: 0;
     padding: 0;
