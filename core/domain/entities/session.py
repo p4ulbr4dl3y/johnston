@@ -211,6 +211,8 @@ class AgentSession:
                 for key in ("status", "is_error", "returncode"):
                     if key in event:
                         target_msg[key] = event[key]
+                if event.get("tool_id"):
+                    target_msg["tool_call_id"] = event["tool_id"]
             else:
                 msg_to_store = dict(event)
                 msg_to_store.pop("phase", None)
@@ -232,6 +234,11 @@ class AgentSession:
             msg_to_store.pop("phase", None)
             msg_to_store.pop("delta", None)
             msg_to_store.pop("from_stream_step", None)
+            if msg_to_store.get("type") == MessageType.TOOL and msg_to_store.get("tool_id"):
+                # Persist the stream's tool_call_id under the canonical key used
+                # by replay consumers (and by result-correlation in the branch
+                # above), so a tool/result pairing survives across replays.
+                msg_to_store["tool_call_id"] = msg_to_store.pop("tool_id")
             self.messages.append(msg_to_store)
             self.updated_at = _now()
 

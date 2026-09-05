@@ -43,6 +43,11 @@ class ChatStreamDriver:
         self.bot_handle: Optional[BotMessage] = None
         self.thinking_handle: Optional[ThinkingWidget] = None
         self.tool_handles: deque[ToolCallWidget] = deque()
+        # Running tool cards that were in flight when a retry was issued. They
+        # are removed from the FIFO queue so a stale result cannot misattach,
+        # but stay mounted awaiting finalization (status_change/error, reuse by
+        # a re-issued tool event, or turn cleanup).
+        self._pending_running_after_retry: list = []
 
     def finalize_thinking_stream(self, duration: float = 0.0, content: str = "") -> None:
         """Finalize any in-flight thinking widget."""
@@ -59,6 +64,7 @@ class ChatStreamDriver:
         self.finalize_thinking_stream()
         self.bot_handle = None
         self.tool_handles.clear()
+        self._pending_running_after_retry.clear()
 
     def cleanup_unfinalized_tools(self, error_message: Optional[str] = "Interrupted") -> None:
         """Mark or remove any unfinalized (generating or running) tool widgets."""
@@ -74,6 +80,15 @@ class ChatStreamDriver:
                     except Exception:
                         pass
             elif st == "running":
+                msg = error_message or "Interrupted"
+                try:
+                    th.set_result(msg, is_error=True, status="error")
+                except Exception:
+                    pass
+        # The retried turn finished without a result for these running cards.
+        while self._pending_running_after_retry:
+            th = self._pending_running_after_retry.pop(0)
+            if getattr(th, "status", None) == "running":
                 msg = error_message or "Interrupted"
                 try:
                     th.set_result(msg, is_error=True, status="error")
@@ -131,6 +146,16 @@ class ChatStreamDriver:
                 if getattr(th, "tool_call_id", None) == tool_id:
                     self.tool_handles.remove(th)
                     return th
+        # Replay-path events carry tool_type but no tool_id (the pairing id was
+        # renamed to tool_call_id when persisted) — match a live card by type.
+        if evt.get("tool_type") and not tool_id:
+            for th in self.tool_handles:
+                if getattr(th, "status", None) in ("running", "generating") and (
+                    getattr(th, "canonical_tool", None) == evt["tool_type"]
+                    or getattr(th, "tool_type", None) == evt["tool_type"]
+                ):
+                    self.tool_handles.remove(th)
+                    return th
         while self.tool_handles:
             st = getattr(self.tool_handles[0], "status", None)
             if isinstance(st, str) and st not in ("running", "generating"):
@@ -152,10 +177,14 @@ class ChatStreamDriver:
     def _find_shell_output_target(self) -> Optional[ToolCallWidget]:
         """Locate the tool card that owns a shell output chunk.
 
-        Prefers the newest live shell card, then any live (running/generating)
-        card, then a live mounted child — never a completed card, so output
-        from a background shell cannot land on a stale neighbour.
+        Prefers a mounted child linked to a background shell task, then the
+        newest live shell card, then any live (running/generating) card, then a
+        live mounted child — never a completed card, so output from a
+        background shell cannot land on a stale neighbour.
         """
+        for child in reversed(list(getattr(self.chat_view, "children", []))):
+            if isinstance(child, ToolCallWidget) and getattr(child, "background_task_id", None):
+                return child
         for th in reversed(self.tool_handles):
             st = getattr(th, "status", None)
             if st in ("running", "generating") and getattr(th, "canonical_tool", None) == "shell":
@@ -242,14 +271,18 @@ class ChatStreamDriver:
             matched = False
             if target_id:
                 for th in self.tool_handles:
-                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_id", None) == target_id:
+                    if getattr(th, "status", None) in ("generating", "running") and getattr(
+                        th, "tool_call_id", None
+                    ) == target_id:
                         if hasattr(th, "update_tool_call"):
                             th.update_tool_call(target=target)
                         matched = True
                         break
             if not matched and target_idx is not None:
                 for th in self.tool_handles:
-                    if getattr(th, "status", None) == "generating" and getattr(th, "tool_call_index", None) == target_idx:
+                    if getattr(th, "status", None) in ("generating", "running") and getattr(
+                        th, "tool_call_index", None
+                    ) == target_idx:
                         if hasattr(th, "update_tool_call"):
                             th.update_tool_call(target=target)
                         matched = True
@@ -267,8 +300,11 @@ class ChatStreamDriver:
                 target_th.append_shell_output(txt)
         elif etype == "tool":
             self.finalize_thinking_stream()
-            # Check if this event is a completion event for an in-flight tool
-            if "result_text" in evt and not evt.get("tool_type"):
+            # Completion events — live tool_result (no tool_type) and replay
+            # result events (tool_type present, pairing id renamed to
+            # tool_call_id) — are matched to a live card first.
+            result_handled = False
+            if "result_text" in evt:
                 w = self._match_tool_result_widget(evt)
                 if w is not None:
                     w.set_result(
@@ -277,9 +313,13 @@ class ChatStreamDriver:
                         status=evt.get("status"),
                         returncode=evt.get("returncode"),
                     )
-                else:
+                    result_handled = True
+                elif not evt.get("tool_type"):
+                    result_handled = True
                     logger.debug("Received session tool_result event with empty tool_handles queue: %s", evt)
-            else:
+            if not result_handled:
+                # Live tool start, or a completed history event (tool_type +
+                # result_text) with no live card to update: render it here.
                 await self.finalize_bot_stream()
                 targs = evt.get("args", {})
                 tool_type = evt.get("tool_type", "")
@@ -311,22 +351,56 @@ class ChatStreamDriver:
                         gen_handle.mark_running()
                     widget = gen_handle
                 else:
-                    tool_kw = {"args": targs}
-                    if not evt.get("from_stream_step"):
-                        tool_kw["result_text"] = evt.get("result_text", "")
-                        tool_kw["status"] = evt.get("status")
-                        tool_kw["returncode"] = evt.get("returncode")
-                        tool_kw["animate"] = animate
-                    widget = await self.chat_view.add_tool_call(
-                        tool_type,
-                        target,
-                        **tool_kw,
-                    )
-                    if tool_id:
-                        setattr(widget, "tool_call_id", tool_id)
-                    # Track in tool_handles only if the tool is actively in-flight (uncompleted)
-                    if "result_text" not in evt and evt.get("status") not in ("done", "error", "cancelled"):
-                        self.tool_handles.append(widget)
+                    # The retried turn re-issued a tool that was running when
+                    # the retry landed: reuse its mounted card instead of
+                    # creating a duplicate; abandoned cards get finalized.
+                    pending_reused = None
+                    for th in self._pending_running_after_retry:
+                        if getattr(th, "status", None) != "running":
+                            continue
+                        match_id = tool_id and getattr(th, "tool_call_id", None) == tool_id
+                        match_type = bool(tool_type) and (
+                            getattr(th, "canonical_tool", None) == tool_type
+                            or getattr(th, "tool_type", None) == tool_type
+                        )
+                        if match_id or match_type:
+                            pending_reused = th
+                            break
+                    if pending_reused is not None:
+                        self._pending_running_after_retry.remove(pending_reused)
+                        gen_handle = pending_reused
+                        if hasattr(gen_handle, "update_tool_call"):
+                            gen_handle.update_tool_call(target=target, args=targs)
+                        if hasattr(gen_handle, "mark_running"):
+                            gen_handle.mark_running()
+                        widget = gen_handle
+                        # Re-track in the FIFO so a later result matches by id.
+                        if "result_text" not in evt and evt.get("status") not in ("done", "error", "cancelled"):
+                            self.tool_handles.append(widget)
+                    else:
+                        while self._pending_running_after_retry:
+                            abandoned = self._pending_running_after_retry.pop(0)
+                            if getattr(abandoned, "status", None) == "running":
+                                try:
+                                    abandoned.mark_cancelled()
+                                except Exception:
+                                    pass
+                        tool_kw = {"args": targs}
+                        if not evt.get("from_stream_step"):
+                            tool_kw["result_text"] = evt.get("result_text", "")
+                            tool_kw["status"] = evt.get("status")
+                            tool_kw["returncode"] = evt.get("returncode")
+                            tool_kw["animate"] = animate
+                        widget = await self.chat_view.add_tool_call(
+                            tool_type,
+                            target,
+                            **tool_kw,
+                        )
+                        if tool_id:
+                            setattr(widget, "tool_call_id", tool_id)
+                        # Track in tool_handles only if the tool is actively in-flight (uncompleted)
+                        if "result_text" not in evt and evt.get("status") not in ("done", "error", "cancelled"):
+                            self.tool_handles.append(widget)
                 if is_expanded and hasattr(widget, "is_expandable") and widget.is_expandable():
                     if hasattr(widget, "set_expanded"):
                         widget.set_expanded(True, scroll=False)
@@ -390,9 +464,11 @@ class ChatStreamDriver:
                         await res
                 except Exception:
                     pass
-            # Drop zombie generating cards from the failed attempt; keep
-            # handles that were already running (their results may still be
-            # in flight and matched by the retried turn).
+            # Drop zombie generating cards from the failed attempt. Handles that
+            # were already running are pulled out of the FIFO (so a stale result
+            # cannot misattach) but kept mounted; they are finalized by a
+            # status_change/error, re-used by a re-issued tool event, or cleaned
+            # up at turn end.
             remaining_handles = deque()
             while self.tool_handles:
                 th = self.tool_handles.popleft()
@@ -401,6 +477,8 @@ class ChatStreamDriver:
                         th.remove()
                     except Exception:
                         pass
+                elif getattr(th, "status", None) == "running":
+                    self._pending_running_after_retry.append(th)
                 else:
                     remaining_handles.append(th)
             self.tool_handles = remaining_handles
@@ -432,6 +510,14 @@ class ChatStreamDriver:
                     w = self.tool_handles.popleft()
                     if hasattr(w, "mark_cancelled"):
                         w.mark_cancelled()
+                # Finalize running cards orphaned by a retry that dropped them.
+                while self._pending_running_after_retry:
+                    w = self._pending_running_after_retry.pop(0)
+                    if hasattr(w, "mark_cancelled"):
+                        try:
+                            w.mark_cancelled()
+                        except Exception:
+                            pass
         elif etype == "error":
             self.finalize_thinking_stream()
             err_kw = {} if evt.get("from_stream_step") else {"animate": animate}

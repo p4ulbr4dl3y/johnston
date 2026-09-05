@@ -259,6 +259,10 @@ class OpenAIAdapter(BaseApiAdapter):
                                     "arguments_delta": fn_args or "",
                                 },
                             )
+                    # A tool-call delta is a substantive response: without this,
+                    # an error/network finish on an otherwise tool-only stream
+                    # would be misread as an empty response below.
+                    had_content = True
         finally:
             if not producer_task.done():
                 producer_task.cancel()

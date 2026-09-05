@@ -194,6 +194,54 @@ class TestUnknownAndSemantics:
         assert received_events[2]["tool_id"] == "c1"
         assert len(sess.messages) == 1  # now persisted to messages
 
+    def test_record_subagent_step_tool_call_id_persisted_and_result_merged(self):
+        from core.application.session.stream import record_subagent_step
+
+        sess = make_session()
+        acc = [""]
+
+        # Tool start: the stream's tool_id is persisted under the canonical
+        # tool_call_id key so the pairing survives replay.
+        record_subagent_step(("tool", "read", "foo.py", {"path": "foo.py"}, "c1"), sess, acc)
+        tool_msg = sess.messages[-1]
+        assert tool_msg["type"] == "tool"
+        assert tool_msg["tool_call_id"] == "c1"
+        assert "tool_id" not in tool_msg
+
+        # Tool result (tool_result carries the same id at position 6): it must
+        # merge into the existing start message and re-affirm the pairing.
+        from core.domain.defaults.errors import ToolResultStatus
+
+        record_subagent_step(
+            ("tool_result", "file contents", "", False, ToolResultStatus.DONE, 0, "c1"),
+            sess,
+            acc,
+        )
+        assert len(sess.messages) == 1
+        tool_msg = sess.messages[-1]
+        assert tool_msg["result_text"] == "file contents"
+        assert tool_msg["status"] == "done"
+        assert tool_msg["returncode"] == 0
+        assert tool_msg["tool_call_id"] == "c1"
+        assert "tool_id" not in tool_msg
+        assert tool_msg["tool_type"] == "read"
+
+    def test_record_subagent_step_tool_call_id_rename_restricted_to_tool(self):
+        from core.application.session.stream import record_subagent_step
+
+        # A non-tool event must NOT get the tool_id -> tool_call_id rename.
+        sess = make_session()
+        acc = [""]
+        sess.add_event({"type": "bot", "text": "hi", "tool_id": "not-a-tool-key"})
+        assert "tool_call_id" not in sess.messages[-1]
+        assert "tool_id" in sess.messages[-1]
+
+        record_subagent_step(("bot_text", "hello", ""), sess, acc)
+        assert sess.messages[-1]["type"] == "bot"
+        # bot_text coalesces into a fresh dict; its tool_id key (if any) must
+        # stay untouched rather than being renamed to tool_call_id.
+        assert "tool_call_id" not in sess.messages[-1]
+
     def test_tool_shell_output_ephemeral(self):
         sess = make_session()
         received_events = []

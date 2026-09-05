@@ -444,7 +444,7 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
 
     async def test_session_event_retry_cleans_generating_keeps_running(self):
         tw_gen = MagicMock(status="generating", remove=MagicMock())
-        tw_run = MagicMock(status="running", set_result=MagicMock())
+        tw_run = MagicMock(status="running", mark_cancelled=MagicMock())
         self.driver.tool_handles.extend([tw_run, tw_gen])
 
         await self.driver.consume_session_event({
@@ -455,8 +455,11 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
             "error": Exception("boom"),
         })
         tw_gen.remove.assert_called_once()
-        self.assertEqual(len(self.driver.tool_handles), 1)
-        self.assertIn(tw_run, self.driver.tool_handles)
+        # Running handles are pulled out of the FIFO (pending) so stale results
+        # cannot misattach — they are finalized by status_change or reused.
+        self.assertEqual(len(self.driver.tool_handles), 0)
+        self.assertEqual(self.driver._pending_running_after_retry, [tw_run])
+        self.assertNotIn(tw_run, self.driver.tool_handles)
 
     async def test_session_event_tool_shell_output_prefers_live_shell_card(self):
         done_card = MagicMock(status="done", append_shell_output=MagicMock())
@@ -509,4 +512,150 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
             "tool_id": "orphan-id",
         })
         child.set_result.assert_called_once_with("late result", is_error=False, status="done", returncode=None)
+
+    async def test_tool_generating_update_matches_running_card(self):
+        """A tool_generating_update landing after the card transitioned to
+        running must still update that card instead of being dropped."""
+        tw = MagicMock()
+        tw.status = "running"
+        tw.tool_call_id = "c1"
+        tw.tool_call_index = 1
+        tw.update_tool_call = MagicMock()
+        self.driver.tool_handles.append(tw)
+
+        await self.driver.consume_session_event({
+            "type": "tool_generating_update",
+            "tool_type": "edit",
+            "target": "file.py",
+            "meta": {"id": "c1", "index": 1},
+        })
+        tw.update_tool_call.assert_called_once_with(target="file.py")
+
+        # Same via index matching with no id in the event.
+        tw2 = MagicMock()
+        tw2.status = "running"
+        tw2.tool_call_index = 2
+        tw2.update_tool_call = MagicMock()
+        self.driver.tool_handles.append(tw2)
+        await self.driver.consume_session_event({
+            "type": "tool_generating_update",
+            "tool_type": "edit",
+            "target": "b.py",
+            "meta": {"index": 2},
+        })
+        tw2.update_tool_call.assert_called_once_with(target="b.py")
+
+    async def test_retry_running_handle_finalized_on_status_change(self):
+        """A running card orphaned by a retry must be finalized (mark_cancelled,
+        exactly once) when status_change('error') arrives, and the pending list
+        must drain."""
+        tw = MagicMock()
+        tw.status = "running"
+        tw.tool_call_id = "c1"
+        tw.mark_cancelled = MagicMock()
+        self.driver.tool_handles.append(tw)
+
+        await self.driver.consume_session_event({
+            "type": "retry",
+            "attempt": 2,
+            "max_retries": 3,
+            "delay": 1.0,
+            "error": Exception("boom"),
+        })
+        self.assertEqual(self.driver._pending_running_after_retry, [tw])
+        self.assertEqual(len(self.driver.tool_handles), 0)
+        self.assertEqual(tw.mark_cancelled.call_count, 0)
+
+        await self.driver.consume_session_event({"type": "status_change", "status": "error"})
+        tw.mark_cancelled.assert_called_once()
+        self.assertEqual(self.driver._pending_running_after_retry, [])
+
+    async def test_retry_running_handle_reused_by_reissued_tool(self):
+        """When the retried turn re-issues the same tool, the mounted running
+        card is reused (no duplicate widget) and re-marked running."""
+        tw = MagicMock()
+        tw.status = "running"
+        tw.tool_call_id = "c1"
+        tw.canonical_tool = "edit"
+        tw.update_tool_call = MagicMock()
+        tw.mark_running = MagicMock()
+        self.driver.tool_handles.append(tw)
+        self.chat_view.add_tool_call = AsyncMock()
+
+        await self.driver.consume_session_event({
+            "type": "retry",
+            "attempt": 2,
+            "max_retries": 3,
+            "delay": 1.0,
+            "error": Exception("boom"),
+        })
+        self.assertEqual(self.driver._pending_running_after_retry, [tw])
+
+        await self.driver.consume_session_event({
+            "type": "tool",
+            "tool_type": "edit",
+            "target": "file.py",
+            "args": {"path": "file.py"},
+            "tool_id": "c1",
+        })
+        self.chat_view.add_tool_call.assert_not_awaited()
+        tw.update_tool_call.assert_called_once_with(target="file.py", args={"path": "file.py"})
+        tw.mark_running.assert_called_once()
+        self.assertEqual(self.driver._pending_running_after_retry, [])
+        self.assertIn(tw, self.driver.tool_handles)
+
+    async def test_retry_abandoned_running_handle_dropped_by_new_tool(self):
+        """If the retried turn never re-calls the orphaned tool, a new tool
+        event finalizes the abandoned card (mark_cancelled) and proceeds."""
+        tw_abandoned = MagicMock()
+        tw_abandoned.status = "running"
+        tw_abandoned.tool_call_id = "old-c1"
+        tw_abandoned.canonical_tool = "read"
+        tw_abandoned.mark_cancelled = MagicMock()
+        self.driver.tool_handles.append(tw_abandoned)
+
+        await self.driver.consume_session_event({
+            "type": "retry",
+            "attempt": 2,
+            "max_retries": 3,
+            "delay": 1.0,
+            "error": Exception("boom"),
+        })
+        self.assertEqual(self.driver._pending_running_after_retry, [tw_abandoned])
+
+        new_widget = MagicMock()
+        new_widget.status = "generating"
+        self.chat_view.add_tool_call.return_value = new_widget
+
+        await self.driver.consume_session_event({
+            "type": "tool",
+            "tool_type": "edit",
+            "target": "file.py",
+            "args": {"path": "file.py"},
+        })
+        tw_abandoned.mark_cancelled.assert_called_once()
+        self.assertEqual(self.driver._pending_running_after_retry, [])
+        self.chat_view.add_tool_call.assert_awaited_once_with(
+            "edit", "file.py", args={"path": "file.py"}, result_text="", status=None, returncode=None, animate=True
+        )
+        self.assertIn(new_widget, self.driver.tool_handles)
+
+    async def test_tool_result_matches_by_tool_type_widget(self):
+        """Replay-path result events (tool_type present, no tool_id) must land
+        on the live card of the same tool type, not on another running card."""
+        w_edit = MagicMock(status="running", canonical_tool="edit", tool_type="edit", set_result=MagicMock())
+        w_read = MagicMock(status="running", canonical_tool="read", tool_type="read", set_result=MagicMock())
+        self.driver.tool_handles.extend([w_read, w_edit])
+
+        await self.driver.consume_session_event({
+            "type": "tool",
+            "tool_type": "edit",
+            "result_text": "r",
+            "status": "done",
+        })
+        w_edit.set_result.assert_called_once_with("r", is_error=False, status="done", returncode=None)
+        w_read.set_result.assert_not_called()
+        self.assertEqual(len(self.driver.tool_handles), 1)
+        self.assertIn(w_read, self.driver.tool_handles)
+        self.assertNotIn(w_edit, self.driver.tool_handles)
 
