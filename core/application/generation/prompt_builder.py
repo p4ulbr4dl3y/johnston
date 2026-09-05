@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from core.application.skills.manager import get_skill_manager
 from core.domain.defaults.config import DEFAULT_AGENT_MD_MAX_CHARS
 from core.domain.defaults.prompts import (
+    CODEBASE_NAVIGATION_SNIPPET,
     DEFAULT_SYSTEM_PROMPT,
     SUBAGENT_DEFAULT_SYSTEM_PROMPT,
     SUBAGENT_WORKTREE_PROMPT,
@@ -473,6 +474,7 @@ class PromptBuilder:
             self.worktree_branch,
             role_ident,
             TOOL_OUTPUT_FORMAT_SNIPPET,
+            CODEBASE_NAVIGATION_SNIPPET,
         )
 
     def _stable_core_cached(self, rules_snippet, mcp_snippet, skills_snippet, subagents_snippet) -> Optional[str]:
@@ -567,10 +569,12 @@ class PromptBuilder:
 
         sys_prompt = f"{base}{role_block}"
 
-        # Insert tool_io_ref RIGHT AFTER identity/contract/role so the model
-        # sees the wire-format conventions before reading the first tool output.
+        # Insert tool_io_ref and codebase_navigation RIGHT AFTER identity/contract/role
+        # so the model sees the wire-format and discovery rules before reading/searching.
         if TOOL_OUTPUT_FORMAT_SNIPPET:
             sys_prompt = f"{sys_prompt}\n\n{TOOL_OUTPUT_FORMAT_SNIPPET}"
+        if CODEBASE_NAVIGATION_SNIPPET:
+            sys_prompt = f"{sys_prompt}\n\n{CODEBASE_NAVIGATION_SNIPPET}"
         if rules_snippet:
             sys_prompt = f"{sys_prompt}\n\n{rules_snippet}"
         if skills_snippet:

@@ -217,7 +217,16 @@ class TestPromptBuilder(unittest.TestCase):
             mdc_rule = next(r for r in rules if "frontend.mdc" in r.name)
             self.assertEqual(mdc_rule.content, "Cursor MDC rule content")
 
+    def test_build_system_prompt_includes_codebase_navigation(self):
+        builder = PromptBuilder("Test base", [], role="worker")
+        prompt = builder.build_system_prompt()
+        self.assertIn("<codebase_navigation>", prompt)
+        self.assertIn("read(dir_path)", prompt)
+        self.assertIn('mode="outline"', prompt)
+        self.assertIn("NEVER grep/rg via shell", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

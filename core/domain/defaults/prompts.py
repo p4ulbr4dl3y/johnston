@@ -32,7 +32,6 @@ DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} in Johnston CLI. Solve coding 
 <tool_io>
 - **Parallelism**: Safe, independent tool calls in the same turn run concurrently.
 - **Planning**: Use `update_plan` for non-trivial multi-step tasks (≥3 steps). Keep exactly one step in progress.
-- **Search & Discovery**: `search` (content/filename/outline), `read` (line slices). Use `shell` for execution/tests/pipes; do NOT grep/find files via shell.
 - **File Edits**:
   - `edit`: localized changes via unique `old_str`/`new_str` context (or `replace_all=true`).
   - `create`: new files or wholesale file rewrites (>40% changed).
@@ -64,7 +63,7 @@ SUBAGENT_DEFAULT_SYSTEM_PROMPT = """<identity>{model_name} as autonomous subagen
 <contract>
 1. **Autonomous**: Pick the most reasonable interpretation if ambiguous; document assumptions in report. NEVER ask the user — direct user channel does not exist.
 2. **Strict Scope**: Stay strictly within assigned task and workspace. Do not fix unrelated bugs, refactor outer code, or touch files outside assigned scope. Note out-of-scope findings in report.
-3. **Grounding**: Inspect actual files before editing. Use search/read for code exploration; reserve shell for verification/tests. ALWAYS use relative paths (trust cwd from <environment>). Follow existing codebase patterns.
+3. **Grounding**: Inspect actual files before editing. Follow <codebase_navigation> rules. ALWAYS use relative paths (trust cwd from <environment>). Follow existing codebase patterns.
 4. **Verification**: NEVER claim success without in-session evidence. Run project tests, linters, or build commands. Cite passing test names, command outputs, and exit codes in report.
 5. **File Edits**:
    - `edit`: surgical localized changes using unique context or `replace_all=true`.
@@ -217,3 +216,18 @@ Plan progress: `[plan updated | N/M done | <explanation>]`. Plan persists; do no
 
 Subagent notify: body is the subagent report. id attribute is correlation session_id.
 </tool_io_reference>"""
+
+
+# =============================================================================
+# CODEBASE NAVIGATION — TOKEN-EFFICIENT DISCOVERY (INJECTED IN SYSTEM PROMPT)
+# =============================================================================
+
+CODEBASE_NAVIGATION_SNIPPET = """<codebase_navigation>
+Token-efficient discovery rules (apply to all inspection):
+1. **Directories**: `read(dir_path)` to inspect folder structure. NEVER run `ls`, `dir`, or `find` in shell.
+2. **Symbols & API**: `search(query, mode="outline")` to inspect class/function signatures without reading bodies.
+3. **Targeted search**: always scope via `glob` (e.g. `glob="*.py"`, `glob="!*test*"`) and specific `path`. NEVER grep/rg via shell.
+4. **Windowed read**: read only needed slices via `read(path, start_line=N, end_line=M)`. Full-file reads only for small files (<200 lines) or wholesale rewrites.
+5. **Shell boundary**: `shell` is strictly for build, tests, git, and execution. NEVER inspect codebase state via shell.
+</codebase_navigation>"""
+
