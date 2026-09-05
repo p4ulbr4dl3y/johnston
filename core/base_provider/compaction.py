@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -226,6 +227,68 @@ def collect_user_messages(
             break
     kept.reverse()
     return kept
+
+
+def _clean_plan_items(raw_items: Any) -> List[Dict[str, str]]:
+    """Clean and validate raw plan items, clamping invalid statuses."""
+    if isinstance(raw_items, str):
+        try:
+            raw_items = json.loads(raw_items)
+        except Exception:
+            raw_items = []
+    if not isinstance(raw_items, list):
+        return []
+    cleaned = []
+    for it in raw_items:
+        if not isinstance(it, dict):
+            continue
+        step = str(it.get("step") or "").strip()
+        if not step:
+            continue
+        status = str(it.get("status") or "pending").strip().lower()
+        if status not in ("pending", "in_progress", "completed"):
+            status = "pending"
+        cleaned.append({"step": step, "status": status})
+    return cleaned
+
+
+def extract_plan_from_history(history: List[Dict[str, Any]]) -> Optional[List[Dict[str, str]]]:
+    """Extract latest active plan from LLM history (tool calls or previous checkpoints)."""
+    if not history:
+        return None
+    for item in reversed(history):
+        if not isinstance(item, dict):
+            continue
+        tool_calls = item.get("tool_calls")
+        if isinstance(tool_calls, list):
+            for tc in reversed(tool_calls):
+                if not isinstance(tc, dict):
+                    continue
+                fn = tc.get("function") or {}
+                if fn.get("name") == "update_plan":
+                    args = fn.get("arguments") or {}
+                    if isinstance(args, str):
+                        try:
+                            args = json.loads(args)
+                        except Exception:
+                            args = {}
+                    if isinstance(args, dict):
+                        valid = _clean_plan_items(args.get("plan"))
+                        if valid and any(p.get("status") in ("in_progress", "pending") for p in valid):
+                            return valid
+        if item.get("role") == "user":
+            content = str(item.get("content") or "")
+            if CHECKPOINT_OPEN_TAG in content and "### Plan" in content:
+                match = re.search(r"(?m)^### Plan\s*```(?:json)?\s*(\[.*?\])\s*```", content, re.DOTALL)
+                if match:
+                    try:
+                        parsed = json.loads(match.group(1))
+                        valid = _clean_plan_items(parsed)
+                        if valid and any(p.get("status") in ("in_progress", "pending") for p in valid):
+                            return valid
+                    except Exception:
+                        pass
+    return None
 
 
 class CompactionMixin:
@@ -630,6 +693,28 @@ class CompactionMixin:
             compact_in = estimate_tokens(compact_messages)
             compact_out = estimate_tokens(sanitized_summary)
             self._accumulate_usage(prompt_tokens_est=compact_in, output_tokens_est=compact_out)
+
+            # Preserve active plan in checkpoint if available
+            active_plan = getattr(self, "current_plan", None)
+            if not active_plan and getattr(self, "session", None):
+                active_plan = getattr(self.session, "current_plan", None)
+            if not active_plan and hasattr(self, "history"):
+                active_plan = extract_plan_from_history(self.history)
+
+            if active_plan:
+                clean_items = _clean_plan_items(active_plan)
+                if clean_items and any(p.get("status") in ("in_progress", "pending") for p in clean_items):
+                    plan_json = json.dumps(clean_items, indent=2)
+                    plan_block = f"\n\n### Plan\n```json\n{plan_json}\n```"
+                    if re.search(r"(?m)^### Plan\b", sanitized_summary):
+                        sanitized_summary = re.sub(
+                            r"(?m)^### Plan\b.*?(?=\n### |\Z)",
+                            lambda _: plan_block.strip(),
+                            sanitized_summary,
+                            flags=re.DOTALL,
+                        )
+                    else:
+                        sanitized_summary = sanitized_summary.strip() + plan_block
 
             checkpoint_content = _wrap_checkpoint(sanitized_summary)
             checkpoint_item = {"role": "user", "content": checkpoint_content}

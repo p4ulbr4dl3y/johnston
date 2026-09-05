@@ -4,6 +4,7 @@ Split out of the former test_base_provider monolith: compact_history / truncatio
 behavior, the /compact command, auto-compaction triggering (sys overhead, error
 warnings, in-loop), and history-shrink edge cases.
 """
+import json
 import unittest
 import unittest.mock
 
@@ -620,3 +621,178 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
 
         # 1_000_000 * 0.75 = 750_000, but clipped to subagent default 200_000
         self.assertEqual(captured_threshold, 200_000)
+
+    def test_extract_plan_from_history_tool_call(self):
+        from core.base_provider.compaction import extract_plan_from_history
+
+        history = [
+            {"role": "user", "content": "hello"},
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "update_plan",
+                            "arguments": json.dumps({
+                                "plan": [
+                                    {"step": "Step 1", "status": "completed"},
+                                    {"step": "Step 2", "status": "in_progress"},
+                                ]
+                            }),
+                        }
+                    }
+                ],
+            },
+        ]
+        plan = extract_plan_from_history(history)
+        self.assertIsNotNone(plan)
+        self.assertEqual(len(plan), 2)
+        self.assertEqual(plan[0]["step"], "Step 1")
+        self.assertEqual(plan[0]["status"], "completed")
+        self.assertEqual(plan[1]["step"], "Step 2")
+        self.assertEqual(plan[1]["status"], "in_progress")
+
+    def test_extract_plan_from_history_previous_checkpoint(self):
+        from core.base_provider.compaction import extract_plan_from_history
+
+        history = [
+            {
+                "role": "user",
+                "content": (
+                    "<compaction_checkpoint>\n"
+                    "### Objective\nFix bugs\n\n"
+                    "### Plan\n```json\n"
+                    '[\n  {"step": "Alpha", "status": "completed"},\n  {"step": "Beta", "status": "pending"}\n]\n'
+                    "```\n"
+                    "</compaction_checkpoint>"
+                ),
+            },
+            {"role": "user", "content": "What next?"},
+        ]
+        plan = extract_plan_from_history(history)
+        self.assertIsNotNone(plan)
+        self.assertEqual(len(plan), 2)
+        self.assertEqual(plan[0]["step"], "Alpha")
+        self.assertEqual(plan[1]["step"], "Beta")
+
+    async def test_compact_history_preserves_active_plan_in_checkpoint(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
+        agent.current_plan = [
+            {"step": "Init", "status": "completed"},
+            {"step": "Run", "status": "in_progress"},
+        ]
+        agent.history = [
+            {"role": "user", "content": "Task start"},
+            {"role": "assistant", "content": "Working on it"},
+            {"role": "tool", "content": "ok"},
+            {"role": "user", "content": "Keep going"},
+            {"role": "assistant", "content": "Next step"},
+            {"role": "user", "content": "Status update"},
+        ]
+
+        mock_response = unittest.mock.MagicMock()
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.message.content = SAMPLE_VALID_SUMMARY
+        mock_response.choices = [mock_choice]
+
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = mock_response
+            success, msg = await agent.compact_history()
+            self.assertTrue(success)
+            checkpoint_content = agent.history[1]["content"]
+            self.assertIn("### Plan", checkpoint_content)
+            self.assertIn('"step": "Init"', checkpoint_content)
+            self.assertIn('"status": "completed"', checkpoint_content)
+            self.assertIn('"step": "Run"', checkpoint_content)
+            self.assertIn('"status": "in_progress"', checkpoint_content)
+
+    def test_extract_plan_stringified_json_and_status_clamping(self):
+        from core.base_provider.compaction import extract_plan_from_history
+
+        history = [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "update_plan",
+                            "arguments": json.dumps({
+                                "plan": json.dumps([
+                                    {"step": "Step A", "status": "INVALID_STATUS"},
+                                    {"step": "Step B", "status": "in_progress"},
+                                ])
+                            }),
+                        }
+                    }
+                ],
+            }
+        ]
+        plan = extract_plan_from_history(history)
+        self.assertIsNotNone(plan)
+        self.assertEqual(len(plan), 2)
+        # Invalid status clamped to "pending"
+        self.assertEqual(plan[0]["status"], "pending")
+        self.assertEqual(plan[1]["status"], "in_progress")
+
+    def test_extract_plan_completed_plan_suppressed(self):
+        from core.base_provider.compaction import extract_plan_from_history
+
+        history = [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "update_plan",
+                            "arguments": json.dumps({
+                                "plan": [
+                                    {"step": "Step 1", "status": "completed"},
+                                    {"step": "Step 2", "status": "completed"},
+                                ]
+                            }),
+                        }
+                    }
+                ],
+            }
+        ]
+        # Fully completed plan has no in_progress or pending steps -> returns None
+        self.assertIsNone(extract_plan_from_history(history))
+
+    async def test_compact_history_does_not_corrupt_summary_mentioning_plan_heading(self):
+        agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
+        self.addAsyncCleanup(agent.close)
+        agent.current_plan = [{"step": "Active task", "status": "in_progress"}]
+        agent.history = [
+            {"role": "user", "content": "Task start"},
+            {"role": "assistant", "content": "Working on it"},
+            {"role": "tool", "content": "ok"},
+            {"role": "user", "content": "Keep going"},
+            {"role": "assistant", "content": "Next step"},
+            {"role": "user", "content": "Status update"},
+        ]
+
+        # Summary text that happens to discuss "### Plan" in its objective prose
+        summary_with_mention = SAMPLE_VALID_SUMMARY.replace(
+            "Fix auth.py",
+            "Fix auth.py while reviewing ### Plan for potential regressions."
+        )
+
+        mock_response = unittest.mock.MagicMock()
+        mock_choice = unittest.mock.MagicMock()
+        mock_choice.message.content = summary_with_mention
+        mock_response.choices = [mock_choice]
+
+        with unittest.mock.patch.object(
+            agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
+        ) as mock_create:
+            mock_create.return_value = mock_response
+            success, _ = await agent.compact_history()
+            self.assertTrue(success)
+            checkpoint_content = agent.history[1]["content"]
+            # The objective prose must NOT be stripped or corrupted
+            self.assertIn("while reviewing ### Plan for potential regressions", checkpoint_content)
+            # The appended ### Plan section must be present
+            self.assertIn('"step": "Active task"', checkpoint_content)
