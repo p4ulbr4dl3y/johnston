@@ -107,12 +107,12 @@ def stream_step_to_session_event(
             "attempt": val1,
             "max_retries": val2,
             "delay": val3 or 0.0,
-            "error": parsed.val4,
+            "error": str(parsed.val4) if parsed.val4 is not None else None,
         }
     elif etype == "event_divider":
         evt = {"type": "event_divider", "text": val1 or "Session Compacted"}
     elif etype == "error":
-        evt = {"type": "error", "text": val1 or "Error"}
+        evt = {"type": "error", "text": str(val1) if val1 is not None else "Error"}
     else:
         return None
 

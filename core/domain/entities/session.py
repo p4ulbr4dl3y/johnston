@@ -263,7 +263,11 @@ class AgentSession:
 
     def finish(self, status: str, error_msg: str = "") -> None:
         self.status = status
-        self.add_event({"type": MessageType.STATUS_CHANGE.value, "status": status, "error": error_msg})
+        self.add_event({
+            "type": MessageType.STATUS_CHANGE.value,
+            "status": status,
+            "error": str(error_msg) if error_msg else "",
+        })
 
     def record_interruption(self, divider_text: str = "Response Interrupted") -> None:
         """Finalize any in-flight tool or thinking events and append an interruption divider."""

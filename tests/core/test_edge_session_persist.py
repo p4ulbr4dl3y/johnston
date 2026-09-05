@@ -577,3 +577,29 @@ def test_reconcile_compaction_divider_on_load(store):
     assert any(m.get("type") == "event_divider" for m in loaded.messages)
 
 
+def test_save_session_with_non_serializable_objects(store):
+    """Session save must not raise TypeError when messages or retry events contain Exception objects."""
+    from core.application.session.stream import stream_step_to_session_event
+
+    sess = store.create_main("non_serializable_sess")
+    # Simulate stream_step_to_session_event with Exception object
+    evt = stream_step_to_session_event(("retry", 1, 3, 2.0, RuntimeError("App is not running")))
+    assert evt is not None
+    sess.add_event(evt)
+
+    # Also directly insert an object that is not JSON-serializable by default
+    sess.messages.append({"type": "custom", "raw_exc": RuntimeError("Token limit reached")})
+    sess.finish("error", RuntimeError("Fatal error"))
+
+    store.save(sess)
+
+    # Invalidate cache and reload
+    store._sessions.clear()
+    store._disk_cache = None
+    loaded = store.get("non_serializable_sess")
+    assert loaded is not None
+    assert len(loaded.messages) >= 3
+    assert any(m.get("type") == "retry" for m in loaded.messages)
+
+
+

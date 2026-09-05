@@ -45,8 +45,8 @@ def _session_change_signature(sess: AgentSession) -> tuple:
     """
     msgs = sess.messages
     hist = sess._history()
-    last_msg = json.dumps(msgs[-1], ensure_ascii=False) if msgs else None
-    last_hist = json.dumps(hist[-1], ensure_ascii=False) if hist else None
+    last_msg = json.dumps(msgs[-1], ensure_ascii=False, default=str) if msgs else None
+    last_hist = json.dumps(hist[-1], ensure_ascii=False, default=str) if hist else None
     meta = tuple(sorted(sess._persistent_fields().items()))
     return (len(msgs), len(hist), last_msg, last_hist, meta)
 
@@ -57,7 +57,7 @@ def _serialize_session_jsonl(sess: AgentSession) -> str:
     One line per entry: meta first, then one ``{"_type": "msg", ...}`` per
     message and one ``{"_type": "history", ...}`` per agent-history entry.
     """
-    return "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in sess.to_jsonl_lines())
+    return "".join(json.dumps(item, ensure_ascii=False, default=str) + "\n" for item in sess.to_jsonl_lines())
 
 
 def get_session_store(ctx_or_app: Any) -> "SessionStore":

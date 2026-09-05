@@ -101,7 +101,7 @@ def atomic_write_text(path: str, content: str) -> None:
 def atomic_write_json(path: str, data: Any, indent: int = 2) -> None:
     import json
 
-    content = json.dumps(data, indent=indent, ensure_ascii=False)
+    content = json.dumps(data, indent=indent, ensure_ascii=False, default=str)
     atomic_write_text(path, content)
 
 
@@ -112,7 +112,7 @@ def atomic_write_jsonl(path: str, data: Any) -> None:
     else:
         import json
 
-        content = "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in data)
+        content = "".join(json.dumps(item, ensure_ascii=False, default=str) + "\n" for item in data)
     atomic_write_text(path, content)
 
 
