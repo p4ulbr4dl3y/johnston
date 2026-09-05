@@ -813,4 +813,28 @@ class TestChatViewDividerSpacing(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(chat_view.get_total_user_message_count(), 1)
             self.assertFalse(chat_view.loading)
 
+    async def test_older_messages_pagination_hidden_during_mount(self):
+        app = JohnstonApp()
+        async with app.run_test(size=(120, 40)) as pilot:
+            chat_view = app.query_one(ChatView)
+            session = MagicMock()
+            msgs = [{"type": "user", "text": "PROMPT_FIRST_MSG"}]
+            for i in range(1, 60):
+                msgs.append({"type": "tool", "tool_type": "shell", "target": f"echo {i}", "result_text": f"res {i}"})
+            session.messages = msgs
+            session.prompt = "PROMPT_FIRST_MSG"
+            await chat_view.load_session(session)
+            await pilot.pause(0.1)
+
+            # Trigger pagination
+            chat_view.scroll_up_page()
+            await pilot.pause(0.1)
+            chat_view.scroll_up_page()
+            await pilot.pause(0.2)
+
+            # Verify all mounted widgets have visible styles restored
+            for child in chat_view.children:
+                self.assertNotEqual(child.styles.visibility, "hidden")
+            self.assertEqual(len(chat_view._unloaded_messages), 0)
+
 

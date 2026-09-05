@@ -293,20 +293,35 @@ class ChatView(VerticalScroll):
             old_max_y = self.max_scroll_y
             old_scroll_y = self.scroll_y
 
+            new_widgets = []
             if anchor is None:
                 for msg in chunk:
                     await self.restore_message(msg, task_manager=task_mgr)
             else:
                 for msg in chunk:
-                    await self.restore_message(msg, before=anchor, task_manager=task_mgr)
+                    w = await self.restore_message(msg, before=anchor, task_manager=task_mgr)
+                    if w is not None:
+                        try:
+                            w.styles.visibility = "hidden"
+                            new_widgets.append(w)
+                        except Exception:
+                            pass
+
+                def _unhide():
+                    for w in new_widgets:
+                        try:
+                            w.styles.visibility = "visible"
+                        except Exception:
+                            pass
 
                 def _compensate_scroll():
                     try:
                         delta = max(0, self.max_scroll_y - old_max_y)
                         target_y = old_scroll_y + delta
-                        self.scroll_to(y=target_y, animate=False)
+                        self.scroll_to(y=target_y, animate=False, immediate=True)
                     except Exception:
                         pass
+                    _unhide()
 
                 if hasattr(self, "call_after_refresh"):
                     self.call_after_refresh(_compensate_scroll)
@@ -314,6 +329,11 @@ class ChatView(VerticalScroll):
                     _compensate_scroll()
         except Exception as e:
             logger.warning("Failed loading older chat messages: %s", e)
+            for w in new_widgets:
+                try:
+                    w.styles.visibility = "visible"
+                except Exception:
+                    pass
         finally:
             self._is_loading_older = False
 
