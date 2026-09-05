@@ -439,8 +439,19 @@ class ThinkingWidget(Vertical):
         self.content_widget = Static("", markup=False, classes="thinking-content")
         self.render_header()
 
+    def set_show_hints(self, show: bool) -> None:
+        if getattr(self, "_show_hints", False) == show:
+            return
+        self._show_hints = show
+        self.render_header()
+
     def _schedule_hint_timer(self) -> None:
         self._cancel_hint_timer()
+        parent = getattr(self, "parent", None)
+        if parent is not None and getattr(parent, "_has_active_hints", False) and self.is_expandable():
+            if hasattr(parent, "activate_hint"):
+                parent.activate_hint(self)
+                return
         self._show_hints = False
         try:
             loop = asyncio.get_running_loop()
@@ -451,8 +462,12 @@ class ThinkingWidget(Vertical):
     def _on_hint_timer(self) -> None:
         self._hint_handle = None
         if self.is_thinking:
-            self._show_hints = True
-            self.render_header()
+            parent = getattr(self, "parent", None)
+            if parent is not None and hasattr(parent, "activate_hint"):
+                parent.activate_hint(self)
+            else:
+                self._show_hints = True
+                self.render_header()
 
     def _cancel_hint_timer(self) -> None:
         if getattr(self, "_hint_handle", None) is not None:
@@ -488,6 +503,12 @@ class ThinkingWidget(Vertical):
             self.header_label.add_class("thinking-header-expandable")
         else:
             self.header_label.remove_class("thinking-header-expandable")
+        if self.is_thinking and self.is_expandable():
+            parent = getattr(self, "parent", None)
+            if parent is not None and getattr(parent, "_has_active_hints", False):
+                if hasattr(parent, "activate_hint"):
+                    self._cancel_hint_timer()
+                    parent.activate_hint(self)
 
     def _schedule_content_update(self) -> None:
         if self._update_scheduled or not self.is_expanded:
@@ -526,7 +547,11 @@ class ThinkingWidget(Vertical):
         self.is_thinking = False
         self.duration_seconds = duration
         self._cancel_hint_timer()
-        self._show_hints = False
+        parent = getattr(self, "parent", None)
+        if parent is not None and hasattr(parent, "on_widget_finished"):
+            parent.on_widget_finished(self)
+        else:
+            self._show_hints = False
         if thinking_content and thinking_content != "Thinking...":
             self._thinking_parts = [thinking_content]
             self._cached_thinking_text = thinking_content

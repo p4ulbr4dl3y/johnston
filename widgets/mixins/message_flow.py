@@ -420,6 +420,12 @@ class MessageFlowMixin:
                 footer.set_generating(False)
             except Exception as e:
                 logger.warning("Footer update failed: %s", e)
+            try:
+                cv = self.query_one(ChatView)
+                if hasattr(cv, "on_generation_finished"):
+                    cv.on_generation_finished()
+            except Exception:
+                pass
             is_active = bool(
                 getattr(self, "is_app_active", True)
                 and not getattr(self, "_exit", False)

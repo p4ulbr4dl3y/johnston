@@ -1097,6 +1097,101 @@ class TestHintDebounce(unittest.IsolatedAsyncioTestCase):
         tw.on_unmount()
 
 
+class TestHintCoordination(unittest.IsolatedAsyncioTestCase):
+    async def test_hint_relay_between_expandable_tools(self):
+        from widgets.presentation.widgets.chat_container import ChatView
+
+        cv = ChatView()
+        cv.HINT_FADE_SECONDS = 0.05
+
+        # Tool 1: shell (expandable)
+        t1 = ToolCallWidget("shell", "pytest")
+        t1.HINT_DEBOUNCE_SECONDS = 0.02
+        t1._parent = cv
+        t1.mark_running()
+
+        # Before debounce fires -> no hints
+        self.assertNotIn("ctrl+o", str(t1.header_label.render()))
+        await asyncio.sleep(0.04)
+        # After debounce fires -> has ctrl+b and ctrl+o
+        t1_running = str(t1.header_label.render())
+        self.assertIn("ctrl+o", t1_running)
+        self.assertIn("ctrl+b", t1_running)
+
+        # Tool 1 completes -> drops ctrl+b, but ctrl+o lingers!
+        t1.set_result("All tests passed", status="done")
+        t1_done = str(t1.header_label.render())
+        self.assertNotIn("ctrl+b", t1_done)
+        self.assertIn("ctrl+o", t1_done)
+
+        # Tool 2: edit (expandable) starts -> immediately takes hint with NO debounce!
+        t2 = ToolCallWidget("edit", "file.py")
+        t2.HINT_DEBOUNCE_SECONDS = 1.0  # large debounce to prove it transfers with 0ms
+        t2._parent = cv
+        t2.mark_running()
+
+        # Tool 1 should now have no hints, Tool 2 should have ctrl+o immediately
+        self.assertNotIn("ctrl+o", str(t1.header_label.render()))
+        self.assertIn("ctrl+o", str(t2.header_label.render()))
+
+        # Tool 3: read file (not expandable) starts
+        t3 = ToolCallWidget("read", "file.py")
+        t3._parent = cv
+        t3.mark_running()
+
+        # Tool 3 is not expandable -> must not get hint; Tool 2 retains hint
+        self.assertNotIn("ctrl+o", str(t3.header_label.render()))
+        self.assertIn("ctrl+o", str(t2.header_label.render()))
+
+        # Finish Tool 2 and wait for fade timer
+        t2.set_result("Done", status="done")
+        self.assertIn("ctrl+o", str(t2.header_label.render()))
+        await asyncio.sleep(0.08)
+        # After fade timer -> cleanly removed
+        self.assertNotIn("ctrl+o", str(t2.header_label.render()))
+
+        cv.on_unmount()
+
+    async def test_hint_relay_thinking_to_tool(self):
+        from widgets.presentation.widgets.chat_container import ChatView
+        from widgets.presentation.widgets.chat_messages import ThinkingWidget
+
+        cv = ChatView()
+        tw = ThinkingWidget()
+        tw.HINT_DEBOUNCE_SECONDS = 0.02
+        tw._parent = cv
+        tw._schedule_hint_timer()
+
+        await asyncio.sleep(0.04)
+        self.assertIn("ctrl+o", str(tw.header_label.render()))
+
+        tw.finish_thinking(0.5, "thoughts")
+        self.assertNotIn("ctrl+o", str(tw.header_label.render()))
+
+        # Next expandable tool starts -> gets hint immediately
+        t1 = ToolCallWidget("shell", "ls")
+        t1.HINT_DEBOUNCE_SECONDS = 1.0
+        t1._parent = cv
+        t1.mark_running()
+        self.assertIn("ctrl+o", str(t1.header_label.render()))
+        cv.on_unmount()
+
+    async def test_clear_hints_on_user_message(self):
+        from widgets.presentation.widgets.chat_container import ChatView
+
+        cv = ChatView()
+        cv._mount_and_scroll = unittest.mock.AsyncMock()
+        t1 = ToolCallWidget("edit", "a.py")
+        t1._parent = cv
+        cv.activate_hint(t1)
+        self.assertIn("ctrl+o", str(t1.header_label.render()))
+
+        await cv.add_user_message("hello")
+        self.assertNotIn("ctrl+o", str(t1.header_label.render()))
+        self.assertIsNone(cv._active_hint_widget)
+        cv.on_unmount()
+
+
 if __name__ == "__main__":
     unittest.main()
 

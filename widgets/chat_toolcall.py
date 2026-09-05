@@ -232,9 +232,26 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.md_widget.display = False
         self.render_header()
         self._sync_sequential_with_prev()
+        if self.status == "running" and self.is_expandable():
+            parent = getattr(self, "parent", None)
+            if parent is not None and getattr(parent, "_has_active_hints", False):
+                if hasattr(parent, "activate_hint"):
+                    self._cancel_hint_timer()
+                    parent.activate_hint(self)
+
+    def set_show_hints(self, show: bool) -> None:
+        if getattr(self, "_show_hints", False) == show:
+            return
+        self._show_hints = show
+        self.render_header()
 
     def _schedule_hint_timer(self) -> None:
         self._cancel_hint_timer()
+        parent = getattr(self, "parent", None)
+        if parent is not None and getattr(parent, "_has_active_hints", False) and self.is_expandable():
+            if hasattr(parent, "activate_hint"):
+                parent.activate_hint(self)
+                return
         self._show_hints = False
         try:
             loop = asyncio.get_running_loop()
@@ -245,8 +262,12 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def _on_hint_timer(self) -> None:
         self._hint_handle = None
         if self.status == "running":
-            self._show_hints = True
-            self.render_header()
+            parent = getattr(self, "parent", None)
+            if parent is not None and hasattr(parent, "activate_hint"):
+                parent.activate_hint(self)
+            else:
+                self._show_hints = True
+                self.render_header()
 
     def _cancel_hint_timer(self) -> None:
         if getattr(self, "_hint_handle", None) is not None:
@@ -353,7 +374,11 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
         if self.status != "running":
             self._cancel_hint_timer()
-            self._show_hints = False
+            parent = getattr(self, "parent", None)
+            if parent is not None and hasattr(parent, "on_widget_finished"):
+                parent.on_widget_finished(self)
+            else:
+                self._show_hints = False
         else:
             self._schedule_hint_timer()
 
@@ -407,6 +432,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return
         self.status = "cancelled"
         self._cancel_hint_timer()
+        parent = getattr(self, "parent", None)
+        if parent is not None and hasattr(parent, "clear_active_hints"):
+            parent.clear_active_hints(immediate=True)
         self._show_hints = False
         clean = (self.result_text or "").strip()
         if not clean:

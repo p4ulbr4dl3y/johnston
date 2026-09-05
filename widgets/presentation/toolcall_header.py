@@ -57,10 +57,10 @@ def build_toolcall_header(
         base_header = f"[{status_color}]{marker} [bold]{tool_name_display}[/bold][/{status_color}]{arg_suffix}"
 
     hints: List[str] = []
-    if show_hints and status == "running":
-        if not is_subagent and canonical_tool == "shell" and not background_task_id:
+    if show_hints:
+        if status == "running" and not is_subagent and canonical_tool == "shell" and not background_task_id:
             hints.append("ctrl+b to bg")
-        if is_expandable:
+        if is_expandable and status in ("running", "done"):
             action = "to collapse" if is_expanded else "to expand"
             hints.append(f"ctrl+o {action}")
 
