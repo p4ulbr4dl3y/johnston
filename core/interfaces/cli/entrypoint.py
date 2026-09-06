@@ -228,6 +228,33 @@ def build_parser() -> argparse.ArgumentParser:
     # rules subparser
     subparsers.add_parser("rules", help="List active project instructions and rules")
 
+    # session subparser
+    session_p = subparsers.add_parser("session", help="Manage chat sessions")
+    session_subs = session_p.add_subparsers(dest="session_action", help="Session actions")
+
+    sess_list = session_subs.add_parser("list", help="List chat sessions")
+    sess_list.add_argument("--limit", type=int, default=None, help="Maximum number of sessions to list")
+
+    sess_rm = session_subs.add_parser("rm", help="Remove a session by ID")
+    sess_rm.add_argument("session_id", help="Session ID to remove")
+
+    sess_prune = session_subs.add_parser("prune", help="Prune old sessions")
+    sess_prune.add_argument("--days", type=int, default=14, help="Prune sessions older than N days (default: 14)")
+
+    sess_export = session_subs.add_parser("export", help="Export session dialogue")
+    sess_export.add_argument("session_id", help="Session ID to export")
+    sess_export.add_argument(
+        "--format",
+        dest="format",
+        choices=["md", "json"],
+        default="md",
+        help="Export format (md or json, default: md)",
+    )
+    sess_export.add_argument("--output", default=None, help="Output file path (default: stdout)")
+
+    # doctor subparser
+    subparsers.add_parser("doctor", help="Check environment and configuration health")
+
     return parser
 
 
@@ -287,6 +314,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.exit(code if code is not None else 0)
     elif args.subcommand == "rules":
         code = _dispatch_rules(args)
+        sys.exit(code if code is not None else 0)
+    elif args.subcommand == "session":
+        from core.interfaces.cli.commands.session_cmd import run_session
+
+        code = run_session(args)
+        sys.exit(code if code is not None else 0)
+    elif args.subcommand == "doctor":
+        from core.interfaces.cli.commands.doctor_cmd import run_doctor
+
+        code = run_doctor(args)
         sys.exit(code if code is not None else 0)
 
     from app import JohnstonApp
