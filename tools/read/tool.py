@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 class ReadTool(BaseTool):
     name = "read"
     description = (
-        f"Read file contents, inspect directory listings, or view archive contents (ZIP/TAR). "
-        f"Converts docs (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) and images. "
+        f"Read file contents, inspect directory listings, or view/extract archive contents (ZIP/TAR/WHL/JAR). "
+        f"Supports inner paths (e.g. 'pkg.whl/mod.py'). Converts docs (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) and images. "
         f"Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers."
     )
     schema = {
@@ -24,7 +24,8 @@ class ReadTool(BaseTool):
         "function": {
             "name": "read",
             "description": (
-                "Read file contents, inspect directory listings, or view archive contents (ZIP/TAR). "
+                "Read file contents, inspect directory listings, or view/extract archive contents (ZIP/TAR/WHL/JAR). "
+                "Supports reading files inside archives (e.g. 'archive.zip/sub/file.py'). "
                 "Converts rich documents (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) and images (base64 JSON). "
                 f"Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers; paginate using start_line/end_line."
             ),
@@ -34,8 +35,8 @@ class ReadTool(BaseTool):
                     "path": {
                         "type": "string",
                         "description": (
-                            "File, directory, archive, or `scheme://...` MCP resource path. "
-                            "Relative paths resolve against cwd (from <environment>)."
+                            "File, directory, archive (ZIP/TAR/WHL/JAR), path inside archive ('pkg.whl/mod.py'), "
+                            "or `scheme://...` MCP resource path. Relative paths resolve against cwd (from <environment>)."
                         ),
                     },
                     "start_line": {
