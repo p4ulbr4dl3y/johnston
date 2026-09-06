@@ -165,7 +165,7 @@ async def check_and_confirm_permission(
             import sys
             if sys.stdin and sys.stdin.isatty():
                 try:
-                    prompt = f"[permission] Allow {display_name} ({decision.reason})? [y/n/a]: "
+                    prompt = f"[permission] Allow {display_name} ({decision.reason})? [y(once)/n(deny)/a(always)]: "
                     sys.stderr.write(prompt)
                     sys.stderr.flush()
                     ans = sys.stdin.readline().strip().lower()

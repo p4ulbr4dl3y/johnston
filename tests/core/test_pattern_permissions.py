@@ -45,6 +45,15 @@ class TestPatternPolicyHelpers(unittest.TestCase):
         self.assertTrue(has_unsafe_shell_syntax("base64 --decode payload.b64"))
         self.assertTrue(has_unsafe_shell_syntax("eval 'dangerous'"))
         self.assertTrue(has_unsafe_shell_syntax("exec /bin/sh"))
+        self.assertTrue(has_unsafe_shell_syntax("python -c 'print(1)'"))
+        self.assertTrue(has_unsafe_shell_syntax("python3.10 -c 'import os'"))
+        self.assertTrue(has_unsafe_shell_syntax("node -e 'process.exit(0)'"))
+        self.assertTrue(has_unsafe_shell_syntax("ruby -e 'puts 1'"))
+        self.assertTrue(has_unsafe_shell_syntax("perl -e 'print 1'"))
+        self.assertTrue(has_unsafe_shell_syntax("echo 'payload' | python3"))
+        self.assertTrue(has_unsafe_shell_syntax("echo 'payload' | node"))
+        self.assertFalse(has_unsafe_shell_syntax("python -m pytest tests/"))
+        self.assertFalse(has_unsafe_shell_syntax("python script.py"))
         self.assertFalse(has_unsafe_shell_syntax("git status"))
         self.assertFalse(has_unsafe_shell_syntax("cat foo.txt && pytest -k test_foo"))
 
@@ -84,6 +93,8 @@ class TestPatternPolicyHelpers(unittest.TestCase):
             "https://docs.python.org/*",
         )
         self.assertIsNone(suggest_pattern("ask_user", {}))
+        self.assertIsNone(suggest_pattern("shell", {"command": "python -c 'print(1)'"}))
+        self.assertEqual(suggest_pattern("shell", {"command": "python -m pytest tests/"}), "python -m pytest *")
 
     def test_evaluate_pattern_rules_shell(self):
         rules = [
@@ -377,9 +388,8 @@ class TestMultiTargetAndEnhancedSafety(unittest.TestCase):
             suggest_pattern("shell", {"command": "python -m pytest tests/"}),
             "python -m pytest *",
         )
-        # Python inline -c never gets wildcard
-        self.assertEqual(
+        # Python inline -c is unsafe and returns None (no pattern auto-allow)
+        self.assertIsNone(
             suggest_pattern("shell", {"command": "python -c 'import sys; print(1)'"}),
-            "python -c",
         )
 

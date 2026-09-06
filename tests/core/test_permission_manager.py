@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from core.domain.policies.permission_policy import (
+    ExecutionMode,
     PermissionAction,
     get_config_dir,
     normalize_action,
@@ -378,6 +379,29 @@ class TestPermissionManager(unittest.TestCase):
                 json.dump({"permissions": {"tools": {"danger__*": "deny"}}}, f)
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
                 self.assertEqual(self.pm.check_permission("danger__run").action, "deny")
+
+    def test_unsafe_shell_cannot_be_bypassed_by_session_override(self):
+        self.pm.set_session_override("shell", "allow")
+        # Normal command is allowed
+        self.assertEqual(self.pm.check_permission("shell", {"command": "git status"}).action, PermissionAction.ALLOW)
+
+        # Dynamic / unsafe commands must still require ASK
+        dec = self.pm.check_permission("shell", {"command": "echo $(whoami)"})
+        self.assertEqual(dec.action, PermissionAction.ASK)
+        self.assertIn("dynamic/unsafe constructs", dec.reason)
+
+        dec_eval = self.pm.check_permission("shell", {"command": "eval 'rm -rf /'"})
+        self.assertEqual(dec_eval.action, PermissionAction.ASK)
+
+        # In YOLO mode, execution is allowed without prompt
+        self.pm.set_session_mode(ExecutionMode.YOLO)
+        self.assertEqual(self.pm.check_permission("shell", {"command": "echo $(whoami)"}).action, PermissionAction.ALLOW)
+
+    def test_wildcard_deny_priority_in_session_overrides(self):
+        self.pm.set_session_override("github__*", "allow")
+        self.pm.set_session_override("github__delete*", "deny")
+        self.assertEqual(self.pm.check_permission("github__create_issue").action, PermissionAction.ALLOW)
+        self.assertEqual(self.pm.check_permission("github__delete_repo").action, PermissionAction.DENY)
 
 
 if __name__ == "__main__":

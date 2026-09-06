@@ -431,7 +431,8 @@ _WRAPPER_COMMANDS = frozenset(
 _UNSAFE_SHELL_REGEX = re.compile(
     r"(\$\(|`"
     r"|\b(?:bash|sh|zsh|dash|powershell|pwsh)\s+(?:-[ceE]\b|-command\b|-encodedcommand\b|[^\s-])"
-    r"|\|\s*(?:bash|sh|zsh|dash|powershell|pwsh)\b"
+    r"|\b(?:python(?:\d+(?:\.\d+)?)?|node|ruby|perl|php)\s+-[cer]\b"
+    r"|\|\s*(?:bash|sh|zsh|dash|powershell|pwsh|python(?:\d+(?:\.\d+)?)?|node|ruby|perl|php)\b"
     r"|<\s*(?:bash|sh|zsh|dash)\b"
     r"|\beval\s+|\bexec\s+"
     r"|\bbase64\s+-(?:d|-decode)\b)",
@@ -559,14 +560,14 @@ def extract_command_signature(cmd: str) -> str:
         if len(meaningful) > 2 and meaningful[1] == "-m":
             return f"{binary} -m {meaningful[2]} *"
         if len(meaningful) > 1 and meaningful[1] in ("-c", "-e"):
-            return f"{binary} {meaningful[1]}"
+            return cmd.strip()
         if len(meaningful) > 1 and not meaningful[1].startswith("-"):
             return f"{binary} {meaningful[1]} *"
         return f"{binary} *"
 
-    if binary in ("node", "ruby", "perl"):
-        if len(meaningful) > 1 and meaningful[1] in ("-e", "-c"):
-            return f"{binary} {meaningful[1]}"
+    if binary in ("node", "ruby", "perl", "php"):
+        if len(meaningful) > 1 and meaningful[1] in ("-e", "-c", "-r"):
+            return cmd.strip()
         if len(meaningful) > 1 and not meaningful[1].startswith("-"):
             return f"{binary} {meaningful[1]} *"
         return f"{binary} *"

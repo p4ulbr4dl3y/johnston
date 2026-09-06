@@ -432,6 +432,15 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         self.assertIn("server_allow:postgres__*", screen._option_keys)
         self.assertIn("server_allow:postgres__*:project", screen._option_keys)
 
+    def test_add_to_roots_option_for_shell_cwd_and_target_file(self):
+        # shell with outside cwd
+        screen_shell = PermissionConfirmScreen("shell", {"command": "git status", "cwd": "/external/repo"})
+        self.assertIn("add_root:/external/repo", screen_shell._option_keys)
+
+        # create with TargetFile
+        screen_create = PermissionConfirmScreen("create", {"TargetFile": "/external/repo/new.py", "content": "x=1"})
+        self.assertIn("add_root:/external/repo", screen_create._option_keys)
+
 
 if __name__ == "__main__":
     unittest.main()

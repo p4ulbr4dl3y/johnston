@@ -161,13 +161,21 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             raw_options.append((f'Always allow ALL tools from "{server_name}" [dim](project)[/]', f"server_allow:{server_name}__*:project"))
 
         nargs = self.args if isinstance(self.args, dict) else {}
-        target_path = nargs.get("path") or ""
-        from core.domain.policies.permission_policy import is_path_within_workspace
+        from core.domain.policies.permission_policy import extract_tool_target_value, is_path_within_workspace
         from core.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
-        if target_path and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
-            root_to_add = os.path.dirname(target_path) or target_path
+        target_path = (
+            (nargs.get("cwd") if self.tool_name == "shell" else "")
+            or extract_tool_target_value(self.tool_name, self.args)
+            or nargs.get("path")
+            or ""
+        )
+        if target_path and isinstance(target_path, str) and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
+            if os.path.isdir(target_path) or (self.tool_name == "shell" and nargs.get("cwd") == target_path):
+                root_to_add = target_path
+            else:
+                root_to_add = os.path.dirname(target_path) or target_path
             raw_options.append((f'Add "{ellipsize(root_to_add, 36)}" to roots [dim](workspace)[/]', f"add_root:{root_to_add}"))
 
         raw_options.append(("Deny", "deny"))

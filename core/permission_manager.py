@@ -11,6 +11,7 @@ from core.domain.policies.permission_policy import (
     evaluate_pattern_rules,
     evaluate_workspace_boundary,
     get_mode_baseline_action,
+    has_unsafe_shell_syntax,
     normalize_execution_mode,
 )
 from core.infrastructure.platform.paths import CONFIG_FILE, LOGS_DIR, SECRETS_FILE
@@ -311,13 +312,28 @@ class PermissionManager:
             action = ws_decision.action if ws_decision.action == PermissionAction.DENY else outside_action
             return PermissionDecision(action, ws_decision.reason)
 
+        # 2b. Dynamic/unsafe shell construct check:
+        # Dynamic shell constructs (subshells, eval, script interpreter code injection)
+        # cannot be bypassed by a tool-level session override unless in YOLO mode.
+        if canonical_name == "shell" and args and isinstance(args, dict):
+            cmd = args.get("command")
+            if isinstance(cmd, str) and has_unsafe_shell_syntax(cmd):
+                if self.execution_mode != ExecutionMode.YOLO:
+                    return PermissionDecision(
+                        PermissionAction.ASK,
+                        f"Shell command contains dynamic/unsafe constructs: '{cmd.strip()}'",
+                    )
+
         # 3. Runtime session tool override
         session_action = self.session_overrides.get(canonical_name)
         if session_action is None:
-            for pat, act in self.session_overrides.items():
-                if ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat):
-                    session_action = act
-                    break
+            matched_acts = [
+                act
+                for pat, act in self.session_overrides.items()
+                if ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat)
+            ]
+            if matched_acts:
+                session_action = "deny" if "deny" in matched_acts else matched_acts[0]
         if session_action is not None:
             return PermissionDecision(
                 PermissionAction(session_action),
@@ -338,10 +354,13 @@ class PermissionManager:
         # 6. Explicit tool permission from user's config file (normalized during merge)
         explicit_action = tools_cfg.get(canonical_name)
         if explicit_action is None:
-            for pat, act in tools_cfg.items():
-                if ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat):
-                    explicit_action = act
-                    break
+            matched_acts = [
+                act
+                for pat, act in tools_cfg.items()
+                if ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat)
+            ]
+            if matched_acts:
+                explicit_action = "deny" if "deny" in matched_acts else matched_acts[0]
         if explicit_action is not None:
             return PermissionDecision(
                 PermissionAction(explicit_action),
