@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 from rich.text import Text
 from textual._context import active_app
@@ -42,12 +42,41 @@ class TestMermaidRenderer:
         assert "B[Decision]" in cleaned
         assert "C[Database]" in cleaned
 
+    def test_normalize_flowchart_shapes_edge_cases(self):
+        code = """---
+title: Sample Frontmatter
+---
+graph TD
+    Client["Клиент (Web / Mobile)"] -->|HTTPS (secure)| Gateway(API Gateway)
+    subgraph Sub (test group)
+        Gateway --> Auth{Токен валиден?}
+    end
+    Узел(Кириллица) --> DB[(PostgreSQL)]
+"""
+        cleaned = clean_mermaid_code(code)
+        # Quoted labels and edge labels preserved
+        assert 'Client["Клиент (Web / Mobile)"]' in cleaned
+        assert "|HTTPS (secure)|" in cleaned
+        assert "subgraph Sub (test group)" in cleaned
+        # Shapes normalized
+        assert "Gateway[API Gateway]" in cleaned
+        assert "Auth[Токен валиден?]" in cleaned
+        assert "Узел[Кириллица]" in cleaned
+        assert "DB[PostgreSQL]" in cleaned
+
     def test_render_mermaid_valid(self):
         code = "graph TD\n    A[Start] --> B[End]"
         result = render_mermaid_to_ascii(code)
         assert result is not None
         assert "Start" in result
         assert "End" in result
+
+    def test_render_mermaid_utf8_encoding_param(self):
+        code = "graph TD\n    A[Начало] --> B[Конец]"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="┌───┐\n│ A │\n└───┘")
+            render_mermaid_to_ascii(code)
+            assert mock_run.call_args.kwargs.get("encoding") == "utf-8"
 
     def test_fix_mojibake(self):
         from widgets.utils.mermaid_renderer import _fix_mojibake
@@ -95,6 +124,18 @@ class TestMermaidRenderer:
             _store_cache("k4", "v4")
             assert render_mermaid_to_ascii("k1") is None or "v4" in str(render_mermaid_to_ascii("k4"))
 
+    def test_cache_thread_safety(self):
+        import concurrent.futures
+
+        def worker(idx):
+            _store_cache(f"key_{idx % 10}", f"val_{idx}")
+            render_mermaid_to_ascii(f"graph TD\n A{idx}-->B{idx}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            futures = [pool.submit(worker, i) for i in range(50)]
+            for f in futures:
+                f.result()
+
     def test_prewarm_mermaid(self):
         code = "graph TD\n    A[Pre] --> B[Warm]"
         prewarm_mermaid(code)
@@ -116,7 +157,6 @@ class TestMermaidRenderer:
         assert isinstance(content_themed, Content)
 
 
-
 class TestCustomMarkdownFenceMermaid:
     def setup_method(self):
         clear_mermaid_cache()
@@ -135,6 +175,9 @@ class TestCustomMarkdownFenceMermaid:
             fence.code = "graph TD\n    A[Start] --> B[Stop]"
             fence.theme = None
             fence.markdown = MagicMock(theme=None)
+
+            # Prewarm so it is in cache
+            prewarm_mermaid(fence.code)
 
             widgets = list(fence.compose())
             assert len(widgets) > 0
@@ -158,7 +201,8 @@ class TestCustomMarkdownFenceMermaid:
 
         toggle_btn = MagicMock(spec=Button)
         toggle_btn.classes = {"fence-toggle-btn"}
-        fence.query_one = MagicMock(return_value=toggle_btn)
+        scroll_box = MagicMock()
+        fence.query_one = MagicMock(side_effect=lambda sel, cls=None: toggle_btn if "toggle" in sel else scroll_box)
         fence.set_content = MagicMock()
 
         # Toggle to code view
@@ -166,6 +210,7 @@ class TestCustomMarkdownFenceMermaid:
         assert fence._show_diagram is False
         assert toggle_btn.label == "diagram"
         fence.set_content.assert_called_with(fence._highlighted_code)
+        assert scroll_box.scroll_x == 0
 
         # Toggle back to diagram view
         fence.toggle_diagram_view()
@@ -191,6 +236,27 @@ class TestCustomMarkdownFenceMermaid:
         fence.toggle_diagram_view.assert_called_once()
         event.stop.assert_called_once()
 
+    def test_on_button_pressed_copy_diagram_and_code(self):
+        fence = CustomMarkdownFence.__new__(CustomMarkdownFence)
+        fence.code = "graph TD\n A-->B"
+        fence._diagram_str = "┌───┐\n│ A │\n└───┘"
+        mock_app = MagicMock()
+
+        event = MagicMock(spec=Button.Pressed)
+        event.button = MagicMock(spec=Button)
+        event.button.classes = {"fence-copy-btn"}
+
+        with patch.object(CustomMarkdownFence, "app", new_callable=PropertyMock, return_value=mock_app):
+            # When viewing diagram -> copies diagram
+            fence._show_diagram = True
+            fence.on_button_pressed(event)
+            mock_app.copy_to_clipboard.assert_called_with(fence._diagram_str)
+
+            # When viewing code -> copies code
+            fence._show_diagram = False
+            fence.on_button_pressed(event)
+            mock_app.copy_to_clipboard.assert_called_with(fence.code)
+
     def test_notify_style_update_mermaid(self):
         fence = CustomMarkdownFence.__new__(CustomMarkdownFence)
         fence.code = "graph TD\n  A --> B"
@@ -207,7 +273,7 @@ class TestCustomMarkdownFenceMermaid:
         count = prewarm_fences_from_markdown(md)
         assert count == 1
 
-    def test_copy_context_and_update_from_block(self):
+    async def test_copy_context_and_update_from_block(self):
         source = CustomMarkdownFence.__new__(CustomMarkdownFence)
         source.code = "graph TD\n  A-->B"
         source.lexer = "mermaid"
@@ -218,6 +284,35 @@ class TestCustomMarkdownFenceMermaid:
 
         target = CustomMarkdownFence.__new__(CustomMarkdownFence)
         target.set_content = MagicMock()
-        target._copy_context(source)
+        target._classes = set()
+        toggle_btn = MagicMock(spec=Button)
+        target.query_one = MagicMock(return_value=toggle_btn)
+
+        await target._update_from_block(source)
         assert target._diagram_str == source._diagram_str
         assert target._show_diagram is True
+        assert toggle_btn.display is True
+        assert toggle_btn.label == "code"
+        target.set_content.assert_called_once()
+
+    async def test_async_render_mermaid_on_cache_miss(self):
+        fence = CustomMarkdownFence.__new__(CustomMarkdownFence)
+        fence.code = "graph TD\n X-->Y"
+        fence.lexer = "mermaid"
+        fence._diagram_str = None
+        fence._show_diagram = False
+        fence._classes = set()
+        fence.set_content = MagicMock()
+        toggle_btn = MagicMock(spec=Button)
+        fence.query_one = MagicMock(return_value=toggle_btn)
+
+        with patch("widgets.utils.mermaid_renderer.render_mermaid_to_ascii", return_value="┌───┐\n│ X │\n└───┘"):
+            await fence._async_render_mermaid()
+
+        assert fence._diagram_str is not None
+        assert fence._show_diagram is True
+        assert toggle_btn.display is True
+        assert toggle_btn.label == "code"
+        fence.set_content.assert_called_once()
+
+

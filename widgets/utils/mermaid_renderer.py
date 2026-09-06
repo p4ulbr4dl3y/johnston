@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+import functools
 import re
 import shutil
 import subprocess
+import threading
+from collections import OrderedDict
 from typing import Any, Optional
 
+from rich.cells import cell_len
 from rich.text import Text
 from textual.content import Content
 
 _BOX_CHARS = frozenset("┌┐└┘├┤┬┴┼─│━┃╭╮╰╯═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬◆◇○●┄┈┆┊")
 _ARROW_CHARS = frozenset("◄►▲▼◀▶")
-_RENDER_CACHE: dict[str, Optional[str]] = {}
+
+_CACHE_LOCK = threading.Lock()
+_RENDER_CACHE: OrderedDict[str, Optional[str]] = OrderedDict()
 _CACHE_MAX_SIZE = 256
 
 
@@ -22,6 +28,7 @@ def is_mermaid(language: str | None) -> bool:
     return clean in ("mermaid", "mmd")
 
 
+@functools.lru_cache(maxsize=1)
 def _get_mermaid_binary() -> Optional[str]:
     """Locate mermaid-ascii binary from python package or system PATH."""
     try:
@@ -40,32 +47,69 @@ def _normalize_flowchart_shapes(code: str) -> str:
     mermaid-ascii's Go AST parser only maps node identifiers correctly when enclosed
     in square brackets [...]. Shapes like (rounded), {rhombus}, [(db)] otherwise get
     treated as new detached node IDs, splitting the graph topology.
+
+    Protects quoted strings, edge labels with pipes |...|, subgraphs, and styles.
+    Supports Unicode/Cyrillic node identifiers.
     """
-    first_line = ""
-    for line in code.splitlines():
+    lines = code.splitlines()
+    in_frontmatter = False
+    is_flowchart = False
+    for line in lines:
         s = line.strip()
-        if s and not s.startswith("%%"):
-            first_line = s.lower()
-            break
-    if not (first_line.startswith("graph") or first_line.startswith("flowchart")):
+        if not s or s.startswith("%%"):
+            continue
+        if s == "---":
+            in_frontmatter = not in_frontmatter
+            continue
+        if in_frontmatter:
+            continue
+        first_word = s.lower().split()[0] if s.split() else ""
+        if first_word in ("graph", "flowchart"):
+            is_flowchart = True
+        break
+
+    if not is_flowchart:
         return code
 
-    # Two-character opening/closing shapes
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[\((.*?)\)\]", r"\1[\2]", code)  # [(...)]
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\(\[(.*?)\]\)", r"\1[\2]", code)  # ([...])
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\(\((.*?)\)\)", r"\1[\2]", code)  # ((...))
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[\[(.*?)\]\]", r"\1[\2]", code)  # [[...]]
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\{\{(.*?)\}\}", r"\1[\2]", code)  # {{...}}
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[/(.*?)/\]", r"\1[\2]", code)  # [/ /]
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[\x5c(.*?)\x5c\]", r"\1[\2]", code)  # [\ \]
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[/(.*?)\x5c\]", r"\1[\2]", code)  # [/ \]
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[\x5c(.*?)/\]", r"\1[\2]", code)  # [\ /]
+    # Protect string literals and pipe edge labels from shape replacements
+    placeholders: list[str] = []
 
-    # Single-character shapes
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\{(.*?)\}", r"\1[\2]", code)  # {...}
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*>\s*(.*?)]", r"\1[\2]", code)  # >...]
-    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\(([^()\n]+)\)", r"\1[\2]", code)  # (...)
-    return code
+    def _save_placeholder(m: re.Match) -> str:
+        placeholders.append(m.group(0))
+        return f"__MERMAID_PH_{len(placeholders) - 1}__"
+
+    protected = re.sub(r'"[^"\n]*"', _save_placeholder, code)
+    protected = re.sub(r"\|[^|\n]*\|", _save_placeholder, protected)
+
+    norm_lines: list[str] = []
+    skip_prefixes = ("subgraph", "style", "classDef", "class ", "click", "linkStyle", "%%", "---")
+    for line in protected.splitlines():
+        s = line.strip()
+        if s.startswith(skip_prefixes):
+            norm_lines.append(line)
+            continue
+
+        # Two-character opening/closing shapes (node ID: Unicode word chars + hyphens)
+        line = re.sub(r"(\b[\w-]+)\s*\[\((.*?)\)\]", r"\1[\2]", line)  # [(...)]
+        line = re.sub(r"(\b[\w-]+)\s*\(\[(.*?)\]\)", r"\1[\2]", line)  # ([...])
+        line = re.sub(r"(\b[\w-]+)\s*\(\((.*?)\)\)", r"\1[\2]", line)  # ((...))
+        line = re.sub(r"(\b[\w-]+)\s*\[\[(.*?)\]\]", r"\1[\2]", line)  # [[...]]
+        line = re.sub(r"(\b[\w-]+)\s*\{\{(.*?)\}\}", r"\1[\2]", line)  # {{...}}
+        line = re.sub(r"(\b[\w-]+)\s*\[/(.*?)/\]", r"\1[\2]", line)  # [/ /]
+        line = re.sub(r"(\b[\w-]+)\s*\[\x5c(.*?)\x5c\]", r"\1[\2]", line)  # [\ \]
+        line = re.sub(r"(\b[\w-]+)\s*\[/(.*?)\x5c\]", r"\1[\2]", line)  # [/ \]
+        line = re.sub(r"(\b[\w-]+)\s*\[\x5c(.*?)/\]", r"\1[\2]", line)  # [\ /]
+
+        # Single-character shapes
+        line = re.sub(r"(\b[\w-]+)\s*\{(.*?)\}", r"\1[\2]", line)  # {...}
+        line = re.sub(r"(\b[\w-]+)\s*>\s*(.*?)]", r"\1[\2]", line)  # >...]
+        line = re.sub(r"(\b[\w-]+)\s*\(([^()\n]+)\)", r"\1[\2]", line)  # (...)
+        norm_lines.append(line)
+
+    result = "\n".join(norm_lines)
+    for i, ph in enumerate(placeholders):
+        result = result.replace(f"__MERMAID_PH_{i}__", ph)
+    return result
 
 
 def clean_mermaid_code(code: str) -> str:
@@ -102,7 +146,7 @@ def _fix_mojibake(text: str) -> str:
                 decoded = chunk.encode("latin1").decode("utf-8")
             except Exception:
                 return chunk
-            diff = len(chunk) - len(decoded)
+            diff = len(chunk) - cell_len(decoded)
             if diff <= 0:
                 return decoded
             start = match.start()
@@ -118,18 +162,34 @@ def _fix_mojibake(text: str) -> str:
     return "\n".join(lines)
 
 
+def get_cached_mermaid(code: str) -> tuple[bool, Optional[str]]:
+    """Check if code is already rendered in cache without triggering execution.
+
+    Returns (is_cached, cached_diagram_string_or_None).
+    """
+    cleaned = clean_mermaid_code(code)
+    if not cleaned:
+        return True, None
+    with _CACHE_LOCK:
+        if cleaned in _RENDER_CACHE:
+            _RENDER_CACHE.move_to_end(cleaned)
+            return True, _RENDER_CACHE[cleaned]
+    return False, None
+
+
 def render_mermaid_to_ascii(code: str, timeout: float = 2.0) -> Optional[str]:
     """Render mermaid code to ASCII/Unicode diagram string using mermaid-ascii.
 
     Returns rendered diagram string or None on syntax error / missing binary.
-    Caches results in-memory.
+    Thread-safe and caches results in-memory.
     """
     cleaned = clean_mermaid_code(code)
     if not cleaned:
         return None
 
-    if cleaned in _RENDER_CACHE:
-        return _RENDER_CACHE[cleaned]
+    is_cached, cached_val = get_cached_mermaid(code)
+    if is_cached:
+        return cached_val
 
     binary = _get_mermaid_binary()
     if not binary:
@@ -141,6 +201,8 @@ def render_mermaid_to_ascii(code: str, timeout: float = 2.0) -> Optional[str]:
             [binary],
             input=cleaned,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
             timeout=timeout,
         )
@@ -161,23 +223,28 @@ def prewarm_mermaid(code: str) -> None:
 
 
 def _store_cache(key: str, value: Optional[str]) -> None:
-    if len(_RENDER_CACHE) >= _CACHE_MAX_SIZE:
-        try:
-            _RENDER_CACHE.pop(next(iter(_RENDER_CACHE)))
-        except Exception:
-            _RENDER_CACHE.clear()
-    _RENDER_CACHE[key] = value
+    with _CACHE_LOCK:
+        if key in _RENDER_CACHE:
+            _RENDER_CACHE.move_to_end(key)
+            _RENDER_CACHE[key] = value
+            return
+        if len(_RENDER_CACHE) >= _CACHE_MAX_SIZE:
+            _RENDER_CACHE.popitem(last=False)
+        _RENDER_CACHE[key] = value
 
 
 def clear_mermaid_cache() -> None:
     """Clear in-memory render cache (useful for tests)."""
-    _RENDER_CACHE.clear()
+    with _CACHE_LOCK:
+        _RENDER_CACHE.clear()
+    _get_mermaid_binary.cache_clear()
 
 
 def format_mermaid_content(diagram_str: str, dark: bool = True, theme_obj: Any = None) -> Content:
     """Format ASCII diagram with colored box drawing lines and arrows into Textual Content.
 
     Uses theme accent tokens when available, matching Johnston's palette aesthetic.
+    Batches adjacent characters of identical style into single text spans for performance.
     """
     text = Text()
 
@@ -192,11 +259,26 @@ def format_mermaid_content(diagram_str: str, dark: bool = True, theme_obj: Any =
     box_style = f"bold {box_color}"
     arrow_style = f"bold {arrow_color}"
 
+    current_style: str | None = None
+    buf: list[str] = []
+
     for char in diagram_str:
         if char in _ARROW_CHARS:
-            text.append(char, style=arrow_style)
+            style = arrow_style
         elif char in _BOX_CHARS:
-            text.append(char, style=box_style)
+            style = box_style
         else:
-            text.append(char)
+            style = None
+
+        if style == current_style:
+            buf.append(char)
+        else:
+            if buf:
+                text.append("".join(buf), style=current_style)
+            buf = [char]
+            current_style = style
+
+    if buf:
+        text.append("".join(buf), style=current_style)
+
     return Content.from_rich_text(text)

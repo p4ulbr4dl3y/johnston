@@ -277,20 +277,65 @@ class CustomMarkdownFence(MarkdownFence):
     def __init__(self, markdown: Markdown, token: Any, code: str) -> None:
         self._diagram_str: str | None = None
         self._show_diagram: bool = False
+        self._render_attempted: bool = False
         super().__init__(markdown, token, code)
         lang_str = self.lexer.strip() if self.lexer else "text"
-        from widgets.utils.mermaid_renderer import is_mermaid, render_mermaid_to_ascii
+        from widgets.utils.mermaid_renderer import get_cached_mermaid, is_mermaid
 
         if is_mermaid(lang_str):
-            rendered = render_mermaid_to_ascii(self.code)
-            if rendered:
-                self._diagram_str = rendered
-                self._show_diagram = True
+            is_cached, cached_val = get_cached_mermaid(self.code)
+            if is_cached:
+                self._render_attempted = True
+                if cached_val:
+                    self._diagram_str = cached_val
+                    self._show_diagram = True
+
+    def on_mount(self) -> None:
+        lang_str = self.lexer.strip() if self.lexer else "text"
+        from widgets.utils.mermaid_renderer import is_mermaid
+
+        if is_mermaid(lang_str) and not self._diagram_str and not getattr(self, "_render_attempted", False):
+            self._render_attempted = True
+            try:
+                self.run_worker(self._async_render_mermaid(), exclusive=False)
+            except Exception:
+                pass
+
+    async def _async_render_mermaid(self) -> None:
+        import asyncio
+
+        from widgets.app.theme_manager import theme_manager
+        from widgets.utils.mermaid_renderer import format_mermaid_content, render_mermaid_to_ascii
+
+        rendered = await asyncio.to_thread(render_mermaid_to_ascii, self.code)
+        if not rendered or getattr(self, "is_destroyed", False):
+            return
+
+        self._diagram_str = rendered
+        self._show_diagram = True
+
+        app = getattr(self, "app", None)
+        curr = getattr(app, "current_theme", None) or theme_manager.current_theme
+        is_dark = getattr(curr, "dark", True)
+
+        try:
+            toggle_btn = self.query_one(".fence-toggle-btn", Button)
+            toggle_btn.display = True
+            toggle_btn.label = "code"
+        except Exception:
+            pass
+
+        try:
+            self.add_class("diagram-mode")
+        except Exception:
+            pass
+        self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr))
 
     def _copy_context(self, block: MarkdownBlock) -> None:
         if isinstance(block, CustomMarkdownFence):
             self._diagram_str = getattr(block, "_diagram_str", None)
             self._show_diagram = getattr(block, "_show_diagram", False)
+            self._render_attempted = getattr(block, "_render_attempted", False)
         super()._copy_context(block)
 
     async def _update_from_block(self, block: MarkdownBlock) -> None:
@@ -303,28 +348,48 @@ class CustomMarkdownFence(MarkdownFence):
             curr = getattr(app, "current_theme", None) or theme_manager.current_theme
             is_dark = getattr(curr, "dark", True)
 
+            try:
+                toggle_btn = self.query_one(".fence-toggle-btn", Button)
+                toggle_btn.display = bool(self._diagram_str)
+                toggle_btn.label = "code" if self._show_diagram else "diagram"
+            except Exception:
+                pass
+
             if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
-                if hasattr(self, "_classes"):
+                try:
                     self.add_class("diagram-mode")
+                except Exception:
+                    pass
                 self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr))
             else:
-                if hasattr(self, "_classes"):
+                try:
                     self.remove_class("diagram-mode")
-                self.set_content(block._highlighted_code)
+                except Exception:
+                    pass
+                highlighted = getattr(block, "_highlighted_code", None)
+                if highlighted is None:
+                    highlighted = self.highlight(self.code, self.lexer, dark=is_dark)
+                self.set_content(highlighted)
         else:
             await super()._update_from_block(block)
 
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "text"
-        from widgets.utils.mermaid_renderer import format_mermaid_content, is_mermaid, render_mermaid_to_ascii
+        from widgets.utils.mermaid_renderer import format_mermaid_content, get_cached_mermaid, is_mermaid
 
-        if not hasattr(self, "_diagram_str") or self._diagram_str is None:
+        if not hasattr(self, "_diagram_str"):
             self._diagram_str = None
+        if not hasattr(self, "_show_diagram"):
             self._show_diagram = False
-            if is_mermaid(lang_str):
-                rendered = render_mermaid_to_ascii(self.code)
-                if rendered:
-                    self._diagram_str = rendered
+        if not hasattr(self, "_render_attempted"):
+            self._render_attempted = False
+
+        if not self._render_attempted and is_mermaid(lang_str):
+            is_cached, cached_val = get_cached_mermaid(self.code)
+            if is_cached:
+                self._render_attempted = True
+                if cached_val:
+                    self._diagram_str = cached_val
                     self._show_diagram = True
 
         lang_label = Label(lang_str, classes="fence-lang")
@@ -336,10 +401,11 @@ class CustomMarkdownFence(MarkdownFence):
         header.ALLOW_SELECT = False
         with header:
             yield lang_label
-            if self._diagram_str:
+            if is_mermaid(lang_str):
                 toggle_btn = Button("code" if self._show_diagram else "diagram", classes="fence-toggle-btn")
                 toggle_btn.can_focus = False
                 toggle_btn.ALLOW_SELECT = False
+                toggle_btn.display = bool(self._diagram_str)
                 yield toggle_btn
             yield copy_btn
 
@@ -351,9 +417,11 @@ class CustomMarkdownFence(MarkdownFence):
         is_dark = getattr(curr, "dark", True)
         self._highlighted_code = self.highlight(self.code, self.lexer, ansi=is_ansi, dark=is_dark)
 
-        if self._show_diagram and self._diagram_str:
-            if hasattr(self, "_classes"):
+        if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
+            try:
                 self.add_class("diagram-mode")
+            except Exception:
+                pass
             initial_content = format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr)
         else:
             initial_content = self._highlighted_code
@@ -387,6 +455,11 @@ class CustomMarkdownFence(MarkdownFence):
         else:
             if hasattr(self, "_classes"):
                 self.remove_class("diagram-mode")
+            try:
+                scroll_box = self.query_one(".fence-scroll-box", Vertical)
+                scroll_box.scroll_x = 0
+            except Exception:
+                pass
             self.set_content(
                 getattr(self, "_highlighted_code", None) or self.highlight(self.code, self.lexer, dark=is_dark)
             )
@@ -438,9 +511,17 @@ class CustomMarkdownFence(MarkdownFence):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if "fence-copy-btn" in event.button.classes:
             try:
-                app = self.app
-                if hasattr(app, "copy_to_clipboard"):
-                    app.copy_to_clipboard(self.code)
+                try:
+                    app = self.app
+                except Exception:
+                    app = None
+                if app and hasattr(app, "copy_to_clipboard"):
+                    text_to_copy = (
+                        self._diagram_str
+                        if (getattr(self, "_show_diagram", False) and self._diagram_str)
+                        else self.code
+                    )
+                    app.copy_to_clipboard(text_to_copy)
             except Exception:
                 pass
             event.stop()
