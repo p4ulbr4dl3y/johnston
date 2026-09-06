@@ -381,6 +381,23 @@ def _evaluate_shell_rules(cmd: str, rules: List[Dict[str, Any]]) -> Optional[Per
         return None
 
     rule_pairs = _iter_rules(rules)
+    for sub in subcmds:
+        sig = extract_command_signature(sub)
+        deny_hit = next(
+            (
+                pair
+                for pair in rule_pairs
+                if pair[1] == PermissionAction.DENY
+                and (match_pattern(sub, pair[0]) or match_pattern(sig, pair[0]))
+            ),
+            None,
+        )
+        if deny_hit is not None:
+            return PermissionDecision(
+                PermissionAction.DENY,
+                f"Subcommand '{sub}' matched deny pattern '{deny_hit[0]}'",
+            )
+
     matched: List[Tuple[PermissionAction, str]] = []
     for sub in subcmds:
         sig = extract_command_signature(sub)
@@ -553,7 +570,30 @@ def merge_perms(base: Dict[str, Any], override: Dict[str, Any]) -> None:
                     )
                     if pat
                 ]
-                base["patterns"][t.lower()] = norm_rules
+                tool_key = t.lower()
+                existing_rules = base["patterns"].get(tool_key, [])
+                if not isinstance(existing_rules, list):
+                    existing_rules = []
+
+                rule_by_pattern: Dict[str, str] = {}
+                for r in existing_rules:
+                    if isinstance(r, dict) and "pattern" in r:
+                        pat_key = str(r["pattern"]).strip()
+                        if pat_key:
+                            rule_by_pattern[pat_key] = normalize_action(str(r.get("action", "ask")))
+
+                for r in norm_rules:
+                    pat_key = r["pattern"]
+                    act_val = r["action"]
+                    # If base already has a DENY rule for this pattern, do not downgrade it
+                    if rule_by_pattern.get(pat_key) == "deny" and act_val != "deny":
+                        continue
+                    rule_by_pattern[pat_key] = act_val
+
+                base["patterns"][tool_key] = [
+                    {"pattern": pat, "action": act}
+                    for pat, act in rule_by_pattern.items()
+                ]
     if "writable_roots" in override and isinstance(override["writable_roots"], list):
         if "writable_roots" not in base or not isinstance(base["writable_roots"], list):
             base["writable_roots"] = []

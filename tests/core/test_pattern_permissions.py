@@ -105,6 +105,11 @@ class TestPatternPolicyHelpers(unittest.TestCase):
         self.assertIsNotNone(dec)
         self.assertEqual(dec.action, PermissionAction.DENY)
 
+        # Compound: first subcommand uncovered by pattern rules, second is DENY -> must return DENY
+        dec_uncovered = evaluate_pattern_rules("shell", {"command": "echo 1 && rm -rf /"}, rules)
+        self.assertIsNotNone(dec_uncovered)
+        self.assertEqual(dec_uncovered.action, PermissionAction.DENY)
+
         # Compound: one ask -> ask
         dec = evaluate_pattern_rules("shell", {"command": "cat file.txt && pytest -v"}, rules)
         self.assertIsNotNone(dec)
@@ -168,6 +173,7 @@ class TestPermissionManagerPatterns(unittest.TestCase):
         self.assertEqual(dec_other.action, PermissionAction.ASK)
 
     def test_config_pattern_rules(self):
+        self.pm.add_workspace_root("/app")
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
@@ -270,3 +276,20 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
                 pm.set_session_pattern_override("shell", "pytest *", "allow")
                 dec = pm.check_permission("shell", {"command": "pytest -v"})
                 self.assertEqual(dec.action, PermissionAction.ALLOW)
+
+    def test_config_deny_wins_over_session_tool_override(self):
+        """Admin config DENY pattern beats runtime session tool-level allow."""
+        pm = PermissionManager()
+        pm.clear_session_overrides()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {"permissions": {"patterns": {"shell": [{"pattern": "rm -rf *", "action": "deny"}]}}},
+                    f,
+                )
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                pm.set_session_override("shell", "allow")
+                dec = pm.check_permission("shell", {"command": "rm -rf /tmp/dangerous"})
+                self.assertEqual(dec.action, PermissionAction.DENY)
+                self.assertIn("deny", dec.reason.lower())

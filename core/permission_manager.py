@@ -552,33 +552,24 @@ class PermissionManager:
         project_dir: Optional[str] = None,
     ) -> PermissionDecision:
         """Evaluates permission for executing a tool against the resolution cascade:
-        1. Runtime session tool override
-        2. Config DENY patterns
-        3. Runtime session pattern overrides
-        4. Config pattern rules
-        5. Explicit tool permission from config
-        --> Check workspace boundary
-        6. Global default fallback (configured 'deny' locks down; junk fails closed to ASK)
-        7. Active Execution Mode baseline
+        1. Config DENY patterns
+        2. Workspace boundary check
+        3. Runtime session tool override
+        4. Runtime session pattern overrides
+        5. Config pattern rules (non-DENY)
+        6. Explicit tool permission from config
+        7. Global default fallback (configured 'deny' locks down; junk fails closed to ASK)
+        8. Active Execution Mode baseline
         """
         canonical_name = self._normalize_name(tool_name)
         # Fail-closed: an empty/absent tool name must never grant execution.
         if not canonical_name:
             return PermissionDecision(PermissionAction.DENY, "No tool name given")
 
-        # 1. Runtime session tool override
-        session_action = self.session_overrides.get(canonical_name)
-        if session_action is not None:
-            return PermissionDecision(
-                PermissionAction(session_action),
-                f"Session override for '{canonical_name}'",
-            )
-
         effective_perms = self.get_effective_permissions(project_dir)
 
-        # 2. Config DENY patterns: a session-scoped allow granted via
-        # the confirmation dialog must never bypass an explicit admin-configured
-        # DENY. Session allows may only override config ASK/ALLOW rules.
+        # 1. Config DENY patterns: an explicit admin-configured DENY pattern
+        # must never be bypassed by session tool/pattern overrides or tool settings.
         config_patterns = effective_perms.get("patterns", {}).get(canonical_name, [])
         config_decision = evaluate_pattern_rules(canonical_name, args, config_patterns)
         if (
@@ -587,26 +578,8 @@ class PermissionManager:
         ):
             return config_decision
 
-        # 3. Runtime session pattern overrides
-        decision = evaluate_pattern_rules(
-            canonical_name, args, self.session_pattern_overrides.get(canonical_name, [])
-        )
-        if decision is not None:
-            return decision
-
-        # 4. Pattern rules from config
-        if config_decision is not None:
-            return config_decision
-
-        # 5. Explicit tool permission from user's config file (normalized during merge)
-        explicit_action = effective_perms.get("tools", {}).get(canonical_name)
-        if explicit_action is not None:
-            return PermissionDecision(
-                PermissionAction(explicit_action),
-                f"Explicit tool permission for '{canonical_name}'",
-            )
-
-        # Check workspace boundary
+        # 2. Workspace boundary check: accessing files outside workspace
+        # cannot be bypassed by session overrides or tool permissions in config.
         raw_outside_action = effective_perms.get("outside_workspace_action", "ask")
         outside_action = (
             PermissionAction.DENY
@@ -620,17 +593,37 @@ class PermissionManager:
             outside_action=outside_action,
         )
         if ws_decision is not None:
-            active_mode = self.execution_mode
-            if active_mode in (ExecutionMode.EDITS, ExecutionMode.YOLO):
-                return PermissionDecision(
-                    outside_action,
-                    f"Path outside workspace roots: {ws_decision.reason}",
-                )
-            if active_mode == ExecutionMode.REVIEW and outside_action == PermissionAction.DENY:
-                return PermissionDecision(
-                    PermissionAction.DENY,
-                    f"Path outside workspace roots: {ws_decision.reason}",
-                )
+            return PermissionDecision(
+                outside_action,
+                f"Path outside workspace roots: {ws_decision.reason}",
+            )
+
+        # 3. Runtime session tool override
+        session_action = self.session_overrides.get(canonical_name)
+        if session_action is not None:
+            return PermissionDecision(
+                PermissionAction(session_action),
+                f"Session override for '{canonical_name}'",
+            )
+
+        # 4. Runtime session pattern overrides
+        decision = evaluate_pattern_rules(
+            canonical_name, args, self.session_pattern_overrides.get(canonical_name, [])
+        )
+        if decision is not None:
+            return decision
+
+        # 5. Pattern rules from config
+        if config_decision is not None:
+            return config_decision
+
+        # 6. Explicit tool permission from user's config file (normalized during merge)
+        explicit_action = effective_perms.get("tools", {}).get(canonical_name)
+        if explicit_action is not None:
+            return PermissionDecision(
+                PermissionAction(explicit_action),
+                f"Explicit tool permission for '{canonical_name}'",
+            )
 
         # Configured global default: only tightens ('deny') or fails closed;
         # valid allow/ask fall through to the mode baseline.

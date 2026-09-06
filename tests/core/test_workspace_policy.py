@@ -174,3 +174,37 @@ class TestWorkspacePolicy(unittest.TestCase):
         # Invalid action should not override
         merge_perms(base, {"outside_workspace_action": "invalid_action"})
         self.assertEqual(base["outside_workspace_action"], "deny")
+
+    def test_tmp_directory_handling(self):
+        tmp_target = "/tmp/test_workspace_check.txt"
+        self.assertTrue(is_path_within_workspace(tmp_target, [], allow_temp=True))
+        self.assertFalse(is_path_within_workspace(tmp_target, [], allow_temp=False))
+
+        roots = [str(self.workspace)]
+        self.assertTrue(is_path_within_workspace(tmp_target, roots, allow_temp=True))
+        self.assertFalse(is_path_within_workspace(tmp_target, roots, allow_temp=False))
+
+    def test_merge_perms_patterns_combines_and_preserves_deny(self):
+        base = {
+            "patterns": {
+                "shell": [
+                    {"pattern": "rm -rf *", "action": "deny"},
+                    {"pattern": "git status*", "action": "ask"},
+                ]
+            }
+        }
+        override = {
+            "patterns": {
+                "shell": [
+                    {"pattern": "rm -rf *", "action": "allow"},
+                    {"pattern": "git status*", "action": "allow"},
+                    {"pattern": "echo *", "action": "allow"},
+                ]
+            }
+        }
+        merge_perms(base, override)
+        shell_patterns = {r["pattern"]: r["action"] for r in base["patterns"]["shell"]}
+        self.assertEqual(shell_patterns["rm -rf *"], "deny")
+        self.assertEqual(shell_patterns["git status*"], "allow")
+        self.assertEqual(shell_patterns["echo *"], "allow")
+

@@ -154,6 +154,48 @@ class TestPermissionCascadeMultitier(unittest.TestCase):
         decision = self.pm.check_permission("edit", {"path": outside_file})
         self.assertEqual(decision.action, PermissionAction.DENY)
 
+    def test_workspace_boundary_review_mode_read_outside(self):
+        """In review mode: read inside workspace is ALLOW; read outside workspace returns ASK (or DENY)."""
+        self.pm.set_session_mode("review")
+        inside_file = os.path.join(self.project_dir, "inside.py")
+        outside_file = os.path.join(self.outside_dir, "outside.py")
+
+        # Read inside workspace is ALLOW in review mode
+        decision = self.pm.check_permission("read", {"path": inside_file})
+        self.assertEqual(decision.action, PermissionAction.ALLOW)
+
+        # Read outside workspace defaults to ASK (not ALLOW baseline)
+        decision = self.pm.check_permission("read", {"path": outside_file})
+        self.assertEqual(decision.action, PermissionAction.ASK)
+        self.assertIn("outside workspace", decision.reason.lower())
+
+        # When outside_workspace_action is deny, read outside becomes DENY
+        project_config = os.path.join(self.project_dir, ".johnston", "config.json")
+        self._write_json(project_config, {"permissions": {"outside_workspace_action": "deny"}})
+        decision = self.pm.check_permission("read", {"path": outside_file})
+        self.assertEqual(decision.action, PermissionAction.DENY)
+
+    def test_session_override_cannot_bypass_workspace_boundary(self):
+        """Session overrides and tool config allowances cannot bypass workspace boundary."""
+        self.pm.set_session_override("edit", "allow")
+        self.pm.set_session_override("read", "allow")
+
+        inside_file = os.path.join(self.project_dir, "inside.py")
+        outside_file = os.path.join(self.outside_dir, "outside.py")
+
+        # Inside file respects session override allow
+        dec_inside = self.pm.check_permission("edit", {"path": inside_file})
+        self.assertEqual(dec_inside.action, PermissionAction.ALLOW)
+
+        # Outside file is stopped by workspace boundary despite session override
+        dec_outside_edit = self.pm.check_permission("edit", {"path": outside_file})
+        self.assertEqual(dec_outside_edit.action, PermissionAction.ASK)
+        self.assertIn("outside workspace", dec_outside_edit.reason.lower())
+
+        dec_outside_read = self.pm.check_permission("read", {"path": outside_file})
+        self.assertEqual(dec_outside_read.action, PermissionAction.ASK)
+        self.assertIn("outside workspace", dec_outside_read.reason.lower())
+
     def test_auto_gitignore_adds_local_config(self):
         """Auto-gitignore adds .johnston/config.local.json to .gitignore."""
         local_config = os.path.join(self.project_dir, ".johnston", "config.local.json")
