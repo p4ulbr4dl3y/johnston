@@ -355,5 +355,31 @@ class TestCLIMCP(unittest.TestCase):
         self.assertIn("Configured MCP Servers:", f.getvalue())
 
 
+    def test_add_mcp_splits_command(self):
+        mgr = MagicMock()
+        code = add_mcp("my-server", cmd="npx -y @mcp/server", mgr=mgr)
+        self.assertEqual(code, 0)
+        mgr.add_server.assert_called_once_with(
+            "my-server",
+            cmd="npx",
+            url=None,
+            args=["-y", "@mcp/server"],
+            scope="global",
+        )
+
+    def test_add_server_config_splits_command(self):
+        add_server_config(
+            "split_srv",
+            cmd="npx -y @mcp/server",
+            scope="global",
+            global_file=self.global_mcp,
+        )
+        with open(self.global_mcp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        entry = data["mcpServers"]["split_srv"]
+        self.assertEqual(entry["command"], "npx")
+        self.assertEqual(entry["args"], ["-y", "@mcp/server"])
+
+
 if __name__ == "__main__":
     unittest.main()

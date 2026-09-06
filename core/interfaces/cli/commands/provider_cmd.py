@@ -62,9 +62,23 @@ def list_providers(pm: Optional[ProviderManager] = None) -> int:
     return 0
 
 
-def set_key(name: str, key: str, pm: Optional[ProviderManager] = None) -> int:
+def set_key(name: str, key: Optional[str] = None, pm: Optional[ProviderManager] = None) -> int:
     """Save provider API key."""
-    if not name or not key:
+    if not name:
+        print("Error: Provider name is required.", file=sys.stderr)
+        return 1
+
+    if key is None:
+        if sys.stdin.isatty():
+            import getpass
+
+            key = getpass.getpass(f"Enter API key for '{name}': ")
+        else:
+            key = sys.stdin.read().strip()
+    elif key == "-":
+        key = sys.stdin.read().strip()
+
+    if not key:
         print("Error: Provider name and API key are required.", file=sys.stderr)
         return 1
     pm = _get_pm(pm)
@@ -90,6 +104,10 @@ def enable_provider(name: str, pm: Optional[ProviderManager] = None) -> int:
         print("Error: Provider name is required.", file=sys.stderr)
         return 1
     pm = _get_pm(pm)
+    all_providers = pm.load_providers(include_disabled=True)
+    if name not in all_providers:
+        print(f"Error: Provider '{name}' not found.", file=sys.stderr)
+        return 1
     pm.set_provider_disabled(name, False)
     print(f"Provider '{name}' enabled.")
     return 0
@@ -101,6 +119,10 @@ def disable_provider(name: str, pm: Optional[ProviderManager] = None) -> int:
         print("Error: Provider name is required.", file=sys.stderr)
         return 1
     pm = _get_pm(pm)
+    all_providers = pm.load_providers(include_disabled=True)
+    if name not in all_providers:
+        print(f"Error: Provider '{name}' not found.", file=sys.stderr)
+        return 1
     pm.set_provider_disabled(name, True)
     print(f"Provider '{name}' disabled.")
     return 0
@@ -144,7 +166,7 @@ def run_provider(args: Any = None, pm: Optional[ProviderManager] = None) -> int:
     if action is None or action == "list":
         return list_providers(pm)
     if action == "set-key":
-        return set_key(getattr(args, "name", ""), getattr(args, "key", ""), pm)
+        return set_key(getattr(args, "name", ""), getattr(args, "key", None), pm)
     if action == "set-model":
         return set_model(getattr(args, "name", ""), getattr(args, "model", ""), pm)
     if action == "enable":

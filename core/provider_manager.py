@@ -1,10 +1,13 @@
 import logging
 import os
-import re
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
-from core.domain.entities.provider import ProviderDef
+from core.domain.entities.provider import (
+    _WARNED_BASE_URL_TOKENS,
+    ProviderDef,
+    resolve_base_url_placeholders,
+)
 from core.domain.policies.provider import split_provider_model
 from core.domain.ports.tool_registry import ToolRegistryPort, get_default_tool_registry
 from core.infrastructure.adapters.models_source import extract_context_length
@@ -57,9 +60,6 @@ MODELS_CACHE_EMPTY_TTL = 300.0
 # Providers whose server runs on localhost and never requires credentials.
 LOCAL_PROVIDER_KEYS = ("ollama", "lmstudio", "litellm")
 
-_BASE_URL_PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
-_WARNED_BASE_URL_TOKENS: set = set()
-
 
 def is_local_provider(
     provider_key: str,
@@ -88,82 +88,7 @@ def is_local_provider(
     return False
 
 
-def resolve_base_url_placeholders(raw: str, provider_key: str, data: Dict[str, Any]) -> str:
-    """Expand ``{token}`` placeholders in a base_url template (azure
-    ``{resource}``, cloudflare ``{account_id}``, ...).
-
-    Resolution order: ``<PROVIDER>_<TOKEN>`` env var, plain ``<TOKEN>`` env
-    var, then a same-named string field of the provider definition.
-    Unresolved tokens stay verbatim (visible failure, no silently wrong host)
-    with a one-time warning pointing at the env var to set.
-    """
-
-    def _sub(match: "re.Match[str]") -> str:
-        token = match.group(1)
-        env_name = f"{provider_key}_{token}".upper().replace("-", "_")
-        val = get_secret(env_name) or get_secret(token) or (data.get(token) if isinstance(data.get(token), str) else "")
-        if val:
-            return str(val)
-        warn_key = (provider_key, token)
-        if warn_key not in _WARNED_BASE_URL_TOKENS:
-            _WARNED_BASE_URL_TOKENS.add(warn_key)
-            logger.warning(
-                "Base URL placeholder {%s} for provider '%s' was not resolved. Set %s in environment or secrets.json.",
-                token,
-                provider_key,
-                env_name,
-            )
-        return match.group(0)
-
-    return _BASE_URL_PLACEHOLDER_RE.sub(_sub, raw)
-
-
-def _field_float(data: Dict[str, Any], key: str, default: float) -> float:
-    """Float config field preserving an explicit 0 (truthiness checks eat it)."""
-    raw = data.get(key)
-    return default if raw is None else float(raw)
-
-
-def _field_int(data: Dict[str, Any], key: str, default: int) -> int:
-    raw = data.get(key)
-    return default if raw is None else int(raw)
-
-
-def _provider_def_from_dict(
-    cls, key: str, data: Dict[str, Any], *, enabled: Optional[bool] = None
-) -> ProviderDef:
-    """Build a ProviderDef from a raw provider JSON dict, applying defaults and secrets interpolation."""
-    raw_key = data.get("api_key") or ""
-    resolved_key = interpolate_secrets(raw_key) if raw_key else ""
-    raw_base_url = resolve_base_url_placeholders(data.get("base_url") or "", key, data)
-    resolved_base_url = interpolate_secrets(raw_base_url)
-    headers = interpolate_secrets_in_obj(data.get("headers")) if data.get("headers") else None
-
-    is_enabled = bool(data.get("enabled", True)) if enabled is None else enabled
-    return cls(
-        key=key,
-        name=data.get("name") or key,
-        base_url=resolved_base_url,
-        model=data.get("model") or "",
-        models=list(data.get("models") or []),
-        fetch_models=bool(data.get("fetch_models", True)),
-        api_type=data.get("api_type") or "openai",
-        headers=headers,
-        extra_body=data.get("extra_body"),
-        reasoning_effort=data.get("reasoning_effort"),
-        chunk_timeout=_field_float(data, "chunk_timeout", get_settings().llm.chunk_timeout),
-        max_tokens=data.get("max_tokens"),
-        max_retries=_field_int(data, "max_retries", get_settings().llm.max_retries),
-        retry_delay=_field_float(data, "retry_delay", get_settings().llm.retry_delay),
-        retry_backoff=_field_float(data, "retry_backoff", get_settings().llm.retry_backoff),
-        max_retry_delay=_field_float(data, "max_retry_delay", get_settings().llm.max_retry_delay),
-        enabled=is_enabled,
-        api_key=resolved_key,
-        requires_key=data.get("requires_key"),
-    )
-
-
-ProviderDef.from_dict = classmethod(_provider_def_from_dict)
+_provider_def_from_dict = ProviderDef.from_dict
 
 
 def _file_mtime(path: str) -> float:
@@ -206,6 +131,7 @@ __all__ = [
     "ProviderManagerConfigMixin",
     "ProviderManagerModelsMixin",
     "ToolRegistryPort",
+    "_WARNED_BASE_URL_TOKENS",
     "atomic_write_json",
     "cached_json_read",
     "catalog",

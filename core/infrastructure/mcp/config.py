@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shlex
 from typing import Any, Dict, Optional, Set, Tuple
 
 from core.infrastructure.platform.paths import CONFIG_DIR
@@ -166,6 +167,12 @@ def add_server_config(
     global_file: str = GLOBAL_MCP_FILE,
 ) -> None:
     """Add or update an MCP server entry in global or project config."""
+    if cmd is not None and isinstance(cmd, str) and " " in cmd.strip() and not args:
+        parts = shlex.split(cmd)
+        if parts:
+            cmd = parts[0]
+            args = parts[1:]
+
     if scope == "project":
         proj_dir = project_dir or os.getcwd()
         target_file = os.path.join(proj_dir, PROJECT_MCP_FILE)

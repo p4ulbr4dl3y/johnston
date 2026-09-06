@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import sys
 from typing import Any, Optional
 
 from core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
+from core.role_registry import RoleRegistry
+from core.roles.apply import apply_role
 
 if False:  # type checking only
     from core.provider_manager import ProviderManager
@@ -95,6 +98,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         pm = ProviderManager()
         close_pm = True
 
+    agent: Any = None
     try:
         provider_key = getattr(args, "provider", None) or pm.get_active_provider_key()
         if not provider_key:
@@ -128,7 +132,12 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
             agent.model = args.model
 
         role = getattr(args, "role", None) or "worker"
-        agent.role = role
+        roles = RoleRegistry.get_instance().load_roles()
+        if role not in roles:
+            sys.stderr.write(f"Error: Role '{role}' not found.\n")
+            return 1
+
+        apply_role(agent, role, is_subagent=False)
 
         is_quiet = bool(getattr(args, "quiet", False))
         is_json = bool(getattr(args, "json", False))
@@ -234,6 +243,10 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         return 1 if has_error else 0
 
     finally:
+        if agent and hasattr(agent, "close") and callable(agent.close):
+            res = agent.close()
+            if inspect.isawaitable(res):
+                await res
         if close_pm:
             await pm.close()
 

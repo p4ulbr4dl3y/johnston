@@ -83,14 +83,12 @@ def _dispatch_roles(args: Any = None) -> int:
 def _dispatch_models(args: Any = None) -> int:
     cli_mod = sys.modules.get("cli")
     if cli_mod and hasattr(cli_mod, "print_models"):
-        from unittest.mock import Mock
+        cli_mod.print_models()
+        return 0
+    from core.interfaces.cli.commands.provider_cmd import print_models
 
-        if isinstance(getattr(cli_mod, "print_models"), Mock):
-            cli_mod.print_models()
-            return 0
-    from core.interfaces.cli.commands.provider_cmd import run_provider
-
-    return run_provider(args)
+    print_models()
+    return 0
 
 
 def _dispatch_skills(args: Any = None) -> int:
@@ -105,14 +103,12 @@ def _dispatch_skills(args: Any = None) -> int:
 def _dispatch_mcp(args: Any = None) -> int:
     cli_mod = sys.modules.get("cli")
     if cli_mod and hasattr(cli_mod, "print_mcp"):
-        from unittest.mock import Mock
+        cli_mod.print_mcp()
+        return 0
+    from core.interfaces.cli.commands.mcp_cmd import print_mcp
 
-        if isinstance(getattr(cli_mod, "print_mcp"), Mock):
-            cli_mod.print_mcp()
-            return 0
-    from core.interfaces.cli.commands.mcp_cmd import run_mcp
-
-    return run_mcp(args)
+    print_mcp()
+    return 0
 
 
 def _dispatch_rules(args: Any = None) -> int:
@@ -172,7 +168,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sk_p = provider_subs.add_parser("set-key", help="Set API key for a provider")
     sk_p.add_argument("name", help="Provider name or key")
-    sk_p.add_argument("key", help="API key to save")
+    sk_p.add_argument("key", nargs="?", default=None, help="API key to save")
 
     sm_p = provider_subs.add_parser("set-model", help="Set active model for a provider")
     sm_p.add_argument("name", help="Provider name or key")

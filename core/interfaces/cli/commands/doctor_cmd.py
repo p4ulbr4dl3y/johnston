@@ -259,11 +259,16 @@ def diagnose_mcp(mgr: Optional[MCPManager] = None) -> List[Tuple[str, str]]:
         url = s.get("url")
 
         if cmd:
-            cmd_bin = cmd.strip().split()[0] if cmd.strip() else ""
+            cmd_bin = (
+                cmd[0]
+                if isinstance(cmd, list)
+                else (cmd.strip().split()[0] if isinstance(cmd, str) and cmd.strip() else "")
+            )
+            cmd_display = " ".join(cmd) if isinstance(cmd, list) else (cmd if isinstance(cmd, str) else str(cmd))
             if shutil.which(cmd_bin) or os.path.exists(cmd_bin):
-                results.append(("✓", f"MCP server '{name}': command valid ('{cmd_bin}'), {count} tool(s)"))
+                results.append(("✓", f"MCP server '{name}': command valid ('{cmd_display}'), {count} tool(s)"))
             else:
-                results.append(("✗", f"MCP server '{name}': command not found ('{cmd_bin}')"))
+                results.append(("✗", f"MCP server '{name}': command not found ('{cmd_display}')"))
         elif url:
             if url.startswith(("http://", "https://")):
                 results.append(("✓", f"MCP server '{name}': endpoint valid ('{url}'), {count} tool(s)"))

@@ -93,15 +93,21 @@ class ProviderManagerConfigMixin:
         json_providers = self._load_json_providers()
         return [k for k, v in json_providers.items() if not v.get("enabled", True)]
 
-    def set_provider_disabled(self, key: str, disabled: bool):
-        data = self._read_providers_json()
-        prov_data = data.get(key)
-        if not isinstance(prov_data, dict):
-            prov_data = {}
-        prov_data["enabled"] = not disabled
-        data[key] = prov_data
-        self._save_providers_json(data)
+    def set_provider_disabled(self, key: str, disabled: bool) -> bool:
+        if key not in self.load_providers(include_disabled=True):
+            return False
+        pm = _pm()
+
+        def _mutate(cfg: Dict[str, Any]) -> None:
+            prov_data = cfg.get(key)
+            if not isinstance(prov_data, dict):
+                prov_data = {}
+            prov_data["enabled"] = not disabled
+            cfg[key] = prov_data
+
+        pm.update_json_config(pm.PROVIDERS_JSON_FILE, _mutate, indent=2)
         self.invalidate_cache()
+        return True
 
     def add_provider(
         self,
@@ -111,36 +117,44 @@ class ProviderManagerConfigMixin:
         base_url: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        data = self._read_providers_json()
-        prov_data = data.get(name)
-        if not isinstance(prov_data, dict):
-            prov_data = {}
-        prov_data["key"] = name
-        prov_data["name"] = prov_data.get("name", name)
-        prov_data["model"] = model
-        models = prov_data.get("models")
-        if not isinstance(models, list):
-            prov_data["models"] = [model]
-        elif model not in models:
-            models.append(model)
-        if base_url:
-            prov_data["base_url"] = base_url
+        pm = _pm()
+
+        def _mutate(cfg: Dict[str, Any]) -> None:
+            prov_data = cfg.get(name)
+            if not isinstance(prov_data, dict):
+                prov_data = {}
+            prov_data["key"] = name
+            prov_data["name"] = prov_data.get("name", name)
+            prov_data["model"] = model
+            models = prov_data.get("models")
+            if not isinstance(models, list):
+                prov_data["models"] = [model]
+            elif model not in models:
+                models.append(model)
+            if base_url:
+                prov_data["base_url"] = base_url
+            prov_data.update(kwargs)
+            cfg[name] = prov_data
+
+        pm.update_json_config(pm.PROVIDERS_JSON_FILE, _mutate, indent=2)
         if api_key:
             self.set_provider_api_key(name, api_key)
-        prov_data.update(kwargs)
-        data[name] = prov_data
-        self._save_providers_json(data)
         self.invalidate_cache()
 
     def remove_provider(self, key: str) -> bool:
         pm = _pm()
-        data = self._read_providers_json()
-        existed = key in self.load_providers() or key in data
-        if key in pm.DEFAULT_JSON_PROVIDERS:
-            data[key] = None
-        else:
-            data.pop(key, None)
-        self._save_providers_json(data)
+        existed = key in self.load_providers(include_disabled=True)
+
+        def _mutate(cfg: Dict[str, Any]) -> None:
+            nonlocal existed
+            if key in cfg:
+                existed = True
+            if key in pm.DEFAULT_JSON_PROVIDERS:
+                cfg[key] = None
+            else:
+                cfg.pop(key, None)
+
+        pm.update_json_config(pm.PROVIDERS_JSON_FILE, _mutate, indent=2)
         self.invalidate_cache()
         return existed
 

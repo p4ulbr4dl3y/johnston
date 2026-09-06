@@ -136,6 +136,7 @@ class TestCLIProvider(unittest.TestCase):
 
     def test_enable_provider(self):
         pm = MagicMock()
+        pm.load_providers.return_value = {"anthropic": {"name": "Anthropic"}}
         f = io.StringIO()
         with redirect_stdout(f):
             code = enable_provider("anthropic", pm)
@@ -151,6 +152,7 @@ class TestCLIProvider(unittest.TestCase):
 
     def test_disable_provider(self):
         pm = MagicMock()
+        pm.load_providers.return_value = {"anthropic": {"name": "Anthropic"}}
         f = io.StringIO()
         with redirect_stdout(f):
             code = disable_provider("anthropic", pm)
@@ -217,6 +219,7 @@ class TestCLIProvider(unittest.TestCase):
 
     def test_run_provider_routing(self):
         pm = MagicMock()
+        pm.load_providers.return_value = {"p1": {"name": "P1"}}
         parser = build_parser()
 
         # default list
@@ -299,6 +302,80 @@ class TestCLIProvider(unittest.TestCase):
         with redirect_stdout(f):
             print_models()
         self.assertIn("Available Johnston Providers & Models:", f.getvalue())
+
+    def test_enable_nonexistent_provider(self):
+        pm = MagicMock()
+        pm.load_providers.return_value = {"openai": {}}
+        err = io.StringIO()
+        with redirect_stderr(err):
+            code = enable_provider("nonexistent", pm)
+        self.assertEqual(code, 1)
+        self.assertIn("Provider 'nonexistent' not found.", err.getvalue())
+        pm.set_provider_disabled.assert_not_called()
+
+    def test_disable_nonexistent_provider(self):
+        pm = MagicMock()
+        pm.load_providers.return_value = {"openai": {}}
+        err = io.StringIO()
+        with redirect_stderr(err):
+            code = disable_provider("nonexistent", pm)
+        self.assertEqual(code, 1)
+        self.assertIn("Provider 'nonexistent' not found.", err.getvalue())
+        pm.set_provider_disabled.assert_not_called()
+
+    def test_set_provider_disabled_nonexistent(self):
+        pm = ProviderManager()
+        res = pm.set_provider_disabled("ghost_provider_xyz", True)
+        self.assertFalse(res)
+        self.assertNotIn("ghost_provider_xyz", pm.load_providers(include_disabled=True))
+
+    def test_set_key_secure_prompt_tty(self):
+        pm = MagicMock()
+        with patch("sys.stdin.isatty", return_value=True), patch("getpass.getpass", return_value="secure_key_val"):
+            code = set_key("openai", None, pm)
+        self.assertEqual(code, 0)
+        pm.set_provider_api_key.assert_called_once_with("openai", "secure_key_val")
+
+    def test_set_key_stdin_pipe(self):
+        pm = MagicMock()
+        with patch("sys.stdin.isatty", return_value=False), patch("sys.stdin.read", return_value="piped_key_val\n"):
+            code = set_key("openai", None, pm)
+        self.assertEqual(code, 0)
+        pm.set_provider_api_key.assert_called_once_with("openai", "piped_key_val")
+
+    def test_set_key_dash_stdin(self):
+        pm = MagicMock()
+        with patch("sys.stdin.read", return_value="dash_key_val\n"):
+            code = set_key("openai", "-", pm)
+        self.assertEqual(code, 0)
+        pm.set_provider_api_key.assert_called_once_with("openai", "dash_key_val")
+
+    def test_subcommands_roles_skills_rules_dispatch(self):
+        with patch("core.interfaces.cli.commands.roles_cmd.run_roles", return_value=0) as m_roles:
+            with self.assertRaises(SystemExit) as cm:
+                main(["roles"])
+            self.assertEqual(cm.exception.code, 0)
+            m_roles.assert_called_once()
+
+        with patch("core.interfaces.cli.commands.skills_cmd.run_skills", return_value=0) as m_skills:
+            with self.assertRaises(SystemExit) as cm:
+                main(["skills"])
+            self.assertEqual(cm.exception.code, 0)
+            m_skills.assert_called_once()
+
+        with patch("core.interfaces.cli.commands.rules_cmd.run_rules", return_value=0) as m_rules:
+            with self.assertRaises(SystemExit) as cm:
+                main(["rules"])
+            self.assertEqual(cm.exception.code, 0)
+            m_rules.assert_called_once()
+
+    def test_provider_def_from_dict_direct(self):
+        from core.domain.entities.provider import ProviderDef
+
+        pdef = ProviderDef.from_dict("custom_key", {"name": "Custom", "model": "m-1", "api_key": "raw_k"})
+        self.assertEqual(pdef.key, "custom_key")
+        self.assertEqual(pdef.name, "Custom")
+        self.assertEqual(pdef.model, "m-1")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ import tempfile
 import time
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from core.domain.entities.session import AgentSession, SessionStatus
@@ -260,6 +261,29 @@ class TestCLISession(unittest.TestCase):
         self.assertIn("file content here", content)
         self.assertIn("### Assistant\n\nHere is what I found.", content)
         self.assertIn("*[Turn Completed]*", content)
+
+    def test_export_session_markdown_non_serializable_args(self):
+        sess = AgentSession(
+            session_id="export-non-serial",
+            title="Non-serializable Test",
+            created_at=1700000000.0,
+        )
+        sess.messages = [
+            {
+                "type": "tool",
+                "tool_type": "custom_tool",
+                "args": {"path": Path("/test/path")},
+                "result_text": "ok",
+            },
+        ]
+        self.mock_store.get.return_value = sess
+
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = export_session("export-non-serial", format_="md", store=self.mock_store)
+
+        self.assertEqual(code, 0)
+        self.assertIn("/test/path", out.getvalue())
 
     def test_export_session_markdown_history_fallback(self):
         sess = AgentSession(

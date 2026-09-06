@@ -1,6 +1,7 @@
 """CLI commands for managing MCP servers."""
 from __future__ import annotations
 
+import shlex
 import sys
 from typing import Any, Optional
 
@@ -85,6 +86,12 @@ def add_mcp(
     if not cmd and not url:
         print("Error: Either --cmd or --url must be specified.", file=sys.stderr)
         return 1
+
+    if cmd and isinstance(cmd, str) and " " in cmd.strip() and not args:
+        parts = shlex.split(cmd)
+        if parts:
+            cmd = parts[0]
+            args = parts[1:]
 
     mgr = _get_mcp_mgr(mgr)
 

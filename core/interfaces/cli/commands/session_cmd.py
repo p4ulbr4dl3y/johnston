@@ -161,7 +161,7 @@ def _format_markdown(sess: AgentSession) -> str:
                 result = msg.get("result_text") or msg.get("result")
                 lines.append(f"**Tool Call:** `{tool_name}`\n")
                 if args:
-                    lines.append(f"```json\n{json.dumps(args, indent=2, ensure_ascii=False)}\n```\n")
+                    lines.append(f"```json\n{json.dumps(args, indent=2, ensure_ascii=False, default=str)}\n```\n")
                 if result:
                     lines.append(f"```\n{result}\n```\n")
             elif mtype == "event_divider":

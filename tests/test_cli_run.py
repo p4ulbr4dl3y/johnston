@@ -171,7 +171,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
             prompt="test",
             provider="openai",
             model="gpt-4-turbo",
-            role="architect",
+            role="explorer",
             quiet=False,
             json=False,
         )
@@ -181,7 +181,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(code, 0)
         self.assertEqual(agent.model, "gpt-4-turbo")
-        self.assertEqual(agent.role, "architect")
+        self.assertEqual(agent.role, "explorer")
 
     async def test_run_headless_async_json_flag(self):
         agent = MockAgent(steps=[
@@ -392,6 +392,84 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(code, 1)
         self.assertIn("Unexpected API crash", err_buf.getvalue())
 
+    async def test_run_headless_async_role_not_found(self):
+        agent = MockAgent(steps=[("content", "done", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="test",
+            provider="openai",
+            model="gpt-4o",
+            role="nonexistent_role_xyz",
+            quiet=False,
+            json=False,
+        )
+        err_buf = io.StringIO()
+        with redirect_stderr(err_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 1)
+        self.assertIn("Role 'nonexistent_role_xyz' not found", err_buf.getvalue())
+
+    async def test_run_headless_async_apply_role_called(self):
+        agent = MockAgent(steps=[("content", "done", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="test",
+            provider="openai",
+            model="gpt-4o",
+            role="worker",
+            quiet=False,
+            json=False,
+        )
+        with patch("core.interfaces.cli.commands.run_cmd.apply_role") as mock_apply:
+            out_buf = io.StringIO()
+            with redirect_stdout(out_buf):
+                code = await run_headless_async(args, pm=pm)
+            self.assertEqual(code, 0)
+            mock_apply.assert_called_once_with(agent, "worker", is_subagent=False)
+
+    async def test_run_headless_async_closes_agent(self):
+        agent = MockAgent(steps=[("content", "done", "")])
+        closed = False
+
+        async def fake_close():
+            nonlocal closed
+            closed = True
+
+        agent.close = fake_close
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="test",
+            provider="openai",
+            model="gpt-4o",
+            role="worker",
+            quiet=False,
+            json=False,
+        )
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args, pm=pm)
+        self.assertEqual(code, 0)
+        self.assertTrue(closed)
+
 
 class TestCLIRunSyncWrapper(unittest.TestCase):
     """Unit tests for synchronous run_headless wrapper."""
@@ -435,3 +513,8 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
             main(["run", "hello", "--quiet"])
         self.assertEqual(cm.exception.code, 0)
         mock_run_headless.assert_called_once()
+
+
+if __name__ == "__main__":
+    unittest.main()
+

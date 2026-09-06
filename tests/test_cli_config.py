@@ -274,6 +274,26 @@ class TestCLIConfig(unittest.TestCase):
         self.assertEqual(run_config(DummyArgs("unset", "theme"), config_file=self.cfg_file), 0)
         self.assertEqual(run_config(DummyArgs("unknown_action"), config_file=self.cfg_file), 1)
 
+    def test_config_set_dict_value(self):
+        ret = set_config("llm.thinking_efforts", '{"openai": {"o3-mini": "high"}}', self.cfg_file)
+        self.assertEqual(ret, 0)
+        settings = load_settings(self.cfg_file)
+        self.assertEqual(settings.llm.thinking_efforts, {"openai": {"o3-mini": "high"}})
+
+    def test_config_set_dict_invalid_json(self):
+        err = io.StringIO()
+        with redirect_stderr(err):
+            ret = set_config("llm.thinking_efforts", "not-valid-json", self.cfg_file)
+        self.assertEqual(ret, 1)
+        self.assertIn("Invalid JSON", err.getvalue())
+
+    def test_config_set_dict_non_dict_rejected(self):
+        err = io.StringIO()
+        with redirect_stderr(err):
+            ret = set_config("llm.thinking_efforts", '"just-a-string"', self.cfg_file)
+        self.assertEqual(ret, 1)
+        self.assertIn("Invalid type", err.getvalue())
+
 
 class TestCLIConfigEntrypoint(unittest.TestCase):
     def setUp(self):

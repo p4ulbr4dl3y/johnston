@@ -1,8 +1,10 @@
 """CLI config command for inspecting and modifying application settings."""
 from __future__ import annotations
 
+import json
 import math
 import sys
+import types
 import typing
 from dataclasses import fields
 from typing import Any, Dict, Optional, Tuple, Type, get_args, get_origin
@@ -146,23 +148,40 @@ def _normalize_type(field_type: Any) -> Tuple[bool, Any]:
     """Extract (is_optional, base_type) from a type hint or string annotation."""
     if isinstance(field_type, str):
         is_opt = "Optional" in field_type or "None" in field_type
-        if "bool" in field_type:
+        low = field_type.lower()
+        if "dict" in low:
+            return is_opt, dict
+        if "list" in low:
+            return is_opt, list
+        if "bool" in low:
             return is_opt, bool
-        if "int" in field_type:
+        if "int" in low:
             return is_opt, int
-        if "float" in field_type:
+        if "float" in low:
             return is_opt, float
         return is_opt, str
 
     origin = get_origin(field_type)
-    if origin is not None:
+    is_opt = False
+    if origin is typing.Union or (hasattr(types, "UnionType") and origin is types.UnionType):
         args = get_args(field_type)
         is_opt = type(None) in args
+        non_none = [t for t in args if t is not type(None)]
+        field_type = non_none[0] if non_none else str
+        origin = get_origin(field_type)
+
+    if origin in (dict, list):
+        return is_opt, origin
+    if field_type in (dict, list):
+        return is_opt, field_type
+
+    if origin is not None:
+        args = get_args(field_type)
         non_none = [t for t in args if t is not type(None)]
         base = non_none[0] if non_none else str
         return is_opt, base
 
-    return False, field_type
+    return is_opt, field_type
 
 
 def _parse_and_validate(raw_val: str, field_type: Any, canonical_key: str) -> Any:
@@ -172,6 +191,18 @@ def _parse_and_validate(raw_val: str, field_type: Any, canonical_key: str) -> An
 
     if is_opt and trimmed.lower() in ("none", "null", ""):
         return None
+
+    if target_type is dict or target_type is list or get_origin(target_type) in (dict, list):
+        expected_origin = dict if (target_type is dict or get_origin(target_type) is dict) else list
+        try:
+            val = json.loads(trimmed)
+        except Exception:
+            kind = "JSON object (dict)" if expected_origin is dict else "JSON array (list)"
+            raise ValueError(f"Invalid JSON for '{canonical_key}'. Expected a {kind}.")
+        if not isinstance(val, expected_origin):
+            kind = "JSON object (dict)" if expected_origin is dict else "JSON array (list)"
+            raise ValueError(f"Invalid type for '{canonical_key}'. Expected a {kind}.")
+        return val
 
     if target_type is bool:
         low = trimmed.lower()

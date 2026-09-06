@@ -348,5 +348,31 @@ class TestCLIDoctor(unittest.TestCase):
             self.assertEqual(m_doc.call_count, 1)
 
 
+    def test_diagnose_mcp_command_list(self):
+        mgr = MagicMock()
+        mgr.load_servers.return_value = [
+            {"name": "srv-list-ok", "command": ["npx", "-y", "@mcp/server"], "enabled": True},
+            {"name": "srv-list-missing", "command": ["nonexistent-bin", "arg1"], "enabled": True},
+        ]
+        mgr.get_active_tools.return_value = []
+        mgr.get_server_status.return_value = {"tools": 3}
+
+        def mock_which(cmd):
+            return "/usr/local/bin/npx" if cmd == "npx" else None
+
+        with patch("shutil.which", side_effect=mock_which), patch("os.path.exists", return_value=False):
+            results = diagnose_mcp(mgr)
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0][0], "✓")
+        self.assertIn("srv-list-ok", results[0][1])
+        self.assertIn("npx -y @mcp/server", results[0][1])
+        self.assertIn("3 tool(s)", results[0][1])
+
+        self.assertEqual(results[1][0], "✗")
+        self.assertIn("srv-list-missing", results[1][1])
+        self.assertIn("command not found ('nonexistent-bin arg1')", results[1][1])
+
+
 if __name__ == "__main__":
     unittest.main()
