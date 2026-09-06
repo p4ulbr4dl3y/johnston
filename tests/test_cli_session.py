@@ -380,6 +380,37 @@ class TestCLISession(unittest.TestCase):
             self.assertEqual(cm.exception.code, 0)
             self.assertEqual(m_run.call_count, 1)
 
+    def test_list_sessions_json_and_all(self):
+        self.mock_store.list_main_sessions.return_value = [
+            {
+                "id": "sess-1",
+                "title": "Title 1",
+                "message_count": 3,
+                "updated_at": 1700000000.0,
+            },
+            {
+                "id": "sess-2",
+                "title": "Title 2",
+                "message_count": 5,
+                "updated_at": 1700000001.0,
+            },
+        ]
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = list_sessions(store=self.mock_store, as_json=True)
+        self.assertEqual(code, 0)
+        data = json.loads(out.getvalue())
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["id"], "sess-1")
+
+        # Test show_all with limit 1
+        out_all = io.StringIO()
+        with redirect_stdout(out_all):
+            code = list_sessions(limit=1, store=self.mock_store, show_all=True, as_json=True)
+        self.assertEqual(code, 0)
+        data_all = json.loads(out_all.getvalue())
+        self.assertEqual(len(data_all), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

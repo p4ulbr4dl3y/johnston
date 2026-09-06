@@ -75,28 +75,16 @@ def _dispatch_version() -> str:
 
 
 def _dispatch_roles(args: Any = None) -> int:
-    cli_mod = sys.modules.get("cli")
-    if cli_mod and hasattr(cli_mod, "print_roles"):
-        cli_mod.print_roles()
-        return 0
     from core.interfaces.cli.commands.roles_cmd import run_roles
     return run_roles(args)
 
 
 def _dispatch_skills(args: Any = None) -> int:
-    cli_mod = sys.modules.get("cli")
-    if cli_mod and hasattr(cli_mod, "print_skills"):
-        cli_mod.print_skills()
-        return 0
     from core.interfaces.cli.commands.skills_cmd import run_skills
     return run_skills(args)
 
 
 def _dispatch_rules(args: Any = None) -> int:
-    cli_mod = sys.modules.get("cli")
-    if cli_mod and hasattr(cli_mod, "print_rules"):
-        cli_mod.print_rules()
-        return 0
     from core.interfaces.cli.commands.rules_cmd import run_rules
     return run_rules(args)
 
@@ -150,10 +138,12 @@ def build_parser() -> argparse.ArgumentParser:
     config_p = subparsers.add_parser("config", help="Inspect and modify application settings")
     config_subs = config_p.add_subparsers(dest="config_action", help="Config actions")
 
-    config_subs.add_parser("list", help="List all configuration settings")
+    cfg_list = config_subs.add_parser("list", help="List all configuration settings")
+    cfg_list.add_argument("--json", action="store_true", help="Print structured JSON output")
 
     get_p = config_subs.add_parser("get", help="Get a configuration setting value")
     get_p.add_argument("key", help="Configuration key (e.g. llm.context_limit, theme)")
+    get_p.add_argument("--json", action="store_true", help="Print structured JSON output")
 
     set_p = config_subs.add_parser("set", help="Set a configuration setting value")
     set_p.add_argument("key", help="Configuration key (e.g. llm.context_limit, theme)")
@@ -166,7 +156,8 @@ def build_parser() -> argparse.ArgumentParser:
     provider_p = subparsers.add_parser("provider", help="Manage LLM providers and models")
     provider_subs = provider_p.add_subparsers(dest="provider_action", help="Provider actions")
 
-    provider_subs.add_parser("list", help="List configured providers and models")
+    prov_list = provider_subs.add_parser("list", help="List configured providers and models")
+    prov_list.add_argument("--json", action="store_true", help="Print structured JSON output")
 
     sk_p = provider_subs.add_parser("set-key", help="Set API key for a provider")
     sk_p.add_argument("name", help="Provider name or key")
@@ -195,7 +186,8 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_p = subparsers.add_parser("mcp", help="Manage Model Context Protocol (MCP) servers")
     mcp_subs = mcp_p.add_subparsers(dest="mcp_action", help="MCP actions")
 
-    mcp_subs.add_parser("list", help="List configured MCP servers")
+    mcp_list = mcp_subs.add_parser("list", help="List configured MCP servers")
+    mcp_list.add_argument("--json", action="store_true", help="Print structured JSON output")
 
     mcp_add = mcp_subs.add_parser("add", help="Add or update an MCP server")
     mcp_add.add_argument("name", help="Server name")
@@ -218,20 +210,25 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_dis.add_argument("--scope", choices=["global", "project"], default=None, help="Scope (global or project)")
 
     # roles subparser
-    subparsers.add_parser("roles", help="List available agent roles (execution modes + subagents)")
+    roles_p = subparsers.add_parser("roles", help="List available agent roles (execution modes + subagents)")
+    roles_p.add_argument("--json", action="store_true", help="Print structured JSON output")
 
     # skills subparser
-    subparsers.add_parser("skills", help="List available skills")
+    skills_p = subparsers.add_parser("skills", help="List available skills")
+    skills_p.add_argument("--json", action="store_true", help="Print structured JSON output")
 
     # rules subparser
-    subparsers.add_parser("rules", help="List active project instructions and rules")
+    rules_p = subparsers.add_parser("rules", help="List active project instructions and rules")
+    rules_p.add_argument("--json", action="store_true", help="Print structured JSON output")
 
     # session subparser
     session_p = subparsers.add_parser("session", help="Manage chat sessions")
     session_subs = session_p.add_subparsers(dest="session_action", help="Session actions")
 
     sess_list = session_subs.add_parser("list", help="List chat sessions")
-    sess_list.add_argument("--limit", type=int, default=None, help="Maximum number of sessions to list")
+    sess_list.add_argument("--limit", type=int, default=20, help="Maximum number of sessions to list (default: 20)")
+    sess_list.add_argument("--all", action="store_true", help="List all sessions without limit")
+    sess_list.add_argument("--json", action="store_true", help="Print structured JSON output")
 
     sess_rm = session_subs.add_parser("rm", help="Remove a session by ID")
     sess_rm.add_argument("session_id", help="Session ID to remove")
@@ -251,7 +248,8 @@ def build_parser() -> argparse.ArgumentParser:
     sess_export.add_argument("--output", default=None, help="Output file path (default: stdout)")
 
     # doctor subparser
-    subparsers.add_parser("doctor", help="Check environment and configuration health")
+    doctor_p = subparsers.add_parser("doctor", help="Check environment and configuration health")
+    doctor_p.add_argument("--json", action="store_true", help="Print structured JSON output")
 
     # run subparser
     run_p = subparsers.add_parser("run", help="Run prompt headlessly and stream response")
@@ -290,6 +288,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_p.add_argument("-C", "--cwd", default=None, help="Change working directory")
     run_p.add_argument("--debug", action="store_true", help="Enable DEBUG logging level")
     run_p.add_argument("--json", action="store_true", help="Print structured JSON output")
+    run_p.add_argument("--stream-json", action="store_true", help="Stream real-time NDJSON events")
     run_p.add_argument(
         "-q",
         "--quiet",

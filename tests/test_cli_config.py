@@ -347,11 +347,32 @@ class TestCLIConfigEntrypoint(unittest.TestCase):
             main(["config", "get", "unknown_key"])
         self.assertEqual(cm.exception.code, 1)
 
-    def test_main_subcommands_roles_skills_rules(self):
+    def test_main_config_json_and_roles_json(self):
+        import json
         for subcmd in ["roles", "skills", "rules"]:
-            with self.assertRaises(SystemExit) as cm:
-                main([subcmd])
+            f = io.StringIO()
+            with redirect_stdout(f):
+                with self.assertRaises(SystemExit) as cm:
+                    main([subcmd, "--json"])
             self.assertEqual(cm.exception.code, 0)
+            data = json.loads(f.getvalue())
+            self.assertIsInstance(data, list)
+
+        f = io.StringIO()
+        with redirect_stdout(f):
+            with self.assertRaises(SystemExit) as cm:
+                main(["config", "list", "--json"])
+        self.assertEqual(cm.exception.code, 0)
+        cfg_data = json.loads(f.getvalue())
+        self.assertIsInstance(cfg_data, list)
+
+        f = io.StringIO()
+        with redirect_stdout(f):
+            with self.assertRaises(SystemExit) as cm:
+                main(["config", "get", "theme", "--json"])
+        self.assertEqual(cm.exception.code, 0)
+        get_data = json.loads(f.getvalue())
+        self.assertIn("theme", get_data)
 
 
 if __name__ == "__main__":

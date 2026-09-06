@@ -22,8 +22,13 @@ __all__ = [
 ]
 
 
-def list_sessions(limit: Optional[int] = None, store: Optional[SessionStore] = None) -> int:
-    """Format and print table with saved sessions."""
+def list_sessions(
+    limit: Optional[int] = 20,
+    store: Optional[SessionStore] = None,
+    as_json: bool = False,
+    show_all: bool = False,
+) -> int:
+    """Format and print table or JSON with saved sessions."""
     if store is None:
         store = SessionStore.get_instance()
 
@@ -37,12 +42,26 @@ def list_sessions(limit: Optional[int] = None, store: Optional[SessionStore] = N
                 reverse=True,
             )
 
+    effective_limit = None if show_all else limit
+    if effective_limit is not None and effective_limit > 0:
+        sessions = sessions[:effective_limit]
+
+    if as_json:
+        data = [
+            {
+                "id": str(s.get("id") or ""),
+                "title": str(s.get("title") or "Untitled"),
+                "message_count": s.get("message_count") if s.get("message_count") is not None else s.get("turn_count", 0),
+                "updated_at": s.get("updated_at") or s.get("created_at"),
+            }
+            for s in sessions
+        ]
+        print(json.dumps(data, indent=2))
+        return 0
+
     if not sessions:
         print("No sessions found.")
         return 0
-
-    if limit is not None and limit > 0:
-        sessions = sessions[:limit]
 
     headers = ["Session ID", "Title", "Messages count", "Last Updated"]
     rows: list[list[str]] = []
@@ -229,7 +248,12 @@ def run_session(args: Any = None, store: Optional[SessionStore] = None) -> int:
     action = getattr(args, "session_action", None) if args is not None else None
 
     if action is None or action == "list":
-        limit = getattr(args, "limit", None)
+        show_all = getattr(args, "all", False) is True
+        raw_limit = getattr(args, "limit", None)
+        limit = None if show_all else (20 if raw_limit is None else raw_limit)
+        as_json = getattr(args, "json", False) is True
+        if as_json or show_all:
+            return list_sessions(limit=limit, store=store, as_json=as_json, show_all=show_all)
         return list_sessions(limit=limit, store=store)
     if action == "rm":
         session_id = getattr(args, "session_id", "")

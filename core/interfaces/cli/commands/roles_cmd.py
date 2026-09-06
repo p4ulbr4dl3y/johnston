@@ -5,11 +5,31 @@ from typing import Any
 
 
 def run_roles(args: Any = None) -> int:
-    """Print available unified agent roles to stdout."""
+    """Print available unified agent roles to stdout or JSON."""
+    import json
+
     from core.role_registry import RoleRegistry
 
     registry = RoleRegistry.get_instance()
     roles = registry.load_roles()
+    as_json = bool(getattr(args, "json", False)) if args else False
+
+    if as_json:
+        data = [
+            {
+                "name": r.name,
+                "key": r.key,
+                "scope": r.scope,
+                "source": r.source,
+                "description": r.description or "",
+                "allowed_tools": r.allowed_tools or [],
+                "disallowed_tools": r.disallowed_tools or [],
+            }
+            for _, r in roles.items()
+        ]
+        print(json.dumps(data, indent=2))
+        return 0
+
     print("Available Agent Roles & Modes:")
     role_list = list(roles.items())
     for idx, (key, r) in enumerate(role_list):

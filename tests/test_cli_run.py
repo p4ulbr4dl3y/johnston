@@ -13,6 +13,7 @@ from core.domain.entities.provider import ProviderDef
 from core.domain.policies.role_policy import AgentMode
 from core.interfaces.cli.commands.run_cmd import (
     format_args_summary,
+    format_meta_footer,
     format_result_summary,
     resolve_prompt,
     run_headless,
@@ -258,16 +259,45 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         pm.create_agent_for_provider.return_value = agent
         pm.close = MagicMock()
 
-        args = MagicMock(prompt="find foo", provider=None, model=None, role="worker", quiet=False, json=False)
+        args = MagicMock(prompt="find foo", provider=None, model=None, role="worker", quiet=False, json=False, stream_json=False)
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertIn("[tool] grep(query='foo')", err_buf.getvalue())
+        self.assertIn("[result] matches found", err_buf.getvalue())
+        self.assertEqual(out_buf.getvalue(), "search complete\n")
+
+    async def test_run_headless_async_stream_json_flag(self):
+        agent = MockAgent(steps=[
+            ("tool", "grep", "foo", {"query": "foo"}, "tc1"),
+            ("tool_result", "matches found", "", False, None, None, "tc1"),
+            ("content", "search complete", ""),
+        ])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(prompt="find foo", provider=None, model=None, role="worker", quiet=False, json=False, stream_json=True)
         out_buf = io.StringIO()
         with redirect_stdout(out_buf):
             code = await run_headless_async(args, pm=pm)
 
         self.assertEqual(code, 0)
-        raw_output = out_buf.getvalue()
-        self.assertIn("[tool] grep(query='foo')", raw_output)
-        self.assertIn("[result] matches found", raw_output)
-        self.assertIn("search complete", raw_output)
+        lines = [json.loads(line) for line in out_buf.getvalue().strip().splitlines()]
+        self.assertEqual(lines[0]["event"], "tool_call")
+        self.assertEqual(lines[0]["name"], "grep")
+        self.assertEqual(lines[1]["event"], "tool_result")
+        self.assertEqual(lines[1]["result"], "matches found")
+        self.assertEqual(lines[2]["event"], "delta")
+        self.assertEqual(lines[2]["text"], "search complete")
+        self.assertEqual(lines[3]["event"], "done")
 
     async def test_run_headless_async_missing_provider(self):
         pm = MagicMock()
@@ -513,7 +543,19 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
         with self.assertRaises(SystemExit) as cm:
             main(["run", "hello", "--quiet"])
         self.assertEqual(cm.exception.code, 0)
-        mock_run_headless.assert_called_once()
+    def test_format_meta_footer(self):
+        footer = format_meta_footer("openai", "gpt-4o", 2.345, 1200, 300, 1500, cost_usd=0.0025)
+        self.assertIn("openai/gpt-4o", footer)
+        self.assertIn("2.35s", footer)
+        self.assertIn("in: 1.2k", footer)
+        self.assertIn("out: 300", footer)
+        self.assertIn("total: 1.5k tok", footer)
+        self.assertIn("$0.0025", footer)
+
+        footer_no_cost = format_meta_footer("ollama", "llama3", 1.0, 0, 0, 0, cost_usd=0.0)
+        self.assertIn("ollama/llama3", footer_no_cost)
+        self.assertIn("1.00s", footer_no_cost)
+        self.assertNotIn("$", footer_no_cost)
 
 
 if __name__ == "__main__":

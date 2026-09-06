@@ -18,8 +18,10 @@ def _get_pm(pm: Optional[ProviderManager] = None) -> ProviderManager:
     return ProviderManager()
 
 
-def list_providers(pm: Optional[ProviderManager] = None) -> int:
-    """Format and print table with configured providers and their states."""
+def list_providers(pm: Optional[ProviderManager] = None, as_json: bool = False) -> int:
+    """Format and print table or JSON with configured providers and their states."""
+    import json
+
     pm = _get_pm(pm)
 
     providers = pm.load_providers(include_disabled=True)
@@ -57,6 +59,20 @@ def list_providers(pm: Optional[ProviderManager] = None) -> int:
             state = "ready"
 
         rows.append([active_mark, key, model, key_status, state])
+
+    if as_json:
+        data = [
+            {
+                "active": row[0] == "*",
+                "provider": row[1],
+                "model": row[2],
+                "key_status": row[3],
+                "state": row[4],
+            }
+            for row in rows
+        ]
+        print(json.dumps(data, indent=2))
+        return 0
 
     print(format_table(headers, rows))
     return 0
@@ -164,7 +180,7 @@ def run_provider(args: Any = None, pm: Optional[ProviderManager] = None) -> int:
     action = getattr(args, "provider_action", None) if args is not None else None
 
     if action is None or action == "list":
-        return list_providers(pm)
+        return list_providers(pm, as_json=bool(getattr(args, "json", False)))
     if action == "set-key":
         return set_key(getattr(args, "name", ""), getattr(args, "key", None), pm)
     if action == "set-model":

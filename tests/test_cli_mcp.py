@@ -381,5 +381,28 @@ class TestCLIMCP(unittest.TestCase):
         self.assertEqual(entry["args"], ["-y", "@mcp/server"])
 
 
+    def test_list_mcp_json_output(self):
+        f = io.StringIO()
+        mgr = MagicMock()
+        mgr.load_servers.return_value = [
+            {
+                "name": "srv1",
+                "scope": "global",
+                "command": "node",
+                "args": ["s1.js"],
+                "enabled": True,
+            }
+        ]
+        mgr.get_active_tools.return_value = [{"_mcp_server": "srv1", "_mcp_tool_name": "t1"}]
+        with redirect_stdout(f):
+            code = list_mcp(mgr=mgr, as_json=True)
+        self.assertEqual(code, 0)
+        data = json.loads(f.getvalue())
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["server"], "srv1")
+        self.assertEqual(data[0]["status"], "enabled")
+        self.assertEqual(data[0]["tools_count"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

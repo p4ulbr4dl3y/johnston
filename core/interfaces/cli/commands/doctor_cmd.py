@@ -286,8 +286,10 @@ def run_doctor(
     mcp_mgr: Optional[MCPManager] = None,
     project_dir: Optional[str] = None,
 ) -> int:
-    """Execute diagnostic checks and print report."""
-    print("Johnston Doctor - Diagnostic Report\n")
+    """Execute diagnostic checks and print report or output JSON."""
+    import json
+
+    as_json = bool(getattr(args, "json", False)) if args else False
 
     sections: List[Tuple[str, List[Tuple[str, str]]]] = [
         ("Environment", [diagnose_python(), diagnose_uv()]),
@@ -300,13 +302,35 @@ def run_doctor(
     has_errors = False
     has_warnings = False
 
-    for title, items in sections:
-        print(f"{title}:")
-        for sym, msg in items:
+    for _, items in sections:
+        for sym, _ in items:
             if sym == "✗":
                 has_errors = True
             elif sym == "!":
                 has_warnings = True
+
+    if as_json:
+        status = "error" if has_errors else ("warn" if has_warnings else "ok")
+        report = {
+            "status": status,
+            "sections": {
+                title: [
+                    {
+                        "status": "ok" if sym == "✓" else ("error" if sym == "✗" else "warn"),
+                        "message": msg,
+                    }
+                    for sym, msg in items
+                ]
+                for title, items in sections
+            },
+        }
+        print(json.dumps(report, indent=2))
+        return 1 if has_errors else 0
+
+    print("Johnston Doctor - Diagnostic Report\n")
+    for title, items in sections:
+        print(f"{title}:")
+        for sym, msg in items:
             print(format_checklist_item(sym, msg))
         print()
 

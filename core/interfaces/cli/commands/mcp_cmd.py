@@ -20,8 +20,10 @@ def _get_mcp_mgr(mgr: Optional[MCPManager] = None) -> MCPManager:
     return get_mcp_manager()
 
 
-def list_mcp(mgr: Optional[MCPManager] = None) -> int:
-    """Format and print table with configured MCP servers."""
+def list_mcp(mgr: Optional[MCPManager] = None, as_json: bool = False) -> int:
+    """Format and print table or JSON with configured MCP servers."""
+    import json
+
     from core.infrastructure.mcp import MCPManager
 
     mgr = _get_mcp_mgr(mgr)
@@ -66,6 +68,20 @@ def list_mcp(mgr: Optional[MCPManager] = None) -> int:
             cmd_url = "(none)"
 
         rows.append([name, scope, status, count_str, cmd_url])
+
+    if as_json:
+        data = [
+            {
+                "server": row[0],
+                "scope": row[1],
+                "status": row[2],
+                "tools_count": int(row[3]) if row[3].isdigit() else 0,
+                "command_or_url": row[4],
+            }
+            for row in rows
+        ]
+        print(json.dumps(data, indent=2))
+        return 0
 
     print(format_table(headers, rows))
     return 0
@@ -153,7 +169,7 @@ def run_mcp(args: Any = None, mgr: Optional[MCPManager] = None) -> int:
     action = getattr(args, "mcp_action", None) if args is not None else None
 
     if action is None or action == "list":
-        return list_mcp(mgr)
+        return list_mcp(mgr, as_json=bool(getattr(args, "json", False)))
     if action == "add":
         return add_mcp(
             getattr(args, "name", ""),

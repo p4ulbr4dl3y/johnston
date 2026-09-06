@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import sys
+import time
 from typing import Any, Optional
 
 from core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
@@ -19,6 +20,7 @@ if False:  # type checking only
 
 __all__ = [
     "format_args_summary",
+    "format_meta_footer",
     "format_result_summary",
     "resolve_prompt",
     "run_headless",
@@ -86,6 +88,37 @@ def format_result_summary(result: Any) -> str:
     if len(s) > 120:
         return s[:117] + "..."
     return s
+
+
+def _format_token_count(n: int) -> str:
+    """Format token count with k/M suffixes for compact display."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}k"
+    return str(n)
+
+
+def format_meta_footer(
+    provider: str,
+    model: str,
+    duration_s: float,
+    tokens_in: int,
+    tokens_out: int,
+    total_tokens: int,
+    cost_usd: float = 0.0,
+) -> str:
+    """Format execution summary metadata line."""
+    prov_model = f"{provider}/{model}" if model and model != "-" else provider
+    dur_str = f"{duration_s:.2f}s"
+    parts = [prov_model, dur_str]
+    if total_tokens > 0 or tokens_in > 0 or tokens_out > 0:
+        parts.append(
+            f"in: {_format_token_count(tokens_in)}, out: {_format_token_count(tokens_out)}, total: {_format_token_count(total_tokens)} tok"
+        )
+    if cost_usd > 0.0:
+        parts.append(f"${cost_usd:.4f}")
+    return f"[{' | '.join(parts)}]"
 
 
 async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) -> int:
@@ -195,13 +228,15 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
 
         apply_role(agent, role, mode=AgentMode.HEADLESS)
 
-        is_quiet = bool(getattr(args, "quiet", False))
-        is_json = bool(getattr(args, "json", False))
-
+        is_quiet = getattr(args, "quiet", False) is True
+        is_json = getattr(args, "json", False) is True
+        is_stream_json = getattr(args, "stream_json", False) is True
 
         response_parts: list[str] = []
         tool_calls: list[dict[str, Any]] = []
         has_error = False
+
+        start_time = time.perf_counter()
 
         try:
             async for step in agent.stream_steps(prompt):
@@ -213,14 +248,20 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                 if etype in ("content", "bot_delta"):
                     chunk = parsed.val1 or ""
                     response_parts.append(chunk)
-                    if not is_json:
+                    if is_stream_json:
+                        sys.stdout.write(json.dumps({"event": "delta", "text": chunk}) + "\n")
+                        sys.stdout.flush()
+                    elif not is_json:
                         sys.stdout.write(chunk)
                         sys.stdout.flush()
 
                 elif etype == "bot_text":
                     if not response_parts and parsed.val1:
                         response_parts.append(parsed.val1)
-                        if not is_json:
+                        if is_stream_json:
+                            sys.stdout.write(json.dumps({"event": "delta", "text": parsed.val1}) + "\n")
+                            sys.stdout.flush()
+                        elif not is_json:
                             sys.stdout.write(parsed.val1)
                             sys.stdout.flush()
 
@@ -250,10 +291,16 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
 
                     tool_calls.append({"name": t_name, "args": t_args})
 
-                    if not is_quiet and not is_json:
-                        summary = format_args_summary(t_args)
-                        print(f"[tool] {t_name}({summary})")
+                    if is_stream_json:
+                        sys.stdout.write(json.dumps({"event": "tool_call", "name": t_name, "args": t_args}) + "\n")
                         sys.stdout.flush()
+                    elif not is_quiet and not is_json:
+                        summary = format_args_summary(t_args)
+                        if response_parts and not response_parts[-1].endswith("\n"):
+                            sys.stdout.write("\n")
+                            sys.stdout.flush()
+                        sys.stderr.write(f"[tool] {t_name}({summary})\n")
+                        sys.stderr.flush()
 
                 elif etype == "tool_result":
                     parsed_tr = parse_tool_result_step(step)
@@ -261,34 +308,53 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                     if tool_calls and "result" not in tool_calls[-1]:
                         tool_calls[-1]["result"] = res_content
 
-                    if not is_quiet and not is_json:
-                        res_summary = format_result_summary(res_content)
-                        print(f"[result] {res_summary}")
+                    if is_stream_json:
+                        sys.stdout.write(json.dumps({"event": "tool_result", "result": res_content}) + "\n")
                         sys.stdout.flush()
+                    elif not is_quiet and not is_json:
+                        res_summary = format_result_summary(res_content)
+                        sys.stderr.write(f"[result] {res_summary}\n")
+                        sys.stderr.flush()
 
                 elif etype == "error":
                     has_error = True
                     err_msg = parsed.val1 or "Unknown stream error"
-                    sys.stderr.write(f"Error: {err_msg}\n")
-                    sys.stderr.flush()
+                    if is_stream_json:
+                        sys.stdout.write(json.dumps({"event": "error", "error": err_msg}) + "\n")
+                        sys.stdout.flush()
+                    else:
+                        sys.stderr.write(f"Error: {err_msg}\n")
+                        sys.stderr.flush()
 
         except Exception as exc:
             has_error = True
-            sys.stderr.write(f"Error: {exc}\n")
-            sys.stderr.flush()
-
-        if not is_json:
-            full_text = "".join(response_parts)
-            if full_text and not full_text.endswith("\n"):
-                sys.stdout.write("\n")
+            if is_stream_json:
+                sys.stdout.write(json.dumps({"event": "error", "error": str(exc)}) + "\n")
                 sys.stdout.flush()
-        else:
-            usage = {
-                "tokens_input": getattr(agent, "tokens_input", 0),
-                "tokens_output": getattr(agent, "tokens_output", 0),
-                "total_tokens": getattr(agent, "total_tokens", 0),
-                "cost_usd": getattr(agent, "cost_usd", 0.0),
-            }
+            else:
+                sys.stderr.write(f"Error: {exc}\n")
+                sys.stderr.flush()
+
+        duration_s = max(0.0, time.perf_counter() - start_time)
+        model_name = getattr(agent, "model", None) or model or "-"
+        ti = getattr(agent, "tokens_input", 0)
+        to = getattr(agent, "tokens_output", 0)
+        tt = getattr(agent, "total_tokens", 0)
+        cu = getattr(agent, "cost_usd", 0.0)
+        usage = {
+            "provider": provider_key,
+            "model": model_name,
+            "duration_s": round(duration_s, 3),
+            "tokens_input": ti if isinstance(ti, (int, float)) else 0,
+            "tokens_output": to if isinstance(to, (int, float)) else 0,
+            "total_tokens": tt if isinstance(tt, (int, float)) else 0,
+            "cost_usd": cu if isinstance(cu, (int, float)) else 0.0,
+        }
+
+        if is_stream_json:
+            sys.stdout.write(json.dumps({"event": "done", "usage": usage}) + "\n")
+            sys.stdout.flush()
+        elif is_json:
             output_payload = {
                 "response": "".join(response_parts),
                 "tool_calls": tool_calls,
@@ -296,6 +362,27 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
             }
             print(json.dumps(output_payload, indent=2))
             sys.stdout.flush()
+        else:
+            full_text = "".join(response_parts)
+            if full_text and not full_text.endswith("\n"):
+                sys.stdout.write("\n")
+                sys.stdout.flush()
+
+            if not is_quiet:
+                footer = format_meta_footer(
+                    provider_key,
+                    model_name,
+                    duration_s,
+                    usage["tokens_input"],
+                    usage["tokens_output"],
+                    usage["total_tokens"],
+                    usage["cost_usd"],
+                )
+                from core.interfaces.cli.formatter import DIM, RESET, supports_color
+
+                styled_footer = f"{DIM}{footer}{RESET}" if supports_color() else footer
+                sys.stderr.write(f"{styled_footer}\n")
+                sys.stderr.flush()
 
         return 1 if has_error else 0
 

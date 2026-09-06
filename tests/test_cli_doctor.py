@@ -374,5 +374,25 @@ class TestCLIDoctor(unittest.TestCase):
         self.assertIn("command not found ('nonexistent-bin arg1')", results[1][1])
 
 
+    def test_run_doctor_json_output(self):
+        import json
+        out = io.StringIO()
+        args = MagicMock(json=True)
+        with patch("core.interfaces.cli.commands.doctor_cmd.diagnose_python", return_value=("✓", "Python v3.11")), \
+             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_uv", return_value=("✓", "uv installed")), \
+             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_config_dirs", return_value=[("✓", "config ok")]), \
+             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_git", return_value=("✓", "git clean")), \
+             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_providers", return_value=[("✓", "openai ready")]), \
+             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_mcp", return_value=[("✓", "mcp ok")]):
+            with redirect_stdout(out):
+                code = run_doctor(args=args)
+
+        self.assertEqual(code, 0)
+        report = json.loads(out.getvalue())
+        self.assertEqual(report["status"], "ok")
+        self.assertIn("Environment", report["sections"])
+        self.assertEqual(report["sections"]["Environment"][0]["status"], "ok")
+
+
 if __name__ == "__main__":
     unittest.main()

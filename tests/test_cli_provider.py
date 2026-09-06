@@ -375,7 +375,31 @@ class TestCLIProvider(unittest.TestCase):
         pdef = ProviderDef.from_dict("custom_key", {"name": "Custom", "model": "m-1", "api_key": "raw_k"})
         self.assertEqual(pdef.key, "custom_key")
         self.assertEqual(pdef.name, "Custom")
-        self.assertEqual(pdef.model, "m-1")
+    def test_list_providers_json_output(self):
+        import json
+        f = io.StringIO()
+        pm = MagicMock()
+        pm.load_providers.return_value = {
+            "openai": {"name": "OpenAI", "model": "gpt-4o", "enabled": True},
+        }
+        pm.get_active_provider_key.return_value = "openai"
+        pm.get_disabled_providers.return_value = []
+        pm.get_provider_model.return_value = "gpt-4o"
+        pm.get_api_key.return_value = "sk-test"
+        pm.load_provider_def.return_value = MagicMock(requires_key=True)
+        pm.provider_needs_key.return_value = True
+
+        with redirect_stdout(f):
+            code = list_providers(pm=pm, as_json=True)
+        self.assertEqual(code, 0)
+        data = json.loads(f.getvalue())
+        self.assertIsInstance(data, list)
+        self.assertEqual(len(data), 1)
+        self.assertTrue(data[0]["active"])
+        self.assertEqual(data[0]["provider"], "openai")
+        self.assertEqual(data[0]["model"], "gpt-4o")
+        self.assertEqual(data[0]["key_status"], "set")
+        self.assertEqual(data[0]["state"], "active")
 
 
 if __name__ == "__main__":

@@ -240,7 +240,7 @@ def _parse_and_validate(raw_val: str, field_type: Any, canonical_key: str) -> An
     return trimmed
 
 
-def list_config(config_file: Optional[str] = None) -> int:
+def list_config(config_file: Optional[str] = None, as_json: bool = False) -> int:
     """List all settings with section/key, current value, and source (config vs default)."""
     target_file = config_file or paths.CONFIG_FILE
     settings = get_settings(target_file)
@@ -264,11 +264,19 @@ def list_config(config_file: Optional[str] = None) -> int:
             source = "config" if f.name in sec_raw else "default"
             rows.append([f_key, str(val if val is not None else "None"), source])
 
+    if as_json:
+        data = [
+            {"setting": row[0], "value": row[1], "source": row[2]}
+            for row in rows
+        ]
+        print(json.dumps(data, indent=2))
+        return 0
+
     print(format_table(["Setting", "Value", "Source"], rows))
     return 0
 
 
-def get_config(key: str, config_file: Optional[str] = None) -> int:
+def get_config(key: str, config_file: Optional[str] = None, as_json: bool = False) -> int:
     """Get value of a single setting."""
     try:
         canonical_key, sec, field_name, _ = resolve_key(key)
@@ -283,6 +291,10 @@ def get_config(key: str, config_file: Optional[str] = None) -> int:
     else:
         sec_obj = getattr(settings, sec, None)
         val = getattr(sec_obj, field_name, None) if sec_obj is not None else None
+
+    if as_json:
+        print(json.dumps({canonical_key: val}, indent=2))
+        return 0
 
     print(str(val if val is not None else "None"))
     return 0
@@ -344,11 +356,13 @@ def run_config(args: Any = None, config_file: Optional[str] = None) -> int:
     action = getattr(args, "config_action", None) if args is not None else None
     cfg_file = getattr(args, "config_file", None) or config_file
 
+    as_json = bool(getattr(args, "json", False))
+
     if action is None or action == "list":
-        return list_config(cfg_file)
+        return list_config(cfg_file, as_json=as_json)
     if action == "get":
         key = getattr(args, "key", "")
-        return get_config(key, cfg_file)
+        return get_config(key, cfg_file, as_json=as_json)
     if action == "set":
         key = getattr(args, "key", "")
         value = getattr(args, "value", "")
