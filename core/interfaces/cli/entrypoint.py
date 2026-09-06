@@ -255,6 +255,25 @@ def build_parser() -> argparse.ArgumentParser:
     # doctor subparser
     subparsers.add_parser("doctor", help="Check environment and configuration health")
 
+    # run subparser
+    run_p = subparsers.add_parser("run", help="Run prompt headlessly and stream response")
+    run_p.add_argument(
+        "prompt",
+        nargs="?",
+        default=None,
+        help="Prompt to execute (use '-' to read from stdin)",
+    )
+    run_p.add_argument("--provider", default=None, help="Override active provider")
+    run_p.add_argument("--model", default=None, help="Override active model")
+    run_p.add_argument("--role", default="worker", help="Agent execution role (default: worker)")
+    run_p.add_argument("--json", action="store_true", help="Print structured JSON output")
+    run_p.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Print only assistant text without tool call status headers",
+    )
+
     return parser
 
 
@@ -324,6 +343,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         from core.interfaces.cli.commands.doctor_cmd import run_doctor
 
         code = run_doctor(args)
+        sys.exit(code if code is not None else 0)
+    elif args.subcommand == "run":
+        from core.interfaces.cli.commands.run_cmd import run_headless
+
+        code = run_headless(args)
         sys.exit(code if code is not None else 0)
 
     from app import JohnstonApp
