@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 from typing import Any
 
 from textual import events
@@ -25,7 +24,6 @@ from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
 from widgets.utils.responsive import (
-    MODAL_COMPACT_MAX_WIDTH,
     MODAL_MEDIUM_MAX_WIDTH,
     MODAL_MIN_WIDTH,
     apply_modal_fit,
@@ -35,6 +33,8 @@ from widgets.utils.row_format import (
     format_badge_row,
     option_list_row_width,
 )
+
+__all__ = ["WorkspaceScreen", "get_root_scope"]
 
 
 def get_root_scope(pm: PermissionManager, path: str) -> str:
@@ -60,95 +60,11 @@ def get_root_scope(pm: PermissionManager, path: str) -> str:
     return "session"
 
 
-class AddWorkspaceRootScreen(BaseModalScreen[tuple[str, str] | None]):
-    """Compact modal screen for entering a new workspace root path."""
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-compact"):
-            yield ModalHeader("Add Workspace Root", esc_hint="")
-            yield Input(
-                placeholder="Directory path (e.g. ~/projects/lib [--project])...",
-                id="workspace-add-input",
-                classes="modal-input",
-            )
-            yield ModalHint("enter Add • esc Cancel", id=MODAL_HINT_ID)
-
-    def _apply_dialog_fit(self) -> None:
-        try:
-            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
-            apply_modal_fit(
-                dialog,
-                MODAL_COMPACT_MAX_WIDTH,
-                min_width=MODAL_MIN_WIDTH,
-                max_width=MODAL_COMPACT_MAX_WIDTH,
-            )
-        except Exception:
-            pass
-
-    def on_mount(self) -> None:
-        super().on_mount()
-        self._apply_dialog_fit()
-        try:
-            inp = self.query_one("#workspace-add-input", Input)
-            inp.focus()
-        except Exception:
-            pass
-
-    def on_resize(self, event: events.Resize) -> None:
-        self._apply_dialog_fit()
-
-    def on_paste(self, event: events.Paste) -> None:
-        clean = decode_pasted_path(event.text)
-        try:
-            inp = self.query_one("#workspace-add-input", Input)
-            inp.insert_text_at_cursor(clean)
-            event.stop()
-            event.prevent_default()
-        except Exception:
-            pass
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        val = event.value.strip()
-        if not val:
-            if self.app and hasattr(self.app, "notify"):
-                self.app.notify("Directory path required", severity="warning")
-            return
-
-        try:
-            tokens = shlex.split(val)
-        except Exception:
-            tokens = val.split()
-
-        scope = "auto"
-        path_tokens = []
-        for token in tokens:
-            if token in ("--local", "--project", "--session"):
-                scope = token[2:]
-            else:
-                path_tokens.append(token)
-
-        if not path_tokens:
-            if self.app and hasattr(self.app, "notify"):
-                self.app.notify("Directory path required", severity="warning")
-            return
-
-        raw_path = " ".join(path_tokens)
-        clean_path = decode_pasted_path(raw_path)
-        abs_path = os.path.realpath(os.path.abspath(clean_path))
-        if not os.path.isdir(abs_path):
-            if self.app and hasattr(self.app, "notify"):
-                self.app.notify(f"Directory '{clean_path}' does not exist", severity="error")
-            return
-
-        self.dismiss((abs_path, scope))
-
-
 class WorkspaceScreen(BaseModalScreen[None]):
     """Modal screen for viewing, adding, and removing workspace roots."""
 
     BINDINGS = expand_bindings([
         ("escape", "cancel", "Close"),
-        ("a", "add_root", "Add"),
         ("d", "remove_root", "Remove"),
         ("x", "remove_root", "Remove"),
         ("delete", "remove_root", "Remove"),
@@ -166,8 +82,13 @@ class WorkspaceScreen(BaseModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
             yield ModalHeader("Workspace Roots", esc_hint="")
+            yield Input(
+                placeholder="Directory path (e.g. ~/projects/lib)...",
+                id="workspace-add-input",
+                classes="modal-input",
+            )
             yield HeaderWrapOptionList(id="workspace-option-list")
-            yield ModalHint("drop folder • a Add • esc Close", id=MODAL_HINT_ID)
+            yield ModalHint("enter Add • drop folder • esc Close", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:
@@ -186,7 +107,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
         self._apply_dialog_fit()
         self.refresh_list()
         try:
-            self.query_one("#workspace-option-list", OptionList).focus()
+            self.query_one("#workspace-add-input", Input).focus()
         except Exception:
             pass
 
@@ -215,7 +136,6 @@ class WorkspaceScreen(BaseModalScreen[None]):
 
         target_w = option_list_row_width(opt_list, MODAL_MEDIUM_ROW_WIDTH)
 
-        # 1. Existing roots
         active_tag = status_tag("ACTIVE")
         locked_tag = status_tag("LOCKED")
         for item in self.roots_data:
@@ -226,29 +146,28 @@ class WorkspaceScreen(BaseModalScreen[None]):
             opt_list.add_option(Option(row))
             self._option_actions.append(("root", item))
 
-        # 2. Divider
-        opt_list.add_option(Option("", disabled=True))
-        self._option_actions.append(("sep", None))
-
-        # 3. Add new root (prefix="+ " aligns '+' directly with '◆' / '●')
-        add_label = format_badge_row("Add workspace root...", badge="", target_width=target_w, prefix="+ ")
-        opt_list.add_option(Option(add_label))
-        self._option_actions.append(("add", None))
-
         if curr_idx is not None and curr_idx < len(opt_list._options):
             opt_list.highlighted = curr_idx
         elif len(self.roots_data) > 0:
             opt_list.highlighted = 0
         else:
-            opt_list.highlighted = len(opt_list._options) - 1
+            opt_list.highlighted = None
 
-        self._update_hint(opt_list.highlighted)
+        self._update_hint()
 
     def _update_hint(self, idx: int | None = None) -> None:
         try:
             hint_widget = self.query_one(f"#{MODAL_HINT_ID}", ModalHint)
         except Exception:
             return
+
+        try:
+            inp = self.query_one("#workspace-add-input", Input)
+            if inp.has_focus:
+                hint_widget.update("enter Add • drop folder • esc Close")
+                return
+        except Exception:
+            pass
 
         if idx is None:
             try:
@@ -259,19 +178,77 @@ class WorkspaceScreen(BaseModalScreen[None]):
 
         if idx is not None and 0 <= idx < len(self._option_actions):
             action_type, data = self._option_actions[idx]
-            if action_type == "add":
-                hint_widget.update("enter Add • drop folder • esc Close")
-                return
             if action_type == "root" and data:
                 if data.get("scope") == "primary":
-                    hint_widget.update("drop folder • a Add • esc Close")
+                    hint_widget.update("drop folder • esc Close")
                     return
-                hint_widget.update("d Delete • a Add • esc Close")
+                hint_widget.update("d Delete • drop folder • esc Close")
                 return
 
-        hint_widget.update("drop folder • a Add • esc Close")
+        hint_widget.update("enter Add • drop folder • esc Close")
+
+    def on_descendant_focus(self, event: events.DescendantFocus) -> None:
+        self._update_hint()
+
+    def _on_key(self, event: events.Key) -> None:
+        key = (event.key or "").lower()
+        try:
+            inp = self.query_one("#workspace-add-input", Input)
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+        except Exception:
+            return
+
+        if inp.has_focus:
+            if key in ("down", "key_down"):
+                if len(opt_list._options) > 0:
+                    if opt_list.highlighted is None:
+                        opt_list.highlighted = 0
+                    opt_list.focus()
+                    self._update_hint(opt_list.highlighted)
+                    event.stop()
+                    event.prevent_default()
+                    return
+        elif opt_list.has_focus:
+            if key in ("up", "key_up") and opt_list.highlighted == 0:
+                inp.focus()
+                self._update_hint()
+                event.stop()
+                event.prevent_default()
+                return
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        val = event.value.strip()
+        if not val:
+            if self.app and hasattr(self.app, "notify"):
+                self.app.notify("Directory path required", severity="warning")
+            return
+
+        clean_path = decode_pasted_path(val.strip("'\""))
+        abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(clean_path)))
+        if not os.path.isdir(abs_path):
+            if self.app and hasattr(self.app, "notify"):
+                self.app.notify(f"Directory '{clean_path}' does not exist", severity="error")
+            return
+
+        self.pm.add_workspace_root(abs_path)
+        if self.app and hasattr(self.app, "notify"):
+            self.app.notify(f"Added `{abs_path}` (session only)", severity="information")
+
+        event.input.value = ""
+        self.refresh_list()
 
     def on_paste(self, event: events.Paste) -> None:
+        try:
+            inp = self.query_one("#workspace-add-input", Input)
+            if inp.has_focus:
+                clean = decode_pasted_path(event.text)
+                inp.insert_text_at_cursor(clean)
+                event.stop()
+                event.prevent_default()
+                return
+        except Exception:
+            pass
+
         raw = event.text.strip()
         if not raw:
             return
@@ -280,18 +257,13 @@ class WorkspaceScreen(BaseModalScreen[None]):
         added_any = False
         for line in lines:
             clean_path = decode_pasted_path(line)
-            abs_path = os.path.realpath(os.path.abspath(clean_path))
+            abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(clean_path)))
             if os.path.isdir(abs_path):
                 event.stop()
                 event.prevent_default()
-                used_scope = self.pm.save_workspace_root(abs_path, scope="auto")
-                scope_desc = {
-                    "session": "session only",
-                    "local": "local config",
-                    "project": "project config",
-                }.get(used_scope, used_scope)
+                self.pm.add_workspace_root(abs_path)
                 if self.app and hasattr(self.app, "notify"):
-                    self.app.notify(f"Added `{abs_path}` ({scope_desc})", severity="information")
+                    self.app.notify(f"Added `{abs_path}` (session only)", severity="information")
                 added_any = True
             elif len(lines) == 1:
                 if self.app and hasattr(self.app, "notify"):
@@ -307,37 +279,22 @@ class WorkspaceScreen(BaseModalScreen[None]):
         idx = event.option_index
         if idx is not None and 0 <= idx < len(self._option_actions):
             action_type, data = self._option_actions[idx]
-            if action_type == "add":
-                self.action_add_root()
-            elif action_type == "root" and data:
+            if action_type == "root" and data:
                 if data.get("scope") == "primary":
                     if self.app and hasattr(self.app, "notify"):
                         self.app.notify("Primary workspace root cannot be removed", severity="warning")
                 else:
                     self._confirm_and_remove(data["path"])
 
-    def action_add_root(self) -> None:
-        def on_added(result: tuple[str, str] | None) -> None:
-            if result:
-                path, scope = result
-                used_scope = self.pm.save_workspace_root(path, scope=scope)
-                scope_desc = {
-                    "session": "session only",
-                    "local": "local config",
-                    "project": "project config",
-                }.get(used_scope, used_scope)
-                if self.app and hasattr(self.app, "notify"):
-                    self.app.notify(f"Added `{path}` ({scope_desc})", severity="information")
-                self.refresh_list()
-            try:
-                self.query_one("#workspace-option-list", OptionList).focus()
-            except Exception:
-                pass
-
-        if self.app and hasattr(self.app, "push_screen"):
-            self.app.push_screen(AddWorkspaceRootScreen(), callback=on_added)
-
     def action_remove_root(self) -> None:
+        try:
+            inp = self.query_one("#workspace-add-input", Input)
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+            if inp.has_focus and not opt_list.has_focus:
+                return
+        except Exception:
+            pass
+
         try:
             opt_list = self.query_one("#workspace-option-list", OptionList)
             idx = opt_list.highlighted

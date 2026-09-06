@@ -5,12 +5,13 @@ import unittest
 from unittest.mock import MagicMock
 
 from textual.app import App
+from textual.events import Paste
 from textual.widgets import Input, OptionList
 
 from core.permission_manager import PermissionManager
 from widgets.presentation.commands.workspace_command import WorkspaceCommand
+from widgets.presentation.screens.confirm import ConfirmScreen
 from widgets.presentation.screens.workspace import (
-    AddWorkspaceRootScreen,
     WorkspaceScreen,
     get_root_scope,
 )
@@ -65,15 +66,19 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 await pilot.pause()
                 opt_list = screen.query_one("#workspace-option-list", OptionList)
-                # 2 roots + 1 divider + 1 "+ Add..." = 4 options
-                self.assertEqual(len(opt_list._options), 4)
+                # Exactly 2 roots (no divider or add item)
+                self.assertEqual(len(opt_list._options), 2)
                 self.assertEqual(len(screen.roots_data), 2)
                 self.assertEqual(screen.roots_data[0]["scope"], "primary")
                 self.assertEqual(screen.roots_data[1]["scope"], "session")
 
-                # Dynamic hint on primary root
+                # Input is present and focused initially
+                inp = screen.query_one("#workspace-add-input", Input)
+                self.assertTrue(inp.has_focus)
+
+                # Hint shows input action
                 hint = screen.query_one("#modal-hint", ModalHint)
-                self.assertIn("a Add", str(hint.left_text))
+                self.assertIn("enter Add", str(hint.left_text))
         finally:
             os.rmdir(extra)
 
@@ -88,21 +93,50 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
                 opt_list = screen.query_one("#workspace-option-list", OptionList)
                 hint = screen.query_one("#modal-hint", ModalHint)
 
-                # Primary root (index 0)
+                # Focus list on primary root (index 0)
+                opt_list.focus()
+                await pilot.pause()
                 opt_list.highlighted = 0
                 screen._update_hint(0)
-                self.assertIn("a Add", str(hint.left_text))
-                self.assertNotIn("Delete", str(hint.left_text))
+                self.assertNotIn("d Delete", str(hint.left_text))
+                self.assertIn("drop folder", str(hint.left_text))
 
                 # Removable root (index 1)
                 opt_list.highlighted = 1
                 screen._update_hint(1)
                 self.assertIn("d Delete", str(hint.left_text))
 
-                # Add option (index 3)
-                opt_list.highlighted = 3
-                screen._update_hint(3)
+                # Return focus to input
+                inp = screen.query_one("#workspace-add-input", Input)
+                inp.focus()
+                await pilot.pause()
+                screen._update_hint()
                 self.assertIn("enter Add", str(hint.left_text))
+        finally:
+            os.rmdir(extra)
+
+    async def test_workspace_screen_navigation_keys(self):
+        extra = os.path.realpath(tempfile.mkdtemp())
+        try:
+            self.pm.add_workspace_root(extra)
+            screen = WorkspaceScreen(pm=self.pm)
+            app = _HostApp(screen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                inp = screen.query_one("#workspace-add-input", Input)
+                opt_list = screen.query_one("#workspace-option-list", OptionList)
+
+                self.assertTrue(inp.has_focus)
+                # Press down key from input -> moves focus to OptionList
+                await pilot.press("down")
+                await pilot.pause()
+                self.assertTrue(opt_list.has_focus)
+                self.assertEqual(opt_list.highlighted, 0)
+
+                # Press up key from top of OptionList -> moves focus to Input
+                await pilot.press("up")
+                await pilot.pause()
+                self.assertTrue(inp.has_focus)
         finally:
             os.rmdir(extra)
 
@@ -112,23 +146,12 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             await pilot.pause()
             opt_list = screen.query_one("#workspace-option-list", OptionList)
-            # Primary root is at index 0
+            opt_list.focus()
+            await pilot.pause()
             opt_list.highlighted = 0
             screen.action_remove_root()
             await pilot.pause()
             self.assertTrue(any("Primary workspace root cannot be removed" in n for n in app.notifications))
-
-    async def test_workspace_screen_select_add_opens_modal(self):
-        screen = WorkspaceScreen(pm=self.pm)
-        app = _HostApp(screen)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            opt_list = screen.query_one("#workspace-option-list", OptionList)
-            # Highlight "+ Add workspace root..." (last item)
-            opt_list.highlighted = len(opt_list._options) - 1
-            await pilot.press("enter")
-            await pilot.pause()
-            self.assertIsInstance(app.screen, AddWorkspaceRootScreen)
 
     async def test_workspace_screen_select_removable_prompts_confirm(self):
         extra = os.path.realpath(tempfile.mkdtemp())
@@ -139,17 +162,17 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 await pilot.pause()
                 opt_list = screen.query_one("#workspace-option-list", OptionList)
+                opt_list.focus()
                 # Removable root is at index 1
                 opt_list.highlighted = 1
                 await pilot.press("enter")
                 await pilot.pause()
-                from widgets.presentation.screens.confirm import ConfirmScreen
                 self.assertIsInstance(app.screen, ConfirmScreen)
         finally:
             os.rmdir(extra)
 
-    async def test_add_workspace_root_screen_empty(self):
-        screen = AddWorkspaceRootScreen()
+    async def test_workspace_screen_input_empty_warns(self):
+        screen = WorkspaceScreen(pm=self.pm)
         app = _HostApp(screen)
         async with app.run_test() as pilot:
             await pilot.pause()
@@ -159,8 +182,8 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertTrue(any("Directory path required" in n for n in app.notifications))
 
-    async def test_add_workspace_root_screen_nonexistent(self):
-        screen = AddWorkspaceRootScreen()
+    async def test_workspace_screen_input_nonexistent_warns(self):
+        screen = WorkspaceScreen(pm=self.pm)
         app = _HostApp(screen)
         async with app.run_test() as pilot:
             await pilot.pause()
@@ -170,21 +193,61 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             self.assertTrue(any("does not exist" in n for n in app.notifications))
 
-    async def test_add_workspace_root_screen_valid(self):
+    async def test_workspace_screen_input_adds_session_root(self):
         extra = os.path.realpath(tempfile.mkdtemp())
         try:
-            screen = AddWorkspaceRootScreen()
-            dismiss_results = []
-            screen.dismiss = lambda res=None: dismiss_results.append(res)
+            screen = WorkspaceScreen(pm=self.pm)
             app = _HostApp(screen)
             async with app.run_test() as pilot:
                 await pilot.pause()
                 inp = screen.query_one("#workspace-add-input", Input)
-                inp.value = f"{extra} --project"
+                inp.value = extra
                 await pilot.press("enter")
                 await pilot.pause()
-                self.assertEqual(len(dismiss_results), 1)
-                self.assertEqual(dismiss_results[0], (extra, "project"))
+
+                self.assertIn(extra, self.pm.get_workspace_roots())
+                self.assertEqual(get_root_scope(self.pm, extra), "session")
+                self.assertTrue(any(f"Added `{extra}` (session only)" in n for n in app.notifications))
+                # Input is cleared
+                self.assertEqual(inp.value, "")
+
+                # Option list refreshed
+                opt_list = screen.query_one("#workspace-option-list", OptionList)
+                self.assertEqual(len(opt_list._options), 2)
+        finally:
+            os.rmdir(extra)
+
+    async def test_workspace_screen_input_paste_decodes(self):
+        extra = os.path.realpath(tempfile.mkdtemp())
+        try:
+            screen = WorkspaceScreen(pm=self.pm)
+            app = _HostApp(screen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen.on_paste(Paste(f"'{extra}'"))
+                await pilot.pause()
+                inp = screen.query_one("#workspace-add-input", Input)
+                self.assertEqual(inp.value, extra)
+        finally:
+            os.rmdir(extra)
+
+    async def test_workspace_screen_drag_and_drop(self):
+        extra = os.path.realpath(tempfile.mkdtemp())
+        try:
+            screen = WorkspaceScreen(pm=self.pm)
+            app = _HostApp(screen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                # When input does NOT have focus (e.g. OptionList has focus)
+                opt_list = screen.query_one("#workspace-option-list", OptionList)
+                opt_list.focus()
+                await pilot.pause()
+
+                # Simulate dropping folder path directly on modal
+                screen.on_paste(Paste(f"file://{extra}"))
+                await pilot.pause()
+                self.assertIn(extra, self.pm.get_workspace_roots())
+                self.assertTrue(any(f"Added `{extra}` (session only)" in n for n in app.notifications))
         finally:
             os.rmdir(extra)
 
@@ -196,36 +259,3 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         mock_app.push_screen.assert_called_once()
         called_screen = mock_app.push_screen.call_args[0][0]
         self.assertIsInstance(called_screen, WorkspaceScreen)
-
-    async def test_workspace_screen_drag_and_drop(self):
-        from textual.events import Paste
-
-        extra = os.path.realpath(tempfile.mkdtemp())
-        try:
-            screen = WorkspaceScreen(pm=self.pm)
-            app = _HostApp(screen)
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                # Simulate dropping folder path (drag-and-drop from file manager)
-                screen.on_paste(Paste(f"file://{extra}"))
-                await pilot.pause()
-                self.assertIn(extra, self.pm.get_workspace_roots())
-                self.assertTrue(any(f"Added `{extra}`" in n for n in app.notifications))
-        finally:
-            os.rmdir(extra)
-
-    async def test_add_workspace_root_screen_on_paste(self):
-        from textual.events import Paste
-
-        extra = os.path.realpath(tempfile.mkdtemp())
-        try:
-            screen = AddWorkspaceRootScreen()
-            app = _HostApp(screen)
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                screen.on_paste(Paste(f"'{extra}'"))
-                await pilot.pause()
-                inp = screen.query_one("#workspace-add-input", Input)
-                self.assertEqual(inp.value, extra)
-        finally:
-            os.rmdir(extra)
