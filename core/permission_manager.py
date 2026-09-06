@@ -146,9 +146,14 @@ class PermissionManager:
         """Combines self.workspace_roots with any configured writable_roots from get_effective_permissions()."""
         roots = list(self.workspace_roots)
         effective = self.get_effective_permissions(project_dir)
+        pdir = os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
         for r in effective.get("writable_roots", []):
             if isinstance(r, str) and r.strip():
-                norm = os.path.realpath(os.path.abspath(r.strip()))
+                val = r.strip()
+                if not os.path.isabs(val):
+                    norm = os.path.realpath(os.path.join(pdir, val))
+                else:
+                    norm = os.path.realpath(os.path.abspath(val))
                 if norm not in roots:
                     roots.append(norm)
         return roots

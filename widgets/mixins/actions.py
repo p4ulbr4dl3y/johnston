@@ -217,7 +217,7 @@ class ActionsMixin(PlanActionsMixin):
                     pm.set_session_pattern_override(perm_name, pattern, "allow")
         elif isinstance(result, str) and result.startswith("add_root:"):
             root_path = result.split(":", 1)[1]
-            pm.add_workspace_root(root_path)
+            pm.save_workspace_root(root_path, scope="auto")
             return True
         elif isinstance(result, str) and result.startswith("deny:"):
             return result

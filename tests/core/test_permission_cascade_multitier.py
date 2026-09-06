@@ -238,6 +238,17 @@ class TestPermissionCascadeMultitier(unittest.TestCase):
         self.pm.set_project_dir(self.project_dir)
         self.assertEqual(self.pm.execution_mode, ExecutionMode.EDITS)
 
+    def test_get_workspace_roots_resolves_relative_path(self):
+        """get_workspace_roots resolves relative writable_roots against project_dir."""
+        project_config = os.path.join(self.project_dir, ".johnston", "config.json")
+        sibling_path = str(self.base_dir / "sibling_dir")
+        os.makedirs(sibling_path, exist_ok=True)
+        # Relative path from project_dir to sibling_dir is "../sibling_dir"
+        self._write_json(project_config, {"permissions": {"writable_roots": ["../sibling_dir"]}})
+
+        roots = self.pm.get_workspace_roots(self.project_dir)
+        self.assertIn(os.path.realpath(sibling_path), roots)
+
 
 if __name__ == "__main__":
     unittest.main()

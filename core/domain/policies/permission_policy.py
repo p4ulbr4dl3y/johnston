@@ -454,7 +454,7 @@ def is_path_within_workspace(
         return False
 
     try:
-        norm_target = os.path.realpath(os.path.abspath(target_path.strip()))
+        norm_target = os.path.normcase(os.path.realpath(os.path.abspath(target_path.strip())))
     except Exception:
         return False
 
@@ -466,7 +466,7 @@ def is_path_within_workspace(
 
     for root in candidates:
         try:
-            norm_root = os.path.realpath(os.path.abspath(root))
+            norm_root = os.path.normcase(os.path.realpath(os.path.abspath(root)))
             if os.path.commonpath([norm_target, norm_root]) == norm_root:
                 return True
         except (ValueError, Exception):
@@ -478,7 +478,7 @@ def is_path_within_workspace(
             if not temp_dir:
                 continue
             try:
-                norm_temp = os.path.realpath(os.path.abspath(temp_dir))
+                norm_temp = os.path.normcase(os.path.realpath(os.path.abspath(temp_dir)))
                 if os.path.commonpath([norm_target, norm_temp]) == norm_temp:
                     return True
             except (ValueError, Exception):
