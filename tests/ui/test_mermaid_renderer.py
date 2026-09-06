@@ -35,6 +35,13 @@ class TestMermaidRenderer:
         wrapped = "```mermaid\ngraph TD\n  A --> B\n```"
         assert clean_mermaid_code(wrapped) == "graph TD\n  A --> B"
 
+    def test_clean_mermaid_code_normalizes_shapes(self):
+        code = "flowchart TD\n  A(Round) --> B{Decision}\n  B --> C[(Database)]"
+        cleaned = clean_mermaid_code(code)
+        assert "A[Round]" in cleaned
+        assert "B[Decision]" in cleaned
+        assert "C[Database]" in cleaned
+
     def test_render_mermaid_valid(self):
         code = "graph TD\n    A[Start] --> B[End]"
         result = render_mermaid_to_ascii(code)

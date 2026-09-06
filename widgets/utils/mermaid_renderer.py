@@ -34,8 +34,42 @@ def _get_mermaid_binary() -> Optional[str]:
     return shutil.which("mermaid-ascii") or shutil.which("mermaid-ascii.exe")
 
 
+def _normalize_flowchart_shapes(code: str) -> str:
+    """Normalize non-standard node shapes (rhombus, rounded, cylinder, stadium) to standard boxes.
+
+    mermaid-ascii's Go AST parser only maps node identifiers correctly when enclosed
+    in square brackets [...]. Shapes like (rounded), {rhombus}, [(db)] otherwise get
+    treated as new detached node IDs, splitting the graph topology.
+    """
+    first_line = ""
+    for line in code.splitlines():
+        s = line.strip()
+        if s and not s.startswith("%%"):
+            first_line = s.lower()
+            break
+    if not (first_line.startswith("graph") or first_line.startswith("flowchart")):
+        return code
+
+    # Two-character opening/closing shapes
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[\((.*?)\)\]", r"\1[\2]", code)  # [(...)]
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\(\[(.*?)\]\)", r"\1[\2]", code)  # ([...])
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\(\((.*?)\)\)", r"\1[\2]", code)  # ((...))
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[\[(.*?)\]\]", r"\1[\2]", code)  # [[...]]
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\{\{(.*?)\}\}", r"\1[\2]", code)  # {{...}}
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[/(.*?)/\]", r"\1[\2]", code)  # [/ /]
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[\x5c(.*?)\x5c\]", r"\1[\2]", code)  # [\ \]
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[/(.*?)\x5c\]", r"\1[\2]", code)  # [/ \]
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\[\x5c(.*?)/\]", r"\1[\2]", code)  # [\ /]
+
+    # Single-character shapes
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\{(.*?)\}", r"\1[\2]", code)  # {...}
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*>\s*(.*?)]", r"\1[\2]", code)  # >...]
+    code = re.sub(r"(\b[a-zA-Z0-9_-]+)\s*\(([^()\n]+)\)", r"\1[\2]", code)  # (...)
+    return code
+
+
 def clean_mermaid_code(code: str) -> str:
-    """Strip code fence markers or trailing whitespace if present."""
+    """Strip code fence markers and normalize shapes to preserve graph topology."""
     if not code:
         return ""
     lines = code.splitlines()
@@ -43,7 +77,9 @@ def clean_mermaid_code(code: str) -> str:
         lines = lines[1:]
     if lines and lines[-1].strip().startswith("```"):
         lines = lines[:-1]
-    return "\n".join(lines).strip()
+    cleaned = "\n".join(lines).strip()
+    return _normalize_flowchart_shapes(cleaned)
+
 
 
 _MOJIBAKE_RE = re.compile(
