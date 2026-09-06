@@ -62,6 +62,25 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
+async def _warmup_mcp_tools() -> None:
+    """Kick off MCP tool warmup in the background WITHOUT blocking the first
+    user turn and WITHOUT cancelling it when that turn wins the race.
+    ``ensure_tools_ready_async`` coalesces concurrent callers and returns
+    already-cached tools when the warmup task is still running; the prompt
+    builder snapshots whatever MCP tools are ready at build time and the
+    still-running warmup fills the cache so a later turn picks the rest up.
+    A slow server (npx/uvx cold start) never stalls the send path.
+    """
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    from core.infrastructure.mcp import get_mcp_manager
+
+    try:
+        await get_mcp_manager().ensure_tools_ready_async(max_age=60.0)
+    except Exception:
+        pass
+
+
 
 
 class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
@@ -274,23 +293,23 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
     def _drain_queued_messages(self) -> List[Tuple[str, Any, bool, Any]]:
         return drain_queued_messages(self)
 
-    async def stream_steps(
-        self, user_text: str, attachments: Optional[List[Any]] = None
-    ) -> AsyncGenerator[Tuple[str, str, str], None]:
-        # Kick off MCP tool warmup in the background WITHOUT blocking the first
-        # user turn and WITHOUT cancelling it when that turn wins the race.
-        # `ensure_tools_ready_async` coalesces concurrent callers and returns
-        # already-cached tools when the warmup task is still running; the prompt
-        # builder snapshots whatever MCP tools are ready at build time and the
-        # still-running warmup fills the cache so a later turn picks the rest up.
-        # A slow server (npx/uvx cold start) never stalls the send path.
-        if not os.environ.get("PYTEST_CURRENT_TEST"):
-            from core.infrastructure.mcp import get_mcp_manager
+    async def _prepare_turn_context(
+        self, user_text: str, attachments: Optional[List[Any]], result: Dict[str, Any]
+    ) -> AsyncGenerator[Tuple[Any, ...], None]:
+        """Build the full message list for this turn and the compaction threshold.
 
-            try:
-                await get_mcp_manager().ensure_tools_ready_async(max_age=60.0)
-            except Exception:
-                pass
+        Runs MCP warmup, builds the system prompt/tool schema, computes the
+        auto-compaction threshold and applies turn-start compaction, assembles
+        the user message (attachments become image blocks), and resyncs
+        ``self.history`` to ``messages[1:]`` so the incremental token
+        accumulator stays exact through the multi-step loop.
+
+        Yields the turn-start compaction events and writes ``messages``,
+        ``all_tools`` and ``threshold`` into ``result`` before returning (an
+        async generator cannot carry a return value, so the caller reads the
+        out-param on ``StopAsyncIteration``).
+        """
+        await _warmup_mcp_tools()
         from core.base_provider.tools import build_prompt_context_async
 
         sys_prompt, all_tools, sys_tokens = await build_prompt_context_async(self)
@@ -374,6 +393,406 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
         # per turn so the incremental token accumulator and in-place appends below
         # keep self.history == messages[1:] through the multi-step loop.
         self._set_history(messages[1:])
+        result["messages"] = messages
+        result["all_tools"] = all_tools
+        result["threshold"] = threshold
+
+    async def _stream_attempts(
+        self,
+        messages: List[Dict[str, Any]],
+        all_tools: List[Dict[str, Any]],
+        prompt_tokens_est: int,
+        max_retries: int,
+        retry_delay: float,
+        retry_backoff: float,
+        max_retry_delay: float,
+        pkey: str,
+        result: Dict[str, Any],
+    ) -> AsyncGenerator[Tuple[Any, ...], None]:
+        """Run the per-step attempt loop (stream consumption + retry/escalation).
+
+        Yields every streaming event exactly as the inline loop did. On a
+        successful attempt it writes ``(messages, thinking_started, thinking_t0,
+        step_usage, full_assistant_parts, active_thought_parts,
+        last_thought_parts, tool_calls_dict)`` into ``result`` before returning
+        (an async generator cannot carry a return value); ``messages`` may have
+        been replaced by vision-error sanitization, so callers must keep the
+        written list.
+        """
+        from core.infrastructure.runtime.circuit_breaker import circuit_breaker
+
+        attempt = 0
+        current_max_tokens = getattr(self, "max_tokens", DEFAULT_MAX_TOKENS)
+        thinking_started = False
+        thinking_t0 = time.time()
+        last_thought_parts = []
+        while True:
+            attempt += 1
+            full_assistant_parts = []
+            active_thought_parts = []
+            step_usage = None
+            tool_calls_dict = {}
+            generating_tools = {}
+            last_finish_reason = None
+
+            try:
+                from core.adapters import get_adapter
+
+                adapter = get_adapter(self.api_type)
+                stream_kwargs = build_stream_kwargs(
+                    self,
+                    messages=messages,
+                    tools=all_tools if all_tools else None,
+                    max_tokens=current_max_tokens,
+                    thinking_effort=getattr(self, "thinking_effort", None),
+                )
+                if self.api_type == "openai":
+                    stream_kwargs["chunk_timeout"] = getattr(self, "chunk_timeout", 30.0)
+                    stream_kwargs["provider_key"] = getattr(self, "provider_key", "openai")
+
+                async for tag, payload in adapter.stream_chat(**stream_kwargs):
+                    if tag == "adapter_text":
+                        if thinking_started:
+                            dt = time.time() - thinking_t0
+                            thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
+                            yield ("thinking_end", f"{dt}", thoughts_str)
+                            thinking_started = False
+                        full_assistant_parts.append(payload)
+                        yield ("bot_delta", payload, "")
+                    elif tag == "adapter_thought":
+                        if not payload or (isinstance(payload, str) and not payload.strip()):
+                            continue
+                        if not thinking_started:
+                            yield ("thinking_start", "Thinking...", "")
+                            thinking_started = True
+                            thinking_t0 = time.time()
+                        active_thought_parts.append(payload)
+                        yield ("thinking_delta", payload, "")
+                    elif tag == "adapter_tool_delta":
+                        if thinking_started:
+                            dt = time.time() - thinking_t0
+                            thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
+                            yield ("thinking_end", f"{dt}", thoughts_str)
+                            thinking_started = False
+                        idx = payload.get("index", 0)
+                        if idx not in generating_tools:
+                            generating_tools[idx] = {
+                                "id": payload.get("id") or new_tool_call_id(idx),
+                                "name": payload.get("name", ""),
+                                "args_buffer": "",
+                                "target": "",
+                                "announced": False,
+                                "target_announced": False,
+                            }
+                        g = generating_tools[idx]
+                        if payload.get("id"):
+                            g["id"] = payload["id"]
+                        if payload.get("name"):
+                            g["name"] = payload["name"]
+                        delta_args = payload.get("arguments_delta", "")
+                        if delta_args:
+                            g["args_buffer"] += delta_args
+
+                        if g["args_buffer"]:
+                            new_target = _extract_streaming_target(
+                                g["args_buffer"], scan_from=g.get("args_scan_pos", 0), tool_name=g.get("name", "")
+                            )
+                            if new_target and new_target != g["target"]:
+                                g["target"] = new_target
+                                if g["announced"]:
+                                    yield ("tool_generating_update", g["name"], g["target"], {"id": g["id"], "index": idx})
+                        g["args_scan_pos"] = len(g["args_buffer"])
+
+                        if g["name"] and not g["announced"]:
+                            g["announced"] = True
+                            yield ("tool_generating", g["name"], g["target"], {"id": g["id"], "index": idx})
+                    elif tag == "adapter_tool_call":
+                        if thinking_started:
+                            dt = time.time() - thinking_t0
+                            thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
+                            yield ("thinking_end", f"{dt}", thoughts_str)
+                            thinking_started = False
+                        # Key by the provider's delta index (now carried in
+                        # the payload) so the final call maps onto the same
+                        # generating_tools slot its deltas announced — even
+                        # when parallel calls finish out of order. Without an
+                        # index (legacy adapter mocks), fall back to arrival
+                        # order, which is what older adapters guaranteed.
+                        idx = payload.get("index")
+                        if idx is None:
+                            idx = len(tool_calls_dict)
+                        tc_id = payload.get("id") or (
+                            generating_tools.get(idx, {}).get("id") if idx in generating_tools else None
+                        ) or new_tool_call_id(idx)
+                        tool_calls_dict[idx] = {
+                            "id": tc_id,
+                            "name": payload.get("name", ""),
+                            "arguments": payload.get("arguments", "") or "",
+                        }
+                    elif tag == "adapter_finish_reason":
+                        last_finish_reason = payload
+                    elif tag == "adapter_usage":
+                        step_usage = payload
+
+                if active_thought_parts:
+                    last_thought_parts = active_thought_parts
+
+                # Check for empty response caused by max tokens cutoff
+                is_token_limit = (
+                    last_finish_reason is not None
+                    and str(last_finish_reason).upper() in ("MAX_TOKENS", "LENGTH", "MAX_OUTPUT_TOKENS")
+                )
+                if not tool_calls_dict and not full_assistant_parts:
+                    if is_token_limit or active_thought_parts:
+                        if attempt < max_retries and current_max_tokens < ESCALATED_MAX_TOKENS:
+                            current_max_tokens = min(ESCALATED_MAX_TOKENS, max(current_max_tokens * 2, 65536))
+                            logger.info(
+                                "Token limit reached during reasoning on attempt %d; escalating max_tokens to %d and retrying...",
+                                attempt,
+                                current_max_tokens,
+                            )
+                            continue
+                        raise RuntimeError(
+                            "Token limit reached during reasoning without generating response text. Try increasing max_tokens or lowering thinking effort."
+                        )
+
+                # Stream completed successfully
+                circuit_breaker.record_success(pkey)
+                break
+            except asyncio.CancelledError:
+                output_est = (
+                    estimate_tokens("".join(full_assistant_parts))
+                    + estimate_tokens("".join(active_thought_parts) or "".join(last_thought_parts))
+                    + estimate_tokens(tool_calls_dict)
+                )
+                self._accumulate_usage(
+                    step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_est
+                )
+                raise
+            except Exception as api_err:
+                if self._is_vision_error(api_err):
+                    sanitized = self._sanitize_vision_error_messages(messages)
+                    if len(sanitized) != len(messages) or any(s != m for s, m in zip(sanitized, messages)):
+                        messages = sanitized
+                        # Sanitize re-allocates message dicts; resync the
+                        # accumulator to the new messages[1:] prefix.
+                        self._set_history(messages[1:])
+                        yield (
+                            "thinking",
+                            "Model does not support vision; converted image tool result to hint.",
+                            "",
+                        )
+                        continue
+
+                is_retryable = self._is_retryable_error(api_err)
+                if is_retryable and attempt < max_retries:
+                    actual_delay = self._calculate_retry_delay(
+                        attempt,
+                        api_err,
+                        retry_delay=retry_delay,
+                        retry_backoff=retry_backoff,
+                        max_retry_delay=max_retry_delay,
+                    )
+                    if full_assistant_parts:
+                        # Signal the UI to drop the partially-streamed text so the
+                        # retried attempt starts from a blank reply (no duplication).
+                        yield ("bot_reset", "", "")
+                    yield ("retry", attempt, max_retries, actual_delay, api_err)
+                    await asyncio.sleep(actual_delay)
+                    continue
+
+                circuit_breaker.record_failure(pkey)
+                raise api_err
+
+        result["messages"] = messages
+        result["thinking_started"] = thinking_started
+        result["thinking_t0"] = thinking_t0
+        result["step_usage"] = step_usage
+        result["full_assistant_parts"] = full_assistant_parts
+        result["active_thought_parts"] = active_thought_parts
+        result["last_thought_parts"] = last_thought_parts
+        result["tool_calls_dict"] = tool_calls_dict
+
+    async def _finalize_step_usage(
+        self,
+        *,
+        full_assistant_parts: List[str],
+        active_thought_parts: List[str],
+        last_thought_parts: List[str],
+        tool_calls_dict: Dict[int, Dict[str, Any]],
+        step_usage: Optional[Dict[str, Any]],
+        prompt_tokens_est: int,
+        thinking_started: bool,
+        thinking_t0: float,
+    ) -> AsyncGenerator[Tuple[str, str, str], None]:
+        """Accumulate usage/metrics for a completed step and close open thinking."""
+        output_tokens_est = (
+            estimate_tokens("".join(full_assistant_parts))
+            + estimate_tokens("".join(active_thought_parts) or "".join(last_thought_parts))
+            + estimate_tokens(tool_calls_dict)
+        )
+        self._accumulate_usage(
+            step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_tokens_est
+        )
+
+        if thinking_started:
+            dt = time.time() - thinking_t0
+            thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
+            yield ("thinking_end", f"{dt}", thoughts_str)
+
+    async def _execute_tool_calls(
+        self,
+        messages: List[Dict[str, Any]],
+        tool_calls_dict: Dict[int, Dict[str, Any]],
+        full_assistant_parts: List[str],
+        active_thought_parts: List[str],
+        threshold: int,
+        result: Dict[str, Any],
+    ) -> AsyncGenerator[Tuple[Any, ...], None]:
+        """Execute a step's tool calls, append results to history, and compact.
+
+        Yields the ``tool`` / ``tool_result`` / compaction-divider events and
+        writes the (possibly compaction-replaced) ``messages`` list into
+        ``result`` before returning (an async generator cannot carry a return
+        value).
+        """
+        # Execute tool calls in the order the model emitted them. Dict insertion
+        # order usually matches, but delta tool_calls can arrive out of order on
+        # some providers, so sort explicitly by the tool-call index key.
+        ordered_calls = [tool_calls_dict[k] for k in sorted(tool_calls_dict.keys())]
+
+        cleaned_tool_calls = []
+        for tc in ordered_calls:
+            raw_args = normalize_tool_arguments_str(tc.get("arguments", "{}"))
+            cleaned_tool_calls.append(
+                {
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {"name": tc["name"], "arguments": raw_args},
+                }
+            )
+
+        assistant_tool_msg: Dict[str, Any] = {
+            "role": "assistant",
+            "content": "".join(full_assistant_parts) or None,
+            "tool_calls": cleaned_tool_calls,
+            "reasoning_content": "".join(active_thought_parts),
+        }
+        messages.append(assistant_tool_msg)
+        self._append_history(assistant_tool_msg)
+
+        from core.role_registry import RoleRegistry
+
+        current_role = getattr(self, "role", "worker").lower()
+        role_def = RoleRegistry.get_instance().get_role(current_role)
+
+        # Partition tool calls into batches: consecutive concurrency-safe
+        # tools run in parallel via asyncio.gather; mutating/barrier tools
+        # execute sequentially.
+        batches: list[tuple[bool, list[tuple[dict, Any]]]] = []
+        for tc in ordered_calls:
+            raw_args = tc.get("arguments", "{}")
+            _, parsed_args = parse_tool_call_args({"function": {"name": tc["name"], "arguments": raw_args}})
+            is_safe = self._is_tool_concurrency_safe(tc["name"], parsed_args if isinstance(parsed_args, dict) else None)
+            if batches and batches[-1][0] and is_safe:
+                batches[-1][1].append((tc, parsed_args))
+            else:
+                batches.append((is_safe, [(tc, parsed_args)]))
+
+        for is_safe, batch in batches:
+            if is_safe and len(batch) > 1:
+                # Concurrent batch: announce all tool cards first
+                for tc, args in batch:
+                    t_name = tc["name"]
+                    target = (
+                        (args.get("path") or args.get("command") or args.get("url") or "")
+                        if isinstance(args, dict)
+                        else ""
+                    )
+                    yield ("tool", t_name, str(target), args, tc.get("id"))
+
+                # Execute concurrently and preserve original order
+                batch_results = await asyncio.gather(*(self._execute_single_tool(tc, role_def) for tc, _ in batch))
+                for t_id, display_result, resolved in batch_results:
+                    yield (
+                        "tool_result",
+                        display_result,
+                        "",
+                        resolved.is_error,
+                        resolved.status,
+                        resolved.returncode,
+                        t_id,
+                    )
+                    messages.append(
+                        {"role": "tool", "name": t_name, "tool_call_id": t_id, "content": resolved.content or ""}
+                    )
+                    self._append_history(messages[-1])
+            else:
+                # Sequential execution (single tool or mutating barrier)
+                for tc, args in batch:
+                    t_name = tc["name"]
+                    target = (
+                        (args.get("path") or args.get("command") or args.get("url") or "")
+                        if isinstance(args, dict)
+                        else ""
+                    )
+                    yield ("tool", t_name, str(target), args, tc.get("id"))
+
+                    t_id, display_result, resolved = await self._execute_single_tool(tc, role_def)
+                    yield (
+                        "tool_result",
+                        display_result,
+                        "",
+                        resolved.is_error,
+                        resolved.status,
+                        resolved.returncode,
+                        t_id,
+                    )
+                    messages.append(
+                        {"role": "tool", "name": t_name, "tool_call_id": t_id, "content": resolved.content or ""}
+                    )
+                    self._append_history(messages[-1])
+
+        # self.history was maintained incrementally via _append_history
+        # throughout this iteration (queued users, assistant msg, tool
+        # results), so no full messages[1:] copy is needed here. Only a
+        # mid-loop compaction (below) replaces the prefix and forces a
+        # wholesale resync.
+        compacted_count = getattr(self, "_compacted_count_this_turn", 0)
+        if compacted_count < 10:
+            messages, compacted_in_loop, compact_msg = await self._compact_messages_if_needed(
+                messages, self._last_sys_tokens, threshold
+            )
+        else:
+            compacted_in_loop, compact_msg = False, ""
+
+        if compacted_in_loop:
+            self._compacted_count_this_turn = compacted_count + 1
+            # Compaction replaced the messages prefix (self.history is now
+            # the compacted history but messages[1:] is a re-sanitization of
+            # it); resync the accumulator so self.history == messages[1:]
+            # holds for the next step's estimate.
+            self._set_history(messages[1:])
+            yield ("event_divider", format_compaction_title(compact_msg), "")
+
+        result["messages"] = messages
+
+    async def stream_steps(
+        self, user_text: str, attachments: Optional[List[Any]] = None
+    ) -> AsyncGenerator[Tuple[str, str, str], None]:
+        prep_result: Dict[str, Any] = {}
+        prep_gen = self._prepare_turn_context(user_text, attachments, prep_result)
+        while True:
+            try:
+                evt = await prep_gen.__anext__()
+            except StopAsyncIteration:
+                break
+            yield evt
+        messages, all_tools, threshold = (
+            prep_result["messages"],
+            prep_result["all_tools"],
+            prep_result["threshold"],
+        )
 
         try:
             while True:
@@ -383,7 +802,6 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     self._append_history(messages[-1])
                     yield ("queued_user_message", msg_text, atts, show_ui, disp_text)
 
-                step_usage = None
                 # messages = [system] + self.history (invariant maintained below), so
                 # estimate_tokens(messages) == estimate_message_tokens(messages[0]) +
                 # self._history_tokens. Only the single system message is walked here;
@@ -404,203 +822,67 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                     cb_rem = circuit_breaker.remaining_cooldown(pkey)
                     raise CircuitBreakerOpenError(pkey, cb_rem)
 
-                attempt = 0
-                current_max_tokens = getattr(self, "max_tokens", DEFAULT_MAX_TOKENS)
-                thinking_started = False
-                thinking_t0 = time.time()
-                last_thought_parts = []
+                # The attempt loop's streaming events are re-yielded directly,
+                # exactly as if the loop body lived in this frame. A consumer
+                # that throws (e.g. athrow(CancelledError)) at a re-yield point
+                # must have the exception delivered INTO the attempt generator
+                # so its cancel-time usage accounting and retry handling run
+                # identically to the inline `except asyncio.CancelledError`.
+                attempt_result: Dict[str, Any] = {}
+                attempt_gen = self._stream_attempts(
+                    messages=messages,
+                    all_tools=all_tools,
+                    prompt_tokens_est=prompt_tokens_est,
+                    max_retries=max_retries,
+                    retry_delay=retry_delay,
+                    retry_backoff=retry_backoff,
+                    max_retry_delay=max_retry_delay,
+                    pkey=pkey,
+                    result=attempt_result,
+                )
                 while True:
-                    attempt += 1
-                    full_assistant_parts = []
-                    active_thought_parts = []
-                    step_usage = None
-                    tool_calls_dict = {}
-                    generating_tools = {}
-                    last_finish_reason = None
-
                     try:
-                        from core.adapters import get_adapter
-
-                        adapter = get_adapter(self.api_type)
-                        stream_kwargs = build_stream_kwargs(
-                            self,
-                            messages=messages,
-                            tools=all_tools if all_tools else None,
-                            max_tokens=current_max_tokens,
-                            thinking_effort=getattr(self, "thinking_effort", None),
-                        )
-                        if self.api_type == "openai":
-                            stream_kwargs["chunk_timeout"] = getattr(self, "chunk_timeout", 30.0)
-                            stream_kwargs["provider_key"] = getattr(self, "provider_key", "openai")
-
-                        async for tag, payload in adapter.stream_chat(**stream_kwargs):
-                            if tag == "adapter_text":
-                                if thinking_started:
-                                    dt = time.time() - thinking_t0
-                                    thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
-                                    yield ("thinking_end", f"{dt}", thoughts_str)
-                                    thinking_started = False
-                                full_assistant_parts.append(payload)
-                                yield ("bot_delta", payload, "")
-                            elif tag == "adapter_thought":
-                                if not payload or (isinstance(payload, str) and not payload.strip()):
-                                    continue
-                                if not thinking_started:
-                                    yield ("thinking_start", "Thinking...", "")
-                                    thinking_started = True
-                                    thinking_t0 = time.time()
-                                active_thought_parts.append(payload)
-                                yield ("thinking_delta", payload, "")
-                            elif tag == "adapter_tool_delta":
-                                if thinking_started:
-                                    dt = time.time() - thinking_t0
-                                    thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
-                                    yield ("thinking_end", f"{dt}", thoughts_str)
-                                    thinking_started = False
-                                idx = payload.get("index", 0)
-                                if idx not in generating_tools:
-                                    generating_tools[idx] = {
-                                        "id": payload.get("id") or new_tool_call_id(idx),
-                                        "name": payload.get("name", ""),
-                                        "args_buffer": "",
-                                        "target": "",
-                                        "announced": False,
-                                        "target_announced": False,
-                                    }
-                                g = generating_tools[idx]
-                                if payload.get("id"):
-                                    g["id"] = payload["id"]
-                                if payload.get("name"):
-                                    g["name"] = payload["name"]
-                                delta_args = payload.get("arguments_delta", "")
-                                if delta_args:
-                                    g["args_buffer"] += delta_args
-
-                                if g["args_buffer"]:
-                                    new_target = _extract_streaming_target(
-                                        g["args_buffer"], scan_from=g.get("args_scan_pos", 0), tool_name=g.get("name", "")
-                                    )
-                                    if new_target and new_target != g["target"]:
-                                        g["target"] = new_target
-                                        if g["announced"]:
-                                            yield ("tool_generating_update", g["name"], g["target"], {"id": g["id"], "index": idx})
-                                g["args_scan_pos"] = len(g["args_buffer"])
-
-                                if g["name"] and not g["announced"]:
-                                    g["announced"] = True
-                                    yield ("tool_generating", g["name"], g["target"], {"id": g["id"], "index": idx})
-                            elif tag == "adapter_tool_call":
-                                if thinking_started:
-                                    dt = time.time() - thinking_t0
-                                    thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
-                                    yield ("thinking_end", f"{dt}", thoughts_str)
-                                    thinking_started = False
-                                # Key by the provider's delta index (now carried in
-                                # the payload) so the final call maps onto the same
-                                # generating_tools slot its deltas announced — even
-                                # when parallel calls finish out of order. Without an
-                                # index (legacy adapter mocks), fall back to arrival
-                                # order, which is what older adapters guaranteed.
-                                idx = payload.get("index")
-                                if idx is None:
-                                    idx = len(tool_calls_dict)
-                                tc_id = payload.get("id") or (
-                                    generating_tools.get(idx, {}).get("id") if idx in generating_tools else None
-                                ) or new_tool_call_id(idx)
-                                tool_calls_dict[idx] = {
-                                    "id": tc_id,
-                                    "name": payload.get("name", ""),
-                                    "arguments": payload.get("arguments", "") or "",
-                                }
-                            elif tag == "adapter_finish_reason":
-                                last_finish_reason = payload
-                            elif tag == "adapter_usage":
-                                step_usage = payload
-
-                        if active_thought_parts:
-                            last_thought_parts = active_thought_parts
-
-                        # Check for empty response caused by max tokens cutoff
-                        is_token_limit = (
-                            last_finish_reason is not None
-                            and str(last_finish_reason).upper() in ("MAX_TOKENS", "LENGTH", "MAX_OUTPUT_TOKENS")
-                        )
-                        if not tool_calls_dict and not full_assistant_parts:
-                            if is_token_limit or active_thought_parts:
-                                if attempt < max_retries and current_max_tokens < ESCALATED_MAX_TOKENS:
-                                    current_max_tokens = min(ESCALATED_MAX_TOKENS, max(current_max_tokens * 2, 65536))
-                                    logger.info(
-                                        "Token limit reached during reasoning on attempt %d; escalating max_tokens to %d and retrying...",
-                                        attempt,
-                                        current_max_tokens,
-                                    )
-                                    continue
-                                raise RuntimeError(
-                                    "Token limit reached during reasoning without generating response text. Try increasing max_tokens or lowering thinking effort."
-                                )
-
-                        # Stream completed successfully
-                        circuit_breaker.record_success(pkey)
+                        evt = await attempt_gen.__anext__()
+                    except StopAsyncIteration:
                         break
-                    except asyncio.CancelledError:
-                        output_est = (
-                            estimate_tokens("".join(full_assistant_parts))
-                            + estimate_tokens("".join(active_thought_parts) or "".join(last_thought_parts))
-                            + estimate_tokens(tool_calls_dict)
-                        )
-                        self._accumulate_usage(
-                            step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_est
-                        )
-                        raise
-                    except Exception as api_err:
-                        if self._is_vision_error(api_err):
-                            sanitized = self._sanitize_vision_error_messages(messages)
-                            if len(sanitized) != len(messages) or any(s != m for s, m in zip(sanitized, messages)):
-                                messages = sanitized
-                                # Sanitize re-allocates message dicts; resync the
-                                # accumulator to the new messages[1:] prefix.
-                                self._set_history(messages[1:])
-                                yield (
-                                    "thinking",
-                                    "Model does not support vision; converted image tool result to hint.",
-                                    "",
-                                )
-                                continue
+                    try:
+                        yield evt
+                    except BaseException as exc:
+                        # The consumer threw at the re-yield point (task
+                        # cancellation or an explicit gen.athrow). The attempt
+                        # generator is suspended at the yield that produced
+                        # ``evt``, so deliver the exception into it: its
+                        # handlers (cancel-time usage accounting, retry
+                        # scheduling, vision recovery) then run exactly as they
+                        # did when the attempt-loop body lived in this frame.
+                        evt = await attempt_gen.athrow(exc)
+                        yield evt
 
-                        is_retryable = self._is_retryable_error(api_err)
-                        if is_retryable and attempt < max_retries:
-                            actual_delay = self._calculate_retry_delay(
-                                attempt,
-                                api_err,
-                                retry_delay=retry_delay,
-                                retry_backoff=retry_backoff,
-                                max_retry_delay=max_retry_delay,
-                            )
-                            if full_assistant_parts:
-                                # Signal the UI to drop the partially-streamed text so the
-                                # retried attempt starts from a blank reply (no duplication).
-                                yield ("bot_reset", "", "")
-                            yield ("retry", attempt, max_retries, actual_delay, api_err)
-                            await asyncio.sleep(actual_delay)
-                            continue
+                messages = attempt_result["messages"]
+                thinking_started = attempt_result["thinking_started"]
+                thinking_t0 = attempt_result["thinking_t0"]
+                step_usage = attempt_result["step_usage"]
+                full_assistant_parts = attempt_result["full_assistant_parts"]
+                active_thought_parts = attempt_result["active_thought_parts"]
+                last_thought_parts = attempt_result["last_thought_parts"]
+                tool_calls_dict = attempt_result["tool_calls_dict"]
 
-                        circuit_breaker.record_failure(pkey)
-                        raise api_err
-
-                output_tokens_est = (
-                    estimate_tokens("".join(full_assistant_parts))
-                    + estimate_tokens("".join(active_thought_parts) or "".join(last_thought_parts))
-                    + estimate_tokens(tool_calls_dict)
+                fin_gen = self._finalize_step_usage(
+                    full_assistant_parts=full_assistant_parts,
+                    active_thought_parts=active_thought_parts,
+                    last_thought_parts=last_thought_parts,
+                    tool_calls_dict=tool_calls_dict,
+                    step_usage=step_usage,
+                    prompt_tokens_est=prompt_tokens_est,
+                    thinking_started=thinking_started,
+                    thinking_t0=thinking_t0,
                 )
-                self._accumulate_usage(
-                    step_usage=step_usage, prompt_tokens_est=prompt_tokens_est, output_tokens_est=output_tokens_est
-                )
-
-                if thinking_started:
-                    dt = time.time() - thinking_t0
-                    thoughts_str = "".join(active_thought_parts) or "".join(last_thought_parts)
-                    yield ("thinking_end", f"{dt}", thoughts_str)
-                    thinking_started = False
+                while True:
+                    try:
+                        evt = await fin_gen.__anext__()
+                    except StopAsyncIteration:
+                        break
+                    yield evt
 
                 if not tool_calls_dict:
                     full_assistant_text_final = "".join(full_assistant_parts)
@@ -618,126 +900,22 @@ class BaseAgent(CompactionMixin, ToolMixin, ErrorHandlingMixin):
                         continue
                     break
 
-                # Execute tool calls in the order the model emitted them. Dict insertion
-                # order usually matches, but delta tool_calls can arrive out of order on
-                # some providers, so sort explicitly by the tool-call index key.
-                ordered_calls = [tool_calls_dict[k] for k in sorted(tool_calls_dict.keys())]
-
-                cleaned_tool_calls = []
-                for tc in ordered_calls:
-                    raw_args = normalize_tool_arguments_str(tc.get("arguments", "{}"))
-                    cleaned_tool_calls.append(
-                        {
-                            "id": tc["id"],
-                            "type": "function",
-                            "function": {"name": tc["name"], "arguments": raw_args},
-                        }
-                    )
-
-                assistant_tool_msg: Dict[str, Any] = {
-                    "role": "assistant",
-                    "content": "".join(full_assistant_parts) or None,
-                    "tool_calls": cleaned_tool_calls,
-                    "reasoning_content": "".join(active_thought_parts),
-                }
-                messages.append(assistant_tool_msg)
-                self._append_history(assistant_tool_msg)
-
-                from core.role_registry import RoleRegistry
-
-                current_role = getattr(self, "role", "worker").lower()
-                role_def = RoleRegistry.get_instance().get_role(current_role)
-
-                # Partition tool calls into batches: consecutive concurrency-safe
-                # tools run in parallel via asyncio.gather; mutating/barrier tools
-                # execute sequentially.
-                batches: list[tuple[bool, list[tuple[dict, Any]]]] = []
-                for tc in ordered_calls:
-                    raw_args = tc.get("arguments", "{}")
-                    _, parsed_args = parse_tool_call_args({"function": {"name": tc["name"], "arguments": raw_args}})
-                    is_safe = self._is_tool_concurrency_safe(tc["name"], parsed_args if isinstance(parsed_args, dict) else None)
-                    if batches and batches[-1][0] and is_safe:
-                        batches[-1][1].append((tc, parsed_args))
-                    else:
-                        batches.append((is_safe, [(tc, parsed_args)]))
-
-                for is_safe, batch in batches:
-                    if is_safe and len(batch) > 1:
-                        # Concurrent batch: announce all tool cards first
-                        for tc, args in batch:
-                            t_name = tc["name"]
-                            target = (
-                                (args.get("path") or args.get("command") or args.get("url") or "")
-                                if isinstance(args, dict)
-                                else ""
-                            )
-                            yield ("tool", t_name, str(target), args, tc.get("id"))
-
-                        # Execute concurrently and preserve original order
-                        batch_results = await asyncio.gather(*(self._execute_single_tool(tc, role_def) for tc, _ in batch))
-                        for t_id, display_result, resolved in batch_results:
-                            yield (
-                                "tool_result",
-                                display_result,
-                                "",
-                                resolved.is_error,
-                                resolved.status,
-                                resolved.returncode,
-                                t_id,
-                            )
-                            messages.append(
-                                {"role": "tool", "name": t_name, "tool_call_id": t_id, "content": resolved.content or ""}
-                            )
-                            self._append_history(messages[-1])
-                    else:
-                        # Sequential execution (single tool or mutating barrier)
-                        for tc, args in batch:
-                            t_name = tc["name"]
-                            target = (
-                                (args.get("path") or args.get("command") or args.get("url") or "")
-                                if isinstance(args, dict)
-                                else ""
-                            )
-                            yield ("tool", t_name, str(target), args, tc.get("id"))
-
-                            t_id, display_result, resolved = await self._execute_single_tool(tc, role_def)
-                            yield (
-                                "tool_result",
-                                display_result,
-                                "",
-                                resolved.is_error,
-                                resolved.status,
-                                resolved.returncode,
-                                t_id,
-                            )
-                            messages.append(
-                                {"role": "tool", "name": t_name, "tool_call_id": t_id, "content": resolved.content or ""}
-                            )
-                            self._append_history(messages[-1])
-
-
-                # self.history was maintained incrementally via _append_history
-                # throughout this iteration (queued users, assistant msg, tool
-                # results), so no full messages[1:] copy is needed here. Only a
-                # mid-loop compaction (below) replaces the prefix and forces a
-                # wholesale resync.
-                compacted_count = getattr(self, "_compacted_count_this_turn", 0)
-                if compacted_count < 10:
-                    messages, compacted_in_loop, compact_msg = await self._compact_messages_if_needed(
-                        messages, self._last_sys_tokens, threshold
-                    )
-                else:
-                    compacted_in_loop, compact_msg = False, ""
-
-                if compacted_in_loop:
-                    self._compacted_count_this_turn = compacted_count + 1
-                    # Compaction replaced the messages prefix (self.history is now
-                    # the compacted history but messages[1:] is a re-sanitization of
-                    # it); resync the accumulator so self.history == messages[1:]
-                    # holds for the next step's estimate.
-                    self._set_history(messages[1:])
-                    yield ("event_divider", format_compaction_title(compact_msg), "")
-
+                tool_result = {}
+                tool_gen = self._execute_tool_calls(
+                    messages=messages,
+                    tool_calls_dict=tool_calls_dict,
+                    full_assistant_parts=full_assistant_parts,
+                    active_thought_parts=active_thought_parts,
+                    threshold=threshold,
+                    result=tool_result,
+                )
+                while True:
+                    try:
+                        evt = await tool_gen.__anext__()
+                    except StopAsyncIteration:
+                        break
+                    yield evt
+                messages = tool_result["messages"]
         except Exception as err:
             logger.exception("API request failed: %s", err)
             error_msg = format_api_error(err)
