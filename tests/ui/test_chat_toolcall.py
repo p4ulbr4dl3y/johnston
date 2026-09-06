@@ -1118,6 +1118,37 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         wide_rendered = str(widget.header_label.render())
         self.assertIn("test_chat_toolcall.py", wide_rendered)
 
+    def test_hints_overhead_adjusts_target_length(self):
+        widget = ToolCallWidget("shell", "pytest -k my_test", status="running")
+        # With hints disabled: target max_len is larger
+        widget._show_hints = False
+        len_no_hints, _ = widget._get_target_max_len(w=80)
+
+        # With hints enabled: target max_len shrinks to leave room for hints
+        widget._show_hints = True
+        len_with_hints, _ = widget._get_target_max_len(w=80)
+
+        self.assertGreater(len_no_hints, len_with_hints)
+
+    def test_compact_hints_on_narrow_screen(self):
+        widget = ToolCallWidget("shell", "pytest", status="running")
+        widget._show_hints = True
+        # Width < 70 -> compact hints
+        _, compact = widget._get_target_max_len(w=65)
+        self.assertTrue(compact)
+        widget.render_header(container_width=65)
+        rendered = str(widget.header_label.render())
+        self.assertIn("ctrl+b bg", rendered)
+        self.assertIn("ctrl+o exp", rendered)
+
+        # Width >= 70 -> full hints
+        _, compact_wide = widget._get_target_max_len(w=80)
+        self.assertFalse(compact_wide)
+        widget.render_header(container_width=80)
+        rendered_wide = str(widget.header_label.render())
+        self.assertIn("ctrl+b to bg", rendered_wide)
+        self.assertIn("ctrl+o to expand", rendered_wide)
+
     def test_mark_running_auto_expands_when_parent_auto_expand_all(self):
         widget = ToolCallWidget("shell", "echo hello", status="generating")
         parent = MagicMock(auto_expand_all=True)

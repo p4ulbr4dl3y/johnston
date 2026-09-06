@@ -7,6 +7,29 @@ from widgets.presentation.widgets.chat_markdown import to_snake_case
 from widgets.presentation.widgets.footer_layout import get_theme_colors
 
 
+def build_toolcall_hints_list(
+    status: str,
+    canonical_tool: str,
+    is_subagent: bool,
+    background_task_id: Optional[str],
+    is_expandable: bool,
+    is_expanded: bool,
+    compact: bool = False,
+) -> List[str]:
+    """Return active hotkey hints for a toolcall."""
+    hints: List[str] = []
+    if status == "running" and not is_subagent and canonical_tool == "shell" and not background_task_id:
+        hints.append("ctrl+b bg" if compact else "ctrl+b to bg")
+    if is_expandable and status in ("running", "done"):
+        if compact:
+            action = "col" if is_expanded else "exp"
+            hints.append(f"ctrl+o {action}")
+        else:
+            action = "to collapse" if is_expanded else "to expand"
+            hints.append(f"ctrl+o {action}")
+    return hints
+
+
 def build_toolcall_header(
     canonical_tool: str,
     tool_type: Optional[str],
@@ -23,6 +46,7 @@ def build_toolcall_header(
     is_expanded: bool,
     show_hints: bool = True,
     max_len: int = 60,
+    compact_hints: bool = False,
 ) -> str:
     """Builds rich markup string for toolcall header label."""
     is_generating = status == "generating"
@@ -63,11 +87,15 @@ def build_toolcall_header(
 
     hints: List[str] = []
     if show_hints:
-        if status == "running" and not is_subagent and canonical_tool == "shell" and not background_task_id:
-            hints.append("ctrl+b to bg")
-        if is_expandable and status in ("running", "done"):
-            action = "to collapse" if is_expanded else "to expand"
-            hints.append(f"ctrl+o {action}")
+        hints = build_toolcall_hints_list(
+            status=status,
+            canonical_tool=canonical_tool,
+            is_subagent=is_subagent,
+            background_task_id=background_task_id,
+            is_expandable=is_expandable,
+            is_expanded=is_expanded,
+            compact=compact_hints,
+        )
 
     if hints:
         _, _, t_muted, _ = get_theme_colors()

@@ -564,54 +564,77 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.header_label.remove_class(TOOL_HEADER)
         self.render_header()
 
-    def _get_target_max_len(self) -> int:
-        """Calculate dynamic max length for header target based on container width."""
-        w = 0
+    def _is_subagent_view(self) -> bool:
+        if self.status != "running":
+            return False
         try:
-            if getattr(self, "is_mounted", False):
-                val = getattr(getattr(self, "size", None), "width", 0)
-                if isinstance(val, int) and not isinstance(val, bool) and val > 0:
-                    w = val
-                elif self.app:
-                    app_val = getattr(getattr(self.app, "size", None), "width", 0)
-                    if isinstance(app_val, int) and not isinstance(app_val, bool) and app_val > 0:
-                        w = app_val
+            if self.screen and type(self.screen).__name__ in ("SubagentViewScreen", "SessionChatScreen"):
+                return True
         except Exception:
+            pass
+        try:
+            for node in getattr(self, "ancestors_with_self", []):
+                if (
+                    getattr(node, "id", None) == "subagent-chat-view"
+                    or type(node).__name__ in ("SubagentViewScreen", "SessionChatScreen")
+                ):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _get_target_max_len(self, w: int | None = None) -> tuple[int, bool]:
+        """Calculate dynamic max length for header target and compact hints flag based on width."""
+        if w is None:
             w = 0
-        if isinstance(w, int) and w > 0:
-            return max(35, w - 35)
-        return 60
+            try:
+                if getattr(self, "is_mounted", False):
+                    val = getattr(getattr(self, "size", None), "width", 0)
+                    if isinstance(val, int) and not isinstance(val, bool) and val > 0:
+                        w = val
+                    elif self.app:
+                        app_val = getattr(getattr(self.app, "size", None), "width", 0)
+                        if isinstance(app_val, int) and not isinstance(app_val, bool) and app_val > 0:
+                            w = app_val
+            except Exception:
+                w = 0
+
+        if not isinstance(w, int) or w <= 0:
+            return 60, False
+
+        compact_hints = w < 70
+        hints_len = 0
+        if getattr(self, "_show_hints", False):
+            from widgets.presentation.toolcall_header import build_toolcall_hints_list
+
+            hints = build_toolcall_hints_list(
+                status=self.status,
+                canonical_tool=self.canonical_tool,
+                is_subagent=self._is_subagent_view(),
+                background_task_id=getattr(self, "background_task_id", None),
+                is_expandable=self.is_expandable(),
+                is_expanded=self.is_expanded,
+                compact=compact_hints,
+            )
+            if hints:
+                hints_len = len(", ".join(hints)) + 3
+
+        display_name = self.DISPLAY_NAMES.get(self.canonical_tool, self.tool_type or "Tool")
+        prefix_len = len(display_name) + 6
+        overhead = prefix_len + hints_len + 4
+        return max(15, w - overhead), compact_hints
 
     def on_resize(self, event: Any) -> None:
         val = getattr(getattr(event, "size", None), "width", None)
-        if isinstance(val, int) and not isinstance(val, bool) and val > 0:
-            self.render_header(max_len=max(35, val - 35))
-        else:
-            self.render_header()
+        w = val if isinstance(val, int) and not isinstance(val, bool) and val > 0 else None
+        self.render_header(container_width=w)
 
-    def render_header(self, max_len: int | None = None) -> None:
+    def render_header(self, max_len: int | None = None, container_width: int | None = None) -> None:
         c = self._get_status_color()
-        is_subagent = False
-        if self.status == "running":
-            try:
-                if self.screen and type(self.screen).__name__ in ("SubagentViewScreen", "SessionChatScreen"):
-                    is_subagent = True
-            except Exception:
-                pass
-            if not is_subagent:
-                try:
-                    for node in getattr(self, "ancestors_with_self", []):
-                        if (
-                            getattr(node, "id", None) == "subagent-chat-view"
-                            or type(node).__name__ in ("SubagentViewScreen", "SessionChatScreen")
-                        ):
-                            is_subagent = True
-                            break
-                except Exception:
-                    pass
+        is_subagent = self._is_subagent_view()
 
-        if max_len is None:
-            max_len = self._get_target_max_len()
+        calc_len, compact_hints = self._get_target_max_len(w=container_width)
+        target_max_len = max_len if max_len is not None else calc_len
 
         header_text = build_toolcall_header(
             canonical_tool=self.canonical_tool,
@@ -628,7 +651,8 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             is_expandable=self.is_expandable(),
             is_expanded=self.is_expanded,
             show_hints=getattr(self, "_show_hints", False),
-            max_len=max_len,
+            max_len=target_max_len,
+            compact_hints=compact_hints,
         )
         self.header_label.update(header_text)
 
