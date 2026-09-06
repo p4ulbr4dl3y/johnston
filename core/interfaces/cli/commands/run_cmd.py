@@ -624,7 +624,7 @@ def run_headless(args: Any, pm: Optional[ProviderManager] = None) -> int:
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                return executor.submit(lambda: asyncio.run(run_headless_async(args, pm=None))).result()
+                return executor.submit(lambda: asyncio.run(run_headless_async(args, pm=pm))).result()
         return asyncio.run(run_headless_async(args, pm=pm))
     except KeyboardInterrupt:
         return 130
