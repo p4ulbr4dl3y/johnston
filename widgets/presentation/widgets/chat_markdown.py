@@ -20,7 +20,10 @@ from textual.widgets import Button, Label, Markdown, Static
 from textual.widgets._markdown import (
     MarkdownBlock,
     MarkdownBlockQuote,
+    MarkdownBullet,
+    MarkdownBulletList,
     MarkdownFence,
+    MarkdownListItem,
     MarkdownParagraph,
     MarkdownTable,
     MarkdownTableCellContents,
@@ -237,6 +240,29 @@ class CustomMarkdownBlockQuote(MarkdownBlockQuote):
                         first._content = sliced
                         first.update(first._content)
         yield from super().compose()
+
+
+class CustomMarkdownBulletList(MarkdownBulletList):
+    """Custom Markdown bullet list that hides redundant bullets for task list items."""
+
+    def compose(self) -> ComposeResult:
+        for block in self._blocks:
+            if isinstance(block, MarkdownListItem):
+                bullet = MarkdownBullet()
+                is_task = False
+                if block._blocks:
+                    first = block._blocks[0]
+                    if isinstance(first, MarkdownParagraph) and hasattr(first, "_content"):
+                        plain = first._content.plain.lstrip()
+                        if plain.startswith("[✓]") or plain.startswith("[ ]"):
+                            is_task = True
+                if is_task:
+                    bullet.symbol = ""
+                    bullet.styles.display = "none"
+                else:
+                    bullet.symbol = block.bullet
+                yield Horizontal(bullet, Vertical(*block._blocks))
+        self._blocks.clear()
 
 
 class CustomMarkdownFence(MarkdownFence):
@@ -605,6 +631,7 @@ def _new_markdown_init(self, *args, **kwargs):
     self.BLOCKS = Markdown.BLOCKS
     self.BLOCKS["table_open"] = CustomMarkdownTable
     self.BLOCKS["blockquote_open"] = CustomMarkdownBlockQuote
+    self.BLOCKS["bullet_list_open"] = CustomMarkdownBulletList
     _old_markdown_init(self, *args, **kwargs)
 
 
@@ -711,6 +738,7 @@ def _apply_chat_markdown_patches() -> None:
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
     Markdown.BLOCKS["table_open"] = CustomMarkdownTable
     Markdown.BLOCKS["blockquote_open"] = CustomMarkdownBlockQuote
+    Markdown.BLOCKS["bullet_list_open"] = CustomMarkdownBulletList
 
     Markdown.__init__ = _new_markdown_init
     MarkdownBlock._get_style = _new_markdown_block_get_style

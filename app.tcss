@@ -1341,10 +1341,17 @@ MarkdownBlockQuote MarkdownFence {
     background: transparent;
 }
 
-/* Markdown Inline Code - Clean Monochrome Slate (White text on dark zinc background) */
+/* Markdown Inline Code and Strikethrough - Clean Monochrome Slate */
 MarkdownBlock:dark > .code_inline,
 MarkdownBlock:light > .code_inline,
 MarkdownBlock > .code_inline {
     background: $bg-surface;
     color: $fg-primary;
+}
+
+MarkdownBlock:dark > .s,
+MarkdownBlock:light > .s,
+MarkdownBlock > .s {
+    color: $fg-muted;
+    text-style: strike;
 }

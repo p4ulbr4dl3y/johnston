@@ -509,3 +509,29 @@ class TestFenceHighlightCache(unittest.TestCase):
         list(bq.compose())
         self.assertNotIn("alert", bq.classes)
 
+    def test_custom_markdown_bullet_list_hides_task_bullets(self):
+        from textual.widgets import Markdown
+        from textual.widgets._markdown import MarkdownBullet
+
+        from widgets.presentation.widgets.chat_markdown import (
+            CustomMarkdownBulletList,
+            _apply_chat_markdown_patches,
+        )
+
+        _apply_chat_markdown_patches()
+        md_text = "- [✓] Task done\n- [ ] Task todo\n- Normal bullet"
+        md = Markdown(md_text)
+        parser = md._parser_factory()
+        blocks = list(md._parse_markdown(parser.parse(md_text)))
+        bl = [b for b in blocks if isinstance(b, CustomMarkdownBulletList)][0]
+        composed = list(bl.compose())
+        bullets = [h._pending_children[0] for h in composed if isinstance(h._pending_children[0], MarkdownBullet)]
+        self.assertEqual(len(bullets), 3)
+        self.assertEqual(bullets[0].symbol, "")
+        self.assertEqual(bullets[0].styles.display, "none")
+        self.assertEqual(bullets[1].symbol, "")
+        self.assertEqual(bullets[1].styles.display, "none")
+        self.assertNotEqual(bullets[2].symbol, "")
+        self.assertNotEqual(bullets[2].styles.display, "none")
+
+
