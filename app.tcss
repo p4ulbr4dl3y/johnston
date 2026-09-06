@@ -386,12 +386,12 @@ CustomMarkdownFence .fence-copy-btn,
 MarkdownFence .fence-copy-btn {
     height: 1;
     min-height: 1;
-    min-width: 6;
+    min-width: 0;
     border: none;
     background: transparent;
     color: $fg-muted;
     text-style: none;
-    padding: 0 1;
+    padding: 0;
     margin: 0;
 }
 
@@ -408,12 +408,12 @@ CustomMarkdownFence .fence-toggle-btn,
 MarkdownFence .fence-toggle-btn {
     height: 1;
     min-height: 1;
-    min-width: 6;
+    min-width: 0;
     border: none;
     background: transparent;
     color: $fg-muted;
     text-style: none;
-    padding: 0 1;
+    padding: 0;
     margin: 0;
 }
 
