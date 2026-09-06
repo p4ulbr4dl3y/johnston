@@ -104,5 +104,7 @@ DEFAULT_PERMISSIONS = {
     "default": "allow",
     "tools": {},
     "patterns": {},
+    "writable_roots": [],
+    "outside_workspace_action": "ask",
 }
 

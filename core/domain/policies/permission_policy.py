@@ -2,9 +2,10 @@ import fnmatch
 import os
 import re
 import shlex
+import tempfile
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 
 class PermissionAction(str, Enum):
@@ -439,6 +440,88 @@ def evaluate_pattern_rules(
     return None
 
 
+def is_path_within_workspace(
+    target_path: str,
+    workspace_roots: Sequence[str],
+    allow_temp: bool = True,
+) -> bool:
+    """Checks whether a target path is contained within any of the workspace roots or system temp.
+
+    Normalizes paths using realpath and abspath to protect against path traversal and symlink escapes.
+    Safely handles missing or invalid paths and exceptions.
+    """
+    if not target_path or not isinstance(target_path, str) or not target_path.strip():
+        return False
+
+    try:
+        norm_target = os.path.realpath(os.path.abspath(target_path.strip()))
+    except Exception:
+        return False
+
+    candidates: List[str] = []
+    if workspace_roots:
+        for r in workspace_roots:
+            if isinstance(r, str) and r.strip():
+                candidates.append(r.strip())
+
+    for root in candidates:
+        try:
+            norm_root = os.path.realpath(os.path.abspath(root))
+            if os.path.commonpath([norm_target, norm_root]) == norm_root:
+                return True
+        except (ValueError, Exception):
+            continue
+
+    if allow_temp:
+        temp_candidates = [tempfile.gettempdir(), "/tmp", "/private/tmp"]
+        for temp_dir in temp_candidates:
+            if not temp_dir:
+                continue
+            try:
+                norm_temp = os.path.realpath(os.path.abspath(temp_dir))
+                if os.path.commonpath([norm_target, norm_temp]) == norm_temp:
+                    return True
+            except (ValueError, Exception):
+                continue
+
+    return False
+
+
+def evaluate_workspace_boundary(
+    tool_name: str,
+    args: Optional[Dict[str, Any]],
+    workspace_roots: Sequence[str],
+    outside_action: PermissionAction = PermissionAction.ASK,
+) -> Optional[PermissionDecision]:
+    """Evaluates whether a tool call accesses a path outside the permitted workspace roots.
+
+    Extracts path for file tools (create, edit, read) or cwd for shell (if specified).
+    Returns PermissionDecision if path is outside workspace roots, otherwise None.
+    """
+    canonical = (tool_name or "").strip().lower()
+    target: Optional[str] = None
+    if canonical in ("create", "edit", "read"):
+        target = extract_tool_target_value(canonical, args)
+    elif canonical == "shell":
+        if isinstance(args, dict):
+            target = args.get("cwd")
+
+    if not target or not isinstance(target, str) or not target.strip():
+        return None
+
+    target = target.strip()
+    if not is_path_within_workspace(target, workspace_roots):
+        action = outside_action
+        if isinstance(action, str):
+            try:
+                action = PermissionAction(action.lower())
+            except ValueError:
+                action = PermissionAction.ASK
+        return PermissionDecision(action, f"Path '{target}' is outside workspace roots")
+
+    return None
+
+
 def merge_perms(base: Dict[str, Any], override: Dict[str, Any]) -> None:
     """Merges a permissions config override into base, in place.
 
@@ -471,4 +554,19 @@ def merge_perms(base: Dict[str, Any], override: Dict[str, Any]) -> None:
                     if pat
                 ]
                 base["patterns"][t.lower()] = norm_rules
+    if "writable_roots" in override and isinstance(override["writable_roots"], list):
+        if "writable_roots" not in base or not isinstance(base["writable_roots"], list):
+            base["writable_roots"] = []
+        for r in override["writable_roots"]:
+            if isinstance(r, str) and r.strip() and r.strip() not in base["writable_roots"]:
+                base["writable_roots"].append(r.strip())
+    if "outside_workspace_action" in override:
+        action_val = override["outside_workspace_action"]
+        if isinstance(action_val, PermissionAction):
+            action_val = action_val.value
+        if isinstance(action_val, str):
+            cleaned_action = action_val.strip().lower()
+            if cleaned_action in ("ask", "deny"):
+                base["outside_workspace_action"] = cleaned_action
+
 
