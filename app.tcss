@@ -1352,6 +1352,6 @@ MarkdownBlock > .code_inline {
 MarkdownBlock:dark > .s,
 MarkdownBlock:light > .s,
 MarkdownBlock > .s {
-    color: $fg-muted;
+    color: $fg-secondary;
     text-style: strike;
 }
