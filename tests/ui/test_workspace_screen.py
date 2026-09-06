@@ -346,7 +346,7 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         mock_app = MagicMock()
         mock_app.push_screen = MagicMock()
         cmd = WorkspaceCommand()
-        await cmd.execute(mock_app, [])
+        await cmd.execute(mock_app)
         mock_app.push_screen.assert_called_once()
         called_screen = mock_app.push_screen.call_args[0][0]
         self.assertIsInstance(called_screen, WorkspaceScreen)

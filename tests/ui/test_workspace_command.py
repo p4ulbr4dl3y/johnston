@@ -1,4 +1,3 @@
-import json
 import os
 import tempfile
 import unittest
@@ -64,7 +63,7 @@ class TestWorkspaceCommand(unittest.IsolatedAsyncioTestCase):
 
     async def test_workspace_list_empty(self):
         cmd = WorkspaceCommand()
-        await cmd.execute(self.app, ["list"])
+        await cmd.execute(self.app)
         self.assertEqual(len(self.app.chat_view.messages), 1)
         content = self.app.chat_view.messages[0].content
         self.assertIn("Workspace Roots:", content)
@@ -76,113 +75,19 @@ class TestWorkspaceCommand(unittest.IsolatedAsyncioTestCase):
         try:
             self.pm.add_workspace_root(extra)
             cmd = WorkspaceCommand()
-            await cmd.execute(self.app, [])
+            await cmd.execute(self.app)
             content = self.app.chat_view.messages[0].content
             self.assertIn(extra, content)
         finally:
             os.rmdir(extra)
 
-    async def test_workspace_add_nonexistent_dir(self):
-        cmd = WorkspaceCommand()
-        await cmd.execute(self.app, ["add", "/nonexistent/directory/path/123"])
-        content = self.app.chat_view.messages[0].content
-        self.assertIn("Error: Directory", content)
-
-    async def test_workspace_add_session(self):
-        extra_dir = os.path.realpath(tempfile.mkdtemp())
-        try:
-            cmd = WorkspaceCommand()
-            await cmd.execute(self.app, ["add", extra_dir, "--session"])
-            content = self.app.chat_view.messages[0].content
-            self.assertIn("Added", content)
-            self.assertIn("session only", content)
-            self.assertIn(extra_dir, self.pm.get_workspace_roots())
-
-            # Verify nothing written to disk
-            cfg_local = os.path.join(self.project_dir, ".johnston", "config.local.json")
-            cfg_project = os.path.join(self.project_dir, ".johnston", "config.json")
-            self.assertFalse(os.path.exists(cfg_local))
-            self.assertFalse(os.path.exists(cfg_project))
-        finally:
-            os.rmdir(extra_dir)
-
-    async def test_workspace_add_project(self):
-        extra_dir = os.path.realpath(tempfile.mkdtemp())
-        try:
-            cmd = WorkspaceCommand()
-            await cmd.execute(self.app, ["add", extra_dir, "--project"])
-            content = self.app.chat_view.messages[0].content
-            self.assertIn("Added", content)
-            self.assertIn("project config", content)
-            self.assertIn(extra_dir, self.pm.get_workspace_roots())
-
-            cfg_project = os.path.join(self.project_dir, ".johnston", "config.json")
-            self.assertTrue(os.path.exists(cfg_project))
-            with open(cfg_project, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.assertIn(extra_dir, data["permissions"]["writable_roots"])
-        finally:
-            os.rmdir(extra_dir)
-
-    async def test_workspace_add_local_with_git(self):
-        os.makedirs(os.path.join(self.project_dir, ".git"), exist_ok=True)
-        extra_dir = os.path.realpath(tempfile.mkdtemp())
-        try:
-            cmd = WorkspaceCommand()
-            await cmd.execute(self.app, ["add", extra_dir])
-            content = self.app.chat_view.messages[0].content
-            self.assertIn("Added", content)
-            self.assertIn("local config", content)
-            self.assertIn(extra_dir, self.pm.get_workspace_roots())
-
-            cfg_local = os.path.join(self.project_dir, ".johnston", "config.local.json")
-            self.assertTrue(os.path.exists(cfg_local))
-            with open(cfg_local, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.assertIn(extra_dir, data["permissions"]["writable_roots"])
-
-            # Verify .gitignore entry created
-            gitignore = os.path.join(self.project_dir, ".gitignore")
-            self.assertTrue(os.path.exists(gitignore))
-            with open(gitignore, "r", encoding="utf-8") as f:
-                self.assertIn(".johnston/config.local.json", f.read())
-        finally:
-            os.rmdir(extra_dir)
-
-    async def test_workspace_remove(self):
-        extra_dir = os.path.realpath(tempfile.mkdtemp())
-        try:
-            # First add to project config
-            cmd = WorkspaceCommand()
-            await cmd.execute(self.app, ["add", extra_dir, "--project"])
-            self.assertIn(extra_dir, self.pm.get_workspace_roots())
-
-            # Now remove
-            await cmd.execute(self.app, ["remove", extra_dir])
-            content = self.app.chat_view.messages[-1].content
-            self.assertIn("Removed", content)
-            self.assertNotIn(extra_dir, self.pm.get_workspace_roots())
-
-            cfg_project = os.path.join(self.project_dir, ".johnston", "config.json")
-            with open(cfg_project, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.assertNotIn(extra_dir, data["permissions"]["writable_roots"])
-        finally:
-            os.rmdir(extra_dir)
-
     async def test_handle_slash_command_dispatch(self):
-        handled = await handle_slash_command(self.app, "/workspace list")
+        handled = await handle_slash_command(self.app, "/workspace")
         self.assertTrue(handled)
         self.assertIn("Workspace Roots:", self.app.chat_view.messages[0].content)
 
         handled_ws = await handle_slash_command(self.app, "/ws")
         self.assertTrue(handled_ws)
-
-    async def test_workspace_unknown_subcmd_shows_usage(self):
-        cmd = WorkspaceCommand()
-        await cmd.execute(self.app, ["invalid_command"])
-        content = self.app.chat_view.messages[0].content
-        self.assertIn("Workspace Command Usage:", content)
 
 
 class TestPermissionConfirmScreenWorkspaceIntegration(unittest.IsolatedAsyncioTestCase):

@@ -404,6 +404,94 @@ class TestPermissionManager(unittest.TestCase):
         self.assertEqual(self.pm.check_permission("github__delete_repo").action, PermissionAction.DENY)
 
 
+class TestWorkspaceRootPersistence(unittest.TestCase):
+    """Persistenced workspace-root scopes (session/local/project) via save_workspace_root."""
+
+    def setUp(self):
+        self.orig_cwd = os.getcwd()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.project_dir = os.path.realpath(self.temp_dir.name)
+        os.chdir(self.project_dir)
+        self.pm = PermissionManager.configure_instance()
+        self.pm.set_project_dir(self.project_dir)
+
+    def tearDown(self):
+        os.chdir(self.orig_cwd)
+        self.temp_dir.cleanup()
+        self.pm.clear_session_overrides()
+
+    def test_save_workspace_root_session(self):
+        extra_dir = os.path.realpath(tempfile.mkdtemp())
+        try:
+            used_scope = self.pm.save_workspace_root(extra_dir, scope="session")
+            self.assertEqual(used_scope, "session")
+            self.assertIn(extra_dir, self.pm.get_workspace_roots())
+
+            # Verify nothing written to disk
+            cfg_local = os.path.join(self.project_dir, ".johnston", "config.local.json")
+            cfg_project = os.path.join(self.project_dir, ".johnston", "config.json")
+            self.assertFalse(os.path.exists(cfg_local))
+            self.assertFalse(os.path.exists(cfg_project))
+        finally:
+            os.rmdir(extra_dir)
+
+    def test_save_workspace_root_project(self):
+        extra_dir = os.path.realpath(tempfile.mkdtemp())
+        try:
+            used_scope = self.pm.save_workspace_root(extra_dir, scope="project")
+            self.assertEqual(used_scope, "project")
+            self.assertIn(extra_dir, self.pm.get_workspace_roots())
+
+            cfg_project = os.path.join(self.project_dir, ".johnston", "config.json")
+            self.assertTrue(os.path.exists(cfg_project))
+            with open(cfg_project, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertIn(extra_dir, data["permissions"]["writable_roots"])
+        finally:
+            os.rmdir(extra_dir)
+
+    def test_save_workspace_root_auto_with_git(self):
+        os.makedirs(os.path.join(self.project_dir, ".git"), exist_ok=True)
+        extra_dir = os.path.realpath(tempfile.mkdtemp())
+        try:
+            used_scope = self.pm.save_workspace_root(extra_dir)
+            self.assertEqual(used_scope, "local")
+            self.assertIn(extra_dir, self.pm.get_workspace_roots())
+
+            cfg_local = os.path.join(self.project_dir, ".johnston", "config.local.json")
+            self.assertTrue(os.path.exists(cfg_local))
+            with open(cfg_local, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertIn(extra_dir, data["permissions"]["writable_roots"])
+
+            # Verify .gitignore entry created
+            gitignore = os.path.join(self.project_dir, ".gitignore")
+            self.assertTrue(os.path.exists(gitignore))
+            with open(gitignore, "r", encoding="utf-8") as f:
+                self.assertIn(".johnston/config.local.json", f.read())
+        finally:
+            os.rmdir(extra_dir)
+
+    def test_remove_persisted_workspace_root(self):
+        extra_dir = os.path.realpath(tempfile.mkdtemp())
+        try:
+            # First add to project config
+            used_scope = self.pm.save_workspace_root(extra_dir, scope="project")
+            self.assertEqual(used_scope, "project")
+            self.assertIn(extra_dir, self.pm.get_workspace_roots())
+
+            # Now remove
+            self.pm.remove_persisted_workspace_root(extra_dir)
+            self.assertNotIn(extra_dir, self.pm.get_workspace_roots())
+
+            cfg_project = os.path.join(self.project_dir, ".johnston", "config.json")
+            with open(cfg_project, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertNotIn(extra_dir, data["permissions"]["writable_roots"])
+        finally:
+            os.rmdir(extra_dir)
+
+
 if __name__ == "__main__":
     unittest.main()
 
