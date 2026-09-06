@@ -73,7 +73,7 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
 
                 # Dynamic hint on primary root
                 hint = screen.query_one("#modal-hint", ModalHint)
-                self.assertIn("a Add", str(hint.left_text))
+                self.assertIn("a add", str(hint.left_text))
         finally:
             os.rmdir(extra)
 
@@ -91,18 +91,18 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
                 # Primary root (index 0)
                 opt_list.highlighted = 0
                 screen._update_hint(0)
-                self.assertIn("a Add", str(hint.left_text))
-                self.assertNotIn("Remove", str(hint.left_text))
+                self.assertIn("a add", str(hint.left_text))
+                self.assertNotIn("delete", str(hint.left_text))
 
                 # Removable root (index 1)
                 opt_list.highlighted = 1
                 screen._update_hint(1)
-                self.assertIn("Remove", str(hint.left_text))
+                self.assertIn("delete", str(hint.left_text))
 
                 # Add option (index 3)
                 opt_list.highlighted = 3
                 screen._update_hint(3)
-                self.assertIn("enter Add", str(hint.left_text))
+                self.assertIn("enter add", str(hint.left_text))
         finally:
             os.rmdir(extra)
 

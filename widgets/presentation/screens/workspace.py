@@ -70,7 +70,7 @@ class AddWorkspaceRootScreen(BaseModalScreen[tuple[str, str] | None]):
                 id="workspace-add-input",
                 classes="modal-input",
             )
-            yield ModalHint("enter Add • esc Cancel", id=MODAL_HINT_ID)
+            yield ModalHint("enter add • esc cancel", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:
@@ -155,7 +155,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
             yield ModalHeader("Workspace Roots", esc_hint="")
             yield HeaderWrapOptionList(id="workspace-option-list")
-            yield ModalHint("a Add • esc Close", id=MODAL_HINT_ID)
+            yield ModalHint("a add • esc close", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:
@@ -248,16 +248,16 @@ class WorkspaceScreen(BaseModalScreen[None]):
         if idx is not None and 0 <= idx < len(self._option_actions):
             action_type, data = self._option_actions[idx]
             if action_type == "add":
-                hint_widget.update("enter Add • esc Close")
+                hint_widget.update("enter add • esc close")
                 return
             if action_type == "root" and data:
                 if data.get("scope") == "primary":
-                    hint_widget.update("a Add • esc Close")
+                    hint_widget.update("a add • esc close")
                     return
-                hint_widget.update("enter / d Remove • a Add • esc Close")
+                hint_widget.update("enter / d delete • a add • esc close")
                 return
 
-        hint_widget.update("a Add • esc Close")
+        hint_widget.update("a add • esc close")
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         self._update_hint(event.option_index)
@@ -327,10 +327,10 @@ class WorkspaceScreen(BaseModalScreen[None]):
         if self.app and hasattr(self.app, "push_screen"):
             self.app.push_screen(
                 ConfirmScreen(
-                    title="Remove Root",
-                    message=f"Remove `{path}` from workspace roots?",
-                    confirm_label="Remove",
-                    cancel_label="Cancel",
+                    title="### **Delete Workspace Root**",
+                    message=f"Delete **{path}**?\nThis cannot be undone.",
+                    confirm_label="delete",
+                    cancel_label="cancel",
                 ),
                 callback=on_confirmed,
             )
