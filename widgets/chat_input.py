@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 from textual import events
 from textual.message import Message
@@ -7,23 +6,7 @@ from textual.widgets import TextArea
 
 from core.infrastructure.config.settings import get_settings
 from core.infrastructure.platform import paths as config
-from core.infrastructure.platform.paths import IMAGE_EXTENSIONS
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
-from widgets.presentation.chat_input_history import (
-    add_to_history,
-    handle_history_navigation,
-    load_prompt_history,
-    save_prompt_history,
-    save_prompt_history_to_disk,
-)
-from widgets.presentation.chat_input_paste import (
-    ClipboardAttachment,
-    decode_pasted_path,
-    format_pasted_file_path,
-    handle_tag_deletion,
-    sanitize_mouse_artifacts,
-    try_paste_clipboard_image,
-)
 from widgets.presentation.chat_input_placeholders import (
     COMPACT_PLACEHOLDER,
     COMPACT_SHELL_PLACEHOLDER,
@@ -35,7 +18,12 @@ from widgets.presentation.chat_input_placeholders import (
     get_placeholder_for_width,
     get_shell_placeholder_for_width,
 )
-from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS, STATUS_FOOTER
+from widgets.presentation.widgets.chat_input_history import ChatInputHistoryMixin
+from widgets.presentation.widgets.chat_input_paste import (
+    ChatInputPasteMixin,
+    ClipboardAttachment,
+)
+from widgets.presentation.widgets.chat_input_suggestions import ChatInputSuggestionsMixin
 from widgets.utils.key_aliases import (
     KEY_CUT,
     KEY_DETACH,
@@ -52,7 +40,7 @@ from widgets.utils.key_aliases import (
 from widgets.utils.responsive import resolve_width
 
 
-class ChatInput(TextArea):
+class ChatInput(ChatInputHistoryMixin, ChatInputSuggestionsMixin, ChatInputPasteMixin, TextArea):
     """Input field with reactive suggestions on character typing"""
 
     class Submitted(Message):
@@ -63,32 +51,11 @@ class ChatInput(TextArea):
             self.value = value
             self.attachments = list(attachments or [])
 
-    @property
-    def PASTE_LINE_THRESHOLD(self) -> int:
-        return get_settings().ui.paste_line_threshold
-
-    @property
-    def MAX_PROMPT_HISTORY(self) -> int:
-        """Max entries retained in prompt history (configurable via ui.max_prompt_history)."""
-        if hasattr(self, "_max_prompt_history") and self._max_prompt_history is not None:
-            return self._max_prompt_history
-        return get_settings().ui.max_prompt_history
-
-    @MAX_PROMPT_HISTORY.setter
-    def MAX_PROMPT_HISTORY(self, value: int) -> None:
-        self._max_prompt_history = value
-
     def __init__(self, **kwargs):
         kwargs.setdefault("soft_wrap", True)
         kwargs.setdefault("placeholder", DEFAULT_PLACEHOLDER)
         super().__init__(**kwargs)
-        self.pasted_texts: dict[str, str] = {}
-        self.clipboard_attachments: list = []
-        self.prompt_history: list[str] = self.load_prompt_history()
-        self.prompt_history_index: int = len(self.prompt_history)
-        self.prompt_draft: str = ""
         self.is_shell_mode: bool = False
-        self._suggestions_active: bool = False
 
     def set_shell_mode(self, enabled: bool) -> None:
         """Toggle shell mode state and update placeholder / styling."""
@@ -100,18 +67,6 @@ class ChatInput(TextArea):
         else:
             self.remove_class("shell-mode")
         self.update_placeholder()
-
-    def load_prompt_history(self) -> list[str]:
-        """Load global prompt history from disk"""
-        return load_prompt_history(self.MAX_PROMPT_HISTORY)
-
-    def _save_prompt_history_to_disk(self, history: list[str]) -> None:
-        save_prompt_history_to_disk(history, self.MAX_PROMPT_HISTORY)
-
-    def save_prompt_history(self) -> None:
-        """Save global prompt history to disk asynchronously off the event loop."""
-        save_prompt_history(self)
-
 
     def update_placeholder(self, width: int | None = None) -> None:
         """Update placeholder responsively unless a custom placeholder is set."""
@@ -146,13 +101,6 @@ class ChatInput(TextArea):
     def on_resize(self, event: events.Resize) -> None:
         self.update_placeholder(event.size.width)
 
-    def on_unmount(self) -> None:
-        if getattr(self, "_save_task", None) is not None and not self._save_task.done():
-            self._save_task.cancel()
-        if getattr(self, "_pending_prompt_history", None) is not None:
-            self._save_prompt_history_to_disk(self._pending_prompt_history)
-            self._pending_prompt_history = None
-
     def load_text(self, text: str) -> None:
         if text is None:
             text = ""
@@ -160,13 +108,6 @@ class ChatInput(TextArea):
             self.pasted_texts.clear()
         super().load_text(text)
         self._on_input_change()
-
-    def get_full_text(self) -> str:
-        text = self.text
-        for tag, raw_val in self.pasted_texts.items():
-            if tag in text:
-                text = text.replace(tag, raw_val)
-        return text
 
     def update_height(self) -> None:
         """Dynamic height calculation from 2/3 to 6 lines, taking wrapped lines into account"""
@@ -191,6 +132,7 @@ class ChatInput(TextArea):
         try:
             if self.is_mounted and self.app:
                 from widgets.command_suggestions import CommandSuggestions
+                from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS
 
                 att_offset = 2 if has_attachments else 0
                 footer_offset = 3
@@ -202,87 +144,6 @@ class ChatInput(TextArea):
                     sugg.styles.margin = new_margin
         except Exception:
             pass
-
-    async def update_suggestions(self) -> None:
-        """Update slash command and file suggestions list"""
-        try:
-            if self.is_mounted and self.app:
-                from widgets.command_suggestions import CommandSuggestions
-
-                suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
-                row, col = self.cursor_location
-                line_str = self.document.get_line(row)
-                await suggestions.update_query(self.text, line_str, col)
-        except Exception:
-            pass
-
-    def apply_file_suggestion(self, chosen_file: str, at_start_idx: int) -> None:
-        """Inserts chosen file path after @ symbol"""
-        prefix = "@" if not chosen_file.startswith("@") else ""
-        self.apply_suggestion(f"{prefix}{chosen_file}", at_start_idx)
-
-    def apply_suggestion(self, inserted_text: str, start_idx: int) -> None:
-        """Inserts chosen suggestion at start_idx with a trailing space"""
-        row, col = self.cursor_location
-        line_str = self.document.get_line(row)
-        before = line_str[:start_idx]
-        after = line_str[col:]
-        inserted = inserted_text if inserted_text.endswith(" ") else f"{inserted_text} "
-        new_line = before + inserted + after
-
-        lines = self.text.split("\n")
-        lines[row] = new_line
-        self.load_text("\n".join(lines))
-
-        new_col = start_idx + len(inserted)
-        self.move_cursor((row, new_col))
-
-    def sanitize_mouse_artifacts(self) -> None:
-        """Strips accidental raw ANSI mouse tracking escape sequences from the text buffer"""
-        sanitize_mouse_artifacts(self)
-
-
-    def _has_suggestion_trigger(self) -> bool:
-        """Return True when the cursor line carries an active /command or @file trigger.
-
-        Mirrors the trigger conditions in CommandSuggestions.update_query: a "/"
-        (outside shell mode) or "@" at line start or after whitespace, with no
-        spaces/newlines in the query part up to the cursor.
-        """
-        row, col = self.cursor_location
-        check_text = self.document.get_line(row)[:col]
-        if not self.is_shell_mode:
-            slash_idx = check_text.rfind("/")
-            if slash_idx != -1 and (slash_idx == 0 or check_text[slash_idx - 1] in " \t\n"):
-                query_part = check_text[slash_idx:]
-                if " " not in query_part and "\n" not in query_part:
-                    return True
-        at_idx = check_text.rfind("@")
-        if at_idx != -1 and (at_idx == 0 or check_text[at_idx - 1] in " \t\n"):
-            query_part = check_text[at_idx + 1 :]
-            if " " not in query_part and "\n" not in query_part:
-                return True
-        return False
-
-    def _schedule_suggestions_update(self) -> None:
-        """Schedule suggestion refresh off the event loop when mounted.
-
-        Gated: the task is only spawned when the cursor line has an active "/" or
-        "@" trigger, or when a previously-open suggestions list needs clearing
-        after its trigger disappeared. Input changes without either never spawn a
-        task, avoiding the per-key query/update overhead entirely.
-        """
-        if not getattr(self, "is_mounted", False):
-            return
-        has_trigger = self._has_suggestion_trigger()
-        if not has_trigger and not getattr(self, "_suggestions_active", False):
-            return
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.update_suggestions())
-        except RuntimeError:
-            return
-        self._suggestions_active = has_trigger
 
     def _on_input_change(self) -> None:
         """Called on any input text change"""
@@ -300,106 +161,6 @@ class ChatInput(TextArea):
             if hasattr(self.app, "copy_to_clipboard"):
                 self.app.copy_to_clipboard(selected)
             self.selection = self.selection.__class__.cursor(self.cursor_location)
-
-
-    def _decode_pasted_path(self, text: str) -> str:
-        return decode_pasted_path(text)
-
-    def format_pasted_file_path(self, pasted_text: str) -> str:
-        """Automatically formats pasted file paths as @file"""
-        return format_pasted_file_path(pasted_text)
-
-    def update_attachment_bar(self) -> None:
-        try:
-            if self.is_mounted and self.app:
-                from widgets.presentation.widgets.attachment_bar import AttachmentBar
-
-                bar = self.app.query_one("#attachment-bar", AttachmentBar)
-                bar.update_attachments(self.clipboard_attachments)
-        except Exception:
-            pass
-        try:
-            if self.is_mounted and self.app:
-                footer = self.app.query_one(STATUS_FOOTER)
-                footer.refresh_footer()
-        except Exception:
-            pass
-
-    def remove_clipboard_attachment(self, attachment) -> None:
-        """Removes a single attachment and cleans up its temp file."""
-        if attachment in self.clipboard_attachments:
-            if hasattr(attachment, "path") and os.path.exists(attachment.path) and "temp_images" in attachment.path:
-                try:
-                    os.remove(attachment.path)
-                except OSError:
-                    pass
-            self.clipboard_attachments.remove(attachment)
-            self.update_attachment_bar()
-
-    async def try_paste_clipboard_image(self) -> bool:
-        """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
-        return await try_paste_clipboard_image(self)
-
-    async def on_paste(self, event: events.Paste) -> None:
-        event.prevent_default()
-        event.stop()
-
-        pasted_text = self.format_pasted_file_path(event.text)
-        if pasted_text.startswith("@") or (
-            pasted_text != event.text
-            and any(line_item.strip().startswith("@") for line_item in pasted_text.splitlines())
-        ):
-            self.insert(pasted_text)
-            self._on_input_change()
-            return
-
-        expanded = self._decode_pasted_path(event.text)
-        exists = await asyncio.to_thread(os.path.exists, expanded)
-        is_existing_image_path = exists and any(expanded.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
-
-        if not is_existing_image_path and not event.text.strip():
-            if await self.try_paste_clipboard_image():
-                return
-
-        lines = pasted_text.splitlines()
-        if len(lines) > self.PASTE_LINE_THRESHOLD:
-            idx = len(self.pasted_texts) + 1
-            tag = f"[Pasted text #{idx} +{len(lines)} lines]"
-            self.pasted_texts[tag] = pasted_text
-            self.insert(tag)
-        else:
-            self.insert(pasted_text)
-        self._on_input_change()
-
-    def add_to_history(self, text: str) -> None:
-        """Save submitted message to query history"""
-        add_to_history(self, text)
-
-    def _handle_tag_deletion(self, event_key: str) -> bool:
-        """Atomic deletion of [Pasted text #N +X lines] block on Backspace or Delete"""
-        return handle_tag_deletion(self, event_key)
-
-
-    def _accept_active_suggestion(self) -> bool:
-        """Apply active suggestion if suggestion menu is visible."""
-        try:
-            from widgets.command_suggestions import CommandSuggestions
-
-            suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
-            if suggestions.display and suggestions.highlighted is not None:
-                if suggestions.highlighted < len(suggestions.current_matched):
-                    chosen = suggestions.current_matched[suggestions.highlighted]
-                    if suggestions.mode == "command":
-                        self.apply_suggestion(chosen, suggestions.at_start_idx)
-                    elif suggestions.mode == "file":
-                        self.apply_file_suggestion(chosen, suggestions.at_start_idx)
-                    suggestions.display = False
-                    if hasattr(suggestions, "_set_display") and callable(suggestions._set_display):
-                        suggestions._set_display(False)
-                    return True
-        except Exception:
-            pass
-        return False
 
     def _handle_chat_scroll_keys(self, key: str) -> bool:
         """Handle page up/down and top/bottom chat scroll keys."""
@@ -425,11 +186,6 @@ class ChatInput(TextArea):
             return True
         except Exception:
             return False
-
-    def _handle_history_navigation(self, key: str) -> bool:
-        """Navigate prompt history when cursor is at the top/bottom boundary."""
-        return handle_history_navigation(self, key)
-
 
     async def _on_key(self, event: events.Key) -> None:
         if event.key in KEY_PASTE:
@@ -479,6 +235,7 @@ class ChatInput(TextArea):
         if event.key == "escape":
             try:
                 from widgets.command_suggestions import CommandSuggestions
+                from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS
 
                 suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 if suggestions.display:
@@ -545,6 +302,7 @@ class ChatInput(TextArea):
         # Handle arrow navigation in suggestions menu
         try:
             from widgets.command_suggestions import CommandSuggestions
+            from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS
 
             suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
             if suggestions.display:
@@ -607,6 +365,7 @@ class ChatInput(TextArea):
             # Hide suggestions
             try:
                 from widgets.command_suggestions import CommandSuggestions
+                from widgets.presentation.screens.constants import COMMAND_SUGGESTIONS
 
                 suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 suggestions.display = False
@@ -637,6 +396,9 @@ class ChatInput(TextArea):
 
 __all__ = [
     "ChatInput",
+    "ChatInputHistoryMixin",
+    "ChatInputPasteMixin",
+    "ChatInputSuggestionsMixin",
     "ClipboardAttachment",
     "COMPACT_PLACEHOLDER",
     "COMPACT_SHELL_PLACEHOLDER",
@@ -648,8 +410,8 @@ __all__ = [
     "get_placeholder_for_width",
     "get_shell_placeholder_for_width",
     "KEY_QUIT",
+    "asyncio",
     "config",
     "read_json",
     "atomic_write_json",
 ]
-
