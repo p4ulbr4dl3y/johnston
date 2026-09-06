@@ -12,7 +12,7 @@ from widgets.presentation.screens.constants import (
 )
 from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
-from widgets.utils.key_aliases import normalize_key_to_latin
+from widgets.utils.key_aliases import expand_bindings, normalize_key_to_latin
 from widgets.utils.responsive import (
     MODAL_COMPACT_MAX_WIDTH,
     MODAL_MIN_WIDTH,
@@ -21,7 +21,21 @@ from widgets.utils.responsive import (
 
 
 class ConfirmScreen(BaseModalScreen[bool]):
-    """Generic confirmation modal screen with enter/esc and y/n keys."""
+    """Generic confirmation modal screen with enter/esc, y/n, and d/c keys."""
+
+    can_focus = True
+
+    BINDINGS = expand_bindings([
+        ("enter", "confirm", "Confirm"),
+        ("y", "confirm", "Yes"),
+        ("d", "confirm", "Delete"),
+        ("delete", "confirm", "Delete"),
+        ("escape", "cancel", "Cancel"),
+        ("n", "cancel", "No"),
+        ("c", "cancel", "Cancel"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
 
     def __init__(
         self,
@@ -58,18 +72,28 @@ class ConfirmScreen(BaseModalScreen[bool]):
     def on_mount(self) -> None:
         super().on_mount()
         self._apply_dialog_fit()
+        try:
+            self.focus()
+        except Exception:
+            pass
 
     def on_resize(self, event: events.Resize) -> None:
         self._apply_dialog_fit()
 
+    def action_confirm(self) -> None:
+        self.dismiss(True)
+
+    def action_cancel(self) -> None:
+        self.dismiss(False)
+
     def _on_key(self, event: events.Key) -> None:
         norm_key = normalize_key_to_latin(event.key)
-        if norm_key in ("enter", "y"):
+        if norm_key in ("enter", "y", "d", "delete"):
             self.dismiss(True)
             event.prevent_default()
             event.stop()
             return
-        if norm_key in ("escape", "n"):
+        if norm_key in ("escape", "n", "c"):
             self.dismiss(False)
             event.prevent_default()
             event.stop()
@@ -79,5 +103,10 @@ class ConfirmScreen(BaseModalScreen[bool]):
             event.stop()
             return
 
-    def action_cancel(self) -> None:
-        self.dismiss(False)
+    def on_click(self, event: events.Click) -> None:
+        try:
+            dialog = self.query_one(f"#{MODAL_DIALOG_ID}")
+            if not dialog.region.contains(event.screen_x, event.screen_y):
+                self.dismiss(False)
+        except Exception:
+            pass
