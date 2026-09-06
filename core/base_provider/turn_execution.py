@@ -51,7 +51,11 @@ class TurnExecutionMixin:
         if parsed_img is not None and parsed_img.get("type") == "image":
             display_result = parsed_img.get("summary", f"[Image file: {parsed_img.get('path')}]")
         elif isinstance(tool_result, ToolResult):
-            display_result = resolved.display if resolved.display is not None else (resolved.content or "")
+            display_result = (
+                resolved.display
+                if (resolved.display is not None and resolved.display.strip() != "")
+                else (resolved.content or "")
+            )
 
         return t_id, display_result, resolved
 

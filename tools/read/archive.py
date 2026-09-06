@@ -133,7 +133,7 @@ def _inspect_archive(
 
         return ToolResult.done(
             content=content_str,
-            display="",
+            display=f"[archive {header_path} | total {total_count}]",
         )
     except Exception as e:
         return ToolResult.error("archive", detail=str(e), name=path)

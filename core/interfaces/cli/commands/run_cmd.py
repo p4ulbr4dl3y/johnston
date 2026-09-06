@@ -250,6 +250,9 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
 
         start_time = time.perf_counter()
 
+        has_written_text = False
+        pending_lead_ws: list[str] = []
+
         try:
             async for step in agent.stream_steps(effective_prompt):
                 parsed = parse_stream_step(step)
@@ -264,8 +267,17 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                         sys.stdout.write(json.dumps({"event": "delta", "text": chunk}) + "\n")
                         sys.stdout.flush()
                     elif not is_json:
-                        sys.stdout.write(chunk)
-                        sys.stdout.flush()
+                        if not has_written_text:
+                            if chunk.strip():
+                                has_written_text = True
+                                pending_lead_ws.clear()
+                                sys.stdout.write(chunk.lstrip("\r\n"))
+                                sys.stdout.flush()
+                            else:
+                                pending_lead_ws.append(chunk)
+                        else:
+                            sys.stdout.write(chunk)
+                            sys.stdout.flush()
 
                 elif etype == "bot_text":
                     if not response_parts and parsed.val1:
@@ -274,10 +286,14 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                             sys.stdout.write(json.dumps({"event": "delta", "text": parsed.val1}) + "\n")
                             sys.stdout.flush()
                         elif not is_json:
-                            sys.stdout.write(parsed.val1)
+                            text = parsed.val1.lstrip("\r\n") if not has_written_text else parsed.val1
+                            sys.stdout.write(text)
                             sys.stdout.flush()
+                            has_written_text = True
 
                 elif etype in ("tool_call", "tool"):
+                    pending_lead_ws.clear()
+                    has_written_text = False
                     t_name = parsed.val1
                     if isinstance(parsed.val3, (dict, list)):
                         t_args = parsed.val3
@@ -308,7 +324,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                         sys.stdout.flush()
                     elif not is_quiet and not is_json:
                         summary = format_args_summary(t_args)
-                        if response_parts and not response_parts[-1].endswith("\n"):
+                        if response_parts and "".join(response_parts).strip() and not response_parts[-1].endswith("\n"):
                             sys.stdout.write("\n")
                             sys.stdout.flush()
                         sys.stderr.write(f"[tool] {t_name}({summary})\n")
@@ -325,8 +341,9 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                         sys.stdout.flush()
                     elif not is_quiet and not is_json:
                         res_summary = format_result_summary(res_content)
-                        sys.stderr.write(f"[result] {res_summary}\n")
-                        sys.stderr.flush()
+                        if res_summary:
+                            sys.stderr.write(f"[result] {res_summary}\n")
+                            sys.stderr.flush()
 
                 elif etype == "error":
                     has_error = True

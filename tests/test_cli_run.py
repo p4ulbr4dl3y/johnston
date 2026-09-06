@@ -273,6 +273,55 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertIn("[result] matches found", err_buf.getvalue())
         self.assertEqual(out_buf.getvalue(), "search complete\n")
 
+    async def test_run_headless_async_empty_tool_result_suppressed(self):
+        agent = MockAgent(steps=[
+            ("tool", "read", "/path", {"path": "/path"}, "tc1"),
+            ("tool_result", "", "", False, None, None, "tc1"),
+            ("content", "finished reading", ""),
+        ])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(prompt="read file", provider=None, model=None, role="worker", quiet=False, json=False, stream_json=False)
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertIn("[tool] read(path='/path')", err_buf.getvalue())
+        self.assertNotIn("[result]", err_buf.getvalue())
+        self.assertEqual(out_buf.getvalue(), "finished reading\n")
+
+    async def test_run_headless_async_leading_whitespace_suppressed(self):
+        agent = MockAgent(steps=[
+            ("content", "\n\n", ""),
+            ("tool", "read", "/path", {"path": "/path"}, "tc1"),
+            ("tool_result", "ok", "", False, None, None, "tc1"),
+            ("content", "\nActual answer", ""),
+        ])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(prompt="read file", provider=None, model=None, role="worker", quiet=False, json=False, stream_json=False)
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(out_buf.getvalue(), "Actual answer\n")
+
     async def test_run_headless_async_stream_json_flag(self):
         agent = MockAgent(steps=[
             ("tool", "grep", "foo", {"query": "foo"}, "tc1"),

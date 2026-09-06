@@ -98,7 +98,8 @@ def format_line_pagination(
     effective_window = min(len(lines), DEFAULT_LINE_WINDOW)
     if total_lines == 0:
         p_info = f" | {path}" if path else ""
-        return ToolResult.done(content=f"[empty file{p_info}]", display="")
+        header = f"[empty file{p_info}]"
+        return ToolResult.done(content=header, display=header)
 
     if start_line is not None:
         start_line_int = try_int(start_line)
@@ -161,4 +162,4 @@ def format_line_pagination(
 
     header = f"[{' | '.join(meta_parts)}]"
     content_str = f"{header}\n" + "\n".join(out_lines) if out_lines else header
-    return ToolResult.done(content=content_str, display="")
+    return ToolResult.done(content=content_str, display=header)

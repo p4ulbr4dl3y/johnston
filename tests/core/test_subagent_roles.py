@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from unittest.mock import MagicMock
 
 from core.infrastructure.storage.session_store import SessionStore
 from core.role_registry import RoleRegistry
@@ -290,6 +291,21 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Loop Breaker & Retry Budget", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
         self.assertIn("Max 3 fix attempts", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
         self.assertIn("Outcome: blocked", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
+
+    def test_headless_prompt_directives(self):
+        from core.domain.defaults.prompts import HEADLESS_DEFAULT_SYSTEM_PROMPT
+        from core.domain.policies.role_policy import AgentMode
+        from core.roles.prompt import apply_prompt
+
+        self.assertIn("Single-Shot Turn", HEADLESS_DEFAULT_SYSTEM_PROMPT)
+        self.assertIn("ZERO conversational closing questions", HEADLESS_DEFAULT_SYSTEM_PROMPT)
+
+        agent = MagicMock()
+        registry = RoleRegistry.get_instance()
+        worker_def = registry.get_role("worker")
+        apply_prompt(agent, worker_def, mode=AgentMode.HEADLESS)
+        self.assertIn("<headless_runtime>", agent.system_prompt)
+        self.assertIn("NEVER ask closing questions", agent.system_prompt)
 
 
 if __name__ == "__main__":
