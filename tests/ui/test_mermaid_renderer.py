@@ -96,11 +96,18 @@ class TestMermaidRenderer:
             mock_run.assert_not_called()
 
     def test_format_mermaid_content(self):
-        diagram = "┌───┐\n│ A │\n└───┘"
+        diagram = "┌───┐\n│ A │\n└───┘\n  ▼\n┌───┐\n│ B │\n└───┘"
         content_dark = format_mermaid_content(diagram, dark=True)
         assert isinstance(content_dark, Content)
         content_light = format_mermaid_content(diagram, dark=False)
         assert isinstance(content_light, Content)
+
+        theme_mock = MagicMock()
+        theme_mock.accent_info = "#10b981"
+        theme_mock.accent_warning = "#ec4899"
+        content_themed = format_mermaid_content(diagram, theme_obj=theme_mock)
+        assert isinstance(content_themed, Content)
+
 
 
 class TestCustomMarkdownFenceMermaid:

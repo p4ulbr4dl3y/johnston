@@ -5,12 +5,13 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
-from typing import Optional
+from typing import Any, Optional
 
 from rich.text import Text
 from textual.content import Content
 
-_BOX_CHARS = frozenset("┌┐└┘├┤┬┴┼─│━┃╭╮╰╯═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬◄►▲▼◀▶◆◇○●┄┈┆┊")
+_BOX_CHARS = frozenset("┌┐└┘├┤┬┴┼─│━┃╭╮╰╯═║╒╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡╢╣╤╥╦╧╨╩╪╫╬◆◇○●┄┈┆┊")
+_ARROW_CHARS = frozenset("◄►▲▼◀▶")
 _RENDER_CACHE: dict[str, Optional[str]] = {}
 _CACHE_MAX_SIZE = 256
 
@@ -137,12 +138,28 @@ def clear_mermaid_cache() -> None:
     _RENDER_CACHE.clear()
 
 
-def format_mermaid_content(diagram_str: str, dark: bool = True) -> Content:
-    """Format ASCII diagram with colored box drawing lines into Textual Content."""
+def format_mermaid_content(diagram_str: str, dark: bool = True, theme_obj: Any = None) -> Content:
+    """Format ASCII diagram with colored box drawing lines and arrows into Textual Content.
+
+    Uses theme accent tokens when available, matching Johnston's palette aesthetic.
+    """
     text = Text()
-    box_style = "bold #38bdf8" if dark else "bold #0284c7"
+
+    box_color = getattr(theme_obj, "accent_info", None) if theme_obj is not None else None
+    if not isinstance(box_color, str) or not box_color.strip():
+        box_color = "#38bdf8" if dark else "#0284c7"
+
+    arrow_color = getattr(theme_obj, "accent_warning", None) if theme_obj is not None else None
+    if not isinstance(arrow_color, str) or not arrow_color.strip():
+        arrow_color = "#f59e0b" if dark else "#d97706"
+
+    box_style = f"bold {box_color}"
+    arrow_style = f"bold {arrow_color}"
+
     for char in diagram_str:
-        if char in _BOX_CHARS:
+        if char in _ARROW_CHARS:
+            text.append(char, style=arrow_style)
+        elif char in _BOX_CHARS:
             text.append(char, style=box_style)
         else:
             text.append(char)

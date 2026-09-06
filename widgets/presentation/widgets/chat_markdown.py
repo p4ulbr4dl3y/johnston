@@ -306,7 +306,7 @@ class CustomMarkdownFence(MarkdownFence):
             if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
                 if hasattr(self, "_classes"):
                     self.add_class("diagram-mode")
-                self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark))
+                self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr))
             else:
                 if hasattr(self, "_classes"):
                     self.remove_class("diagram-mode")
@@ -354,7 +354,7 @@ class CustomMarkdownFence(MarkdownFence):
         if self._show_diagram and self._diagram_str:
             if hasattr(self, "_classes"):
                 self.add_class("diagram-mode")
-            initial_content = format_mermaid_content(self._diagram_str, dark=is_dark)
+            initial_content = format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr)
         else:
             initial_content = self._highlighted_code
 
@@ -383,7 +383,7 @@ class CustomMarkdownFence(MarkdownFence):
         if self._show_diagram:
             if hasattr(self, "_classes"):
                 self.add_class("diagram-mode")
-            self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark))
+            self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr))
         else:
             if hasattr(self, "_classes"):
                 self.remove_class("diagram-mode")
@@ -411,7 +411,7 @@ class CustomMarkdownFence(MarkdownFence):
         if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
             if hasattr(self, "_classes"):
                 self.add_class("diagram-mode")
-            self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark))
+            self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr))
         else:
             if hasattr(self, "_classes"):
                 self.remove_class("diagram-mode")
