@@ -404,11 +404,38 @@ MarkdownFence .fence-copy-btn:focus {
     text-style: none;
 }
 
+CustomMarkdownFence .fence-toggle-btn,
+MarkdownFence .fence-toggle-btn {
+    height: 1;
+    min-height: 1;
+    min-width: 6;
+    border: none;
+    background: transparent;
+    color: $fg-muted;
+    text-style: none;
+    padding: 0 1;
+    margin: 0;
+}
+
+CustomMarkdownFence .fence-toggle-btn:hover,
+MarkdownFence .fence-toggle-btn:hover,
+CustomMarkdownFence .fence-toggle-btn:focus,
+MarkdownFence .fence-toggle-btn:focus {
+    background: transparent;
+    color: $fg-secondary;
+    text-style: none;
+}
+
 CustomMarkdownFence .fence-scroll-box,
 MarkdownFence .fence-scroll-box {
     width: 100%;
     height: auto;
     scrollbar-size: 0 0 !important;
+}
+
+CustomMarkdownFence.diagram-mode .fence-scroll-box,
+MarkdownFence.diagram-mode .fence-scroll-box {
+    overflow-x: auto;
 }
 
 CustomMarkdownFence #code-content,
@@ -418,6 +445,13 @@ MarkdownFence #code-content {
     padding: 0 1;
     background: $bg-surface;
     text-wrap: wrap;
+}
+
+CustomMarkdownFence.diagram-mode #code-content,
+MarkdownFence.diagram-mode #code-content {
+    width: auto;
+    min-width: 100%;
+    text-wrap: nowrap;
 }
 
 /* OptionList Base Styles */

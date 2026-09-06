@@ -116,7 +116,12 @@ def prewarm_fences_from_markdown(markdown: str, dark: bool = True) -> int:
         # only pre-warm blocks with actual content.
         if closed and code_lines:
             try:
-                CustomMarkdownFence.highlight("\n".join(code_lines), lang, dark=dark)
+                code_text = "\n".join(code_lines)
+                if lang and lang.strip().lower() in ("mermaid", "mmd"):
+                    from widgets.utils.mermaid_renderer import prewarm_mermaid
+
+                    prewarm_mermaid(code_text)
+                CustomMarkdownFence.highlight(code_text, lang, dark=dark)
                 count += 1
             except Exception:
                 pass
@@ -221,6 +226,14 @@ class CustomMarkdownFence(MarkdownFence):
         height: auto;
         width: 100%;
     }
+    CustomMarkdownFence.diagram-mode .fence-scroll-box {
+        overflow-x: auto;
+    }
+    CustomMarkdownFence.diagram-mode #code-content {
+        width: auto;
+        min-width: 100%;
+        text-wrap: nowrap;
+    }
     """
 
     @property
@@ -263,6 +276,17 @@ class CustomMarkdownFence(MarkdownFence):
 
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "text"
+        from widgets.utils.mermaid_renderer import format_mermaid_content, is_mermaid, render_mermaid_to_ascii
+
+        self._diagram_str: str | None = None
+        self._show_diagram: bool = False
+
+        if is_mermaid(lang_str):
+            rendered = render_mermaid_to_ascii(self.code)
+            if rendered:
+                self._diagram_str = rendered
+                self._show_diagram = True
+
         lang_label = Label(lang_str, classes="fence-lang")
         lang_label.ALLOW_SELECT = False
         copy_btn = Button("copy", classes="fence-copy-btn")
@@ -272,6 +296,11 @@ class CustomMarkdownFence(MarkdownFence):
         header.ALLOW_SELECT = False
         with header:
             yield lang_label
+            if self._diagram_str:
+                toggle_btn = Button("code", classes="fence-toggle-btn")
+                toggle_btn.can_focus = False
+                toggle_btn.ALLOW_SELECT = False
+                yield toggle_btn
             yield copy_btn
 
         from widgets.app.theme_manager import theme_manager
@@ -280,13 +309,52 @@ class CustomMarkdownFence(MarkdownFence):
         is_ansi = getattr(app, "native_ansi_color", False) if app else True
         curr = getattr(app, "current_theme", None) or theme_manager.current_theme
         is_dark = getattr(curr, "dark", True)
-        code_content = self.highlight(self.code, self.lexer, ansi=is_ansi, dark=is_dark)
+        self._highlighted_code = self.highlight(self.code, self.lexer, ansi=is_ansi, dark=is_dark)
+
+        if self._show_diagram and self._diagram_str:
+            if hasattr(self, "_classes"):
+                self.add_class("diagram-mode")
+            initial_content = format_mermaid_content(self._diagram_str, dark=is_dark)
+        else:
+            initial_content = self._highlighted_code
+
         with Vertical(classes="fence-scroll-box"):
-            yield Label(code_content, id="code-content", expand=True)
+            yield Label(initial_content, id="code-content", expand=True)
+
+    def toggle_diagram_view(self) -> None:
+        """Toggle between rendered ASCII diagram and raw code."""
+        if not getattr(self, "_diagram_str", None):
+            return
+        self._show_diagram = not getattr(self, "_show_diagram", False)
+
+        from widgets.app.theme_manager import theme_manager
+        from widgets.utils.mermaid_renderer import format_mermaid_content
+
+        app = getattr(self, "app", None)
+        curr = getattr(app, "current_theme", None) or theme_manager.current_theme
+        is_dark = getattr(curr, "dark", True)
+
+        try:
+            toggle_btn = self.query_one(".fence-toggle-btn", Button)
+            toggle_btn.label = "code" if self._show_diagram else "diagram"
+        except Exception:
+            pass
+
+        if self._show_diagram:
+            if hasattr(self, "_classes"):
+                self.add_class("diagram-mode")
+            self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark))
+        else:
+            if hasattr(self, "_classes"):
+                self.remove_class("diagram-mode")
+            self.set_content(
+                getattr(self, "_highlighted_code", None) or self.highlight(self.code, self.lexer, dark=is_dark)
+            )
 
     def notify_style_update(self) -> None:
         """Update highlight theme when App theme changes."""
         from widgets.app.theme_manager import theme_manager
+        from widgets.utils.mermaid_renderer import format_mermaid_content
 
         app = getattr(self, "app", None)
         is_ansi = getattr(app, "native_ansi_color", False) if app else True
@@ -298,8 +366,14 @@ class CustomMarkdownFence(MarkdownFence):
             ansi=is_ansi,
             dark=is_dark,
         )
-        self.set_content(self._highlighted_code)
-        return super().notify_style_update()
+        if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
+            self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark))
+        else:
+            self.set_content(self._highlighted_code)
+        try:
+            return super().notify_style_update()
+        except Exception:
+            return None
 
     def set_content(self, content: Any) -> None:
         self._content = content
@@ -323,6 +397,9 @@ class CustomMarkdownFence(MarkdownFence):
                     app.copy_to_clipboard(self.code)
             except Exception:
                 pass
+            event.stop()
+        elif "fence-toggle-btn" in event.button.classes:
+            self.toggle_diagram_view()
             event.stop()
 
 
