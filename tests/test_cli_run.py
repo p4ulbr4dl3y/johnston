@@ -669,6 +669,77 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lines[0]["event"], "skills")
         self.assertEqual(lines[0]["skills"], ["caveman"])
 
+    async def test_run_headless_async_compaction_event(self):
+        agent = MockAgent(steps=[
+            ("event_divider", "Session Compacted", ""),
+            ("content", "resumed after compaction", ""),
+        ])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(prompt="long task", provider=None, model=None, role="worker", quiet=False, json=False, stream_json=False)
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertIn("[compaction] Session Compacted", err_buf.getvalue())
+        self.assertIn("compacted", err_buf.getvalue())
+        self.assertEqual(out_buf.getvalue(), "resumed after compaction\n")
+
+    async def test_run_headless_async_compaction_json(self):
+        agent = MockAgent(steps=[
+            ("event_divider", "Session Compacted", ""),
+            ("content", "resumed after compaction", ""),
+        ])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(prompt="long task", provider=None, model=None, role="worker", quiet=False, json=True, stream_json=False)
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        data = json.loads(out_buf.getvalue())
+        self.assertTrue(data.get("compacted"))
+        self.assertTrue(data["usage"].get("compacted"))
+
+    async def test_run_headless_async_compaction_stream_json(self):
+        agent = MockAgent(steps=[
+            ("event_divider", "Session Compacted", ""),
+            ("content", "resumed after compaction", ""),
+        ])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(prompt="long task", provider=None, model=None, role="worker", quiet=False, json=False, stream_json=True)
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        lines = [json.loads(line) for line in out_buf.getvalue().strip().splitlines()]
+        self.assertEqual(lines[0]["event"], "compaction")
+        self.assertEqual(lines[0]["title"], "Session Compacted")
+        self.assertTrue(lines[-1]["usage"].get("compacted"))
+
 
 class TestCLIRunSyncWrapper(unittest.TestCase):
     """Unit tests for synchronous run_headless wrapper."""
@@ -712,18 +783,34 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
             main(["run", "hello", "--quiet"])
         self.assertEqual(cm.exception.code, 0)
     def test_format_meta_footer(self):
-        footer = format_meta_footer("openai", "gpt-4o", 2.345, 1200, 300, 1500, cost_usd=0.0025)
+        footer = format_meta_footer("openai", "gpt-4o", 2.345, 1200, 300, 1500, cost_usd=0.0025, role="worker")
         self.assertIn("openai/gpt-4o", footer)
+        self.assertNotIn("worker:", footer)
         self.assertIn("2.35s", footer)
+        self.assertIn("127.9 tok/s", footer)
         self.assertIn("in: 1.2k", footer)
         self.assertIn("out: 300", footer)
         self.assertIn("total: 1.5k tok", footer)
         self.assertIn("$0.0025", footer)
 
-        footer_no_cost = format_meta_footer("ollama", "llama3", 1.0, 0, 0, 0, cost_usd=0.0)
-        self.assertIn("ollama/llama3", footer_no_cost)
-        self.assertIn("1.00s", footer_no_cost)
-        self.assertNotIn("$", footer_no_cost)
+        footer_custom = format_meta_footer(
+            "opencode",
+            "big-pickle",
+            10.0,
+            1000,
+            500,
+            1500,
+            cost_usd=0.0,
+            role="Explorer",
+            sandbox=True,
+            effort="high",
+            compacted=True,
+        )
+        self.assertIn("explorer: opencode/big-pickle (high)", footer_custom)
+        self.assertIn("sandbox", footer_custom)
+        self.assertIn("compacted", footer_custom)
+        self.assertIn("50.0 tok/s", footer_custom)
+        self.assertNotIn("$", footer_custom)
 
 
 if __name__ == "__main__":

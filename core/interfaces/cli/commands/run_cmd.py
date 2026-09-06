@@ -107,11 +107,33 @@ def format_meta_footer(
     tokens_out: int,
     total_tokens: int,
     cost_usd: float = 0.0,
+    role: Optional[str] = None,
+    sandbox: bool = False,
+    effort: Optional[str] = None,
+    compacted: bool = False,
 ) -> str:
     """Format execution summary metadata line."""
     prov_model = f"{provider}/{model}" if model and model != "-" else provider
-    dur_str = f"{duration_s:.2f}s"
-    parts = [prov_model, dur_str]
+    if effort and str(effort).strip():
+        prov_model = f"{prov_model} ({str(effort).strip().lower()})"
+
+    if role and isinstance(role, str) and role.strip().lower() not in ("", "worker"):
+        identity = f"{role.strip().lower()}: {prov_model}"
+    else:
+        identity = prov_model
+
+    parts = [identity]
+    if sandbox:
+        parts.append("sandbox")
+    if compacted:
+        parts.append("compacted")
+
+    parts.append(f"{duration_s:.2f}s")
+
+    if tokens_out > 0 and duration_s > 0:
+        tps = tokens_out / duration_s
+        parts.append(f"{tps:.1f} tok/s")
+
     if total_tokens > 0 or tokens_in > 0 or tokens_out > 0:
         parts.append(
             f"in: {_format_token_count(tokens_in)}, out: {_format_token_count(tokens_out)}, total: {_format_token_count(total_tokens)} tok"
@@ -247,6 +269,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         response_parts: list[str] = []
         tool_calls: list[dict[str, Any]] = []
         has_error = False
+        compacted = False
 
         start_time = time.perf_counter()
 
@@ -345,6 +368,16 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                             sys.stderr.write(f"[result] {res_summary}\n")
                             sys.stderr.flush()
 
+                elif etype in ("event_divider", "compaction"):
+                    compacted = True
+                    comp_title = parsed.val1 or "Session Compacted"
+                    if is_stream_json:
+                        sys.stdout.write(json.dumps({"event": "compaction", "title": comp_title}) + "\n")
+                        sys.stdout.flush()
+                    elif not is_quiet and not is_json:
+                        sys.stderr.write(f"[compaction] {comp_title}\n")
+                        sys.stderr.flush()
+
                 elif etype == "error":
                     has_error = True
                     err_msg = parsed.val1 or "Unknown stream error"
@@ -370,15 +403,20 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         to = getattr(agent, "tokens_output", 0)
         tt = getattr(agent, "total_tokens", 0)
         cu = getattr(agent, "cost_usd", 0.0)
+        to_val = to if isinstance(to, (int, float)) else 0
+        tps = round(to_val / duration_s, 1) if duration_s > 0 and to_val > 0 else 0.0
         usage = {
             "provider": provider_key,
             "model": model_name,
             "duration_s": round(duration_s, 3),
+            "tok_per_sec": tps,
             "tokens_input": ti if isinstance(ti, (int, float)) else 0,
-            "tokens_output": to if isinstance(to, (int, float)) else 0,
+            "tokens_output": to_val,
             "total_tokens": tt if isinstance(tt, (int, float)) else 0,
             "cost_usd": cu if isinstance(cu, (int, float)) else 0.0,
         }
+        if compacted:
+            usage["compacted"] = True
 
         if is_stream_json:
             sys.stdout.write(json.dumps({"event": "done", "usage": usage}) + "\n")
@@ -391,6 +429,12 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
             }
             if activated_skills:
                 output_payload["skills"] = activated_skills
+            if compacted:
+                output_payload["compacted"] = True
+            if role and role.strip().lower() != "worker":
+                output_payload["role"] = role.strip().lower()
+            if getattr(agent, "sandbox_enabled", False) is True:
+                output_payload["sandbox"] = True
             print(json.dumps(output_payload, indent=2))
             sys.stdout.flush()
         else:
@@ -400,6 +444,8 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                 sys.stdout.flush()
 
             if not is_quiet:
+                effort_val = getattr(args, "effort", None)
+                sandbox_val = getattr(agent, "sandbox_enabled", False) is True
                 footer = format_meta_footer(
                     provider_key,
                     model_name,
@@ -408,6 +454,10 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                     usage["tokens_output"],
                     usage["total_tokens"],
                     usage["cost_usd"],
+                    role=role,
+                    sandbox=sandbox_val,
+                    effort=effort_val,
+                    compacted=compacted,
                 )
                 from core.interfaces.cli.formatter import DIM, RESET, supports_color
 
