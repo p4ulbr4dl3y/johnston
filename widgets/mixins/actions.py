@@ -206,6 +206,16 @@ class ActionsMixin(PlanActionsMixin):
         elif result == "always_allow:project":
             if perm_name:
                 pm.save_tool_permission(perm_name, "allow", scope="auto")
+        elif isinstance(result, str) and result.startswith("server_allow:"):
+            if result.endswith(":project"):
+                pattern = result[len("server_allow:") : -len(":project")]
+                if pattern:
+                    pm.save_tool_permission(pattern, "allow", scope="auto")
+            else:
+                pattern = result.split(":", 1)[1]
+                if pattern:
+                    pm.set_session_override(pattern, "allow")
+            return True
         elif isinstance(result, str) and result.startswith("pattern:"):
             if result.endswith(":project"):
                 pattern = result[len("pattern:") : -len(":project")]
@@ -223,7 +233,14 @@ class ActionsMixin(PlanActionsMixin):
             return result
         return (
             result in ("allow", "always_allow", "always_allow:project")
-            or (isinstance(result, str) and (result.startswith("pattern:") or result.startswith("add_root:")))
+            or (
+                isinstance(result, str)
+                and (
+                    result.startswith("pattern:")
+                    or result.startswith("add_root:")
+                    or result.startswith("server_allow:")
+                )
+            )
         )
 
     async def ask_user(self, questions: list[Dict[str, Any]]) -> str:

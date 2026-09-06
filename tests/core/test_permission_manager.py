@@ -360,7 +360,27 @@ class TestPermissionManager(unittest.TestCase):
         dec_logs = self.pm.check_permission("search", {"path": LOGS_DIR})
         self.assertEqual(dec_logs.action, PermissionAction.ALLOW)
 
+    def test_wildcard_tool_permissions(self):
+        # 1. Session wildcard override (e.g. github__*)
+        self.pm.set_session_mode("review")
+        self.assertEqual(self.pm.check_permission("github__create_issue").action, "ask")
+
+        self.pm.set_session_override("github__*", "allow")
+        self.assertEqual(self.pm.check_permission("github__create_issue").action, "allow")
+        self.assertEqual(self.pm.check_permission("github__list_repos").action, "allow")
+        self.assertEqual(self.pm.check_permission("slack__post_message").action, "ask")
+
+        # 2. Config wildcard deny wins over session allow
+        self.pm.set_session_override("danger__run", "allow")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"danger__*": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.assertEqual(self.pm.check_permission("danger__run").action, "deny")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

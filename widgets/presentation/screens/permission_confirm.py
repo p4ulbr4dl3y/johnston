@@ -130,17 +130,26 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         raw_options: list[tuple[str, str]] = []
         raw_options.append(("Allow once", "allow"))
 
+        is_mcp = "__" in self.tool_name
+        server_name = self.tool_name.split("__", 1)[0] if is_mcp else ""
+
         if self.suggested_pattern:
             pat_clean = " ".join(self.suggested_pattern.split())
             raw_options.append((f'Allow pattern "{pat_clean}" [dim]• session[/dim]', f"pattern:{self.suggested_pattern}"))
 
         raw_options.append((f'Always allow "{self.tool_name}" [dim]• session[/dim]', "always_allow"))
 
+        if is_mcp and server_name:
+            raw_options.append((f'Always allow ALL tools from "{server_name}" [dim]• session[/dim]', f"server_allow:{server_name}__*"))
+
         if self.suggested_pattern:
             pat_clean = " ".join(self.suggested_pattern.split())
             raw_options.append((f'Allow pattern "{pat_clean}" [dim]• project[/dim]', f"pattern:{self.suggested_pattern}:project"))
 
         raw_options.append((f'Always allow "{self.tool_name}" [dim]• project[/dim]', "always_allow:project"))
+
+        if is_mcp and server_name:
+            raw_options.append((f'Always allow ALL tools from "{server_name}" [dim]• project[/dim]', f"server_allow:{server_name}__*:project"))
 
         nargs = self.args if isinstance(self.args, dict) else {}
         target_path = nargs.get("path") or ""
@@ -265,6 +274,12 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"{actor} wants to ask a question"
         elif self.tool_name == "shell":
             action_desc = f"{actor} wants to run shell command:"
+        elif "__" in self.tool_name:
+            server_name, tool_subname = self.tool_name.split("__", 1)
+            if self.args:
+                action_desc = f"{actor} wants to call `{tool_subname}` from MCP server `{server_name}` with parameters:"
+            else:
+                action_desc = f"{actor} wants to call `{tool_subname}` from MCP server `{server_name}`"
         else:
             if self.args:
                 action_desc = f"{actor} wants to execute `{self.tool_name}` with parameters:"
@@ -272,8 +287,9 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"{actor} wants to execute `{self.tool_name}`"
 
         self._action_desc = action_desc
+        header_title = f"Confirm MCP Action: {self.tool_name.split('__', 1)[0]}" if "__" in self.tool_name else "Confirm Tool Action"
         with Vertical(id="modal-dialog", classes="bash-confirm-dialog"):
-            yield ModalHeader("Confirm Tool Action", esc_hint="")
+            yield ModalHeader(header_title, esc_hint="")
             yield Markdown(action_desc, classes="modal-markdown")
 
             if self.tool_name == "create":
@@ -354,7 +370,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             options = self._options
 
         hint = self._build_hint_text()
-        title = "Confirm Tool Action"
+        title = f"Confirm MCP Action: {self.tool_name.split('__', 1)[0]}" if "__" in self.tool_name else "Confirm Tool Action"
         base_width = modal_content_width(
             options=options, title=title, hint=hint, extra=MODAL_CONTENT_GUTTER
         )
@@ -524,6 +540,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             elif key == "always_allow":
                 self.dismiss("always_allow")
             elif key.startswith("always_allow:"):
+                self.dismiss(key)
+            elif key.startswith("server_allow:"):
                 self.dismiss(key)
             elif key.startswith("add_root:"):
                 self.dismiss(key)

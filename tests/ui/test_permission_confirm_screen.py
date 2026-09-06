@@ -405,7 +405,20 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         screen.action_approve()
         self.assertEqual(dismissed[-1], "deny:custom reason")
 
+    def test_mcp_tool_options_and_server_allow(self):
+        screen = PermissionConfirmScreen("github__create_issue", {"title": "bug"})
+        self.assertIn("server_allow:github__*", screen._option_keys)
+        self.assertIn("server_allow:github__*:project", screen._option_keys)
+
+        dismissed = []
+        screen.dismiss = lambda val: dismissed.append(val)
+
+        server_allow_idx = screen._option_keys.index("server_allow:github__*")
+        screen._select_option_by_index(server_allow_idx)
+        self.assertEqual(dismissed[-1], "server_allow:github__*")
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

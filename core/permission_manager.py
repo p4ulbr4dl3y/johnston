@@ -1,3 +1,4 @@
+import fnmatch
 import os
 from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
@@ -276,6 +277,14 @@ class PermissionManager:
 
         # 1. Config DENY patterns: an explicit admin-configured DENY pattern
         # must never be bypassed by session tool/pattern overrides or tool settings.
+        tools_cfg = effective_perms.get("tools", {})
+        for pat, act in tools_cfg.items():
+            if ("__" in pat and ("*" in pat or "?" in pat)) and act == "deny" and fnmatch.fnmatch(canonical_name, pat):
+                return PermissionDecision(
+                    PermissionAction.DENY,
+                    f"Configured tool deny pattern '{pat}' matched '{canonical_name}'",
+                )
+
         config_patterns = effective_perms.get("patterns", {}).get(canonical_name, [])
         config_decision = evaluate_pattern_rules(canonical_name, args, config_patterns)
         if (
@@ -304,6 +313,11 @@ class PermissionManager:
 
         # 3. Runtime session tool override
         session_action = self.session_overrides.get(canonical_name)
+        if session_action is None:
+            for pat, act in self.session_overrides.items():
+                if ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat):
+                    session_action = act
+                    break
         if session_action is not None:
             return PermissionDecision(
                 PermissionAction(session_action),
@@ -322,7 +336,12 @@ class PermissionManager:
             return config_decision
 
         # 6. Explicit tool permission from user's config file (normalized during merge)
-        explicit_action = effective_perms.get("tools", {}).get(canonical_name)
+        explicit_action = tools_cfg.get(canonical_name)
+        if explicit_action is None:
+            for pat, act in tools_cfg.items():
+                if ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat):
+                    explicit_action = act
+                    break
         if explicit_action is not None:
             return PermissionDecision(
                 PermissionAction(explicit_action),
