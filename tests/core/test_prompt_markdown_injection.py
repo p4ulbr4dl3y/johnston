@@ -114,7 +114,8 @@ class SubagentsMarkdownInjectionTests(unittest.TestCase):
         self.assertIn("self-contained:", out)
         self.assertIn("parallel vs serial:", out)
         self.assertIn("permissions:", out)
-        self.assertIn("inspect diff, run tests, and run `git merge", out)
+        self.assertIn("git branch -d", out)
+        self.assertIn("git branch -D", out)
         self.assertIn("≤5 parallel", out)
 
 

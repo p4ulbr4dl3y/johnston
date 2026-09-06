@@ -160,7 +160,7 @@ def format_subagents_markdown(roles: List[Any], max_concurrent: int = 5) -> str:
         "- parallel vs serial: run parallel ONLY for disjoint files or read-only tasks. If tasks touch same files or have data dependencies (A output -> B input) → run strictly serial to prevent git conflicts.\n"
         "- permissions: ask user before spawn IF: task is ambiguous, touches DB/infra migrations, or spawns ≥3 heavy workers. Routine/read-only tasks run without asking.\n"
         "- isolation: write roles (e.g. worker) auto-isolate in a git worktree on an auto-generated branch. Read-only roles (e.g. explorer) run in the main workspace.\n"
-        "- merge: on subagent completion, notification provides branch name in `branch=\"...\"` attribute; parent MUST inspect diff, run tests, and run `git merge <branch>`.\n"
+        "- merge: on subagent completion with branch=\"...\": inspect diff and run tests. If accepted → 'git merge <branch>' and delete branch ('git branch -d <branch>'). If rejected/failed → clean up branch ('git branch -D <branch>').\n"
         "- follow-up: use `manage_subagent(action=\"send_message\", session_id=...)` for refinements, fixes on partial/blocked tasks, or next steps in same scope (restores worktree + history). Spawn NEW subagent for independent tasks or different roles.\n"
         "- reactive: execution automatically pauses and resumes with <notification> when subagents finish. The notification is authoritative — NEVER call `manage_subagent(action=\"list\")` to wait or verify; stop calling tools to wait.\n"
         "- limits: subagents cannot call `invoke_subagent`/`manage_subagent`/`manage_shell`/`ask_user`, cannot run background processes, cannot ask the user. Decisions needing the user go in the subagent's report.\n"
