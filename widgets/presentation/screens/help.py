@@ -27,6 +27,7 @@ COMMANDS_DATA: list[tuple[str, str]] = [
     ("/shell", "View and manage background shell tasks"),
     ("/skills", "Browse and activate available skills"),
     ("/mcp", "Manage MCP servers & tools"),
+    ("/workspace", "Manage allowed workspace roots"),
     ("/questions", "Resume pending user questions wizard"),
     ("/rewind", "Rollback chat history to a selected message"),
     ("/fork", "Fork session from a selected message"),

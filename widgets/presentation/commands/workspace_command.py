@@ -35,6 +35,12 @@ class WorkspaceCommand(BaseCommand):
         if raw_args and raw_args[0] in ("/workspace", "/ws"):
             raw_args = raw_args[1:]
 
+        if not raw_args and hasattr(app, "push_screen"):
+            from widgets.presentation.screens.workspace import WorkspaceScreen
+
+            app.push_screen(WorkspaceScreen())
+            return
+
         subcmd = raw_args[0].lower() if raw_args else "list"
 
         if subcmd in ("list", ""):
