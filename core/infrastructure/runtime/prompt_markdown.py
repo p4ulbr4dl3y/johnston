@@ -154,7 +154,7 @@ def format_subagents_markdown(roles: List[Any], max_concurrent: int = 5) -> str:
         "Delegate bounded tasks via `invoke_subagent` (background; auto-notify on completion).\n"
         "Rules:\n"
         "- threshold: do atomic/routine tasks directly (<3 steps). Delegate to subagents ONLY when work is: parallelizable, requires isolation, or large (≥3-5 steps).\n"
-        "- self-contained: subagent has ZERO main chat history. `prompt` MUST be self-contained with relative paths, acceptance criteria, and expected output format.\n"
+        "- self-contained: subagent has ZERO main chat history. `prompt` MUST be self-contained with relative paths (NEVER absolute paths), acceptance criteria, and expected output format.\n"
         "- title: noun phrase in English, 3-5 words (e.g. 'Auth token refactor'), not verbs.\n"
         f"- concurrency: ≤{max_concurrent} parallel. Hit limit → wait for completion notifications before spawning more; NEVER poll list.\n"
         "- parallel vs serial: run parallel ONLY for disjoint files or read-only tasks. If tasks touch same files or have data dependencies (A output -> B input) → run strictly serial to prevent git conflicts.\n"
