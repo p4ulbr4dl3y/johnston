@@ -5,6 +5,8 @@ from tools.read.archive import (
     _format_entry_size,
     _inspect_archive,
     is_archive_file,
+    read_archive_member,
+    split_archive_path,
 )
 from tools.read.cache import (
     _DOC_CACHE,
@@ -29,6 +31,8 @@ __all__ = [
     "convert_doc_to_markdown_sync",
     "process_image_file_sync",
     "is_archive_file",
+    "split_archive_path",
+    "read_archive_member",
     "ARCHIVE_EXTENSIONS",
     "ZIP_EXTENSIONS",
     "TAR_EXTENSIONS",

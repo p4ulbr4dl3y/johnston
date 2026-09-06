@@ -132,8 +132,12 @@ class ReadTool(BaseTool):
         start_line_int = try_int(start_line)
         end_line_int = try_int(end_line)
 
-        def _inspect_path() -> ToolResult | tuple[str, str | None]:
+        def _inspect_path() -> ToolResult | tuple[str, Any]:
             if not os.path.exists(path):
+                archive_split = read_pkg.split_archive_path(path)
+                if archive_split:
+                    return ("archive_member", archive_split)
+
                 parent_dir = os.path.dirname(path) or "."
                 hint = ""
                 if os.path.exists(parent_dir) and os.path.isdir(parent_dir):
@@ -171,6 +175,30 @@ class ReadTool(BaseTool):
         probe_res = await run_cancellable(_inspect_path)
         if isinstance(probe_res, ToolResult):
             return probe_res
+        if probe_res[0] == "archive_member":
+            archive_path, inner_path = probe_res[1]
+            tools_cfg = read_pkg._tools_settings()
+            max_dir_entries = tools_cfg.max_dir_entries if tools_cfg else 60
+            member_res = await run_cancellable(
+                read_pkg.read_archive_member,
+                archive_path,
+                inner_path,
+                max_entries=max_dir_entries,
+                start_line=start_line_int,
+                end_line=end_line_int,
+            )
+            if isinstance(member_res, ToolResult):
+                return member_res
+            lines, total_lines = member_res
+            return format_line_pagination(
+                lines,
+                start_line=start_line,
+                end_line=end_line,
+                total_lines=total_lines,
+                window_start=1,
+                max_chars=100000,
+                path=path,
+            )
         _, ext = probe_res
 
         # Handle image files

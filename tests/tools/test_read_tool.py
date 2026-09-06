@@ -493,6 +493,50 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("testpkg/__init__.py", res.content)
         self.assertIn("testpkg-1.0.0.dist-info/METADATA", res.content)
 
+    async def test_read_inner_file_from_zip(self):
+        import zipfile
+        tool = ReadTool()
+        zip_path = os.path.join(self.test_dir, "nested.zip")
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.writestr("sub/hello.py", "line 1\nline 2\nline 3\n")
+
+        # Slash syntax
+        res = await tool.execute({"path": f"{zip_path}/sub/hello.py", "start_line": 2, "end_line": 3})
+        self.assertEqual(res.status, ToolResultStatus.DONE)
+        self.assertIn("2|line 2", res.content)
+        self.assertIn("3|line 3", res.content)
+        self.assertNotIn("1|line 1", res.content)
+
+        # Colon syntax
+        res_colon = await tool.execute({"path": f"{zip_path}:sub/hello.py"})
+        self.assertEqual(res_colon.status, ToolResultStatus.DONE)
+        self.assertIn("1|line 1", res_colon.content)
+
+        # Not found
+        res_missing = await tool.execute({"path": f"{zip_path}/sub/missing.py"})
+        self.assertEqual(res_missing.status, ToolResultStatus.ERROR)
+
+        # Inner folder listing
+        res_dir = await tool.execute({"path": f"{zip_path}/sub"})
+        self.assertEqual(res_dir.status, ToolResultStatus.DONE)
+        self.assertIn("[archive", res_dir.content)
+        self.assertIn("hello.py", res_dir.content)
+
+    async def test_read_inner_file_from_tar(self):
+        import io
+        import tarfile
+        tool = ReadTool()
+        tar_path = os.path.join(self.test_dir, "nested.tar.gz")
+        with tarfile.open(tar_path, "w:gz") as tf:
+            content = b"print('tar content')\n"
+            ti = tarfile.TarInfo("src/app.py")
+            ti.size = len(content)
+            tf.addfile(ti, io.BytesIO(content))
+
+        res = await tool.execute({"path": f"{tar_path}/src/app.py"})
+        self.assertEqual(res.status, ToolResultStatus.DONE)
+        self.assertIn("1|print('tar content')", res.content)
+
 
 if __name__ == "__main__":
     unittest.main()
