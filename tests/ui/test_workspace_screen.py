@@ -196,3 +196,36 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         mock_app.push_screen.assert_called_once()
         called_screen = mock_app.push_screen.call_args[0][0]
         self.assertIsInstance(called_screen, WorkspaceScreen)
+
+    async def test_workspace_screen_drag_and_drop(self):
+        from textual.events import Paste
+
+        extra = os.path.realpath(tempfile.mkdtemp())
+        try:
+            screen = WorkspaceScreen(pm=self.pm)
+            app = _HostApp(screen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                # Simulate dropping folder path (drag-and-drop from file manager)
+                screen.on_paste(Paste(f"file://{extra}"))
+                await pilot.pause()
+                self.assertIn(extra, self.pm.get_workspace_roots())
+                self.assertTrue(any(f"Added `{extra}`" in n for n in app.notifications))
+        finally:
+            os.rmdir(extra)
+
+    async def test_add_workspace_root_screen_on_paste(self):
+        from textual.events import Paste
+
+        extra = os.path.realpath(tempfile.mkdtemp())
+        try:
+            screen = AddWorkspaceRootScreen()
+            app = _HostApp(screen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                screen.on_paste(Paste(f"'{extra}'"))
+                await pilot.pause()
+                inp = screen.query_one("#workspace-add-input", Input)
+                self.assertEqual(inp.value, extra)
+        finally:
+            os.rmdir(extra)

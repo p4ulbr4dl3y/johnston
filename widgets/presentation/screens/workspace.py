@@ -20,6 +20,7 @@ from widgets.presentation.screens.constants import (
     MODAL_DIALOG_ID,
     MODAL_HINT_ID,
 )
+from widgets.presentation.widgets.chat_input_paste import decode_pasted_path
 from widgets.presentation.widgets.modal_header import ModalHeader
 from widgets.presentation.widgets.modal_hint import ModalHint
 from widgets.utils.key_aliases import expand_bindings
@@ -96,6 +97,16 @@ class AddWorkspaceRootScreen(BaseModalScreen[tuple[str, str] | None]):
     def on_resize(self, event: events.Resize) -> None:
         self._apply_dialog_fit()
 
+    def on_paste(self, event: events.Paste) -> None:
+        clean = decode_pasted_path(event.text)
+        try:
+            inp = self.query_one("#workspace-add-input", Input)
+            inp.insert_text_at_cursor(clean)
+            event.stop()
+            event.prevent_default()
+        except Exception:
+            pass
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         val = event.value.strip()
         if not val:
@@ -122,10 +133,11 @@ class AddWorkspaceRootScreen(BaseModalScreen[tuple[str, str] | None]):
             return
 
         raw_path = " ".join(path_tokens)
-        abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(raw_path)))
+        clean_path = decode_pasted_path(raw_path)
+        abs_path = os.path.realpath(os.path.abspath(clean_path))
         if not os.path.isdir(abs_path):
             if self.app and hasattr(self.app, "notify"):
-                self.app.notify(f"Directory '{raw_path}' does not exist", severity="error")
+                self.app.notify(f"Directory '{clean_path}' does not exist", severity="error")
             return
 
         self.dismiss((abs_path, scope))
@@ -155,7 +167,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
             yield ModalHeader("Workspace Roots", esc_hint="")
             yield HeaderWrapOptionList(id="workspace-option-list")
-            yield ModalHint("a Add • esc Close", id=MODAL_HINT_ID)
+            yield ModalHint("drop folder • a Add • esc Close", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:
@@ -248,16 +260,45 @@ class WorkspaceScreen(BaseModalScreen[None]):
         if idx is not None and 0 <= idx < len(self._option_actions):
             action_type, data = self._option_actions[idx]
             if action_type == "add":
-                hint_widget.update("enter Add • esc Close")
+                hint_widget.update("enter Add • drop folder • esc Close")
                 return
             if action_type == "root" and data:
                 if data.get("scope") == "primary":
-                    hint_widget.update("a Add • esc Close")
+                    hint_widget.update("drop folder • a Add • esc Close")
                     return
                 hint_widget.update("d Delete • a Add • esc Close")
                 return
 
-        hint_widget.update("a Add • esc Close")
+        hint_widget.update("drop folder • a Add • esc Close")
+
+    def on_paste(self, event: events.Paste) -> None:
+        raw = event.text.strip()
+        if not raw:
+            return
+
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        added_any = False
+        for line in lines:
+            clean_path = decode_pasted_path(line)
+            abs_path = os.path.realpath(os.path.abspath(clean_path))
+            if os.path.isdir(abs_path):
+                event.stop()
+                event.prevent_default()
+                used_scope = self.pm.save_workspace_root(abs_path, scope="auto")
+                scope_desc = {
+                    "session": "session only",
+                    "local": "local config",
+                    "project": "project config",
+                }.get(used_scope, used_scope)
+                if self.app and hasattr(self.app, "notify"):
+                    self.app.notify(f"Added `{abs_path}` ({scope_desc})", severity="information")
+                added_any = True
+            elif len(lines) == 1:
+                if self.app and hasattr(self.app, "notify"):
+                    self.app.notify(f"Path '{clean_path}' is not a directory", severity="warning")
+
+        if added_any:
+            self.refresh_list()
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
         self._update_hint(event.option_index)
