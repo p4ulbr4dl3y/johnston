@@ -1,12 +1,39 @@
+"""PromptBuilder — composite system prompt and tool definitions for MCP, Skills and agent role.
+
+Concern split (see the sibling modules):
+
+- ``git_info``: git branch detection + per-directory TTL cache.
+- ``project_rules``: project instruction files (AGENTS.md, .cursor/rules, ...) and
+  rules-snippet assembly with mtime-based cache invalidation.
+
+This module keeps the ``PromptBuilder`` class and re-exports the moved public
+API so every import site (``core.base_provider.tools``, widgets, tests) works
+unchanged.
+"""
+
 import asyncio
 import datetime
 import os
 import platform
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
+from core.application.generation.git_info import (
+    _GIT_INFO_CACHE,  # noqa: F401  (re-exported for tests/monkeypatch targets)
+    _GIT_INFO_CACHE_TTL,  # noqa: F401  (re-exported for tests/monkeypatch targets)
+    _compute_git_info,  # noqa: F401  (re-exported for tests/monkeypatch targets)
+    get_git_info,
+    get_git_info_async,
+)
+from core.application.generation.project_rules import (
+    _PROJECT_INSTR_CACHE_MAX,  # noqa: F401  (re-exported for tests)
+    _PROJECT_INSTRUCTION_CACHE,  # noqa: F401  (re-exported for tests)
+    INSTRUCTION_FILES,
+    get_project_instruction_rules,  # noqa: F401  (re-exported public API)
+    get_project_instructions_snippet,  # noqa: F401  (re-exported public API)
+    get_rules_snippet,
+    get_rules_snippet_async,
+)
 from core.application.skills.manager import get_skill_manager
-from core.domain.defaults.config import DEFAULT_AGENT_MD_MAX_CHARS
 from core.domain.defaults.prompts import (
     CODEBASE_NAVIGATION_SNIPPET,
     DEFAULT_SYSTEM_PROMPT,
@@ -17,17 +44,6 @@ from core.domain.defaults.prompts import (
 from core.infrastructure.runtime.lru import LruCache
 from core.infrastructure.runtime.xml_utils import escape_xml
 
-INSTRUCTION_FILES = [
-    "AGENTS.md",
-    "AGENT.md",
-    "CLAUDE.md",
-    ".cursorrules",
-    ".windsurfrules",
-    ".clinerules",
-    "CONVENTIONS.md",
-    os.path.join(".github", "copilot-instructions.md"),
-]
-
 __all__ = [
     "DEFAULT_SYSTEM_PROMPT",
     "SUBAGENT_DEFAULT_SYSTEM_PROMPT",
@@ -36,16 +52,8 @@ __all__ = [
     "INSTRUCTION_FILES",
 ]
 
-_GIT_INFO_CACHE: Dict[str, Tuple[float, str]] = {}
-_GIT_INFO_CACHE_TTL = 30.0
-
-_PROJECT_INSTR_CACHE_MAX = 64
 _STABLE_CORE_CACHE_MAX = 256
 _TOOLS_CACHE_MAX = 32
-
-# (realpath cwd) -> (mtime/size signature, rules). Invalidates when any
-# instruction file appears/disappears or its mtime changes.
-_PROJECT_INSTRUCTION_CACHE: "LruCache[str, Tuple[tuple, List[Any]]]" = LruCache(_PROJECT_INSTR_CACHE_MAX)
 
 # Semantic cache for the stable (non-volatile) prefix of the system prompt.
 # Keyed by the assembled stable parts so it only rebuilds when roles / rules /
@@ -59,189 +67,6 @@ _STABLE_CORE_CACHE: "LruCache[tuple, str]" = LruCache(_STABLE_CORE_CACHE_MAX)
 # Pre-sorted tool schema cache keyed by a content identity (tool object ids +
 # role flags). build_tools deepcopy+sorts only on cache miss.
 _TOOLS_CACHE: "LruCache[tuple, List[Dict[str, Any]]]" = LruCache(_TOOLS_CACHE_MAX)
-
-
-def _cached_git_info(cwd: Optional[str] = None) -> Optional[str]:
-    """Return the cached git-info string for a directory, or None when stale/absent."""
-    key = os.path.realpath(cwd) if cwd else os.path.realpath(os.getcwd())
-    cached = _GIT_INFO_CACHE.get(key)
-    if cached is not None and time.time() - cached[0] < _GIT_INFO_CACHE_TTL:
-        return cached[1]
-    return None
-
-
-def _cache_git_info(cwd: Optional[str] = None, value: str = "") -> str:
-    _GIT_INFO_CACHE[os.path.realpath(cwd) if cwd else os.path.realpath(os.getcwd())] = (time.time(), value)
-    return value
-
-
-def get_git_info(cwd: str = None) -> str:
-    """Returns current git branch for a working directory (defaults to os.getcwd()).
-
-    Cached briefly per-directory so the multi-step agent loop does not spawn two
-    git subprocesses on every tool-call step, and subagents report their own
-    worktree branch instead of the parent checkout's.
-    """
-    key = os.path.realpath(cwd) if cwd else os.path.realpath(os.getcwd())
-    cached = _cached_git_info(key)
-    if cached is not None:
-        return cached
-
-    last_known = _GIT_INFO_CACHE.get(key, (0, ""))[1]
-
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    if loop and loop.is_running():
-        try:
-            loop.create_task(get_git_info_async(cwd=cwd))
-        except Exception:
-            pass
-        return last_known
-    return _cache_git_info(key, _compute_git_info(cwd))
-
-
-async def get_git_info_async(cwd: str = None) -> str:
-    key = os.path.realpath(cwd) if cwd else os.path.realpath(os.getcwd())
-    cached = _cached_git_info(key)
-    if cached is not None:
-        return cached
-    return _cache_git_info(key, await asyncio.to_thread(_compute_git_info, cwd))
-
-
-def _compute_git_info(cwd: str = None) -> str:
-    from core.infrastructure.runtime.git_utils import format_git_branch_info
-
-    return format_git_branch_info(cwd=cwd)
-
-
-def _scan_cursor_rules_files(cwd: str) -> List[Tuple[str, str]]:
-    """Scan .cursor/rules directory for .md and .mdc files; returns [(rel_path, abs_path), ...]"""
-    cursor_dir = os.path.join(cwd, ".cursor", "rules")
-    if not os.path.isdir(cursor_dir):
-        return []
-    rules = []
-    try:
-        for fname in sorted(os.listdir(cursor_dir)):
-            if fname.endswith((".md", ".mdc")) and not fname.startswith("."):
-                fpath = os.path.join(cursor_dir, fname)
-                if os.path.isfile(fpath):
-                    rules.append((os.path.join(".cursor", "rules", fname), fpath))
-    except Exception:
-        pass
-    return rules
-
-
-def _project_instr_signature(cwd: str) -> tuple:
-    """Cheap (name, mtime_ns, size) signature for every instruction file present.
-
-    Detects additions, removals and edits without re-reading file contents.
-    """
-    entries = []
-    for name in INSTRUCTION_FILES:
-        fpath = os.path.join(cwd, name)
-        try:
-            st = os.stat(fpath)
-            entries.append((name, st.st_mtime_ns, st.st_size))
-        except OSError:
-            positions = {e[0] for e in entries}
-            if name not in positions:
-                entries.append((name, 0, 0))
-
-    for rel_name, fpath in _scan_cursor_rules_files(cwd):
-        try:
-            st = os.stat(fpath)
-            entries.append((rel_name, st.st_mtime_ns, st.st_size))
-        except OSError:
-            pass
-
-    return tuple(entries)
-
-
-def get_project_instruction_rules(cwd: str = None) -> List[Any]:
-    """Reads INSTRUCTION_FILES and .cursor/rules from a working directory as RuleDefinitions.
-
-    Cached per-directory by an mtime/size signature; files are only re-read
-    when they change, so the agent loop does not re-open disk files every turn.
-    """
-    cwd = os.path.realpath(cwd) if cwd else os.getcwd()
-    sig = _project_instr_signature(cwd)
-    cached = _PROJECT_INSTRUCTION_CACHE.get(cwd)
-    if cached is not None and cached[0] == sig:
-        return cached[1]
-
-    from core.application.rules.rules import RuleDefinition
-    from core.infrastructure.runtime.frontmatter import parse_frontmatter
-
-    try:
-        from core.infrastructure.config.settings import get_settings
-
-        max_chars = get_settings().llm.agent_md_max_chars
-    except Exception:
-        max_chars = DEFAULT_AGENT_MD_MAX_CHARS
-
-    found_rules = []
-    for name in INSTRUCTION_FILES:
-        filepath = os.path.join(cwd, name)
-        if os.path.isfile(filepath):
-            try:
-                with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                    raw = f.read().strip()
-                if raw:
-                    _, content = parse_frontmatter(raw)
-                    content = content.strip()
-                    if content:
-                        if len(content) > max_chars:
-                            content = content[:max_chars] + f"\n... [Project instructions truncated at {max_chars} chars]"
-                        found_rules.append(RuleDefinition(name=name, content=content, source="project"))
-            except Exception:
-                pass
-
-    for rel_name, filepath in _scan_cursor_rules_files(cwd):
-        try:
-            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                raw = f.read().strip()
-            if raw:
-                _, content = parse_frontmatter(raw)
-                content = content.strip()
-                if content:
-                    if len(content) > max_chars:
-                        content = content[:max_chars] + f"\n... [Project instructions truncated at {max_chars} chars]"
-                    found_rules.append(RuleDefinition(name=rel_name, content=content, source="project"))
-        except Exception:
-            pass
-
-    _PROJECT_INSTRUCTION_CACHE.put(cwd, (sig, found_rules))
-    return found_rules
-
-
-def get_project_instructions_snippet(cwd: str = None) -> str:
-    """Reads INSTRUCTION_FILES from a working directory and formats as rules block."""
-    from core.infrastructure.runtime.prompt_markdown import format_rules_markdown
-
-    rules = get_project_instruction_rules(cwd)
-    return format_rules_markdown(rules)
-
-
-def get_rules_snippet(role: str = "worker", cwd: str = None) -> str:
-    """Reads rules from ~/.johnston/rules and <cwd>/.johnston/rules and project instruction files.
-
-    cwd selects the project directory so a subagent working in an isolated
-    worktree sees its own rules and instructions instead of the parent checkout's.
-    """
-    from core.application.rules.rules import RulesManager
-    from core.infrastructure.runtime.prompt_markdown import format_rules_markdown
-
-    rules = list(RulesManager.get_instance().get_active_rules(project_dir=cwd))
-    instructions = get_project_instruction_rules(cwd)
-    return format_rules_markdown(rules + instructions)
-
-
-async def get_rules_snippet_async(role: str = "worker", cwd: str = None) -> str:
-    """Async variant of ``get_rules_snippet``: reads rules on a thread."""
-    return await asyncio.to_thread(get_rules_snippet, role, cwd)
 
 
 def _role_ident(obj: Any) -> Optional[tuple]:
