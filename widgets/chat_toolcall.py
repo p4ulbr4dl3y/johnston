@@ -1,10 +1,8 @@
 """Chat tool call widget and presentation components."""
 from __future__ import annotations
 
-import asyncio
 import json
 import re
-from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
@@ -14,17 +12,16 @@ from core.infrastructure.config.settings import get_settings
 from core.infrastructure.tasks.output import strip_ansi
 from widgets.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 from widgets.presentation.tool_mixins import FormattingMixin, ParsingMixin
-from widgets.presentation.tool_renderers import compute_tool_call_content, format_truncation_for_ui
-from widgets.presentation.toolcall_header import build_toolcall_header
+from widgets.presentation.tool_renderers import format_truncation_for_ui
+from widgets.presentation.toolcall_actions import ToolCallActionsMixin
+from widgets.presentation.toolcall_content import ToolCallContentMixin
+from widgets.presentation.toolcall_hints import ToolCallHintsMixin
 from widgets.presentation.toolcall_shell import (
+    ToolCallShellMixin,
     bash_ends_with_spinner,
     bash_safe_boundary,
-    compose_bash_result,
 )
-from widgets.presentation.widgets.chat_markdown import (
-    TransparentSyntax,
-    safe_update_markdown,
-)
+from widgets.presentation.widgets.chat_markdown import TransparentSyntax
 
 DISPLAY_NAMES: dict[str, str] = {
     "read": "Read",
@@ -45,16 +42,6 @@ SYSTEM_TOOLS: frozenset[str] = frozenset(DISPLAY_NAMES.keys())
 _bash_safe_boundary = bash_safe_boundary
 _bash_ends_with_spinner = bash_ends_with_spinner
 
-__all__ = [
-    "ToolCallWidget",
-    "ToolScrollBox",
-    "DISPLAY_NAMES",
-    "SYSTEM_TOOLS",
-    "_bash_safe_boundary",
-    "_bash_ends_with_spinner",
-    "format_truncation_for_ui",
-]
-
 
 class ToolScrollBox(Vertical):
     """Horizontal scroll box for tool code/diff view."""
@@ -62,7 +49,15 @@ class ToolScrollBox(Vertical):
     pass
 
 
-class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
+class ToolCallWidget(
+    ToolCallContentMixin,
+    ToolCallActionsMixin,
+    ToolCallHintsMixin,
+    ToolCallShellMixin,
+    FormattingMixin,
+    ParsingMixin,
+    Vertical,
+):
     """Tool call widget (Create, Read, Edit, Shell) with expansion support."""
 
     can_focus = False
@@ -78,8 +73,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
 
     DISPLAY_NAMES = DISPLAY_NAMES
     SYSTEM_TOOLS = SYSTEM_TOOLS
-    HINT_DEBOUNCE_SECONDS: float = 0.25
-    _RAW_BASH_TRUNC = "[…[truncated]]\n"
 
     @property
     def _RAW_BASH_LIMIT(self) -> int:
@@ -121,9 +114,9 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         self.tool_call_id: str | None = None
         self.tool_call_index: int | None = None
         self._shell_update_scheduled = False
-        self._shell_update_handle: asyncio.TimerHandle | None = None
+        self._shell_update_handle = None
         self._show_hints = False
-        self._hint_handle: asyncio.TimerHandle | None = None
+        self._hint_handle = None
         # Incremental shell-stream flush state (see _flush_shell_update).
         self._bash_processed_len = 0
         self._bash_needs_resync = False
@@ -173,71 +166,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             return True
         return self.tool_type in self.EXPANDABLE_TOOLS
 
-    def has_subagent_session(self) -> bool:
-        """Check whether this toolcall is associated with an existing subagent session."""
-        if getattr(self, "subagent_session_id", None):
-            return True
-        args = self.args if isinstance(self.args, dict) else {}
-        session_id = args.get("session_id")
-        if not session_id and self.result_text:
-            m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", self.result_text, re.IGNORECASE)
-            if m:
-                session_id = m.group(1)
-        if session_id:
-            self.subagent_session_id = str(session_id)
-            return True
-
-        if self.canonical_tool in ("invoke_subagent", "manage_subagent"):
-            title = args.get("title") or args.get("prompt")
-            if title:
-                app = None
-                try:
-                    app = self.app
-                except Exception:
-                    pass
-                store = getattr(app, "sm", None) if app else None
-                if store is None:
-                    try:
-                        from core.infrastructure.storage.session_store import SessionStore
-
-                        store = SessionStore.get_instance()
-                    except Exception:
-                        store = None
-                if store is not None and hasattr(store, "find_session_by_title_or_id"):
-                    try:
-                        curr_sid = getattr(app, "current_session_id", None) if app else None
-                        sess = store.find_session_by_title_or_id(str(title), parent_id=curr_sid)
-                        if not sess:
-                            sess = store.find_session_by_title_or_id(str(title))
-                        if sess is not None and getattr(sess, "id", None) and (
-                            isinstance(sess.id, str) or type(sess).__name__ == "MagicMock"
-                        ):
-                            if isinstance(sess.id, str):
-                                self.subagent_session_id = sess.id
-                            return True
-                    except Exception:
-                        pass
-        return False
-
-    def is_clickable_header(self) -> bool:
-        if self.status == "generating":
-            return False
-        if self.canonical_tool in ("invoke_subagent", "manage_subagent"):
-            if self.has_subagent_session():
-                return True
-            if self.status in ("error", "cancelled"):
-                return False
-            return self.canonical_tool == "invoke_subagent"
-
-        if self.status in ("error", "cancelled"):
-            return (
-                self.canonical_tool == "shell" and bool((self.result_text or "").strip())
-            )
-        return (
-            self.is_expandable()
-            or self.canonical_tool in ("invoke_subagent", "ask_user")
-        )
-
     def _clean_hints_for_ui(self, text: str) -> str:
         return format_truncation_for_ui(text)
 
@@ -248,17 +176,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
         if "\x1b" in clean:
             clean = strip_ansi(clean)
         return clean
-
-    def _is_parent_at_bottom(self) -> bool:
-        try:
-            from textual.containers import VerticalScroll
-
-            parent = getattr(self, "parent", None)
-            if isinstance(parent, VerticalScroll):
-                return getattr(parent, "is_at_bottom", lambda: True)()
-        except Exception:
-            pass
-        return True
 
     def compose(self) -> ComposeResult:
         yield self.header_label
@@ -288,125 +205,19 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                     self._cancel_hint_timer()
                     parent.activate_hint(self)
 
-    def set_show_hints(self, show: bool) -> None:
-        if getattr(self, "_show_hints", False) == show:
-            return
-        self._show_hints = show
-        self.render_header()
-
-    def _schedule_hint_timer(self) -> None:
-        self._cancel_hint_timer()
-        if not self.is_expandable():
-            self._show_hints = False
-            return
-        parent = getattr(self, "parent", None)
-        if parent is not None and getattr(parent, "_has_active_hints", False):
-            if hasattr(parent, "activate_hint"):
-                parent.activate_hint(self)
-                return
-        self._show_hints = False
-        try:
-            loop = asyncio.get_running_loop()
-            self._hint_handle = loop.call_later(self.HINT_DEBOUNCE_SECONDS, self._on_hint_timer)
-        except RuntimeError:
-            self._show_hints = True
-
-    def _on_hint_timer(self) -> None:
-        self._hint_handle = None
-        if self.status == "running" and self.is_expandable():
-            parent = getattr(self, "parent", None)
-            if parent is not None and hasattr(parent, "activate_hint"):
-                parent.activate_hint(self)
-            else:
-                self._show_hints = True
-                self.render_header()
-
-    def _cancel_hint_timer(self) -> None:
-        if getattr(self, "_hint_handle", None) is not None:
-            try:
-                self._hint_handle.cancel()
-            except Exception:
-                pass
-            self._hint_handle = None
-
     def on_unmount(self) -> None:
         self._cancel_hint_timer()
         parent = getattr(self, "parent", None)
         if parent is not None and getattr(parent, "_active_hint_widget", None) is self:
             if hasattr(parent, "clear_active_hints"):
                 parent.clear_active_hints(immediate=True)
-        if getattr(self, "_shell_update_handle", None) is not None:
-            try:
-                self._shell_update_handle.cancel()
-            except Exception:
-                pass
-            self._shell_update_handle = None
-        self._shell_update_scheduled = False
+        self._cancel_shell_update()
         if getattr(self, "_render_gate", None) is not None:
             try:
                 self._render_gate.cancel()
             except Exception:
                 pass
             self._render_gate = None
-
-    def _update_next_sibling_spacing(self) -> None:
-        if not self.parent:
-            return
-        raw = getattr(self.parent, "children", None)
-        if raw is None or not hasattr(raw, "__iter__") or type(raw).__name__ == "MagicMock":
-            return
-        children = list(raw)
-        try:
-            idx = children.index(self)
-        except ValueError:
-            return
-        for child in children[idx + 1 :]:
-            if getattr(child, "_pruning", False):
-                continue
-            from widgets.presentation.widgets.chat_messages import BotMessage
-
-            if isinstance(child, BotMessage):
-                c_str = child.raw_text if hasattr(child, "raw_text") else getattr(child, "content", "")
-                if not (c_str or "").strip():
-                    continue
-            if isinstance(child, ToolCallWidget):
-                child.is_sequential = True
-                if self.is_expanded:
-                    child.remove_class("tool-sequential")
-                else:
-                    child.add_class("tool-sequential")
-            break
-
-    def _sync_sequential_with_prev(self) -> None:
-        if not self.parent:
-            return
-        raw = getattr(self.parent, "children", None)
-        if raw is None or not hasattr(raw, "__iter__") or type(raw).__name__ == "MagicMock":
-            return
-        children = list(raw)
-        try:
-            idx = children.index(self)
-        except ValueError:
-            return
-        for child in reversed(children[:idx]):
-            if getattr(child, "_pruning", False):
-                continue
-            from widgets.presentation.widgets.chat_messages import BotMessage
-
-            if isinstance(child, BotMessage):
-                c_str = child.raw_text if hasattr(child, "raw_text") else getattr(child, "content", "")
-                if not (c_str or "").strip():
-                    continue
-            if isinstance(child, ToolCallWidget):
-                self.is_sequential = True
-                if child.is_expanded:
-                    self.remove_class("tool-sequential")
-                else:
-                    self.add_class("tool-sequential")
-            else:
-                self.is_sequential = False
-                self.remove_class("tool-sequential")
-            break
 
     def set_result(
         self,
@@ -437,13 +248,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
                 if log_m and not self.log_path:
                     self.log_path = log_m.group(1).rstrip(".]")
             else:
-                if getattr(self, "_shell_update_handle", None) is not None:
-                    try:
-                        self._shell_update_handle.cancel()
-                    except Exception:
-                        pass
-                    self._shell_update_handle = None
-                self._shell_update_scheduled = False
+                self._cancel_shell_update()
                 self.result_text = cleaned
         else:
             self.result_text = cleaned
@@ -497,13 +302,7 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.result_text = "[interrupted | tool cancelled]"
         elif "[interrupted" not in clean:
             self.result_text = f"{clean}\n[interrupted | command cancelled]"
-        if getattr(self, "_shell_update_handle", None) is not None:
-            try:
-                self._shell_update_handle.cancel()
-            except Exception:
-                pass
-            self._shell_update_handle = None
-        self._shell_update_scheduled = False
+        self._cancel_shell_update()
         if not self.is_clickable_header():
             self.header_label.remove_class(TOOL_HEADER_EXPANDABLE)
             self.header_label.add_class(TOOL_HEADER)
@@ -564,203 +363,6 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
             self.header_label.remove_class(TOOL_HEADER)
         self.render_header()
 
-    def _is_subagent_view(self) -> bool:
-        if self.status != "running":
-            return False
-        try:
-            if self.screen and type(self.screen).__name__ in ("SubagentViewScreen", "SessionChatScreen"):
-                return True
-        except Exception:
-            pass
-        try:
-            for node in getattr(self, "ancestors_with_self", []):
-                if (
-                    getattr(node, "id", None) == "subagent-chat-view"
-                    or type(node).__name__ in ("SubagentViewScreen", "SessionChatScreen")
-                ):
-                    return True
-        except Exception:
-            pass
-        return False
-
-    def _get_target_max_len(self, w: int | None = None) -> tuple[int, bool]:
-        """Calculate dynamic max length for header target and compact hints flag based on width."""
-        if w is None:
-            w = 0
-            try:
-                if getattr(self, "is_mounted", False):
-                    val = getattr(getattr(self, "size", None), "width", 0)
-                    if isinstance(val, int) and not isinstance(val, bool) and val > 0:
-                        w = val
-                    elif self.app:
-                        app_val = getattr(getattr(self.app, "size", None), "width", 0)
-                        if isinstance(app_val, int) and not isinstance(app_val, bool) and app_val > 0:
-                            w = app_val
-            except Exception:
-                w = 0
-
-        if not isinstance(w, int) or w <= 0:
-            return 60, False
-
-        compact_hints = w < 70
-        hints_len = 0
-        if getattr(self, "_show_hints", False):
-            from widgets.presentation.toolcall_header import build_toolcall_hints_list
-
-            hints = build_toolcall_hints_list(
-                status=self.status,
-                canonical_tool=self.canonical_tool,
-                is_subagent=self._is_subagent_view(),
-                background_task_id=getattr(self, "background_task_id", None),
-                is_expandable=self.is_expandable(),
-                is_expanded=self.is_expanded,
-                compact=compact_hints,
-            )
-            if hints:
-                hints_len = len(", ".join(hints)) + 3
-
-        display_name = self.DISPLAY_NAMES.get(self.canonical_tool, self.tool_type or "Tool")
-        prefix_len = len(display_name) + 6
-        overhead = prefix_len + hints_len + 4
-        return max(15, w - overhead), compact_hints
-
-    def on_resize(self, event: Any) -> None:
-        val = getattr(getattr(event, "size", None), "width", None)
-        w = val if isinstance(val, int) and not isinstance(val, bool) and val > 0 else None
-        self.render_header(container_width=w)
-
-    def render_header(self, max_len: int | None = None, container_width: int | None = None) -> None:
-        c = self._get_status_color()
-        is_subagent = self._is_subagent_view()
-
-        calc_len, compact_hints = self._get_target_max_len(w=container_width)
-        target_max_len = max_len if max_len is not None else calc_len
-
-        header_text = build_toolcall_header(
-            canonical_tool=self.canonical_tool,
-            tool_type=self.tool_type,
-            args=self.args or {},
-            target=self.target,
-            status=self.status,
-            status_color=c,
-            system_tools=self.SYSTEM_TOOLS,
-            display_names=self.DISPLAY_NAMES,
-            is_mcp=self.is_mcp,
-            is_subagent=is_subagent,
-            background_task_id=getattr(self, "background_task_id", None),
-            is_expandable=self.is_expandable(),
-            is_expanded=self.is_expanded,
-            show_hints=getattr(self, "_show_hints", False),
-            max_len=target_max_len,
-            compact_hints=compact_hints,
-        )
-        self.header_label.update(header_text)
-
-
-
-    def on_click(self, event) -> None:
-        if not self.is_clickable_header():
-            return
-
-        app = None
-        try:
-            app = self.app
-        except Exception:
-            pass
-
-        if self.canonical_tool == "invoke_subagent":
-            args = self.args if isinstance(self.args, dict) else {}
-            session_id = getattr(self, "subagent_session_id", None)
-            if not session_id and self.result_text:
-                m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", self.result_text, re.IGNORECASE)
-                if m:
-                    session_id = m.group(1)
-            identifier = session_id or args.get("session_id") or args.get("title") or args.get("prompt") or self.target
-            store = getattr(app, "sm", None) if app else None
-            if store is None:
-                from core.infrastructure.storage.session_store import SessionStore
-
-                store = SessionStore.get_instance()
-            curr_session_id = getattr(app, "current_session_id", None) if app else None
-            session = store.find_session_by_title_or_id(str(identifier), parent_id=curr_session_id) if store else None
-            if not session and store:
-                session = store.find_session_by_title_or_id(str(identifier))
-            if not session:
-                if app and hasattr(app, "notify"):
-                    app.notify("Subagent session not found", severity="warning")
-                event.stop()
-                return
-            event.stop()
-            try:
-                from widgets.presentation.screens.subagent_screen import SubagentViewScreen
-
-                if app:
-                    target_id = (
-                        identifier
-                        if session_id or (isinstance(args, dict) and args.get("session_id"))
-                        else (getattr(session, "id", None) or str(identifier))
-                    )
-                    app.push_screen(SubagentViewScreen(target_id))
-            except Exception:
-                pass
-            return
-        if self.canonical_tool == "manage_subagent":
-            args = self.args
-            session_id = getattr(self, "subagent_session_id", None) or args.get("session_id")
-            if session_id:
-                store = getattr(app, "sm", None) if app else None
-                if store is None:
-                    from core.infrastructure.storage.session_store import SessionStore
-
-                    store = SessionStore.get_instance()
-                curr_session_id = getattr(app, "current_session_id", None) if app else None
-                session = (
-                    store.find_session_by_title_or_id(session_id, parent_id=curr_session_id)
-                    if store
-                    else None
-                )
-                if not session:
-                    if app and hasattr(app, "notify"):
-                        app.notify("Subagent session not found", severity="warning")
-                    event.stop()
-                    return
-                event.stop()
-                try:
-                    from widgets.presentation.screens.subagent_screen import SubagentViewScreen
-
-                    if app:
-                        app.push_screen(SubagentViewScreen(session_id))
-                except Exception:
-                    pass
-                return
-
-
-        if self.canonical_tool == "ask_user":
-            if getattr(app, "_pending_ask_user", None) is not None:
-                self._resume_ask_user_wizard()
-                event.stop()
-                return
-
-        if self.is_expandable():
-            self.toggle_expanded()
-            event.stop()
-
-    def _resume_ask_user_wizard(self) -> None:
-        """Resume a minimized ask_user wizard if present."""
-        pending = getattr(self.app, "_pending_ask_user", None)
-        if callable(pending):
-            pending()
-
-    def _scroll_if_needed(self, force: bool = False) -> None:
-        from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
-
-        scroll_parent_if_needed(self, force=force)
-
-    def _scroll_to_widget(self, top: bool = False) -> None:
-        from widgets.presentation.widgets.chat_messages import scroll_parent_to_widget
-
-        scroll_parent_to_widget(self, top=top)
-
     def set_expanded(self, expanded: bool, scroll: bool = False) -> None:
         if not self.is_expandable():
             return
@@ -784,207 +386,20 @@ class ToolCallWidget(FormattingMixin, ParsingMixin, Vertical):
     def toggle_expanded(self, scroll: bool = True) -> None:
         self.set_expanded(not self.is_expanded, scroll=scroll)
 
-    def append_shell_output(self, text: str) -> None:
-        if not hasattr(self, "_raw_bash_buffer"):
-            self._raw_bash_buffer = ""
-        self._raw_bash_buffer += text
-        if len(self._raw_bash_buffer) > self._RAW_BASH_LIMIT:
-            self._raw_bash_buffer = self._RAW_BASH_TRUNC + self._raw_bash_buffer[-self._RAW_BASH_LIMIT :]
-            # The front of the buffer was cut: the processed offset and the
-            # rendered tail are stale, so the next flush must re-sync.
-            self._bash_needs_resync = True
-        self._schedule_shell_update()
-
-    def _schedule_shell_update(self) -> None:
-        if getattr(self, "_shell_update_scheduled", False):
-            return
-        self._shell_update_scheduled = True
-        try:
-            loop = asyncio.get_running_loop()
-            self._shell_update_handle = loop.call_later(get_settings().ui.stream_flush_interval, self._flush_shell_update)
-        except RuntimeError:
-            self._flush_shell_update()
-
-    def _flush_shell_update(self) -> None:
-        """Incrementally fold the shell stream delta into the rendered tail.
-
-        Only the bytes appended since the previous flush are re-processed
-        (truncation-banner cleanup + carriage-return collapsing), so a growing
-        ``_RAW_BASH_LIMIT`` buffer is no longer fully re-processed on every
-        flush. ``result_text`` stays byte-identical to the legacy full-buffer
-        computation ``process_carriage_returns(clean_bash_output(buf))``: the
-        trailing partial line (and any unterminated truncation banner) is carried
-        raw across flushes and only committed once complete, so ``\\r`` sequences
-        split across flushes are never corrupted. Collapsed cards only pay the
-        delta processing; the widget is re-rendered only when the result changed.
-        """
-        self._shell_update_scheduled = False
-        self._shell_update_handle = None
-        from core.infrastructure.tasks.output import process_carriage_returns, process_carriage_returns_lines
-
-        buf = getattr(self, "_raw_bash_buffer", "")
-        if getattr(self, "_bash_needs_resync", False):
-            # The raw buffer front was cut to respect _RAW_BASH_LIMIT: the
-            # offset and rendered tail are stale, so fall back to reprocessing
-            # the buffer from scratch (rare, amortized O(limit) per eviction).
-            self._bash_needs_resync = False
-            self._bash_processed_len = 0
-            self._rendered_bash_tail = ""
-            self._bash_tail_line_is_spinner = False
-            self._bash_leading_stripped = False
-
-        processed = getattr(self, "_bash_processed_len", 0)
-        carry_raw = ""
-        if len(buf) > processed:
-            examine = buf[processed:]
-            boundary = _bash_safe_boundary(examine)
-            commit_raw = examine[:boundary]
-            carry_raw = examine[boundary:]
-            if commit_raw:
-                cleaned = format_truncation_for_ui(commit_raw, strip_edges=False)
-                if cleaned and not cleaned.endswith("\n"):
-                    # A truncation banner swallowed the trailing newline (never
-                    # seen with real tool output): reprocess the whole buffer
-                    # exactly like the legacy path to stay byte-identical.
-                    self.result_text = process_carriage_returns(self._clean_bash_output(buf))
-                    self._bash_processed_len = len(buf)
-                    self._rendered_bash_tail = self.result_text
-                    self._bash_tail_line_is_spinner = _bash_ends_with_spinner(self.result_text)
-                    self._bash_leading_stripped = True
-                    if self.is_expanded:
-                        self.render_content()
-                        self._scroll_if_needed()
-                    return
-                lines = cleaned.split("\n")[:-1]
-                leading_stripped = getattr(self, "_bash_leading_stripped", False)
-                if not leading_stripped:
-                    # The leading-whitespace run (which legacy strip() removes)
-                    # may span several flushes and lines: drop whitespace-only
-                    # lines and trim the first line that holds real content.
-                    for i, ln in enumerate(lines):
-                        lstripped = ln.lstrip()
-                        if lstripped:
-                            lines = [lstripped] + lines[i + 1 :]
-                            leading_stripped = True
-                            break
-                    else:
-                        lines = []
-                tail, is_spinner = process_carriage_returns_lines(
-                    lines,
-                    tail=getattr(self, "_rendered_bash_tail", ""),
-                    tail_is_spinner=getattr(self, "_bash_tail_line_is_spinner", False),
-                )
-                self._bash_processed_len = processed + boundary
-                self._rendered_bash_tail = tail
-                self._bash_tail_line_is_spinner = is_spinner
-                self._bash_leading_stripped = leading_stripped
-
-        result_text = self._bash_compose_result(carry_raw)
-        if result_text != self.result_text:
-            self.result_text = result_text
-            if self.is_expanded:
-                self.render_content()
-                self._scroll_if_needed()
-
-    def _bash_compose_result(self, carry_raw: str) -> str:
-        return compose_bash_result(
-            tail=getattr(self, "_rendered_bash_tail", ""),
-            carry_raw=carry_raw,
-            tail_line_is_spinner=getattr(self, "_bash_tail_line_is_spinner", False),
-            leading_stripped=getattr(self, "_bash_leading_stripped", False),
-        )
-
-    def _compute_content(self) -> tuple[str, Any]:
-        """Pure content computation (safe to run in a thread); returns (kind, value)."""
-        return compute_tool_call_content(
-            tool_type=self.tool_type,
-            canonical_tool=self.canonical_tool,
-            args=self.args,
-            target=self.target,
-            result_text=self.result_text,
-            is_error=self._is_error(),
-            guess_lexer=self._guess_lexer,
-            clean_markup=self._clean_markup_text,
-            clean_hints=self._clean_hints_for_ui,
-            clean_bash_output=self._clean_bash_output,
-            format_json_result_fn=self._format_json_result,
-        )
-
-    def _apply_content(self, kind: str, value: Any) -> None:
-        """Apply a computed content payload to the widgets (event-loop only)."""
-        try:
-            if kind == "raw":
-                self.content_widget.update(value)
-                self.content_widget.display = True
-                self.md_widget.display = False
-            elif kind == "md":
-                safe_update_markdown(self.md_widget, value)
-                self.md_widget.display = True
-                self.content_widget.display = False
-            else:  # "markup"
-                self.content_widget.update(value)
-                self.content_widget.display = True
-                self.md_widget.display = False
-        except Exception:
-            pass
-
-    def render_content(self) -> None:
-        """Render the tool's terminal content into the widgets."""
-        try:
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
-            if loop is not None and getattr(self, "is_mounted", True):
-                self.scroll_box.display = True
-                self.content_widget.display = True
-                self.md_widget.display = False
-                gate: asyncio.Task | None = self._render_gate if hasattr(self, "_render_gate") else None
-                if gate is not None and not gate.done():
-                    gate.cancel()
-                self._render_version = getattr(self, "_render_version", 0) + 1
-                version = self._render_version
-                self._render_gate = loop.create_task(self._async_render_content(version))
-            else:
-                kind, value = self._compute_content()
-                self._apply_content(kind, value)
-                if self.is_expanded:
-                    if getattr(self, "_should_scroll_to_widget", False):
-                        self._should_scroll_to_widget = False
-                        self._scroll_to_widget(top=False)
-                    else:
-                        force = getattr(self, "_should_scroll_on_render", False)
-                        self._should_scroll_on_render = False
-                        self._scroll_if_needed(force=force)
-        except Exception:
-            pass
-
-    async def _async_render_content(self, version: int) -> None:
-        try:
-            kind, value = await asyncio.to_thread(self._compute_content)
-        except Exception:
-            kind, value = "markup", self._clean_markup_text(self.result_text or "")
-        if version != getattr(self, "_render_version", 0):
-            return
-        if not getattr(self, "is_mounted", True):
-            return
-        self._apply_content(kind, value)
-        if self.is_expanded:
-            if getattr(self, "_should_scroll_to_widget", False):
-                self._should_scroll_to_widget = False
-                self._scroll_to_widget(top=False)
-            else:
-                force = getattr(self, "_should_scroll_on_render", False)
-                self._should_scroll_on_render = False
-                self._scroll_if_needed(force=force)
-
 
 __all__ = [
     "DISPLAY_NAMES",
     "FormattingMixin",
     "ParsingMixin",
     "SYSTEM_TOOLS",
+    "ToolCallActionsMixin",
+    "ToolCallContentMixin",
+    "ToolCallHintsMixin",
+    "ToolCallShellMixin",
     "ToolCallWidget",
     "ToolScrollBox",
     "TransparentSyntax",
+    "_bash_ends_with_spinner",
+    "_bash_safe_boundary",
+    "format_truncation_for_ui",
 ]
