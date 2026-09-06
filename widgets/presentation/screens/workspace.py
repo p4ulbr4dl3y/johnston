@@ -34,7 +34,7 @@ from widgets.utils.row_format import (
     option_list_row_width,
 )
 
-__all__ = ["WorkspaceScreen", "get_root_scope"]
+__all__ = ["WorkspaceScreen", "WorkspaceInput", "WorkspaceOptionList", "get_root_scope"]
 
 
 def get_root_scope(pm: PermissionManager, path: str) -> str:
@@ -60,6 +60,60 @@ def get_root_scope(pm: PermissionManager, path: str) -> str:
     return "session"
 
 
+class WorkspaceInput(Input):
+    """Input widget that forwards vertical navigation keys to OptionList and prevents select-all."""
+
+    def _clear_selection(self) -> None:
+        val_len = len(self.value)
+        self.cursor_position = val_len
+        try:
+            from textual.widgets._input import Selection
+
+            self.selection = Selection(val_len, val_len)
+        except Exception:
+            pass
+
+    def _on_focus(self, event: events.Focus) -> None:
+        super()._on_focus(event)
+        self._clear_selection()
+        self.call_after_refresh(self._clear_selection)
+
+    async def _on_key(self, event: events.Key) -> None:
+        key = (event.key or "").lower()
+
+        if key in ("down", "key_down"):
+            if self.screen and hasattr(self.screen, "focus_first_option"):
+                getattr(self.screen, "focus_first_option")()
+                event.stop()
+                event.prevent_default()
+                return
+
+        elif key in ("up", "key_up"):
+            if self.screen and hasattr(self.screen, "focus_last_option"):
+                getattr(self.screen, "focus_last_option")()
+                event.stop()
+                event.prevent_default()
+                return
+
+        await super()._on_key(event)
+
+
+class WorkspaceOptionList(HeaderWrapOptionList):
+    """OptionList that routes boundary vertical navigation back to WorkspaceInput."""
+
+    def action_cursor_down(self) -> None:
+        if self.screen and hasattr(self.screen, "handle_option_list_down"):
+            if getattr(self.screen, "handle_option_list_down")():
+                return
+        super().action_cursor_down()
+
+    def action_cursor_up(self) -> None:
+        if self.screen and hasattr(self.screen, "handle_option_list_up"):
+            if getattr(self.screen, "handle_option_list_up")():
+                return
+        super().action_cursor_up()
+
+
 class WorkspaceScreen(BaseModalScreen[None]):
     """Modal screen for viewing, adding, and removing workspace roots."""
 
@@ -82,12 +136,12 @@ class WorkspaceScreen(BaseModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
             yield ModalHeader("Workspace Roots", esc_hint="")
-            yield Input(
+            yield WorkspaceInput(
                 placeholder="Directory path (e.g. ~/projects/lib)...",
                 id="workspace-add-input",
                 classes="modal-input",
             )
-            yield HeaderWrapOptionList(id="workspace-option-list")
+            yield WorkspaceOptionList(id="workspace-option-list")
             yield ModalHint("enter Add • drop folder • esc Close", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
@@ -107,7 +161,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
         self._apply_dialog_fit()
         self.refresh_list()
         try:
-            self.query_one("#workspace-add-input", Input).focus()
+            self.query_one("#workspace-add-input", WorkspaceInput).focus()
         except Exception:
             pass
 
@@ -162,8 +216,9 @@ class WorkspaceScreen(BaseModalScreen[None]):
             return
 
         try:
-            inp = self.query_one("#workspace-add-input", Input)
-            if inp.has_focus:
+            inp = self.query_one("#workspace-add-input", WorkspaceInput)
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+            if inp.has_focus and not opt_list.has_focus:
                 hint_widget.update("enter Add • drop folder • esc Close")
                 return
         except Exception:
@@ -190,31 +245,53 @@ class WorkspaceScreen(BaseModalScreen[None]):
     def on_descendant_focus(self, event: events.DescendantFocus) -> None:
         self._update_hint()
 
-    def _on_key(self, event: events.Key) -> None:
-        key = (event.key or "").lower()
+    def focus_input(self) -> None:
         try:
-            inp = self.query_one("#workspace-add-input", Input)
-            opt_list = self.query_one("#workspace-option-list", OptionList)
+            inp = self.query_one("#workspace-add-input", WorkspaceInput)
+            inp.focus()
+            self._update_hint()
         except Exception:
-            return
+            pass
 
-        if inp.has_focus:
-            if key in ("down", "key_down"):
-                if len(opt_list._options) > 0:
-                    if opt_list.highlighted is None:
-                        opt_list.highlighted = 0
-                    opt_list.focus()
-                    self._update_hint(opt_list.highlighted)
-                    event.stop()
-                    event.prevent_default()
-                    return
-        elif opt_list.has_focus:
-            if key in ("up", "key_up") and opt_list.highlighted == 0:
-                inp.focus()
-                self._update_hint()
-                event.stop()
-                event.prevent_default()
-                return
+    def focus_first_option(self) -> None:
+        try:
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+            if len(opt_list._options) > 0:
+                opt_list.highlighted = 0
+                opt_list.focus()
+                self._update_hint(0)
+        except Exception:
+            pass
+
+    def focus_last_option(self) -> None:
+        try:
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+            if len(opt_list._options) > 0:
+                opt_list.highlighted = len(opt_list._options) - 1
+                opt_list.focus()
+                self._update_hint(opt_list.highlighted)
+        except Exception:
+            pass
+
+    def handle_option_list_down(self) -> bool:
+        try:
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+            if opt_list.highlighted is not None and opt_list.highlighted == len(opt_list._options) - 1:
+                self.focus_input()
+                return True
+        except Exception:
+            pass
+        return False
+
+    def handle_option_list_up(self) -> bool:
+        try:
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+            if opt_list.highlighted is not None and opt_list.highlighted == 0:
+                self.focus_input()
+                return True
+        except Exception:
+            pass
+        return False
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         val = event.value.strip()
@@ -239,7 +316,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
 
     def on_paste(self, event: events.Paste) -> None:
         try:
-            inp = self.query_one("#workspace-add-input", Input)
+            inp = self.query_one("#workspace-add-input", WorkspaceInput)
             if inp.has_focus:
                 clean = decode_pasted_path(event.text)
                 inp.insert_text_at_cursor(clean)
@@ -288,7 +365,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
 
     def action_remove_root(self) -> None:
         try:
-            inp = self.query_one("#workspace-add-input", Input)
+            inp = self.query_one("#workspace-add-input", WorkspaceInput)
             opt_list = self.query_one("#workspace-option-list", OptionList)
             if inp.has_focus and not opt_list.has_focus:
                 return

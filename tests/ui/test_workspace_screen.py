@@ -127,16 +127,42 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
                 opt_list = screen.query_one("#workspace-option-list", OptionList)
 
                 self.assertTrue(inp.has_focus)
-                # Press down key from input -> moves focus to OptionList
+                # Down from input -> moves focus to OptionList (first item)
                 await pilot.press("down")
                 await pilot.pause()
                 self.assertTrue(opt_list.has_focus)
                 self.assertEqual(opt_list.highlighted, 0)
 
-                # Press up key from top of OptionList -> moves focus to Input
+                # Down to last item (index 1)
+                await pilot.press("down")
+                await pilot.pause()
+                self.assertEqual(opt_list.highlighted, 1)
+
+                # Down from last item -> loops back to Input!
+                await pilot.press("down")
+                await pilot.pause()
+                self.assertTrue(inp.has_focus)
+
+                # Up from Input -> moves to last item in OptionList!
+                await pilot.press("up")
+                await pilot.pause()
+                self.assertTrue(opt_list.has_focus)
+                self.assertEqual(opt_list.highlighted, 1)
+
+                # Up to first item (index 0)
+                await pilot.press("up")
+                await pilot.pause()
+                self.assertEqual(opt_list.highlighted, 0)
+
+                # Up from top of OptionList -> moves focus back to Input
                 await pilot.press("up")
                 await pilot.pause()
                 self.assertTrue(inp.has_focus)
+
+                # Test _clear_selection on focus
+                inp.value = "/some/test/path"
+                inp._on_focus(MagicMock())
+                self.assertEqual(inp.cursor_position, len(inp.value))
         finally:
             os.rmdir(extra)
 
