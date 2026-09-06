@@ -14,7 +14,7 @@ except Exception:
     LOGS_DIR = os.path.join(_cfg, "logs")
     SECRETS_FILE = os.path.join(_cfg, "secrets.json")
 
-READ_ONLY_TOOLS = frozenset({"read", "view_file"})
+READ_ONLY_TOOLS = frozenset({"read", "view_file", "search"})
 
 
 def get_config_dir() -> str:
@@ -87,16 +87,19 @@ def is_secrets_file(
 
     try:
         expanded_target = os.path.expanduser(clean_target)
-        norm_target_real = os.path.normcase(os.path.realpath(os.path.abspath(expanded_target)))
-        norm_target_abs = os.path.normcase(os.path.abspath(expanded_target))
+        norm_target_real = os.path.normcase(os.path.realpath(os.path.abspath(expanded_target))).lower()
+        norm_target_abs = os.path.normcase(os.path.abspath(expanded_target)).lower()
     except Exception:
         return False
 
-    normalized_slash_target = clean_target.replace("\\", "/")
+    target_lower = clean_target.lower().replace("\\", "/")
     if (
-        normalized_slash_target.endswith("/.johnston/secrets.json")
-        or normalized_slash_target == ".johnston/secrets.json"
-        or normalized_slash_target == "~/.johnston/secrets.json"
+        target_lower.endswith("/.johnston/secrets.json")
+        or target_lower == ".johnston/secrets.json"
+        or target_lower == "~/.johnston/secrets.json"
+        or target_lower.endswith("/.config/johnston/secrets.json")
+        or target_lower == ".config/johnston/secrets.json"
+        or target_lower == "~/.config/johnston/secrets.json"
     ):
         return True
 
@@ -104,18 +107,18 @@ def is_secrets_file(
         if not sec:
             continue
         try:
-            norm_sec_real = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(sec.strip()))))
-            norm_sec_abs = os.path.normcase(os.path.abspath(os.path.expanduser(sec.strip())))
+            norm_sec_real = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(sec.strip())))).lower()
+            norm_sec_abs = os.path.normcase(os.path.abspath(os.path.expanduser(sec.strip()))).lower()
         except Exception:
-            norm_sec_real = norm_sec_abs = os.path.normcase(os.path.expanduser(sec.strip()))
+            norm_sec_real = norm_sec_abs = os.path.normcase(os.path.expanduser(sec.strip())).lower()
 
         if norm_target_real in (norm_sec_real, norm_sec_abs) or norm_target_abs in (norm_sec_real, norm_sec_abs):
             return True
 
-        if normalized_slash_target == "secrets.json":
+        if target_lower == "secrets.json":
             try:
-                cwd_real = os.path.normcase(os.path.realpath(os.getcwd()))
-                sec_dir = os.path.normcase(os.path.dirname(norm_sec_real))
+                cwd_real = os.path.normcase(os.path.realpath(os.getcwd())).lower()
+                sec_dir = os.path.normcase(os.path.dirname(norm_sec_real)).lower()
                 if cwd_real == sec_dir:
                     return True
             except Exception:
@@ -140,62 +143,147 @@ def is_secrets_shell_command(
     if not command or not isinstance(command, str) or not command.strip():
         return False
 
-    sec_candidates = [secrets_file] if secrets_file else get_secrets_files()
-    norm_cmd = os.path.normcase(command)
+    cmd_lower = command.lower().replace("\\", "/")
 
-    cmd_slashes = command.replace("\\", "/")
+    # Check for direct secrets pattern references and globs
+    if re.search(r"(\.config/johnston|\.johnston).*secret", cmd_lower):
+        return True
+    if re.search(r"(\.config/johnston|\.johnston)/[^\s/]*(?:sec\*|\*\.json)", cmd_lower):
+        return True
+
+    sec_candidates = [secrets_file] if secrets_file else get_secrets_files()
+    norm_cmd = cmd_lower
+
     if (
-        ".johnston/secrets.json" in cmd_slashes
-        or "~/.johnston/secrets.json" in cmd_slashes
-        or "$HOME/.johnston/secrets.json" in cmd_slashes
-        or "${HOME}/.johnston/secrets.json" in cmd_slashes
+        ".johnston/secrets.json" in cmd_lower
+        or "~/.johnston/secrets.json" in cmd_lower
+        or "$home/.johnston/secrets.json" in cmd_lower
+        or "${home}/.johnston/secrets.json" in cmd_lower
+        or ".config/johnston/secrets.json" in cmd_lower
+        or "~/.config/johnston/secrets.json" in cmd_lower
+        or "$home/.config/johnston/secrets.json" in cmd_lower
+        or "${home}/.config/johnston/secrets.json" in cmd_lower
     ):
         return True
 
     eff_cwd = cwd.strip() if cwd and isinstance(cwd, str) and cwd.strip() else ""
 
+    sec_dirs: List[str] = []
     for sec in sec_candidates:
         if not sec:
             continue
         try:
-            norm_sec_real = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(sec.strip()))))
-            norm_sec_abs = os.path.normcase(os.path.abspath(os.path.expanduser(sec.strip())))
+            norm_sec_real = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(sec.strip())))).lower()
+            norm_sec_abs = os.path.normcase(os.path.abspath(os.path.expanduser(sec.strip()))).lower()
         except Exception:
-            norm_sec_real = norm_sec_abs = os.path.normcase(os.path.expanduser(sec.strip()))
+            norm_sec_real = norm_sec_abs = os.path.normcase(os.path.expanduser(sec.strip())).lower()
 
         if norm_sec_real in norm_cmd or norm_sec_abs in norm_cmd:
             return True
 
-        if eff_cwd:
-            try:
-                norm_cwd = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(eff_cwd))))
-                sec_dir = os.path.normcase(os.path.dirname(norm_sec_real))
-                if norm_cwd == sec_dir and re.search(r"\bsecrets\.json\b", command, re.IGNORECASE):
-                    return True
-            except Exception:
-                pass
+        sec_dir = os.path.dirname(norm_sec_real)
+        if sec_dir and sec_dir not in sec_dirs:
+            sec_dirs.append(sec_dir)
+
+    def _is_johnston_dir(path_str: str) -> bool:
+        if not path_str or not isinstance(path_str, str):
+            return False
+        p = path_str.strip().lower().replace("\\", "/").rstrip("/")
+        if (
+            p.endswith("/.johnston")
+            or p in (".johnston", "~/.johnston", "$home/.johnston", "${home}/.johnston")
+            or p.endswith("/.config/johnston")
+            or p in (".config/johnston", "~/.config/johnston", "$home/.config/johnston", "${home}/.config/johnston")
+            or bool(re.search(r"(\.config/johnston|\.johnston)$", p))
+        ):
+            return True
+        try:
+            resolved = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(path_str.strip())))).lower()
+            if resolved in sec_dirs:
+                return True
+            if resolved.endswith("/.johnston") or resolved.endswith("/.config/johnston"):
+                return True
+        except Exception:
+            pass
+        return False
+
+    current_dir = eff_cwd
+    in_secrets_dir = _is_johnston_dir(eff_cwd) if eff_cwd else False
 
     subcmds = extract_shell_subcommands(command) or [command]
     for sub in subcmds:
+        sub_stripped = sub.strip()
+        if not sub_stripped:
+            continue
+        sub_lower = sub_stripped.lower().replace("\\", "/")
+
         try:
-            tokens = shlex.split(sub)
+            tokens = shlex.split(sub_stripped)
         except Exception:
-            tokens = sub.strip().split()
+            tokens = sub_stripped.split()
+
+        if not tokens:
+            continue
+
+        first_tok = tokens[0].lower()
+        tok_idx = 0
+        if first_tok in ("builtin", "command") and len(tokens) > 1:
+            tok_idx = 1
+            first_tok = tokens[1].lower()
+
+        if first_tok == "cd":
+            cd_args = [t for t in tokens[tok_idx + 1:] if not t.startswith("-") or t == "--"]
+            if cd_args and cd_args[0] == "--":
+                cd_args = cd_args[1:]
+            cd_target = cd_args[0] if cd_args else "~"
+            cd_target_cleaned = cd_target.strip("'\"")
+
+            candidate_target = cd_target_cleaned
+            if current_dir and not os.path.isabs(os.path.expanduser(candidate_target)):
+                candidate_target = os.path.join(current_dir, candidate_target)
+
+            if _is_johnston_dir(cd_target_cleaned) or _is_johnston_dir(candidate_target):
+                in_secrets_dir = True
+                current_dir = candidate_target
+            else:
+                in_secrets_dir = False
+                current_dir = candidate_target
+            continue
+
+        if in_secrets_dir:
+            if (
+                re.search(r"\bsecret", sub_lower)
+                or re.search(r"\bsec\*", sub_lower)
+            ):
+                return True
+            for tok in tokens:
+                cleaned = tok.lstrip("<>|&;\"'").rstrip("<>|&;\"'").lower()
+                if not cleaned:
+                    continue
+                if (
+                    fnmatch.fnmatch(cleaned, "secret*")
+                    or fnmatch.fnmatch(cleaned, "sec*")
+                    or fnmatch.fnmatch(cleaned, "*.json")
+                    or fnmatch.fnmatch("secrets.json", cleaned)
+                ):
+                    return True
+
         for tok in tokens:
             cleaned = tok.lstrip("<>|&;\"'").rstrip("<>|&;\"'")
             if not cleaned:
                 continue
             if is_secrets_file(cleaned, secrets_file=secrets_file):
                 return True
-            if eff_cwd:
+            if current_dir:
                 try:
-                    candidate = os.path.join(eff_cwd, cleaned)
+                    candidate = os.path.join(current_dir, cleaned)
                     if is_secrets_file(candidate, secrets_file=secrets_file):
                         return True
                 except Exception:
                     pass
 
     return False
+
 
 
 class PermissionAction(str, Enum):
@@ -503,7 +591,7 @@ def extract_tool_target_value(tool_name: str, args: Optional[Dict[str, Any]]) ->
     canonical = (tool_name or "").strip().lower()
     if canonical == "shell":
         return args.get("command")
-    if canonical in ("create", "edit", "read", "view_file"):
+    if canonical in ("create", "edit", "read", "view_file", "search"):
         for key in ("path", "AbsolutePath", "file_path", "target_file", "TargetFile"):
             val = args.get(key)
             if isinstance(val, str) and val.strip():
@@ -522,7 +610,7 @@ def suggest_pattern(tool_name: str, args: Optional[Dict[str, Any]]) -> Optional[
     canonical = (tool_name or "").strip().lower()
     if canonical == "shell":
         return extract_command_signature(val)
-    if canonical in ("create", "edit", "read", "view_file"):
+    if canonical in ("create", "edit", "read", "view_file", "search"):
         # Suggest directory pattern or basename
         dirname = os.path.dirname(val)
         if dirname and dirname not in (".", "/"):
@@ -643,7 +731,7 @@ def evaluate_pattern_rules(
     if canonical == "shell":
         return _evaluate_shell_rules(target, rules)
 
-    if canonical in ("create", "edit", "read", "view_file"):
+    if canonical in ("create", "edit", "read", "view_file", "search"):
         return _evaluate_target_rules(target, rules, match_path_pattern, subject=f"Path '{target}'")
 
     if canonical == "web_fetch":
@@ -736,7 +824,7 @@ def evaluate_workspace_boundary(
     """Evaluates whether a tool call accesses a path outside the permitted workspace roots,
     or attempts to access the protected secrets file.
 
-    Extracts path for file tools (create, edit, read, view_file) or cwd/command for shell.
+    Extracts path for file tools (create, edit, read, view_file, search) or cwd/command for shell.
     Returns PermissionDecision if path is outside workspace roots or targets secrets, otherwise None.
     """
     canonical = (tool_name or "").strip().lower()
@@ -766,7 +854,7 @@ def evaluate_workspace_boundary(
         return None
 
     target: Optional[str] = None
-    if canonical in ("create", "edit", "read", "view_file"):
+    if canonical in ("create", "edit", "read", "view_file", "search"):
         target = extract_tool_target_value(canonical, args)
 
     if not target or not isinstance(target, str) or not target.strip():

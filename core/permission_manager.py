@@ -596,10 +596,7 @@ class PermissionManager:
         )
         if ws_decision is not None:
             action = ws_decision.action if ws_decision.action == PermissionAction.DENY else outside_action
-            return PermissionDecision(
-                action,
-                ws_decision.reason if action == PermissionAction.DENY else f"Path outside workspace roots: {ws_decision.reason}",
-            )
+            return PermissionDecision(action, ws_decision.reason)
 
         # 3. Runtime session tool override
         session_action = self.session_overrides.get(canonical_name)

@@ -322,6 +322,40 @@ class TestPermissionManager(unittest.TestCase):
         self.assertEqual(dec_hist.action, PermissionAction.ASK)
         self.assertIn("outside workspace", dec_hist.reason.lower())
 
+    def test_logs_dir_path_traversal(self):
+        traversal_secrets = os.path.join(LOGS_DIR, "../secrets.json")
+        traversal_config = os.path.join(LOGS_DIR, "../config.json")
+
+        dec_sec = self.pm.check_permission("read", {"path": traversal_secrets})
+        self.assertEqual(dec_sec.action, PermissionAction.DENY)
+
+        dec_cfg = self.pm.check_permission("read", {"path": traversal_config})
+        self.assertEqual(dec_cfg.action, PermissionAction.ASK)
+        self.assertNotIn("Path outside workspace roots: Path", dec_cfg.reason)
+
+    def test_shell_secrets_cd_and_globs(self):
+        dec_cd = self.pm.check_permission("shell", {"command": "cd ~/.johnston && cat secrets.json"})
+        self.assertEqual(dec_cd.action, PermissionAction.DENY)
+
+        dec_glob = self.pm.check_permission("shell", {"command": "cat ~/.johnston/sec*"})
+        self.assertEqual(dec_glob.action, PermissionAction.DENY)
+
+    def test_search_tool_permissions(self):
+        # search targeting secrets.json -> DENY
+        dec_sec = self.pm.check_permission("search", {"path": "~/.johnston/secrets.json"})
+        self.assertEqual(dec_sec.action, PermissionAction.DENY)
+
+        # search outside workspace roots -> ASK (no duplicate reason prefix)
+        dec_outside = self.pm.check_permission("search", {"path": "/etc/passwd"})
+        self.assertEqual(dec_outside.action, PermissionAction.ASK)
+        self.assertNotIn("Path outside workspace roots: Path", dec_outside.reason)
+        self.assertIn("outside workspace roots", dec_outside.reason)
+
+        # search targeting LOGS_DIR -> ALLOW
+        dec_logs = self.pm.check_permission("search", {"path": LOGS_DIR})
+        self.assertEqual(dec_logs.action, PermissionAction.ALLOW)
+
 
 if __name__ == "__main__":
     unittest.main()
+

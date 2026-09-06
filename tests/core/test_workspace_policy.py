@@ -247,8 +247,13 @@ class TestWorkspacePolicy(unittest.TestCase):
         # Helper detection
         self.assertTrue(is_secrets_file(SECRETS_FILE))
         self.assertTrue(is_secrets_file("~/.johnston/secrets.json"))
+        self.assertTrue(is_secrets_file("~/.Johnston/Secrets.json"))
+        self.assertTrue(is_secrets_file(".config/johnston/secrets.json"))
+        self.assertTrue(is_secrets_file(".Config/Johnston/Secrets.json"))
         self.assertTrue(is_secrets_shell_command(f"cat {SECRETS_FILE}"))
         self.assertTrue(is_secrets_shell_command("cat ~/.johnston/secrets.json"))
+        self.assertTrue(is_secrets_shell_command("cat ~/.Johnston/Secrets.json"))
+        self.assertTrue(is_secrets_shell_command("cat ~/.Config/Johnston/Secrets.json"))
         self.assertTrue(is_secrets_shell_command("echo test > ~/.johnston/secrets.json"))
 
         # Reading secrets.json is DENIED
@@ -299,4 +304,51 @@ class TestWorkspacePolicy(unittest.TestCase):
         self.assertIsNotNone(dec_hist)
         self.assertEqual(dec_hist.action, PermissionAction.ASK)
         self.assertIn("outside workspace roots", dec_hist.reason)
+
+    def test_logs_dir_path_traversal(self):
+        roots = [str(self.workspace)]
+        traversal_secrets = os.path.join(LOGS_DIR, "../secrets.json")
+        traversal_config = os.path.join(LOGS_DIR, "../config.json")
+
+        # Path traversal targeting secrets.json is DENIED
+        dec_sec = evaluate_workspace_boundary("read", {"path": traversal_secrets}, roots)
+        self.assertIsNotNone(dec_sec)
+        self.assertEqual(dec_sec.action, PermissionAction.DENY)
+
+        # Path traversal targeting config.json requires confirmation (ASK)
+        dec_cfg = evaluate_workspace_boundary("read", {"path": traversal_config}, roots)
+        self.assertIsNotNone(dec_cfg)
+        self.assertEqual(dec_cfg.action, PermissionAction.ASK)
+
+    def test_shell_secrets_cd_and_globs(self):
+        roots = [str(self.workspace)]
+        self.assertTrue(is_secrets_shell_command("cd ~/.johnston && cat secrets.json"))
+        self.assertTrue(is_secrets_shell_command("cat ~/.johnston/sec*"))
+        self.assertTrue(is_secrets_shell_command("grep key ~/.johnston/*.json"))
+
+        dec_cd = evaluate_workspace_boundary("shell", {"command": "cd ~/.johnston && cat secrets.json"}, roots)
+        self.assertIsNotNone(dec_cd)
+        self.assertEqual(dec_cd.action, PermissionAction.DENY)
+
+        dec_glob = evaluate_workspace_boundary("shell", {"command": "cat ~/.johnston/sec*"}, roots)
+        self.assertIsNotNone(dec_glob)
+        self.assertEqual(dec_glob.action, PermissionAction.DENY)
+
+    def test_search_tool_workspace_boundary(self):
+        roots = [str(self.workspace)]
+
+        # search tool targeting secrets file -> DENY
+        dec_sec = evaluate_workspace_boundary("search", {"path": "~/.johnston/secrets.json"}, roots)
+        self.assertIsNotNone(dec_sec)
+        self.assertEqual(dec_sec.action, PermissionAction.DENY)
+
+        # search tool outside workspace roots -> ASK
+        dec_outside = evaluate_workspace_boundary("search", {"path": "/etc/passwd"}, roots)
+        self.assertIsNotNone(dec_outside)
+        self.assertEqual(dec_outside.action, PermissionAction.ASK)
+
+        # search tool inside trusted read root (LOGS_DIR) -> ALLOW (None)
+        dec_logs = evaluate_workspace_boundary("search", {"path": LOGS_DIR}, roots)
+        self.assertIsNone(dec_logs)
+
 
