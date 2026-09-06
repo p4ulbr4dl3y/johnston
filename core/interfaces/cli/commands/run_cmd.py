@@ -288,6 +288,9 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         from core.permission_manager import PermissionManager
 
         perm_mgr = PermissionManager.get_instance()
+        for ws in getattr(args, "workspace", []) or []:
+            if ws:
+                perm_mgr.add_workspace_root(ws)
         if getattr(args, "yolo", False) is True:
             active_mode = perm_mgr.set_session_mode(ExecutionMode.YOLO)
         elif getattr(args, "mode", None):
@@ -613,6 +616,12 @@ def run_headless(args: Any, pm: Optional[ProviderManager] = None) -> int:
         if not os.path.isdir(cwd_target):
             return _emit_early_error(f"Directory '{candidate}' does not exist.", is_json, is_stream_json)
         os.chdir(cwd_target)
+
+    for ws in getattr(args, "workspace", []) or []:
+        if ws:
+            from core.permission_manager import PermissionManager
+
+            PermissionManager.get_instance().add_workspace_root(ws)
 
     try:
         try:

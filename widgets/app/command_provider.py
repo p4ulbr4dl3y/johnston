@@ -11,6 +11,13 @@ import time
 
 from core.application.skills.manager import get_skill_manager
 from widgets.app.dispatch import COMMAND_REGISTRY
+from widgets.presentation.commands.workspace_command import WorkspaceCommand
+
+__all__ = [
+    "WorkspaceCommand",
+    "_build_command_suggestions",
+    "get_all_command_suggestions",
+]
 
 _command_suggestions_cache: list[tuple[str, str]] = []
 _command_suggestions_cache_time: float = 0.0

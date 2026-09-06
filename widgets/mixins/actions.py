@@ -203,13 +203,28 @@ class ActionsMixin(PlanActionsMixin):
         if result == "always_allow":
             if perm_name:
                 pm.set_session_override(perm_name, "allow")
+        elif result == "always_allow:project":
+            if perm_name:
+                pm.save_tool_permission(perm_name, "allow", scope="auto")
         elif isinstance(result, str) and result.startswith("pattern:"):
-            pattern = result.split(":", 1)[1]
-            if perm_name and pattern:
-                pm.set_session_pattern_override(perm_name, pattern, "allow")
+            if result.endswith(":project"):
+                pattern = result[len("pattern:") : -len(":project")]
+                if perm_name and pattern:
+                    pm.save_pattern_permission(perm_name, pattern, "allow", scope="auto")
+            else:
+                pattern = result.split(":", 1)[1]
+                if perm_name and pattern:
+                    pm.set_session_pattern_override(perm_name, pattern, "allow")
+        elif isinstance(result, str) and result.startswith("add_root:"):
+            root_path = result.split(":", 1)[1]
+            pm.add_workspace_root(root_path)
+            return True
         elif isinstance(result, str) and result.startswith("deny:"):
             return result
-        return result in ("allow", "always_allow") or (isinstance(result, str) and result.startswith("pattern:"))
+        return (
+            result in ("allow", "always_allow", "always_allow:project")
+            or (isinstance(result, str) and (result.startswith("pattern:") or result.startswith("add_root:")))
+        )
 
     async def ask_user(self, questions: list[Dict[str, Any]]) -> str:
         """Shows the AskUserWizardScreen and returns the user's answer.

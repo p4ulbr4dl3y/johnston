@@ -296,11 +296,27 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             if self.suggested_pattern:
                 pat_clean = " ".join(self.suggested_pattern.split())
                 pat_escaped = escape(ellipsize(pat_clean, 56))
-                options.append(f"Allow pattern [dim]({pat_escaped})[/dim]")
+                options.append(f"Allow pattern [dim]({pat_escaped})[/dim] (Session)")
                 self._option_keys.append(f"pattern:{self.suggested_pattern}")
 
             options.append("Always allow for session")
             self._option_keys.append("always_allow")
+
+            if self.suggested_pattern:
+                options.append(f"Allow pattern [dim]({pat_escaped})[/dim] (Project)")
+                self._option_keys.append(f"pattern:{self.suggested_pattern}:project")
+
+            options.append("Always allow for project")
+            self._option_keys.append("always_allow:project")
+
+            from core.domain.policies.permission_policy import is_path_within_workspace
+            from core.permission_manager import PermissionManager
+
+            pm = PermissionManager.get_instance()
+            if target_path and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
+                root_to_add = os.path.dirname(target_path) or target_path
+                options.append(f"Add '{ellipsize(root_to_add, 40)}' to workspace roots")
+                self._option_keys.append(f"add_root:{root_to_add}")
 
             options.append("Deny")
             self._option_keys.append("deny")
@@ -324,12 +340,24 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         options = [
             "Allow once",
             "Always allow for session",
+            "Always allow for project",
             "Deny",
             "Reject with feedback...",
         ]
         if self.suggested_pattern:
             pat_clean = " ".join(self.suggested_pattern.split())
-            options.append(f"Allow pattern ({ellipsize(pat_clean, 56)})")
+            options.append(f"Allow pattern ({ellipsize(pat_clean, 56)}) (Session)")
+            options.append(f"Allow pattern ({ellipsize(pat_clean, 56)}) (Project)")
+
+        nargs = self.args if isinstance(self.args, dict) else {}
+        target_path = nargs.get("path") or ""
+        from core.domain.policies.permission_policy import is_path_within_workspace
+        from core.permission_manager import PermissionManager
+
+        pm = PermissionManager.get_instance()
+        if target_path and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
+            root_to_add = os.path.dirname(target_path) or target_path
+            options.append(f"Add '{ellipsize(root_to_add, 40)}' to workspace roots")
 
         hint = self._build_hint_text()
         title = "Confirm Tool Action"
@@ -500,6 +528,10 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 self.dismiss(key)
             elif key == "always_allow":
                 self.dismiss("always_allow")
+            elif key.startswith("always_allow:"):
+                self.dismiss(key)
+            elif key.startswith("add_root:"):
+                self.dismiss(key)
             elif key == "deny":
                 self.dismiss("deny")
             elif key == "reject_reason":

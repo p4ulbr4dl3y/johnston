@@ -127,6 +127,13 @@ def build_parser() -> argparse.ArgumentParser:
     sandbox_grp = parser.add_mutually_exclusive_group()
     sandbox_grp.add_argument("--sandbox", action="store_true", help="Enable execution sandbox")
     sandbox_grp.add_argument("--no-sandbox", action="store_true", help="Disable execution sandbox")
+    parser.add_argument(
+        "-w",
+        "--workspace",
+        action="append",
+        default=[],
+        help="Additional allowed workspace root directory",
+    )
     parser.add_argument("-C", "--cwd", default=None, help="Change working directory")
     parser.add_argument("--theme", default=None, help="UI theme override")
     parser.add_argument("--debug", action="store_true", help="Enable DEBUG logging level")
@@ -297,6 +304,13 @@ def build_parser() -> argparse.ArgumentParser:
     run_sandbox = run_p.add_mutually_exclusive_group()
     run_sandbox.add_argument("--sandbox", action="store_true", help="Enable execution sandbox")
     run_sandbox.add_argument("--no-sandbox", action="store_true", help="Disable execution sandbox")
+    run_p.add_argument(
+        "-w",
+        "--workspace",
+        action="append",
+        default=[],
+        help="Additional allowed workspace root directory",
+    )
     run_p.add_argument("-C", "--cwd", default=None, help="Change working directory")
     run_p.add_argument(
         "-s",
@@ -335,6 +349,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             sys.stderr.write(f"Error: Directory '{args.cwd}' does not exist.\n")
             sys.exit(1)
         os.chdir(cwd_dir)
+
+    for ws in getattr(args, "workspace", []) or []:
+        if ws:
+            from core.permission_manager import PermissionManager
+
+            PermissionManager.get_instance().add_workspace_root(ws)
 
     if args.version:
         print(f"johnston {_dispatch_version()}")

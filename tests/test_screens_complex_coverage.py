@@ -383,13 +383,15 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
             screen.on_option_list_option_selected(mock_sel2)
             self.assertEqual(dismiss_val, "always_allow")
 
-            # 3: deny
-            mock_sel3 = MagicMock(spec=OptionList.OptionSelected, option_index=3)
+            # deny
+            deny_idx = screen._option_keys.index("deny")
+            mock_sel3 = MagicMock(spec=OptionList.OptionSelected, option_index=deny_idx)
             screen.on_option_list_option_selected(mock_sel3)
             self.assertEqual(dismiss_val, "deny")
 
-            # 4: reject_reason
-            mock_sel4 = MagicMock(spec=OptionList.OptionSelected, option_index=4)
+            # reject_reason
+            reject_idx = screen._option_keys.index("reject_reason")
+            mock_sel4 = MagicMock(spec=OptionList.OptionSelected, option_index=reject_idx)
             screen.on_option_list_option_selected(mock_sel4)
             inp = screen.query_one("#reject-reason-input", RejectReasonInput)
             self.assertTrue(inp.display)

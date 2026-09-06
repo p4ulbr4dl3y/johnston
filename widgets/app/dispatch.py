@@ -11,6 +11,7 @@ classes are bound to screens in ``widgets.commands``); the registry lives here.
 from __future__ import annotations
 
 import asyncio
+import inspect
 
 from core.application.skills.inject import (
     load_skill_blocks as _load_skill_blocks,
@@ -54,6 +55,10 @@ async def handle_slash_command(app, command_text: str, attachments: list | None 
 
     if command_text.strip().startswith("/") and normalized_name in registry:
         cmd_instance = registry[normalized_name]()
+        if hasattr(cmd_instance, "set_args"):
+            res = cmd_instance.set_args(words[1:])
+            if inspect.isawaitable(res):
+                await res
         await cmd_instance.execute(app)
         if attachments:
             try:

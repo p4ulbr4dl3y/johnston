@@ -36,11 +36,13 @@ from widgets.presentation.commands.ui_commands import (
     KeybindsCommand,
     ThemeCommand,
 )
+from widgets.presentation.commands.workspace_command import WorkspaceCommand
 
 COMMAND_CLASSES = [
     ModelsCommand,
     ThinkingEffortCommand,
     ProvidersCommand,
+    WorkspaceCommand,
     NewCommand,
     ResumeCommand,
     CompactCommand,
@@ -70,6 +72,7 @@ __all__ = [
     "ModelsCommand",
     "ThinkingEffortCommand",
     "ProvidersCommand",
+    "WorkspaceCommand",
     "NewCommand",
     "ResumeCommand",
     "CompactCommand",
