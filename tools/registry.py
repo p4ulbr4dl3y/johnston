@@ -126,6 +126,7 @@ async def check_and_confirm_permission(
     args: Dict[str, Any],
     context_or_app: Any,
     confirm_tool_name: str | None = None,
+    server_name: str | None = None,
 ) -> ToolResult | None:
     """
     Checks tool permissions via PermissionManager and prompts user if confirmation is required.
@@ -153,6 +154,7 @@ async def check_and_confirm_permission(
                 ctx_or_app=context_or_app or app_obj,
                 is_subagent=is_sub,
                 subagent_role=sub_role,
+                server_name=server_name,
             )
             if isinstance(confirmed, str) and confirmed.startswith("deny:"):
                 user_reason = confirmed.split(":", 1)[1].strip()
@@ -330,7 +332,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             target_entry = t
             break
 
-    perm_err = await check_and_confirm_permission(exposed_name, name, args, ctx_or_app)
+    target_server = target_entry.get("_mcp_server") if isinstance(target_entry, dict) else None
+    perm_err = await check_and_confirm_permission(
+        exposed_name, name, args, ctx_or_app, server_name=target_server
+    )
     if perm_err:
         return perm_err
 

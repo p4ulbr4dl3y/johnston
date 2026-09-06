@@ -117,12 +117,19 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         args: Optional[Dict[str, Any]] = None,
         diff: str = "",
         is_subagent: bool = False,
+        server_name: Optional[str] = None,
     ):
         super().__init__()
         self.tool_name = tool_name
         self.args = args or {}
         self.diff = diff
         self.is_subagent = is_subagent
+        if server_name and isinstance(server_name, str) and server_name.strip():
+            self.server_name = server_name.strip()
+        elif "__" in self.tool_name:
+            self.server_name = self.tool_name.split("__", 1)[0].strip()
+        else:
+            self.server_name = ""
         self.suggested_pattern = suggest_pattern(self.tool_name, self.args)
         self._options, self._option_keys = self._build_options()
 
@@ -130,8 +137,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         raw_options: list[tuple[str, str]] = []
         raw_options.append(("Allow once", "allow"))
 
-        is_mcp = "__" in self.tool_name
-        server_name = self.tool_name.split("__", 1)[0] if is_mcp else ""
+        is_mcp = bool(self.server_name or "__" in self.tool_name)
+        server_name = self.server_name or (self.tool_name.split("__", 1)[0] if is_mcp else "")
 
         if self.suggested_pattern:
             pat_clean = " ".join(self.suggested_pattern.split())
@@ -274,8 +281,9 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"{actor} wants to ask a question"
         elif self.tool_name == "shell":
             action_desc = f"{actor} wants to run shell command:"
-        elif "__" in self.tool_name:
-            server_name, tool_subname = self.tool_name.split("__", 1)
+        elif self.server_name or "__" in self.tool_name:
+            server_name = self.server_name or self.tool_name.split("__", 1)[0]
+            tool_subname = self.tool_name.split("__", 1)[1] if "__" in self.tool_name else self.tool_name
             if self.args:
                 action_desc = f"{actor} wants to call `{tool_subname}` from MCP server `{server_name}` with parameters:"
             else:
@@ -287,7 +295,11 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"{actor} wants to execute `{self.tool_name}`"
 
         self._action_desc = action_desc
-        header_title = f"Confirm MCP Action: {self.tool_name.split('__', 1)[0]}" if "__" in self.tool_name else "Confirm Tool Action"
+        header_title = (
+            f"Confirm MCP Action: {self.server_name or self.tool_name.split('__', 1)[0]}"
+            if (self.server_name or "__" in self.tool_name)
+            else "Confirm Tool Action"
+        )
         with Vertical(id="modal-dialog", classes="bash-confirm-dialog"):
             yield ModalHeader(header_title, esc_hint="")
             yield Markdown(action_desc, classes="modal-markdown")
@@ -370,7 +382,11 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             options = self._options
 
         hint = self._build_hint_text()
-        title = f"Confirm MCP Action: {self.tool_name.split('__', 1)[0]}" if "__" in self.tool_name else "Confirm Tool Action"
+        title = (
+            f"Confirm MCP Action: {self.server_name or self.tool_name.split('__', 1)[0]}"
+            if (getattr(self, "server_name", None) or "__" in self.tool_name)
+            else "Confirm Tool Action"
+        )
         base_width = modal_content_width(
             options=options, title=title, hint=hint, extra=MODAL_CONTENT_GUTTER
         )

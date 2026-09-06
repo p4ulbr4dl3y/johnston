@@ -365,6 +365,7 @@ async def confirm_permission(
     ctx_or_app: Any = None,
     is_subagent: bool = False,
     subagent_role: str = "",
+    server_name: str | None = None,
 ) -> bool | str:
     """Prompt the user for a tool-permission confirmation via the host.
 
@@ -382,6 +383,7 @@ async def confirm_permission(
 
     confirm = getattr(_resolve_app(ctx_or_app), "confirm_permission", None)
     if callable(confirm):
+        kwargs = {"server_name": server_name} if server_name is not None else {}
         return await confirm(
             screen_name,
             args,
@@ -389,6 +391,7 @@ async def confirm_permission(
             perm_name,
             is_subagent=is_subagent,
             subagent_role=subagent_role,
+            **kwargs,
         )
     return False
 

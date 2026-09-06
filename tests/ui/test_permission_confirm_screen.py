@@ -407,6 +407,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     def test_mcp_tool_options_and_server_allow(self):
         screen = PermissionConfirmScreen("github__create_issue", {"title": "bug"})
+        self.assertEqual(screen.server_name, "github")
         self.assertIn("server_allow:github__*", screen._option_keys)
         self.assertIn("server_allow:github__*:project", screen._option_keys)
 
@@ -416,6 +417,12 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         server_allow_idx = screen._option_keys.index("server_allow:github__*")
         screen._select_option_by_index(server_allow_idx)
         self.assertEqual(dismissed[-1], "server_allow:github__*")
+
+    def test_mcp_tool_options_with_explicit_server_name(self):
+        screen = PermissionConfirmScreen("sql_database_query", {"query": "SELECT 1"}, server_name="postgres")
+        self.assertEqual(screen.server_name, "postgres")
+        self.assertIn("server_allow:postgres__*", screen._option_keys)
+        self.assertIn("server_allow:postgres__*:project", screen._option_keys)
 
 
 if __name__ == "__main__":

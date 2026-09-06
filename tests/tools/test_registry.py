@@ -429,6 +429,40 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(res.is_error)
         self.assertIn("ERR: denied 'shell'", res.content)
 
+    async def test_mcp_tool_confirms_with_server_name(self):
+        from tools.context import ToolContext
+
+        mock_app = MagicMock()
+        mock_app.confirm_permission = AsyncMock(return_value=True)
+
+        ctx = ToolContext(app=mock_app)
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Need user confirm")
+
+        mock_mcp = MagicMock()
+        mock_mcp.get_cached_tools.return_value = [
+            {"function": {"name": "query_db"}, "_mcp_server": "postgres"}
+        ]
+        mock_mcp.call_tool_async = AsyncMock(return_value="QUERY_OK")
+
+        with (
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp),
+        ):
+            res = await execute_tool("query_db", {"sql": "SELECT 1"}, context=ctx)
+
+        self.assertFalse(res.is_error)
+        self.assertEqual(res.content, "QUERY_OK")
+        mock_app.confirm_permission.assert_called_once_with(
+            "query_db",
+            {"sql": "SELECT 1"},
+            "Need user confirm",
+            "query_db",
+            is_subagent=False,
+            subagent_role="",
+            server_name="postgres",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

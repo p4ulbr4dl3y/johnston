@@ -173,6 +173,7 @@ class ActionsMixin(PlanActionsMixin):
         perm_name: str | None = None,
         is_subagent: bool = False,
         subagent_role: str = "",
+        server_name: str | None = None,
     ) -> bool | str:
         """Shows the permission confirmation screen and applies session overrides for confirmed tools.
 
@@ -188,6 +189,7 @@ class ActionsMixin(PlanActionsMixin):
             tool_name=screen_name,
             args=args,
             is_subagent=is_subagent,
+            server_name=server_name,
         )
 
         loop = asyncio.get_running_loop()
