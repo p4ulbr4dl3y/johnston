@@ -97,7 +97,7 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
                 # Removable root (index 1)
                 opt_list.highlighted = 1
                 screen._update_hint(1)
-                self.assertIn("Delete", str(hint.left_text))
+                self.assertIn("d Delete", str(hint.left_text))
 
                 # Add option (index 3)
                 opt_list.highlighted = 3

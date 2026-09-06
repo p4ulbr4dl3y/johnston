@@ -254,7 +254,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
                 if data.get("scope") == "primary":
                     hint_widget.update("a Add • esc Close")
                     return
-                hint_widget.update("enter/d Delete • a Add • esc Close")
+                hint_widget.update("d Delete • a Add • esc Close")
                 return
 
         hint_widget.update("a Add • esc Close")
