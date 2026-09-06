@@ -192,3 +192,18 @@ class TestCustomMarkdownFenceMermaid:
         md = "```mermaid\ngraph TD\n    A --> B\n```"
         count = prewarm_fences_from_markdown(md)
         assert count == 1
+
+    def test_copy_context_and_update_from_block(self):
+        source = CustomMarkdownFence.__new__(CustomMarkdownFence)
+        source.code = "graph TD\n  A-->B"
+        source.lexer = "mermaid"
+        source._diagram_str = "┌───┐\n│ A │\n└───┘"
+        source._show_diagram = True
+        source._highlighted_code = Content.from_rich_text(Text(source.code))
+        source._token = MagicMock()
+
+        target = CustomMarkdownFence.__new__(CustomMarkdownFence)
+        target.set_content = MagicMock()
+        target._copy_context(source)
+        assert target._diagram_str == source._diagram_str
+        assert target._show_diagram is True

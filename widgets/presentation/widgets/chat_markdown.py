@@ -274,18 +274,58 @@ class CustomMarkdownFence(MarkdownFence):
         _highlight_cache.put(key, content)
         return content
 
-    def compose(self) -> ComposeResult:
-        lang_str = self.lexer.strip() if self.lexer else "text"
-        from widgets.utils.mermaid_renderer import format_mermaid_content, is_mermaid, render_mermaid_to_ascii
-
+    def __init__(self, markdown: Markdown, token: Any, code: str) -> None:
         self._diagram_str: str | None = None
         self._show_diagram: bool = False
+        super().__init__(markdown, token, code)
+        lang_str = self.lexer.strip() if self.lexer else "text"
+        from widgets.utils.mermaid_renderer import is_mermaid, render_mermaid_to_ascii
 
         if is_mermaid(lang_str):
             rendered = render_mermaid_to_ascii(self.code)
             if rendered:
                 self._diagram_str = rendered
                 self._show_diagram = True
+
+    def _copy_context(self, block: MarkdownBlock) -> None:
+        if isinstance(block, CustomMarkdownFence):
+            self._diagram_str = getattr(block, "_diagram_str", None)
+            self._show_diagram = getattr(block, "_show_diagram", False)
+        super()._copy_context(block)
+
+    async def _update_from_block(self, block: MarkdownBlock) -> None:
+        if isinstance(block, CustomMarkdownFence):
+            self._copy_context(block)
+            from widgets.app.theme_manager import theme_manager
+            from widgets.utils.mermaid_renderer import format_mermaid_content
+
+            app = getattr(self, "app", None)
+            curr = getattr(app, "current_theme", None) or theme_manager.current_theme
+            is_dark = getattr(curr, "dark", True)
+
+            if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
+                if hasattr(self, "_classes"):
+                    self.add_class("diagram-mode")
+                self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark))
+            else:
+                if hasattr(self, "_classes"):
+                    self.remove_class("diagram-mode")
+                self.set_content(block._highlighted_code)
+        else:
+            await super()._update_from_block(block)
+
+    def compose(self) -> ComposeResult:
+        lang_str = self.lexer.strip() if self.lexer else "text"
+        from widgets.utils.mermaid_renderer import format_mermaid_content, is_mermaid, render_mermaid_to_ascii
+
+        if not hasattr(self, "_diagram_str") or self._diagram_str is None:
+            self._diagram_str = None
+            self._show_diagram = False
+            if is_mermaid(lang_str):
+                rendered = render_mermaid_to_ascii(self.code)
+                if rendered:
+                    self._diagram_str = rendered
+                    self._show_diagram = True
 
         lang_label = Label(lang_str, classes="fence-lang")
         lang_label.ALLOW_SELECT = False
@@ -297,7 +337,7 @@ class CustomMarkdownFence(MarkdownFence):
         with header:
             yield lang_label
             if self._diagram_str:
-                toggle_btn = Button("code", classes="fence-toggle-btn")
+                toggle_btn = Button("code" if self._show_diagram else "diagram", classes="fence-toggle-btn")
                 toggle_btn.can_focus = False
                 toggle_btn.ALLOW_SELECT = False
                 yield toggle_btn
@@ -353,6 +393,8 @@ class CustomMarkdownFence(MarkdownFence):
 
     def notify_style_update(self) -> None:
         """Update highlight theme when App theme changes."""
+        from textual.widgets._markdown import MarkdownFence
+
         from widgets.app.theme_manager import theme_manager
         from widgets.utils.mermaid_renderer import format_mermaid_content
 
@@ -367,11 +409,15 @@ class CustomMarkdownFence(MarkdownFence):
             dark=is_dark,
         )
         if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
+            if hasattr(self, "_classes"):
+                self.add_class("diagram-mode")
             self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark))
         else:
+            if hasattr(self, "_classes"):
+                self.remove_class("diagram-mode")
             self.set_content(self._highlighted_code)
         try:
-            return super().notify_style_update()
+            return super(MarkdownFence, self).notify_style_update()
         except Exception:
             return None
 
