@@ -197,7 +197,7 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         finally:
             os.rmdir(extra)
 
-    async def test_workspace_screen_input_empty_warns(self):
+    async def test_workspace_screen_input_empty_noop(self):
         screen = WorkspaceScreen(pm=self.pm)
         app = _HostApp(screen)
         async with app.run_test() as pilot:
@@ -206,7 +206,7 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
             inp.value = ""
             await pilot.press("enter")
             await pilot.pause()
-            self.assertTrue(any("Directory path required" in n for n in app.notifications))
+            self.assertEqual(len(app.notifications), 0)
 
     async def test_workspace_screen_input_nonexistent_warns(self):
         screen = WorkspaceScreen(pm=self.pm)
@@ -233,7 +233,6 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
 
                 self.assertIn(extra, self.pm.get_workspace_roots())
                 self.assertEqual(get_root_scope(self.pm, extra), "session")
-                self.assertTrue(any(f"Added `{extra}` (session only)" in n for n in app.notifications))
                 # Input is cleared
                 self.assertEqual(inp.value, "")
 
@@ -273,7 +272,6 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
                 screen.on_paste(Paste(f"file://{extra}"))
                 await pilot.pause()
                 self.assertIn(extra, self.pm.get_workspace_roots())
-                self.assertTrue(any(f"Added `{extra}` (session only)" in n for n in app.notifications))
         finally:
             os.rmdir(extra)
 

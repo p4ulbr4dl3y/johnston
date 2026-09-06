@@ -296,8 +296,6 @@ class WorkspaceScreen(BaseModalScreen[None]):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         val = event.value.strip()
         if not val:
-            if self.app and hasattr(self.app, "notify"):
-                self.app.notify("Directory path required", severity="warning")
             return
 
         clean_path = decode_pasted_path(val.strip("'\""))
@@ -308,9 +306,6 @@ class WorkspaceScreen(BaseModalScreen[None]):
             return
 
         self.pm.add_workspace_root(abs_path)
-        if self.app and hasattr(self.app, "notify"):
-            self.app.notify(f"Added `{abs_path}` (session only)", severity="information")
-
         event.input.value = ""
         self.refresh_list()
 
@@ -339,8 +334,6 @@ class WorkspaceScreen(BaseModalScreen[None]):
                 event.stop()
                 event.prevent_default()
                 self.pm.add_workspace_root(abs_path)
-                if self.app and hasattr(self.app, "notify"):
-                    self.app.notify(f"Added `{abs_path}` (session only)", severity="information")
                 added_any = True
             elif len(lines) == 1:
                 if self.app and hasattr(self.app, "notify"):
@@ -391,8 +384,6 @@ class WorkspaceScreen(BaseModalScreen[None]):
         def on_confirmed(confirmed: bool) -> None:
             if confirmed:
                 self.pm.remove_persisted_workspace_root(path)
-                if self.app and hasattr(self.app, "notify"):
-                    self.app.notify(f"Removed `{path}` from workspace roots", severity="information")
                 self.refresh_list()
             try:
                 self.query_one("#workspace-option-list", OptionList).focus()
