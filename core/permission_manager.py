@@ -15,10 +15,12 @@ from core.domain.policies.permission_policy import (
     merge_perms,
     normalize_execution_mode,
 )
-from core.infrastructure.platform.paths import CONFIG_FILE
+from core.infrastructure.platform.paths import CONFIG_FILE, LOGS_DIR, SECRETS_FILE
 from core.infrastructure.platform.platform_utils import cached_json_read
 from core.infrastructure.runtime.git_utils import is_git_repository
 from core.infrastructure.runtime.tool_name import normalize_tool_name
+
+__all__ = ["PermissionManager", "CONFIG_FILE", "LOGS_DIR", "SECRETS_FILE"]
 
 # Effective-permissions cache entry: (tuple of 3 file paths, tuple of 3 mtimes, merged perms).
 _EffectiveCache = Tuple[
@@ -593,9 +595,10 @@ class PermissionManager:
             outside_action=outside_action,
         )
         if ws_decision is not None:
+            action = ws_decision.action if ws_decision.action == PermissionAction.DENY else outside_action
             return PermissionDecision(
-                outside_action,
-                f"Path outside workspace roots: {ws_decision.reason}",
+                action,
+                ws_decision.reason if action == PermissionAction.DENY else f"Path outside workspace roots: {ws_decision.reason}",
             )
 
         # 3. Runtime session tool override

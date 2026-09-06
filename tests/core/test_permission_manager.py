@@ -4,8 +4,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.domain.policies.permission_policy import normalize_action
-from core.permission_manager import PermissionManager
+from core.domain.policies.permission_policy import (
+    PermissionAction,
+    get_config_dir,
+    normalize_action,
+)
+from core.permission_manager import LOGS_DIR, SECRETS_FILE, PermissionManager
 
 
 class TestPermissionManager(unittest.TestCase):
@@ -255,6 +259,68 @@ class TestPermissionManager(unittest.TestCase):
                 self.assertEqual(paths[0], cfg_file)
                 self.assertIsInstance(stamps[0], float)
                 self.assertIsInstance(perms, dict)
+
+    def test_logs_dir_read_allowed(self):
+        log_file = os.path.join(LOGS_DIR, "snapshot_123.log")
+        # Reading inside LOGS_DIR via read is allowed
+        dec_read = self.pm.check_permission("read", {"path": log_file})
+        self.assertEqual(dec_read.action, PermissionAction.ALLOW)
+
+        # Reading inside LOGS_DIR via view_file is allowed
+        dec_view = self.pm.check_permission("view_file", {"path": log_file})
+        self.assertEqual(dec_view.action, PermissionAction.ALLOW)
+
+        # Modifying LOGS_DIR via create / edit requires confirmation (ASK)
+        dec_create = self.pm.check_permission("create", {"path": log_file})
+        self.assertEqual(dec_create.action, PermissionAction.ASK)
+        self.assertIn("outside workspace", dec_create.reason.lower())
+
+        dec_edit = self.pm.check_permission("edit", {"path": log_file})
+        self.assertEqual(dec_edit.action, PermissionAction.ASK)
+        self.assertIn("outside workspace", dec_edit.reason.lower())
+
+    def test_secrets_file_blocked_deny(self):
+        # Reading secrets.json is blocked (DENY)
+        dec_read = self.pm.check_permission("read", {"path": SECRETS_FILE})
+        self.assertEqual(dec_read.action, PermissionAction.DENY)
+
+        dec_view = self.pm.check_permission("view_file", {"path": SECRETS_FILE})
+        self.assertEqual(dec_view.action, PermissionAction.DENY)
+
+        # Modifying secrets.json is blocked (DENY)
+        dec_edit = self.pm.check_permission("edit", {"path": SECRETS_FILE})
+        self.assertEqual(dec_edit.action, PermissionAction.DENY)
+
+        dec_create = self.pm.check_permission("create", {"path": SECRETS_FILE})
+        self.assertEqual(dec_create.action, PermissionAction.DENY)
+
+        # Shell command targeting secrets.json is blocked (DENY)
+        dec_shell = self.pm.check_permission("shell", {"command": f"cat {SECRETS_FILE}"})
+        self.assertEqual(dec_shell.action, PermissionAction.DENY)
+
+        dec_shell_tilde = self.pm.check_permission("shell", {"command": "cat ~/.johnston/secrets.json"})
+        self.assertEqual(dec_shell_tilde.action, PermissionAction.DENY)
+
+    def test_secrets_file_blocked_cannot_be_bypassed_by_yolo_or_overrides(self):
+        # Even in YOLO mode and with session override allow, secrets.json MUST be DENY
+        self.pm.set_session_mode("yolo")
+        self.pm.set_session_override("read", "allow")
+        self.pm.set_session_override("shell", "allow")
+        self.assertEqual(self.pm.check_permission("read", {"path": SECRETS_FILE}).action, PermissionAction.DENY)
+        self.assertEqual(self.pm.check_permission("shell", {"command": f"cat {SECRETS_FILE}"}).action, PermissionAction.DENY)
+
+    def test_other_johnston_files_require_confirmation(self):
+        cfg_dir = get_config_dir()
+        config_file = os.path.join(cfg_dir, "config.json")
+        prompt_hist = os.path.join(cfg_dir, "prompt_history.json")
+
+        dec_cfg = self.pm.check_permission("read", {"path": config_file})
+        self.assertEqual(dec_cfg.action, PermissionAction.ASK)
+        self.assertIn("outside workspace", dec_cfg.reason.lower())
+
+        dec_hist = self.pm.check_permission("read", {"path": prompt_hist})
+        self.assertEqual(dec_hist.action, PermissionAction.ASK)
+        self.assertIn("outside workspace", dec_hist.reason.lower())
 
 
 if __name__ == "__main__":

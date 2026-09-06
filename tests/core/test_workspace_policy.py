@@ -4,9 +4,14 @@ import unittest
 from pathlib import Path
 
 from core.domain.policies.permission_policy import (
+    LOGS_DIR,
+    SECRETS_FILE,
     PermissionAction,
     evaluate_workspace_boundary,
+    get_config_dir,
     is_path_within_workspace,
+    is_secrets_file,
+    is_secrets_shell_command,
     merge_perms,
 )
 
@@ -207,4 +212,91 @@ class TestWorkspacePolicy(unittest.TestCase):
         self.assertEqual(shell_patterns["rm -rf *"], "deny")
         self.assertEqual(shell_patterns["git status*"], "allow")
         self.assertEqual(shell_patterns["echo *"], "allow")
+
+    def test_logs_dir_read_allowed(self):
+        roots = [str(self.workspace)]
+        log_file = os.path.join(LOGS_DIR, "test_snapshot.log")
+
+        # is_path_within_workspace with allowed_read_roots
+        self.assertTrue(is_path_within_workspace(log_file, roots, allowed_read_roots=[LOGS_DIR]))
+        # Without allowed_read_roots, it is not in workspace
+        self.assertFalse(is_path_within_workspace(log_file, roots, allow_temp=True))
+
+        # read tool: permitted (decision is None)
+        dec_read = evaluate_workspace_boundary("read", {"path": log_file}, roots)
+        self.assertIsNone(dec_read)
+
+        # view_file tool: permitted (decision is None)
+        dec_view = evaluate_workspace_boundary("view_file", {"path": log_file}, roots)
+        self.assertIsNone(dec_view)
+
+        # create and edit tools: require confirmation (ASK)
+        dec_create = evaluate_workspace_boundary("create", {"path": log_file}, roots)
+        self.assertIsNotNone(dec_create)
+        self.assertEqual(dec_create.action, PermissionAction.ASK)
+        self.assertIn("outside workspace roots", dec_create.reason)
+
+        dec_edit = evaluate_workspace_boundary("edit", {"path": log_file}, roots)
+        self.assertIsNotNone(dec_edit)
+        self.assertEqual(dec_edit.action, PermissionAction.ASK)
+        self.assertIn("outside workspace roots", dec_edit.reason)
+
+    def test_secrets_file_blocked(self):
+        roots = [str(self.workspace)]
+
+        # Helper detection
+        self.assertTrue(is_secrets_file(SECRETS_FILE))
+        self.assertTrue(is_secrets_file("~/.johnston/secrets.json"))
+        self.assertTrue(is_secrets_shell_command(f"cat {SECRETS_FILE}"))
+        self.assertTrue(is_secrets_shell_command("cat ~/.johnston/secrets.json"))
+        self.assertTrue(is_secrets_shell_command("echo test > ~/.johnston/secrets.json"))
+
+        # Reading secrets.json is DENIED
+        dec_read = evaluate_workspace_boundary("read", {"path": SECRETS_FILE}, roots)
+        self.assertIsNotNone(dec_read)
+        self.assertEqual(dec_read.action, PermissionAction.DENY)
+        self.assertIn("secrets", dec_read.reason.lower())
+
+        # Modifying secrets.json is DENIED
+        dec_edit = evaluate_workspace_boundary("edit", {"path": SECRETS_FILE}, roots)
+        self.assertIsNotNone(dec_edit)
+        self.assertEqual(dec_edit.action, PermissionAction.DENY)
+
+        dec_create = evaluate_workspace_boundary("create", {"path": SECRETS_FILE}, roots)
+        self.assertIsNotNone(dec_create)
+        self.assertEqual(dec_create.action, PermissionAction.DENY)
+
+        # Shell command accessing secrets.json is DENIED
+        dec_shell = evaluate_workspace_boundary("shell", {"command": f"cat {SECRETS_FILE}"}, roots)
+        self.assertIsNotNone(dec_shell)
+        self.assertEqual(dec_shell.action, PermissionAction.DENY)
+
+        # Symlink inside workspace pointing to secrets.json is also DENIED
+        link_to_secrets = self.workspace / "secrets_symlink.json"
+        try:
+            os.symlink(SECRETS_FILE, link_to_secrets)
+            dec_symlink = evaluate_workspace_boundary("read", {"path": str(link_to_secrets)}, roots)
+            self.assertIsNotNone(dec_symlink)
+            self.assertEqual(dec_symlink.action, PermissionAction.DENY)
+        finally:
+            if link_to_secrets.is_symlink():
+                link_to_secrets.unlink()
+
+    def test_other_johnston_files_require_confirmation(self):
+        roots = [str(self.workspace)]
+        cfg_dir = get_config_dir()
+        config_file = os.path.join(cfg_dir, "config.json")
+        prompt_hist = os.path.join(cfg_dir, "prompt_history.json")
+
+        # config.json requires ASK (outside workspace)
+        dec_cfg = evaluate_workspace_boundary("read", {"path": config_file}, roots)
+        self.assertIsNotNone(dec_cfg)
+        self.assertEqual(dec_cfg.action, PermissionAction.ASK)
+        self.assertIn("outside workspace roots", dec_cfg.reason)
+
+        # prompt_history.json requires ASK (outside workspace)
+        dec_hist = evaluate_workspace_boundary("read", {"path": prompt_hist}, roots)
+        self.assertIsNotNone(dec_hist)
+        self.assertEqual(dec_hist.action, PermissionAction.ASK)
+        self.assertIn("outside workspace roots", dec_hist.reason)
 

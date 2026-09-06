@@ -7,6 +7,196 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+try:
+    from core.infrastructure.platform.paths import LOGS_DIR, SECRETS_FILE
+except Exception:
+    _cfg = os.environ.get("JOHNSTON_CONFIG_DIR") or os.path.expanduser("~/.johnston")
+    LOGS_DIR = os.path.join(_cfg, "logs")
+    SECRETS_FILE = os.path.join(_cfg, "secrets.json")
+
+READ_ONLY_TOOLS = frozenset({"read", "view_file"})
+
+
+def get_config_dir() -> str:
+    """Returns the Johnston configuration directory path."""
+    try:
+        from core.infrastructure.platform import paths
+
+        cd = getattr(paths, "CONFIG_DIR", None)
+        if cd:
+            return str(cd)
+    except Exception:
+        pass
+    return os.environ.get("JOHNSTON_CONFIG_DIR") or os.path.expanduser("~/.johnston")
+
+
+def get_trusted_read_roots() -> List[str]:
+    """Returns trusted read-only roots (e.g. LOGS_DIR)."""
+    roots: List[str] = []
+    try:
+        from core.infrastructure.platform import paths
+
+        ld = getattr(paths, "LOGS_DIR", None)
+        if ld and str(ld) not in roots:
+            roots.append(str(ld))
+    except Exception:
+        pass
+    if LOGS_DIR and str(LOGS_DIR) not in roots:
+        roots.append(str(LOGS_DIR))
+    default_home = os.path.expanduser("~/.johnston/logs")
+    if default_home not in roots:
+        roots.append(default_home)
+    return roots
+
+
+def get_secrets_files() -> List[str]:
+    """Returns all candidate paths for the centralized secrets file."""
+    candidates: List[str] = []
+    try:
+        from core.infrastructure.platform import paths
+
+        sec = getattr(paths, "SECRETS_FILE", None)
+        if sec and str(sec) not in candidates:
+            candidates.append(str(sec))
+    except Exception:
+        pass
+    if SECRETS_FILE and str(SECRETS_FILE) not in candidates:
+        candidates.append(str(SECRETS_FILE))
+    default_sec = os.path.expanduser("~/.johnston/secrets.json")
+    if default_sec not in candidates:
+        candidates.append(default_sec)
+    return candidates
+
+
+def get_secrets_file() -> str:
+    """Returns path to the centralized secrets file."""
+    files = get_secrets_files()
+    return files[0] if files else SECRETS_FILE
+
+
+def is_secrets_file(
+    target_path: str,
+    secrets_file: Optional[str] = None,
+) -> bool:
+    """Checks whether target_path matches or resolves to the centralized SECRETS_FILE."""
+    if not target_path or not isinstance(target_path, str) or not target_path.strip():
+        return False
+
+    sec_candidates = [secrets_file] if secrets_file else get_secrets_files()
+    clean_target = target_path.strip()
+
+    try:
+        expanded_target = os.path.expanduser(clean_target)
+        norm_target_real = os.path.normcase(os.path.realpath(os.path.abspath(expanded_target)))
+        norm_target_abs = os.path.normcase(os.path.abspath(expanded_target))
+    except Exception:
+        return False
+
+    normalized_slash_target = clean_target.replace("\\", "/")
+    if (
+        normalized_slash_target.endswith("/.johnston/secrets.json")
+        or normalized_slash_target == ".johnston/secrets.json"
+        or normalized_slash_target == "~/.johnston/secrets.json"
+    ):
+        return True
+
+    for sec in sec_candidates:
+        if not sec:
+            continue
+        try:
+            norm_sec_real = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(sec.strip()))))
+            norm_sec_abs = os.path.normcase(os.path.abspath(os.path.expanduser(sec.strip())))
+        except Exception:
+            norm_sec_real = norm_sec_abs = os.path.normcase(os.path.expanduser(sec.strip()))
+
+        if norm_target_real in (norm_sec_real, norm_sec_abs) or norm_target_abs in (norm_sec_real, norm_sec_abs):
+            return True
+
+        if normalized_slash_target == "secrets.json":
+            try:
+                cwd_real = os.path.normcase(os.path.realpath(os.getcwd()))
+                sec_dir = os.path.normcase(os.path.dirname(norm_sec_real))
+                if cwd_real == sec_dir:
+                    return True
+            except Exception:
+                pass
+
+        if os.path.exists(norm_sec_real) and os.path.exists(norm_target_real):
+            try:
+                if os.path.samefile(norm_sec_real, norm_target_real):
+                    return True
+            except (OSError, ValueError, Exception):
+                pass
+
+    return False
+
+
+def is_secrets_shell_command(
+    command: str,
+    cwd: Optional[str] = None,
+    secrets_file: Optional[str] = None,
+) -> bool:
+    """Detects whether a shell command attempts to read, modify or reference SECRETS_FILE."""
+    if not command or not isinstance(command, str) or not command.strip():
+        return False
+
+    sec_candidates = [secrets_file] if secrets_file else get_secrets_files()
+    norm_cmd = os.path.normcase(command)
+
+    cmd_slashes = command.replace("\\", "/")
+    if (
+        ".johnston/secrets.json" in cmd_slashes
+        or "~/.johnston/secrets.json" in cmd_slashes
+        or "$HOME/.johnston/secrets.json" in cmd_slashes
+        or "${HOME}/.johnston/secrets.json" in cmd_slashes
+    ):
+        return True
+
+    eff_cwd = cwd.strip() if cwd and isinstance(cwd, str) and cwd.strip() else ""
+
+    for sec in sec_candidates:
+        if not sec:
+            continue
+        try:
+            norm_sec_real = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(sec.strip()))))
+            norm_sec_abs = os.path.normcase(os.path.abspath(os.path.expanduser(sec.strip())))
+        except Exception:
+            norm_sec_real = norm_sec_abs = os.path.normcase(os.path.expanduser(sec.strip()))
+
+        if norm_sec_real in norm_cmd or norm_sec_abs in norm_cmd:
+            return True
+
+        if eff_cwd:
+            try:
+                norm_cwd = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(eff_cwd))))
+                sec_dir = os.path.normcase(os.path.dirname(norm_sec_real))
+                if norm_cwd == sec_dir and re.search(r"\bsecrets\.json\b", command, re.IGNORECASE):
+                    return True
+            except Exception:
+                pass
+
+    subcmds = extract_shell_subcommands(command) or [command]
+    for sub in subcmds:
+        try:
+            tokens = shlex.split(sub)
+        except Exception:
+            tokens = sub.strip().split()
+        for tok in tokens:
+            cleaned = tok.lstrip("<>|&;\"'").rstrip("<>|&;\"'")
+            if not cleaned:
+                continue
+            if is_secrets_file(cleaned, secrets_file=secrets_file):
+                return True
+            if eff_cwd:
+                try:
+                    candidate = os.path.join(eff_cwd, cleaned)
+                    if is_secrets_file(candidate, secrets_file=secrets_file):
+                        return True
+                except Exception:
+                    pass
+
+    return False
+
 
 class PermissionAction(str, Enum):
     """Outcome of a tool permission check."""
@@ -112,6 +302,7 @@ BUILTIN_TOOLS = frozenset(
         "manage_subagent",
         "manage_shell",
         "update_plan",
+        "view_file",
     }
 )
 
@@ -312,8 +503,12 @@ def extract_tool_target_value(tool_name: str, args: Optional[Dict[str, Any]]) ->
     canonical = (tool_name or "").strip().lower()
     if canonical == "shell":
         return args.get("command")
-    if canonical in ("create", "edit", "read"):
-        return args.get("path")
+    if canonical in ("create", "edit", "read", "view_file"):
+        for key in ("path", "AbsolutePath", "file_path", "target_file", "TargetFile"):
+            val = args.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return None
     if canonical == "web_fetch":
         return args.get("url")
     return None
@@ -327,7 +522,7 @@ def suggest_pattern(tool_name: str, args: Optional[Dict[str, Any]]) -> Optional[
     canonical = (tool_name or "").strip().lower()
     if canonical == "shell":
         return extract_command_signature(val)
-    if canonical in ("create", "edit", "read"):
+    if canonical in ("create", "edit", "read", "view_file"):
         # Suggest directory pattern or basename
         dirname = os.path.dirname(val)
         if dirname and dirname not in (".", "/"):
@@ -448,7 +643,7 @@ def evaluate_pattern_rules(
     if canonical == "shell":
         return _evaluate_shell_rules(target, rules)
 
-    if canonical in ("create", "edit", "read"):
+    if canonical in ("create", "edit", "read", "view_file"):
         return _evaluate_target_rules(target, rules, match_path_pattern, subject=f"Path '{target}'")
 
     if canonical == "web_fetch":
@@ -461,8 +656,9 @@ def is_path_within_workspace(
     target_path: str,
     workspace_roots: Sequence[str],
     allow_temp: bool = True,
+    allowed_read_roots: Optional[Sequence[str]] = None,
 ) -> bool:
-    """Checks whether a target path is contained within any of the workspace roots or system temp.
+    """Checks whether a target path is contained within any of the workspace roots, system temp, or allowed read roots.
 
     Normalizes paths using realpath and abspath to protect against path traversal and symlink escapes.
     Safely handles missing or invalid paths and exceptions.
@@ -471,7 +667,7 @@ def is_path_within_workspace(
         return False
 
     try:
-        norm_target = os.path.normcase(os.path.realpath(os.path.abspath(target_path.strip())))
+        norm_target = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(target_path.strip()))))
     except Exception:
         return False
 
@@ -483,20 +679,45 @@ def is_path_within_workspace(
 
     for root in candidates:
         try:
-            norm_root = os.path.normcase(os.path.realpath(os.path.abspath(root)))
+            norm_root = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(root))))
             if os.path.commonpath([norm_target, norm_root]) == norm_root:
                 return True
         except (ValueError, Exception):
             continue
 
     if allow_temp:
-        temp_candidates = [tempfile.gettempdir(), "/tmp", "/private/tmp"]
-        for temp_dir in temp_candidates:
-            if not temp_dir:
+        # CONFIG_DIR (~/.johnston) is the application directory containing configuration,
+        # history, and secrets. It must never be treated as a temporary scratch directory,
+        # even if running in test environments where CONFIG_DIR is placed in a temp folder.
+        is_in_config_dir = False
+        try:
+            cfg_dir = get_config_dir()
+            if cfg_dir:
+                norm_cfg = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(cfg_dir))))
+                if os.path.commonpath([norm_target, norm_cfg]) == norm_cfg:
+                    is_in_config_dir = True
+        except Exception:
+            pass
+
+        if not is_in_config_dir:
+            temp_candidates = [tempfile.gettempdir(), "/tmp", "/private/tmp"]
+            for temp_dir in temp_candidates:
+                if not temp_dir:
+                    continue
+                try:
+                    norm_temp = os.path.normcase(os.path.realpath(os.path.abspath(temp_dir)))
+                    if os.path.commonpath([norm_target, norm_temp]) == norm_temp:
+                        return True
+                except (ValueError, Exception):
+                    continue
+
+    if allowed_read_roots:
+        for r_root in allowed_read_roots:
+            if not r_root or not isinstance(r_root, str) or not r_root.strip():
                 continue
             try:
-                norm_temp = os.path.normcase(os.path.realpath(os.path.abspath(temp_dir)))
-                if os.path.commonpath([norm_target, norm_temp]) == norm_temp:
+                norm_r = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(r_root.strip()))))
+                if os.path.commonpath([norm_target, norm_r]) == norm_r:
                     return True
             except (ValueError, Exception):
                 continue
@@ -509,25 +730,63 @@ def evaluate_workspace_boundary(
     args: Optional[Dict[str, Any]],
     workspace_roots: Sequence[str],
     outside_action: PermissionAction = PermissionAction.ASK,
+    allowed_read_roots: Optional[Sequence[str]] = None,
+    secrets_file: Optional[str] = None,
 ) -> Optional[PermissionDecision]:
-    """Evaluates whether a tool call accesses a path outside the permitted workspace roots.
+    """Evaluates whether a tool call accesses a path outside the permitted workspace roots,
+    or attempts to access the protected secrets file.
 
-    Extracts path for file tools (create, edit, read) or cwd for shell (if specified).
-    Returns PermissionDecision if path is outside workspace roots, otherwise None.
+    Extracts path for file tools (create, edit, read, view_file) or cwd/command for shell.
+    Returns PermissionDecision if path is outside workspace roots or targets secrets, otherwise None.
     """
     canonical = (tool_name or "").strip().lower()
+
+    if canonical == "shell":
+        cmd = args.get("command") if isinstance(args, dict) else None
+        cwd = args.get("cwd") if isinstance(args, dict) else None
+        if cmd and is_secrets_shell_command(cmd, cwd=cwd, secrets_file=secrets_file):
+            return PermissionDecision(
+                PermissionAction.DENY,
+                "Access to secrets file is denied",
+            )
+        if cwd and isinstance(cwd, str) and cwd.strip():
+            if is_secrets_file(cwd.strip(), secrets_file=secrets_file):
+                return PermissionDecision(
+                    PermissionAction.DENY,
+                    f"Access to secrets file '{cwd.strip()}' is denied",
+                )
+            if not is_path_within_workspace(cwd.strip(), workspace_roots):
+                action = outside_action
+                if isinstance(action, str):
+                    try:
+                        action = PermissionAction(action.lower())
+                    except ValueError:
+                        action = PermissionAction.ASK
+                return PermissionDecision(action, f"Path '{cwd.strip()}' is outside workspace roots")
+        return None
+
     target: Optional[str] = None
-    if canonical in ("create", "edit", "read"):
+    if canonical in ("create", "edit", "read", "view_file"):
         target = extract_tool_target_value(canonical, args)
-    elif canonical == "shell":
-        if isinstance(args, dict):
-            target = args.get("cwd")
 
     if not target or not isinstance(target, str) or not target.strip():
         return None
 
     target = target.strip()
-    if not is_path_within_workspace(target, workspace_roots):
+
+    # 1. Protection for SECRETS_FILE: always DENY across all file tools
+    if is_secrets_file(target, secrets_file=secrets_file):
+        return PermissionDecision(
+            PermissionAction.DENY,
+            f"Access to secrets file '{target}' is denied",
+        )
+
+    # 2. Workspace boundary check with read-only root support (LOGS_DIR)
+    effective_read_roots = None
+    if canonical in READ_ONLY_TOOLS:
+        effective_read_roots = allowed_read_roots if allowed_read_roots is not None else get_trusted_read_roots()
+
+    if not is_path_within_workspace(target, workspace_roots, allowed_read_roots=effective_read_roots):
         action = outside_action
         if isinstance(action, str):
             try:
