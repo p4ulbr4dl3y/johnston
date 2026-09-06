@@ -47,6 +47,9 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         self.pm.clear_session_overrides()
 
     def test_get_root_scope(self):
+        import json
+        from unittest.mock import patch
+
         # Primary
         self.assertEqual(get_root_scope(self.pm, self.project_dir), "primary")
 
@@ -57,6 +60,44 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(get_root_scope(self.pm, extra), "session")
         finally:
             os.rmdir(extra)
+
+        # Local
+        local_dir = os.path.realpath(tempfile.mkdtemp())
+        try:
+            dot_j = os.path.join(self.project_dir, ".johnston")
+            os.makedirs(dot_j, exist_ok=True)
+            with open(os.path.join(dot_j, "config.local.json"), "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"writable_roots": [local_dir]}}, f)
+            self.assertEqual(get_root_scope(self.pm, local_dir), "local")
+        finally:
+            os.rmdir(local_dir)
+
+        # Project
+        proj_dir = os.path.realpath(tempfile.mkdtemp())
+        try:
+            dot_j = os.path.join(self.project_dir, ".johnston")
+            os.makedirs(dot_j, exist_ok=True)
+            with open(os.path.join(dot_j, "config.json"), "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"writable_roots": [proj_dir]}}, f)
+            self.assertEqual(get_root_scope(self.pm, proj_dir), "project")
+        finally:
+            os.rmdir(proj_dir)
+
+        # Global
+        global_dir = os.path.realpath(tempfile.mkdtemp())
+        global_cfg = os.path.join(self.temp_dir.name, "fake_global_config.json")
+        try:
+            with open(global_cfg, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"writable_roots": [global_dir]}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", global_cfg):
+                self.assertEqual(get_root_scope(self.pm, global_dir), "global")
+                # Also test remove_persisted_workspace_root on global config
+                self.pm.remove_persisted_workspace_root(global_dir)
+                with open(global_cfg, "r", encoding="utf-8") as f:
+                    after = json.load(f)
+                self.assertNotIn(global_dir, after.get("permissions", {}).get("writable_roots", []))
+        finally:
+            os.rmdir(global_dir)
 
     def test_format_workspace_path(self):
         home = os.path.realpath(os.path.expanduser("~"))

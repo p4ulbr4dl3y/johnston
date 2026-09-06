@@ -115,6 +115,20 @@ def get_root_scope(pm: PermissionManager, path: str) -> str:
                     return scope
             except Exception:
                 pass
+
+    try:
+        from core.permission_manager import CONFIG_FILE as global_path
+
+        if os.path.isfile(global_path):
+            with open(global_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            perms = data.get("permissions", {})
+            roots = perms.get("writable_roots", [])
+            if any(os.path.realpath(os.path.abspath(r)) == norm for r in roots if isinstance(r, str)):
+                return "global"
+    except Exception:
+        pass
+
     return "session"
 
 

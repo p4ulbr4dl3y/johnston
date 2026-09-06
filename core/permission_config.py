@@ -190,12 +190,18 @@ class PermissionConfigStore:
         path: str,
         project_dir: Optional[str] = None,
     ) -> None:
-        """Removes path from config.local.json / config.json if present."""
+        """Removes path from config.local.json / config.json / global CONFIG_FILE if present."""
         abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(path)))
 
         pdir = self._resolve_pdir(project_dir)
-        for filename in ("config.local.json", "config.json"):
-            cfg_path = os.path.join(pdir, ".johnston", filename)
+        from core.permission_manager import CONFIG_FILE as global_path
+
+        candidates = [
+            os.path.join(pdir, ".johnston", "config.local.json"),
+            os.path.join(pdir, ".johnston", "config.json"),
+            global_path,
+        ]
+        for cfg_path in candidates:
             if not os.path.isfile(cfg_path):
                 continue
             try:
