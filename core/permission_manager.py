@@ -1,8 +1,6 @@
-import json
 import os
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
-from core.domain.defaults.config import DEFAULT_PERMISSIONS
 from core.domain.policies.permission_policy import (
     BUILTIN_TOOLS,
     VALID_ACTIONS,
@@ -12,30 +10,14 @@ from core.domain.policies.permission_policy import (
     evaluate_pattern_rules,
     evaluate_workspace_boundary,
     get_mode_baseline_action,
-    merge_perms,
     normalize_execution_mode,
 )
 from core.infrastructure.platform.paths import CONFIG_FILE, LOGS_DIR, SECRETS_FILE
-from core.infrastructure.platform.platform_utils import cached_json_read
-from core.infrastructure.runtime.git_utils import is_git_repository
+from core.infrastructure.runtime.git_utils import is_git_repository  # noqa: F401  (re-exported for patching)
 from core.infrastructure.runtime.tool_name import normalize_tool_name
+from core.permission_config import PermissionConfigStore
 
 __all__ = ["PermissionManager", "CONFIG_FILE", "LOGS_DIR", "SECRETS_FILE"]
-
-# Effective-permissions cache entry: (tuple of 3 file paths, tuple of 3 mtimes, merged perms).
-_EffectiveCache = Tuple[
-    Tuple[str, str, str],
-    Tuple[Optional[float], Optional[float], Optional[float]],
-    Dict[str, Any],
-]
-
-
-def _file_mtime(path: str) -> Optional[float]:
-    """Returns the file mtime used as a cache key, or None when unreadable/missing."""
-    try:
-        return os.path.getmtime(path)
-    except OSError:
-        return None
 
 
 class PermissionManager:
@@ -55,11 +37,31 @@ class PermissionManager:
         self.builtin_tool_names = builtin_tool_names if builtin_tool_names is not None else BUILTIN_TOOLS
         self.current_project_dir: Optional[str] = None
         self.workspace_roots: List[str] = [os.path.realpath(os.getcwd())]
-        self._effective_cache: Optional[_EffectiveCache] = None
-        self._effective_cache_by_key: Dict[
-            Tuple[Tuple[str, str, str], Tuple[Optional[float], Optional[float], Optional[float]]],
-            Dict[str, Any],
-        ] = {}
+        self._config = PermissionConfigStore(
+            current_project_dir=self.current_project_dir,
+            workspace_roots=self.workspace_roots,
+            tool_name_normalizer=tool_name_normalizer,
+        )
+
+    # ── effective-permissions cache (proxied to config store) ──────────────
+
+    @property
+    def _effective_cache(self):
+        """Effective-permissions cache entry, proxied to the config store."""
+        return self._config._effective_cache
+
+    @_effective_cache.setter
+    def _effective_cache(self, value) -> None:
+        self._config._effective_cache = value
+
+    @property
+    def _effective_cache_by_key(self):
+        """Effective-permissions per-key cache, proxied to the config store."""
+        return self._config._effective_cache_by_key
+
+    @_effective_cache_by_key.setter
+    def _effective_cache_by_key(self, value) -> None:
+        self._config._effective_cache_by_key = value
 
     @classmethod
     def get_instance(cls) -> "PermissionManager":
@@ -84,14 +86,7 @@ class PermissionManager:
         )
         return cls._instance
 
-    @property
-    def execution_mode(self) -> ExecutionMode:
-        """Returns the active execution mode (session override or config default)."""
-        if self.session_mode is not None:
-            return self.session_mode
-        effective = self.get_effective_permissions()
-        configured_mode = effective.get("mode")
-        return normalize_execution_mode(configured_mode, default=ExecutionMode.REVIEW)
+    # ── session overrides ───────────────────────────────────────────────────
 
     def set_session_mode(self, mode: Any) -> ExecutionMode:
         """Sets a runtime session execution mode override ('review', 'edits', 'yolo')."""
@@ -122,15 +117,13 @@ class PermissionManager:
         existing = [r for r in self.session_pattern_overrides[canonical] if r.get("pattern") != pat]
         self.session_pattern_overrides[canonical] = [{"pattern": pat, "action": raw}] + existing
 
-    def _normalize_name(self, tool_name: str) -> str:
-        """Canonicalizes a tool name via the injected normalizer, falling back
-        to the shared normalize_tool_name when none is provided."""
-        if self.tool_name_normalizer:
-            try:
-                return self.tool_name_normalizer(tool_name)
-            except Exception:
-                return normalize_tool_name(tool_name)
-        return normalize_tool_name(tool_name)
+    def clear_session_overrides(self) -> None:
+        self.session_overrides.clear()
+        self.session_pattern_overrides.clear()
+        self.session_mode = None
+        self._config.invalidate_cache()
+
+    # ── workspace root in-memory ────────────────────────────────────────────
 
     def add_workspace_root(self, path: str) -> None:
         """Normalizes path via os.path.realpath(os.path.abspath(path)) and appends if not present."""
@@ -164,42 +157,30 @@ class PermissionManager:
         """Updates self.current_project_dir and sets primary workspace root."""
         norm = os.path.realpath(os.path.abspath(path))
         self.current_project_dir = norm
+        self._config.current_project_dir = norm
         additional = [r for r in self.workspace_roots[1:] if r != norm]
         self.workspace_roots = [norm] + additional
 
+    # ── normalization ───────────────────────────────────────────────────────
+
+    def _normalize_name(self, tool_name: str) -> str:
+        """Canonicalizes a tool name via the injected normalizer, falling back
+        to the shared normalize_tool_name when none is provided."""
+        if self.tool_name_normalizer:
+            try:
+                return self.tool_name_normalizer(tool_name)
+            except Exception:
+                return normalize_tool_name(tool_name)
+        return normalize_tool_name(tool_name)
+
+    # ── config persistence (delegates to _config) ───────────────────────────
+
     def ensure_gitignore(self, project_dir: Optional[str] = None) -> bool:
         """Ensures .johnston/config.local.json is listed in <project_dir>/.gitignore if git exists."""
+        from core.permission_config import ensure_gitignore as _ensure
+
         pdir = os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
-        has_git = (
-            os.path.exists(os.path.join(pdir, ".git"))
-            or os.path.exists(os.path.join(pdir, ".gitignore"))
-            or is_git_repository(pdir)
-        )
-        if not has_git:
-            return False
-
-        gitignore_path = os.path.join(pdir, ".gitignore")
-        target_entry = ".johnston/config.local.json"
-        content = ""
-        if os.path.exists(gitignore_path):
-            try:
-                with open(gitignore_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-            except OSError:
-                return False
-
-            lines = [line.strip() for line in content.splitlines()]
-            if target_entry in lines or f"/{target_entry}" in lines:
-                return True
-
-        try:
-            with open(gitignore_path, "a", encoding="utf-8") as f:
-                if content and not content.endswith("\n"):
-                    f.write("\n")
-                f.write(f"{target_entry}\n")
-            return True
-        except OSError:
-            return False
+        return _ensure(pdir)
 
     def save_workspace_root(
         self,
@@ -214,64 +195,7 @@ class PermissionManager:
         """
         abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(path)))
         self.add_workspace_root(abs_path)
-
-        if scope == "session":
-            return "session"
-
-        pdir = os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
-        if scope == "local":
-            target_file = os.path.join(pdir, ".johnston", "config.local.json")
-            actual_scope = "local"
-        elif scope == "project":
-            target_file = os.path.join(pdir, ".johnston", "config.json")
-            actual_scope = "project"
-        else:  # auto
-            has_git = (
-                os.path.exists(os.path.join(pdir, ".git"))
-                or os.path.exists(os.path.join(pdir, ".gitignore"))
-                or is_git_repository(pdir)
-            )
-            if has_git:
-                target_file = os.path.join(pdir, ".johnston", "config.local.json")
-                actual_scope = "local"
-            else:
-                target_file = os.path.join(pdir, ".johnston", "config.json")
-                actual_scope = "project"
-
-        data: Dict[str, Any] = {}
-        if os.path.isfile(target_file):
-            try:
-                with open(target_file, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                    if isinstance(loaded, dict):
-                        data = loaded
-            except Exception:
-                data = {}
-
-        perms = data.setdefault("permissions", {})
-        if not isinstance(perms, dict):
-            perms = {}
-            data["permissions"] = perms
-
-        writable_roots = perms.setdefault("writable_roots", [])
-        if not isinstance(writable_roots, list):
-            writable_roots = []
-            perms["writable_roots"] = writable_roots
-
-        if abs_path not in writable_roots:
-            writable_roots.append(abs_path)
-
-        os.makedirs(os.path.dirname(target_file), exist_ok=True)
-        with open(target_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
-
-        if actual_scope == "local":
-            self.ensure_gitignore(pdir)
-
-        self._effective_cache = None
-        self._effective_cache_by_key.clear()
-        return actual_scope
+        return self._config.save_workspace_root(path, scope=scope, project_dir=project_dir)
 
     def remove_persisted_workspace_root(
         self,
@@ -281,39 +205,7 @@ class PermissionManager:
         """Removes path from memory and from config.local.json / config.json if present."""
         abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(path)))
         self.remove_workspace_root(abs_path)
-
-        pdir = os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
-        for filename in ("config.local.json", "config.json"):
-            cfg_path = os.path.join(pdir, ".johnston", filename)
-            if not os.path.isfile(cfg_path):
-                continue
-            try:
-                with open(cfg_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                if not isinstance(data, dict):
-                    continue
-                perms = data.get("permissions")
-                if not isinstance(perms, dict):
-                    continue
-                roots = perms.get("writable_roots")
-                if not isinstance(roots, list):
-                    continue
-                norm = os.path.realpath(os.path.abspath(abs_path))
-                new_roots = [
-                    r
-                    for r in roots
-                    if r != abs_path and (not isinstance(r, str) or os.path.realpath(os.path.abspath(r)) != norm)
-                ]
-                if len(new_roots) != len(roots):
-                    perms["writable_roots"] = new_roots
-                    with open(cfg_path, "w", encoding="utf-8") as f:
-                        json.dump(data, f, indent=2)
-                        f.write("\n")
-            except Exception:
-                pass
-
-        self._effective_cache = None
-        self._effective_cache_by_key.clear()
+        self._config.remove_persisted_workspace_root(path, project_dir=project_dir)
 
     def save_tool_permission(
         self,
@@ -331,61 +223,7 @@ class PermissionManager:
             return "session"
 
         self.set_session_override(canonical, act)
-        if scope == "session":
-            return "session"
-
-        pdir = os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
-        if scope == "local":
-            target_file = os.path.join(pdir, ".johnston", "config.local.json")
-            actual_scope = "local"
-        elif scope == "project":
-            target_file = os.path.join(pdir, ".johnston", "config.json")
-            actual_scope = "project"
-        else:
-            has_git = (
-                os.path.exists(os.path.join(pdir, ".git"))
-                or os.path.exists(os.path.join(pdir, ".gitignore"))
-                or is_git_repository(pdir)
-            )
-            target_file = (
-                os.path.join(pdir, ".johnston", "config.local.json")
-                if has_git
-                else os.path.join(pdir, ".johnston", "config.json")
-            )
-            actual_scope = "local" if has_git else "project"
-
-        data: Dict[str, Any] = {}
-        if os.path.isfile(target_file):
-            try:
-                with open(target_file, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                    if isinstance(loaded, dict):
-                        data = loaded
-            except Exception:
-                data = {}
-
-        perms = data.setdefault("permissions", {})
-        if not isinstance(perms, dict):
-            perms = {}
-            data["permissions"] = perms
-
-        tools = perms.setdefault("tools", {})
-        if not isinstance(tools, dict):
-            tools = {}
-            perms["tools"] = tools
-        tools[canonical] = act
-
-        os.makedirs(os.path.dirname(target_file), exist_ok=True)
-        with open(target_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
-
-        if actual_scope == "local":
-            self.ensure_gitignore(pdir)
-
-        self._effective_cache = None
-        self._effective_cache_by_key.clear()
-        return actual_scope
+        return self._config.save_tool_permission(tool_name, action=action, scope=scope, project_dir=project_dir)
 
     def save_pattern_permission(
         self,
@@ -403,149 +241,15 @@ class PermissionManager:
             return "session"
 
         self.set_session_pattern_override(canonical, pat, act)
-        if scope == "session":
-            return "session"
+        return self._config.save_pattern_permission(
+            tool_name, pattern, action=action, scope=scope, project_dir=project_dir
+        )
 
-        pdir = os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
-        if scope == "local":
-            target_file = os.path.join(pdir, ".johnston", "config.local.json")
-            actual_scope = "local"
-        elif scope == "project":
-            target_file = os.path.join(pdir, ".johnston", "config.json")
-            actual_scope = "project"
-        else:
-            has_git = (
-                os.path.exists(os.path.join(pdir, ".git"))
-                or os.path.exists(os.path.join(pdir, ".gitignore"))
-                or is_git_repository(pdir)
-            )
-            target_file = (
-                os.path.join(pdir, ".johnston", "config.local.json")
-                if has_git
-                else os.path.join(pdir, ".johnston", "config.json")
-            )
-            actual_scope = "local" if has_git else "project"
-
-        data: Dict[str, Any] = {}
-        if os.path.isfile(target_file):
-            try:
-                with open(target_file, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                    if isinstance(loaded, dict):
-                        data = loaded
-            except Exception:
-                data = {}
-
-        perms = data.setdefault("permissions", {})
-        if not isinstance(perms, dict):
-            perms = {}
-            data["permissions"] = perms
-
-        patterns_map = perms.setdefault("patterns", {})
-        if not isinstance(patterns_map, dict):
-            patterns_map = {}
-            perms["patterns"] = patterns_map
-
-        rules = patterns_map.setdefault(canonical, [])
-        if not isinstance(rules, list):
-            rules = []
-            patterns_map[canonical] = rules
-
-        rules = [r for r in rules if not (isinstance(r, dict) and r.get("pattern") == pat)]
-        rules.insert(0, {"pattern": pat, "action": act})
-        patterns_map[canonical] = rules
-
-        os.makedirs(os.path.dirname(target_file), exist_ok=True)
-        with open(target_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
-
-        if actual_scope == "local":
-            self.ensure_gitignore(pdir)
-
-        self._effective_cache = None
-        self._effective_cache_by_key.clear()
-        return actual_scope
-
-    def clear_session_overrides(self) -> None:
-        self.session_overrides.clear()
-        self.session_pattern_overrides.clear()
-        self.session_mode = None
-        self._effective_cache = None
-        self._effective_cache_by_key.clear()
-
-    def _load_json_config(self, filepath: str) -> Dict[str, Any]:
-        data = cached_json_read(filepath, {})
-        return data if isinstance(data, dict) else {}
+    # ── permission evaluation ───────────────────────────────────────────────
 
     def get_effective_permissions(self, project_dir: Optional[str] = None) -> Dict[str, Any]:
-        """Merges global, project, and local config on top of DEFAULT_PERMISSIONS.
-
-        Cascade order:
-        1. Base DEFAULT_PERMISSIONS
-        2. Global config: CONFIG_FILE (~/.johnston/config.json)
-        3. Project shared config: <project_dir>/.johnston/config.json
-        4. Project local config: <project_dir>/.johnston/config.local.json
-
-        If project_dir is None, defaults to self.current_project_dir or os.getcwd().
-        Caches effective permissions keyed by all three file paths and their mtimes.
-        """
-        pdir = os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
-
-        global_path = CONFIG_FILE
-        shared_path = os.path.join(pdir, ".johnston", "config.json")
-        local_path = os.path.join(pdir, ".johnston", "config.local.json")
-
-        global_mtime = _file_mtime(global_path)
-        shared_mtime = _file_mtime(shared_path)
-        local_mtime = _file_mtime(local_path)
-
-        paths = (global_path, shared_path, local_path)
-        stamps = (global_mtime, shared_mtime, local_mtime)
-        cache_key = (paths, stamps)
-
-        if (
-            self._effective_cache is not None
-            and self._effective_cache[0] == paths
-            and self._effective_cache[1] == stamps
-        ):
-            return self._effective_cache[2]
-
-        if cache_key in self._effective_cache_by_key:
-            merged = self._effective_cache_by_key[cache_key]
-            self._effective_cache = (paths, stamps, merged)
-            return merged
-
-        # Auto-gitignore helper: when <project_dir>/.johnston/config.local.json exists or is updated,
-        # ensure .johnston/config.local.json is listed in <project_dir>/.gitignore if git exists.
-        if os.path.exists(local_path):
-            self.ensure_gitignore(pdir)
-
-        # 1. Base defaults
-        merged: Dict[str, Any] = {
-            "mode": DEFAULT_PERMISSIONS.get("mode", "review"),
-            "default": DEFAULT_PERMISSIONS.get("default", "allow"),
-            "tools": dict(DEFAULT_PERMISSIONS.get("tools", {})),
-            "patterns": {k: list(v) for k, v in DEFAULT_PERMISSIONS.get("patterns", {}).items()},
-            "writable_roots": list(DEFAULT_PERMISSIONS.get("writable_roots", [])),
-            "outside_workspace_action": DEFAULT_PERMISSIONS.get("outside_workspace_action", "ask"),
-        }
-
-        # 2. Global config, 3. Project shared config, 4. Project local config
-        for cfg_path in (global_path, shared_path, local_path):
-            cfg_data = self._load_json_config(cfg_path)
-            if not cfg_data:
-                continue
-            perms = cfg_data.get("permissions") if isinstance(cfg_data.get("permissions"), dict) else cfg_data
-            if "mode" in perms and isinstance(perms["mode"], str):
-                merged["mode"] = normalize_execution_mode(perms["mode"]).value
-            elif "mode" in cfg_data and isinstance(cfg_data["mode"], str):
-                merged["mode"] = normalize_execution_mode(cfg_data["mode"]).value
-            merge_perms(merged, perms)
-
-        self._effective_cache = (paths, stamps, merged)
-        self._effective_cache_by_key[cache_key] = merged
-        return merged
+        """Merges global, project, and local config on top of DEFAULT_PERMISSIONS."""
+        return self._config.get_effective_permissions(project_dir)
 
     def check_permission(
         self,
@@ -649,3 +353,14 @@ class PermissionManager:
             mode_action,
             f"Execution mode '{active_mode.value}' baseline for '{canonical_name}'",
         )
+
+    # ── properties ──────────────────────────────────────────────────────────
+
+    @property
+    def execution_mode(self) -> ExecutionMode:
+        """Returns the active execution mode (session override or config default)."""
+        if self.session_mode is not None:
+            return self.session_mode
+        effective = self.get_effective_permissions()
+        configured_mode = effective.get("mode")
+        return normalize_execution_mode(configured_mode, default=ExecutionMode.REVIEW)
