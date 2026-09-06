@@ -42,6 +42,14 @@ class TestMermaidRenderer:
         assert "Start" in result
         assert "End" in result
 
+    def test_fix_mojibake(self):
+        from widgets.utils.mermaid_renderer import _fix_mojibake
+
+        mojibake = "Ð\x94Ð°"
+        assert _fix_mojibake(mojibake) == "Да"
+        mojibake2 = "Ð\x9dÐµÑ\x82"
+        assert _fix_mojibake(mojibake2) == "Нет"
+
     def test_render_mermaid_cached(self):
         code = "graph TD\n    A[X] --> B[Y]"
         first = render_mermaid_to_ascii(code)

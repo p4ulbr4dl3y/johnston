@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from typing import Optional
@@ -44,6 +45,23 @@ def clean_mermaid_code(code: str) -> str:
     return "\n".join(lines).strip()
 
 
+_MOJIBAKE_RE = re.compile(
+    r"(?:[\u00c0-\u00df][\u0080-\u00bf]|[\u00e0-\u00ef][\u0080-\u00bf]{2}|[\u00f0-\u00f7][\u0080-\u00bf]{3})+"
+)
+
+
+def _fix_mojibake(text: str) -> str:
+    """Repair double-encoded UTF-8 artifacts produced by some Go lexers on non-ASCII edge labels."""
+
+    def _repair(match: re.Match) -> str:
+        try:
+            return match.group(0).encode("latin1").decode("utf-8")
+        except Exception:
+            return match.group(0)
+
+    return _MOJIBAKE_RE.sub(_repair, text)
+
+
 def render_mermaid_to_ascii(code: str, timeout: float = 2.0) -> Optional[str]:
     """Render mermaid code to ASCII/Unicode diagram string using mermaid-ascii.
 
@@ -71,7 +89,7 @@ def render_mermaid_to_ascii(code: str, timeout: float = 2.0) -> Optional[str]:
             timeout=timeout,
         )
         if res.returncode == 0 and res.stdout.strip():
-            output = res.stdout.rstrip()
+            output = _fix_mojibake(res.stdout.rstrip())
             _store_cache(cleaned, output)
             return output
     except Exception:
