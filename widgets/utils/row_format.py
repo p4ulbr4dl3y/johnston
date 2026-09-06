@@ -25,6 +25,8 @@ MODAL_WIDE_ROW_WIDTH = 98
 MODAL_MEDIUM_ROW_WIDTH = 80
 MODAL_DEFAULT_ROW_WIDTH = 72
 DIFF_SIDEBAR_ROW_WIDTH = 31
+WORKSPACE_SIDEBAR_ROW_WIDTH = 40
+
 
 
 def format_relative_time(ts: float | int | None, now: float | int | None = None) -> str:

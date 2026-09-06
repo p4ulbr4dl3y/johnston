@@ -1141,6 +1141,83 @@ ModalScreen OptionList > .option-list--option-hover {
     background: transparent;
 }
 
+#workspace-split-container {
+    width: 100%;
+    height: 14;
+    layout: horizontal;
+    margin: 0 0 1 0;
+}
+
+#workspace-left-pane {
+    width: 44;
+    height: 100%;
+    border-right: solid $border;
+    padding-right: 1;
+}
+
+#workspace-left-pane.-full-width {
+    width: 100%;
+    border-right: none;
+    padding-right: 0;
+}
+
+#workspace-left-pane #workspace-option-list {
+    height: 100%;
+    max-height: 100%;
+}
+
+#workspace-right-pane {
+    width: 1fr;
+    height: 100%;
+    padding-left: 1;
+}
+
+#workspace-right-pane.-hidden {
+    display: none;
+}
+
+#workspace-tree-header {
+    width: 100%;
+    height: 1;
+    color: $fg-muted;
+    text-style: bold;
+    margin-bottom: 0;
+}
+
+#workspace-dir-tree {
+    width: 100%;
+    height: 1fr;
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+#modal-dialog #workspace-dir-tree:focus .tree--cursor {
+    background: transparent;
+    color: $fg-primary;
+    text-style: bold;
+}
+
+#modal-dialog #workspace-dir-tree .tree--cursor {
+    background: transparent;
+    color: $fg-secondary;
+}
+
+#modal-dialog #workspace-dir-tree .tree--guides {
+    color: $fg-muted;
+}
+
+#workspace-info-view {
+    width: 100%;
+    height: 1fr;
+    color: $fg-muted;
+    padding: 1 0;
+}
+
+#workspace-info-view.-hidden {
+    display: none;
+}
+
 #modal-dialog Input,
 #modal-dialog Input:focus,
 .modal-input,
