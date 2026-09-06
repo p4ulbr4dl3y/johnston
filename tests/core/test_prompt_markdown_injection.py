@@ -108,6 +108,15 @@ class SubagentsMarkdownInjectionTests(unittest.TestCase):
         self.assertIn("&lt;/subagents&gt;", out)
         self.assertIn("&lt;x&gt;", out)
 
+    def test_subagent_rules_contain_policy_directives(self):
+        role = _Role(key="worker", description="worker agent")
+        out = format_subagents_markdown([role], max_concurrent=5)
+        self.assertIn("self-contained:", out)
+        self.assertIn("parallel vs serial:", out)
+        self.assertIn("permissions:", out)
+        self.assertIn("inspect diff, run tests, and run `git merge", out)
+        self.assertIn("≤5 parallel", out)
+
 
 class MCPServersMarkdownInjectionTests(unittest.TestCase):
     def test_server_and_tool_names_are_xml_escaped(self):
