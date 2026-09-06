@@ -19,7 +19,9 @@ from textual.style import Style
 from textual.widgets import Button, Label, Markdown, Static
 from textual.widgets._markdown import (
     MarkdownBlock,
+    MarkdownBlockQuote,
     MarkdownFence,
+    MarkdownParagraph,
     MarkdownTable,
     MarkdownTableCellContents,
     MarkdownTableContent,
@@ -145,6 +147,17 @@ _RE_DOUBLE_BULLET = re.compile(r"^(\s*)(?:[-*]|\d+\.)\s+[-*]\s+")
 _RE_BLOCKQUOTE_BULLET = re.compile(r"^(\s*>\s*)[-*]\s+")
 _RE_LIST_PREFIX = re.compile(r"^(\s*(?:[-*]|\d+\.))\s+(.*)")
 _RE_EXCESS_INDENT = re.compile(r"^(\s+)([-*]|\d+\.)\s+(.*)")
+_RE_ALERT_PREFIX = re.compile(r"^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*", re.IGNORECASE)
+_RE_ALERT_NO_SPACE = re.compile(r"^(\s*>+)\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]", re.IGNORECASE)
+_ALERT_CLASSES = {
+    "NOTE": "alert-note",
+    "TIP": "alert-tip",
+    "IMPORTANT": "alert-important",
+    "WARNING": "alert-warning",
+    "CAUTION": "alert-caution",
+}
+_RE_TASK_DONE = re.compile(r"^(\s*[-*+]\s+)\[[xX]\]\s*(.*)$")
+_RE_TASK_TODO = re.compile(r"^(\s*[-*+]\s+)\[ \]\s*(.*)$")
 
 
 def to_snake_case(name: str) -> str:
@@ -201,6 +214,29 @@ class CustomMarkdownTable(MarkdownTable):
         self._headers = headers
         self._rows = rows
         yield CustomMarkdownTableContent(headers, rows)
+
+
+class CustomMarkdownBlockQuote(MarkdownBlockQuote):
+    """Custom Markdown blockquote supporting GitHub-style alert callouts with color borders."""
+
+    def compose(self) -> ComposeResult:
+        if self._blocks:
+            first = self._blocks[0]
+            if isinstance(first, MarkdownParagraph) and hasattr(first, "_content"):
+                plain = first._content.plain
+                m = _RE_ALERT_PREFIX.match(plain)
+                if m:
+                    alert_type = m.group(1).upper()
+                    css_class = _ALERT_CLASSES.get(alert_type, "alert-note")
+                    self.add_class("alert")
+                    self.add_class(css_class)
+                    sliced = first._content[m.end():]
+                    if not sliced.plain.strip() and len(self._blocks) > 1:
+                        self._blocks.pop(0)
+                    else:
+                        first._content = sliced
+                        first.update(first._content)
+        yield from super().compose()
 
 
 class CustomMarkdownFence(MarkdownFence):
@@ -568,6 +604,7 @@ def _new_markdown_init(self, *args, **kwargs):
     # global patch still picks up the patched table/fence block classes.
     self.BLOCKS = Markdown.BLOCKS
     self.BLOCKS["table_open"] = CustomMarkdownTable
+    self.BLOCKS["blockquote_open"] = CustomMarkdownBlockQuote
     _old_markdown_init(self, *args, **kwargs)
 
 
@@ -673,6 +710,7 @@ def _apply_chat_markdown_patches() -> None:
     Markdown.BLOCKS["fence"] = CustomMarkdownFence
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
     Markdown.BLOCKS["table_open"] = CustomMarkdownTable
+    Markdown.BLOCKS["blockquote_open"] = CustomMarkdownBlockQuote
 
     Markdown.__init__ = _new_markdown_init
     MarkdownBlock._get_style = _new_markdown_block_get_style
@@ -730,6 +768,7 @@ def clean_markdown_for_rendering(text: str) -> str:
             line = _RE_DOUBLE_BULLET.sub(r"\1* ", line)
         if has_quote:
             line = _RE_BLOCKQUOTE_BULLET.sub(r"\1", line)
+            line = _RE_ALERT_NO_SPACE.sub(r"\1 [!\2]", line)
 
         if has_star or has_dash or has_digit:
             m_list = _RE_LIST_PREFIX.match(line)
@@ -742,6 +781,22 @@ def clean_markdown_for_rendering(text: str) -> str:
                 indent, marker, content = m.groups()
                 new_indent_len = min(len(indent), 8)
                 line = (" " * new_indent_len) + marker + " " + content
+
+        if has_star or has_dash or "+" in line:
+            m_done = _RE_TASK_DONE.match(line)
+            if m_done:
+                prefix, content = m_done.groups()
+                if content.startswith("~~") and content.endswith("~~"):
+                    line = f"{prefix}[✓] {content}"
+                elif content:
+                    line = f"{prefix}[✓] ~~{content}~~"
+                else:
+                    line = f"{prefix}[✓]"
+            else:
+                m_todo = _RE_TASK_TODO.match(line)
+                if m_todo:
+                    prefix, content = m_todo.groups()
+                    line = f"{prefix}[ ] {content}"
 
         if not line.strip():
             blank_run += 1

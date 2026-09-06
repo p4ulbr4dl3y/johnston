@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from textual.widgets import Label
 
 from widgets.presentation.widgets.chat_markdown import (
+    CustomMarkdownBlockQuote,
     CustomMarkdownFence,
     CustomMarkdownTable,
     CustomMarkdownTableContent,
@@ -436,3 +437,75 @@ class TestFenceHighlightCache(unittest.TestCase):
         for i in range(_HIGHLIGHT_CACHE_MAX + 10):
             CustomMarkdownFence.highlight(f"v = {i}\n", "python")
         self.assertEqual(len(_highlight_cache), _HIGHLIGHT_CACHE_MAX)
+
+    def test_clean_markdown_task_lists(self):
+        md = (
+            "- [x] Done item\n"
+            "- [X] Uppercase done\n"
+            "- [ ] Todo item\n"
+            "* [x] Star done\n"
+            "+ [x] Plus done\n"
+            "  - [x] Indented done\n"
+            "- [x] ~~Already struck~~\n"
+            "- Normal bullet"
+        )
+        cleaned = clean_markdown_for_rendering(md)
+        expected = (
+            "- [✓] ~~Done item~~\n"
+            "- [✓] ~~Uppercase done~~\n"
+            "- [ ] Todo item\n"
+            "* [✓] ~~Star done~~\n"
+            "+ [✓] ~~Plus done~~\n"
+            "  - [✓] ~~Indented done~~\n"
+            "- [✓] ~~Already struck~~\n"
+            "- Normal bullet"
+        )
+        self.assertEqual(cleaned, expected)
+
+    def test_clean_markdown_alert_spacing_normalization(self):
+        md = ">[!NOTE]\n> Note text\n>[!WARNING]\n> Warning text"
+        cleaned = clean_markdown_for_rendering(md)
+        self.assertIn("> [!NOTE]", cleaned)
+        self.assertIn("> [!WARNING]", cleaned)
+
+    def test_custom_markdown_blockquote_alert_types(self):
+        from textual.widgets import Markdown
+        from textual.widgets._markdown import MarkdownParagraph
+
+        from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
+
+        _apply_chat_markdown_patches()
+
+        cases = [
+            ("> [!NOTE]\n> This is info", "alert-note", "This is info"),
+            ("> [!TIP]\n> Helpful tip", "alert-tip", "Helpful tip"),
+            ("> [!IMPORTANT]\n> Key detail", "alert-important", "Key detail"),
+            ("> [!WARNING]\n> Be careful", "alert-warning", "Be careful"),
+            ("> [!CAUTION]\n> Danger zone", "alert-caution", "Danger zone"),
+        ]
+
+        for md_text, expected_class, expected_text in cases:
+            md = Markdown(md_text)
+            parser = md._parser_factory()
+            blocks = list(md._parse_markdown(parser.parse(md_text)))
+            bq = [b for b in blocks if isinstance(b, CustomMarkdownBlockQuote)][0]
+            rendered_blocks = list(bq.compose())
+            self.assertIn("alert", bq.classes)
+            self.assertIn(expected_class, bq.classes)
+            p = [b for b in rendered_blocks if isinstance(b, MarkdownParagraph)][0]
+            self.assertEqual(p._content.plain, expected_text)
+
+    def test_custom_markdown_blockquote_standard_quote(self):
+        from textual.widgets import Markdown
+
+        from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
+
+        _apply_chat_markdown_patches()
+        md_text = "> Just a regular quote"
+        md = Markdown(md_text)
+        parser = md._parser_factory()
+        blocks = list(md._parse_markdown(parser.parse(md_text)))
+        bq = [b for b in blocks if isinstance(b, CustomMarkdownBlockQuote)][0]
+        list(bq.compose())
+        self.assertNotIn("alert", bq.classes)
+

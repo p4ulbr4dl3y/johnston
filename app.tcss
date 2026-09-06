@@ -1313,6 +1313,28 @@ MarkdownBlockQuote {
     padding: 0 1;
 }
 
+MarkdownBlockQuote.alert {
+    color: $fg-primary;
+    border-left: solid $border;
+}
+
+MarkdownBlockQuote.alert-note,
+MarkdownBlockQuote.alert-important {
+    border-left: solid $accent-info;
+}
+
+MarkdownBlockQuote.alert-tip {
+    border-left: solid $accent-success;
+}
+
+MarkdownBlockQuote.alert-warning {
+    border-left: solid $accent-warning;
+}
+
+MarkdownBlockQuote.alert-caution {
+    border-left: solid $accent-error;
+}
+
 MarkdownBlockQuote MarkdownFence {
     border: none;
     margin: 0;
