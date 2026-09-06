@@ -1,5 +1,7 @@
 from tools.read.archive import (
     ARCHIVE_EXTENSIONS,
+    TAR_EXTENSIONS,
+    ZIP_EXTENSIONS,
     _format_entry_size,
     _inspect_archive,
     is_archive_file,
@@ -28,6 +30,8 @@ __all__ = [
     "process_image_file_sync",
     "is_archive_file",
     "ARCHIVE_EXTENSIONS",
+    "ZIP_EXTENSIONS",
+    "TAR_EXTENSIONS",
     "_format_entry_size",
     "_inspect_archive",
     "_inspect_directory",

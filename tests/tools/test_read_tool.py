@@ -479,6 +479,21 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("exceeds entry count", res.content)
 
 
+    async def test_read_wheel_and_jar_archive(self):
+        import zipfile
+        tool = ReadTool()
+        whl_path = os.path.join(self.test_dir, "testpkg-1.0.0-py3-none-any.whl")
+        with zipfile.ZipFile(whl_path, "w") as zf:
+            zf.writestr("testpkg/__init__.py", "x = 1\n")
+            zf.writestr("testpkg-1.0.0.dist-info/METADATA", "Name: testpkg\n")
+
+        res = await tool.execute({"path": whl_path})
+        self.assertEqual(res.status, ToolResultStatus.DONE)
+        self.assertIn("[archive", res.content)
+        self.assertIn("testpkg/__init__.py", res.content)
+        self.assertIn("testpkg-1.0.0.dist-info/METADATA", res.content)
+
+
 if __name__ == "__main__":
     unittest.main()
 

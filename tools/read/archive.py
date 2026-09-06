@@ -2,8 +2,16 @@ import os
 
 from core.domain.defaults.errors import ToolResult
 
-ARCHIVE_EXTENSIONS = (
+ZIP_EXTENSIONS = (
     ".zip",
+    ".whl",
+    ".jar",
+    ".war",
+    ".ear",
+    ".apk",
+)
+
+TAR_EXTENSIONS = (
     ".tar",
     ".tar.gz",
     ".tgz",
@@ -12,6 +20,8 @@ ARCHIVE_EXTENSIONS = (
     ".tar.xz",
     ".txz",
 )
+
+ARCHIVE_EXTENSIONS = ZIP_EXTENSIONS + TAR_EXTENSIONS
 
 
 def is_archive_file(path: str) -> bool:
@@ -42,7 +52,7 @@ def _inspect_archive(
     files: list[str] = []
 
     try:
-        if lower.endswith(".zip"):
+        if any(lower.endswith(ext) for ext in ZIP_EXTENSIONS):
             with zipfile.ZipFile(path, "r") as zf:
                 for info in zf.infolist():
                     name = info.filename
