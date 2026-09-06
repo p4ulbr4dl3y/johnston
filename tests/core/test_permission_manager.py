@@ -251,9 +251,9 @@ class TestPermissionManager(unittest.TestCase):
                 self.pm.get_effective_permissions()
                 self.assertIsNotNone(self.pm._effective_cache)
                 self.assertEqual(len(self.pm._effective_cache), 3)
-                path, stamp, perms = self.pm._effective_cache
-                self.assertEqual(path, cfg_file)
-                self.assertIsInstance(stamp, float)
+                paths, stamps, perms = self.pm._effective_cache
+                self.assertEqual(paths[0], cfg_file)
+                self.assertIsInstance(stamps[0], float)
                 self.assertIsInstance(perms, dict)
 
 
