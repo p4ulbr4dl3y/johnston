@@ -184,9 +184,11 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         # Hint text is unified with OptionList and collapses below BREAKPOINT_HINT (60)
         screen = PermissionConfirmScreen("read", {})
         self.assertIn("enter Select", screen._build_hint_text(width=80))
+        self.assertIn("1-5", screen._build_hint_text(width=80))
         self.assertIn("r Feedback", screen._build_hint_text(width=80))
         compact = screen._build_hint_text(width=40)
         self.assertIn("enter", compact)
+        self.assertIn("1-5", compact)
         self.assertIn("r", compact)
         self.assertNotIn("enter Select", compact)
 

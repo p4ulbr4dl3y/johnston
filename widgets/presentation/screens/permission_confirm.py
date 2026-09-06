@@ -478,9 +478,11 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         self._apply_dialog_fit()
 
     def _build_hint_text(self, width: Optional[int] = None) -> str:
+        num = len(getattr(self, "_options", []))
+        num_part = f" • 1-{num}" if num > 1 else (" • 1" if num == 1 else "")
         if isinstance(width, int) and is_compact_width(width, breakpoint=BREAKPOINT_HINT):
-            return "enter • 1-9 • r • esc"
-        return "enter Select • 1-9 • r Feedback • esc Deny"
+            return f"enter{num_part} • r • esc"
+        return f"enter Select{num_part} • r Feedback • esc Deny"
 
     def on_resize(self, event) -> None:
         self._apply_dialog_fit()
