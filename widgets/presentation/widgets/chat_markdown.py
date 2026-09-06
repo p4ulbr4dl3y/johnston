@@ -19,7 +19,12 @@ from textual.style import Style
 from textual.widgets import Button, Label, Markdown, Static
 from textual.widgets._markdown import (
     MarkdownBlock,
+    MarkdownBlockQuote,
+    MarkdownBullet,
+    MarkdownBulletList,
     MarkdownFence,
+    MarkdownListItem,
+    MarkdownParagraph,
     MarkdownTable,
     MarkdownTableCellContents,
     MarkdownTableContent,
@@ -116,7 +121,12 @@ def prewarm_fences_from_markdown(markdown: str, dark: bool = True) -> int:
         # only pre-warm blocks with actual content.
         if closed and code_lines:
             try:
-                CustomMarkdownFence.highlight("\n".join(code_lines), lang, dark=dark)
+                code_text = "\n".join(code_lines)
+                if lang and lang.strip().lower() in ("mermaid", "mmd"):
+                    from widgets.utils.mermaid_renderer import prewarm_mermaid
+
+                    prewarm_mermaid(code_text)
+                CustomMarkdownFence.highlight(code_text, lang, dark=dark)
                 count += 1
             except Exception:
                 pass
@@ -140,6 +150,17 @@ _RE_DOUBLE_BULLET = re.compile(r"^(\s*)(?:[-*]|\d+\.)\s+[-*]\s+")
 _RE_BLOCKQUOTE_BULLET = re.compile(r"^(\s*>\s*)[-*]\s+")
 _RE_LIST_PREFIX = re.compile(r"^(\s*(?:[-*]|\d+\.))\s+(.*)")
 _RE_EXCESS_INDENT = re.compile(r"^(\s+)([-*]|\d+\.)\s+(.*)")
+_RE_ALERT_PREFIX = re.compile(r"^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*", re.IGNORECASE)
+_RE_ALERT_NO_SPACE = re.compile(r"^(\s*>+)\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]", re.IGNORECASE)
+_ALERT_CLASSES = {
+    "NOTE": "alert-note",
+    "TIP": "alert-tip",
+    "IMPORTANT": "alert-important",
+    "WARNING": "alert-warning",
+    "CAUTION": "alert-caution",
+}
+_RE_TASK_DONE = re.compile(r"^(\s*[-*+]\s+)\[[xX]\]\s*(.*)$")
+_RE_TASK_TODO = re.compile(r"^(\s*[-*+]\s+)\[ \]\s*(.*)$")
 
 
 def to_snake_case(name: str) -> str:
@@ -198,6 +219,52 @@ class CustomMarkdownTable(MarkdownTable):
         yield CustomMarkdownTableContent(headers, rows)
 
 
+class CustomMarkdownBlockQuote(MarkdownBlockQuote):
+    """Custom Markdown blockquote supporting GitHub-style alert callouts with color borders."""
+
+    def compose(self) -> ComposeResult:
+        if self._blocks:
+            first = self._blocks[0]
+            if isinstance(first, MarkdownParagraph) and hasattr(first, "_content"):
+                plain = first._content.plain
+                m = _RE_ALERT_PREFIX.match(plain)
+                if m:
+                    alert_type = m.group(1).upper()
+                    css_class = _ALERT_CLASSES.get(alert_type, "alert-note")
+                    self.add_class("alert")
+                    self.add_class(css_class)
+                    sliced = first._content[m.end():]
+                    if not sliced.plain.strip() and len(self._blocks) > 1:
+                        self._blocks.pop(0)
+                    else:
+                        first._content = sliced
+                        first.update(first._content)
+        yield from super().compose()
+
+
+class CustomMarkdownBulletList(MarkdownBulletList):
+    """Custom Markdown bullet list that hides redundant bullets for task list items."""
+
+    def compose(self) -> ComposeResult:
+        for block in self._blocks:
+            if isinstance(block, MarkdownListItem):
+                bullet = MarkdownBullet()
+                is_task = False
+                if block._blocks:
+                    first = block._blocks[0]
+                    if isinstance(first, MarkdownParagraph) and hasattr(first, "_content"):
+                        plain = first._content.plain.lstrip()
+                        if plain.startswith("[✓]") or plain.startswith("[ ]"):
+                            is_task = True
+                if is_task:
+                    bullet.symbol = ""
+                    bullet.styles.display = "none"
+                else:
+                    bullet.symbol = block.bullet
+                yield Horizontal(bullet, Vertical(*block._blocks))
+        self._blocks.clear()
+
+
 class CustomMarkdownFence(MarkdownFence):
     """Markdown code block with a header line and Copy button."""
 
@@ -220,6 +287,14 @@ class CustomMarkdownFence(MarkdownFence):
     CustomMarkdownFence #code-content {
         height: auto;
         width: 100%;
+    }
+    CustomMarkdownFence.diagram-mode .fence-scroll-box {
+        overflow-x: auto;
+    }
+    CustomMarkdownFence.diagram-mode #code-content {
+        width: auto;
+        min-width: 100%;
+        text-wrap: nowrap;
     }
     """
 
@@ -261,8 +336,132 @@ class CustomMarkdownFence(MarkdownFence):
         _highlight_cache.put(key, content)
         return content
 
+    def __init__(self, markdown: Markdown, token: Any, code: str) -> None:
+        self._diagram_str: str | None = None
+        self._show_diagram: bool = False
+        self._render_attempted: bool = False
+        super().__init__(markdown, token, code)
+        lang_str = self.lexer.strip() if self.lexer else "text"
+        from widgets.utils.mermaid_renderer import get_cached_mermaid, is_mermaid
+
+        if is_mermaid(lang_str):
+            is_cached, cached_val = get_cached_mermaid(self.code)
+            if is_cached:
+                self._render_attempted = True
+                if cached_val:
+                    self._diagram_str = cached_val
+                    self._show_diagram = True
+
+    def on_mount(self) -> None:
+        lang_str = self.lexer.strip() if self.lexer else "text"
+        from widgets.utils.mermaid_renderer import is_mermaid
+
+        if is_mermaid(lang_str) and not self._diagram_str and not getattr(self, "_render_attempted", False):
+            self._render_attempted = True
+            try:
+                self.run_worker(self._async_render_mermaid(), exclusive=False)
+            except Exception:
+                pass
+
+    async def _async_render_mermaid(self) -> None:
+        import asyncio
+
+        from widgets.app.theme_manager import theme_manager
+        from widgets.utils.mermaid_renderer import format_mermaid_content, render_mermaid_to_ascii
+
+        rendered = await asyncio.to_thread(render_mermaid_to_ascii, self.code)
+        if not rendered or not getattr(self, "is_attached", True):
+            return
+
+        self._diagram_str = rendered
+        self._show_diagram = True
+
+        app = getattr(self, "app", None)
+        curr = getattr(app, "current_theme", None) or theme_manager.current_theme
+        is_dark = getattr(curr, "dark", True)
+
+        try:
+            toggle_btn = self.query_one(".fence-toggle-btn", Button)
+            toggle_btn.display = True
+            toggle_btn.label = "code"
+        except Exception:
+            pass
+
+        try:
+            self.add_class("diagram-mode")
+        except Exception:
+            pass
+        self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr))
+
+    def _copy_context(self, block: MarkdownBlock) -> None:
+        if isinstance(block, CustomMarkdownFence):
+            self._diagram_str = getattr(block, "_diagram_str", None)
+            self._show_diagram = getattr(block, "_show_diagram", False)
+            self._render_attempted = getattr(block, "_render_attempted", False)
+        super()._copy_context(block)
+
+    async def _update_from_block(self, block: MarkdownBlock) -> None:
+        if isinstance(block, CustomMarkdownFence):
+            self._copy_context(block)
+            from widgets.app.theme_manager import theme_manager
+            from widgets.utils.mermaid_renderer import format_mermaid_content, is_mermaid
+
+            app = getattr(self, "app", None)
+            curr = getattr(app, "current_theme", None) or theme_manager.current_theme
+            is_dark = getattr(curr, "dark", True)
+
+            lang_str = self.lexer.strip() if self.lexer else "text"
+            if is_mermaid(lang_str) and not self._diagram_str and not getattr(self, "_render_attempted", False):
+                self._render_attempted = True
+                try:
+                    self.run_worker(self._async_render_mermaid(), exclusive=False)
+                except Exception:
+                    pass
+
+            try:
+                toggle_btn = self.query_one(".fence-toggle-btn", Button)
+                toggle_btn.display = bool(self._diagram_str)
+                toggle_btn.label = "code" if self._show_diagram else "diagram"
+            except Exception:
+                pass
+
+            if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
+                try:
+                    self.add_class("diagram-mode")
+                except Exception:
+                    pass
+                self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr))
+            else:
+                try:
+                    self.remove_class("diagram-mode")
+                except Exception:
+                    pass
+                highlighted = getattr(block, "_highlighted_code", None)
+                if highlighted is None:
+                    highlighted = self.highlight(self.code, self.lexer, dark=is_dark)
+                self.set_content(highlighted)
+        else:
+            await super()._update_from_block(block)
+
     def compose(self) -> ComposeResult:
         lang_str = self.lexer.strip() if self.lexer else "text"
+        from widgets.utils.mermaid_renderer import format_mermaid_content, get_cached_mermaid, is_mermaid
+
+        if not hasattr(self, "_diagram_str"):
+            self._diagram_str = None
+        if not hasattr(self, "_show_diagram"):
+            self._show_diagram = False
+        if not hasattr(self, "_render_attempted"):
+            self._render_attempted = False
+
+        if not self._render_attempted and is_mermaid(lang_str):
+            is_cached, cached_val = get_cached_mermaid(self.code)
+            if is_cached:
+                self._render_attempted = True
+                if cached_val:
+                    self._diagram_str = cached_val
+                    self._show_diagram = True
+
         lang_label = Label(lang_str, classes="fence-lang")
         lang_label.ALLOW_SELECT = False
         copy_btn = Button("copy", classes="fence-copy-btn")
@@ -272,6 +471,12 @@ class CustomMarkdownFence(MarkdownFence):
         header.ALLOW_SELECT = False
         with header:
             yield lang_label
+            if is_mermaid(lang_str):
+                toggle_btn = Button("code" if self._show_diagram else "diagram", classes="fence-toggle-btn")
+                toggle_btn.can_focus = False
+                toggle_btn.ALLOW_SELECT = False
+                toggle_btn.display = bool(self._diagram_str)
+                yield toggle_btn
             yield copy_btn
 
         from widgets.app.theme_manager import theme_manager
@@ -280,13 +485,61 @@ class CustomMarkdownFence(MarkdownFence):
         is_ansi = getattr(app, "native_ansi_color", False) if app else True
         curr = getattr(app, "current_theme", None) or theme_manager.current_theme
         is_dark = getattr(curr, "dark", True)
-        code_content = self.highlight(self.code, self.lexer, ansi=is_ansi, dark=is_dark)
+        self._highlighted_code = self.highlight(self.code, self.lexer, ansi=is_ansi, dark=is_dark)
+
+        if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
+            try:
+                self.add_class("diagram-mode")
+            except Exception:
+                pass
+            initial_content = format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr)
+        else:
+            initial_content = self._highlighted_code
+
         with Vertical(classes="fence-scroll-box"):
-            yield Label(code_content, id="code-content", expand=True)
+            yield Label(initial_content, id="code-content", expand=True)
+
+    def toggle_diagram_view(self) -> None:
+        """Toggle between rendered ASCII diagram and raw code."""
+        if not getattr(self, "_diagram_str", None):
+            return
+        self._show_diagram = not getattr(self, "_show_diagram", False)
+
+        from widgets.app.theme_manager import theme_manager
+        from widgets.utils.mermaid_renderer import format_mermaid_content
+
+        app = getattr(self, "app", None)
+        curr = getattr(app, "current_theme", None) or theme_manager.current_theme
+        is_dark = getattr(curr, "dark", True)
+
+        try:
+            toggle_btn = self.query_one(".fence-toggle-btn", Button)
+            toggle_btn.label = "code" if self._show_diagram else "diagram"
+        except Exception:
+            pass
+
+        if self._show_diagram:
+            if hasattr(self, "_classes"):
+                self.add_class("diagram-mode")
+            self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr))
+        else:
+            if hasattr(self, "_classes"):
+                self.remove_class("diagram-mode")
+            try:
+                scroll_box = self.query_one(".fence-scroll-box", Vertical)
+                scroll_box.scroll_x = 0
+            except Exception:
+                pass
+            self.set_content(
+                getattr(self, "_highlighted_code", None) or self.highlight(self.code, self.lexer, dark=is_dark)
+            )
 
     def notify_style_update(self) -> None:
         """Update highlight theme when App theme changes."""
+        from textual.widgets._markdown import MarkdownFence
+
         from widgets.app.theme_manager import theme_manager
+        from widgets.utils.mermaid_renderer import format_mermaid_content
 
         app = getattr(self, "app", None)
         is_ansi = getattr(app, "native_ansi_color", False) if app else True
@@ -298,8 +551,18 @@ class CustomMarkdownFence(MarkdownFence):
             ansi=is_ansi,
             dark=is_dark,
         )
-        self.set_content(self._highlighted_code)
-        return super().notify_style_update()
+        if getattr(self, "_show_diagram", False) and getattr(self, "_diagram_str", None):
+            if hasattr(self, "_classes"):
+                self.add_class("diagram-mode")
+            self.set_content(format_mermaid_content(self._diagram_str, dark=is_dark, theme_obj=curr))
+        else:
+            if hasattr(self, "_classes"):
+                self.remove_class("diagram-mode")
+            self.set_content(self._highlighted_code)
+        try:
+            return super(MarkdownFence, self).notify_style_update()
+        except Exception:
+            return None
 
     def set_content(self, content: Any) -> None:
         self._content = content
@@ -318,11 +581,22 @@ class CustomMarkdownFence(MarkdownFence):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if "fence-copy-btn" in event.button.classes:
             try:
-                app = self.app
-                if hasattr(app, "copy_to_clipboard"):
-                    app.copy_to_clipboard(self.code)
+                try:
+                    app = self.app
+                except Exception:
+                    app = None
+                if app and hasattr(app, "copy_to_clipboard"):
+                    text_to_copy = (
+                        self._diagram_str
+                        if (getattr(self, "_show_diagram", False) and self._diagram_str)
+                        else self.code
+                    )
+                    app.copy_to_clipboard(text_to_copy)
             except Exception:
                 pass
+            event.stop()
+        elif "fence-toggle-btn" in event.button.classes:
+            self.toggle_diagram_view()
             event.stop()
 
 
@@ -356,6 +630,8 @@ def _new_markdown_init(self, *args, **kwargs):
     # global patch still picks up the patched table/fence block classes.
     self.BLOCKS = Markdown.BLOCKS
     self.BLOCKS["table_open"] = CustomMarkdownTable
+    self.BLOCKS["blockquote_open"] = CustomMarkdownBlockQuote
+    self.BLOCKS["bullet_list_open"] = CustomMarkdownBulletList
     _old_markdown_init(self, *args, **kwargs)
 
 
@@ -461,6 +737,8 @@ def _apply_chat_markdown_patches() -> None:
     Markdown.BLOCKS["fence"] = CustomMarkdownFence
     Markdown.BLOCKS["code_block"] = CustomMarkdownFence
     Markdown.BLOCKS["table_open"] = CustomMarkdownTable
+    Markdown.BLOCKS["blockquote_open"] = CustomMarkdownBlockQuote
+    Markdown.BLOCKS["bullet_list_open"] = CustomMarkdownBulletList
 
     Markdown.__init__ = _new_markdown_init
     MarkdownBlock._get_style = _new_markdown_block_get_style
@@ -518,6 +796,7 @@ def clean_markdown_for_rendering(text: str) -> str:
             line = _RE_DOUBLE_BULLET.sub(r"\1* ", line)
         if has_quote:
             line = _RE_BLOCKQUOTE_BULLET.sub(r"\1", line)
+            line = _RE_ALERT_NO_SPACE.sub(r"\1 [!\2]", line)
 
         if has_star or has_dash or has_digit:
             m_list = _RE_LIST_PREFIX.match(line)
@@ -530,6 +809,22 @@ def clean_markdown_for_rendering(text: str) -> str:
                 indent, marker, content = m.groups()
                 new_indent_len = min(len(indent), 8)
                 line = (" " * new_indent_len) + marker + " " + content
+
+        if has_star or has_dash or "+" in line:
+            m_done = _RE_TASK_DONE.match(line)
+            if m_done:
+                prefix, content = m_done.groups()
+                if content.startswith("~~") and content.endswith("~~"):
+                    line = f"{prefix}[✓] {content}"
+                elif content:
+                    line = f"{prefix}[✓] ~~{content}~~"
+                else:
+                    line = f"{prefix}[✓]"
+            else:
+                m_todo = _RE_TASK_TODO.match(line)
+                if m_todo:
+                    prefix, content = m_todo.groups()
+                    line = f"{prefix}[ ] {content}"
 
         if not line.strip():
             blank_run += 1

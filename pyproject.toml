@@ -28,6 +28,7 @@ dependencies = [
     "tree-sitter-typescript>=0.23.0",
     "tree-sitter-go>=0.23.0",
     "tree-sitter-rust>=0.23.0",
+    "mermaid-ascii>=1.2.0",
 ]
 
 [project.urls]
