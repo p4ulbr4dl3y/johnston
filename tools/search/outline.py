@@ -55,7 +55,7 @@ class _OutlineCache:
             self._cache.clear()
 
 
-_OUTLINE_CACHE = _OutlineCache(max_size=100)
+_OUTLINE_CACHE = _OutlineCache(max_size=500)
 
 
 def _format_ast_args(args: ast.arguments) -> str:
@@ -217,7 +217,6 @@ RE_GENERIC_DEF = re.compile(
     r"message\s+(?P<pbmsg>[A-Za-z0-9_]+)"
     r"|"
     r"service\s+(?P<pbsvc>[A-Za-z0-9_]+)"
-    r"|"
     # C/C++ functions and structs
     r"|"
     r"(?:(?:inline|static|virtual|extern|constexpr)\s+)*(?:[A-Za-z0-9_:<>&*]+\s+)+(?P<cfn>[A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)\s*(?:const)?\s*[{;]"

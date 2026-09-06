@@ -82,7 +82,12 @@ def _search_filename_ripgrep(
                     if not raw_path:
                         continue
                     fpath = raw_path.decode("utf-8", errors="replace")
-                    rel = _safe_relpath(fpath, cwd) if os.path.isabs(fpath) else fpath
+                    if os.path.isabs(fpath):
+                        rel = _safe_relpath(fpath, cwd)
+                    else:
+                        rel = fpath.replace("\\", "/")
+                        if rel.startswith("./"):
+                            rel = rel[2:]
                     fname = os.path.basename(rel)
 
                     if not q_is_wild:

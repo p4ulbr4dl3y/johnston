@@ -1401,6 +1401,35 @@ impl<T> Display for Widget<T> {
         self.assertIn("4: type User struct", result.content)
         self.assertIn("5: type ID int", result.content)
 
+    def test_re_generic_def_no_empty_matches(self):
+        """Test that RE_GENERIC_DEF does not match arbitrary non-definition text as empty string."""
+        from tools.search.outline import RE_GENERIC_DEF
+
+        self.assertIsNone(RE_GENERIC_DEF.search("hello world"))
+        self.assertIsNone(RE_GENERIC_DEF.search("int a = 123;"))
+        self.assertIsNone(RE_GENERIC_DEF.search("return false;"))
+
+    def test_search_filename_ripgrep_path_normalization(self):
+        """Test that _search_filename_ripgrep normalizes backslashes and strips ./ prefix."""
+        from tools.search.files import _search_filename_ripgrep
+
+        mock_proc = MagicMock()
+        mock_proc.stdout = MagicMock()
+        mock_proc.stdout.read.side_effect = [b".\\sub\\file.txt\x00./another/path.py\x00", b""]
+        mock_proc.poll.return_value = 0
+        mock_proc.returncode = 0
+
+        with patch("shutil.which", return_value="/usr/bin/rg"), patch("subprocess.Popen", return_value=mock_proc):
+            res = _search_filename_ripgrep(
+                target_path=".",
+                query="",
+                cwd=self.tmpdir,
+            )
+            self.assertIsNotNone(res)
+            paths, count = res
+            self.assertEqual(count, 2)
+            self.assertEqual(paths, ["sub/file.txt", "another/path.py"])
+
 
 if __name__ == "__main__":
     unittest.main()
