@@ -135,21 +135,21 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
         if self.suggested_pattern:
             pat_clean = " ".join(self.suggested_pattern.split())
-            raw_options.append((f'Allow pattern "{pat_clean}" [dim]• session[/dim]', f"pattern:{self.suggested_pattern}"))
+            raw_options.append((f'Allow pattern "{pat_clean}" [dim](session)[/]', f"pattern:{self.suggested_pattern}"))
 
-        raw_options.append((f'Always allow "{self.tool_name}" [dim]• session[/dim]', "always_allow"))
+        raw_options.append((f'Always allow "{self.tool_name}" [dim](session)[/]', "always_allow"))
 
         if is_mcp and server_name:
-            raw_options.append((f'Always allow ALL tools from "{server_name}" [dim]• session[/dim]', f"server_allow:{server_name}__*"))
+            raw_options.append((f'Always allow ALL tools from "{server_name}" [dim](session)[/]', f"server_allow:{server_name}__*"))
 
         if self.suggested_pattern:
             pat_clean = " ".join(self.suggested_pattern.split())
-            raw_options.append((f'Allow pattern "{pat_clean}" [dim]• project[/dim]', f"pattern:{self.suggested_pattern}:project"))
+            raw_options.append((f'Allow pattern "{pat_clean}" [dim](project)[/]', f"pattern:{self.suggested_pattern}:project"))
 
-        raw_options.append((f'Always allow "{self.tool_name}" [dim]• project[/dim]', "always_allow:project"))
+        raw_options.append((f'Always allow "{self.tool_name}" [dim](project)[/]', "always_allow:project"))
 
         if is_mcp and server_name:
-            raw_options.append((f'Always allow ALL tools from "{server_name}" [dim]• project[/dim]', f"server_allow:{server_name}__*:project"))
+            raw_options.append((f'Always allow ALL tools from "{server_name}" [dim](project)[/]', f"server_allow:{server_name}__*:project"))
 
         nargs = self.args if isinstance(self.args, dict) else {}
         target_path = nargs.get("path") or ""
@@ -159,7 +159,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         pm = PermissionManager.get_instance()
         if target_path and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
             root_to_add = os.path.dirname(target_path) or target_path
-            raw_options.append((f'Add "{ellipsize(root_to_add, 36)}" to roots [dim]• workspace[/dim]', f"add_root:{root_to_add}"))
+            raw_options.append((f'Add "{ellipsize(root_to_add, 36)}" to roots [dim](workspace)[/]', f"add_root:{root_to_add}"))
 
         raw_options.append(("Deny", "deny"))
         raw_options.append(("Reject with feedback...", "reject_reason"))
