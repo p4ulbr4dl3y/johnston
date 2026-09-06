@@ -90,7 +90,16 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
     AUTO_FOCUS = ""
     ALLOW_SELECT = False
     BINDINGS = expand_bindings([
-        ("enter", "approve", "Approve Once"),
+        ("enter", "approve", "Select"),
+        ("1", "select_1", "Option 1"),
+        ("2", "select_2", "Option 2"),
+        ("3", "select_3", "Option 3"),
+        ("4", "select_4", "Option 4"),
+        ("5", "select_5", "Option 5"),
+        ("6", "select_6", "Option 6"),
+        ("7", "select_7", "Option 7"),
+        ("8", "select_8", "Option 8"),
+        ("9", "select_9", "Option 9"),
         ("p", "allow_pattern", "Allow Pattern (Session)"),
         ("a", "always_allow", "Always Allow (Session)"),
         ("r", "reject_with_reason", "Reject with Reason"),
@@ -115,6 +124,43 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         self.diff = diff
         self.is_subagent = is_subagent
         self.suggested_pattern = suggest_pattern(self.tool_name, self.args)
+        self._options, self._option_keys = self._build_options()
+
+    def _build_options(self) -> tuple[list[str], list[str]]:
+        raw_options: list[tuple[str, str]] = []
+        raw_options.append(("Allow once", "allow"))
+
+        if self.suggested_pattern:
+            pat_clean = " ".join(self.suggested_pattern.split())
+            raw_options.append((f'Allow pattern "{pat_clean}" [dim]• session[/dim]', f"pattern:{self.suggested_pattern}"))
+
+        raw_options.append((f'Always allow "{self.tool_name}" [dim]• session[/dim]', "always_allow"))
+
+        if self.suggested_pattern:
+            pat_clean = " ".join(self.suggested_pattern.split())
+            raw_options.append((f'Allow pattern "{pat_clean}" [dim]• project[/dim]', f"pattern:{self.suggested_pattern}:project"))
+
+        raw_options.append((f'Always allow "{self.tool_name}" [dim]• project[/dim]', "always_allow:project"))
+
+        nargs = self.args if isinstance(self.args, dict) else {}
+        target_path = nargs.get("path") or ""
+        from core.domain.policies.permission_policy import is_path_within_workspace
+        from core.permission_manager import PermissionManager
+
+        pm = PermissionManager.get_instance()
+        if target_path and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
+            root_to_add = os.path.dirname(target_path) or target_path
+            raw_options.append((f'Add "{ellipsize(root_to_add, 36)}" to roots [dim]• workspace[/dim]', f"add_root:{root_to_add}"))
+
+        raw_options.append(("Deny", "deny"))
+        raw_options.append(("Reject with feedback...", "reject_reason"))
+
+        options: list[str] = []
+        keys: list[str] = []
+        for i, (label, key) in enumerate(raw_options):
+            options.append(f"[bold]{i + 1}.[/bold] {label}")
+            keys.append(key)
+        return options, keys
 
     def _build_diff_text(self, target_path: str) -> str:
 
@@ -289,41 +335,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```json\n{args_str}\n```", classes="modal-diff-view")
 
-            options = ["Allow once"]
-            self._option_keys = ["allow"]
-
-            if self.suggested_pattern:
-                pat_clean = " ".join(self.suggested_pattern.split())
-                options.append(f'Allow pattern "{pat_clean}" [dim]• session[/dim]')
-                self._option_keys.append(f"pattern:{self.suggested_pattern}")
-
-            options.append(f'Always allow "{self.tool_name}" [dim]• session[/dim]')
-            self._option_keys.append("always_allow")
-
-            if self.suggested_pattern:
-                pat_clean = " ".join(self.suggested_pattern.split())
-                options.append(f'Allow pattern "{pat_clean}" [dim]• project[/dim]')
-                self._option_keys.append(f"pattern:{self.suggested_pattern}:project")
-
-            options.append(f'Always allow "{self.tool_name}" [dim]• project[/dim]')
-            self._option_keys.append("always_allow:project")
-
-            from core.domain.policies.permission_policy import is_path_within_workspace
-            from core.permission_manager import PermissionManager
-
-            pm = PermissionManager.get_instance()
-            if target_path and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
-                root_to_add = os.path.dirname(target_path) or target_path
-                options.append(f'Add "{ellipsize(root_to_add, 36)}" to roots [dim]• workspace[/dim]')
-                self._option_keys.append(f"add_root:{root_to_add}")
-
-            options.append("Deny")
-            self._option_keys.append("deny")
-
-            options.append("Reject with feedback...")
-            self._option_keys.append("reject_reason")
-
-            yield PermissionOptionList(*options, id="permission-options-list")
+            yield PermissionOptionList(*self._options, id="permission-options-list")
 
             inp = RejectReasonInput(
                 placeholder="Type feedback for agent and press Enter...",
@@ -336,27 +348,10 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             yield ModalHint(self._build_hint_text(), id="modal-hint")
 
     def _calculate_content_width(self) -> int:
-        options = [
-            "Allow once",
-            f'Always allow "{self.tool_name}" • session',
-            f'Always allow "{self.tool_name}" • project',
-            "Deny",
-            "Reject with feedback...",
-        ]
-        if self.suggested_pattern:
-            pat_clean = " ".join(self.suggested_pattern.split())
-            options.append(f'Allow pattern "{ellipsize(pat_clean, 48)}" • session')
-            options.append(f'Allow pattern "{ellipsize(pat_clean, 48)}" • project')
-
-        nargs = self.args if isinstance(self.args, dict) else {}
-        target_path = nargs.get("path") or ""
-        from core.domain.policies.permission_policy import is_path_within_workspace
-        from core.permission_manager import PermissionManager
-
-        pm = PermissionManager.get_instance()
-        if target_path and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
-            root_to_add = os.path.dirname(target_path) or target_path
-            options.append(f'Add "{ellipsize(root_to_add, 36)}" to roots • workspace')
+        options = getattr(self, "_options", None)
+        if not options:
+            self._options, self._option_keys = self._build_options()
+            options = self._options
 
         hint = self._build_hint_text()
         title = "Confirm Tool Action"
@@ -484,8 +479,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
     def _build_hint_text(self, width: Optional[int] = None) -> str:
         if isinstance(width, int) and is_compact_width(width, breakpoint=BREAKPOINT_HINT):
-            return "enter • r • esc"
-        return "enter Select • r Feedback • esc Deny"
+            return "enter • 1-9 • r • esc"
+        return "enter Select • 1-9 • r Feedback • esc Deny"
 
     def on_resize(self, event) -> None:
         self._apply_dialog_fit()
@@ -516,8 +511,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         except Exception:
             pass
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        idx = event.option_index
+    def _select_option_by_index(self, idx: int) -> None:
         keys = getattr(self, "_option_keys", [])
         if 0 <= idx < len(keys):
             key = keys[idx]
@@ -535,6 +529,9 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 self.dismiss("deny")
             elif key == "reject_reason":
                 self.focus_reject_input()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self._select_option_by_index(event.option_index)
 
     def focus_reject_input(self) -> None:
         try:
@@ -600,15 +597,65 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         except Exception:
             pass
 
-    def action_approve(self) -> None:
+    def _is_input_active(self) -> bool:
         try:
             inp = self.query_one("#reject-reason-input", Input)
-            if inp.display and inp.has_focus:
+            return bool(inp.display and inp.has_focus)
+        except Exception:
+            return False
+
+    def action_approve(self) -> None:
+        if self._is_input_active():
+            try:
+                inp = self.query_one("#reject-reason-input", Input)
                 self.on_input_submitted(Input.Submitted(inp, inp.value))
+                return
+            except Exception:
+                pass
+        try:
+            opt_list = self.query_one("#permission-options-list", OptionList)
+            if opt_list.highlighted is not None:
+                self._select_option_by_index(opt_list.highlighted)
                 return
         except Exception:
             pass
         self.dismiss("allow")
+
+    def action_select_1(self) -> None:
+        if not self._is_input_active():
+            self._select_option_by_index(0)
+
+    def action_select_2(self) -> None:
+        if not self._is_input_active():
+            self._select_option_by_index(1)
+
+    def action_select_3(self) -> None:
+        if not self._is_input_active():
+            self._select_option_by_index(2)
+
+    def action_select_4(self) -> None:
+        if not self._is_input_active():
+            self._select_option_by_index(3)
+
+    def action_select_5(self) -> None:
+        if not self._is_input_active():
+            self._select_option_by_index(4)
+
+    def action_select_6(self) -> None:
+        if not self._is_input_active():
+            self._select_option_by_index(5)
+
+    def action_select_7(self) -> None:
+        if not self._is_input_active():
+            self._select_option_by_index(6)
+
+    def action_select_8(self) -> None:
+        if not self._is_input_active():
+            self._select_option_by_index(7)
+
+    def action_select_9(self) -> None:
+        if not self._is_input_active():
+            self._select_option_by_index(8)
 
     def action_allow_pattern(self) -> None:
         try:

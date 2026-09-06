@@ -354,6 +354,56 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         screen.on_resize(MagicMock())
         screen.focus_reject_input.assert_called_once()
 
+    def test_quick_select_actions(self):
+        screen = PermissionConfirmScreen("shell", {"command": "ls"})
+        dismissed = []
+        screen.dismiss = lambda val: dismissed.append(val)
+
+        # Keys 1 -> option 0 ("allow")
+        screen.action_select_1()
+        self.assertEqual(dismissed[-1], "allow")
+
+        # Key 2 -> option 1 (suggested pattern for 'ls')
+        screen.action_select_2()
+        self.assertEqual(dismissed[-1], screen._option_keys[1])
+
+        # If input is active, quick-select should be ignored
+        screen._is_input_active = lambda: True
+        screen.action_select_1()
+        self.assertEqual(len(dismissed), 2)  # no new dismiss
+
+    def test_action_approve_with_highlighted_or_input(self):
+        screen = PermissionConfirmScreen("shell", {"command": "ls"})
+        dismissed = []
+        screen.dismiss = lambda val: dismissed.append(val)
+
+        deny_idx = screen._option_keys.index("deny")
+        mock_opt = MagicMock()
+        mock_opt.highlighted = deny_idx
+
+        mock_inp = MagicMock()
+        mock_inp.display = False
+        mock_inp.has_focus = False
+
+        def fake_query_one(selector, *args):
+            if "reject" in selector:
+                return mock_inp
+            return mock_opt
+
+        screen.query_one = fake_query_one
+
+        screen.action_approve()
+        self.assertEqual(dismissed[-1], "deny")
+
+        # When input active, submits input
+        mock_inp.display = True
+        mock_inp.has_focus = True
+        mock_inp.value = "custom reason"
+        mock_inp.id = "reject-reason-input"
+        screen.action_approve()
+        self.assertEqual(dismissed[-1], "deny:custom reason")
+
 
 if __name__ == "__main__":
     unittest.main()
+
