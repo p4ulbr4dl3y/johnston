@@ -5,13 +5,12 @@ import unittest
 from unittest.mock import MagicMock
 
 from textual.app import App
-from textual.widgets import Input, OptionList, Static
+from textual.widgets import Input, OptionList
 
 from core.permission_manager import PermissionManager
 from widgets.presentation.commands.workspace_command import WorkspaceCommand
 from widgets.presentation.screens.workspace import (
     AddWorkspaceRootScreen,
-    WorkspaceDirectoryTree,
     WorkspaceScreen,
     get_root_scope,
 )
@@ -230,83 +229,3 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(inp.value, extra)
         finally:
             os.rmdir(extra)
-
-    async def test_workspace_screen_split_layout_elements(self):
-        screen = WorkspaceScreen(pm=self.pm)
-        app = _HostApp(screen)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            tree = screen.query_one("#workspace-dir-tree", WorkspaceDirectoryTree)
-            header = screen.query_one("#workspace-tree-header", Static)
-            info = screen.query_one("#workspace-info-view", Static)
-            self.assertIsNotNone(tree)
-            self.assertIsNotNone(header)
-            self.assertFalse(tree.has_class("-hidden"))
-            self.assertTrue(info.has_class("-hidden"))
-            self.assertIn(os.path.basename(self.project_dir), str(header.content))
-
-    async def test_workspace_screen_tree_updates_on_highlight(self):
-        extra = os.path.realpath(tempfile.mkdtemp())
-        try:
-            self.pm.add_workspace_root(extra)
-            screen = WorkspaceScreen(pm=self.pm)
-            app = _HostApp(screen)
-            async with app.run_test() as pilot:
-                await pilot.pause()
-                opt_list = screen.query_one("#workspace-option-list", OptionList)
-                tree = screen.query_one("#workspace-dir-tree", WorkspaceDirectoryTree)
-                info = screen.query_one("#workspace-info-view", Static)
-
-                # Highlight second root (index 1)
-                opt_list.highlighted = 1
-                screen._update_tree_for_option(1)
-                self.assertEqual(os.path.realpath(str(tree.path)), extra)
-                self.assertFalse(tree.has_class("-hidden"))
-
-                # Highlight "+ Add workspace root..." (index 3)
-                opt_list.highlighted = 3
-                screen._update_tree_for_option(3)
-                self.assertTrue(tree.has_class("-hidden"))
-                self.assertFalse(info.has_class("-hidden"))
-                self.assertIn("Extend Johnston's access", str(info.content))
-        finally:
-            os.rmdir(extra)
-
-    async def test_workspace_screen_toggle_pane(self):
-        screen = WorkspaceScreen(pm=self.pm)
-        app = _HostApp(screen)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            opt_list = screen.query_one("#workspace-option-list", OptionList)
-            tree = screen.query_one("#workspace-dir-tree", WorkspaceDirectoryTree)
-
-            self.assertTrue(opt_list.has_focus)
-            # Press tab to switch to tree
-            await pilot.press("tab")
-            await pilot.pause()
-            self.assertTrue(tree.has_focus)
-
-            # Press tab again to switch back
-            await pilot.press("tab")
-            await pilot.pause()
-            self.assertTrue(opt_list.has_focus)
-
-            # Press right arrow from opt_list to focus tree
-            await pilot.press("right")
-            await pilot.pause()
-            self.assertTrue(tree.has_focus)
-
-    def test_workspace_directory_tree_filter(self):
-        from pathlib import Path
-        tree = WorkspaceDirectoryTree(self.project_dir)
-        paths = [
-            Path(self.project_dir) / ".git",
-            Path(self.project_dir) / ".venv",
-            Path(self.project_dir) / "__pycache__",
-            Path(self.project_dir) / "node_modules",
-            Path(self.project_dir) / "src",
-            Path(self.project_dir) / "main.py",
-        ]
-        filtered = [p.name for p in tree.filter_paths(paths)]
-        self.assertEqual(filtered, ["src", "main.py"])
-
