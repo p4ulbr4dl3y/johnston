@@ -431,7 +431,7 @@ _WRAPPER_COMMANDS = frozenset(
 _UNSAFE_SHELL_REGEX = re.compile(
     r"(\$\(|`"
     r"|\b(?:bash|sh|zsh|dash|powershell|pwsh)\s+(?:-[ceE]\b|-command\b|-encodedcommand\b|[^\s-])"
-    r"|\b(?:python(?:\d+(?:\.\d+)?)?|node|ruby|perl|php)\s+-[cer]\b"
+    r"|\b(?:python(?:\d+(?:\.\d+)?)?|node|ruby|perl|php)\b(?:\s+-[^\s\-]+)*\s+(?:-[a-z0-9]*[cer]\b|--eval\b)"
     r"|\|\s*(?:bash|sh|zsh|dash|powershell|pwsh|python(?:\d+(?:\.\d+)?)?|node|ruby|perl|php)\b"
     r"|<\s*(?:bash|sh|zsh|dash)\b"
     r"|\beval\s+|\bexec\s+"
