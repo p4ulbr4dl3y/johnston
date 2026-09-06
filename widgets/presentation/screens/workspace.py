@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+from typing import Any
 
 from textual import events
 from textual.app import ComposeResult
@@ -65,7 +66,7 @@ class AddWorkspaceRootScreen(BaseModalScreen[tuple[str, str] | None]):
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-compact"):
             yield ModalHeader("Add Workspace Root", esc_hint="")
             yield Input(
-                placeholder="Directory path (e.g. ~/projects/lib [--project | --session])...",
+                placeholder="Directory path (e.g. ~/projects/lib [--project])...",
                 id="workspace-add-input",
                 classes="modal-input",
             )
@@ -148,12 +149,13 @@ class WorkspaceScreen(BaseModalScreen[None]):
         super().__init__()
         self.pm = pm or PermissionManager.get_instance()
         self.roots_data: list[dict[str, str]] = []
+        self._option_actions: list[tuple[str, Any]] = []
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
             yield ModalHeader("Workspace Roots", esc_hint="")
             yield HeaderWrapOptionList(id="workspace-option-list")
-            yield ModalHint("enter Select/Remove • a Add • d Remove • esc Close", id=MODAL_HINT_ID)
+            yield ModalHint("a Add • esc Close", id=MODAL_HINT_ID)
 
     def _apply_dialog_fit(self) -> None:
         try:
@@ -190,6 +192,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
 
     def refresh_list(self) -> None:
         self.roots_data = self._load_roots()
+        self._option_actions = []
         try:
             opt_list = self.query_one("#workspace-option-list", OptionList)
         except Exception:
@@ -200,34 +203,77 @@ class WorkspaceScreen(BaseModalScreen[None]):
 
         target_w = option_list_row_width(opt_list, MODAL_MEDIUM_ROW_WIDTH)
 
-        add_label = format_badge_row("+ Add workspace root...", badge="", target_width=target_w, prefix="  ")
-        opt_list.add_option(Option(add_label))
-
+        # 1. Existing roots
         active_tag = status_tag("ACTIVE")
+        locked_tag = status_tag("LOCKED")
         for item in self.roots_data:
             path = item["path"]
             scope = item["scope"]
-            row = format_badge_row(path, badge=scope, target_width=target_w, prefix=f"{active_tag} ")
+            stag = locked_tag if scope == "primary" else active_tag
+            row = format_badge_row(path, badge=scope, target_width=target_w, prefix=f"{stag} ")
             opt_list.add_option(Option(row))
+            self._option_actions.append(("root", item))
+
+        # 2. Divider
+        opt_list.add_option(Option("", disabled=True))
+        self._option_actions.append(("sep", None))
+
+        # 3. Add new root (prefix="+ " aligns '+' directly with '◆' / '●')
+        add_label = format_badge_row("Add workspace root...", badge="", target_width=target_w, prefix="+ ")
+        opt_list.add_option(Option(add_label))
+        self._option_actions.append(("add", None))
 
         if curr_idx is not None and curr_idx < len(opt_list._options):
             opt_list.highlighted = curr_idx
-        elif len(opt_list._options) > 1:
-            opt_list.highlighted = 1
-        elif len(opt_list._options) > 0:
+        elif len(self.roots_data) > 0:
             opt_list.highlighted = 0
+        else:
+            opt_list.highlighted = len(opt_list._options) - 1
+
+        self._update_hint(opt_list.highlighted)
+
+    def _update_hint(self, idx: int | None = None) -> None:
+        try:
+            hint_widget = self.query_one(f"#{MODAL_HINT_ID}", ModalHint)
+        except Exception:
+            return
+
+        if idx is None:
+            try:
+                opt_list = self.query_one("#workspace-option-list", OptionList)
+                idx = opt_list.highlighted
+            except Exception:
+                idx = None
+
+        if idx is not None and 0 <= idx < len(self._option_actions):
+            action_type, data = self._option_actions[idx]
+            if action_type == "add":
+                hint_widget.update("enter Add • esc Close")
+                return
+            if action_type == "root" and data:
+                if data.get("scope") == "primary":
+                    hint_widget.update("a Add • esc Close")
+                    return
+                hint_widget.update("enter / d Remove • a Add • esc Close")
+                return
+
+        hint_widget.update("a Add • esc Close")
+
+    def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
+        self._update_hint(event.option_index)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         idx = event.option_index
-        if idx == 0:
-            self.action_add_root()
-        elif 1 <= idx <= len(self.roots_data):
-            root_info = self.roots_data[idx - 1]
-            if root_info["scope"] == "primary":
-                if self.app and hasattr(self.app, "notify"):
-                    self.app.notify("Primary workspace root cannot be removed", severity="warning")
-            else:
-                self._confirm_and_remove(root_info["path"])
+        if idx is not None and 0 <= idx < len(self._option_actions):
+            action_type, data = self._option_actions[idx]
+            if action_type == "add":
+                self.action_add_root()
+            elif action_type == "root" and data:
+                if data.get("scope") == "primary":
+                    if self.app and hasattr(self.app, "notify"):
+                        self.app.notify("Primary workspace root cannot be removed", severity="warning")
+                else:
+                    self._confirm_and_remove(data["path"])
 
     def action_add_root(self) -> None:
         def on_added(result: tuple[str, str] | None) -> None:
@@ -257,15 +303,14 @@ class WorkspaceScreen(BaseModalScreen[None]):
         except Exception:
             return
 
-        if idx is None or idx == 0:
-            return
-        if 1 <= idx <= len(self.roots_data):
-            root_info = self.roots_data[idx - 1]
-            if root_info["scope"] == "primary":
-                if self.app and hasattr(self.app, "notify"):
-                    self.app.notify("Primary workspace root cannot be removed", severity="warning")
-                return
-            self._confirm_and_remove(root_info["path"])
+        if idx is not None and 0 <= idx < len(self._option_actions):
+            action_type, data = self._option_actions[idx]
+            if action_type == "root" and data:
+                if data.get("scope") == "primary":
+                    if self.app and hasattr(self.app, "notify"):
+                        self.app.notify("Primary workspace root cannot be removed", severity="warning")
+                    return
+                self._confirm_and_remove(data["path"])
 
     def _confirm_and_remove(self, path: str) -> None:
         def on_confirmed(confirmed: bool) -> None:

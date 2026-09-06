@@ -14,6 +14,7 @@ from widgets.presentation.screens.workspace import (
     WorkspaceScreen,
     get_root_scope,
 )
+from widgets.presentation.widgets.modal_hint import ModalHint
 
 
 class _HostApp(App[None]):
@@ -64,11 +65,44 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 await pilot.pause()
                 opt_list = screen.query_one("#workspace-option-list", OptionList)
-                # First is "+ Add workspace root...", followed by primary and extra
-                self.assertEqual(len(opt_list._options), 3)
+                # 2 roots + 1 divider + 1 "+ Add..." = 4 options
+                self.assertEqual(len(opt_list._options), 4)
                 self.assertEqual(len(screen.roots_data), 2)
                 self.assertEqual(screen.roots_data[0]["scope"], "primary")
                 self.assertEqual(screen.roots_data[1]["scope"], "session")
+
+                # Dynamic hint on primary root
+                hint = screen.query_one("#modal-hint", ModalHint)
+                self.assertIn("a Add", str(hint.left_text))
+        finally:
+            os.rmdir(extra)
+
+    async def test_workspace_screen_dynamic_hint(self):
+        extra = os.path.realpath(tempfile.mkdtemp())
+        try:
+            self.pm.add_workspace_root(extra)
+            screen = WorkspaceScreen(pm=self.pm)
+            app = _HostApp(screen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                opt_list = screen.query_one("#workspace-option-list", OptionList)
+                hint = screen.query_one("#modal-hint", ModalHint)
+
+                # Primary root (index 0)
+                opt_list.highlighted = 0
+                screen._update_hint(0)
+                self.assertIn("a Add", str(hint.left_text))
+                self.assertNotIn("Remove", str(hint.left_text))
+
+                # Removable root (index 1)
+                opt_list.highlighted = 1
+                screen._update_hint(1)
+                self.assertIn("Remove", str(hint.left_text))
+
+                # Add option (index 3)
+                opt_list.highlighted = 3
+                screen._update_hint(3)
+                self.assertIn("enter Add", str(hint.left_text))
         finally:
             os.rmdir(extra)
 
@@ -78,8 +112,8 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             await pilot.pause()
             opt_list = screen.query_one("#workspace-option-list", OptionList)
-            # Highlight primary root (index 1)
-            opt_list.highlighted = 1
+            # Primary root is at index 0
+            opt_list.highlighted = 0
             screen.action_remove_root()
             await pilot.pause()
             self.assertTrue(any("Primary workspace root cannot be removed" in n for n in app.notifications))
@@ -90,8 +124,8 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             await pilot.pause()
             opt_list = screen.query_one("#workspace-option-list", OptionList)
-            opt_list.highlighted = 0
-            # Press enter / select "+ Add..."
+            # Highlight "+ Add workspace root..." (last item)
+            opt_list.highlighted = len(opt_list._options) - 1
             await pilot.press("enter")
             await pilot.pause()
             self.assertIsInstance(app.screen, AddWorkspaceRootScreen)
@@ -105,7 +139,8 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
             async with app.run_test() as pilot:
                 await pilot.pause()
                 opt_list = screen.query_one("#workspace-option-list", OptionList)
-                opt_list.highlighted = 2
+                # Removable root is at index 1
+                opt_list.highlighted = 1
                 await pilot.press("enter")
                 await pilot.pause()
                 from widgets.presentation.screens.confirm import ConfirmScreen
