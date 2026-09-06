@@ -117,6 +117,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         args: Optional[Dict[str, Any]] = None,
         diff: str = "",
         is_subagent: bool = False,
+        subagent_role: str = "",
         server_name: Optional[str] = None,
     ):
         super().__init__()
@@ -124,6 +125,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         self.args = args or {}
         self.diff = diff
         self.is_subagent = is_subagent
+        self.subagent_role = (subagent_role or "").strip()
         if server_name and isinstance(server_name, str) and server_name.strip():
             self.server_name = server_name.strip()
         elif "__" in self.tool_name:
@@ -199,7 +201,10 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
     def compose(self) -> ComposeResult:
         nargs = self.args if isinstance(self.args, dict) else {}
         target_path = nargs.get("path") or ""
-        actor = "Subagent" if self.is_subagent else "Agent"
+        if self.is_subagent:
+            actor = f"Subagent ({self.subagent_role})" if self.subagent_role else "Subagent"
+        else:
+            actor = "Agent"
 
         if self.tool_name == "create":
             file_exists = bool(target_path and os.path.isfile(target_path))

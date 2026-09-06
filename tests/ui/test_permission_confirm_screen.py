@@ -154,6 +154,14 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
             self.assertIn("Subagent wants to edit", all_md)
 
+    async def test_compose_subagent_actor_role_prefix(self):
+        screen = PermissionConfirmScreen("edit", {"path": "main.py"}, is_subagent=True, subagent_role="worker")
+        async with HostApp(screen).run_test() as pilot:
+            await pilot.pause()
+            mds = screen.query("Markdown")
+            all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
+            self.assertIn("Subagent (worker) wants to edit", all_md)
+
     async def test_compose_manage_shell_list_other(self):
         cases = [
             {"action": "list"},

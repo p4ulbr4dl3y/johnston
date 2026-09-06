@@ -189,6 +189,7 @@ class ActionsMixin(PlanActionsMixin):
             tool_name=screen_name,
             args=args,
             is_subagent=is_subagent,
+            subagent_role=subagent_role,
             server_name=server_name,
         )
 
