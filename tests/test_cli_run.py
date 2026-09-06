@@ -999,6 +999,72 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent.history, [{"role": "user", "content": "prior"}])
         mock_store.save.assert_called_once_with(mock_session)
 
+    async def test_early_error_json_output(self):
+        args = MagicMock(
+            prompt="   ",
+            json=True,
+            stream_json=False,
+            quiet=False,
+            cwd=None,
+        )
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args)
+        self.assertEqual(code, 1)
+        data = json.loads(out_buf.getvalue())
+        self.assertEqual(data.get("status"), "error")
+        self.assertIn("No prompt provided", data.get("error", ""))
+
+    async def test_early_error_stream_json_output(self):
+        args = MagicMock(
+            prompt="   ",
+            json=False,
+            stream_json=True,
+            quiet=False,
+            cwd=None,
+        )
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args)
+        self.assertEqual(code, 1)
+        data = json.loads(out_buf.getvalue())
+        self.assertEqual(data.get("event"), "error")
+        self.assertIn("No prompt provided", data.get("error", ""))
+
+    async def test_model_override_precedence_over_role(self):
+        agent = MockAgent(steps=[("content", "hello", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="hi",
+            skills=[],
+            provider=None,
+            model="override-model-123",
+            effort="high",
+            role="worker",
+            quiet=True,
+            json=False,
+            stream_json=False,
+            continue_latest=False,
+            resume=None,
+            yolo=False,
+            mode=None,
+            sandbox=False,
+            no_sandbox=True,
+        )
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(agent.model, "override-model-123")
+        self.assertEqual(agent.thinking_effort, "high")
+
 
 class TestCLIRunSyncWrapper(unittest.TestCase):
     """Unit tests for synchronous run_headless wrapper."""
@@ -1035,6 +1101,20 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
             code = run_headless(args)
         self.assertEqual(code, 1)
         self.assertIn("Fatal crash", err_buf.getvalue())
+
+    @patch("core.interfaces.cli.commands.run_cmd.run_headless_async")
+    def test_run_headless_sync_running_loop_fallback(self, mock_async):
+        async def fake_run(*args, **kwargs):
+            return 0
+
+        mock_async.side_effect = fake_run
+        mock_loop = MagicMock()
+        mock_loop.is_running.return_value = True
+
+        with patch("asyncio.get_running_loop", return_value=mock_loop):
+            args = MagicMock(prompt="hi", debug=False, cwd=None, json=False, stream_json=False)
+            code = run_headless(args)
+            self.assertEqual(code, 0)
 
     @patch("core.interfaces.cli.commands.run_cmd.run_headless", return_value=0)
     def test_entrypoint_main_run_dispatch(self, mock_run_headless):

@@ -28,17 +28,37 @@ __all__ = [
 ]
 
 
-def resolve_prompt(prompt_arg: Optional[str]) -> Optional[str]:
+def _emit_early_error(error_msg: str, is_json: bool = False, is_stream_json: bool = False) -> int:
+    """Emit startup or validation error according to output mode format."""
+    clean_msg = error_msg if not error_msg.startswith("Error: ") else error_msg[7:]
+    if is_stream_json:
+        sys.stdout.write(json.dumps({"event": "error", "error": clean_msg}) + "\n")
+        sys.stdout.flush()
+    elif is_json:
+        sys.stdout.write(json.dumps({"error": clean_msg, "status": "error"}, indent=2) + "\n")
+        sys.stdout.flush()
+    else:
+        prefix = "" if error_msg.startswith("Error") else "Error: "
+        sys.stderr.write(f"{prefix}{error_msg}\n")
+        sys.stderr.flush()
+    return 1
+
+
+def resolve_prompt(
+    prompt_arg: Optional[str],
+    is_json: bool = False,
+    is_stream_json: bool = False,
+) -> Optional[str]:
     """Resolve prompt text from positional argument or stdin."""
     if prompt_arg == "-" or (not prompt_arg and not sys.stdin.isatty()):
         try:
             prompt_arg = sys.stdin.read()
         except Exception as exc:
-            sys.stderr.write(f"Error reading from stdin: {exc}\n")
+            _emit_early_error(f"Error reading from stdin: {exc}", is_json, is_stream_json)
             return None
 
     if not prompt_arg or not prompt_arg.strip():
-        sys.stderr.write("Error: No prompt provided. Specify prompt or pass via stdin.\n")
+        _emit_early_error("No prompt provided. Specify prompt or pass via stdin.", is_json, is_stream_json)
         return None
 
     return prompt_arg.strip()
@@ -151,15 +171,18 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
     if getattr(args, "debug", False) is True:
         logging.getLogger().setLevel(logging.DEBUG)
 
+    is_quiet = getattr(args, "quiet", False) is True
+    is_json = getattr(args, "json", False) is True
+    is_stream_json = getattr(args, "stream_json", False) is True
+
     candidate = getattr(args, "cwd", None)
     if isinstance(candidate, str) and candidate.strip():
         cwd_target = os.path.abspath(candidate)
         if not os.path.isdir(cwd_target):
-            sys.stderr.write(f"Error: Directory '{candidate}' does not exist.\n")
-            return 1
+            return _emit_early_error(f"Directory '{candidate}' does not exist.", is_json, is_stream_json)
         os.chdir(cwd_target)
 
-    prompt = resolve_prompt(getattr(args, "prompt", None))
+    prompt = resolve_prompt(getattr(args, "prompt", None), is_json=is_json, is_stream_json=is_stream_json)
     if prompt is None:
         return 1
 
@@ -176,40 +199,44 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
     try:
         provider_key = getattr(args, "provider", None) or pm.get_active_provider_key()
         if not provider_key:
-            sys.stderr.write("Error: No active provider configured or specified.\n")
-            return 1
+            return _emit_early_error("No active provider configured or specified.", is_json, is_stream_json)
 
         pdef = pm.load_provider_def(provider_key)
         if pdef is None:
-            sys.stderr.write(f"Error: Provider '{provider_key}' not found.\n")
-            return 1
+            return _emit_early_error(f"Provider '{provider_key}' not found.", is_json, is_stream_json)
 
         if not pdef.enabled:
-            sys.stderr.write(f"Error: Provider '{provider_key}' is disabled.\n")
-            return 1
+            return _emit_early_error(f"Provider '{provider_key}' is disabled.", is_json, is_stream_json)
 
         needs_key = pm.provider_needs_key(provider_key, pdef)
         api_key = pm.get_api_key(pdef.key) or pdef.api_key
         if needs_key and not api_key:
-            sys.stderr.write(
-                f"Error: No API key configured for provider '{provider_key}'. "
-                f"Set key with: johnston provider set-key {provider_key} <KEY>\n"
+            return _emit_early_error(
+                f"No API key configured for provider '{provider_key}'. "
+                f"Set key with: johnston provider set-key {provider_key} <KEY>",
+                is_json,
+                is_stream_json,
             )
-            return 1
 
         agent = pm.create_agent_for_provider(provider_key)
         if agent is None:
-            sys.stderr.write(f"Error: Failed to create agent for provider '{provider_key}'.\n")
-            return 1
+            return _emit_early_error(f"Failed to create agent for provider '{provider_key}'.", is_json, is_stream_json)
+
+        role = getattr(args, "role", None) or "worker"
+        roles = RoleRegistry.get_instance().load_roles()
+        if role not in roles:
+            return _emit_early_error(f"Role '{role}' not found.", is_json, is_stream_json)
+
+        apply_role(agent, role, mode=AgentMode.HEADLESS)
 
         model = getattr(args, "model", None)
         if isinstance(model, str) and model.strip():
-            agent.model = model
+            agent.model = model.strip()
 
         effort = getattr(args, "effort", None)
         if isinstance(effort, str) and effort.strip():
-            agent.thinking_effort = effort
-            agent.reasoning_effort = effort
+            agent.thinking_effort = effort.strip().lower()
+            agent.reasoning_effort = effort.strip().lower()
 
         if getattr(args, "sandbox", False) is True:
             agent.sandbox_enabled = True
@@ -226,11 +253,10 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         )
         resume_arg = getattr(args, "resume", None)
         sess: Any = None
-        store: Any = None
-        if continue_latest or (isinstance(resume_arg, str) or resume_arg == ""):
-            from core.infrastructure.storage.session_store import SessionStore
+        from core.infrastructure.storage.session_store import SessionStore
 
-            store = SessionStore.get_instance()
+        store = SessionStore.get_instance()
+        if continue_latest or (isinstance(resume_arg, str) or resume_arg == ""):
             target_sid = resume_arg if isinstance(resume_arg, str) and resume_arg.strip() else None
             if not target_sid:
                 main_sessions = store.list_main_sessions()
@@ -252,14 +278,11 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                     if hasattr(sess, "cost_usd") and hasattr(agent, "cost_usd"):
                         agent.cost_usd = sess.cost_usd
 
-
-        role = getattr(args, "role", None) or "worker"
-        roles = RoleRegistry.get_instance().load_roles()
-        if role not in roles:
-            sys.stderr.write(f"Error: Role '{role}' not found.\n")
-            return 1
-
-        apply_role(agent, role, mode=AgentMode.HEADLESS)
+        if sess is None:
+            try:
+                sess = store.create_main(role=role)
+            except Exception as create_err:
+                logging.debug("Could not create session in headless run: %s", create_err)
 
         from core.domain.policies.permission_policy import ExecutionMode
         from core.permission_manager import PermissionManager
@@ -350,7 +373,9 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                             if chunk.strip():
                                 has_written_text = True
                                 pending_lead_ws.clear()
-                                sys.stdout.write(chunk.lstrip("\r\n"))
+                                import re
+
+                                sys.stdout.write(re.sub(r"^(?:[ \t]*[\r\n]+)+", "", chunk))
                                 sys.stdout.flush()
                             else:
                                 pending_lead_ws.append(chunk)
@@ -365,7 +390,9 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                             sys.stdout.write(json.dumps({"event": "delta", "text": parsed.val1}) + "\n")
                             sys.stdout.flush()
                         elif not is_json:
-                            text = parsed.val1.lstrip("\r\n") if not has_written_text else parsed.val1
+                            import re
+
+                            text = re.sub(r"^(?:[ \t]*[\r\n]+)+", "", parsed.val1) if not has_written_text else parsed.val1
                             sys.stdout.write(text)
                             sys.stdout.flush()
                             has_written_text = True
@@ -549,21 +576,27 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         if perm_mgr is not None:
             try:
                 perm_mgr.clear_session_overrides()
-            except Exception:
+            except BaseException:
                 pass
         if enabled_mcp_servers:
             try:
                 from core.infrastructure.mcp import get_mcp_manager
 
-                await asyncio.wait_for(get_mcp_manager().stop_all_async(), timeout=5.0)
-            except Exception:
+                await asyncio.shield(asyncio.wait_for(get_mcp_manager().stop_all_async(), timeout=5.0))
+            except BaseException:
                 pass
         if agent and hasattr(agent, "close") and callable(agent.close):
-            res = agent.close()
-            if inspect.isawaitable(res):
-                await res
+            try:
+                res = agent.close()
+                if inspect.isawaitable(res):
+                    await asyncio.shield(res)
+            except BaseException:
+                pass
         if close_pm:
-            await pm.close()
+            try:
+                await asyncio.shield(pm.close())
+            except BaseException:
+                pass
 
 
 def run_headless(args: Any, pm: Optional[ProviderManager] = None) -> int:
@@ -571,12 +604,14 @@ def run_headless(args: Any, pm: Optional[ProviderManager] = None) -> int:
     if getattr(args, "debug", False) is True:
         logging.getLogger().setLevel(logging.DEBUG)
 
+    is_json = getattr(args, "json", False) is True
+    is_stream_json = getattr(args, "stream_json", False) is True
+
     candidate = getattr(args, "cwd", None)
     if isinstance(candidate, str) and candidate.strip():
         cwd_target = os.path.abspath(candidate)
         if not os.path.isdir(cwd_target):
-            sys.stderr.write(f"Error: Directory '{candidate}' does not exist.\n")
-            return 1
+            return _emit_early_error(f"Directory '{candidate}' does not exist.", is_json, is_stream_json)
         os.chdir(cwd_target)
 
     try:
@@ -589,10 +624,9 @@ def run_headless(args: Any, pm: Optional[ProviderManager] = None) -> int:
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                return executor.submit(asyncio.run, run_headless_async(args, pm=pm)).result()
+                return executor.submit(lambda: asyncio.run(run_headless_async(args, pm=None))).result()
         return asyncio.run(run_headless_async(args, pm=pm))
     except KeyboardInterrupt:
         return 130
     except Exception as exc:
-        sys.stderr.write(f"Error: {exc}\n")
-        return 1
+        return _emit_early_error(str(exc), is_json, is_stream_json)
