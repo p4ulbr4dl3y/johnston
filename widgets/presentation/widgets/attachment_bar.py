@@ -46,8 +46,8 @@ class AttachmentHint(Static):
     def __init__(self, *args, **kwargs) -> None:
         from widgets.presentation.widgets.footer_layout import get_theme_colors
 
-        _, t_secondary, t_muted, _ = get_theme_colors()
-        text = f"[{t_muted}]([{t_secondary}]ctrl+d[/] [{t_muted}]to detach)[/]"
+        _, _, t_muted, _ = get_theme_colors()
+        text = f"[{t_muted}](ctrl+d to detach)[/]"
         super().__init__(text, *args, **kwargs)
 
 
