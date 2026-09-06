@@ -161,7 +161,10 @@ class WorkspaceScreen(BaseModalScreen[None]):
         self._apply_dialog_fit()
         self.refresh_list()
         try:
-            self.query_one("#workspace-add-input", WorkspaceInput).focus()
+            inp = self.query_one("#workspace-add-input", WorkspaceInput)
+            inp.focus()
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+            opt_list.highlighted = None
         except Exception:
             pass
 
@@ -200,9 +203,18 @@ class WorkspaceScreen(BaseModalScreen[None]):
             opt_list.add_option(Option(row))
             self._option_actions.append(("root", item))
 
-        if curr_idx is not None and curr_idx < len(opt_list._options):
+        is_inp_focused = False
+        try:
+            inp = self.query_one("#workspace-add-input", WorkspaceInput)
+            is_inp_focused = inp.has_focus
+        except Exception:
+            pass
+
+        if is_inp_focused:
+            opt_list.highlighted = None
+        elif curr_idx is not None and curr_idx < len(opt_list._options):
             opt_list.highlighted = curr_idx
-        elif len(self.roots_data) > 0:
+        elif len(self.roots_data) > 0 and opt_list.has_focus:
             opt_list.highlighted = 0
         else:
             opt_list.highlighted = None
@@ -243,10 +255,19 @@ class WorkspaceScreen(BaseModalScreen[None]):
         hint_widget.update("enter Add • drop folder • esc Close")
 
     def on_descendant_focus(self, event: events.DescendantFocus) -> None:
+        try:
+            inp = self.query_one("#workspace-add-input", WorkspaceInput)
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+            if inp.has_focus:
+                opt_list.highlighted = None
+        except Exception:
+            pass
         self._update_hint()
 
     def focus_input(self) -> None:
         try:
+            opt_list = self.query_one("#workspace-option-list", OptionList)
+            opt_list.highlighted = None
             inp = self.query_one("#workspace-add-input", WorkspaceInput)
             inp.focus()
             self._update_hint()

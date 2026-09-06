@@ -72,9 +72,10 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(screen.roots_data[0]["scope"], "primary")
                 self.assertEqual(screen.roots_data[1]["scope"], "session")
 
-                # Input is present and focused initially
+                # Input is present and focused initially, list has no ghost highlight
                 inp = screen.query_one("#workspace-add-input", Input)
                 self.assertTrue(inp.has_focus)
+                self.assertIsNone(opt_list.highlighted)
 
                 # Hint shows input action
                 hint = screen.query_one("#modal-hint", ModalHint)
