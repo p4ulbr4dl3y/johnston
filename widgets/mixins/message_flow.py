@@ -63,6 +63,10 @@ class MessageFlowMixin:
 
     async def on_paste(self, event: events.Paste) -> None:
         """Forward application-level paste/drag-and-drop events to ChatInput"""
+        from textual.screen import ModalScreen
+
+        if isinstance(getattr(self, "screen", None), ModalScreen):
+            return
         try:
             chat_input = self.query_one("#message-input", ChatInput)
             chat_input.focus()

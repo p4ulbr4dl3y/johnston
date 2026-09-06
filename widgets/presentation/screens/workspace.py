@@ -97,6 +97,12 @@ class WorkspaceInput(Input):
 
         await super()._on_key(event)
 
+    def _on_paste(self, event: events.Paste) -> None:
+        event.stop()
+        event.prevent_default()
+        clean = decode_pasted_path(event.text)
+        self.insert_text_at_cursor(clean)
+
 
 class WorkspaceOptionList(HeaderWrapOptionList):
     """OptionList that routes boundary vertical navigation back to WorkspaceInput."""
@@ -331,13 +337,14 @@ class WorkspaceScreen(BaseModalScreen[None]):
         self.refresh_list()
 
     def on_paste(self, event: events.Paste) -> None:
+        event.stop()
+        event.prevent_default()
+
         try:
             inp = self.query_one("#workspace-add-input", WorkspaceInput)
             if inp.has_focus:
                 clean = decode_pasted_path(event.text)
                 inp.insert_text_at_cursor(clean)
-                event.stop()
-                event.prevent_default()
                 return
         except Exception:
             pass
@@ -352,8 +359,6 @@ class WorkspaceScreen(BaseModalScreen[None]):
             clean_path = decode_pasted_path(line)
             abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(clean_path)))
             if os.path.isdir(abs_path):
-                event.stop()
-                event.prevent_default()
                 self.pm.add_workspace_root(abs_path)
                 added_any = True
             elif len(lines) == 1:

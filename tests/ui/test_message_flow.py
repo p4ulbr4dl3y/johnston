@@ -28,6 +28,21 @@ class TestMessageFlowPaste(unittest.IsolatedAsyncioTestCase):
             with patch.object(app, "query_one", side_effect=Exception("boom")):
                 await app.on_paste(events.Paste("hello"))  # must not raise
 
+    async def test_on_paste_ignored_when_modal_screen_active(self):
+        from textual import events
+        from textual.screen import ModalScreen
+
+        app = JohnstonApp()
+        async with app.run_test() as pilot:
+            chat_input = MagicMock()
+            chat_input.on_paste = unittest.mock.AsyncMock()
+            modal = ModalScreen()
+            app.push_screen(modal)
+            await pilot.pause()
+            with patch.object(app, "query_one", return_value=chat_input):
+                await app.on_paste(events.Paste("hello"))
+            chat_input.on_paste.assert_not_awaited()
+
 
 class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
     async def test_slash_command_unprocessed_single_tokens_notifies(self):
