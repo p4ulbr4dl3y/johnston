@@ -4,6 +4,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import logging
+import os
 import sys
 from typing import Any, Optional
 
@@ -87,6 +89,17 @@ def format_result_summary(result: Any) -> str:
 
 async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) -> int:
     """Async execution logic for johnston run."""
+    if getattr(args, "debug", False) is True:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    candidate = getattr(args, "cwd", None)
+    if isinstance(candidate, str) and candidate.strip():
+        cwd_target = os.path.abspath(candidate)
+        if not os.path.isdir(cwd_target):
+            sys.stderr.write(f"Error: Directory '{candidate}' does not exist.\n")
+            return 1
+        os.chdir(cwd_target)
+
     prompt = resolve_prompt(getattr(args, "prompt", None))
     if prompt is None:
         return 1
@@ -128,8 +141,50 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
             sys.stderr.write(f"Error: Failed to create agent for provider '{provider_key}'.\n")
             return 1
 
-        if getattr(args, "model", None):
-            agent.model = args.model
+        model = getattr(args, "model", None)
+        if isinstance(model, str) and model.strip():
+            agent.model = model
+
+        effort = getattr(args, "effort", None)
+        if isinstance(effort, str) and effort.strip():
+            agent.thinking_effort = effort
+            agent.reasoning_effort = effort
+
+        if getattr(args, "sandbox", False) is True:
+            agent.sandbox_enabled = True
+        elif getattr(args, "no_sandbox", False) is True:
+            agent.sandbox_enabled = False
+
+        continue_latest = (
+            getattr(args, "continue_latest", False) is True
+            or getattr(args, "continue", False) is True
+        )
+        resume_arg = getattr(args, "resume", None)
+        if continue_latest or (isinstance(resume_arg, str) or resume_arg == ""):
+            from core.infrastructure.storage.session_store import SessionStore
+
+            store = SessionStore.get_instance()
+            target_sid = resume_arg if isinstance(resume_arg, str) and resume_arg.strip() else None
+            if not target_sid:
+                main_sessions = store.list_main_sessions()
+                if main_sessions:
+                    target_sid = main_sessions[0]["id"]
+            if target_sid:
+                sess = store.get(target_sid)
+                if sess:
+                    if hasattr(sess, "agent_history") and sess.agent_history:
+                        agent.history = list(sess.agent_history)
+                    if hasattr(agent, "messages"):
+                        agent.messages = list(getattr(sess, "messages", []) or getattr(sess, "agent_history", []))
+                    if hasattr(sess, "tokens_input") and hasattr(agent, "tokens_input"):
+                        agent.tokens_input = sess.tokens_input
+                    if hasattr(sess, "tokens_output") and hasattr(agent, "tokens_output"):
+                        agent.tokens_output = sess.tokens_output
+                    if hasattr(sess, "total_tokens") and hasattr(agent, "total_tokens"):
+                        agent.total_tokens = sess.total_tokens
+                    if hasattr(sess, "cost_usd") and hasattr(agent, "cost_usd"):
+                        agent.cost_usd = sess.cost_usd
+
 
         role = getattr(args, "role", None) or "worker"
         roles = RoleRegistry.get_instance().load_roles()
@@ -141,6 +196,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
 
         is_quiet = bool(getattr(args, "quiet", False))
         is_json = bool(getattr(args, "json", False))
+
 
         response_parts: list[str] = []
         tool_calls: list[dict[str, Any]] = []
@@ -253,6 +309,17 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
 
 def run_headless(args: Any, pm: Optional[ProviderManager] = None) -> int:
     """Headless run command synchronous entrypoint."""
+    if getattr(args, "debug", False) is True:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    candidate = getattr(args, "cwd", None)
+    if isinstance(candidate, str) and candidate.strip():
+        cwd_target = os.path.abspath(candidate)
+        if not os.path.isdir(cwd_target):
+            sys.stderr.write(f"Error: Directory '{candidate}' does not exist.\n")
+            return 1
+        os.chdir(cwd_target)
+
     try:
         try:
             loop = asyncio.get_running_loop()

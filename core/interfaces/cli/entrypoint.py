@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import os
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -17,6 +19,7 @@ from core.interfaces.cli.commands.mcp_cmd import print_mcp
 from core.interfaces.cli.commands.provider_cmd import print_models
 
 __all__ = ["build_parser", "get_version", "main", "print_mcp", "print_models"]
+
 
 
 def get_version() -> str:
@@ -105,12 +108,40 @@ def build_parser() -> argparse.ArgumentParser:
         description="Johnston Coding Agent",
     )
     parser.add_argument(
+        "-c",
+        "--continue",
+        dest="continue_latest",
+        action="store_true",
+        help="Resume most recent session",
+    )
+    parser.add_argument(
         "--resume",
         nargs="?",
         const="",
         default=None,
         help="Resume specific session ID (or pick from list if ID omitted)",
     )
+    parser.add_argument("-p", "--prompt", default=None, help="Initial prompt to post on start")
+    parser.add_argument("-m", "--model", default=None, help="Override active model")
+    parser.add_argument("-r", "--role", default=None, help="Initial agent role")
+    parser.add_argument(
+        "--mode",
+        choices=["review", "edits", "yolo"],
+        default=None,
+        help="Initial permission mode",
+    )
+    parser.add_argument(
+        "--effort",
+        choices=["low", "medium", "high"],
+        default=None,
+        help="Thinking/reasoning effort",
+    )
+    sandbox_grp = parser.add_mutually_exclusive_group()
+    sandbox_grp.add_argument("--sandbox", action="store_true", help="Enable execution sandbox")
+    sandbox_grp.add_argument("--no-sandbox", action="store_true", help="Disable execution sandbox")
+    parser.add_argument("-C", "--cwd", default=None, help="Change working directory")
+    parser.add_argument("--theme", default=None, help="UI theme override")
+    parser.add_argument("--debug", action="store_true", help="Enable DEBUG logging level")
     parser.add_argument("-v", "--version", action="store_true", help="Show application version")
 
     subparsers = parser.add_subparsers(dest="subcommand", help="Available subcommands")
@@ -230,9 +261,34 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Prompt to execute (use '-' to read from stdin)",
     )
+    run_p.add_argument(
+        "-c",
+        "--continue",
+        dest="continue_latest",
+        action="store_true",
+        help="Resume most recent session",
+    )
+    run_p.add_argument(
+        "--resume",
+        nargs="?",
+        const="",
+        default=None,
+        help="Resume session ID (latest if omitted)",
+    )
     run_p.add_argument("--provider", default=None, help="Override active provider")
     run_p.add_argument("--model", default=None, help="Override active model")
     run_p.add_argument("--role", default="worker", help="Agent execution role (default: worker)")
+    run_p.add_argument(
+        "--effort",
+        choices=["low", "medium", "high"],
+        default=None,
+        help="Thinking/reasoning effort",
+    )
+    run_sandbox = run_p.add_mutually_exclusive_group()
+    run_sandbox.add_argument("--sandbox", action="store_true", help="Enable execution sandbox")
+    run_sandbox.add_argument("--no-sandbox", action="store_true", help="Disable execution sandbox")
+    run_p.add_argument("-C", "--cwd", default=None, help="Change working directory")
+    run_p.add_argument("--debug", action="store_true", help="Enable DEBUG logging level")
     run_p.add_argument("--json", action="store_true", help="Print structured JSON output")
     run_p.add_argument(
         "-q",
@@ -250,6 +306,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if getattr(args, "debug", False):
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    if getattr(args, "cwd", None):
+        cwd_dir = os.path.abspath(args.cwd)
+        if not os.path.isdir(cwd_dir):
+            sys.stderr.write(f"Error: Directory '{args.cwd}' does not exist.\n")
+            sys.exit(1)
+        os.chdir(cwd_dir)
 
     if args.version:
         print(f"johnston {_dispatch_version()}")
@@ -298,8 +364,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     from app import JohnstonApp
 
+    sandbox_val = True if getattr(args, "sandbox", False) else (False if getattr(args, "no_sandbox", False) else None)
     app = JohnstonApp(
-        resume_session_id=args.resume,
+        resume_session_id=getattr(args, "resume", None),
+        continue_latest=getattr(args, "continue_latest", False),
+        initial_prompt=getattr(args, "prompt", None),
+        model=getattr(args, "model", None),
+        role=getattr(args, "role", None),
+        mode=getattr(args, "mode", None),
+        effort=getattr(args, "effort", None),
+        sandbox=sandbox_val,
+        theme=getattr(args, "theme", None),
     )
     try:
         app.run()
@@ -308,3 +383,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     _print_resume_hint(app)
     sys.exit(0)
+

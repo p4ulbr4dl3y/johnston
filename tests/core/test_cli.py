@@ -115,7 +115,17 @@ class TestCLI(unittest.TestCase):
 
                 main()
             self.assertEqual(cm.exception.code, 0)
-            mock_app_cls.assert_called_once_with(resume_session_id="")
+            mock_app_cls.assert_called_once_with(
+                resume_session_id="",
+                continue_latest=False,
+                initial_prompt=None,
+                model=None,
+                role=None,
+                mode=None,
+                effort=None,
+                sandbox=None,
+                theme=None,
+            )
             self.assertTrue(mock_app_run.called)
 
 

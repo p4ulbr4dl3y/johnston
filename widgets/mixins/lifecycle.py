@@ -124,14 +124,35 @@ class LifecycleMixin:
             if not os.environ.get("PYTEST_CURRENT_TEST"):
                 asyncio.create_task(_refresh_catalog_bg())
 
+        if getattr(self, "initial_prompt", None) and not getattr(self, "_initial_prompt_posted", False):
+            self._initial_prompt_posted = True
+            init_prompt = self.initial_prompt
+
+            async def _post_initial_prompt() -> None:
+                await asyncio.sleep(0.05)
+                try:
+                    chat_input = self.query_one("#message-input", ChatInput)
+                    chat_input.load_text("")
+                    chat_input.add_to_history(init_prompt)
+                    chat_input.post_message(ChatInput.Submitted(init_prompt))
+                except Exception:
+                    pass
+
+            if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
+                self.create_tracked_task(_post_initial_prompt())
+            else:
+                asyncio.create_task(_post_initial_prompt())
+
     async def _check_initial_setup(self) -> None:
         """Auto-prompt for provider/model selection on first launch if unconfigured"""
         if (
             getattr(self, "resume_session_id", None) is not None
+            or getattr(self, "initial_prompt", None) is not None
             or os.environ.get("PYTEST_CURRENT_TEST")
             or not getattr(self, "is_app_active", True)
         ):
             return
+
         active_key = self.pm.get_active_provider_key()
         if not active_key or not self.pm.is_provider_connected(active_key):
             if not getattr(self, "is_app_active", True):

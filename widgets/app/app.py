@@ -37,7 +37,18 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         ("shift+tab", "toggle_mode", "Toggle Mode"),
     ])
 
-    def __init__(self, resume_session_id: str | None = None):
+    def __init__(
+        self,
+        resume_session_id: str | None = None,
+        continue_latest: bool = False,
+        initial_prompt: str | None = None,
+        model: str | None = None,
+        role: str | None = None,
+        mode: str | None = None,
+        effort: str | None = None,
+        sandbox: bool | None = None,
+        theme: str | None = None,
+    ):
         super().__init__()
         from core.infrastructure.runtime.tool_name import normalize_tool_name
         from core.permission_manager import PermissionManager
@@ -66,10 +77,15 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             self.agent.app = self
 
         self.resume_session_id = resume_session_id
-        if resume_session_id:
-            sess = self.sm.get(resume_session_id)
+        if continue_latest and not self.resume_session_id:
+            main_sessions = self.sm.list_main_sessions()
+            if main_sessions:
+                self.resume_session_id = main_sessions[0]["id"]
+
+        if self.resume_session_id:
+            sess = self.sm.get(self.resume_session_id)
             if sess:
-                self.current_session_id = resume_session_id
+                self.current_session_id = self.resume_session_id
             else:
                 self.current_session_id = self.sm.generate_session_id()
         else:
@@ -82,6 +98,41 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.is_generating = False
         self.sandbox_enabled = load_sandbox_config()
         self._background_tasks: set[asyncio.Task] = set()
+
+        if theme:
+            self.theme = theme
+
+        if model and self.agent:
+            self.agent.model = model
+
+        if effort and self.agent:
+            self.agent.thinking_effort = effort
+            self.agent.reasoning_effort = effort
+
+        if sandbox is not None:
+            self.sandbox_enabled = sandbox
+            if self.agent:
+                self.agent.sandbox_enabled = sandbox
+
+        if mode:
+            from core.domain.policies.permission_policy import ExecutionMode
+            from core.permission_manager import PermissionManager
+
+            try:
+                PermissionManager.get_instance().set_session_mode(ExecutionMode(mode.lower()))
+            except Exception:
+                pass
+
+        if role and self.agent:
+            from core.roles.apply import apply_role
+
+            try:
+                apply_role(self.agent, role, is_subagent=False)
+                self.role = role
+            except Exception:
+                pass
+
+        self.initial_prompt = initial_prompt
 
     def create_tracked_task(self, coro) -> asyncio.Task | None:
         """Spawn an asyncio task and keep a strong reference until done."""

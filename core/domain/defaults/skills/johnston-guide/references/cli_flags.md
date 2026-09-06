@@ -3,10 +3,112 @@
 ## Overview
 Johnston CLI provides subcommands for managing configurations, LLM providers, MCP servers, chat sessions, environment diagnostics, and headless execution, alongside the interactive Textual TUI.
 
-## Interactive TUI Launch
-- `johnston`: Start interactive Textual UI application (entry point `cli:main`).
+## Interactive TUI Launch (`johnston`)
+Start the interactive Textual UI application:
+- `johnston`: Start interactive Textual UI application.
 - `uv run python cli.py`: Run locally from a repository checkout.
-- `johnston --resume [session_id]`: Resume previous conversation session (interactive picker if ID omitted).
+
+### TUI Startup Flags
+- `-c`, `--continue`: Resume the most recent conversation session directly without picker.
+  ```bash
+  johnston -c
+  ```
+- `--resume [session_id]`: Resume a conversation session by ID (opens interactive picker if ID is omitted).
+  ```bash
+  johnston --resume
+  johnston --resume sess_abc123
+  ```
+- `-p`, `--prompt <text>`: Initial prompt to post and submit automatically on startup.
+  ```bash
+  johnston -p "Analyze current git diff and summarize changes"
+  ```
+- `-m`, `--model <model>`: Override active LLM model.
+  ```bash
+  johnston -m claude-3-7-sonnet-20250219
+  ```
+- `-r`, `--role <role>`: Specify initial agent execution role.
+  ```bash
+  johnston -r planner
+  ```
+- `--mode {review,edits,yolo}`: Specify initial permission execution mode.
+  ```bash
+  johnston --mode yolo
+  ```
+- `--effort {low,medium,high}`: Set thinking / reasoning effort level.
+  ```bash
+  johnston --effort high
+  ```
+- `--sandbox` / `--no-sandbox`: Enable or disable shell command execution sandboxing.
+  ```bash
+  johnston --sandbox
+  johnston --no-sandbox
+  ```
+- `-C`, `--cwd <dir>`: Change working directory before running.
+  ```bash
+  johnston -C /path/to/project
+  ```
+- `--theme <theme>`: Override active UI theme.
+  ```bash
+  johnston --theme nord
+  ```
+- `--debug`: Enable DEBUG logging level in `~/.johnston/logs/johnston.log`.
+  ```bash
+  johnston --debug
+  ```
+- `-v`, `--version`: Show application version and exit.
+- `-h`, `--help`: Show CLI help and exit.
+
+## Headless Execution (`johnston run`)
+Execute an agent turn directly in the terminal without launching the Textual TUI:
+- `johnston run "<prompt>"`: Run prompt and stream assistant output to stdout.
+- `echo "prompt" | johnston run`: Read prompt from stdin pipe.
+- `johnston run -`: Explicitly read prompt from stdin.
+
+### Headless Execution Flags
+- `-c`, `--continue`: Continue conversation history from the most recent session.
+  ```bash
+  johnston run -c "What was the last test we discussed?"
+  ```
+- `--resume [session_id]`: Resume conversation history from a specific session ID (latest if ID omitted).
+  ```bash
+  johnston run --resume sess_abc123 "Refactor the authentication middleware"
+  ```
+- `--effort {low,medium,high}`: Set thinking / reasoning effort level.
+  ```bash
+  johnston run --effort medium "Explain quantum entanglement in simple terms"
+  ```
+- `--sandbox` / `--no-sandbox`: Force enable or disable tool execution sandboxing.
+  ```bash
+  johnston run --sandbox "Run make test and report results"
+  ```
+- `-C`, `--cwd <dir>`: Change working directory before running.
+  ```bash
+  johnston run -C /path/to/repo "Check git status"
+  ```
+- `--debug`: Enable DEBUG level logging during execution.
+  ```bash
+  johnston run --debug "Diagnose dependencies"
+  ```
+- `--provider <name>`: Override active provider profile.
+  ```bash
+  johnston run --provider anthropic "Hello"
+  ```
+- `--model <model>`: Override active model.
+  ```bash
+  johnston run --model gpt-4o "Hello"
+  ```
+- `--role <role>`: Specify agent execution role (default: `worker`).
+  ```bash
+  johnston run --role planner "Draft implementation plan"
+  ```
+- `--json`: Output final structured JSON payload containing `response`, `tool_calls`, and `usage`.
+  ```bash
+  johnston run --json "List the top 3 files in src"
+  ```
+- `-q`, `--quiet`: Output only assistant response text, suppressing tool call status lines.
+  ```bash
+  johnston run -q "What is 2 + 2?"
+  ```
 
 ## Subcommands
 
@@ -50,26 +152,10 @@ Inspect and manage persisted chat sessions:
   - LLM providers API keys and local endpoint connectivity
   - MCP servers command/URL validation and tool count checks
 
-### 6. `johnston run` — Headless / One-shot Execution
-Execute agent turn directly in terminal without Textual TUI:
-- `johnston run "<prompt>"`: Run prompt and stream assistant output to stdout.
-- `echo "prompt" | johnston run`: Read prompt from stdin pipe.
-- Flags:
-  - `--provider <name>`: Override active provider.
-  - `--model <model>`: Override active model.
-  - `--role <role>`: Specify agent execution role (default: `worker`).
-  - `--json`: Output final structured JSON payload (`response`, `tool_calls`, `usage`).
-  - `-q`, `--quiet`: Output only assistant text, suppressing tool call status headers.
-
-### 7. Inspection Commands
+### 6. Inspection Commands
 - `johnston roles`: List available agent roles (execution modes and subagent roles).
 - `johnston skills`: List registered global and project skills.
 - `johnston rules`: List active project instructions and rules.
-
-## General Options
-- `-h`, `--help`: Show CLI help and exit.
-- `-v`, `--version`: Show application version.
-- `--resume [ID]`: Resume a conversation session in TUI.
 
 ## Session Resume Hint
 Upon exiting an active conversation session in TUI mode, Johnston prints:
