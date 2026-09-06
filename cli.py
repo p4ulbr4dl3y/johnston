@@ -10,15 +10,13 @@ try:
 except ImportError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[no-redef]
 
+from core.interfaces.cli.commands.mcp_cmd import print_mcp
+from core.interfaces.cli.commands.provider_cmd import print_models
 from core.interfaces.cli.commands.roles_cmd import print_roles
 from core.interfaces.cli.commands.rules_cmd import print_rules
 from core.interfaces.cli.commands.skills_cmd import print_skills
 from core.interfaces.cli.entrypoint import (
     main as _entrypoint_main,
-)
-from core.interfaces.cli.entrypoint import (
-    print_mcp,
-    print_models,
 )
 
 __all__ = [

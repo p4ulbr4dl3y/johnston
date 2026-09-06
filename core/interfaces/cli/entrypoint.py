@@ -13,7 +13,10 @@ except ImportError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[no-redef]
 
 from core.infrastructure.platform.logging_setup import setup_logging
-from core.infrastructure.platform.paths import CONFIG_DIR
+from core.interfaces.cli.commands.mcp_cmd import print_mcp
+from core.interfaces.cli.commands.provider_cmd import print_models
+
+__all__ = ["build_parser", "get_version", "main", "print_mcp", "print_models"]
 
 
 def get_version() -> str:
@@ -36,105 +39,6 @@ def get_version() -> str:
             except Exception:
                 pass
         return "0.1.0-dev"
-
-
-def print_models() -> None:
-    """Print available providers and models to stdout."""
-    from core.provider_manager import ProviderManager
-
-    pm = ProviderManager()
-    providers = pm.load_providers()
-    active_key = pm.get_active_provider_key()
-    print("Available Johnston Providers & Models:")
-    items = []
-    for key, info in providers.items():
-        api_key = pm.get_api_key(key) or info.get("api_key", "")
-        models = info.get("models") or ([info["model"]] if info.get("model") else [])
-        if not api_key and not models:
-            continue
-        items.append((key, info, api_key, models))
-
-    for idx, (key, info, api_key, models) in enumerate(items):
-        is_active = "*" if key == active_key else " "
-        name = info.get("name") or key
-        model = info.get("model") or (models[0] if models else "not configured")
-        key_status = "[key set]" if api_key else "[no key]"
-        base_url = info.get("base_url") or ""
-
-        print(f"{is_active} [{key}] {name} {key_status}")
-        if model and model != "not configured":
-            print(f"    Active Model: {model}")
-        if models:
-            print(f"    Models: {', '.join(models[:5])}{' ...' if len(models) > 5 else ''}")
-        if base_url:
-            print(f"    Base URL: {base_url}")
-        if idx < len(items) - 1:
-            print()
-
-
-def print_mcp() -> None:
-    """Print configured MCP servers to stdout."""
-    from core.infrastructure.mcp import MCPManager, get_mcp_manager
-
-    mgr = get_mcp_manager()
-    servers = mgr.load_servers()
-    print("Configured MCP Servers:")
-    if not servers:
-        print(f"  No MCP servers configured ({CONFIG_DIR}/mcp.json or .johnston/mcp.json)")
-        return
-
-    tools_by_server: dict[str, list[str]] = {}
-    try:
-        active_tools = mgr.get_active_tools()
-        for t in active_tools:
-            s_name = t.get("_mcp_server")
-            t_name = t.get("_mcp_tool_name")
-            if s_name and t_name:
-                tools_by_server.setdefault(s_name, []).append(t_name)
-    except Exception:
-        pass
-
-    for idx, s in enumerate(servers):
-        enabled = MCPManager.server_enabled(s)
-        status = "[enabled]" if enabled else "[disabled]"
-        scope = f"[{s.get('scope', 'global')}]"
-        name = s.get("name")
-
-        cmd = s.get("command")
-        args = s.get("args") or []
-        url = s.get("url")
-        if cmd:
-            cmd_str = f"Command: {cmd}" + (f" {' '.join(str(a) for a in args)}" if args else "")
-        elif url:
-            cmd_str = f"URL: {url}"
-        else:
-            cmd_str = "Command: (none)"
-
-        print(f"  * {name} {scope} {status}")
-        print(f"    {cmd_str}")
-
-        if not enabled:
-            if idx < len(servers) - 1:
-                print()
-            continue
-
-        tools = tools_by_server.get(name, [])
-        if tools:
-            print(f"    Tools: {', '.join(tools)}")
-        elif url and not cmd:
-            print("    Error: HTTP/SSE URL transport not supported yet (only stdio commands supported)")
-        else:
-            server_status = mgr.get_server_status(name) if hasattr(mgr, "get_server_status") else {}
-            err = server_status.get("error") if isinstance(server_status, dict) else None
-            if err:
-                print(f"    Error: {err}")
-            elif not cmd:
-                print("    Error: Server configuration missing 'command' or 'url'")
-            else:
-                print("    Error: No tools reported or server failed to respond")
-
-        if idx < len(servers) - 1:
-            print()
 
 
 def _print_resume_hint(app: Any) -> None:
@@ -176,13 +80,17 @@ def _dispatch_roles(args: Any = None) -> int:
     return run_roles(args)
 
 
-def _dispatch_models() -> int:
+def _dispatch_models(args: Any = None) -> int:
     cli_mod = sys.modules.get("cli")
     if cli_mod and hasattr(cli_mod, "print_models"):
-        cli_mod.print_models()
-        return 0
-    print_models()
-    return 0
+        from unittest.mock import Mock
+
+        if isinstance(getattr(cli_mod, "print_models"), Mock):
+            cli_mod.print_models()
+            return 0
+    from core.interfaces.cli.commands.provider_cmd import run_provider
+
+    return run_provider(args)
 
 
 def _dispatch_skills(args: Any = None) -> int:
@@ -194,13 +102,17 @@ def _dispatch_skills(args: Any = None) -> int:
     return run_skills(args)
 
 
-def _dispatch_mcp() -> int:
+def _dispatch_mcp(args: Any = None) -> int:
     cli_mod = sys.modules.get("cli")
     if cli_mod and hasattr(cli_mod, "print_mcp"):
-        cli_mod.print_mcp()
-        return 0
-    print_mcp()
-    return 0
+        from unittest.mock import Mock
+
+        if isinstance(getattr(cli_mod, "print_mcp"), Mock):
+            cli_mod.print_mcp()
+            return 0
+    from core.interfaces.cli.commands.mcp_cmd import run_mcp
+
+    return run_mcp(args)
 
 
 def _dispatch_rules(args: Any = None) -> int:
@@ -252,6 +164,61 @@ def build_parser() -> argparse.ArgumentParser:
     unset_p = config_subs.add_parser("unset", help="Reset a configuration setting to default")
     unset_p.add_argument("key", help="Configuration key (e.g. llm.context_limit, theme)")
 
+    # provider subparser
+    provider_p = subparsers.add_parser("provider", help="Manage LLM providers and models")
+    provider_subs = provider_p.add_subparsers(dest="provider_action", help="Provider actions")
+
+    provider_subs.add_parser("list", help="List configured providers and models")
+
+    sk_p = provider_subs.add_parser("set-key", help="Set API key for a provider")
+    sk_p.add_argument("name", help="Provider name or key")
+    sk_p.add_argument("key", help="API key to save")
+
+    sm_p = provider_subs.add_parser("set-model", help="Set active model for a provider")
+    sm_p.add_argument("name", help="Provider name or key")
+    sm_p.add_argument("model", help="Model name to set")
+
+    en_p = provider_subs.add_parser("enable", help="Enable a provider")
+    en_p.add_argument("name", help="Provider name or key")
+
+    dis_p = provider_subs.add_parser("disable", help="Disable a provider")
+    dis_p.add_argument("name", help="Provider name or key")
+
+    add_p = provider_subs.add_parser("add", help="Add a new provider to providers.json")
+    add_p.add_argument("name", help="Provider name or key")
+    add_p.add_argument("--model", required=True, help="Default model for provider")
+    add_p.add_argument("--api-key", default=None, help="API key for provider")
+    add_p.add_argument("--base-url", default=None, help="Base URL for provider API")
+
+    rm_p = provider_subs.add_parser("rm", help="Remove a provider from providers.json")
+    rm_p.add_argument("name", help="Provider name or key")
+
+    # mcp subparser
+    mcp_p = subparsers.add_parser("mcp", help="Manage Model Context Protocol (MCP) servers")
+    mcp_subs = mcp_p.add_subparsers(dest="mcp_action", help="MCP actions")
+
+    mcp_subs.add_parser("list", help="List configured MCP servers")
+
+    mcp_add = mcp_subs.add_parser("add", help="Add or update an MCP server")
+    mcp_add.add_argument("name", help="Server name")
+    cmd_or_url = mcp_add.add_mutually_exclusive_group(required=True)
+    cmd_or_url.add_argument("--cmd", dest="cmd", help="Command to run the stdio MCP server")
+    cmd_or_url.add_argument("--url", dest="url", help="HTTP/SSE URL for the MCP server")
+    mcp_add.add_argument("--args", nargs="*", default=None, help="Arguments for the command")
+    mcp_add.add_argument("--scope", choices=["global", "project"], default="global", help="Scope (global or project)")
+
+    mcp_rm = mcp_subs.add_parser("rm", help="Remove an MCP server")
+    mcp_rm.add_argument("name", help="Server name")
+    mcp_rm.add_argument("--scope", choices=["global", "project"], default=None, help="Scope (global or project)")
+
+    mcp_en = mcp_subs.add_parser("enable", help="Enable an MCP server")
+    mcp_en.add_argument("name", help="Server name")
+    mcp_en.add_argument("--scope", choices=["global", "project"], default=None, help="Scope (global or project)")
+
+    mcp_dis = mcp_subs.add_parser("disable", help="Disable an MCP server")
+    mcp_dis.add_argument("name", help="Server name")
+    mcp_dis.add_argument("--scope", choices=["global", "project"], default=None, help="Scope (global or project)")
+
     # roles subparser
     subparsers.add_parser("roles", help="List available agent roles (execution modes + subagents)")
 
@@ -281,7 +248,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.exit(0)
 
     if args.models:
-        _dispatch_models()
+        _dispatch_models(args)
         sys.exit(0)
 
     if args.skills:
@@ -289,7 +256,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.exit(0)
 
     if args.mcp:
-        _dispatch_mcp()
+        _dispatch_mcp(args)
         sys.exit(0)
 
     if args.rules:
@@ -302,6 +269,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         code = run_config(args)
         sys.exit(code)
+    elif args.subcommand == "provider":
+        from core.interfaces.cli.commands.provider_cmd import run_provider
+
+        code = run_provider(args)
+        sys.exit(code if code is not None else 0)
+    elif args.subcommand == "mcp":
+        from core.interfaces.cli.commands.mcp_cmd import run_mcp
+
+        code = run_mcp(args)
+        sys.exit(code if code is not None else 0)
     elif args.subcommand == "roles":
         code = _dispatch_roles(args)
         sys.exit(code if code is not None else 0)

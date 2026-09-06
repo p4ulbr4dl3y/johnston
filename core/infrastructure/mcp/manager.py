@@ -259,6 +259,59 @@ class MCPManager:
 
         return server_enabled(server)
 
+    def add_server(
+        self,
+        name: str,
+        cmd: Optional[str] = None,
+        url: Optional[str] = None,
+        args: Optional[list[str]] = None,
+        env: Optional[Dict[str, str]] = None,
+        scope: str = "global",
+    ) -> None:
+        from core.infrastructure.mcp.config import add_server_config
+
+        add_server_config(
+            name,
+            cmd=cmd,
+            url=url,
+            args=args,
+            env=env,
+            scope=scope,
+            project_dir=self.project_dir,
+            global_file=self.global_file,
+        )
+        self._notify_listeners("server_updated")
+
+    def remove_server(self, name: str, scope: Optional[str] = None) -> bool:
+        from core.infrastructure.mcp.config import remove_server_config
+
+        res = remove_server_config(
+            name,
+            scope=scope,
+            project_dir=self.project_dir,
+            global_file=self.global_file,
+        )
+        if res:
+            self._pool.stop_client(name)
+            self._notify_listeners("server_updated")
+        return res
+
+    def set_server_enabled(self, name: str, enabled: bool, scope: Optional[str] = None) -> bool:
+        from core.infrastructure.mcp.config import set_server_enabled
+
+        res = set_server_enabled(
+            name,
+            enabled,
+            scope=scope,
+            project_dir=self.project_dir,
+            global_file=self.global_file,
+        )
+        if res:
+            if not enabled:
+                self._pool.stop_client(name)
+            self._notify_listeners("server_updated")
+        return res
+
     # -- tools ----------------------------------------------------------------------
 
     def get_active_tools(self) -> List[Dict[str, Any]]:

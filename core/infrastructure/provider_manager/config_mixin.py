@@ -103,6 +103,47 @@ class ProviderManagerConfigMixin:
         self._save_providers_json(data)
         self.invalidate_cache()
 
+    def add_provider(
+        self,
+        name: str,
+        model: str,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        data = self._read_providers_json()
+        prov_data = data.get(name)
+        if not isinstance(prov_data, dict):
+            prov_data = {}
+        prov_data["key"] = name
+        prov_data["name"] = prov_data.get("name", name)
+        prov_data["model"] = model
+        models = prov_data.get("models")
+        if not isinstance(models, list):
+            prov_data["models"] = [model]
+        elif model not in models:
+            models.append(model)
+        if base_url:
+            prov_data["base_url"] = base_url
+        if api_key:
+            self.set_provider_api_key(name, api_key)
+        prov_data.update(kwargs)
+        data[name] = prov_data
+        self._save_providers_json(data)
+        self.invalidate_cache()
+
+    def remove_provider(self, key: str) -> bool:
+        pm = _pm()
+        data = self._read_providers_json()
+        existed = key in self.load_providers() or key in data
+        if key in pm.DEFAULT_JSON_PROVIDERS:
+            data[key] = None
+        else:
+            data.pop(key, None)
+        self._save_providers_json(data)
+        self.invalidate_cache()
+        return existed
+
     def load_providers(self, include_disabled: bool = True) -> Dict[str, Any]:
         """Loads providers from JSON definitions (memoized until source files change)."""
         pm = _pm()

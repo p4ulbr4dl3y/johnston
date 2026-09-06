@@ -153,3 +153,119 @@ def update_server_config(
             entry.pop("enabled", None)
 
     update_json_config(file_to_update, _mutate, indent=2)
+
+
+def add_server_config(
+    name: str,
+    cmd: Optional[str] = None,
+    url: Optional[str] = None,
+    args: Optional[list[str]] = None,
+    env: Optional[Dict[str, str]] = None,
+    scope: str = "global",
+    project_dir: Optional[str] = None,
+    global_file: str = GLOBAL_MCP_FILE,
+) -> None:
+    """Add or update an MCP server entry in global or project config."""
+    if scope == "project":
+        proj_dir = project_dir or os.getcwd()
+        target_file = os.path.join(proj_dir, PROJECT_MCP_FILE)
+        os.makedirs(os.path.dirname(target_file), exist_ok=True)
+    else:
+        target_file = global_file
+        os.makedirs(os.path.dirname(target_file), exist_ok=True)
+
+    def _mutate(cfg: Dict[str, Any]) -> None:
+        cfg.setdefault("mcpServers", {})
+        existing = cfg["mcpServers"].get(name)
+        entry = dict(existing) if isinstance(existing, dict) else {}
+        if cmd is not None:
+            entry["command"] = cmd
+            entry.pop("url", None)
+            if args is not None:
+                entry["args"] = list(args)
+        elif url is not None:
+            entry["url"] = url
+            entry.pop("command", None)
+            entry.pop("args", None)
+        elif args is not None:
+            entry["args"] = list(args)
+        if env is not None:
+            entry["env"] = dict(env)
+        cfg["mcpServers"][name] = entry
+
+    update_json_config(target_file, _mutate, indent=2)
+
+
+def remove_server_config(
+    name: str,
+    scope: Optional[str] = None,
+    project_dir: Optional[str] = None,
+    global_file: str = GLOBAL_MCP_FILE,
+) -> bool:
+    """Remove an MCP server entry from global and/or project config."""
+    proj_dir = project_dir or os.getcwd()
+    proj_file = os.path.join(proj_dir, PROJECT_MCP_FILE)
+
+    if scope == "project":
+        files_to_check = [proj_file]
+    elif scope == "global":
+        files_to_check = [global_file]
+    else:
+        files_to_check = [proj_file, global_file]
+
+    removed = False
+    for path in files_to_check:
+        if not os.path.exists(path):
+            continue
+
+        def _mutate(cfg: Dict[str, Any]) -> None:
+            nonlocal removed
+            servers = cfg.get("mcpServers")
+            if isinstance(servers, dict) and name in servers:
+                del servers[name]
+                removed = True
+
+        update_json_config(path, _mutate, indent=2)
+        if removed and scope is None:
+            break
+
+    return removed
+
+
+def set_server_enabled(
+    name: str,
+    enabled: bool,
+    scope: Optional[str] = None,
+    project_dir: Optional[str] = None,
+    global_file: str = GLOBAL_MCP_FILE,
+) -> bool:
+    """Update enabled status of an MCP server in config."""
+    proj_dir = project_dir or os.getcwd()
+    proj_file = os.path.join(proj_dir, PROJECT_MCP_FILE)
+
+    if scope == "project":
+        files_to_check = [proj_file]
+    elif scope == "global":
+        files_to_check = [global_file]
+    else:
+        files_to_check = [proj_file, global_file]
+
+    updated = False
+    for path in files_to_check:
+        if not os.path.exists(path):
+            continue
+
+        def _mutate(cfg: Dict[str, Any]) -> None:
+            nonlocal updated
+            servers = cfg.get("mcpServers")
+            if isinstance(servers, dict) and name in servers:
+                entry = servers[name]
+                if isinstance(entry, dict):
+                    entry["enabled"] = enabled
+                    updated = True
+
+        update_json_config(path, _mutate, indent=2)
+        if updated and scope is None:
+            break
+
+    return updated
