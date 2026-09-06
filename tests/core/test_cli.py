@@ -351,18 +351,17 @@ class TestCLIAdvanced(unittest.TestCase):
         self.assertIn("Disallowed tools: rm", out)
 
 
-class TestMainFlags(unittest.TestCase):
-    def test_main_models_flag(self):
-        with patch("sys.argv", ["johnston", "--models"]):
-            with patch("cli.print_models"):
-                with self.assertRaises(SystemExit) as cm:
-                    from cli import main
+class TestMainSubcommands(unittest.TestCase):
+    def test_main_provider_list_cmd(self):
+        with patch("sys.argv", ["johnston", "provider", "list"]):
+            with self.assertRaises(SystemExit) as cm:
+                from cli import main
 
-                    main()
+                main()
         self.assertEqual(cm.exception.code, 0)
 
-    def test_main_skills_flag(self):
-        with patch("sys.argv", ["johnston", "--skills"]):
+    def test_main_skills_cmd(self):
+        with patch("sys.argv", ["johnston", "skills"]):
             with patch("cli.print_skills"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
@@ -370,17 +369,16 @@ class TestMainFlags(unittest.TestCase):
                     main()
         self.assertEqual(cm.exception.code, 0)
 
-    def test_main_mcp_flag(self):
-        with patch("sys.argv", ["johnston", "--mcp"]):
-            with patch("cli.print_mcp"):
-                with self.assertRaises(SystemExit) as cm:
-                    from cli import main
+    def test_main_mcp_list_cmd(self):
+        with patch("sys.argv", ["johnston", "mcp", "list"]):
+            with self.assertRaises(SystemExit) as cm:
+                from cli import main
 
-                    main()
+                main()
         self.assertEqual(cm.exception.code, 0)
 
-    def test_main_roles_flag(self):
-        with patch("sys.argv", ["johnston", "--roles"]):
+    def test_main_roles_cmd(self):
+        with patch("sys.argv", ["johnston", "roles"]):
             with patch("cli.print_roles"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main
@@ -388,8 +386,8 @@ class TestMainFlags(unittest.TestCase):
                     main()
         self.assertEqual(cm.exception.code, 0)
 
-    def test_main_rules_flag(self):
-        with patch("sys.argv", ["johnston", "--rules"]):
+    def test_main_rules_cmd(self):
+        with patch("sys.argv", ["johnston", "rules"]):
             with patch("cli.print_rules"):
                 with self.assertRaises(SystemExit) as cm:
                     from cli import main

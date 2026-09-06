@@ -80,17 +80,6 @@ def _dispatch_roles(args: Any = None) -> int:
     return run_roles(args)
 
 
-def _dispatch_models(args: Any = None) -> int:
-    cli_mod = sys.modules.get("cli")
-    if cli_mod and hasattr(cli_mod, "print_models"):
-        cli_mod.print_models()
-        return 0
-    from core.interfaces.cli.commands.provider_cmd import print_models
-
-    print_models()
-    return 0
-
-
 def _dispatch_skills(args: Any = None) -> int:
     cli_mod = sys.modules.get("cli")
     if cli_mod and hasattr(cli_mod, "print_skills"):
@@ -98,17 +87,6 @@ def _dispatch_skills(args: Any = None) -> int:
         return 0
     from core.interfaces.cli.commands.skills_cmd import run_skills
     return run_skills(args)
-
-
-def _dispatch_mcp(args: Any = None) -> int:
-    cli_mod = sys.modules.get("cli")
-    if cli_mod and hasattr(cli_mod, "print_mcp"):
-        cli_mod.print_mcp()
-        return 0
-    from core.interfaces.cli.commands.mcp_cmd import print_mcp
-
-    print_mcp()
-    return 0
 
 
 def _dispatch_rules(args: Any = None) -> int:
@@ -134,13 +112,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Resume specific session ID (or pick from list if ID omitted)",
     )
     parser.add_argument("-v", "--version", action="store_true", help="Show application version")
-
-    # Legacy flags for backward compatibility
-    parser.add_argument("--models", action="store_true", help="List available providers and models")
-    parser.add_argument("--skills", action="store_true", help="List available skills")
-    parser.add_argument("--mcp", action="store_true", help="List configured MCP servers")
-    parser.add_argument("--roles", action="store_true", help="List available agent roles (execution modes + subagents)")
-    parser.add_argument("--rules", action="store_true", help="List active project instructions and rules")
 
     subparsers = parser.add_subparsers(dest="subcommand", help="Available subcommands")
 
@@ -280,29 +251,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    # Legacy flag dispatching in exact priority order
     if args.version:
         print(f"johnston {_dispatch_version()}")
-        sys.exit(0)
-
-    if args.roles:
-        _dispatch_roles(args)
-        sys.exit(0)
-
-    if args.models:
-        _dispatch_models(args)
-        sys.exit(0)
-
-    if args.skills:
-        _dispatch_skills(args)
-        sys.exit(0)
-
-    if args.mcp:
-        _dispatch_mcp(args)
-        sys.exit(0)
-
-    if args.rules:
-        _dispatch_rules(args)
         sys.exit(0)
 
     # Subcommands

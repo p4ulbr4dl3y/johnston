@@ -66,13 +66,10 @@ Execute agent turn directly in terminal without Textual TUI:
 - `johnston skills`: List registered global and project skills.
 - `johnston rules`: List active project instructions and rules.
 
-## Backward-Compatible Legacy Flags
-- `johnston -v` / `johnston --version`: Show application version.
-- `johnston --models`: Alias for `johnston provider list`.
-- `johnston --skills`: Alias for `johnston skills`.
-- `johnston --mcp`: Alias for `johnston mcp list`.
-- `johnston --roles`: Alias for `johnston roles`.
-- `johnston --rules`: Alias for `johnston rules`.
+## General Options
+- `-h`, `--help`: Show CLI help and exit.
+- `-v`, `--version`: Show application version.
+- `--resume [ID]`: Resume a conversation session in TUI.
 
 ## Session Resume Hint
 Upon exiting an active conversation session in TUI mode, Johnston prints:

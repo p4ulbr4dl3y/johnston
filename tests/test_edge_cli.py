@@ -19,27 +19,22 @@ class TestCLIEdgeMain(unittest.TestCase):
         self.assertEqual(cm.exception.code, 0)
         self.assertTrue(mock_app.run.called)
 
-    @patch("sys.argv", ["johnston", "--models", "--skills"])
-    def test_invalid_flag_combo_runs_both_but_exits_once(self):
-        """Passing two listing flags is ambiguous; the CLI must handle it
-        deterministically (first wins) without a traceback."""
-        with patch("cli.print_models") as pm, patch("cli.print_skills") as ps:
-            with self.assertRaises(SystemExit) as cm:
-                main()
-            self.assertEqual(cm.exception.code, 0)
-            pm.assert_called_once()
-            ps.assert_not_called()
+    @patch("sys.argv", ["johnston", "--unknown-flag"])
+    def test_unknown_flag_exits_with_error(self):
+        """Passing unrecognized flag exits with code 2."""
+        with self.assertRaises(SystemExit) as cm:
+            main()
+        self.assertEqual(cm.exception.code, 2)
 
-    @patch("sys.argv", ["johnston", "-v", "--models"])
+    @patch("sys.argv", ["johnston", "-v", "provider", "list"])
     def test_version_takes_precedence(self):
-        with patch("cli.print_models") as pm, patch("cli.get_version", return_value="1.2.3"):
+        with patch("cli.get_version", return_value="1.2.3"):
             f = io.StringIO()
             with redirect_stdout(f):
                 with self.assertRaises(SystemExit) as cm:
                     main()
             self.assertEqual(cm.exception.code, 0)
             self.assertIn("1.2.3", f.getvalue())
-            pm.assert_not_called()
 
     @patch("sys.argv", ["johnston", "--resume", "sess-юникод-1"])
     @patch("app.JohnstonApp.run")
