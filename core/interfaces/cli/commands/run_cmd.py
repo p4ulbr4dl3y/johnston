@@ -232,6 +232,18 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         is_json = getattr(args, "json", False) is True
         is_stream_json = getattr(args, "stream_json", False) is True
 
+        extra_skills = getattr(args, "skills", None) or []
+        from core.application.skills.inject import extract_and_inject_skills
+
+        effective_prompt, activated_skills = extract_and_inject_skills(prompt, extra_skills=extra_skills)
+        if activated_skills:
+            if is_stream_json:
+                sys.stdout.write(json.dumps({"event": "skills", "skills": activated_skills}) + "\n")
+                sys.stdout.flush()
+            elif not is_quiet and not is_json:
+                sys.stderr.write(f"[skills] activated: {', '.join(activated_skills)}\n")
+                sys.stderr.flush()
+
         response_parts: list[str] = []
         tool_calls: list[dict[str, Any]] = []
         has_error = False
@@ -239,7 +251,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         start_time = time.perf_counter()
 
         try:
-            async for step in agent.stream_steps(prompt):
+            async for step in agent.stream_steps(effective_prompt):
                 parsed = parse_stream_step(step)
                 if parsed is None:
                     continue
@@ -360,6 +372,8 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                 "tool_calls": tool_calls,
                 "usage": usage,
             }
+            if activated_skills:
+                output_payload["skills"] = activated_skills
             print(json.dumps(output_payload, indent=2))
             sys.stdout.flush()
         else:

@@ -11,78 +11,17 @@ classes are bound to screens in ``widgets.commands``); the registry lives here.
 from __future__ import annotations
 
 import asyncio
-import os
 
+from core.application.skills.inject import (
+    load_skill_blocks as _load_skill_blocks,
+)
+from core.application.skills.inject import (
+    normalize_homoglyphs,
+)
+from core.application.skills.inject import (
+    resolve_skills as _resolve_skills,
+)
 from core.application.skills.manager import get_skill_manager
-
-CYRILLIC_HOMOGLYPHS: dict[str, str] = {
-    "а": "a",
-    "в": "b",
-    "е": "e",
-    "к": "k",
-    "м": "m",
-    "н": "h",
-    "о": "o",
-    "р": "p",
-    "с": "c",
-    "т": "t",
-    "у": "y",
-    "х": "x",
-    "А": "A",
-    "В": "B",
-    "Е": "E",
-    "К": "K",
-    "М": "M",
-    "Н": "H",
-    "О": "O",
-    "Р": "P",
-    "С": "C",
-    "Т": "T",
-    "У": "Y",
-    "Х": "X",
-}
-
-
-def normalize_homoglyphs(text: str) -> str:
-    """Normalize Cyrillic homoglyphs to Latin ASCII equivalents."""
-    return "".join(CYRILLIC_HOMOGLYPHS.get(c, c) for c in text)
-
-
-def _resolve_skills(sm, norm_skill_words):
-    """(sync, thread-safe) Resolve slash args into Skill objects; returns (skills, unresolved)."""
-    loaded_skills = []
-    unresolved = []
-    for norm in norm_skill_words:
-        skill = sm.get_skill(norm)
-        if skill:
-            if skill not in loaded_skills:
-                loaded_skills.append(skill)
-        else:
-            unresolved.append(norm)
-    return loaded_skills, unresolved
-
-
-def _load_skill_blocks(loaded_skills) -> list[str]:
-    """(sync, thread-safe) Read skill content from disk for the invocation blocks."""
-    blocks = []
-    for s in loaded_skills:
-        content = s.content.strip()
-        if not content and s.location and os.path.exists(s.location):
-            try:
-                with open(s.location, "r", encoding="utf-8") as f:
-                    raw_c = f.read()
-                from core.infrastructure.runtime.frontmatter import parse_frontmatter
-
-                _, body = parse_frontmatter(raw_c)
-                content = body.strip()
-            except Exception:
-                content = ""
-        from core.infrastructure.runtime.xml_utils import escape_xml_attr
-
-        escaped_name = escape_xml_attr(s.name or "")
-        path_attr = f' path="{escape_xml_attr(s.location)}"' if s.location else ""
-        blocks.append(f'<skill name="{escaped_name}"{path_attr}>\n{content}\n</skill>')
-    return blocks
 
 
 def build_command_registry() -> dict:

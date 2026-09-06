@@ -33,8 +33,10 @@ class MockAgent:
         self.tokens_output = 20
         self.total_tokens = 30
         self.cost_usd = 0.001
+        self.received_prompt: str | None = None
 
     async def stream_steps(self, prompt: str) -> AsyncGenerator[Any, None]:
+        self.received_prompt = prompt
         for step in self.steps:
             yield step
 
@@ -44,7 +46,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
 
     def test_parser_run_subcommand(self):
         parser = build_parser()
-        args = parser.parse_args(["run", "test prompt", "--provider", "openai", "--model", "gpt-4o", "-q", "--json"])
+        args = parser.parse_args(["run", "test prompt", "--provider", "openai", "--model", "gpt-4o", "-q", "--json", "-s", "caveman", "--skill", "debugger"])
         self.assertEqual(args.subcommand, "run")
         self.assertEqual(args.prompt, "test prompt")
         self.assertEqual(args.provider, "openai")
@@ -52,6 +54,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(args.role, "worker")
         self.assertTrue(args.quiet)
         self.assertTrue(args.json)
+        self.assertEqual(args.skills, ["caveman", "debugger"])
 
     def test_resolve_prompt_direct(self):
         prompt = resolve_prompt("hello world")
@@ -500,6 +503,122 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
             code = await run_headless_async(args, pm=pm)
         self.assertEqual(code, 0)
         self.assertTrue(closed)
+
+    @patch("core.application.skills.manager.get_skill_manager")
+    async def test_run_headless_async_slash_skill_injection(self, mock_get_sm):
+        skill = MagicMock()
+        skill.name = "caveman"
+        skill.location = None
+        skill.content = "Be concise."
+        sm = MagicMock()
+        sm.get_skill.side_effect = lambda n: skill if n == "caveman" else None
+        mock_get_sm.return_value = sm
+
+        agent = MockAgent(steps=[("content", "grunt done", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="/caveman write poem",
+            skills=[],
+            provider=None,
+            model=None,
+            role="worker",
+            quiet=False,
+            json=False,
+            stream_json=False,
+        )
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertIsNotNone(agent.received_prompt)
+        self.assertIn('<skill name="caveman">', agent.received_prompt)
+        self.assertIn("write poem", agent.received_prompt)
+        self.assertIn("[skills] activated: caveman", err_buf.getvalue())
+
+    @patch("core.application.skills.manager.get_skill_manager")
+    async def test_run_headless_async_explicit_skill_flag_json(self, mock_get_sm):
+        skill = MagicMock()
+        skill.name = "caveman"
+        skill.location = None
+        skill.content = "Be concise."
+        sm = MagicMock()
+        sm.get_skill.side_effect = lambda n: skill if n == "caveman" else None
+        mock_get_sm.return_value = sm
+
+        agent = MockAgent(steps=[("content", "grunt done", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="write poem",
+            skills=["caveman"],
+            provider=None,
+            model=None,
+            role="worker",
+            quiet=False,
+            json=True,
+            stream_json=False,
+        )
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertIsNotNone(agent.received_prompt)
+        self.assertIn('<skill name="caveman">', agent.received_prompt)
+        self.assertNotIn("[skills]", err_buf.getvalue())
+        data = json.loads(out_buf.getvalue())
+        self.assertEqual(data["skills"], ["caveman"])
+
+    @patch("core.application.skills.manager.get_skill_manager")
+    async def test_run_headless_async_skills_stream_json(self, mock_get_sm):
+        skill = MagicMock()
+        skill.name = "caveman"
+        skill.location = None
+        skill.content = "Be concise."
+        sm = MagicMock()
+        sm.get_skill.side_effect = lambda n: skill if n == "caveman" else None
+        mock_get_sm.return_value = sm
+
+        agent = MockAgent(steps=[("content", "grunt done", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="write poem",
+            skills=["caveman"],
+            provider=None,
+            model=None,
+            role="worker",
+            quiet=False,
+            json=False,
+            stream_json=True,
+        )
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        lines = [json.loads(line) for line in out_buf.getvalue().strip().splitlines()]
+        self.assertEqual(lines[0]["event"], "skills")
+        self.assertEqual(lines[0]["skills"], ["caveman"])
 
 
 class TestCLIRunSyncWrapper(unittest.TestCase):

@@ -286,6 +286,14 @@ def build_parser() -> argparse.ArgumentParser:
     run_sandbox.add_argument("--sandbox", action="store_true", help="Enable execution sandbox")
     run_sandbox.add_argument("--no-sandbox", action="store_true", help="Disable execution sandbox")
     run_p.add_argument("-C", "--cwd", default=None, help="Change working directory")
+    run_p.add_argument(
+        "-s",
+        "--skill",
+        dest="skills",
+        action="append",
+        default=[],
+        help="Activate skill(s) by name (can be specified multiple times)",
+    )
     run_p.add_argument("--debug", action="store_true", help="Enable DEBUG logging level")
     run_p.add_argument("--json", action="store_true", help="Print structured JSON output")
     run_p.add_argument("--stream-json", action="store_true", help="Stream real-time NDJSON events")
