@@ -13,6 +13,7 @@ from widgets.presentation.commands.workspace_command import WorkspaceCommand
 from widgets.presentation.screens.confirm import ConfirmScreen
 from widgets.presentation.screens.workspace import (
     WorkspaceScreen,
+    format_workspace_path,
     get_root_scope,
 )
 from widgets.presentation.widgets.modal_hint import ModalHint
@@ -56,6 +57,30 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(get_root_scope(self.pm, extra), "session")
         finally:
             os.rmdir(extra)
+
+    def test_format_workspace_path(self):
+        home = os.path.realpath(os.path.expanduser("~"))
+        # Within home
+        test_path = os.path.join(home, "projects", "my-repo")
+        self.assertEqual(format_workspace_path(test_path, 50), "~/projects/my-repo")
+
+        # Home itself
+        self.assertEqual(format_workspace_path(home, 50), "~")
+
+        # Middle truncation when exceeding max_width
+        deep_path = os.path.join(home, "dev", "workspaces", "team", "long-name", "project-x")
+        formatted = format_workspace_path(deep_path, 25)
+        self.assertIn("/.../project-x", formatted)
+        self.assertTrue(len(formatted) <= 25)
+
+        # Path outside home
+        outside = "/private/var/custom/deep/sub/new_root"
+        formatted_outside = format_workspace_path(outside, 24)
+        self.assertIn("/.../new_root", formatted_outside)
+        self.assertTrue(len(formatted_outside) <= 24)
+
+        # Empty
+        self.assertEqual(format_workspace_path("", 50), "")
 
     async def test_workspace_screen_render(self):
         extra = os.path.realpath(tempfile.mkdtemp())

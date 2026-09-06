@@ -30,11 +30,69 @@ from widgets.utils.responsive import (
 )
 from widgets.utils.row_format import (
     MODAL_MEDIUM_ROW_WIDTH,
+    display_width,
     format_badge_row,
     option_list_row_width,
 )
 
-__all__ = ["WorkspaceScreen", "WorkspaceInput", "WorkspaceOptionList", "get_root_scope"]
+__all__ = ["WorkspaceScreen", "WorkspaceInput", "WorkspaceOptionList", "format_workspace_path", "get_root_scope"]
+
+
+def format_workspace_path(path: str, max_width: int) -> str:
+    """Format a workspace path replacing $HOME with ~ and middle-truncating if too long."""
+    if not path:
+        return ""
+    try:
+        norm_path = os.path.abspath(os.path.expanduser(path))
+        home = os.path.abspath(os.path.expanduser("~"))
+        home_real = os.path.realpath(home)
+        norm_real = os.path.realpath(norm_path)
+
+        if norm_path == home or norm_real == home_real:
+            display = "~"
+        elif norm_path.startswith(home + os.sep):
+            display = f"~/{os.path.relpath(norm_path, home)}"
+        elif norm_real.startswith(home_real + os.sep):
+            display = f"~/{os.path.relpath(norm_real, home_real)}"
+        else:
+            display = norm_path
+    except Exception:
+        display = path
+
+    display = display.replace("\\", "/")
+    if display_width(display) <= max_width:
+        return display
+
+    parts = [p for p in display.split("/") if p]
+    prefix = "~" if display.startswith("~") else ""
+    if not prefix and display.startswith("/"):
+        prefix = "/"
+
+    if len(parts) >= 2:
+        last = parts[-1]
+        first = parts[0]
+        base_prefix = f"{first}" if first == "~" else f"{prefix}{first}"
+        candidate = f"{base_prefix}/.../{last}"
+        if display_width(candidate) <= max_width:
+            left = 1
+            while left < len(parts) - 1:
+                test_head = (
+                    f"{base_prefix}/" + "/".join(parts[1 : left + 1])
+                    if first == "~"
+                    else f"{prefix}" + "/".join(parts[: left + 1])
+                )
+                test = f"{test_head}/.../{last}"
+                if display_width(test) <= max_width:
+                    candidate = test
+                    left += 1
+                else:
+                    break
+            return candidate
+        else:
+            avail = max(4, max_width - display_width(base_prefix) - 5)
+            return f"{base_prefix}/.../{last[:avail]}..."
+
+    return display[: max(0, max_width - 3)] + "..."
 
 
 def get_root_scope(pm: PermissionManager, path: str) -> str:
@@ -205,7 +263,10 @@ class WorkspaceScreen(BaseModalScreen[None]):
             path = item["path"]
             scope = item["scope"]
             stag = locked_tag if scope == "primary" else active_tag
-            row = format_badge_row(path, badge=scope, target_width=target_w, prefix=f"{stag} ")
+            prefix = f"{stag} "
+            max_title = max(10, target_w - display_width(prefix) - display_width(scope) - 2)
+            display_path = format_workspace_path(path, max_title)
+            row = format_badge_row(display_path, badge=scope, target_width=target_w, prefix=prefix)
             opt_list.add_option(Option(row))
             self._option_actions.append(("root", item))
 
