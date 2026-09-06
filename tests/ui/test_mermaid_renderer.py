@@ -45,10 +45,16 @@ class TestMermaidRenderer:
     def test_fix_mojibake(self):
         from widgets.utils.mermaid_renderer import _fix_mojibake
 
-        mojibake = "Ð\x94Ð°"
-        assert _fix_mojibake(mojibake) == "Да"
-        mojibake2 = "Ð\x9dÐµÑ\x82"
-        assert _fix_mojibake(mojibake2) == "Нет"
+        mojibake = "──Ð\x9dÐµÑ\x82──"
+        fixed = _fix_mojibake(mojibake)
+        assert "Нет" in fixed
+        assert len(fixed) == len(mojibake)
+        assert fixed.startswith("─") and fixed.endswith("─")
+
+        space_mojibake = "  Ð\x94Ð°  "
+        fixed_space = _fix_mojibake(space_mojibake)
+        assert "Да" in fixed_space
+        assert len(fixed_space) == len(space_mojibake)
 
     def test_render_mermaid_cached(self):
         code = "graph TD\n    A[X] --> B[Y]"

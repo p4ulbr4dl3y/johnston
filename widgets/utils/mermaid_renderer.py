@@ -51,15 +51,34 @@ _MOJIBAKE_RE = re.compile(
 
 
 def _fix_mojibake(text: str) -> str:
-    """Repair double-encoded UTF-8 artifacts produced by some Go lexers on non-ASCII edge labels."""
+    """Repair double-encoded UTF-8 artifacts produced by some Go lexers on non-ASCII edge labels.
 
-    def _repair(match: re.Match) -> str:
-        try:
-            return match.group(0).encode("latin1").decode("utf-8")
-        except Exception:
-            return match.group(0)
+    Pads the replacement so the character column layout calculated by the Go engine
+    remains strictly aligned (preserves vertical borders, arrows, corners).
+    """
+    lines: list[str] = []
+    for line in text.splitlines():
 
-    return _MOJIBAKE_RE.sub(_repair, text)
+        def _repair(match: re.Match) -> str:
+            chunk = match.group(0)
+            try:
+                decoded = chunk.encode("latin1").decode("utf-8")
+            except Exception:
+                return chunk
+            diff = len(chunk) - len(decoded)
+            if diff <= 0:
+                return decoded
+            start = match.start()
+            end = match.end()
+            before_char = line[start - 1] if start > 0 else " "
+            after_char = line[end] if end < len(line) else " "
+            pad_char = "─" if (before_char in "─═━" or after_char in "─═━") else " "
+            left_pad = diff // 2
+            right_pad = diff - left_pad
+            return (pad_char * left_pad) + decoded + (pad_char * right_pad)
+
+        lines.append(_MOJIBAKE_RE.sub(_repair, line))
+    return "\n".join(lines)
 
 
 def render_mermaid_to_ascii(code: str, timeout: float = 2.0) -> Optional[str]:
