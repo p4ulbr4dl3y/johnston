@@ -168,6 +168,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         close_pm = True
 
     agent: Any = None
+    enabled_mcp_servers: list[Any] = []
     try:
         provider_key = getattr(args, "provider", None) or pm.get_active_provider_key()
         if not provider_key:
@@ -265,6 +266,39 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
             elif not is_quiet and not is_json:
                 sys.stderr.write(f"[skills] activated: {', '.join(activated_skills)}\n")
                 sys.stderr.flush()
+
+        enabled_mcp_servers.clear()
+        mcp_tools_count: int = 0
+        from core.infrastructure.mcp import get_mcp_manager
+
+        try:
+            mcp_mgr = get_mcp_manager()
+            servers = mcp_mgr.load_servers()
+            enabled_mcp_servers = [s for s in servers if mcp_mgr.server_enabled(s)]
+            if enabled_mcp_servers and (
+                not os.environ.get("PYTEST_CURRENT_TEST") or getattr(args, "_test_mcp_warmup", False)
+            ):
+                mcp_tools = await asyncio.wait_for(mcp_mgr.get_active_tools_async(), timeout=10.0)
+                mcp_tools_count = len(mcp_tools) if mcp_tools else 0
+                if mcp_tools_count > 0:
+                    names_str = ", ".join(s.get("name", "") for s in enabled_mcp_servers if s.get("name"))
+                    if is_stream_json:
+                        sys.stdout.write(
+                            json.dumps(
+                                {
+                                    "event": "mcp",
+                                    "servers": [s.get("name", "") for s in enabled_mcp_servers],
+                                    "tools": mcp_tools_count,
+                                }
+                            )
+                            + "\n"
+                        )
+                        sys.stdout.flush()
+                    elif not is_quiet and not is_json:
+                        sys.stderr.write(f"[mcp] active: {names_str} ({mcp_tools_count} tools)\n")
+                        sys.stderr.flush()
+        except Exception as mcp_exc:
+            logging.debug("Headless MCP warmup failed or timed out: %s", mcp_exc)
 
         response_parts: list[str] = []
         tool_calls: list[dict[str, Any]] = []
@@ -429,6 +463,11 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
             }
             if activated_skills:
                 output_payload["skills"] = activated_skills
+            if mcp_tools_count > 0:
+                output_payload["mcp"] = {
+                    "servers": [s.get("name", "") for s in enabled_mcp_servers if s.get("name")],
+                    "tools": mcp_tools_count,
+                }
             if compacted:
                 output_payload["compacted"] = True
             if role and role.strip().lower() != "worker":
@@ -468,6 +507,13 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
         return 1 if has_error else 0
 
     finally:
+        if enabled_mcp_servers:
+            try:
+                from core.infrastructure.mcp import get_mcp_manager
+
+                await asyncio.wait_for(get_mcp_manager().stop_all_async(), timeout=5.0)
+            except Exception:
+                pass
         if agent and hasattr(agent, "close") and callable(agent.close):
             res = agent.close()
             if inspect.isawaitable(res):

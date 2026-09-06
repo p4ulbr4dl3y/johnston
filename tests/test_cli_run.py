@@ -740,6 +740,144 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lines[0]["title"], "Session Compacted")
         self.assertTrue(lines[-1]["usage"].get("compacted"))
 
+    @patch("core.infrastructure.mcp.get_mcp_manager")
+    async def test_run_headless_async_mcp_warmup_and_shutdown(self, mock_get_mm):
+        mock_mm = MagicMock()
+        mock_mm.load_servers.return_value = [{"name": "my-mcp"}]
+        mock_mm.server_enabled.return_value = True
+
+        async def fake_tools():
+            return [{"type": "function", "function": {"name": "tool1"}}, {"type": "function", "function": {"name": "tool2"}}]
+
+        mock_mm.get_active_tools_async = fake_tools
+        mock_mm.stop_all_async = MagicMock()
+
+        async def fake_stop():
+            pass
+
+        mock_mm.stop_all_async.side_effect = fake_stop
+        mock_get_mm.return_value = mock_mm
+
+        agent = MockAgent(steps=[("content", "done", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(
+            prompt="use mcp",
+            provider=None,
+            model=None,
+            role="worker",
+            quiet=False,
+            json=False,
+            stream_json=False,
+            _test_mcp_warmup=True,
+        )
+        out_buf = io.StringIO()
+        err_buf = io.StringIO()
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertIn("[mcp] active: my-mcp (2 tools)", err_buf.getvalue())
+        self.assertTrue(mock_mm.stop_all_async.called)
+
+    @patch("core.infrastructure.mcp.get_mcp_manager")
+    async def test_run_headless_async_mcp_json(self, mock_get_mm):
+        mock_mm = MagicMock()
+        mock_mm.load_servers.return_value = [{"name": "my-mcp"}]
+        mock_mm.server_enabled.return_value = True
+
+        async def fake_tools():
+            return [{"type": "function", "function": {"name": "tool1"}}]
+
+        mock_mm.get_active_tools_async = fake_tools
+        mock_mm.stop_all_async = MagicMock()
+
+        async def fake_stop():
+            pass
+
+        mock_mm.stop_all_async.side_effect = fake_stop
+        mock_get_mm.return_value = mock_mm
+
+        agent = MockAgent(steps=[("content", "done", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(
+            prompt="use mcp",
+            provider=None,
+            model=None,
+            role="worker",
+            quiet=False,
+            json=True,
+            stream_json=False,
+            _test_mcp_warmup=True,
+        )
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        data = json.loads(out_buf.getvalue())
+        self.assertEqual(data.get("mcp"), {"servers": ["my-mcp"], "tools": 1})
+
+    @patch("core.infrastructure.mcp.get_mcp_manager")
+    async def test_run_headless_async_mcp_stream_json(self, mock_get_mm):
+        mock_mm = MagicMock()
+        mock_mm.load_servers.return_value = [{"name": "my-mcp"}]
+        mock_mm.server_enabled.return_value = True
+
+        async def fake_tools():
+            return [{"type": "function", "function": {"name": "tool1"}}]
+
+        mock_mm.get_active_tools_async = fake_tools
+        mock_mm.stop_all_async = MagicMock()
+
+        async def fake_stop():
+            pass
+
+        mock_mm.stop_all_async.side_effect = fake_stop
+        mock_get_mm.return_value = mock_mm
+
+        agent = MockAgent(steps=[("content", "done", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(
+            prompt="use mcp",
+            provider=None,
+            model=None,
+            role="worker",
+            quiet=False,
+            json=False,
+            stream_json=True,
+            _test_mcp_warmup=True,
+        )
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        lines = [json.loads(line) for line in out_buf.getvalue().strip().splitlines()]
+        self.assertEqual(lines[0]["event"], "mcp")
+        self.assertEqual(lines[0]["servers"], ["my-mcp"])
+        self.assertEqual(lines[0]["tools"], 1)
+
 
 class TestCLIRunSyncWrapper(unittest.TestCase):
     """Unit tests for synchronous run_headless wrapper."""
