@@ -147,8 +147,10 @@ class ShellTool(BaseTool):
                             "Non-interactive shell command. Runs in project root by default. "
                             "NEVER use 'cd' — state does not persist across calls. "
                             "NO interactive REPLs or paginators. "
-                            "Do not pipe to tail/head/less (runtime auto-truncates; "
-                            "piping breaks streaming, swallows exit codes, and causes idle timeouts)."
+                            "NEVER pipe command output through tail/head/less. Output is auto-truncated "
+                            "to the last N chars with full log path returned ([truncated | log <p>]) — "
+                            "piping hides the real exit code, hangs paginators, and suppresses live streaming. "
+                            "Re-run unfiltered; inspect logs via read."
                         ),
                     },
                     "cwd": {

@@ -46,27 +46,6 @@ class AskUserTool(BaseTool):
             "description": (
                 "Prompt user with an interactive modal to clarify ambiguous requirements or choose implementation options."
             ),
-            "description_verbose": (
-                "Ask the user 1-4 multiple-choice questions for ambiguous design decisions. "
-                "Reserve for genuine forks, NOT routine confirmations.\n\n"
-                "Format example:\n"
-                "```\n"
-                "ask_user(questions=[\n"
-                "  {\"question\": \"Which auth strategy?\", \"header\": \"Auth\", \"options\": [\n"
-                "    {\"label\": \"JWT (Recommended)\", \"description\": \"Stateless, scales horizontally\"},\n"
-                "    {\"label\": \"Session cookies\", \"description\": \"Server-side state, simpler\"}\n"
-                "  ]}\n"
-                "])\n"
-                "```\n\n"
-                "Rules:\n"
-                "- 1-4 questions per call; each has 2-4 options.\n"
-                "- Append `(Recommended)` to the suggested option's label (UI highlights it).\n"
-                "- `header` is a short tag (≤12 chars) shown above the question.\n"
-                "- `is_multi_select=true` allows multiple selections; comma-separated in output.\n"
-                "- User can press Esc to cancel → returns `[cancelled by user]`.\n\n"
-                "Subagent behavior: REMOVED from subagent toolset. Use sparingly in main agent — every call "
-                "blocks the agent loop until the user answers."
-            ),
             "parameters": {
                 "type": "object",
                 "properties": {
