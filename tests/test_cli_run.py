@@ -878,6 +878,127 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lines[0]["servers"], ["my-mcp"])
         self.assertEqual(lines[0]["tools"], 1)
 
+    async def test_run_headless_async_yolo_mode(self):
+        from core.domain.policies.permission_policy import ExecutionMode
+        from core.permission_manager import PermissionManager
+
+        agent = MockAgent(steps=[("content", "hello", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="create file",
+            skills=[],
+            provider=None,
+            model=None,
+            role="worker",
+            quiet=False,
+            json=False,
+            stream_json=False,
+            yolo=True,
+            mode=None,
+        )
+        err_buf = io.StringIO()
+        out_buf = io.StringIO()
+
+        observed_mode = None
+
+        original_stream = agent.stream_steps
+
+        async def spy_stream(p):
+            nonlocal observed_mode
+            observed_mode = PermissionManager.get_instance().execution_mode
+            async for s in original_stream(p):
+                yield s
+
+        agent.stream_steps = spy_stream
+
+        with redirect_stdout(out_buf), redirect_stderr(err_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(observed_mode, ExecutionMode.YOLO)
+        self.assertIn("yolo", err_buf.getvalue())
+        # Verify session mode was cleaned up after run
+        self.assertIsNone(PermissionManager.get_instance().session_mode)
+
+    async def test_run_headless_async_mode_flag_json(self):
+        agent = MockAgent(steps=[("content", "done", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="edit code",
+            skills=[],
+            provider=None,
+            model=None,
+            role="worker",
+            quiet=False,
+            json=True,
+            stream_json=False,
+            yolo=False,
+            mode="edits",
+        )
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        data = json.loads(out_buf.getvalue())
+        self.assertEqual(data.get("mode"), "edits")
+
+    @patch("core.infrastructure.storage.session_store.SessionStore.get_instance")
+    async def test_run_headless_async_resume_and_save(self, mock_get_store):
+        mock_store = MagicMock()
+        mock_session = MagicMock()
+        mock_session.agent_history = [{"role": "user", "content": "prior"}]
+        mock_session.messages = []
+        mock_session.tokens_input = 10
+        mock_session.tokens_output = 5
+        mock_session.total_tokens = 15
+        mock_session.cost_usd = 0.001
+        mock_store.get.return_value = mock_session
+        mock_store.list_main_sessions.return_value = [{"id": "sess-123"}]
+        mock_get_store.return_value = mock_store
+
+        agent = MockAgent(steps=[("content", "resumed reply", "")])
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+
+        args = MagicMock(
+            prompt="next question",
+            skills=[],
+            provider=None,
+            model=None,
+            role="worker",
+            quiet=True,
+            json=False,
+            stream_json=False,
+            continue_latest=True,
+            resume="",
+            yolo=False,
+            mode=None,
+        )
+        out_buf = io.StringIO()
+        with redirect_stdout(out_buf):
+            code = await run_headless_async(args, pm=pm)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(agent.history, [{"role": "user", "content": "prior"}])
+        mock_store.save.assert_called_once_with(mock_session)
+
 
 class TestCLIRunSyncWrapper(unittest.TestCase):
     """Unit tests for synchronous run_headless wrapper."""
@@ -949,6 +1070,31 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
         self.assertIn("compacted", footer_custom)
         self.assertIn("50.0 tok/s", footer_custom)
         self.assertNotIn("$", footer_custom)
+
+        footer_yolo = format_meta_footer("openai", "gpt-4o", 1.0, 100, 50, 150, mode="yolo")
+        self.assertIn("openai/gpt-4o | yolo | 1.00s", footer_yolo)
+
+        footer_edits = format_meta_footer("openai", "gpt-4o", 1.0, 100, 50, 150, mode="edits")
+        self.assertIn("openai/gpt-4o | edits | 1.00s", footer_edits)
+
+        footer_review = format_meta_footer("openai", "gpt-4o", 1.0, 100, 50, 150, mode="review")
+        self.assertNotIn("review", footer_review)
+
+    @patch("core.interfaces.cli.commands.run_cmd.run_headless", return_value=0)
+    def test_main_run_with_yolo_and_mode_flags(self, mock_run):
+        from core.interfaces.cli.entrypoint import main
+
+        with self.assertRaises(SystemExit) as cm:
+            main(["run", "hello", "-y"])
+        self.assertEqual(cm.exception.code, 0)
+        parsed_args = mock_run.call_args[0][0]
+        self.assertTrue(parsed_args.yolo)
+
+        with self.assertRaises(SystemExit) as cm2:
+            main(["run", "hello", "--mode", "edits"])
+        self.assertEqual(cm2.exception.code, 0)
+        parsed_args2 = mock_run.call_args[0][0]
+        self.assertEqual(parsed_args2.mode, "edits")
 
 
 if __name__ == "__main__":

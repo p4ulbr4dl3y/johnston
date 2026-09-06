@@ -108,6 +108,7 @@ def format_meta_footer(
     total_tokens: int,
     cost_usd: float = 0.0,
     role: Optional[str] = None,
+    mode: Optional[str] = None,
     sandbox: bool = False,
     effort: Optional[str] = None,
     compacted: bool = False,
@@ -123,6 +124,8 @@ def format_meta_footer(
         identity = prov_model
 
     parts = [identity]
+    if mode and isinstance(mode, str) and mode.strip().lower() not in ("", "review"):
+        parts.append(mode.strip().lower())
     if sandbox:
         parts.append("sandbox")
     if compacted:
@@ -169,6 +172,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
 
     agent: Any = None
     enabled_mcp_servers: list[Any] = []
+    perm_mgr: Any = None
     try:
         provider_key = getattr(args, "provider", None) or pm.get_active_provider_key()
         if not provider_key:
@@ -211,12 +215,18 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
             agent.sandbox_enabled = True
         elif getattr(args, "no_sandbox", False) is True:
             agent.sandbox_enabled = False
+        else:
+            from core.infrastructure.config.config_helpers import load_sandbox_config
+
+            agent.sandbox_enabled = load_sandbox_config()
 
         continue_latest = (
             getattr(args, "continue_latest", False) is True
             or getattr(args, "continue", False) is True
         )
         resume_arg = getattr(args, "resume", None)
+        sess: Any = None
+        store: Any = None
         if continue_latest or (isinstance(resume_arg, str) or resume_arg == ""):
             from core.infrastructure.storage.session_store import SessionStore
 
@@ -250,6 +260,18 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
             return 1
 
         apply_role(agent, role, mode=AgentMode.HEADLESS)
+
+        from core.domain.policies.permission_policy import ExecutionMode
+        from core.permission_manager import PermissionManager
+
+        perm_mgr = PermissionManager.get_instance()
+        if getattr(args, "yolo", False) is True:
+            active_mode = perm_mgr.set_session_mode(ExecutionMode.YOLO)
+        elif getattr(args, "mode", None):
+            active_mode = perm_mgr.set_session_mode(getattr(args, "mode"))
+        else:
+            active_mode = perm_mgr.execution_mode
+        mode_val = active_mode.value
 
         is_quiet = getattr(args, "quiet", False) is True
         is_json = getattr(args, "json", False) is True
@@ -472,6 +494,8 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                 output_payload["compacted"] = True
             if role and role.strip().lower() != "worker":
                 output_payload["role"] = role.strip().lower()
+            if mode_val and mode_val != "review":
+                output_payload["mode"] = mode_val
             if getattr(agent, "sandbox_enabled", False) is True:
                 output_payload["sandbox"] = True
             print(json.dumps(output_payload, indent=2))
@@ -494,6 +518,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                     usage["total_tokens"],
                     usage["cost_usd"],
                     role=role,
+                    mode=mode_val,
                     sandbox=sandbox_val,
                     effort=effort_val,
                     compacted=compacted,
@@ -504,9 +529,28 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
                 sys.stderr.write(f"{styled_footer}\n")
                 sys.stderr.flush()
 
+        if sess is not None and store is not None:
+            try:
+                if hasattr(agent, "history") and agent.history:
+                    sess.agent_history = list(agent.history)
+                if hasattr(agent, "messages"):
+                    sess.messages = list(agent.messages)
+                sess.tokens_input = getattr(agent, "tokens_input", sess.tokens_input)
+                sess.tokens_output = getattr(agent, "tokens_output", sess.tokens_output)
+                sess.total_tokens = getattr(agent, "total_tokens", sess.total_tokens)
+                sess.cost_usd = getattr(agent, "cost_usd", sess.cost_usd)
+                store.save(sess)
+            except Exception as save_err:
+                logging.debug("Failed to persist resumed session: %s", save_err)
+
         return 1 if has_error else 0
 
     finally:
+        if perm_mgr is not None:
+            try:
+                perm_mgr.clear_session_overrides()
+            except Exception:
+                pass
         if enabled_mcp_servers:
             try:
                 from core.infrastructure.mcp import get_mcp_manager

@@ -282,6 +282,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Thinking/reasoning effort",
     )
+    run_p.add_argument(
+        "--mode",
+        choices=["review", "edits", "yolo"],
+        default=None,
+        help="Permission mode (review, edits, yolo)",
+    )
+    run_p.add_argument(
+        "-y",
+        "--yolo",
+        action="store_true",
+        help="Shortcut for --mode yolo (allow all tool actions without confirmation)",
+    )
     run_sandbox = run_p.add_mutually_exclusive_group()
     run_sandbox.add_argument("--sandbox", action="store_true", help="Enable execution sandbox")
     run_sandbox.add_argument("--no-sandbox", action="store_true", help="Disable execution sandbox")
