@@ -1,10 +1,11 @@
 import asyncio
+import copy
 import hashlib
 import json
 import logging
 import os
+import shutil
 import time
-import uuid
 from typing import Any, Dict, List, Optional
 
 from core.domain.entities.session import (
@@ -17,12 +18,14 @@ from core.domain.policies.messages import (
     transcript_before_turn,
 )
 from core.domain.policies.session_naming import build_fork_title
-from core.infrastructure.config.settings import get_settings
+from core.infrastructure.config.settings import get_settings  # noqa: F401
 from core.infrastructure.platform.paths import PROJECTS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_text, update_json_config
 from core.infrastructure.platform.session_lock import SessionLock
-from core.infrastructure.runtime.fs_signature import compute_dir_signature_hash
 from core.infrastructure.storage.session_index_db import SessionIndexDb
+from core.infrastructure.storage.session_store_cache import SessionStoreCacheMixin
+from core.infrastructure.storage.session_store_locks import SessionStoreLocksMixin
+from core.infrastructure.storage.session_store_paths import SessionStorePathsMixin
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +92,7 @@ def get_session_store(ctx_or_app: Any) -> "SessionStore":
     return store
 
 
-class SessionStore:
+class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreCacheMixin):
     """Unified store for main and subagent sessions, organized by project.
 
     Disk layout:
@@ -100,17 +103,6 @@ class SessionStore:
     """
 
     _instance: Optional["SessionStore"] = None
-
-    @property
-    def DISK_CACHE_TTL(self) -> float:
-        """Seconds between filesystem rescans (storage.disk_cache_ttl)."""
-        if hasattr(self, "_disk_cache_ttl") and self._disk_cache_ttl is not None:
-            return self._disk_cache_ttl
-        return get_settings().storage.disk_cache_ttl
-
-    @DISK_CACHE_TTL.setter
-    def DISK_CACHE_TTL(self, value: float) -> None:
-        self._disk_cache_ttl = value
 
     def __init__(self, project_path: Optional[str] = None):
         if not project_path:
@@ -135,6 +127,7 @@ class SessionStore:
         self._disk_cache_signature: Optional[int] = None
         self._disk_cache: Optional[Dict[str, AgentSession]] = None
         self._disk_cache_ts: float = 0.0
+        self._disk_cache_ttl: Optional[float] = None
         # Last-written state per session file (``{fpath: {"sig": ..., "content_hash":
         # ...}}``), used to skip no-op re-serializations/rewrites in save().
         self._session_write_state: Dict[str, Dict[str, Any]] = {}
@@ -145,32 +138,6 @@ class SessionStore:
         if cls._instance is None or project_path is not None:
             cls._instance = SessionStore(project_path=project_path)
         return cls._instance
-
-    def ensure_dirs(self) -> None:
-        os.makedirs(self.sessions_dir, exist_ok=True)
-
-    def generate_session_id(self) -> str:
-        while True:
-            sid = uuid.uuid4().hex[:8]
-            if not os.path.exists(self._main_path(sid)):
-                return sid
-
-    def generate_subagent_id(self) -> str:
-        return uuid.uuid4().hex[:8]
-
-    # -- paths -------------------------------------------------------------
-
-    def _main_path(self, session_id: str) -> str:
-        safe_id = os.path.basename(session_id or "")
-        return os.path.join(self.sessions_dir, f"{safe_id}.jsonl")
-
-    def _subagent_dir(self, parent_id: str) -> str:
-        safe_parent = os.path.basename(parent_id or "")
-        return os.path.join(self.sessions_dir, f"{safe_parent}.subagents")
-
-    def _subagent_path(self, parent_id: str, subagent_id: str) -> str:
-        safe_sub = os.path.basename(subagent_id or "")
-        return os.path.join(self._subagent_dir(parent_id), f"{safe_sub}.jsonl")
 
     # -- CRUD --------------------------------------------------------------
 
@@ -235,31 +202,6 @@ class SessionStore:
                 logger.warning("Failed to load session from disk: %s", fpath, exc_info=True)
         return None
 
-    def _subagent_path_from_scan(self, subagent_id: str) -> Optional[str]:
-        if not os.path.isdir(self.sessions_dir):
-            return None
-        # Fast SQLite check for parent_id
-        try:
-            with self.index_db._connection() as conn:
-                cursor = conn.execute("SELECT parent_id FROM session_index WHERE id = ?", (subagent_id,))
-                row = cursor.fetchone()
-                if row and row["parent_id"]:
-                    fpath = self._subagent_path(row["parent_id"], subagent_id)
-                    if os.path.exists(fpath):
-                        return fpath
-        except Exception:
-            pass
-
-        # Fallback directory scan
-        for fname in os.listdir(self.sessions_dir):
-            if not fname.endswith(".subagents"):
-                continue
-            sdir = os.path.join(self.sessions_dir, fname)
-            fpath = os.path.join(sdir, f"{subagent_id}.jsonl")
-            if os.path.exists(fpath):
-                return fpath
-        return None
-
     def list(self, kind: Optional[str] = None) -> List[AgentSession]:
         """Load all sessions (main + subagents) for the current project from disk.
 
@@ -276,59 +218,6 @@ class SessionStore:
             result = [s for s in result if s.kind == SessionKind(kind)]
         return result
 
-    def _load_disk_sessions(self) -> Dict[str, AgentSession]:
-        now = time.time()
-        if self._disk_cache is not None and (now - self._disk_cache_ts < self.DISK_CACHE_TTL):
-            return dict(self._disk_cache)
-
-        signature = self._disk_signature()
-        if signature is not None and signature == self._disk_cache_signature and self._disk_cache is not None:
-            self._disk_cache_ts = now
-            return dict(self._disk_cache)
-
-        sessions: Dict[str, AgentSession] = {}
-        if os.path.isdir(self.sessions_dir):
-            for fname in sorted(os.listdir(self.sessions_dir)):
-                fpath = os.path.join(self.sessions_dir, fname)
-                if os.path.isdir(fpath):
-                    if fname.endswith(".subagents"):
-                        for sub_name in sorted(os.listdir(fpath)):
-                            if sub_name.endswith(".jsonl"):
-                                self._load_file(sessions, os.path.join(fpath, sub_name))
-                elif fname.endswith(".jsonl"):
-                    self._load_file(sessions, fpath)
-        self._disk_cache = sessions
-        self._disk_cache_signature = signature
-        self._disk_cache_ts = now
-        return sessions
-
-    def _disk_signature(self) -> Optional[int]:
-        """Hash of (path, mtime_ns, size) for every session JSONL on disk,
-        used to detect external changes without re-reading file contents."""
-        if not os.path.isdir(self.sessions_dir):
-            return None
-        sub_dirs = []
-        try:
-            for fname in sorted(os.listdir(self.sessions_dir)):
-                fpath = os.path.join(self.sessions_dir, fname)
-                if os.path.isdir(fpath) and fname.endswith(".subagents"):
-                    sub_dirs.append(fpath)
-        except OSError:
-            return None
-        return compute_dir_signature_hash([self.sessions_dir, *sub_dirs], [".jsonl"]) or 0
-
-    def _invalidate_disk_cache(self) -> None:
-        self._disk_cache_signature = None
-        self._disk_cache = None
-        self._disk_cache_ts = 0.0
-
-    def _load_file(self, sessions: Dict[str, AgentSession], fpath: str) -> None:
-        try:
-            sess = AgentSession.from_file(fpath)
-            if sess:
-                sessions[sess.id] = sess
-        except Exception:
-            logger.warning("Failed to load session file: %s", fpath, exc_info=True)
     def list_main_sessions(self) -> List[Dict[str, Any]]:
         """Return NON-EMPTY main sessions sorted by updated time (for /resume UI).
 
@@ -384,7 +273,7 @@ class SessionStore:
 
     # -- save/delete -------------------------------------------------------
 
-    def save(self, sess: AgentSession) -> None:
+    def save(self, sess: AgentSession) -> bool:
         try:
             if sess.kind == SessionKind.SUBAGENT:
                 os.makedirs(self._subagent_dir(sess.parent_id), exist_ok=True)
@@ -436,8 +325,6 @@ class SessionStore:
     def delete(self, session_id: str) -> None:
         sess = self.get(session_id)
         if sess and sess.kind == SessionKind.MAIN:
-            import shutil
-
             shutil.rmtree(self._subagent_dir(session_id), ignore_errors=True)
             try:
                 os.remove(self._main_path(session_id))
@@ -535,58 +422,6 @@ class SessionStore:
 
         return None
 
-    # -- locking & forking ----------------------------------------------------
-
-    def _lock_path(self, session_id: str) -> str:
-        safe_id = os.path.basename(session_id or "default")
-        return os.path.join(self.sessions_dir, f"{safe_id}.lock")
-
-    def is_session_locked(self, session_id: str) -> bool:
-        """Check if session is currently locked by another active process."""
-        if not session_id:
-            return False
-        if session_id in self._active_locks:
-            return False
-        is_locked, _ = SessionLock.probe(self._lock_path(session_id))
-        return is_locked
-
-    def acquire_session_lock(self, session_id: str) -> bool:
-        """Acquire exclusive lock on session. Returns True on success."""
-        if not session_id:
-            return False
-        if session_id in self._active_locks:
-            return True
-        lock = SessionLock(self._lock_path(session_id))
-        if lock.acquire():
-            self._active_locks[session_id] = lock
-            return True
-        return False
-
-    def release_session_lock(self, session_id: str) -> None:
-        """Release lock held by this process on session."""
-        if not session_id:
-            return
-        lock = self._active_locks.pop(session_id, None)
-        if lock:
-            lock.release()
-
-    def release_all_locks(self) -> None:
-        """Release all locks held by this process."""
-        for lock in list(self._active_locks.values()):
-            lock.release()
-        self._active_locks.clear()
-
-    def steal_session_lock(self, session_id: str) -> bool:
-        """Steal lock from other process and acquire it for this process."""
-        if not session_id:
-            return False
-        self.release_session_lock(session_id)
-        lock = SessionLock.steal(self._lock_path(session_id))
-        if lock:
-            self._active_locks[session_id] = lock
-            return True
-        return False
-
     def fork_session(
         self,
         session_id: str,
@@ -600,8 +435,6 @@ class SessionStore:
         get the ``(fork N)`` marker appended. Subagent sessions are not
         forkable — forking is a user action on main sessions only.
         """
-        import copy
-
         source = self.get(session_id)
         if not source or source.kind != SessionKind.MAIN:
             return None
@@ -646,3 +479,4 @@ class SessionStore:
         return new_sess
 
 
+__all__ = ["SessionStore", "get_session_store"]
