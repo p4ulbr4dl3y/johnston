@@ -40,5 +40,10 @@
 - **Prompts**: `prompts/list` and `prompts/get` (executable in chat as `/<prompt>` or `/<server>__<prompt>`).
 - **Roots**: `roots/list` (automatically responds with project workspace directory).
 
-## Verification
-- Run `johnston --mcp` via shell tool to verify server registration, readiness, and listed tools.
+## Verification & CLI Management (`johnston mcp`)
+- `johnston mcp list`: Verify server registration, readiness, scope, and listed tools.
+- `johnston mcp add <name> (--cmd <cmd> | --url <url>) [--args ...] [--scope global|project]`: Add or update an MCP server definition.
+- `johnston mcp rm <name> [--scope global|project]`: Remove an MCP server.
+- `johnston mcp enable <name> [--scope global|project]`: Enable server.
+- `johnston mcp disable <name> [--scope global|project]`: Disable server.
+- Legacy verification: `johnston --mcp`.

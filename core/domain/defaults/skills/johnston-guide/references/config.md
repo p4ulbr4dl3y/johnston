@@ -139,3 +139,11 @@ Parameters can be overridden via environment variables:
   - `yolo`: Auto-allows all standard tool executions.
 - **Permission Actions**: `allow` (auto-execute), `ask` (prompt user), `deny` (block execution).
 - **Read-Only Roles**: The `explorer` role enforces kernel sandbox. Roles with `read_only: true` disable `create` and `edit` tools.
+
+## CLI Configuration Management (`johnston config`)
+Inspect and mutate `~/.johnston/config.json` safely from the command line:
+- `johnston config list`: Display all configuration keys, current values, and whether they come from defaults or config file.
+- `johnston config get <key>`: Print specific configuration value (e.g. `llm.context_limit`, `theme`).
+- `johnston config set <key> <value>`: Validate types, bounds, and write updated value atomically. Complex fields (`dict`, `list`) accept valid JSON strings.
+- `johnston config unset <key>`: Reset setting to its default value.
+

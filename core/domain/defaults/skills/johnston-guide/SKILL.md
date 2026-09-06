@@ -11,8 +11,8 @@ You are operating inside Johnston CLI. Use this master guide to understand and c
 
 When performing specific configuration tasks, inspect ONLY the relevant reference document:
 
-1. **CLI Flags & Startup Options**: [references/cli_flags.md](references/cli_flags.md)
-   - Command line flags (`--models`, `--skills`, `--mcp`, `--roles`, `--rules`, `--resume`, `--version`) and session resume hints.
+1. **CLI Commands & Startup Options**: [references/cli_flags.md](references/cli_flags.md)
+   - Subcommands (`config`, `provider`, `mcp`, `session`, `doctor`, `run`, `roles`, `skills`, `rules`), flags, and session resume hints.
 
 2. **MCP Servers**: [references/mcp.md](references/mcp.md)
    - Configuration files, JSON schema, stdio/SSE transports, secret substitution, namespacing, and verification (`johnston --mcp`).

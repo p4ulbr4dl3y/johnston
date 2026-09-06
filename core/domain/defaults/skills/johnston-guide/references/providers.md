@@ -50,3 +50,13 @@ Resolution order: `~/.johnston/secrets.json` (exact) âž” `os.environ` (exact) âž
 - `model`: Single source of truth for provider and model (`"provider/model"` or bare `"provider"`).
 - `llm.thinking_efforts`: Per-provider and per-model reasoning effort (`{"anthropic": {"claude-3-7-sonnet-latest": "medium"}}`).
 - `permissions`: Execution mode and per-tool permission rules.
+
+## CLI Provider Management (`johnston provider`)
+Manage providers, API keys, and models from the command line:
+- `johnston provider list`: Show table of configured providers, active models, key status (`[set]`, `[unset]`, `not required`), and state.
+- `johnston provider set-key <name> [key]`: Set provider API key. If key is omitted, prompts securely without terminal echo. If `-`, reads from stdin.
+- `johnston provider set-model <name> <model>`: Set active model for provider.
+- `johnston provider add <name> --model <model> [--api-key <k>] [--base-url <u>]`: Register a custom endpoint.
+- `johnston provider rm <name>`: Remove custom provider profile from `providers.json`.
+- `johnston provider enable <name>`: Enable a previously disabled provider.
+- `johnston provider disable <name>`: Disable provider without deleting definition.
