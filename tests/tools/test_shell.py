@@ -628,6 +628,15 @@ def _ctx(make_tool_context, cwd=None, is_subagent=True):
     return make_tool_context(is_subagent=is_subagent, cwd=cwd)
 
 
+async def test_shell_readonly_sandbox_unsupported_fails_closed(tool, make_tool_context):
+    ctx = make_tool_context(is_subagent=True, sandbox_enabled=True, is_read_only=True)
+    with patch("core.infrastructure.platform.sandbox.is_sandbox_supported", return_value=False):
+        res = await tool.execute({"command": "echo test"}, ctx=ctx)
+    assert res.is_error
+    assert "read-only role requires sandbox isolation" in (res.display or res.content or "")
+
+
+
 _SANDBOX_NOTICE = "[sandbox unavailable | executed unsandboxed]\n"
 
 

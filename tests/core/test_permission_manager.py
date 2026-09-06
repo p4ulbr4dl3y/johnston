@@ -65,7 +65,7 @@ class TestPermissionManager(unittest.TestCase):
         self.assertEqual(self.pm.check_permission("edit").action, "allow")
         self.assertEqual(self.pm.check_permission("shell").action, "ask")
         self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
-        self.assertEqual(self.pm.check_permission("mcp_custom_tool").action, "allow")
+        self.assertEqual(self.pm.check_permission("mcp_custom_tool").action, "ask")
         self.assertEqual(self.pm.check_permission("read").action, "allow")
 
         # 3. YOLO mode
@@ -73,6 +73,7 @@ class TestPermissionManager(unittest.TestCase):
         self.assertEqual(self.pm.check_permission("create").action, "allow")
         self.assertEqual(self.pm.check_permission("edit").action, "allow")
         self.assertEqual(self.pm.check_permission("shell").action, "allow")
+        self.assertEqual(self.pm.check_permission("mcp_custom_tool").action, "allow")
         self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
         self.assertEqual(self.pm.check_permission("mcp_custom_tool").action, "allow")
         self.assertEqual(self.pm.check_permission("read").action, "allow")
@@ -83,8 +84,12 @@ class TestPermissionManager(unittest.TestCase):
         decision = self.pm.check_permission("gh__search")
         self.assertEqual(decision.action, "ask")
 
-        # In edits and yolo, MCP tools default to 'allow'
+        # In edits mode, MCP tools default to 'ask' (aligned with references/tools.md)
         self.pm.set_session_mode("edits")
+        self.assertEqual(self.pm.check_permission("gh__search").action, "ask")
+
+        # In yolo mode, MCP tools default to 'allow'
+        self.pm.set_session_mode("yolo")
         self.assertEqual(self.pm.check_permission("gh__search").action, "allow")
 
         # An explicit config entry still wins over the MCP mode default

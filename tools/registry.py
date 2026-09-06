@@ -160,6 +160,22 @@ async def check_and_confirm_permission(
             elif not confirmed:
                 return ToolResult.error("denied", name=display_name, detail="by user")
         else:
+            import sys
+            if sys.stdin and sys.stdin.isatty():
+                try:
+                    prompt = f"[permission] Allow {display_name} ({decision.reason})? [y/n/a]: "
+                    sys.stderr.write(prompt)
+                    sys.stderr.flush()
+                    ans = sys.stdin.readline().strip().lower()
+                    if ans in ("y", "yes"):
+                        return None
+                    elif ans in ("a", "always"):
+                        pm.set_session_override(target_perm_name, "allow")
+                        return None
+                    else:
+                        return ToolResult.error("denied", name=display_name, detail="by user in terminal")
+                except Exception:
+                    return ToolResult.error("denied", name=display_name, detail="cancelled in terminal")
             return ToolResult.error(
                 "denied", name=display_name, detail=f"requires user confirmation ({decision.reason})"
             )

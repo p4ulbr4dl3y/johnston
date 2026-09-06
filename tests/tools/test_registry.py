@@ -231,12 +231,39 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.content, "ERR: denied 'read': by user")
 
     async def test_execute_tool_permission_ask_no_app(self):
-        # No interactive app available -> fall back to a textual denial.
+        # No interactive app available and non-tty -> fall back to a textual denial.
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "No interactive app")
         with patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"})
         self.assertEqual(res.content, "ERR: denied 'read': requires user confirmation (No interactive app)")
+
+    async def test_execute_tool_permission_ask_terminal_interactive_allow(self):
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "CLI test")
+        with (
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("sys.stdin.isatty", return_value=True),
+            patch("sys.stdin.readline", return_value="y\n"),
+            patch("sys.stderr.write"),
+            patch("sys.stderr.flush"),
+            patch("tools.read.ReadTool.execute", return_value="file content"),
+        ):
+            res = await execute_tool("read", {"path": "foo.txt"})
+        self.assertEqual(res.content, "file content")
+
+    async def test_execute_tool_permission_ask_terminal_interactive_deny(self):
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "CLI test")
+        with (
+            patch("core.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("sys.stdin.isatty", return_value=True),
+            patch("sys.stdin.readline", return_value="n\n"),
+            patch("sys.stderr.write"),
+            patch("sys.stderr.flush"),
+        ):
+            res = await execute_tool("read", {"path": "foo.txt"})
+        self.assertEqual(res.content, "ERR: denied 'read': by user in terminal")
 
     async def test_execute_tool_mcp_async_call(self):
         # Manager class whose type name does not end with "Mock" and which exposes

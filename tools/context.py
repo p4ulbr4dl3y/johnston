@@ -119,6 +119,8 @@ class ToolContext:
     @property
     def sandbox_enabled(self) -> bool:
         """Returns whether shell command sandboxing is active."""
+        if hasattr(self, "_sandbox_enabled") and self._sandbox_enabled is not None:
+            return bool(self._sandbox_enabled)
         if self.host is None:
             return False
         val = getattr(self.host, "sandbox_enabled", False)
@@ -128,22 +130,32 @@ class ToolContext:
             return str(val).lower() in ("true", "1", "yes", "on")
         return False
 
+    @sandbox_enabled.setter
+    def sandbox_enabled(self, value: bool) -> None:
+        self._sandbox_enabled = bool(value)
+
     @property
     def is_read_only(self) -> bool:
         """Returns whether the current role or execution context is read-only."""
-        if getattr(self.host, "is_read_only", False):
+        if hasattr(self, "_is_read_only") and self._is_read_only is not None:
+            return bool(self._is_read_only)
+        if getattr(self.host, "is_read_only", False) is True:
             return True
         try:
             from core.role_registry import RoleRegistry
 
             role_name = self.subagent_role or getattr(self.host, "role", "")
-            if role_name:
+            if isinstance(role_name, str) and role_name:
                 role_def = RoleRegistry.get_instance().get_role(role_name, project_dir=self.project_dir)
-                if getattr(role_def, "read_only", False):
+                if getattr(role_def, "read_only", False) is True:
                     return True
         except Exception:
             pass
         return False
+
+    @is_read_only.setter
+    def is_read_only(self, value: bool) -> None:
+        self._is_read_only = bool(value)
 
     @property
     def project_dir(self) -> str:

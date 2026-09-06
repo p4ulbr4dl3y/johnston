@@ -258,7 +258,15 @@ class ShellTool(BaseTool):
             from core.infrastructure.platform.sandbox import (
                 is_path_readable_in_sandbox,
                 is_path_writable_in_sandbox,
+                is_sandbox_supported,
             )
+
+            if not allow_workspace_writes and not is_sandbox_supported():
+                return ToolResult.error(
+                    "sandbox",
+                    name="shell",
+                    detail="read-only role requires sandbox isolation, but OS sandbox backend is unavailable",
+                )
 
             if not is_path_readable_in_sandbox(proc_cwd, cwd=workspace_dir):
                 return ToolResult.error(

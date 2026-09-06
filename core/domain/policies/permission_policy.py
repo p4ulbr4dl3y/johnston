@@ -321,7 +321,7 @@ MODE_TOOL_BASELINES: Dict[ExecutionMode, Dict[str, PermissionAction]] = {
         "edit": PermissionAction.ALLOW,
         "shell": PermissionAction.ASK,
         "web_fetch": PermissionAction.ALLOW,
-        "_mcp": PermissionAction.ALLOW,
+        "_mcp": PermissionAction.ASK,
         "default": PermissionAction.ALLOW,
     },
     ExecutionMode.YOLO: {
@@ -429,7 +429,12 @@ _WRAPPER_COMMANDS = frozenset(
 )
 
 _UNSAFE_SHELL_REGEX = re.compile(
-    r"(\$\(|`|\b(?:bash|sh|zsh|dash|powershell|pwsh)\s+-c\b|\beval\s+|\bexec\s+)",
+    r"(\$\(|`"
+    r"|\b(?:bash|sh|zsh|dash|powershell|pwsh)\s+(?:-[ceE]\b|-command\b|-encodedcommand\b|[^\s-])"
+    r"|\|\s*(?:bash|sh|zsh|dash|powershell|pwsh)\b"
+    r"|<\s*(?:bash|sh|zsh|dash)\b"
+    r"|\beval\s+|\bexec\s+"
+    r"|\bbase64\s+-(?:d|-decode)\b)",
     re.IGNORECASE,
 )
 
@@ -550,6 +555,22 @@ def extract_command_signature(cmd: str) -> str:
         return cmd.strip()
 
     binary = os.path.basename(meaningful[0])
+    if binary in ("python", "python3", "python3.10", "python3.11", "python3.12", "python3.13"):
+        if len(meaningful) > 2 and meaningful[1] == "-m":
+            return f"{binary} -m {meaningful[2]} *"
+        if len(meaningful) > 1 and meaningful[1] in ("-c", "-e"):
+            return f"{binary} {meaningful[1]}"
+        if len(meaningful) > 1 and not meaningful[1].startswith("-"):
+            return f"{binary} {meaningful[1]} *"
+        return f"{binary} *"
+
+    if binary in ("node", "ruby", "perl"):
+        if len(meaningful) > 1 and meaningful[1] in ("-e", "-c"):
+            return f"{binary} {meaningful[1]}"
+        if len(meaningful) > 1 and not meaningful[1].startswith("-"):
+            return f"{binary} {meaningful[1]} *"
+        return f"{binary} *"
+
     if binary in _MULTI_COMMAND_TOOLS and len(meaningful) > 1 and not meaningful[1].startswith("-"):
         return f"{binary} {meaningful[1]} *"
     return f"{binary} *"
@@ -584,22 +605,65 @@ def match_path_pattern(path: str, pattern: str) -> bool:
 
 
 
-def extract_tool_target_value(tool_name: str, args: Optional[Dict[str, Any]]) -> Optional[str]:
-    """Extracts the primary target argument (command, path, or url) for a given tool."""
+PATH_ARG_KEYS = (
+    "path",
+    "AbsolutePath",
+    "file_path",
+    "target_file",
+    "TargetFile",
+    "source",
+    "source_file",
+    "src",
+    "dest",
+    "destination",
+    "output_path",
+    "output_file",
+    "directory",
+    "SearchDirectory",
+)
+
+
+def extract_tool_target_values(tool_name: str, args: Optional[Dict[str, Any]]) -> List[str]:
+    """Extracts all target arguments (commands, paths, urls) for a given tool."""
     if not args or not isinstance(args, dict):
-        return None
+        return []
     canonical = (tool_name or "").strip().lower()
     if canonical == "shell":
-        return args.get("command")
+        cmd = args.get("command")
+        return [cmd.strip()] if isinstance(cmd, str) and cmd.strip() else []
+    if canonical == "web_fetch":
+        url = args.get("url")
+        return [url.strip()] if isinstance(url, str) and url.strip() else []
     if canonical in ("create", "edit", "read", "view_file", "search"):
-        for key in ("path", "AbsolutePath", "file_path", "target_file", "TargetFile"):
+        targets: List[str] = []
+        for key in PATH_ARG_KEYS:
             val = args.get(key)
             if isinstance(val, str) and val.strip():
-                return val.strip()
-        return None
-    if canonical == "web_fetch":
-        return args.get("url")
-    return None
+                clean_val = val.strip()
+                if clean_val not in targets:
+                    targets.append(clean_val)
+            elif isinstance(val, (list, tuple)):
+                for item in val:
+                    if isinstance(item, str) and item.strip():
+                        clean_item = item.strip()
+                        if clean_item not in targets:
+                            targets.append(clean_item)
+        for list_key in ("paths", "files"):
+            items = args.get(list_key)
+            if isinstance(items, (list, tuple)):
+                for item in items:
+                    if isinstance(item, str) and item.strip():
+                        clean_item = item.strip()
+                        if clean_item not in targets:
+                            targets.append(clean_item)
+        return targets
+    return []
+
+
+def extract_tool_target_value(tool_name: str, args: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Extracts the primary target argument (command, path, or url) for a given tool."""
+    targets = extract_tool_target_values(tool_name, args)
+    return targets[0] if targets else None
 
 
 def suggest_pattern(tool_name: str, args: Optional[Dict[str, Any]]) -> Optional[str]:
@@ -609,6 +673,8 @@ def suggest_pattern(tool_name: str, args: Optional[Dict[str, Any]]) -> Optional[
         return None
     canonical = (tool_name or "").strip().lower()
     if canonical == "shell":
+        if has_unsafe_shell_syntax(val):
+            return None
         return extract_command_signature(val)
     if canonical in ("create", "edit", "read", "view_file", "search"):
         # Suggest directory pattern or basename
@@ -722,19 +788,34 @@ def evaluate_pattern_rules(
     if not rules:
         return None
 
-    target = extract_tool_target_value(tool_name, args)
-    if target is None:
-        return None
-
     canonical = (tool_name or "").strip().lower()
 
     if canonical == "shell":
+        target = extract_tool_target_value(tool_name, args)
+        if target is None:
+            return None
         return _evaluate_shell_rules(target, rules)
 
     if canonical in ("create", "edit", "read", "view_file", "search"):
-        return _evaluate_target_rules(target, rules, match_path_pattern, subject=f"Path '{target}'")
+        targets = extract_tool_target_values(canonical, args)
+        if not targets:
+            return None
+        decisions: List[PermissionDecision] = []
+        for target in targets:
+            dec = _evaluate_target_rules(target, rules, match_path_pattern, subject=f"Path '{target}'")
+            if dec is None:
+                return None  # At least one target is uncovered -> fallback to tool level
+            if dec.action == PermissionAction.DENY:
+                return dec  # Fail-closed immediately on any deny match
+            decisions.append(dec)
+        if any(d.action == PermissionAction.ASK for d in decisions):
+            return next(d for d in decisions if d.action == PermissionAction.ASK)
+        return decisions[0]
 
     if canonical == "web_fetch":
+        target = extract_tool_target_value(tool_name, args)
+        if target is None:
+            return None
         return _evaluate_target_rules(target, rules, match_pattern, subject=f"URL '{target}'")
 
     return None
@@ -853,35 +934,37 @@ def evaluate_workspace_boundary(
                 return PermissionDecision(action, f"Path '{cwd.strip()}' is outside workspace roots")
         return None
 
-    target: Optional[str] = None
+    targets: List[str] = []
     if canonical in ("create", "edit", "read", "view_file", "search"):
-        target = extract_tool_target_value(canonical, args)
+        targets = extract_tool_target_values(canonical, args)
 
-    if not target or not isinstance(target, str) or not target.strip():
+    if not targets:
         return None
 
-    target = target.strip()
-
     # 1. Protection for SECRETS_FILE: always DENY across all file tools
-    if is_secrets_file(target, secrets_file=secrets_file):
-        return PermissionDecision(
-            PermissionAction.DENY,
-            f"Access to secrets file '{target}' is denied",
-        )
+    for raw_target in targets:
+        target = raw_target.strip()
+        if is_secrets_file(target, secrets_file=secrets_file):
+            return PermissionDecision(
+                PermissionAction.DENY,
+                f"Access to secrets file '{target}' is denied",
+            )
 
     # 2. Workspace boundary check with read-only root support (LOGS_DIR)
     effective_read_roots = None
     if canonical in READ_ONLY_TOOLS:
         effective_read_roots = allowed_read_roots if allowed_read_roots is not None else get_trusted_read_roots()
 
-    if not is_path_within_workspace(target, workspace_roots, allowed_read_roots=effective_read_roots):
-        action = outside_action
-        if isinstance(action, str):
-            try:
-                action = PermissionAction(action.lower())
-            except ValueError:
-                action = PermissionAction.ASK
-        return PermissionDecision(action, f"Path '{target}' is outside workspace roots")
+    for raw_target in targets:
+        target = raw_target.strip()
+        if not is_path_within_workspace(target, workspace_roots, allowed_read_roots=effective_read_roots):
+            action = outside_action
+            if isinstance(action, str):
+                try:
+                    action = PermissionAction(action.lower())
+                except ValueError:
+                    action = PermissionAction.ASK
+            return PermissionDecision(action, f"Path '{target}' is outside workspace roots")
 
     return None
 

@@ -7,8 +7,10 @@ from unittest.mock import patch
 from core.domain.policies.permission_policy import (
     PermissionAction,
     evaluate_pattern_rules,
+    evaluate_workspace_boundary,
     extract_command_signature,
     extract_shell_subcommands,
+    extract_tool_target_values,
     has_unsafe_shell_syntax,
     match_path_pattern,
     match_pattern,
@@ -35,6 +37,12 @@ class TestPatternPolicyHelpers(unittest.TestCase):
         self.assertTrue(has_unsafe_shell_syntax("powershell -c 'dir'"))
         self.assertTrue(has_unsafe_shell_syntax("pwsh -c 'Get-Process'"))
         self.assertTrue(has_unsafe_shell_syntax("sh -c 'echo 1'"))
+        self.assertTrue(has_unsafe_shell_syntax("sh script.sh"))
+        self.assertTrue(has_unsafe_shell_syntax("echo 'rm -rf /' | sh"))
+        self.assertTrue(has_unsafe_shell_syntax("echo 'payload' | bash"))
+        self.assertTrue(has_unsafe_shell_syntax("bash < exploit.sh"))
+        self.assertTrue(has_unsafe_shell_syntax("base64 -d payload.b64"))
+        self.assertTrue(has_unsafe_shell_syntax("base64 --decode payload.b64"))
         self.assertTrue(has_unsafe_shell_syntax("eval 'dangerous'"))
         self.assertTrue(has_unsafe_shell_syntax("exec /bin/sh"))
         self.assertFalse(has_unsafe_shell_syntax("git status"))
@@ -293,3 +301,85 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
                 dec = pm.check_permission("shell", {"command": "rm -rf /tmp/dangerous"})
                 self.assertEqual(dec.action, PermissionAction.DENY)
                 self.assertIn("deny", dec.reason.lower())
+
+
+class TestMultiTargetAndEnhancedSafety(unittest.TestCase):
+    def test_extract_tool_target_values_multi(self):
+        # Multiple keys
+        args = {"source": "/app/src.py", "dest": "/app/dst.py"}
+        targets = extract_tool_target_values("create", args)
+        self.assertEqual(targets, ["/app/src.py", "/app/dst.py"])
+
+        # List of paths
+        args_list = {"paths": ["/app/a.py", "/app/b.py"], "path": "/app/c.py"}
+        targets_list = extract_tool_target_values("edit", args_list)
+        self.assertEqual(targets_list, ["/app/c.py", "/app/a.py", "/app/b.py"])
+
+        # Shell command
+        self.assertEqual(extract_tool_target_values("shell", {"command": "ls -l"}), ["ls -l"])
+
+        # Empty
+        self.assertEqual(extract_tool_target_values("edit", {}), [])
+        self.assertEqual(extract_tool_target_values("unknown", {"path": "/foo"}), [])
+
+    def test_evaluate_workspace_boundary_multi_target(self):
+        with tempfile.TemporaryDirectory() as ws:
+            ws_roots = [os.path.realpath(ws)]
+            inside1 = os.path.join(ws, "inside1.py")
+            inside2 = os.path.join(ws, "inside2.py")
+            outside = "/etc/shadow"
+
+            # All inside -> None
+            dec = evaluate_workspace_boundary("create", {"source": inside1, "dest": inside2}, ws_roots)
+            self.assertIsNone(dec)
+
+            # One outside -> triggers outside action
+            dec_out = evaluate_workspace_boundary("create", {"source": inside1, "dest": outside}, ws_roots)
+            self.assertIsNotNone(dec_out)
+            self.assertEqual(dec_out.action, PermissionAction.ASK)
+            self.assertIn("outside workspace", dec_out.reason)
+
+            # Secrets access in secondary target -> DENY
+            dec_sec = evaluate_workspace_boundary(
+                "edit",
+                {"source": inside1, "dest": os.path.expanduser("~/.johnston/secrets.json")},
+                ws_roots,
+            )
+            self.assertIsNotNone(dec_sec)
+            self.assertEqual(dec_sec.action, PermissionAction.DENY)
+
+    def test_evaluate_pattern_rules_multi_target(self):
+        rules = [
+            {"pattern": "/app/src/**", "action": "allow"},
+            {"pattern": "/app/secret/**", "action": "deny"},
+        ]
+        # Both allowed
+        dec = evaluate_pattern_rules("create", {"source": "/app/src/a.py", "dest": "/app/src/b.py"}, rules)
+        self.assertIsNotNone(dec)
+        self.assertEqual(dec.action, PermissionAction.ALLOW)
+
+        # One denied -> DENY
+        dec_deny = evaluate_pattern_rules("create", {"source": "/app/src/a.py", "dest": "/app/secret/key.txt"}, rules)
+        self.assertIsNotNone(dec_deny)
+        self.assertEqual(dec_deny.action, PermissionAction.DENY)
+
+        # One not covered -> None (fallback to tool level)
+        dec_uncovered = evaluate_pattern_rules("create", {"source": "/app/src/a.py", "dest": "/var/tmp/x"}, rules)
+        self.assertIsNone(dec_uncovered)
+
+    def test_suggest_pattern_safety(self):
+        # Unsafe shell command returns None
+        self.assertIsNone(suggest_pattern("shell", {"command": "echo bad | sh"}))
+        self.assertIsNone(suggest_pattern("shell", {"command": "sh exploit.sh"}))
+
+        # Python interpreter with -m
+        self.assertEqual(
+            suggest_pattern("shell", {"command": "python -m pytest tests/"}),
+            "python -m pytest *",
+        )
+        # Python inline -c never gets wildcard
+        self.assertEqual(
+            suggest_pattern("shell", {"command": "python -c 'import sys; print(1)'"}),
+            "python -c",
+        )
+
