@@ -304,8 +304,8 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
         registry = RoleRegistry.get_instance()
         worker_def = registry.get_role("worker")
         apply_prompt(agent, worker_def, mode=AgentMode.HEADLESS)
-        self.assertIn("<headless_runtime>", agent.system_prompt)
-        self.assertIn("NEVER ask closing questions", agent.system_prompt)
+        self.assertIn("Single-Shot Turn", agent.system_prompt)
+        self.assertIn("NEVER ask conversational closing questions", agent.system_prompt)
 
 
 if __name__ == "__main__":

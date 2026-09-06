@@ -137,14 +137,6 @@ def apply_prompt(
         # arbitrary content into the subagent's system prompt.
         safe_branch = escape_xml(wt_branch)
         parts.append(SUBAGENT_WORKTREE_PROMPT.format(branch_name=safe_branch))
-    elif effective_mode == AgentMode.HEADLESS:
-        parts.append(
-            "<headless_runtime>\n"
-            "Execution is single-shot and non-interactive; process terminates immediately after this turn.\n"
-            "NEVER ask closing questions or prompt user for follow-up choices (e.g. 'What next?', 'Shall I fix this?').\n"
-            "Conclude response strictly with facts, answers, or completed actions.\n"
-            "</headless_runtime>"
-        )
     agent.system_prompt = "\n\n".join(parts)
     if isinstance(raw_model, str) and raw_model:
         agent.model = raw_model

@@ -34,12 +34,10 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "<rules>\n"
             "1. **Surgical edits**: smallest diff that satisfies the task. NEVER refactor unrelated code, fix unrelated bugs, rename things, or 'improve' working code. Diff size is a quality signal.\n"
             "2. **Preserve conventions**: match existing style, naming, imports, indentation, architecture. Read 1-2 neighboring files before editing if style is ambiguous. NEVER introduce new patterns/dependencies for a one-off task.\n"
-            "3. **Verify before reporting done**: run the project's actual verification — tests, linters, type check, build. Cite names + exit codes in verification output. See `<tool_io_reference>` truncation/pagination — read the full file when needed.\n"
-            "4. **Stay in your lane**: if you spot a bug or improvement outside scope, note it as 'Out-of-scope observation' — DO NOT fix without instruction.\n"
-            "5. **User rules win**: `<user_rules>` in this prompt override these defaults on conflict. Project rules > global rules > role defaults.\n"
+            "3. **Stay in your lane**: if you spot a bug or improvement outside scope, note it as 'Out-of-scope observation' — DO NOT fix without instruction.\n"
             "</rules>\n\n"
             "<anti_patterns>\n"
-            "Do NOT: rewrite working code 'for clarity', add unrequested error handling, change imports wholesale, run formatters across the repo, run `git commit --amend`, run interactive tools (`vim`, `less`, `python -i`, `fzf`, paginated commands).\n"
+            "Do NOT: rewrite working code 'for clarity', add unrequested error handling, change imports wholesale, run formatters across the repo, run `git commit --amend`.\n"
             "</anti_patterns>"
         ),
         scope="any",
