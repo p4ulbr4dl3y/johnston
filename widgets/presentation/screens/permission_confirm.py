@@ -27,7 +27,7 @@ from widgets.utils.responsive import (
     modal_content_width,
     resolve_width,
 )
-from widgets.utils.row_format import display_width, ellipsize, format_badge_row
+from widgets.utils.row_format import display_width, ellipsize
 
 
 class RejectReasonInput(Input):
@@ -289,50 +289,23 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```json\n{args_str}\n```", classes="modal-diff-view")
 
-            content_w = self._calculate_content_width()
-            row_width = max(MODAL_MIN_WIDTH - 6, min(MODAL_WIDE_MAX_WIDTH - 6, content_w - 6))
-
             options = ["Allow once"]
             self._option_keys = ["allow"]
 
             if self.suggested_pattern:
                 pat_clean = " ".join(self.suggested_pattern.split())
-                options.append(
-                    format_badge_row(
-                        f'Allow pattern "{pat_clean}"',
-                        badge="session",
-                        target_width=row_width,
-                    )
-                )
+                options.append(f'Allow pattern "{pat_clean}" [dim]• session[/dim]')
                 self._option_keys.append(f"pattern:{self.suggested_pattern}")
 
-            options.append(
-                format_badge_row(
-                    f'Always allow "{self.tool_name}"',
-                    badge="session",
-                    target_width=row_width,
-                )
-            )
+            options.append(f'Always allow "{self.tool_name}" [dim]• session[/dim]')
             self._option_keys.append("always_allow")
 
             if self.suggested_pattern:
                 pat_clean = " ".join(self.suggested_pattern.split())
-                options.append(
-                    format_badge_row(
-                        f'Allow pattern "{pat_clean}"',
-                        badge="project",
-                        target_width=row_width,
-                    )
-                )
+                options.append(f'Allow pattern "{pat_clean}" [dim]• project[/dim]')
                 self._option_keys.append(f"pattern:{self.suggested_pattern}:project")
 
-            options.append(
-                format_badge_row(
-                    f'Always allow "{self.tool_name}"',
-                    badge="project",
-                    target_width=row_width,
-                )
-            )
+            options.append(f'Always allow "{self.tool_name}" [dim]• project[/dim]')
             self._option_keys.append("always_allow:project")
 
             from core.domain.policies.permission_policy import is_path_within_workspace
@@ -341,13 +314,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             pm = PermissionManager.get_instance()
             if target_path and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
                 root_to_add = os.path.dirname(target_path) or target_path
-                options.append(
-                    format_badge_row(
-                        f'Add "{ellipsize(root_to_add, 36)}" to roots',
-                        badge="workspace",
-                        target_width=row_width,
-                    )
-                )
+                options.append(f'Add "{ellipsize(root_to_add, 36)}" to roots [dim]• workspace[/dim]')
                 self._option_keys.append(f"add_root:{root_to_add}")
 
             options.append("Deny")
@@ -371,15 +338,15 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
     def _calculate_content_width(self) -> int:
         options = [
             "Allow once",
-            f'Always allow "{self.tool_name}"  session',
-            f'Always allow "{self.tool_name}"  project',
+            f'Always allow "{self.tool_name}" • session',
+            f'Always allow "{self.tool_name}" • project',
             "Deny",
             "Reject with feedback...",
         ]
         if self.suggested_pattern:
             pat_clean = " ".join(self.suggested_pattern.split())
-            options.append(f'Allow pattern "{ellipsize(pat_clean, 44)}"  session')
-            options.append(f'Allow pattern "{ellipsize(pat_clean, 44)}"  project')
+            options.append(f'Allow pattern "{ellipsize(pat_clean, 48)}" • session')
+            options.append(f'Allow pattern "{ellipsize(pat_clean, 48)}" • project')
 
         nargs = self.args if isinstance(self.args, dict) else {}
         target_path = nargs.get("path") or ""
@@ -389,7 +356,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         pm = PermissionManager.get_instance()
         if target_path and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
             root_to_add = os.path.dirname(target_path) or target_path
-            options.append(f'Add "{ellipsize(root_to_add, 36)}" to roots  workspace')
+            options.append(f'Add "{ellipsize(root_to_add, 36)}" to roots • workspace')
 
         hint = self._build_hint_text()
         title = "Confirm Tool Action"
