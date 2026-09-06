@@ -10,6 +10,7 @@ from typing import Any, AsyncGenerator
 from unittest.mock import MagicMock, patch
 
 from core.domain.entities.provider import ProviderDef
+from core.domain.policies.role_policy import AgentMode
 from core.interfaces.cli.commands.run_cmd import (
     format_args_summary,
     format_result_summary,
@@ -438,7 +439,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
             with redirect_stdout(out_buf):
                 code = await run_headless_async(args, pm=pm)
             self.assertEqual(code, 0)
-            mock_apply.assert_called_once_with(agent, "worker", is_subagent=False)
+            mock_apply.assert_called_once_with(agent, "worker", mode=AgentMode.HEADLESS)
 
     async def test_run_headless_async_closes_agent(self):
         agent = MockAgent(steps=[("content", "done", "")])

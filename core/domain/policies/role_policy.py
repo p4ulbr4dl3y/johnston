@@ -24,12 +24,51 @@ class RoleScope(str, Enum):
     SUBAGENT = "subagent"
 
 
-def normalize_role_scope(scope: str) -> str:
+class AgentMode(str, Enum):
+    """Execution context and interaction model for an agent."""
+
+    INTERACTIVE = "interactive"
+    HEADLESS = "headless"
+    SUBAGENT = "subagent"
+
+    @property
+    def is_interactive(self) -> bool:
+        """True if the agent has a live interactive UI host (dialogs, question modals)."""
+        return self == AgentMode.INTERACTIVE
+
+    @property
+    def is_subagent(self) -> bool:
+        """True if running as an isolated background subagent reporting to a parent."""
+        return self == AgentMode.SUBAGENT
+
+    @property
+    def target_scope(self) -> RoleScope:
+        """Target role scope for resolving roles in this mode."""
+        return RoleScope.SUBAGENT if self == AgentMode.SUBAGENT else RoleScope.MAIN
+
+
+def normalize_role_scope(scope: Any) -> str:
     """Normalize a role scope value to its canonical short name."""
+    if hasattr(scope, "value"):
+        scope = scope.value
     clean = (scope or "").strip().lower()
     if clean in ("both", "all"):
         return "any"
     return clean or "any"
+
+
+def is_role_scope_compatible(scope: Any, mode: AgentMode) -> bool:
+    """Check if a role scope is compatible with the given execution mode."""
+    clean = normalize_role_scope(scope)
+    if clean == RoleScope.BOTH:
+        return True
+    if mode == AgentMode.SUBAGENT:
+        return clean == RoleScope.SUBAGENT
+    if mode == AgentMode.HEADLESS:
+        return clean in (RoleScope.MAIN, "headless")
+    if mode == AgentMode.INTERACTIVE:
+        return clean in (RoleScope.MAIN, "interactive")
+    return False
 
 
 class AgentRole:
@@ -84,12 +123,14 @@ def _tool_policy_result(
     tool_name: str,
     is_subagent: bool = False,
     tool_name_normalizer: Optional[Callable[[str], str]] = None,
+    mode: Optional[AgentMode] = None,
 ) -> Tuple[bool, Optional[str]]:
     """Evaluate a tool call against a role definition.
 
-    Returns (allowed, reason). reason is None when allowed. When ``is_subagent``
-    is set, subagent-excluded tools are always denied. ``tool_name_normalizer``
-    canonicalizes tool names; when None (or on error) the name is used as-is.
+    Returns (allowed, reason). reason is None when allowed. When the execution
+    mode is non-interactive (subagent or headless), non-interactive excluded tools
+    are always denied. ``tool_name_normalizer`` canonicalizes tool names; when
+    None (or on error) the name is used as-is.
     """
     if not tool_name:
         return True, None
@@ -100,8 +141,10 @@ def _tool_policy_result(
     except Exception:
         resolved = clean
 
-    if is_subagent and (clean in SUBAGENT_EXCLUDED_TOOLS or resolved in SUBAGENT_EXCLUDED_TOOLS):
-        return False, format_tool_error(f"tool '{clean}' disabled for subagent roles")
+    effective_mode = mode if mode is not None else (AgentMode.SUBAGENT if is_subagent else AgentMode.INTERACTIVE)
+    if not effective_mode.is_interactive and (clean in SUBAGENT_EXCLUDED_TOOLS or resolved in SUBAGENT_EXCLUDED_TOOLS):
+        mode_label = "subagent roles" if effective_mode == AgentMode.SUBAGENT else f"{effective_mode.value} mode"
+        return False, format_tool_error(f"tool '{clean}' disabled for {mode_label}")
 
     name = getattr(role_def, "name", "Role")
     if getattr(role_def, "read_only", False):
@@ -126,6 +169,7 @@ def role_tool_error(
     tool_name: str,
     is_subagent: bool = False,
     tool_name_normalizer: Optional[Callable[[str], str]] = None,
+    mode: Optional[AgentMode] = None,
 ) -> Optional[ToolResult]:
     """Return an error ToolResult if role_def denies tool_name, else None."""
     if not role_def:
@@ -133,7 +177,11 @@ def role_tool_error(
     if tool_name_normalizer is None:
         tool_name_normalizer = getattr(role_def, "tool_name_normalizer", None)
     _, reason = _tool_policy_result(
-        role_def, tool_name, is_subagent=is_subagent, tool_name_normalizer=tool_name_normalizer
+        role_def,
+        tool_name,
+        is_subagent=is_subagent,
+        tool_name_normalizer=tool_name_normalizer,
+        mode=mode,
     )
     if reason is None:
         return None

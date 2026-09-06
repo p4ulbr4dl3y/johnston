@@ -10,6 +10,7 @@ import sys
 from typing import Any, Optional
 
 from core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
+from core.domain.policies.role_policy import AgentMode
 from core.role_registry import RoleRegistry
 from core.roles.apply import apply_role
 
@@ -192,7 +193,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
             sys.stderr.write(f"Error: Role '{role}' not found.\n")
             return 1
 
-        apply_role(agent, role, is_subagent=False)
+        apply_role(agent, role, mode=AgentMode.HEADLESS)
 
         is_quiet = bool(getattr(args, "quiet", False))
         is_json = bool(getattr(args, "json", False))

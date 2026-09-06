@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from core.domain.policies.role_policy import AgentRole
+from core.domain.policies.role_policy import AgentMode, AgentRole
 from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr
 
 
@@ -66,16 +66,33 @@ def apply_prompt(
     definition: AgentRole,
     worktree_branch: Optional[str] = None,
     is_subagent: bool = True,
+    mode: Optional[AgentMode] = None,
 ) -> None:
     """Set the agent's role-aware system prompt and pinned model (if any)."""
     from core.domain.defaults.prompts import (
         DEFAULT_SYSTEM_PROMPT,
+        HEADLESS_DEFAULT_SYSTEM_PROMPT,
         SUBAGENT_DEFAULT_SYSTEM_PROMPT,
         SUBAGENT_WORKTREE_PROMPT,
     )
+    from core.domain.policies.role_policy import AgentMode
+
+    if mode is not None:
+        effective_mode = AgentMode(mode.lower().strip()) if isinstance(mode, str) else mode
+    else:
+        agent_mode = getattr(agent, "mode", None)
+        if isinstance(agent_mode, AgentMode):
+            effective_mode = agent_mode
+        elif isinstance(agent_mode, str):
+            try:
+                effective_mode = AgentMode(agent_mode.lower().strip())
+            except ValueError:
+                effective_mode = AgentMode.SUBAGENT if is_subagent else AgentMode.INTERACTIVE
+        else:
+            effective_mode = AgentMode.SUBAGENT if is_subagent else AgentMode.INTERACTIVE
 
     key = getattr(definition, "key", "")
-    if is_subagent and isinstance(key, str) and key:
+    if effective_mode == AgentMode.SUBAGENT and isinstance(key, str) and key:
         agent.role = key
     elif not getattr(agent, "role", None) and isinstance(key, str) and key:
         agent.role = key
@@ -89,7 +106,13 @@ def apply_prompt(
     # so a malicious role file can't inject literal <system_note>,
     # <subagent>, or <worktree> close-tags at the identity-block level.
     safe_model_label = escape_xml(model_label)
-    base_prompt = SUBAGENT_DEFAULT_SYSTEM_PROMPT if is_subagent else DEFAULT_SYSTEM_PROMPT
+
+    mode_base_prompts = {
+        AgentMode.INTERACTIVE: DEFAULT_SYSTEM_PROMPT,
+        AgentMode.HEADLESS: HEADLESS_DEFAULT_SYSTEM_PROMPT,
+        AgentMode.SUBAGENT: SUBAGENT_DEFAULT_SYSTEM_PROMPT,
+    }
+    base_prompt = mode_base_prompts.get(effective_mode, DEFAULT_SYSTEM_PROMPT)
     prompt = base_prompt.replace("{model_name}", safe_model_label)
     if "{compaction_ratio}" in prompt:
         try:
@@ -107,7 +130,7 @@ def apply_prompt(
         formatted = format_role_prompt(key if isinstance(key, str) else "", body)
         if formatted:
             parts.append(formatted)
-    if is_subagent and wt_branch and isinstance(wt_branch, str):
+    if effective_mode == AgentMode.SUBAGENT and wt_branch and isinstance(wt_branch, str):
         # Branch name is user-controlled (passed via invoke_subagent(branch=...))
         # and gets interpolated into the system prompt. Escape it so a name
         # containing literal </worktree> cannot truncate the wrapper and inject

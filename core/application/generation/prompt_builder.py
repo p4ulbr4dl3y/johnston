@@ -272,6 +272,7 @@ class PromptBuilder:
         subagent_schema: Optional[Dict] = None,
         sandbox_enabled: Optional[bool] = None,
         worktree_branch: Optional[str] = None,
+        mode: Optional[Any] = None,
     ):
         self.base_system_prompt = base_system_prompt
         self.base_tools = list(base_tools or [])
@@ -279,7 +280,13 @@ class PromptBuilder:
         self.allow_task = allow_task
         self.model_name = model_name
         self.cwd = os.path.realpath(cwd) if cwd else None
-        self.is_subagent = is_subagent
+        if mode is not None:
+            self.mode = mode
+        else:
+            from core.domain.policies.role_policy import AgentMode
+
+            self.mode = AgentMode.SUBAGENT if is_subagent else AgentMode.INTERACTIVE
+        self.is_subagent = self.mode.is_subagent
         self.subagent_schema = subagent_schema
         self.worktree_branch = worktree_branch
         if sandbox_enabled is not None:
@@ -302,7 +309,9 @@ class PromptBuilder:
 
         skills_snippet = format_skills_markdown(get_skill_manager(self.cwd).get_system_prompt_skills())
         subagents_snippet = (
-            "" if self.is_subagent else RoleRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
+            ""
+            if not self.mode.is_interactive
+            else RoleRegistry.get_instance().get_system_prompt_snippet(project_dir=cwd)
         )
 
         now_str = datetime.datetime.now().astimezone().strftime("%Y-%m-%d")
@@ -343,7 +352,7 @@ class PromptBuilder:
         )
         subagents_snippet = (
             ""
-            if self.is_subagent
+            if not self.mode.is_interactive
             else await asyncio.to_thread(RoleRegistry.get_instance().get_system_prompt_snippet, project_dir=cwd)
         )
 
@@ -609,24 +618,24 @@ class PromptBuilder:
         role_def = RoleRegistry.get_instance().get_role(self.role, project_dir=self.cwd or os.getcwd())
 
         # Single role-tool policy (shared with roles/tools and role_registry).
-        # is_subagent passes the subagent-excluded-tool check into the core policy.
+        # mode passes the non-interactive excluded-tool check into the core policy.
         filtered_base = [
             t
             for t in base_tools_list
-            if role_tool_error(role_def, t.get("function", {}).get("name", ""), is_subagent=self.is_subagent) is None
+            if role_tool_error(role_def, t.get("function", {}).get("name", ""), mode=self.mode) is None
         ]
 
         filtered_mcp = [
             t
             for t in clean_mcp_tools
-            if role_tool_error(role_def, t.get("function", {}).get("name", ""), is_subagent=self.is_subagent) is None
+            if role_tool_error(role_def, t.get("function", {}).get("name", ""), mode=self.mode) is None
         ]
 
         if (
-            not self.is_subagent
+            self.mode.is_interactive
             and self.allow_task
             and self.subagent_schema
-            and role_tool_error(role_def, "invoke_subagent", is_subagent=self.is_subagent) is None
+            and role_tool_error(role_def, "invoke_subagent", mode=self.mode) is None
             and not any(
                 t.get("function", {}).get("name", "").lower() == "invoke_subagent"
                 for t in filtered_base
@@ -634,7 +643,7 @@ class PromptBuilder:
         ):
             filtered_base.append(self.subagent_schema)
 
-        if self.is_subagent:
+        if not self.mode.is_interactive:
             from core.roles.tools import _rebuild_tool
 
             filtered_base = [_rebuild_tool(t) for t in filtered_base]
@@ -670,7 +679,7 @@ class PromptBuilder:
         key = (
             tuple(id(t) for t in filtered_base),
             tuple(id(t) for t in filtered_mcp),
-            self.is_subagent,
+            self.mode,
             self.allow_task,
         )
         cached = _TOOLS_CACHE.get(key)

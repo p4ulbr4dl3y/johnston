@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from core.domain.policies.role_policy import AgentRole
+from core.domain.policies.role_policy import AgentMode, AgentRole
 from core.roles.prompt import apply_prompt
 from core.roles.provider import apply_provider
 from core.roles.resolve import resolve_role
@@ -15,22 +15,42 @@ def apply_role(
     project_dir: Optional[str] = None,
     worktree_branch: Optional[str] = None,
     is_subagent: Optional[bool] = None,
+    mode: Optional[AgentMode] = None,
 ) -> AgentRole:
-    """Apply a role definition to an agent (main or subagent).
+    """Apply a role definition to an agent (interactive, headless, or subagent).
 
-    Resolves the effective role (with scope fallback), switches provider
+    Resolves the effective role (with mode scope fallback), switches provider
     if pinned, filters/hardens tools, and sets the system prompt and model.
     Returns the resolved role definition.
     """
     from core.role_registry import RoleRegistry
 
-    if is_subagent is None:
-        is_subagent = getattr(agent, "is_subagent", False)
+    if mode is not None:
+        effective_mode = AgentMode(mode.lower().strip()) if isinstance(mode, str) else mode
+    elif is_subagent is not None:
+        effective_mode = AgentMode.SUBAGENT if is_subagent else AgentMode.INTERACTIVE
+    else:
+        agent_mode = getattr(agent, "mode", None)
+        if isinstance(agent_mode, AgentMode):
+            effective_mode = agent_mode
+        elif isinstance(agent_mode, str):
+            try:
+                effective_mode = AgentMode(agent_mode.lower().strip())
+            except ValueError:
+                effective_mode = AgentMode.SUBAGENT if getattr(agent, "is_subagent", False) else AgentMode.INTERACTIVE
+        else:
+            effective_mode = AgentMode.SUBAGENT if getattr(agent, "is_subagent", False) else AgentMode.INTERACTIVE
+
+    mode = effective_mode
+
+    agent.mode = mode
+    agent.is_subagent = mode.is_subagent
+    agent.is_headless = (mode == AgentMode.HEADLESS)
 
     registry = RoleRegistry.get_instance()
-    definition = resolve_role(registry, role_key, project_dir=project_dir, is_subagent=is_subagent)
+    definition = resolve_role(registry, role_key, project_dir=project_dir, mode=mode)
     try:
-        if is_subagent:
+        if mode == AgentMode.SUBAGENT:
             agent.role = definition.key
         else:
             agent.role = role_key or definition.key
@@ -40,8 +60,8 @@ def apply_role(
         pass
 
     apply_provider(agent, definition)
-    apply_role_tools(agent, definition, is_subagent=is_subagent)
-    apply_prompt(agent, definition, worktree_branch=worktree_branch, is_subagent=is_subagent)
+    apply_role_tools(agent, definition, mode=mode)
+    apply_prompt(agent, definition, worktree_branch=worktree_branch, mode=mode)
     return definition
 
 

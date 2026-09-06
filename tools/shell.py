@@ -289,7 +289,7 @@ class ShellTool(BaseTool):
             except (ValueError, TypeError):
                 wait_seconds = None
 
-        if wait_seconds is not None and ctx.is_subagent:
+        if wait_seconds is not None and not getattr(ctx, "is_interactive", True):
             return ToolResult.error("wait_seconds", name="shell")
 
         # Auto-derived idle timeout: 0 for persistent services (wait_seconds=0),
