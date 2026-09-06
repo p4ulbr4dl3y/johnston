@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 from core.domain.entities.session import AgentSession
 from core.domain.policies.messages import is_ui_visible_user_message
+from core.infrastructure.storage.session_serialization import to_dict as _session_to_dict
 from core.infrastructure.storage.session_store import SessionStore
 from core.interfaces.cli.formatter import format_table
 
@@ -222,7 +223,7 @@ def export_session(
         return 1
 
     if format_ == "json":
-        data = sess.to_dict()
+        data = _session_to_dict(sess)
         content = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     else:
         content = _format_markdown(sess)

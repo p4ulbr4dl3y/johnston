@@ -23,6 +23,15 @@ from core.infrastructure.platform.paths import PROJECTS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_text, update_json_config
 from core.infrastructure.platform.session_lock import SessionLock
 from core.infrastructure.storage.session_index_db import SessionIndexDb
+from core.infrastructure.storage.session_serialization import (
+    from_file as _session_from_file,
+)
+from core.infrastructure.storage.session_serialization import (
+    persistent_fields as _session_persistent_fields,
+)
+from core.infrastructure.storage.session_serialization import (
+    session_history as _session_history,
+)
 from core.infrastructure.storage.session_store_cache import SessionStoreCacheMixin
 from core.infrastructure.storage.session_store_locks import SessionStoreLocksMixin
 from core.infrastructure.storage.session_store_paths import SessionStorePathsMixin
@@ -48,10 +57,10 @@ def _session_change_signature(sess: AgentSession) -> tuple:
     persisted raises here too and ``save`` keeps today's failure semantics.
     """
     msgs = sess.messages
-    hist = sess._history()
+    hist = _session_history(sess)
     last_msg = json.dumps(msgs[-1], ensure_ascii=False, default=str) if msgs else None
     last_hist = json.dumps(hist[-1], ensure_ascii=False, default=str) if hist else None
-    meta = tuple(sorted(sess._persistent_fields().items()))
+    meta = tuple(sorted(_session_persistent_fields(sess).items()))
     return (len(msgs), len(hist), last_msg, last_hist, meta)
 
 
@@ -194,7 +203,7 @@ class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreC
             if not fpath or not os.path.exists(fpath):
                 continue
             try:
-                sess = AgentSession.from_file(fpath)
+                sess = _session_from_file(fpath)
                 if sess:
                     self._sessions[sess.id] = sess
                     return sess

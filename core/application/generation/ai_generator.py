@@ -18,12 +18,12 @@ from typing import Any, Callable, Optional
 
 from core.application.session.stream import record_session_step, sync_session_metrics
 from core.domain.defaults.errors import parse_stream_step
-from core.domain.entities.session import record_session_interruption
 from core.domain.policies.messages import (
     SYSTEM_NOTICE_KIND_INTERRUPTED,
     format_system_note,
 )
 from core.domain.ports.checkpoint import get_checkpoint_manager
+from core.infrastructure.runtime.session_interruption import record_session_interruption
 from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
 
 logger = logging.getLogger(__name__)

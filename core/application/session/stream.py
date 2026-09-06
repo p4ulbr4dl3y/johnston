@@ -9,7 +9,8 @@ import logging
 from typing import Any, Callable, Optional, Sequence
 
 from core.domain.defaults.errors import ToolResult, parse_stream_step, parse_tool_result_step
-from core.domain.entities.session import AgentSession, SessionStatus, record_session_interruption
+from core.domain.entities.session import AgentSession, SessionStatus
+from core.infrastructure.runtime.session_interruption import record_session_interruption
 
 logger = logging.getLogger(__name__)
 

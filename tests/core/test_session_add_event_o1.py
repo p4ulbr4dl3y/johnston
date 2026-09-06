@@ -13,6 +13,15 @@ import json
 import pytest
 
 from core.domain.entities.session import AgentSession, MessageType
+from core.infrastructure.storage.session_serialization import (
+    from_file as _session_from_file,
+)
+from core.infrastructure.storage.session_serialization import (
+    to_dict as _session_to_dict,
+)
+from core.infrastructure.storage.session_serialization import (
+    to_jsonl_lines as _session_to_jsonl_lines,
+)
 
 
 def _add_tool(sess: AgentSession, name: str) -> None:
@@ -152,10 +161,10 @@ def test_from_file_roundtrip_matches_unmatched_tools(tmp_path, sess):
     _add_tool(sess, "2.py")
     fpath = tmp_path / "session.jsonl"
     with open(fpath, "w", encoding="utf-8") as f:
-        for line in sess.to_jsonl_lines():
+        for line in _session_to_jsonl_lines(sess):
             f.write(json.dumps(line, ensure_ascii=False) + "\n")
 
-    loaded = AgentSession.from_file(str(fpath))
+    loaded = _session_from_file(str(fpath))
     assert loaded is not None
     assert loaded._next_unmatched_tool_idx == 0  # live-only state resets on load
     assert len(_tool_msgs(loaded)) == 2
@@ -182,15 +191,15 @@ def _walk_keys(obj):
 
 def test_tracker_not_persisted(sess):
     sess._next_unmatched_tool_idx = 7  # make it non-trivial
-    lines = sess.to_jsonl_lines()
+    lines = _session_to_jsonl_lines(sess)
     assert "next_unmatched" not in json.dumps(lines)
-    assert "next_unmatched" not in json.dumps(sess.to_dict())
+    assert "next_unmatched" not in json.dumps(_session_to_dict(sess))
     assert not any("_next_unmatched_tool_idx" in k for k in _walk_keys(lines))
-    assert not any("_next_unmatched_tool_idx" in k for k in _walk_keys(sess.to_dict()))
+    assert not any("_next_unmatched_tool_idx" in k for k in _walk_keys(_session_to_dict(sess)))
 
 
 def test_record_interruption_finalizes_tool_and_thinking(sess):
-    from core.domain.entities.session import record_session_interruption
+    from core.infrastructure.runtime.session_interruption import record_session_interruption
 
     _add_tool(sess, "edit.py")
     sess.add_event({"type": "thinking", "text": "pondering"})

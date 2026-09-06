@@ -8,6 +8,7 @@ from core.domain.entities.session import AgentSession
 from core.infrastructure.config.settings import get_settings
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_hash
 from core.infrastructure.storage.session_index_db import SessionIndexDb
+from core.infrastructure.storage.session_serialization import from_file as _session_from_file
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +109,7 @@ class SessionStoreCacheMixin:
 
     def _load_file(self, sessions: Dict[str, AgentSession], fpath: str) -> None:
         try:
-            sess = AgentSession.from_file(fpath)
+            sess = _session_from_file(fpath)
             if sess:
                 sessions[sess.id] = sess
         except Exception:

@@ -12,8 +12,8 @@ from unittest.mock import patch
 
 import pytest
 
-from core.domain.entities.session import AgentSession
 from core.infrastructure.storage import session_store as session_store_mod
+from core.infrastructure.storage.session_serialization import from_file as _session_from_file
 from core.infrastructure.storage.session_store import SessionStore
 
 
@@ -83,7 +83,7 @@ def test_resave_identical_session_object_skips_write(store, write_spy):
     sess = store.create_main("s2")
     sess.messages = [{"type": "user", "text": "q"}]
     store.save(sess)
-    loaded = AgentSession.from_file(_path(store, "s2.jsonl"))
+    loaded = _session_from_file(_path(store, "s2.jsonl"))
     assert loaded is not None
     write_spy.clear()
 

@@ -173,7 +173,7 @@ async def compact_session(
                 status=CompactionStatus.COMPLETED, message=msg, title=title, tokens=tokens
             )
             if session is not None:
-                from core.domain.entities.session import record_session_compaction
+                from core.infrastructure.runtime.session_interruption import record_session_compaction
 
                 record_session_compaction(session, title)
             on_divider_update(title)
@@ -181,14 +181,14 @@ async def compact_session(
         else:
             outcome = CompactionOutcome(status=CompactionStatus.FAILED, message=msg)
             if session is not None:
-                from core.domain.entities.session import record_session_compaction
+                from core.infrastructure.runtime.session_interruption import record_session_compaction
 
                 record_session_compaction(session, "Compaction Failed")
             on_divider_update("Compaction Failed")
         return outcome
     except asyncio.CancelledError:
         if session is not None:
-            from core.domain.entities.session import record_session_compaction
+            from core.infrastructure.runtime.session_interruption import record_session_compaction
 
             record_session_compaction(session, "Compaction Cancelled")
         on_divider_update("Compaction Cancelled")

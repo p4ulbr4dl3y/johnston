@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.domain.entities.session import AgentSession
+from core.infrastructure.storage.session_serialization import from_file as _session_from_file
 from core.infrastructure.storage.session_store import SessionStore
 from tools.manage_subagent import ManageSubagentTool
 
@@ -92,7 +93,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
         done_task.cancel.assert_not_called()  # done tasks are not re-cancelled
 
         # The fallback save persisted the finalized session to disk (A6).
-        persisted = AgentSession.from_file(self.store._subagent_path("sess-main", "sub-stale"))
+        persisted = _session_from_file(self.store._subagent_path("sess-main", "sub-stale"))
         self.assertIsNotNone(persisted)
         self.assertEqual(persisted.status, "cancelled")
 
@@ -145,7 +146,7 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
             pass
         self.assertTrue(bg_task.cancelled() or bg_task.done())
 
-        persisted = AgentSession.from_file(self.store._subagent_path("sess-main", "sub-atomic"))
+        persisted = _session_from_file(self.store._subagent_path("sess-main", "sub-atomic"))
         self.assertIsNotNone(persisted)
         self.assertEqual(persisted.status, "cancelled")
 

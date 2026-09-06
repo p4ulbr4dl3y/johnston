@@ -1,11 +1,6 @@
-import json
-import logging
-import os
 import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
-
-logger = logging.getLogger(__name__)
 
 
 class SessionStatus(str, Enum):
@@ -105,6 +100,13 @@ class AgentSession:
 
     Hierarchy: project -> main session -> subagent sessions (parent_id).
     Messages use a single renderable format shared with the chat UI.
+
+    Pure domain record: live streaming/coalescing lives in
+    ``core.infrastructure.runtime.session_coalescer``, persistence in
+    ``core.infrastructure.storage.session_serialization`` and interruption/
+    compaction finalization in
+    ``core.infrastructure.runtime.session_interruption``; this class only
+    holds state and thin delegating methods.
     """
 
     def __init__(
@@ -166,122 +168,23 @@ class AgentSession:
     def role_name(self, value: str) -> None:
         self._role_name = value
 
-    # -- live event streaming (subagents) ---------------------------------
+    # -- live event streaming (delegated to session_coalescer) -------------
 
     def add_event(self, event: Dict[str, Any]) -> None:
-        """Append a stream event, coalescing consecutive chunks into canonical messages.
+        """Append a stream event, coalescing consecutive chunks into canonical messages."""
+        from core.infrastructure.runtime.session_coalescer import add_event
 
-        Canonical message types (shared with main session snapshots):
-        - "bot": text of a reply, coalesced (replace) across stream chunks
-        - "thinking": text + optional duration, coalesced until thinking finishes
-        - "tool": tool call, with "result_text" merged into the same message
-        """
-        etype = event.get("type", "")
-        event = sanitize_session_event(event)
-        last = self.messages[-1] if self.messages else None
-
-        if etype in (
-            MessageType.TOOL_GENERATING,
-            MessageType.TOOL_GENERATING_UPDATE,
-            MessageType.TOOL_SHELL_OUTPUT,
-            "tool_generating",
-            "tool_generating_update",
-            "tool_shell_output",
-        ):
-            if not self.listeners:
-                return
-            for cb in list(self.listeners):
-                try:
-                    cb(event)
-                except Exception:
-                    logger.warning("Session listener callback failed", exc_info=True)
-            return
-
-        if etype == MessageType.BOT and last and last.get("type") == MessageType.BOT:
-            last["text"] = event.get("text", "")
-            last.pop("delta", None)
-            if event.get("final"):
-                last["final"] = True
-        elif etype == MessageType.BOT_RESET and last and last.get("type") == MessageType.BOT:
-            last["text"] = ""
-            last.pop("final", None)
-            last.pop("delta", None)
-        elif etype == MessageType.THINKING and last and last.get("type") == MessageType.THINKING and "duration" not in last:
-            if event.get("phase") == "delta":
-                last["text"] = (last.get("text", "") or "") + (event.get("text", "") or "")
-            else:
-                last["text"] = event.get("text", "")
-            if event.get("duration") is not None:
-                last["duration"] = event["duration"]
-            last.pop("phase", None)
-        elif etype == MessageType.TOOL and "result_text" in event:
-            target_msg = None
-            # Tool results always land on the FIRST unmatched TOOL message (no
-            # tool-id correlation upstream), so everything before the pointer is
-            # already matched or non-matchable and must not be rescanned: O(1)
-            # amortized per result. Clamp on truncation/rewind, which may replace
-            # self.messages with a shorter prefix (re-exposed messages keep their
-            # result_text, so skipping them matches the old from-0 scan).
-            idx = min(self._next_unmatched_tool_idx, len(self.messages))
-            for i in range(idx, len(self.messages)):
-                msg = self.messages[i]
-                if isinstance(msg, dict) and msg.get("type") == MessageType.TOOL and "result_text" not in msg:
-                    target_msg = msg
-                    self._next_unmatched_tool_idx = i + 1
-                    break
-            else:
-                self._next_unmatched_tool_idx = len(self.messages)
-            if target_msg is not None:
-                target_msg["result_text"] = event["result_text"]
-                for key in ("status", "is_error", "returncode"):
-                    if key in event:
-                        target_msg[key] = event[key]
-                if event.get("tool_id"):
-                    target_msg["tool_call_id"] = event["tool_id"]
-            else:
-                msg_to_store = dict(event)
-                msg_to_store.pop("phase", None)
-                msg_to_store.pop("delta", None)
-                msg_to_store.pop("from_stream_step", None)
-                self.messages.append(msg_to_store)
-                self.updated_at = _now()
-        elif (
-            etype == MessageType.EVENT_DIVIDER
-            and last
-            and last.get("type") == MessageType.EVENT_DIVIDER
-            and last.get("text") == event.get("text")
-        ):
-            return
-        else:
-            if etype == MessageType.TOOL and last and last.get("type") == MessageType.BOT and not last.get("text", "").strip():
-                self.messages.pop()
-            msg_to_store = dict(event)
-            msg_to_store.pop("phase", None)
-            msg_to_store.pop("delta", None)
-            msg_to_store.pop("from_stream_step", None)
-            if msg_to_store.get("type") == MessageType.TOOL and msg_to_store.get("tool_id"):
-                # Persist the stream's tool_call_id under the canonical key used
-                # by replay consumers (and by result-correlation in the branch
-                # above), so a tool/result pairing survives across replays.
-                msg_to_store["tool_call_id"] = msg_to_store.pop("tool_id")
-            self.messages.append(msg_to_store)
-            self.updated_at = _now()
-
-        if not self.listeners:
-            return
-        for cb in list(self.listeners):
-            try:
-                cb(event)
-            except Exception:
-                logger.warning("Session listener callback failed", exc_info=True)
+        add_event(self, event)
 
     def add_listener(self, cb: Any) -> None:
-        if cb not in self.listeners:
-            self.listeners.append(cb)
+        from core.infrastructure.runtime.session_coalescer import add_listener
+
+        add_listener(self, cb)
 
     def remove_listener(self, cb: Any) -> None:
-        if cb in self.listeners:
-            self.listeners.remove(cb)
+        from core.infrastructure.runtime.session_coalescer import remove_listener
+
+        remove_listener(self, cb)
 
     def touch(self) -> None:
         self.updated_at = _now()
@@ -296,123 +199,51 @@ class AgentSession:
 
     def record_interruption(self, divider_text: str = "Response Interrupted") -> None:
         """Finalize any in-flight tool or thinking events and append an interruption divider."""
-        if self.messages:
-            for msg in reversed(self.messages):
-                if isinstance(msg, dict):
-                    if msg.get("type") == MessageType.TOOL.value and "result_text" not in msg:
-                        self.add_event({
-                            "type": MessageType.TOOL.value,
-                            "result_text": "[interrupted | tool cancelled]",
-                            "status": "cancelled",
-                        })
-                    elif msg.get("type") == MessageType.THINKING.value and "duration" not in msg:
-                        self.add_event({
-                            "type": MessageType.THINKING.value,
-                            "duration": 0.0,
-                        })
-                    else:
-                        break
-        try:
-            self.add_event({"type": MessageType.EVENT_DIVIDER.value, "text": divider_text})
-        except Exception:
-            pass
+        from core.infrastructure.runtime.session_interruption import record_session_interruption
+
+        record_session_interruption(self, divider_text)
 
     def record_compaction(self, title: str = "Session Compacted") -> None:
         """Record compaction event divider into session messages."""
         self.add_event({"type": MessageType.EVENT_DIVIDER.value, "text": title})
 
-
-    # -- persistence -------------------------------------------------------
+    # -- persistence (delegated to session_serialization) ------------------
 
     def _history(self) -> List[Dict[str, Any]]:
         """Agent history: prefer the live agent's history, fall back to the stored copy."""
-        history = getattr(self.agent, "history", None)
-        return history if history is not None else self.agent_history
+        from core.infrastructure.storage.session_serialization import session_history
+
+        return session_history(self)
 
     def _persistent_fields(self) -> Dict[str, Any]:
         """Scalar (non-message) fields shared by to_dict and to_jsonl_lines meta."""
-        return {
-            "id": self.id,
-            "kind": self.kind.value,
-            "parent_id": self.parent_id,
-            "role": self.role,
-            "status": self.status,
-            "project_key": self.project_key,
-            "title": self._title,
-            "prompt": self.prompt,
-            "auto_titled": self.auto_titled,
-            "fork_msg_count": self.fork_msg_count,
-            "tokens_input": self.tokens_input,
-            "tokens_output": self.tokens_output,
-            "total_tokens": self.total_tokens,
-            "cost_usd": self.cost_usd,
-            "last_context_tokens": self.last_context_tokens,
-            "tokens_cache_read": self.tokens_cache_read,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "project_dir": self.project_dir,
-            "branch_name": self.branch_name,
-        }
+        from core.infrastructure.storage.session_serialization import persistent_fields
+
+        return persistent_fields(self)
 
     def to_dict(self) -> Dict[str, Any]:
-        data = self._persistent_fields()
-        data["messages"] = self.messages
-        data["agent_history"] = self._history()
-        return data
+        from core.infrastructure.storage.session_serialization import to_dict
+
+        return to_dict(self)
 
     def to_jsonl_lines(self) -> List[Dict[str, Any]]:
-        meta = {"_type": "meta", **self._persistent_fields()}
-        lines: List[Dict[str, Any]] = [meta]
-        for m in self.messages:
-            lines.append({"_type": "msg", "data": sanitize_session_event(m) if isinstance(m, dict) else str(m)})
-        for h in self._history():
-            lines.append({"_type": "history", "data": sanitize_session_event(h) if isinstance(h, dict) else str(h)})
-        return lines
+        from core.infrastructure.storage.session_serialization import to_jsonl_lines
+
+        return to_jsonl_lines(self)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AgentSession":
-        raw_kind = data.get("kind", SessionKind.MAIN.value)
-        try:
-            kind = SessionKind(raw_kind)
-        except ValueError:
-            kind = SessionKind.MAIN
-        sess = cls(
-            session_id=data.get("id", ""),
-            kind=kind,
-            parent_id=data.get("parent_id"),
-            role=data.get("role", "worker"),
-            status=data.get("status", SessionStatus.ACTIVE),
-            project_key=data.get("project_key", ""),
-            title=data.get("title") or "",
-            prompt=data.get("prompt") or "",
-            created_at=data.get("created_at"),
-            updated_at=data.get("updated_at"),
-            auto_titled=bool(data.get("auto_titled", False)),
-            fork_msg_count=_coerce_int(data.get("fork_msg_count")),
-        )
-        sess.messages = data.get("messages", [])
-        sess.agent_history = data.get("agent_history", [])
-        sess.tokens_input = _coerce_int(data.get("tokens_input"))
-        sess.tokens_output = _coerce_int(data.get("tokens_output"))
-        sess.total_tokens = _coerce_int(data.get("total_tokens"))
-        sess.cost_usd = _coerce_float(data.get("cost_usd"))
-        sess.last_context_tokens = _coerce_int(data.get("last_context_tokens"))
-        sess.tokens_cache_read = _coerce_int(data.get("tokens_cache_read"))
-        sess.project_dir = data.get("project_dir", "")
-        sess.branch_name = data.get("branch_name", "")
-        return sess
+        from core.infrastructure.storage.session_serialization import from_dict
+
+        return from_dict(data)
 
     def reconcile_compaction_divider(self) -> None:
         """Ensure sessions with compaction checkpoints have at least one visible event divider."""
-        if not self.agent_history or any(
-            isinstance(m, dict) and m.get("type") == MessageType.EVENT_DIVIDER
-            for m in self.messages
-        ):
-            return
-        for h in self.agent_history:
-            if isinstance(h, dict) and isinstance(h.get("content"), str) and h["content"].startswith("<compaction_checkpoint>"):
-                self.messages.append({"type": MessageType.EVENT_DIVIDER, "text": "Session Compacted"})
-                break
+        from core.infrastructure.storage.session_serialization import (
+            reconcile_compaction_divider,
+        )
+
+        reconcile_compaction_divider(self)
 
     @property
     def title(self) -> str:
@@ -470,92 +301,24 @@ class AgentSession:
 
     @classmethod
     def from_file(cls, fpath: str) -> Optional["AgentSession"]:
-        if not fpath or not os.path.exists(fpath):
-            return None
-        try:
-            with open(fpath, "r", encoding="utf-8") as f:
-                first_line = f.readline().strip()
-                if not first_line:
-                    return None
-                try:
-                    first = json.loads(first_line)
-                except Exception:
-                    return None
+        from core.infrastructure.storage.session_serialization import from_file
 
-                if not isinstance(first, dict) or first.get("_type") != "meta":
-                    return None
-
-                sess = cls.from_dict(first)
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        entry = json.loads(line)
-                    except Exception:
-                        continue
-                    if not isinstance(entry, dict):
-                        continue
-                    etype = entry.get("_type")
-                    if etype == "msg":
-                        data = entry.get("data")
-                        sess.messages.append(data if data is not None else {})
-                    elif etype == "history":
-                        data = entry.get("data")
-                        sess.agent_history.append(data if data is not None else {})
-                sess.reconcile_compaction_divider()
-                return sess
-        except Exception:
-            return None
+        return from_file(fpath)
 
 
 def record_session_interruption(session: Any, divider_text: str = "Response Interrupted") -> None:
     """Unify cancellation/interruption finalization across main agent and subagents."""
-    if not session:
-        return
-    if isinstance(session, AgentSession):
-        session.record_interruption(divider_text)
-        return
-    if hasattr(session, "messages") and session.messages:
-        for msg in reversed(session.messages):
-            if isinstance(msg, dict):
-                if msg.get("type") == MessageType.TOOL.value and "result_text" not in msg:
-                    try:
-                        session.add_event({
-                            "type": MessageType.TOOL.value,
-                            "result_text": "[interrupted | tool cancelled]",
-                            "status": "cancelled",
-                        })
-                    except Exception:
-                        pass
-                elif msg.get("type") == MessageType.THINKING.value and "duration" not in msg:
-                    try:
-                        session.add_event({
-                            "type": MessageType.THINKING.value,
-                            "duration": 0.0,
-                        })
-                    except Exception:
-                        pass
-                else:
-                    break
-    if hasattr(session, "add_event"):
-        try:
-            session.add_event({"type": MessageType.EVENT_DIVIDER.value, "text": divider_text})
-        except Exception:
-            pass
+    from core.infrastructure.runtime.session_interruption import (
+        record_session_interruption as _record,
+    )
+
+    _record(session, divider_text)
 
 
 def record_session_compaction(session: Any, title: str = "Session Compacted") -> None:
     """Unify compaction divider recording across session instances."""
-    if not session:
-        return
-    if isinstance(session, AgentSession):
-        session.record_compaction(title)
-        return
-    if hasattr(session, "add_event"):
-        try:
-            session.add_event({"type": MessageType.EVENT_DIVIDER.value, "text": title})
-        except Exception:
-            pass
+    from core.infrastructure.runtime.session_interruption import (
+        record_session_compaction as _record,
+    )
 
-
+    _record(session, title)

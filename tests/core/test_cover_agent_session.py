@@ -519,7 +519,8 @@ class TestRewindExtraPaths(unittest.IsolatedAsyncioTestCase):
 
 class TestRecordSessionCompaction(unittest.TestCase):
     def test_record_compaction_on_agent_session(self):
-        from core.domain.entities.session import AgentSession, record_session_compaction
+        from core.domain.entities.session import AgentSession
+        from core.infrastructure.runtime.session_interruption import record_session_compaction
 
         sess = AgentSession("test_id")
         record_session_compaction(sess, "Session Compacted (10k → 2k)")
@@ -528,7 +529,7 @@ class TestRecordSessionCompaction(unittest.TestCase):
         self.assertEqual(sess.messages[0]["text"], "Session Compacted (10k → 2k)")
 
     def test_record_session_compaction_none_or_plain_object(self):
-        from core.domain.entities.session import record_session_compaction
+        from core.infrastructure.runtime.session_interruption import record_session_compaction
 
         record_session_compaction(None)
         mock_obj = MagicMock()
