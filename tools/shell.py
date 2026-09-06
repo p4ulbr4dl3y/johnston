@@ -495,7 +495,8 @@ class ShellTool(BaseTool):
                 content_str = f"[exit {returncode}]" if (returncode is not None and returncode != 0) else "[no output]"
                 return ToolResult.done(content=content_str, display=content_str, returncode=returncode)
             truncated = _truncate_output(res).strip()
-            return ToolResult.done(content=truncated, display=truncated, returncode=returncode)
+            content_str = f"[exit {returncode}]\n{truncated}" if (returncode is not None and returncode != 0) else truncated
+            return ToolResult.done(content=content_str, display=content_str, returncode=returncode)
         except asyncio.TimeoutError:
             await terminate_process(p)
             if read_task and not read_task.done():

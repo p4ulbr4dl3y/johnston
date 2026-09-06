@@ -449,6 +449,12 @@ class PromptBuilder:
             for t in base_tools_list
             if role_tool_error(role_def, t.get("function", {}).get("name", ""), mode=self.mode) is None
         ]
+        if not self.allow_task:
+            filtered_base = [
+                t
+                for t in filtered_base
+                if t.get("function", {}).get("name", "").lower() not in ("invoke_subagent", "manage_subagent")
+            ]
 
         filtered_mcp = [
             t
