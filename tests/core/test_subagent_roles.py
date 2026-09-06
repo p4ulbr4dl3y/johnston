@@ -282,6 +282,15 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(res)
         self.assertEqual(res.id, "task-1")
 
+    def test_subagent_default_prompt_directives(self):
+        from core.domain.defaults.prompts import SUBAGENT_DEFAULT_SYSTEM_PROMPT
+
+        self.assertIn("Autonomous but Bounded", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
+        self.assertIn("Strict Scope & Minimal Diff", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
+        self.assertIn("Loop Breaker & Retry Budget", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
+        self.assertIn("Max 3 fix attempts", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
+        self.assertIn("Outcome: blocked", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
+
 
 if __name__ == "__main__":
     unittest.main()
