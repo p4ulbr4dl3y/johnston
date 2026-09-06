@@ -64,6 +64,16 @@ graph TD
         assert "Узел[Кириллица]" in cleaned
         assert "DB[PostgreSQL]" in cleaned
 
+    def test_normalize_flowchart_shapes_quoted_edges_and_escaped_quotes(self):
+        code = '''graph TD
+    A["Hello \\"world\\" (app)"] -->|"quoted (edge)"| B(Round)
+'''
+        cleaned = clean_mermaid_code(code)
+        assert '__MERMAID_PH_' not in cleaned
+        assert 'A["Hello \\"world\\" (app)"]' in cleaned
+        assert '|"quoted (edge)"|' in cleaned
+        assert 'B[Round]' in cleaned
+
     def test_render_mermaid_valid(self):
         code = "graph TD\n    A[Start] --> B[End]"
         result = render_mermaid_to_ascii(code)
@@ -314,5 +324,26 @@ class TestCustomMarkdownFenceMermaid:
         assert toggle_btn.display is True
         assert toggle_btn.label == "code"
         fence.set_content.assert_called_once()
+
+    async def test_integration_markdown_mount_pilot(self):
+        from textual.app import App
+        from textual.widgets import Markdown
+
+        from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
+
+        _apply_chat_markdown_patches()
+
+        class DummyApp(App):
+            def compose(self):
+                yield Markdown("```mermaid\ngraph TD\n  A-->B\n```")
+
+        app = DummyApp()
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            fence = app.screen.query_one(CustomMarkdownFence)
+            assert fence is not None
+            toggle_btn = fence.query_one(".fence-toggle-btn", Button)
+            assert toggle_btn is not None
+
 
 

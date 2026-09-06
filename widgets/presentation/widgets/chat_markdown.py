@@ -308,7 +308,7 @@ class CustomMarkdownFence(MarkdownFence):
         from widgets.utils.mermaid_renderer import format_mermaid_content, render_mermaid_to_ascii
 
         rendered = await asyncio.to_thread(render_mermaid_to_ascii, self.code)
-        if not rendered or getattr(self, "is_destroyed", False):
+        if not rendered or not getattr(self, "is_attached", True):
             return
 
         self._diagram_str = rendered
@@ -342,11 +342,19 @@ class CustomMarkdownFence(MarkdownFence):
         if isinstance(block, CustomMarkdownFence):
             self._copy_context(block)
             from widgets.app.theme_manager import theme_manager
-            from widgets.utils.mermaid_renderer import format_mermaid_content
+            from widgets.utils.mermaid_renderer import format_mermaid_content, is_mermaid
 
             app = getattr(self, "app", None)
             curr = getattr(app, "current_theme", None) or theme_manager.current_theme
             is_dark = getattr(curr, "dark", True)
+
+            lang_str = self.lexer.strip() if self.lexer else "text"
+            if is_mermaid(lang_str) and not self._diagram_str and not getattr(self, "_render_attempted", False):
+                self._render_attempted = True
+                try:
+                    self.run_worker(self._async_render_mermaid(), exclusive=False)
+                except Exception:
+                    pass
 
             try:
                 toggle_btn = self.query_one(".fence-toggle-btn", Button)

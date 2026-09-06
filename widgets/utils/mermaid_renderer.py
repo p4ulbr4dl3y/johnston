@@ -78,7 +78,7 @@ def _normalize_flowchart_shapes(code: str) -> str:
         placeholders.append(m.group(0))
         return f"__MERMAID_PH_{len(placeholders) - 1}__"
 
-    protected = re.sub(r'"[^"\n]*"', _save_placeholder, code)
+    protected = re.sub(r'"(?:\\.|[^"\\])*"', _save_placeholder, code)
     protected = re.sub(r"\|[^|\n]*\|", _save_placeholder, protected)
 
     norm_lines: list[str] = []
@@ -107,7 +107,7 @@ def _normalize_flowchart_shapes(code: str) -> str:
         norm_lines.append(line)
 
     result = "\n".join(norm_lines)
-    for i, ph in enumerate(placeholders):
+    for i, ph in reversed(list(enumerate(placeholders))):
         result = result.replace(f"__MERMAID_PH_{i}__", ph)
     return result
 
@@ -187,9 +187,10 @@ def render_mermaid_to_ascii(code: str, timeout: float = 2.0) -> Optional[str]:
     if not cleaned:
         return None
 
-    is_cached, cached_val = get_cached_mermaid(code)
-    if is_cached:
-        return cached_val
+    with _CACHE_LOCK:
+        if cleaned in _RENDER_CACHE:
+            _RENDER_CACHE.move_to_end(cleaned)
+            return _RENDER_CACHE[cleaned]
 
     binary = _get_mermaid_binary()
     if not binary:
