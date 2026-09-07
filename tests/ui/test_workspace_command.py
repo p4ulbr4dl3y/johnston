@@ -114,14 +114,15 @@ class TestPermissionConfirmScreenWorkspaceIntegration(unittest.IsolatedAsyncioTe
         from widgets.mixins.actions import ActionsMixin
 
         class AppWithActions(ActionsMixin):
-            def __init__(self):
+            def __init__(self, pm=None):
                 self.screen = MagicMock()
+                self.pm = pm
 
             def push_screen(self, scr, callback=None):
                 if callback:
                     callback("add_root:/var/custom/new_root")
 
-        app = AppWithActions()
+        app = AppWithActions(pm=self.pm)
         res = await app.confirm_permission("create", {"path": "/var/custom/new_root/file.py"}, "testing")
         self.assertTrue(res)
         roots = self.pm.get_workspace_roots()
@@ -131,14 +132,15 @@ class TestPermissionConfirmScreenWorkspaceIntegration(unittest.IsolatedAsyncioTe
         from widgets.mixins.actions import ActionsMixin
 
         class AppWithActions(ActionsMixin):
-            def __init__(self):
+            def __init__(self, pm=None):
                 self.screen = MagicMock()
+                self.pm = pm
 
             def push_screen(self, scr, callback=None):
                 if callback:
                     callback("always_allow:project")
 
-        app = AppWithActions()
+        app = AppWithActions(pm=self.pm)
         with patch.object(self.pm, "save_tool_permission") as mock_save:
             res = await app.confirm_permission("shell", {"command": "ls"}, "testing", perm_name="shell")
             self.assertTrue(res)
@@ -148,14 +150,15 @@ class TestPermissionConfirmScreenWorkspaceIntegration(unittest.IsolatedAsyncioTe
         from widgets.mixins.actions import ActionsMixin
 
         class AppWithActions(ActionsMixin):
-            def __init__(self):
+            def __init__(self, pm=None):
                 self.screen = MagicMock()
+                self.pm = pm
 
             def push_screen(self, scr, callback=None):
                 if callback:
                     callback("pattern:npm test *:project")
 
-        app = AppWithActions()
+        app = AppWithActions(pm=self.pm)
         with patch.object(self.pm, "save_pattern_permission") as mock_save:
             res = await app.confirm_permission("shell", {"command": "npm test"}, "testing", perm_name="shell")
             self.assertTrue(res)

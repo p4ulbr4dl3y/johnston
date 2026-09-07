@@ -12,7 +12,7 @@ from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
 from core.permission_manager import PermissionManager
-from widgets.presentation.screens.base_modal import BaseModalScreen, status_tag
+from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.confirm import ConfirmScreen
 from widgets.presentation.screens.constants import (
@@ -271,16 +271,12 @@ class WorkspaceScreen(BaseModalScreen[None]):
 
         target_w = option_list_row_width(opt_list, MODAL_MEDIUM_ROW_WIDTH)
 
-        active_tag = status_tag("ACTIVE")
-        locked_tag = status_tag("LOCKED")
         for item in self.roots_data:
             path = item["path"]
             scope = item["scope"]
-            stag = locked_tag if scope == "primary" else active_tag
-            prefix = f"{stag} "
-            max_title = max(10, target_w - display_width(prefix) - display_width(scope) - 2)
+            max_title = max(10, target_w - display_width(scope) - 2)
             display_path = format_workspace_path(path, max_title)
-            row = format_badge_row(display_path, badge=scope, target_width=target_w, prefix=prefix)
+            row = format_badge_row(display_path, badge=scope, target_width=target_w)
             opt_list.add_option(Option(row))
             self._option_actions.append(("root", item))
 

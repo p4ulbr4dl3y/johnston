@@ -160,6 +160,7 @@ class BranchScreen(BaseModalScreen[Any]):
         self.branches_data: list[Any] = []
         self._option_actions: list[tuple[str, Any]] = []
         self.current_branch_name: str = ""
+        self._shown_count: int = 0
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
@@ -315,9 +316,11 @@ class BranchScreen(BaseModalScreen[Any]):
             filtered = list(self.branches_data)
             has_exact = True
 
+        self._shown_count = len(filtered)
+
         if query and not has_exact:
-            prefix = f"{status_tag('OFF')} "
-            row = format_badge_row(f'+ Create worktree on "{query}"', badge="new", target_width=target_w, prefix=prefix)
+            prefix = "  "
+            row = format_badge_row(f'+ Create worktree on "{query}"', target_width=target_w, prefix=prefix)
             opt_list.add_option(Option(row))
             self._option_actions.append(("new", {"branch": query}))
         elif not self.branches_data:
@@ -328,17 +331,9 @@ class BranchScreen(BaseModalScreen[Any]):
         for item in filtered:
             branch = _get_branch_name(item)
             is_curr = _is_current(item)
-            is_root = _is_root(item)
             badge = _get_badge(item)
 
-            if is_curr:
-                stag = status_tag("ACTIVE")
-            elif is_root:
-                stag = status_tag("LOCKED")
-            else:
-                stag = status_tag("OFF")
-
-            prefix = f"{stag} "
+            prefix = f"{status_tag('ACTIVE')} " if is_curr else "  "
             row = format_badge_row(branch, badge=badge, target_width=target_w, prefix=prefix)
             opt_list.add_option(Option(row))
             self._option_actions.append(("branch", item))
@@ -367,7 +362,9 @@ class BranchScreen(BaseModalScreen[Any]):
         except Exception:
             return
 
-        hint_widget.update("enter Switch/Create • m Merge • d Delete • esc Close")
+        total = len(self.branches_data)
+        right_text = f"{self._shown_count}/{total}" if total > 0 else ""
+        hint_widget.update("enter Switch/Create • m Merge • d Delete • esc Close", right_text=right_text)
 
     def on_input_changed(self, event: Input.Changed) -> None:
         self._render_options(filter_text=event.value)

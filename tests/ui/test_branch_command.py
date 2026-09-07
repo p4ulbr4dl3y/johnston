@@ -122,6 +122,7 @@ class TestBranchScreen(unittest.IsolatedAsyncioTestCase):
 
             hint = screen.query_one("#modal-hint", ModalHint)
             self.assertIn("enter Switch/Create", str(hint.left_text))
+            self.assertEqual(hint.right_text, "4/4")
 
     async def test_branch_screen_filter_and_new_option(self) -> None:
         screen = BranchScreen(project_dir="/tmp/repo", manager=self.mock_mgr)
@@ -138,6 +139,8 @@ class TestBranchScreen(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(opt_list._options), 1)
             self.assertEqual(screen._option_actions[0][0], "new")
             self.assertEqual(screen._option_actions[0][1]["branch"], "feat/brand-new")
+            hint = screen.query_one("#modal-hint", ModalHint)
+            self.assertEqual(hint.right_text, "0/4")
 
     async def test_branch_screen_switch_existing_worktree(self) -> None:
         screen = BranchScreen(project_dir="/tmp/repo", manager=self.mock_mgr)
