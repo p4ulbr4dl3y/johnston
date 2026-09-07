@@ -291,6 +291,7 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Loop Breaker & Retry Budget", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
         self.assertIn("Max 3 fix attempts", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
         self.assertIn("Outcome: blocked", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
+        self.assertIn("Git Commits", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
 
     def test_headless_prompt_directives(self):
         from core.domain.defaults.prompts import HEADLESS_DEFAULT_SYSTEM_PROMPT
