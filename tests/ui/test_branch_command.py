@@ -278,7 +278,7 @@ class TestBranchScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             self.mock_mgr.remove_worktree_async.assert_called_once_with(
-                "/tmp/repo", "/tmp/repo-wt-1", delete_branch=False
+                "/tmp/repo", "/tmp/repo-wt-1", branch_name="feat/existing-wt", delete_branch=False
             )
             self.assertTrue(any("Deleted worktree" in n for n in app.notifications))
 

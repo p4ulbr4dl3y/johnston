@@ -310,5 +310,8 @@ class LifecycleMixin:
         if getattr(self, "agent", None):
             self.agent.project_dir = new_dir
             self.agent.worktree_branch = branch
+        if getattr(self, "session", None):
+            self.session.project_dir = new_dir
+            self.session.branch_name = branch
         if hasattr(self, "refresh_status_footer"):
             self.refresh_status_footer()

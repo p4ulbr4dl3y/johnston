@@ -358,6 +358,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             PermissionManager.get_instance().add_workspace_root(ws)
 
+    if args.version:
+        print(f"johnston {_dispatch_version()}")
+        sys.exit(0)
+
     branch_wt_path = None
     branch_name = None
     if getattr(args, "branch", None):
@@ -379,10 +383,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             PermissionManager.get_instance().set_project_dir(wt_path)
             branch_wt_path = wt_path
             branch_name = actual_b
-
-    if args.version:
-        print(f"johnston {_dispatch_version()}")
-        sys.exit(0)
 
     # Subcommands
     if args.subcommand == "config":

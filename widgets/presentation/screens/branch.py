@@ -252,14 +252,18 @@ class BranchScreen(BaseModalScreen[Any]):
         return True
 
     @staticmethod
-    async def _remove_wt(mgr: Any, repo_dir: str, wt_path: str, delete_branch: bool = False) -> Any:
+    async def _remove_wt(
+        mgr: Any, repo_dir: str, wt_path: str, branch_name: str = "", delete_branch: bool = False
+    ) -> Any:
         if hasattr(mgr, "remove_worktree_async"):
-            res = mgr.remove_worktree_async(repo_dir, wt_path, delete_branch=delete_branch)
+            res = mgr.remove_worktree_async(repo_dir, wt_path, branch_name=branch_name, delete_branch=delete_branch)
             if asyncio.iscoroutine(res):
                 return await res
             return res
         if hasattr(mgr, "remove_worktree"):
-            return await asyncio.to_thread(mgr.remove_worktree, repo_dir, wt_path, delete_branch)
+            return await asyncio.to_thread(
+                mgr.remove_worktree, repo_dir, wt_path, branch_name=branch_name, delete_branch=delete_branch
+            )
         return None
 
     async def refresh_list_async(self) -> None:
@@ -316,6 +320,10 @@ class BranchScreen(BaseModalScreen[Any]):
             row = format_badge_row(f'+ Create worktree on "{query}"', badge="new", target_width=target_w, prefix=prefix)
             opt_list.add_option(Option(row))
             self._option_actions.append(("new", {"branch": query}))
+        elif not self.branches_data:
+            row = format_badge_row("No git repository or branches found", badge="empty", target_width=target_w)
+            opt_list.add_option(Option(row, disabled=True))
+            self._option_actions.append(("empty", {}))
 
         for item in filtered:
             branch = _get_branch_name(item)
@@ -513,6 +521,11 @@ class BranchScreen(BaseModalScreen[Any]):
         source_branch = _get_branch_name(data)
         target_branch = self.current_branch_name or "main"
 
+        if source_branch.startswith("detached") or target_branch.startswith("detached"):
+            if hasattr(self.app, "notify"):
+                self.app.notify("Cannot merge detached HEAD", severity="warning")
+            return
+
         if source_branch == target_branch:
             if hasattr(self.app, "notify"):
                 self.app.notify("Cannot merge branch into itself", severity="warning")
@@ -591,11 +604,22 @@ class BranchScreen(BaseModalScreen[Any]):
         branch = _get_branch_name(data)
         is_root = _is_root(data)
         is_current = _is_current(data)
+        is_worktree = _is_worktree(data)
         path = _get_path(data)
+
+        if branch.startswith("detached"):
+            if hasattr(self.app, "notify"):
+                self.app.notify("Cannot delete detached HEAD", severity="warning")
+            return
 
         if is_root:
             if hasattr(self.app, "notify"):
                 self.app.notify("Cannot delete repository root", severity="warning")
+            return
+
+        if not is_worktree and not path:
+            if hasattr(self.app, "notify"):
+                self.app.notify(f"'{branch}' has no active worktree to delete", severity="warning")
             return
 
         current_dir = getattr(self.app, "project_dir", None) or os.getcwd()
@@ -611,7 +635,7 @@ class BranchScreen(BaseModalScreen[Any]):
 
         async def on_confirm(confirmed: bool) -> None:
             if confirmed:
-                await self._remove_wt(mgr, pdir, wt_path=wt_path, delete_branch=False)
+                await self._remove_wt(mgr, pdir, wt_path=wt_path, branch_name=branch, delete_branch=False)
                 if hasattr(self.app, "notify"):
                     self.app.notify(f"Deleted worktree for '{branch}'", severity="information")
                 await self.refresh_list_async()

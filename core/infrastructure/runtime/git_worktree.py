@@ -266,10 +266,14 @@ class GitWorktreeManager:
         """
         if not GitWorktreeManager.is_git_repo(project_dir):
             return True, ["Not a git repository"]
-        repo_root = GitWorktreeManager.get_repo_root(project_dir) or project_dir
+        if not source_branch or source_branch.startswith("detached"):
+            return True, [f"Invalid source branch: '{source_branch}'"]
+        if not target_branch or target_branch.startswith("detached"):
+            return True, [f"Invalid target branch: '{target_branch}'"]
         if source_branch == target_branch:
             return False, []
 
+        repo_root = GitWorktreeManager.get_repo_root(project_dir) or project_dir
         res = run_git(
             ["merge-tree", "--write-tree", "--name-only", target_branch, source_branch],
             cwd=repo_root,
@@ -315,6 +319,11 @@ class GitWorktreeManager:
         """
         if not GitWorktreeManager.is_git_repo(project_dir):
             return False, "Not a git repository"
+        if not source_branch or source_branch.startswith("detached"):
+            return False, f"Invalid source branch: '{source_branch}'"
+        if not target_branch or target_branch.startswith("detached"):
+            return False, f"Invalid target branch: '{target_branch}'"
+
         repo_root = GitWorktreeManager.get_repo_root(project_dir) or project_dir
 
         has_conflicts, conflict_files = GitWorktreeManager.check_merge_conflicts(
@@ -325,8 +334,18 @@ class GitWorktreeManager:
             return False, f"Merge conflicts detected in: {files_str}"
 
         wt_list = GitWorktreeManager.list_branches_and_worktrees(repo_root)
-        target_entry = next((e for e in wt_list if e["name"] == target_branch and e["path"]), None)
-        merge_cwd = target_entry["path"] if target_entry else repo_root
+        target_entry = next((e for e in wt_list if e["name"] == target_branch and e.get("path")), None)
+        if target_entry and target_entry.get("path"):
+            merge_cwd = target_entry["path"]
+        else:
+            wt_path, _ = GitWorktreeManager.create_worktree(repo_root, target_branch)
+            if not wt_path:
+                return False, f"Cannot merge: target branch '{target_branch}' is not checked out and failed to create worktree."
+            merge_cwd = wt_path
+
+        cur_head = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=merge_cwd, timeout=5)
+        if cur_head.returncode != 0 or cur_head.stdout.strip() != target_branch:
+            return False, f"Target directory '{merge_cwd}' is on branch '{cur_head.stdout.strip()}', expected '{target_branch}'."
 
         res = run_git(["merge", "--no-edit", source_branch], cwd=merge_cwd, timeout=30)
         if res.returncode == 0:
