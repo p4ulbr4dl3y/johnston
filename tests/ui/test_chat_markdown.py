@@ -565,4 +565,38 @@ class TestFenceHighlightCache(unittest.TestCase):
         ev_right.prevent_default.assert_called_once()
         ev_right.stop.assert_called_once()
 
+    def test_thin_scrollbar_render(self):
+        from rich.color import Color
+
+        from widgets.presentation.widgets.chat_markdown import DiagramScrollBox, ThinScrollBarRender
+
+        segs = ThinScrollBarRender.render_bar(
+            size=20,
+            virtual_size=100,
+            window_size=20,
+            position=10,
+            vertical=False,
+            back_color=Color.parse("#27272a"),
+            bar_color=Color.parse("#52525b"),
+        )
+        texts = [s.text for s in segs.segments]
+        self.assertIn("▄", "".join(texts))
+
+        # Vertical falls back to super()
+        segs_vert = ThinScrollBarRender.render_bar(
+            size=20,
+            virtual_size=100,
+            window_size=20,
+            position=10,
+            vertical=True,
+        )
+        self.assertIsNotNone(segs_vert)
+
+        # DiagramScrollBox attaches ThinScrollBarRender
+        box = DiagramScrollBox()
+        mock_sb = MagicMock()
+        with unittest.mock.patch.object(DiagramScrollBox.__bases__[0], "horizontal_scrollbar", property(lambda s: mock_sb)):
+            sb = box.horizontal_scrollbar
+            self.assertIs(sb.renderer, ThinScrollBarRender)
+
 

@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import re
+from math import ceil
 from typing import Any
 
 from markdown_it import MarkdownIt
@@ -8,7 +9,9 @@ from pygments.lexers import get_lexer_by_name
 from pygments.style import Style as PygmentsStyle
 from pygments.styles import get_style_by_name
 from pygments.token import Token
-from rich.segment import Segment
+from rich.color import Color
+from rich.segment import Segment, Segments
+from rich.style import Style as RichStyle
 from rich.syntax import PygmentsSyntaxTheme, Syntax
 from rich.text import Text
 from textual import events
@@ -16,6 +19,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.content import Content
 from textual.highlight import HighlightTheme
+from textual.scrollbar import ScrollBar, ScrollBarRender
 from textual.style import Style
 from textual.widgets import Button, Label, Markdown, Static
 from textual.widgets._markdown import (
@@ -266,8 +270,63 @@ class CustomMarkdownBulletList(MarkdownBulletList):
         self._blocks.clear()
 
 
+class ThinScrollBarRender(ScrollBarRender):
+    """Horizontal scrollbar renderer using lower half-block glyphs for a thinner line."""
+
+    @classmethod
+    def render_bar(
+        cls,
+        size: int = 25,
+        virtual_size: float = 50,
+        window_size: float = 20,
+        position: float = 0,
+        thickness: int = 1,
+        vertical: bool = True,
+        back_color: Color = Color.parse("#27272a"),
+        bar_color: Color = Color.parse("#52525b"),
+    ) -> Segments:
+        if vertical:
+            return super().render_bar(
+                size, virtual_size, window_size, position, thickness, vertical, back_color, bar_color
+            )
+
+        back = back_color
+        bar = bar_color
+        blank = " "
+        foreground_meta = {"@mouse.down": "grab"}
+        upper = {"@mouse.down": "scroll_up"}
+        lower = {"@mouse.down": "scroll_down"}
+
+        if window_size and size and virtual_size and size != virtual_size:
+            bar_ratio = virtual_size / size
+            thumb_size = max(1, window_size / bar_ratio)
+            position_ratio = position / (virtual_size - window_size)
+            position = (size - thumb_size) * position_ratio
+
+            start_index = int(position)
+            end_index = min(size, start_index + max(1, ceil(thumb_size)))
+
+            upper_back = Segment(blank, RichStyle(bgcolor=back, meta=upper))
+            lower_back = Segment(blank, RichStyle(bgcolor=back, meta=lower))
+            thumb_seg = Segment("▄", RichStyle(color=bar, bgcolor=back, meta=foreground_meta))
+
+            segments = [upper_back] * int(size)
+            segments[end_index:] = [lower_back] * (size - end_index)
+            segments[start_index:end_index] = [thumb_seg] * (end_index - start_index)
+        else:
+            segments = [Segment(blank, RichStyle(bgcolor=back))] * int(size)
+
+        return Segments(segments + [Segment.line()], new_lines=False)
+
+
 class DiagramScrollBox(Vertical):
     """Scroll container for code fences that only scrolls via scrollbar drag, ignoring wheel/trackpad."""
+
+    @property
+    def horizontal_scrollbar(self) -> ScrollBar:
+        sb = super().horizontal_scrollbar
+        sb.renderer = ThinScrollBarRender
+        return sb
 
     def _on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
         event.prevent_default()
