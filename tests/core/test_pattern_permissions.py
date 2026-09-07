@@ -61,6 +61,56 @@ class TestPatternPolicyHelpers(unittest.TestCase):
         self.assertFalse(has_unsafe_shell_syntax("git status"))
         self.assertFalse(has_unsafe_shell_syntax("cat foo.txt && pytest -k test_foo"))
 
+    def test_unsafe_shell_env_prefixed_interpreter(self):
+        """Env-prefixed interpreter launches are unsafe (startup file injection)."""
+        for cmd in (
+            "BASH_ENV=/tmp/evil.sh bash",
+            "ENV=/tmp/e sh",
+            "ZDOTDIR=/tmp/x zsh",
+            "NODE_OPTIONS=--require=/tmp/e.js node --version",
+            "PYTHONSTARTUP=/tmp/e.py python",
+            "RUBYOPT=-r/tmp/e.rb ruby -v",
+            "FOO=1 bash",
+            "A=1 B=2 bash",
+            "env bash",
+            "env -i python",
+            "NODE_OPTIONS=--env-file=/tmp/e node x.js",
+            "BASH_ENV=/tmp/e.sh; bash",
+        ):
+            self.assertTrue(
+                has_unsafe_shell_syntax(cmd),
+                f"env-prefixed interpreter must be unsafe: {cmd!r}",
+            )
+
+    def test_unsafe_shell_combined_flags(self):
+        """Combined/login/script flags switch the interpreter to code mode."""
+        for cmd in (
+            "bash -lc 'ls'",
+            "bash --login -c 'ls'",
+            "sh -ec 'ls'",
+            "zsh -fc 'ls'",
+            "dash -sc 'ls'",
+            "bash -li 'ls'",
+            "python3.13 --no-user-site -c 'x'",
+        ):
+            self.assertTrue(
+                has_unsafe_shell_syntax(cmd),
+                f"combined-flag interpreter must be unsafe: {cmd!r}",
+            )
+
+    def test_safe_interpreter_invocations_stay_safe(self):
+        """Deterministic interpreter invocations (module/script) stay safe."""
+        for cmd in (
+            "python -m pytest tests/",
+            "python3.12 -m pytest -q",
+            "python -u script.py",
+            "python script.py",
+        ):
+            self.assertFalse(
+                has_unsafe_shell_syntax(cmd),
+                f"deterministic interpreter invocation must stay safe: {cmd!r}",
+            )
+
     def test_extract_command_signature(self):
         self.assertEqual(extract_command_signature("cat file.txt"), "cat *")
         self.assertEqual(extract_command_signature("/usr/bin/cat file.txt"), "cat *")
@@ -316,6 +366,59 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
                 dec = pm.check_permission("shell", {"command": "rm -rf /tmp/dangerous"})
                 self.assertEqual(dec.action, PermissionAction.DENY)
                 self.assertIn("deny", dec.reason.lower())
+
+    def test_config_tool_deny_wins_over_session_pattern_allow(self):
+        """Regression: explicit config tool-level DENY beats session pattern allow."""
+        pm = PermissionManager()
+        pm.clear_session_overrides()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {"permissions": {"tools": {"shell": "deny", "read": "deny"}}},
+                    f,
+                )
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                pm.set_session_pattern_override("shell", "ls *", "allow")
+                dec = pm.check_permission("shell", {"command": "ls -la"})
+                self.assertEqual(dec.action, PermissionAction.DENY)
+
+                pm2 = PermissionManager()
+                pm2.clear_session_overrides()
+                pm2.set_session_pattern_override("read", "/etc/hosts", "allow")
+                dec3 = pm2.check_permission("read", {"path": "/etc/hosts"})
+                self.assertEqual(dec3.action, PermissionAction.DENY)
+
+    def test_config_tool_deny_is_overridden_by_explicit_session_tool_override(self):
+        """Documented contract: explicit session tool-level override beats config tool deny."""
+        pm = PermissionManager()
+        pm.clear_session_overrides()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"shell": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                pm.set_session_override("shell", "allow")
+                dec = pm.check_permission("shell", {"command": "ls -la"})
+                self.assertEqual(dec.action, PermissionAction.ALLOW)
+                self.assertIn("Session override", dec.reason)
+
+                pm.set_session_override("shell", "ask")
+                dec2 = pm.check_permission("shell", {"command": "ls -la"})
+                self.assertEqual(dec2.action, PermissionAction.ASK)
+
+    def test_config_tool_deny_wins_over_session_pattern_allow_unsafe_shell(self):
+        """Regression: config tool deny also blocks env-prefixed interpreter launches."""
+        pm = PermissionManager()
+        pm.clear_session_overrides()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"shell": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                pm.set_session_pattern_override("shell", "bash *", "allow")
+                dec = pm.check_permission("shell", {"command": "BASH_ENV=/tmp/evil.sh bash"})
+                self.assertEqual(dec.action, PermissionAction.DENY)
 
 
 class TestMultiTargetAndEnhancedSafety(unittest.TestCase):

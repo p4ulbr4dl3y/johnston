@@ -175,6 +175,26 @@ class PermissionManager:
                 return normalize_tool_name(tool_name)
         return normalize_tool_name(tool_name)
 
+    @staticmethod
+    def _config_tool_action(tools_cfg: Dict[str, Any], canonical_name: str) -> Optional[str]:
+        """Resolves the explicit config action for a canonical tool name.
+
+        Literal entries win; wildcard entries (``tool__*``) match via fnmatch
+        and fall back fail-closed to 'deny' when any wildcard denies. Returns
+        None when no config entry matches (caller falls back to defaults).
+        """
+        explicit = tools_cfg.get(canonical_name)
+        if explicit is not None:
+            return str(explicit) if isinstance(explicit, str) else None
+        matched_acts = [
+            act
+            for pat, act in tools_cfg.items()
+            if ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat)
+        ]
+        if not matched_acts:
+            return None
+        return "deny" if "deny" in matched_acts else matched_acts[0]
+
     # ── config persistence (delegates to _config) ───────────────────────────
 
     def ensure_gitignore(self, project_dir: Optional[str] = None) -> bool:
@@ -286,6 +306,23 @@ class PermissionManager:
                     f"Configured tool deny pattern '{pat}' matched '{canonical_name}'",
                 )
 
+        # 1b. Config explicit tool-level DENY: an admin-configured tool deny
+        # (literal or wildcard) must never be bypassed by runtime session
+        # *pattern* overrides (approval-path "allow once" grants). An explicit
+        # session tool-level override remains above the config layer by
+        # documented cascade contract (see test_session_override_overrides_*).
+        explicit_action = self._config_tool_action(tools_cfg, canonical_name)
+        if explicit_action == "deny":
+            has_session_tool_grant = canonical_name in self.session_overrides or any(
+                ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat)
+                for pat in self.session_overrides
+            )
+            if not has_session_tool_grant:
+                return PermissionDecision(
+                    PermissionAction.DENY,
+                    f"Configured tool permission for '{canonical_name}'",
+                )
+
         config_patterns = effective_perms.get("patterns", {}).get(canonical_name, [])
         config_decision = evaluate_pattern_rules(canonical_name, args, config_patterns)
         if (
@@ -352,15 +389,7 @@ class PermissionManager:
             return config_decision
 
         # 6. Explicit tool permission from user's config file (normalized during merge)
-        explicit_action = tools_cfg.get(canonical_name)
-        if explicit_action is None:
-            matched_acts = [
-                act
-                for pat, act in tools_cfg.items()
-                if ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat)
-            ]
-            if matched_acts:
-                explicit_action = "deny" if "deny" in matched_acts else matched_acts[0]
+        explicit_action = self._config_tool_action(tools_cfg, canonical_name)
         if explicit_action is not None:
             return PermissionDecision(
                 PermissionAction(explicit_action),

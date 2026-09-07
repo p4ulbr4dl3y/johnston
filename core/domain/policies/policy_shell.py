@@ -41,9 +41,41 @@ _WRAPPER_COMMANDS = frozenset(
     }
 )
 
+# Interpreter tokens (shells, python, node, ruby, perl, php) with optional
+# versioned names and path prefixes: /bin/bash, /usr/bin/env bash, python3.13.
+_INTERP_NAMES = frozenset(
+    {
+        "bash",
+        "sh",
+        "zsh",
+        "dash",
+        "pwsh",
+        "powershell",
+        "python",
+        "python3",
+        "python3.10",
+        "python3.11",
+        "python3.12",
+        "python3.13",
+        "node",
+        "ruby",
+        "perl",
+        "php",
+    }
+)
+
+
+def _is_interpreter_token(token: str) -> bool:
+    """True when a command token is a known interpreter binary (path allowed)."""
+    if not token:
+        return False
+    base = os.path.basename(token)
+    return base in _INTERP_NAMES or bool(re.fullmatch(r"python\d+(?:\.\d+)?", base))
+
+
 _UNSAFE_SHELL_REGEX = re.compile(
     r"(\$\(|`"
-    r"|\b(?:bash|sh|zsh|dash|powershell|pwsh)\s+(?:-[ceE]\b|-command\b|-encodedcommand\b|[^\s-])"
+    r"|\b(?:bash|sh|zsh|dash|powershell|pwsh)\s+(?:-[ceElis]\b|-command\b|-encodedcommand\b|[^\s-])"
     r"|\b(?:python(?:\d+(?:\.\d+)?)?|node|ruby|perl|php)\b(?:\s+-[^\s\-]+)*\s+(?:-[a-z0-9]*[cer]\b|--eval\b)"
     r"|\|\s*(?:bash|sh|zsh|dash|powershell|pwsh|python(?:\d+(?:\.\d+)?)?|node|ruby|perl|php)\b"
     r"|<\s*(?:bash|sh|zsh|dash)\b"
@@ -139,10 +171,91 @@ def extract_shell_subcommands(cmd: str) -> List[str]:
 
 
 def has_unsafe_shell_syntax(cmd: str) -> bool:
-    """Detects unsafe/dynamic shell syntax that cannot be safely validated by static patterns."""
+    """Detects unsafe/dynamic shell syntax that cannot be safely validated by static patterns.
+
+    Conservative (fail-closed): a known interpreter token that appears in an
+    invocable position — leading executable, after an env assignment, invoked
+    via ``env``, or with combined/script flags — is treated as unsafe because
+    the command string can inject code or load an attacker-controlled startup
+    file. Compound commands are checked per subcommand.
+    """
     if not cmd or not isinstance(cmd, str):
         return False
-    return bool(_UNSAFE_SHELL_REGEX.search(cmd))
+    if _UNSAFE_SHELL_REGEX.search(cmd):
+        return True
+    parts = extract_shell_subcommands(cmd)
+    if len(parts) > 1:
+        return any(has_unsafe_shell_syntax(p) for p in parts)
+    if not parts:
+        return False
+    return _interpreter_invocation_unsafe(parts[0])
+
+
+def _interpreter_invocation_unsafe(cmd: str) -> bool:
+    """True when a single (non-compound) command invokes an interpreter in a
+    way that can execute code or inject startup files."""
+    try:
+        tokens = shlex.split(cmd)
+    except Exception:
+        tokens = cmd.strip().split()
+    if not tokens:
+        return False
+
+    idx = 0
+    env_assigned = False
+    n = len(tokens)
+    while idx < n:
+        tok = tokens[idx]
+        if tok == "env":
+            # env [-options] <command> — env itself is a wrapper; skip its flags
+            idx += 1
+            while idx < n and tokens[idx].startswith("-") and tokens[idx] != "-":
+                idx += 1
+            continue
+        if "=" in tok and not tok.startswith("-"):
+            env_assigned = True
+            idx += 1
+            continue
+        if tok in _WRAPPER_COMMANDS:
+            idx += 1
+            continue
+        break
+    if idx >= n:
+        return False
+
+    binary = tokens[idx]
+    if not _is_interpreter_token(binary):
+        return False
+
+    # Env assignment before an interpreter can inject startup files
+    # (BASH_ENV=..., ENV=..., NODE_OPTIONS=..., PYTHONSTARTUP=...).
+    if env_assigned:
+        return True
+
+    args = tokens[idx + 1 :]
+    if not args:
+        # Bare interpreter launch reads code from stdin / env startup files.
+        return True
+    if args[0] == "-m":
+        # python -m <module> is a deterministic module invocation.
+        return False
+    for a in args:
+        if a.startswith("-"):
+            if binary in ("bash", "sh", "zsh", "dash", "pwsh", "powershell"):
+                # Combined/script flags (-lc, -ec, -fc, -sc, -li, --login)
+                # switch the shell to code/interactive/login mode.
+                if re.search(r"[cei]", a):
+                    return True
+                continue
+            # python/node/ruby/perl/php: explicit code flags.
+            if a in ("-c", "-e", "--eval") or re.search(r"-[a-z0-9]*[cer]\b", a):
+                return True
+            continue
+        # First non-flag argument is a script file: safe static invocation
+        # (python script.py, python -u script.py).
+        return False
+    # All flags, no script/module: python -u (stdin code), node -i, etc.
+    return True
 
 
 def extract_command_signature(cmd: str) -> str:
