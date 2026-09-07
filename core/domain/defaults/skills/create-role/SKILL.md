@@ -60,9 +60,9 @@ Johnston provides 11 builtin tools:
 - `create`: Create new files.
 - `edit`: Surgical string replacements in existing files.
 - `shell`: Run commands in persistent session (with idle timeouts).
-- `manage_shell`: Inspect, poll, or terminate background processes.
+- `manage_shell`: Terminate or send input to background processes.
 - `invoke_subagent`: Launch autonomous child agents in background.
-- `manage_subagent`: List or terminate running subagents.
+- `manage_subagent`: Terminate or send message to running subagents.
 - `ask_user`: Interactive multiple-choice prompts for user feedback.
 - `update_plan`: Maintain persistent task list / progress tracking.
 - `web_fetch`: Retrieve URL contents as markdown or HTML.

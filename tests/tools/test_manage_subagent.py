@@ -39,24 +39,11 @@ class TestManageSubagentTool(unittest.IsolatedAsyncioTestCase):
             status=status,
         )
 
-    async def test_list_action(self):
+    async def test_list_action_rejected(self):
         tool = ManageSubagentTool()
-        res_empty = await tool.execute({"action": "list"})
-        self.assertEqual(res_empty.content, "[subagents 0]")
-        self.assertEqual(res_empty.display, "")
-
-        self._mk_subagent("sub-1", "Search files", "find python files", role="explorer")
-        self._mk_subagent("sub-2", "Run tests", "run pytest", role="worker", status="completed")
-        self._mk_subagent("sub-3", "", "fallback prompt text", role="tester", status="error")
-        self._mk_subagent("sub-4", "Cancelled task", "", role="coder", status="cancelled")
-
         res = await tool.execute({"action": "list"})
-        self.assertIn("[subagents 4 | id|status|role|title]", res.content)
-        self.assertIn("sub-1|running|explorer|Search files", res.content)
-        self.assertIn("sub-2|completed|worker|Run tests", res.content)
-        self.assertIn("sub-3|error|tester|fallback prompt text", res.content)
-        self.assertIn("sub-4|cancelled|coder|Cancelled task", res.content)
-        self.assertEqual(res.display, "")
+        self.assertTrue(res.is_error)
+        self.assertIn("valid: send_message, kill", res.content)
 
     async def test_kill_action(self):
         tool = ManageSubagentTool()
@@ -541,61 +528,16 @@ class TestManageSubagentSendMessageRunning(unittest.IsolatedAsyncioTestCase):
             self.assertIn("[message sent | id sub-wt]", res)
             mock_wt.assert_awaited_once_with(sess, parent_dir="/tmp/parent")
 
-    async def test_manage_subagent_missing_session_id_self_healing(self):
+    async def test_manage_subagent_missing_session_id(self):
         sess = self._mk_subagent("sub-1", role="worker")
         app, _ = self._app_with_widget(sess)
         tool = ManageSubagentTool()
 
         res_kill = str(await tool.execute({"action": "kill"}, ctx=app))
         self.assertTrue("required for 'kill'" in res_kill or "required for &apos;kill&apos;" in res_kill)
-        self.assertTrue("manage_subagent(action='list')" in res_kill or "manage_subagent(action=&apos;list&apos;)" in res_kill)
 
         res_msg = str(await tool.execute({"action": "send_message", "message": "hello"}, ctx=app))
         self.assertTrue("required for 'send_message'" in res_msg or "required for &apos;send_message&apos;" in res_msg)
-        self.assertTrue("manage_subagent(action='list')" in res_msg or "manage_subagent(action=&apos;list&apos;)" in res_msg)
-
-    async def test_manage_subagent_consecutive_list_polling_circuit_breaker(self):
-        sess = self._mk_subagent("sub-poll-1", role="worker")
-        app, _ = self._app_with_widget(sess)
-        tool = ManageSubagentTool()
-
-        # First list call succeeds
-        res1 = await tool.execute({"action": "list"}, ctx=app)
-        self.assertFalse(res1.is_error)
-
-        # 2nd consecutive call with identical status triggers circuit breaker
-        res2 = await tool.execute({"action": "list"}, ctx=app)
-        self.assertTrue(res2.is_error)
-        self.assertIn("Consecutive polling of", res2.content)
-        self.assertIn("is blocked", res2.content)
-
-        # Non-list action resets breaker
-        await tool.execute({"action": "kill", "session_id": "sub-poll-1"}, ctx=app)
-        res3 = await tool.execute({"action": "list"}, ctx=app)
-        self.assertFalse(res3.is_error)
-
-    async def test_manage_subagent_circuit_breaker_reset_and_session_isolation(self):
-        sess = self._mk_subagent("sub-poll-iso", role="worker")
-        app1, _ = self._app_with_widget(sess)
-        app1.current_session_id = "s1"
-        app2, _ = self._app_with_widget(sess)
-        app2.current_session_id = "s2"
-        tool = ManageSubagentTool()
-
-        # s1 called twice -> triggers breaker
-        res1 = await tool.execute({"action": "list"}, ctx=app1)
-        self.assertFalse(res1.is_error)
-        res2 = await tool.execute({"action": "list"}, ctx=app1)
-        self.assertTrue(res2.is_error)
-
-        # s2 is isolated -> first list call succeeds
-        res_s2 = await tool.execute({"action": "list"}, ctx=app2)
-        self.assertFalse(res_s2.is_error)
-
-        # reset on s1 allows list again
-        tool.reset_circuit_breaker("s1")
-        res_s1_after = await tool.execute({"action": "list"}, ctx=app1)
-        self.assertFalse(res_s1_after.is_error)
 
     async def test_send_message_persists_immediately_and_registers_in_store(self):
         sess = self._mk_subagent("sub-imm-save")

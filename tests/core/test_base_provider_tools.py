@@ -112,8 +112,8 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 self.task_manager = TaskManager()
 
         app = DummyApp()
-        res_list = await execute_tool("manage_shell", {"action": "list"}, app=app)
-        self.assertEqual(res_list.content, "[tasks 0]")
+        res = await execute_tool("manage_shell", {"action": "kill", "task_id": "not_found"}, app=app)
+        self.assertIn("notfound", res.content.lower())
 
     async def test_task_tool_foreground(self):
         import tempfile

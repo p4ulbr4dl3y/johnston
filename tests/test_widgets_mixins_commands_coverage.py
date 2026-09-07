@@ -483,6 +483,8 @@ def test_session_persistence_write_session_data_read_only_and_unchanged():
     session_mock.cost_usd = 0.0
     session_mock.last_context_tokens = 0
     session_mock.tokens_cache_read = 0
+    session_mock.project_dir = ""
+    session_mock.branch_name = ""
 
     app.sm.get.return_value = session_mock
     app._write_session_data(

@@ -56,83 +56,26 @@ def _app(make_app_mock, tasks=None, session_id=None):
 
 
 # --------------------------------------------------------------------------- #
-# list
+# action validation
 # --------------------------------------------------------------------------- #
 
 
-async def test_list_no_tasks(tool, make_app_mock):
+async def test_list_action_rejected(tool, make_app_mock):
     app = _app(make_app_mock, tasks=[])
     res = await tool.execute({"action": "list"}, ctx=app)
-    assert res.content == "[tasks 0]"
-    assert res.display == ""
+    assert res.is_error
+    assert "send_input" in res.content and "kill" in res.content
 
 
-async def test_list_scoped_to_current_session(tool, make_app_mock):
-    t1 = _make_task("t1", "echo hi", session_id="sess-A")
-    t2 = _make_task("t2", "ls -la", session_id="sess-B")
-    app = _app(make_app_mock, [t1, t2], session_id="sess-A")
-    res = str(await tool.execute({"action": "list"}, ctx=app))
-    assert "t1" in res
-    assert "echo hi" in res
-    assert "t2" not in res
-    assert "ls -la" not in res
-
-
-async def test_list_with_tasks(tool, make_app_mock):
-    t1 = _make_task("t1", "echo hello", proc=MagicMock())
-    t2 = _make_task("t2", "ls -la", status=TaskStatus.COMPLETED)
-    t2.completed_at = t2.created_at + 2.5
-    app = _app(make_app_mock, [t1, t2])
-    res = await tool.execute({"action": "list"}, ctx=app)
-    assert "[tasks 2 | id|status|duration|cmd|log]" in res.content
-    assert "t1|running|" in res.content
-    assert "|echo hello|" in res.content
-    assert "t2|exit:0|2.5s|ls -la|" in res.content
-
-
-async def test_list_many_tasks_preserves_input_order(tool, make_app_mock):
-    # Mix of running/finished tasks, order preserved as registered.
-    tasks = [
-        _make_task(
-            f"t{i}",
-            status=None if i % 2 == 0 else TaskStatus.COMPLETED,
-            proc=MagicMock() if i % 2 == 0 else None,
-            session_id="s1",
-        )
-        for i in range(50)
-    ]
-    app = _app(make_app_mock, tasks, session_id="s1")
-    res = str(await tool.execute({"action": "list"}, ctx=app))
-    # order preserved as registered
-    first_occ = [res.index(fid) for fid in ("t0", "t1", "t2")]
-    assert first_occ == sorted(first_occ)
-
-
-async def test_background_task_already_finished_is_excluded_from_list(tool, make_app_mock):
-    """Race: a task that finished between registration and manage must not crash list."""
-    t1 = _make_task("tbkg", "sleep 1", session_id="s1")
-    t2 = _make_task("tbkg2", "sleep 1", proc=MagicMock(), session_id="s1")
-    app = _app(make_app_mock, [t1, t2], session_id="s1")
-    # Race: t1 finishes right before manage runs.
-    t1.status = TaskStatus.COMPLETED
-    res = await tool.execute({"action": "list"}, ctx=app)
-    assert "tbkg|exit:0|" in res.content
-    assert "|sleep 1|" in res.content
-
-
-async def test_list_task_status_variants(tool, make_app_mock):
-    t_killed = _make_task("tk", "sleep 10", status=TaskStatus.KILLED)
-    t_err = _make_task("terr", "bad cmd", status=TaskStatus.ERROR)
-    t_err.exit_code = 127
-    t_err.completed_at = t_err.created_at + 0.05
-    app = _app(make_app_mock, [t_killed, t_err])
-    res = await tool.execute({"action": "list"}, ctx=app)
-    assert "tk|killed|" in res.content
-    assert "terr|exit:127|<0.1s|bad cmd|" in res.content
+async def test_missing_action_rejected(tool, make_app_mock):
+    app = _app(make_app_mock, tasks=[])
+    res = await tool.execute({}, ctx=app)
+    assert res.is_error
+    assert "action" in res.content
 
 
 async def test_no_task_manager_no_app(tool):
-    res = str(await tool.execute({"action": "list"}))
+    res = str(await tool.execute({"action": "kill", "task_id": "t1"}))
     assert "ERR: manager 'none'" in res
 
 
@@ -313,11 +256,11 @@ async def test_unknown_action(tool, make_app_mock):
     assert "bogus" in res
 
 
-async def test_none_action_defaults_to_list(tool, make_app_mock):
+async def test_none_action_errors(tool, make_app_mock):
     app = _app(make_app_mock, [])
     res = await tool.execute({"action": None}, ctx=app)
-    assert not res.is_error
-    assert res.content == "[tasks 0]"
+    assert res.is_error
+    assert "action" in res.content
 
 
 async def test_unknown_action_none_task_id_should_not_crash(tool, make_app_mock):
@@ -374,51 +317,9 @@ async def test_manage_shell_missing_task_id_self_healing(tool, make_app_mock):
 
     res_kill = str(await tool.execute({"action": "kill"}, ctx=app))
     assert "required for 'kill'" in res_kill or "required for &apos;kill&apos;" in res_kill
-    assert "manage_shell(action='list')" in res_kill or "manage_shell(action=&apos;list&apos;)" in res_kill
 
     res_send = str(await tool.execute({"action": "send_input", "input": "yes"}, ctx=app))
     assert "required for 'send_input'" in res_send or "required for &apos;send_input&apos;" in res_send
-    assert "manage_shell(action='list')" in res_send or "manage_shell(action=&apos;list&apos;)" in res_send
 
-
-async def test_manage_shell_consecutive_list_polling_circuit_breaker(tool, make_app_mock):
-    t1 = _make_task("t1", "sleep 10", proc=MagicMock())
-    app = _app(make_app_mock, [t1])
-
-    # First list call succeeds
-    res1 = await tool.execute({"action": "list"}, ctx=app)
-    assert not res1.is_error
-
-    # 2nd consecutive call with identical task state triggers circuit breaker
-    res2 = await tool.execute({"action": "list"}, ctx=app)
-    assert res2.is_error
-    assert "Consecutive polling of" in res2.content and "is blocked" in res2.content
-
-    # State change resets breaker
-    t2 = _make_task("t2", "pytest", proc=MagicMock())
-    app2 = _app(make_app_mock, [t1, t2])
-    res3 = await tool.execute({"action": "list"}, ctx=app2)
-    assert not res3.is_error
-
-
-async def test_manage_shell_circuit_breaker_reset_and_session_isolation(tool, make_app_mock):
-    t1 = _make_task("t1", "sleep 10", proc=MagicMock())
-    app_s1 = _app(make_app_mock, [t1], session_id="session-1")
-    app_s2 = _app(make_app_mock, [t1], session_id="session-2")
-
-    # Call on s1 twice -> triggers breaker on s1
-    res1 = await tool.execute({"action": "list"}, ctx=app_s1)
-    assert not res1.is_error
-    res2 = await tool.execute({"action": "list"}, ctx=app_s1)
-    assert res2.is_error
-
-    # Session s2 is isolated and succeeds on first call despite same task fp
-    res_s2 = await tool.execute({"action": "list"}, ctx=app_s2)
-    assert not res_s2.is_error
-
-    # Resetting s1 allows s1 to call list again
-    tool.reset_circuit_breaker("session-1")
-    res_s1_after = await tool.execute({"action": "list"}, ctx=app_s1)
-    assert not res_s1_after.is_error
 
 

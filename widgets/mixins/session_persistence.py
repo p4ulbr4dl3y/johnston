@@ -139,7 +139,7 @@ class SessionPersistenceMixin:
         # Restore project dir / branch state if recorded and path exists
         sess_dir = getattr(session, "project_dir", None)
         sess_branch = getattr(session, "branch_name", "") or ""
-        if sess_dir:
+        if isinstance(sess_dir, str) and sess_dir:
             if os.path.isdir(sess_dir) and hasattr(self, "switch_project_dir"):
                 if sess_dir != getattr(self, "project_dir", None) or sess_branch != getattr(getattr(self, "agent", None), "worktree_branch", ""):
                     self.switch_project_dir(sess_dir, sess_branch)
@@ -150,8 +150,11 @@ class SessionPersistenceMixin:
                 if getattr(self, "agent", None):
                     self.agent.worktree_branch = ""
                 if hasattr(self, "notify"):
-                    self.notify("Worktree directory no longer exists. Resumed in project root.", severity="warning")
-        elif sess_branch and getattr(self, "agent", None):
+                    try:
+                        self.notify("Worktree directory no longer exists. Resumed in project root.", severity="warning")
+                    except Exception:
+                        pass
+        elif isinstance(sess_branch, str) and sess_branch and getattr(self, "agent", None):
             self.agent.worktree_branch = sess_branch
 
         self.refresh_status_footer()

@@ -4,7 +4,6 @@ from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from core.infrastructure.tasks.manage import (
     filter_to_session,
     find_any,
-    format_tasks_plain,
     not_found_message,
 )
 from tools.base import BaseTool
@@ -12,58 +11,40 @@ from tools.base import BaseTool
 
 class ManageShellTool(BaseTool):
     name = "manage_shell"
-    description = "Control active background shell tasks."
+    description = "Control active background shell tasks: send stdin input or terminate process."
     schema = {
         "type": "function",
         "function": {
             "name": "manage_shell",
-            "description": "Control active background shell tasks.",
+            "description": "Control active background shell tasks: send stdin input or terminate process.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["list", "send_input", "kill"],
+                        "enum": ["send_input", "kill"],
                         "description": (
-                            "Operation: 'list' (show running tasks; DO NOT poll in loop, runtime wakes via <notification>), "
-                            "'send_input' (send stdin to task), 'kill' (terminate process)."
+                            "Operation: 'send_input' (send stdin to task), 'kill' (terminate process)."
                         ),
                     },
                     "task_id": {
                         "type": "string",
-                        "description": "Background task_id (required for 'send_input' and 'kill')",
+                        "description": "Background task_id (required).",
                     },
                     "input": {
                         "type": "string",
-                        "description": "Input text to write to process stdin (required for 'send_input')",
+                        "description": "Input text to write to process stdin (required for 'send_input').",
                     },
                 },
-                "required": ["action"],
+                "required": ["action", "task_id"],
             },
         },
     }
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._breaker_state: Dict[str, tuple[Any, int]] = {}
-        self._last_list_fp = None
-        self._consecutive_list_count = 0
-
-    def reset_circuit_breaker(self, session_id: str | None = None) -> None:
-        """Reset consecutive polling circuit breaker for session or globally."""
-        if not hasattr(self, "_breaker_state"):
-            self._breaker_state = {}
-        if session_id:
-            self._breaker_state.pop(session_id, None)
-        else:
-            self._breaker_state.clear()
-        self._last_list_fp = None
-        self._consecutive_list_count = 0
-
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
-        action = (args.get("action") or "list").lower()
+        action = (args.get("action") or "").strip().lower()
         task_id = (args.get("task_id") or "").strip()
 
         tasks = ctx.background_tasks
@@ -72,40 +53,20 @@ class ManageShellTool(BaseTool):
         curr_sid = ctx.session_id or ""
         tasks = filter_to_session(tasks, curr_sid)
 
-        if not hasattr(self, "_breaker_state"):
-            self._breaker_state = {}
+        if not action:
+            return ToolResult.error("params", name="action", detail="required ('send_input' or 'kill')")
 
-        if action == "list":
-            fp = [(getattr(t, "id", None), getattr(t, "status", None), getattr(t, "is_active", getattr(t, "is_running", None))) for t in (tasks or [])]
-            last_fp, count = self._breaker_state.get(curr_sid, (None, 0))
-            if last_fp == fp and count >= 1:
-                return ToolResult.error(
-                    "execute",
-                    detail=(
-                        "Consecutive polling of 'list' is blocked. Task status has not changed. "
-                        "The system automatically wakes you with <notification type='shell'> on exit. "
-                        "Stop calling tools to wait."
-                    ),
-                    name="manage_shell",
-                )
-            new_count = count + 1 if last_fp == fp else 1
-            self._breaker_state[curr_sid] = (fp, new_count)
-            self._last_list_fp = fp
-            self._consecutive_list_count = new_count
+        if action not in ("send_input", "kill"):
+            return ToolResult.error("action", detail="use 'send_input' or 'kill'", name=action)
 
-            content_plain = format_tasks_plain(tasks)
-            return ToolResult.done(content=content_plain, display="")
-
-        self._breaker_state[curr_sid] = (None, 0)
-        self._consecutive_list_count = 0
+        if not task_id:
+            return ToolResult.error(
+                "params",
+                name="task_id",
+                detail=f"required for '{action}'.",
+            )
 
         if action == "send_input":
-            if not task_id:
-                return ToolResult.error(
-                    "params",
-                    name="task_id",
-                    detail="required for 'send_input'. Run manage_shell(action='list') to get active task IDs.",
-                )
             input_text = args.get("input", "") or ""
             t = find_any(tasks, task_id)
             if t is None:
@@ -118,12 +79,6 @@ class ManageShellTool(BaseTool):
             return ToolResult.error("nowrite", name=task_id, detail="stdin not writable")
 
         elif action == "kill":
-            if not task_id:
-                return ToolResult.error(
-                    "params",
-                    name="task_id",
-                    detail="required for 'kill'. Run manage_shell(action='list') to get active task IDs.",
-                )
             t = find_any(tasks, task_id)
             if t is None:
                 if ctx.host and hasattr(ctx.host, "_background_shell_widgets") and isinstance(ctx.host._background_shell_widgets, dict):
@@ -153,4 +108,4 @@ class ManageShellTool(BaseTool):
                 ctx.host._background_shell_widgets.pop(task_id, None)
             return ToolResult.error("notrunning", name=task_id)
 
-        return ToolResult.error("action", detail="use 'list', 'send_input', or 'kill'", name=action)
+        return ToolResult.error("action", detail="use 'send_input' or 'kill'", name=action)

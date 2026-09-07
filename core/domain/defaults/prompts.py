@@ -107,7 +107,7 @@ DEFAULT_SYSTEM_PROMPT = f"""<identity>{{model_name}} in Johnston CLI. Solve codi
   - For servers/daemons, set `wait_seconds=0`.
   - For long jobs (tests/builds), set `wait_seconds=5` for fast return or auto-backgrounding.
   - Shell background tasks and subagents are reactive. After launching, STOP calling tools immediately to yield the turn.
-  - Runtime automatically wakes execution via `<notification>`. NEVER poll `manage_shell` or `manage_subagent` to wait.
+  - Runtime automatically wakes execution via `<notification>`. Stop calling tools to wait.
 - **Subagents**: Use `invoke_subagent` for bounded, isolated, or parallel sub-tasks (see <subagents>).
 </tool_io>
 

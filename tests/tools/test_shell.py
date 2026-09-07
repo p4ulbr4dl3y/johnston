@@ -588,10 +588,7 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
     assert len(tasks) == 1
     assert tasks[0].is_background
 
-    # list: process alive -> RUNNING
-    r = await mgr.execute({"action": "list"}, ctx=app)
-    assert "RUNNING" in r.display or "running" in r.content
-    assert task_id in r.content
+    assert tasks[0].is_running
 
     # send_input: writes to live stdin
     got_output = asyncio.Event()

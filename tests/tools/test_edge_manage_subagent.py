@@ -206,45 +206,15 @@ async def test_kill_twice_idempotent(sub_tool, store):
     assert "[killed sk2]" in str(r2)
 
 
-# --- list edge cases -------------------------------------------------------
+# --- list action rejected --------------------------------------------------
 
 
-async def test_list_no_subagents_no_crash(sub_tool, store):
+async def test_subagent_list_action_removed(sub_tool, store):
+    """'list' was dropped from manage_subagent; it must return error."""
+    _mk("slist", status="running")
     res = await sub_tool.execute({"action": "list"})
-    assert res.content == "[subagents 0]"
-    assert res.display == ""
-
-
-async def test_list_filters_by_parent(sub_tool, store):
-    """list with current_session_id only shows that parent's subagents."""
-    _mk("sp1a", parent="parent-a")
-    _mk("sp1b", parent="parent-a")
-    _mk("sp2", parent="parent-b")
-    app = _SmApp(store, current_session_id="parent-a")
-    app.sm = store
-    res = str(await sub_tool.execute({"action": "list"}, ctx=_ctx(app)))
-    assert "sp1a" in res
-    assert "sp1b" in res
-    assert "sp2" not in res
-
-
-async def test_list_invalid_parent_id_no_crash(sub_tool, store):
-    _mk("sip", parent="parent-a")
-    app = _SmApp(store, current_session_id="parent-zzz")
-    res = await sub_tool.execute({"action": "list"}, ctx=_ctx(app))
-    assert res.content == "[subagents 0]"
-    assert "sip" not in res.content
-
-
-# --- race / double send ----------------------------------------------------
-
-
-async def test_list_stable_while_running_does_not_finish(sub_tool, store):
-    """Repeated list on a running subagent must not flip it to completed."""
-    sess = _mk("sstable", status="running")
-    for _ in range(3):
-        await sub_tool.execute({"action": "list"})
-    assert sess.status == "running"
+    assert res.is_error
+    assert "valid: send_message, kill" in res.content
 
 
 async def test_send_message_status_change_recorded(sub_tool, store):
