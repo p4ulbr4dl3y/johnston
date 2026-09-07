@@ -4,14 +4,10 @@ apply_textual_patches()
 
 import asyncio
 from pathlib import Path
-from typing import Any
 
 from textual.app import App
 
 from core.infrastructure.platform.logging_setup import adopt_task_exception
-from core.infrastructure.storage.session_store import SessionStore
-from core.infrastructure.tasks.manager import TaskManager
-from core.provider_manager import ProviderManager
 from widgets.mixins.actions import ActionsMixin
 from widgets.mixins.lifecycle import LifecycleMixin
 from widgets.mixins.message_flow import MessageFlowMixin
@@ -50,89 +46,31 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         theme: str | None = None,
     ):
         super().__init__()
-        from core.infrastructure.runtime.tool_name import normalize_tool_name
-        from core.permission_manager import PermissionManager
-        from core.role_registry import RoleRegistry
-        from widgets.app.theme_manager import theme_manager
-
-        if hasattr(self, "register_theme"):
-            for t in theme_manager.get_all_textual_themes():
-                self.register_theme(t)
-            self.theme = theme_manager.current_theme.name
-
-        PermissionManager.configure_instance(tool_name_normalizer=normalize_tool_name)
-        RoleRegistry._instance = RoleRegistry(tool_name_normalizer=normalize_tool_name)
-
-        self.pm = ProviderManager()
-        self.sm = SessionStore()
-        self.task_manager = TaskManager()
-        self._subagent_tools: dict[str, Any] = {}
-        # task_id -> shell tool card: completion handle for the message-flow
-        # repaint once a background shell task exits (chunks stream via the
-        # task's output listeners; this registry is only for the final status).
-        self._background_shell_widgets: dict[str, Any] = {}
-        self.agent = self.pm.create_active_agent()
-        self.role = getattr(self.agent, "role", "worker") if self.agent else "worker"
-        if self.agent:
-            self.agent.app = self
-
-        self.resume_session_id = resume_session_id
-        if continue_latest and not self.resume_session_id:
-            main_sessions = self.sm.list_main_sessions()
-            if main_sessions:
-                self.resume_session_id = main_sessions[0]["id"]
-
-        if self.resume_session_id:
-            sess = self.sm.get(self.resume_session_id)
-            if sess:
-                self.current_session_id = self.resume_session_id
-            else:
-                self.current_session_id = self.sm.generate_session_id()
-        else:
-            self.current_session_id = self.sm.generate_session_id()
-
         from core.infrastructure.config.config_helpers import load_sandbox_config
+        from core.infrastructure.runtime.tool_name import normalize_tool_name
+        from widgets.app.startup import (
+            apply_startup_flags,
+            build_agent,
+            configure_global_managers,
+            register_textual_themes,
+            resolve_session_id,
+        )
 
-        self.selection_copy_active = False
-        self.message_queue = []
-        self.is_generating = False
+        register_textual_themes(self)
+        configure_global_managers(normalize_tool_name)
+        build_agent(self)
+        resolve_session_id(self, self.sm, resume_session_id, continue_latest)
         self.sandbox_enabled = load_sandbox_config()
-        self._background_tasks: set[asyncio.Task] = set()
-
-        if theme:
-            self.theme = theme
-
-        if model and self.agent:
-            self.agent.model = model
-
-        if effort and self.agent:
-            self.agent.thinking_effort = effort
-            self.agent.reasoning_effort = effort
-
-        if sandbox is not None:
-            self.sandbox_enabled = sandbox
-            if self.agent:
-                self.agent.sandbox_enabled = sandbox
-
-        if mode:
-            from core.domain.policies.permission_policy import ExecutionMode
-            from core.permission_manager import PermissionManager
-
-            try:
-                PermissionManager.get_instance().set_session_mode(ExecutionMode(mode.lower()))
-            except Exception:
-                pass
-
-        if role and self.agent:
-            from core.roles.apply import apply_role
-
-            try:
-                apply_role(self.agent, role, is_subagent=False)
-                self.role = role
-            except Exception:
-                pass
-
-        self.initial_prompt = initial_prompt
+        apply_startup_flags(
+            self,
+            theme=theme,
+            model=model,
+            effort=effort,
+            sandbox=sandbox,
+            mode=mode,
+            role=role,
+            initial_prompt=initial_prompt,
+        )
 
     def create_tracked_task(self, coro) -> asyncio.Task | None:
         """Spawn an asyncio task and keep a strong reference until done."""
