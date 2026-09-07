@@ -275,6 +275,21 @@ async def run_subagent_stream_bg(
                         pass
         except asyncio.CancelledError:
             raise
+        finally:
+            try:
+                sid = session_id or getattr(session, "id", None)
+                app = getattr(ctx, "host", None)
+                if app is not None and sid and hasattr(app, "_subagent_tools") and isinstance(app._subagent_tools, dict):
+                    app._subagent_tools.pop(sid, None)
+
+                if hasattr(session, "async_task"):
+                    session.async_task = None
+                if hasattr(session, "agent"):
+                    session.agent = None
+                if hasattr(subagent, "session") and getattr(subagent, "session", None) is session:
+                    subagent.session = None
+            except Exception:
+                pass
 
     return acc[0]
 

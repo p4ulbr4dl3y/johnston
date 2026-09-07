@@ -31,6 +31,10 @@ def schedule_session_save(app: Any, session: Any) -> None:
 
 def update_background_shell_widget(app: Any, task_id: str, result: str) -> None:
     """Repaint the linked shell tool card once a background task finishes."""
+    widget = None
+    if hasattr(app, "_background_shell_widgets") and isinstance(app._background_shell_widgets, dict):
+        widget = app._background_shell_widgets.pop(task_id, None)
+
     mgr = getattr(app, "task_manager", None)
     task = None
     if mgr is not None:
@@ -50,8 +54,6 @@ def update_background_shell_widget(app: Any, task_id: str, result: str) -> None:
         save_log=False,
         log_path=task_log,
     )
-    reg = getattr(app, "_background_shell_widgets", None)
-    widget = (reg or {}).pop(task_id, None)
     task_status = (getattr(getattr(task, "status", None), "value", None) or "").lower() if task is not None else ""
     status = "error" if task_status == "error" else ("done" if task_status in ("completed", "killed", "timeout") else "done")
 
@@ -78,9 +80,9 @@ def update_background_shell_widget(app: Any, task_id: str, result: str) -> None:
 
 def on_background_shell_completed(app: Any, task_id: str, command_str: str, result: str) -> None:
     """Callback when background shell command finishes."""
-    if not getattr(app, "is_app_active", True):
-        return
     try:
+        if not getattr(app, "is_app_active", True):
+            return
         update_background_shell_widget(app, task_id, result)
         from tools.base import format_background_notification, truncate_output
 
@@ -143,6 +145,9 @@ def on_background_shell_completed(app: Any, task_id: str, command_str: str, resu
             app.generate_ai_response(msg, show_in_ui=False)
     except Exception as e:
         logger.warning("Background completion handling failed: %s", e)
+    finally:
+        if hasattr(app, "_background_shell_widgets") and isinstance(app._background_shell_widgets, dict):
+            app._background_shell_widgets.pop(task_id, None)
 
 
 def on_background_shell_progress(

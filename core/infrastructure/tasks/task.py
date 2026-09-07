@@ -21,6 +21,7 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     ERROR = "error"
     KILLED = "killed"
+    TIMEOUT = "timeout"
 
     @property
     def is_running(self) -> bool:

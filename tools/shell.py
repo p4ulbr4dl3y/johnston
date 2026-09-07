@@ -49,7 +49,13 @@ def _new_task_id() -> str:
     return f"shell-{uuid.uuid4().hex[:4]}"
 
 
-def _attach_shell_widget(host, task_id: str, widget, log_path: str = None) -> None:
+def _attach_shell_widget(
+    host: Any,
+    task_id: str,
+    widget: Any,
+    log_path: str | None = None,
+    is_background: bool = False,
+) -> None:
     """Link the shell tool card to the task for the completion repaint.
 
     Live chunks stream to the card through the task's output listeners; this
@@ -58,9 +64,13 @@ def _attach_shell_widget(host, task_id: str, widget, log_path: str = None) -> No
     """
     if host is None or widget is None:
         return
-    setattr(widget, "background_task_id", task_id)
-    if log_path:
-        setattr(widget, "log_path", log_path)
+    if is_background:
+        if hasattr(widget, "mark_background"):
+            widget.mark_background(task_id, log_path)
+        else:
+            setattr(widget, "background_task_id", task_id)
+            if log_path:
+                setattr(widget, "log_path", log_path)
     reg = getattr(host, "_background_shell_widgets", None)
     if reg is None:
         reg = host._background_shell_widgets = {}
@@ -349,7 +359,7 @@ class ShellTool(BaseTool):
             # log path (task.log_path is only populated by open_log()).
             task.open_log()
             if not getattr(ctx, "is_subagent", False):
-                _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path)
+                _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path, is_background=True)
             ctx.add_background_task(task)
             task.start_reading(on_completed=callback, on_progress=progress_cb)
 
@@ -416,7 +426,7 @@ class ShellTool(BaseTool):
         if getattr(ctx, "session", None) and hasattr(ctx.session, "add_event"):
             task.add_listener(lambda chunk: ctx.session.add_event({"type": "tool_shell_output", "text": chunk}))
         if not getattr(ctx, "is_subagent", False):
-            _attach_shell_widget(ctx.host, task_id, target_widget)
+            _attach_shell_widget(ctx.host, task_id, target_widget, is_background=False)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
         progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
         ctx.add_background_task(task)
@@ -448,8 +458,13 @@ class ShellTool(BaseTool):
                     if hard_timeout is not None and elapsed >= hard_timeout:
                         raise asyncio.TimeoutError()
                     task.move_to_background()
-                    if target_widget is not None and task.log_path:
-                        setattr(target_widget, "log_path", task.log_path)
+                    if target_widget is not None and not getattr(ctx, "is_subagent", False):
+                        if hasattr(target_widget, "mark_background"):
+                            target_widget.mark_background(task_id, task.log_path)
+                        else:
+                            setattr(target_widget, "background_task_id", task_id)
+                            if task.log_path:
+                                setattr(target_widget, "log_path", task.log_path)
                     raw_out = task.get_formatted_output().strip()
                     if raw_out:
                         truncated = truncate_output(
@@ -471,8 +486,13 @@ class ShellTool(BaseTool):
 
             if task.background_event.is_set() or getattr(task, "is_background", False):
                 task.move_to_background()
-                if target_widget is not None and task.log_path:
-                    setattr(target_widget, "log_path", task.log_path)
+                if target_widget is not None and not getattr(ctx, "is_subagent", False):
+                    if hasattr(target_widget, "mark_background"):
+                        target_widget.mark_background(task_id, task.log_path)
+                    else:
+                        setattr(target_widget, "background_task_id", task_id)
+                        if task.log_path:
+                            setattr(target_widget, "log_path", task.log_path)
                 elapsed = max(0.1, round(time.monotonic() - start_time, 1))
                 raw_out = task.get_formatted_output().strip()
                 if raw_out:
@@ -534,6 +554,8 @@ class ShellTool(BaseTool):
                         mgr.drop(task.task_id)
                     except Exception:
                         pass
+                if ctx.host and getattr(ctx.host, "_background_shell_widgets", None):
+                    ctx.host._background_shell_widgets.pop(task.task_id, None)
 
     async def _create_std_process(
         self,

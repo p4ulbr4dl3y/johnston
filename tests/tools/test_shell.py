@@ -1325,6 +1325,46 @@ async def test_shell_cwd_sandbox_write_blocked(tool, make_app_mock, make_tool_co
             assert "cannot write" in str(res)
 
 
+def test_attach_shell_widget_sync_vs_background():
+    from tools.shell import _attach_shell_widget
+
+    host = MagicMock()
+    host._background_shell_widgets = {}
+    widget = MagicMock(spec=["mark_background"])
+
+    # Sync attach does not mark background on widget
+    _attach_shell_widget(host, "t1", widget, is_background=False)
+    assert host._background_shell_widgets["t1"] is widget
+    widget.mark_background.assert_not_called()
+
+    # Background attach marks background on widget
+    _attach_shell_widget(host, "t2", widget, log_path="/log.txt", is_background=True)
+    assert host._background_shell_widgets["t2"] is widget
+    widget.mark_background.assert_called_once_with("t2", "/log.txt")
+
+
+async def test_sync_shell_cleans_up_background_registry_on_exit(tool, make_app_mock, make_tool_context):
+    app = _app(make_app_mock, task_manager=TaskManager())
+    app._background_shell_widgets = {}
+    widget = MagicMock()
+    app.current_tool_widget = widget
+    ctx = make_tool_context(app=app)
+    p = _process(stdout=b"hello\n")
+
+    with (
+        patch.object(ShellTool, "_create_std_process", return_value=p),
+        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+    ):
+        res = await tool.execute({"command": "echo hello"}, ctx=ctx)
+        assert not res.is_error
+        # Registry must be cleaned up on normal exit
+        assert len(app._background_shell_widgets) == 0
+        # Widget was never marked as background
+        widget.mark_background.assert_not_called()
+
+
+
 
 
 

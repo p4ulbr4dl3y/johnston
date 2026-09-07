@@ -243,6 +243,7 @@ class ShellTask(BaseTask):
                 # Final notification signal: empty string tells subscribers that
                 # stream closed so they can flush buffered partial lines.
                 self._notify_listeners("")
+                self._listeners.clear()
 
                 exit_code = 0
                 if self.process is not None:
@@ -317,6 +318,7 @@ class ShellTask(BaseTask):
 
     async def kill(self) -> None:
         self.was_killed = True
+        self._listeners.clear()
         if self.watcher_task is not None and not self.watcher_task.done():
             self.watcher_task.cancel()
         await self.close_log_async()
@@ -330,6 +332,7 @@ class ShellTask(BaseTask):
     def kill_sync(self) -> None:
         """Synchronous kill used by exit paths that run outside the event loop."""
         self.was_killed = True
+        self._listeners.clear()
         if self.watcher_task is not None and not self.watcher_task.done():
             self.watcher_task.cancel()
         self.close_log()

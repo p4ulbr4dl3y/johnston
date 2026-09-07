@@ -126,6 +126,8 @@ class ManageShellTool(BaseTool):
                 )
             t = find_any(tasks, task_id)
             if t is None:
+                if ctx.host and hasattr(ctx.host, "_background_shell_widgets") and isinstance(ctx.host._background_shell_widgets, dict):
+                    ctx.host._background_shell_widgets.pop(task_id, None)
                 return ToolResult(content=not_found_message(task_id, tasks, "background"), display="", status=ToolResultStatus.ERROR)
             if getattr(t, "is_running", False):
                 try:
@@ -139,6 +141,16 @@ class ManageShellTool(BaseTool):
                     return ToolResult.done(content=msg, display="")
                 except Exception as e:
                     return ToolResult.error("kill", detail=str(e), name=task_id)
+                finally:
+                    if ctx.host and hasattr(ctx.host, "_background_shell_widgets") and isinstance(ctx.host._background_shell_widgets, dict):
+                        widget = ctx.host._background_shell_widgets.pop(task_id, None)
+                        if widget is not None and hasattr(widget, "set_result"):
+                            try:
+                                widget.set_result(t.get_formatted_output() if hasattr(t, "get_formatted_output") else "[killed]", status="done")
+                            except Exception:
+                                pass
+            if ctx.host and hasattr(ctx.host, "_background_shell_widgets") and isinstance(ctx.host._background_shell_widgets, dict):
+                ctx.host._background_shell_widgets.pop(task_id, None)
             return ToolResult.error("notrunning", name=task_id)
 
         return ToolResult.error("action", detail="use 'list', 'send_input', or 'kill'", name=action)

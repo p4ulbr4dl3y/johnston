@@ -322,8 +322,17 @@ class ShellTasksScreen(BaseTasksListScreen):
                     pass
 
     def _sync_task_listeners(self, tasks: list) -> None:
+        for t in list(self._observed_tasks):
+            if not getattr(t, "is_running", False):
+                if hasattr(t, "remove_listener"):
+                    try:
+                        t.remove_listener(self._on_task_event)
+                    except Exception:
+                        pass
+                self._observed_tasks.discard(t)
+
         for t in tasks:
-            if hasattr(t, "add_listener") and t not in self._observed_tasks:
+            if getattr(t, "is_running", False) and hasattr(t, "add_listener") and t not in self._observed_tasks:
                 try:
                     t.add_listener(self._on_task_event)
                     self._observed_tasks.add(t)

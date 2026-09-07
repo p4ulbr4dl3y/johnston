@@ -101,6 +101,8 @@ class ChatView(ChatViewHintsMixin, ChatViewScrollMixin, ChatViewHistoryMixin, Ve
         returncode: int = None,
         before: Any = None,
         subagent_session_id: str = None,
+        background_task_id: str = None,
+        log_path: str = None,
     ) -> ToolCallWidget:
         last_child = None
         children_to_check = self.children if before is None else [c for c in self.children if c != before]
@@ -139,6 +141,8 @@ class ChatView(ChatViewHintsMixin, ChatViewScrollMixin, ChatViewHistoryMixin, Ve
             returncode=returncode,
             is_mcp=is_mcp,
             subagent_session_id=subagent_session_id,
+            background_task_id=background_task_id,
+            log_path=log_path,
         )
         if self.auto_expand_all and widget.is_expandable():
             widget.is_expanded = True

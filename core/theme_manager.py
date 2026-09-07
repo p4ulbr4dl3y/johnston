@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
+import weakref
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from core.domain.defaults.themes import ZINC_DARK, list_themes
 from core.domain.entities.theme import Theme
@@ -100,6 +102,11 @@ class ThemeManager:
         """Get the currently active theme."""
         return self._adapt_theme(self._current_theme)
 
+    def _unwrap_listener(self, ref: Any) -> Optional[Callable[[Theme], None]]:
+        if isinstance(ref, (weakref.ReferenceType, weakref.WeakMethod)):
+            return ref()
+        return ref
+
     def set_theme(self, name: str, persist: bool = True) -> Theme:
         """Set active theme by name, optionally persisting to config and notifying listeners."""
         theme = self._themes.get(name)
@@ -114,22 +121,45 @@ class ThemeManager:
                 logger.warning("Failed to persist theme config: %s", e)
 
         active_theme = self._adapt_theme(theme)
-        for listener in list(self._listeners):
-            try:
-                listener(active_theme)
-            except Exception as e:
-                logger.warning("Theme listener error: %s", e)
+        alive_listeners = []
+        for ref in self._listeners:
+            callback = self._unwrap_listener(ref)
+            if callback is not None:
+                alive_listeners.append(ref)
+                try:
+                    callback(active_theme)
+                except Exception as e:
+                    logger.warning("Theme listener error: %s", e)
+        self._listeners = alive_listeners
         return active_theme
 
     def add_listener(self, listener: Callable[[Theme], None]) -> None:
-        """Subscribe listener callback to theme changes."""
-        if listener not in self._listeners:
-            self._listeners.append(listener)
+        """Subscribe listener callback to theme changes (using weak references for methods)."""
+        alive_listeners = []
+        for ref in self._listeners:
+            cb = self._unwrap_listener(ref)
+            if cb is not None:
+                if cb == listener:
+                    return
+                alive_listeners.append(ref)
+        self._listeners = alive_listeners
+
+        if inspect.ismethod(listener):
+            try:
+                self._listeners.append(weakref.WeakMethod(listener))
+                return
+            except TypeError:
+                pass
+        self._listeners.append(listener)
 
     def remove_listener(self, listener: Callable[[Theme], None]) -> None:
-        """Unsubscribe listener callback."""
-        if listener in self._listeners:
-            self._listeners.remove(listener)
+        """Safely unsubscribe listener callback."""
+        alive_listeners = []
+        for ref in self._listeners:
+            cb = self._unwrap_listener(ref)
+            if cb is not None and cb != listener:
+                alive_listeners.append(ref)
+        self._listeners = alive_listeners
 
 
 theme_manager = ThemeManager.get_instance()

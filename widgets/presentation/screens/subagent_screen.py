@@ -48,6 +48,7 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         self._last_tool_widget = None
         self.event_queue = asyncio.Queue()
         self.queue_task = None
+        self._notch_task = None
 
     @property
     def thinking_widget(self):
@@ -148,9 +149,9 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
 
     def _get_app(self):
         try:
-            return self.app
+            return getattr(self, "_app", None) or self.app
         except Exception:
-            return None
+            return getattr(self, "_app", None)
 
     def _save_expand_state(self) -> None:
         app = self._get_app()
@@ -193,6 +194,12 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
                 }
         except Exception:
             pass
+
+        max_cache = 50
+        while len(app._subagent_expand_state) > max_cache:
+            app._subagent_expand_state.pop(next(iter(app._subagent_expand_state)), None)
+        while len(app._subagent_plan_state) > max_cache:
+            app._subagent_plan_state.pop(next(iter(app._subagent_plan_state)), None)
 
     def _on_plan_update(self, plan: list, explanation: str) -> None:
         self.on_plan_update(plan, explanation)
@@ -267,7 +274,9 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
                 except Exception:
                     pass
 
-            asyncio.create_task(_restore_notch_delayed())
+            if getattr(self, "_notch_task", None) is not None and not self._notch_task.done():
+                self._notch_task.cancel()
+            self._notch_task = asyncio.create_task(_restore_notch_delayed())
 
             if not self.queue_task or self.queue_task.done():
                 self.queue_task = asyncio.create_task(self._process_queue())
@@ -306,6 +315,9 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
             except Exception:
                 pass
             self._history_worker = None
+        if getattr(self, "_notch_task", None) is not None and not self._notch_task.done():
+            self._notch_task.cancel()
+        self._notch_task = None
         if self.queue_task and not self.queue_task.done():
             self.queue_task.cancel()
         if self.session:

@@ -338,9 +338,9 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget.set_result("Command is running in the background", status="running")
         self.assertEqual(widget.status, "running")
 
-    def test_set_result_shell_background_banner_extracts_id_and_log(self):
+    def test_mark_background_sets_id_and_log(self):
         widget = self._widget("shell", "cmd")
-        widget.set_result("[Background Task ID: task_123 | Full Log: /path/to/task.log]", status="running")
+        widget.mark_background("task_123", "/path/to/task.log")
         self.assertEqual(widget.background_task_id, "task_123")
         self.assertEqual(widget.log_path, "/path/to/task.log")
 
@@ -930,11 +930,20 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
 
         # 4. Background shell -> no ctrl+b
         w_bg = self._widget("shell", "pytest")
-        w_bg.background_task_id = "task-99"
+        w_bg.mark_background("task-99")
         w_bg.mark_running()
         label_bg = str(w_bg.header_label.render())
         self.assertNotIn("ctrl+b", label_bg)
         self.assertIn("ctrl+o", label_bg)
+
+        # 4b. Dynamic transition: foreground -> background drops ctrl+b immediately
+        w_dyn = self._widget("shell", "pytest")
+        w_dyn.mark_running()
+        self.assertIn("ctrl+b", str(w_dyn.header_label.render()))
+        w_dyn.mark_background("task-100")
+        label_dyn = str(w_dyn.header_label.render())
+        self.assertNotIn("ctrl+b", label_dyn)
+        self.assertIn("ctrl+o", label_dyn)
 
         # 5. Shell running inside subagent screen -> no ctrl+b
         w_sub = self._widget("shell", "pytest")

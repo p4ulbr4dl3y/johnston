@@ -89,6 +89,8 @@ class ToolCallWidget(
         returncode: int = None,
         is_mcp: bool = False,
         subagent_session_id: str = None,
+        background_task_id: str = None,
+        log_path: str = None,
     ):
         classes = f"tool-call tool-{(tool_type or '').lower()}"
         if is_sequential:
@@ -107,8 +109,8 @@ class ToolCallWidget(
         self.returncode = returncode
         self.is_mcp = is_mcp
         self.is_expanded = False
-        self.background_task_id = None
-        self.log_path: str | None = None
+        self.background_task_id = background_task_id
+        self.log_path: str | None = log_path
         self.task_id: str | None = None
         self.subagent_session_id: str | None = subagent_session_id
         self.tool_call_id: str | None = None
@@ -218,6 +220,29 @@ class ToolCallWidget(
             except Exception:
                 pass
             self._render_gate = None
+        try:
+            try:
+                app = getattr(self, "app", None)
+            except Exception:
+                app = None
+            if app is None:
+                app = getattr(self, "_app", None)
+            if app is not None and hasattr(app, "_background_shell_widgets") and isinstance(app._background_shell_widgets, dict):
+                tid = getattr(self, "background_task_id", None)
+                if tid:
+                    app._background_shell_widgets.pop(tid, None)
+                for k, v in list(app._background_shell_widgets.items()):
+                    if v is self:
+                        app._background_shell_widgets.pop(k, None)
+        except Exception:
+            pass
+
+    def mark_background(self, task_id: str, log_path: str | None = None) -> None:
+        """Mark the tool card as moved to background task."""
+        self.background_task_id = task_id
+        if log_path:
+            self.log_path = log_path
+        self.render_header()
 
     def set_result(
         self,
@@ -225,6 +250,8 @@ class ToolCallWidget(
         is_error: bool = False,
         status: str = None,
         returncode: int = None,
+        background_task_id: str | None = None,
+        log_path: str | None = None,
     ) -> None:
         """Apply a tool's terminal/streamed result to the card."""
         if not isinstance(result_text, str):
@@ -239,15 +266,13 @@ class ToolCallWidget(
         else:
             self.status = "done"
 
+        if background_task_id:
+            self.background_task_id = background_task_id
+        if log_path:
+            self.log_path = log_path
+
         if self.canonical_tool == "shell":
-            if status == "running":
-                bg_m = re.search(r"(?:Background Task ID:|id:)\s*([^\s\]\|]+)", cleaned, re.IGNORECASE)
-                if bg_m and not self.background_task_id:
-                    self.background_task_id = bg_m.group(1)
-                log_m = re.search(r"(?:Full Log:|log:)\s*([^\s\(\)\|\]]+)", cleaned, re.IGNORECASE)
-                if log_m and not self.log_path:
-                    self.log_path = log_m.group(1).rstrip(".]")
-            else:
+            if status != "running":
                 self._cancel_shell_update()
                 self.result_text = cleaned
         else:

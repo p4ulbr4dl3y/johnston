@@ -49,3 +49,7 @@ class ResizeDebounceMixin:
                 timer.stop()
             except Exception:
                 pass
+
+    def on_unmount(self) -> None:
+        """Cancel any pending resize debounce timer when unmounted."""
+        self.cancel_resize_timer()

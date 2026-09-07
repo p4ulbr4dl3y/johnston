@@ -478,13 +478,14 @@ class TestToolExpansion(unittest.TestCase):
         )
         widget.append_shell_output("line 1\n")
         widget.toggle_expanded()
+        widget.mark_background("bg_1")
         widget.set_result("[Background Task ID: bg_1] 'long_job' moved to background by user after 2.0s.", status="running")
         # Expansion must not be closed by the ctrl+b transition
         self.assertTrue(widget.is_expanded)
         # Live streamed output must not be overwritten by the transient banner
         self.assertIn("line 1", widget.result_text)
         self.assertNotIn("moved to background", widget.result_text)
-        # Task id still parsed for the completion repaint
+        # Task id still preserved for completion repaint
         self.assertEqual(widget.background_task_id, "bg_1")
 
     def test_shell_bg_banner_not_put_into_result_text_when_no_live_output(self):
@@ -493,6 +494,7 @@ class TestToolExpansion(unittest.TestCase):
             tool_type="shell",
             target="server",
             args={"command": "server"},
+            background_task_id="bg_2",
         )
         widget.set_result("[Background Task ID: bg_2] 'server' moved to background.", status="running")
         self.assertNotIn("moved to background", widget.result_text)
@@ -507,6 +509,7 @@ class TestToolExpansion(unittest.TestCase):
             args={"command": "long_job"},
         )
         widget.append_shell_output("partial\n")
+        widget.mark_background("bg_3")
         widget.set_result("[Background Task ID: bg_3] 'long_job' moved to background by user after 1.0s.", status="running")
         widget.set_result("[Output truncated: showing last 4000 chars (80 lines).]\nfinal output", status="done")
         self.assertEqual(widget.status, "done")
