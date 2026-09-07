@@ -15,8 +15,8 @@ Johnston equips the primary agent and subagents with a suite of 11 builtin tools
 3. **`create`**: Atomically create new files or overwrite existing files with full contents (`path`, `content`).
 4. **`edit`**: Apply precise search-and-replace edits (`path`, `old_str`, `new_str`, `replace_all`). Omit `new_str` or set empty to delete `old_str`.
 5. **`shell`**: Execute shell commands (`command`, `cwd`, `timeout`, `wait_seconds`).
-   - `command`: Run commands directly without piping to `tail`/`head`/`less` (runtime auto-truncates; piping breaks streaming and swallows exit codes).
-   - `cwd`: Target subdirectory to run command in (default: current workspace root). Omit when working in project root.
+   - `command`: Run commands directly without `cd` or piping (`| grep`, `| tail`, `| head`, etc.). Runtime auto-truncates and logs full output; piping breaks streaming and swallows exit codes.
+   - `cwd`: Target subdirectory to run command in (default: current workspace root). Always use this parameter instead of `cd`. Omit when working in project root.
    - `wait_seconds=0` spawns async background processes immediately (servers/daemons) and returns a task ID.
    - `wait_seconds=N` waits up to N seconds before transitioning to background with hang detection.
 6. **`manage_shell`**: Manage background shell tasks (`action` in `["list", "send_input", "kill"]`, `task_id`, `input`).

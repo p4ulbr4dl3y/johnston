@@ -145,18 +145,20 @@ class ShellTool(BaseTool):
                         "type": "string",
                         "description": (
                             "Non-interactive shell command. Runs in project root by default. "
-                            "NEVER use 'cd' — state does not persist across calls. "
+                            "NEVER use 'cd' or inline '(cd ...)' — state does not persist across calls. "
+                            "Use the 'cwd' parameter to target subdirectories. "
                             "NO interactive REPLs or paginators. "
-                            "NEVER pipe command output through tail/head/less. Output is auto-truncated "
+                            "NEVER pipe command output through other commands (| grep, | tail, | head, | less). Output is auto-truncated "
                             "to the last N chars with full log path returned ([truncated | log <p>]) — "
                             "piping hides the real exit code, hangs paginators, and suppresses live streaming. "
-                            "Re-run unfiltered; inspect logs via read."
+                            "Run commands raw; inspect logs via read."
                         ),
                     },
                     "cwd": {
                         "type": "string",
                         "description": (
                             "Directory to run command in (default: current workspace root). "
+                            "Always use this parameter instead of 'cd'. "
                             "Omit if working in project root."
                         ),
                     },

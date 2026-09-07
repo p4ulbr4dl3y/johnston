@@ -19,7 +19,8 @@ class ManageSubagentTool(BaseTool):
                         "type": "string",
                         "enum": ["list", "kill", "send_message"],
                         "description": (
-                            "Operation: 'list' (active sessions), 'send_message' (resume subagent with new input), 'kill' (terminate session)."
+                            "Operation: 'list' (active sessions; DO NOT poll in loop, runtime wakes via <notification>), "
+                            "'send_message' (resume subagent with new input), 'kill' (terminate session)."
                         ),
                     },
                     "session_id": {

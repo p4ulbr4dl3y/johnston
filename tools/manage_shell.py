@@ -25,7 +25,8 @@ class ManageShellTool(BaseTool):
                         "type": "string",
                         "enum": ["list", "send_input", "kill"],
                         "description": (
-                            "Operation: 'list' (show running tasks), 'send_input' (send stdin to task), 'kill' (terminate process)."
+                            "Operation: 'list' (show running tasks; DO NOT poll in loop, runtime wakes via <notification>), "
+                            "'send_input' (send stdin to task), 'kill' (terminate process)."
                         ),
                     },
                     "task_id": {
