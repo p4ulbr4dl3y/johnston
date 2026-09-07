@@ -44,6 +44,8 @@ def collect_session_data(app: Any) -> Optional[dict]:
         "cost_usd": getattr(app.agent, "cost_usd", 0.0),
         "last_context_tokens": getattr(app.agent, "last_context_tokens", 0),
         "tokens_cache_read": getattr(app.agent, "tokens_cache_read", 0),
+        "project_dir": getattr(app, "project_dir", "") or getattr(session, "project_dir", ""),
+        "branch_name": getattr(getattr(app, "agent", None), "worktree_branch", "") or getattr(session, "branch_name", ""),
     }
 
 

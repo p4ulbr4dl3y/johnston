@@ -59,11 +59,11 @@ class TestStatusFooterCoverage(unittest.TestCase):
         self.assertEqual(format_display_path(WORKTREES_DIR), "worktree")
         # Subpath under WORKTREES_DIR
         subpath = os.path.join(WORKTREES_DIR, "subagent-16ab6b")
-        self.assertEqual(format_display_path(subpath), "worktree:subagent-16ab6b")
+        self.assertEqual(format_display_path(subpath), "subagent-16ab6b (wt)")
         # Very long worktree name truncated
         long_wt = os.path.join(WORKTREES_DIR, "subagent-super-long-identifier-1234567890")
         res = format_display_path(long_wt, max_length=20)
-        self.assertTrue(res.startswith("worktree:"))
+        self.assertTrue(res.endswith(" (wt)"))
         self.assertLessEqual(len(res), 20)
 
     def test_format_display_path_exception_returns_raw(self):

@@ -99,12 +99,22 @@ def format_display_path(raw_path: str, max_length: int = 40) -> str:
                 break
             if norm_path.startswith(wt + os.sep):
                 rel = os.path.relpath(norm_path, wt)
-                display_path = f"worktree:{rel}"
+                parts = [p for p in rel.split(os.sep) if p]
+                repo = parts[0] if parts else "wt"
+                display_path = f"{repo} (wt)"
                 break
             if norm_real.startswith(wt_real + os.sep):
                 rel = os.path.relpath(norm_real, wt_real)
-                display_path = f"worktree:{rel}"
+                parts = [p for p in rel.split(os.sep) if p]
+                repo = parts[0] if parts else "wt"
+                display_path = f"{repo} (wt)"
                 break
+
+        if display_path is None:
+            git_file = os.path.join(norm_real, ".git")
+            if os.path.isfile(git_file):
+                repo = os.path.basename(norm_real) or "wt"
+                display_path = f"{repo} (wt)"
 
         if display_path is None:
             if norm_path == home or norm_real == home_real:
@@ -119,14 +129,10 @@ def format_display_path(raw_path: str, max_length: int = 40) -> str:
                 display_path = norm_path
 
         if len(display_path) > max_length:
-            if display_path.startswith("worktree:"):
-                wt_suffix = display_path[len("worktree:") :]
-                parts = wt_suffix.split(os.sep)
-                if len(parts) > 1:
-                    display_path = f"worktree:.../{parts[-1]}"
-                if len(display_path) > max_length:
-                    avail = max(6, max_length - len("worktree:"))
-                    display_path = f"worktree:{ellipsize(parts[-1], avail)}"
+            if display_path.endswith(" (wt)"):
+                base_name = display_path[:-5]
+                avail = max(4, max_length - 5)
+                display_path = f"{ellipsize(base_name, avail)} (wt)"
             else:
                 parts = display_path.split(os.sep)
                 if len(parts) > 3:

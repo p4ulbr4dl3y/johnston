@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import threading
 import time
 from typing import Any, Optional
@@ -134,6 +135,25 @@ class SessionPersistenceMixin:
 
         self.current_plan = restored_plan
         self.current_plan_explanation = restored_explanation
+
+        # Restore project dir / branch state if recorded and path exists
+        sess_dir = getattr(session, "project_dir", None)
+        sess_branch = getattr(session, "branch_name", "") or ""
+        if sess_dir:
+            if os.path.isdir(sess_dir) and hasattr(self, "switch_project_dir"):
+                if sess_dir != getattr(self, "project_dir", None) or sess_branch != getattr(getattr(self, "agent", None), "worktree_branch", ""):
+                    self.switch_project_dir(sess_dir, sess_branch)
+            elif not os.path.isdir(sess_dir):
+                root_dir = getattr(self, "project_dir", "") or os.getcwd()
+                session.project_dir = root_dir
+                session.branch_name = ""
+                if getattr(self, "agent", None):
+                    self.agent.worktree_branch = ""
+                if hasattr(self, "notify"):
+                    self.notify("Worktree directory no longer exists. Resumed in project root.", severity="warning")
+        elif sess_branch and getattr(self, "agent", None):
+            self.agent.worktree_branch = sess_branch
+
         self.refresh_status_footer()
 
     def _get_current_session_data(self) -> Optional[dict]:
@@ -183,6 +203,8 @@ class SessionPersistenceMixin:
                 ("cost_usd", 0.0),
                 ("last_context_tokens", 0),
                 ("tokens_cache_read", 0),
+                ("project_dir", ""),
+                ("branch_name", ""),
             ):
                 new_value = session_data.get(attr, default)
                 if getattr(session, attr) != new_value:

@@ -24,6 +24,7 @@ class DummyApp(SessionPersistenceMixin):
         self.refresh_status_footer = MagicMock()
         self.run_worker = MagicMock()
         self.query_one = MagicMock()
+        self.query = MagicMock(return_value=[])
 
 
 class TestSessionRolePersistence(unittest.TestCase):
@@ -115,4 +116,72 @@ class TestSessionRolePersistence(unittest.TestCase):
 
         app.sm.save.assert_not_called()
         self.assertEqual(session.updated_at, orig_ts)
+
+    def test_collect_session_data_includes_project_dir_and_branch(self):
+        app = DummyApp()
+        app.project_dir = "/tmp/fake-dir"
+        app.agent.worktree_branch = "feat/new-ui"
+        session = AgentSession(session_id="test-session", role="worker")
+        session.messages = [{"type": "user", "text": "test", "show_in_ui": True}]
+        app.sm.get.return_value = session
+
+        data = collect_session_data(app)
+        self.assertIsNotNone(data)
+        self.assertEqual(data["project_dir"], "/tmp/fake-dir")
+        self.assertEqual(data["branch_name"], "feat/new-ui")
+
+    def test_write_session_data_persists_branch_and_dir(self):
+        app = DummyApp()
+        session = AgentSession(session_id="test-session", role="worker")
+        app.sm.get.return_value = session
+
+        session_data = {
+            "title": "Branch Session",
+            "role": "worker",
+            "messages": [],
+            "agent_history": [],
+            "project_dir": "/tmp/custom-worktree",
+            "branch_name": "feat/worktree-branch",
+        }
+        app._write_session_data(session_data)
+
+        self.assertEqual(session.project_dir, "/tmp/custom-worktree")
+        self.assertEqual(session.branch_name, "feat/worktree-branch")
+        app.sm.save.assert_called_once_with(session)
+
+    def test_restore_session_state_switches_project_dir_and_branch(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            app = DummyApp()
+            app.project_dir = "/other/path"
+            app.switch_project_dir = MagicMock()
+            session = AgentSession(session_id="test-session", role="worker")
+            session.project_dir = tmp_dir
+            session.branch_name = "feat/restored-branch"
+            app.sm.get.return_value = session
+            app.load_session_ui("test-session")
+
+            app.switch_project_dir.assert_called_once_with(tmp_dir, "feat/restored-branch")
+            app.refresh_status_footer.assert_called_once()
+
+    def test_restore_session_state_handles_missing_worktree_dir(self):
+        app = DummyApp()
+        app.project_dir = "/repo/main"
+        app.switch_project_dir = MagicMock()
+        app.notify = MagicMock()
+        app.agent.worktree_branch = "feat/old"
+        session = AgentSession(session_id="test-session", role="worker")
+        session.project_dir = "/nonexistent/deleted/worktree"
+        session.branch_name = "feat/deleted"
+        app.sm.get.return_value = session
+        app.load_session_ui("test-session")
+
+        app.switch_project_dir.assert_not_called()
+        self.assertEqual(session.project_dir, "/repo/main")
+        self.assertEqual(session.branch_name, "")
+        self.assertEqual(app.agent.worktree_branch, "")
+        app.notify.assert_called_once()
+        self.assertIn("no longer exists", app.notify.call_args[0][0])
+
 

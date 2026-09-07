@@ -300,15 +300,14 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         # Deep worktree in home
         self.assertEqual(
             format_display_path(os.path.join(home, ".johnston", "worktrees", "subagent-123")),
-            "worktree:subagent-123",
+            "subagent-123 (wt)",
         )
-        # Deep nested worktree truncation
+        # Deep nested worktree (repo/branch)
         self.assertEqual(
             format_display_path(
-                os.path.join(home, ".johnston", "worktrees", "subagent-123", "pkg", "mod"),
-                max_length=25,
+                os.path.join(home, ".johnston", "worktrees", "johnston", "my-feat"),
             ),
-            "worktree:.../mod",
+            "johnston (wt)",
         )
         # Outside home
         self.assertEqual(format_display_path("/tmp/myproject"), "/tmp/myproject")

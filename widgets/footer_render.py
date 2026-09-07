@@ -133,8 +133,7 @@ def render_compact_rows(
     row1_left = sep_compact.join(row1_left_parts)
 
     # Row 2 (Env): johnston • main (+3/-1) • sb:on • mode  <left> | <right> ⚡ 2a • 1s
-    dir_raw = os.path.basename(os.path.abspath(directory)) or directory
-    dir_basename = ellipsize(dir_raw, max(12, width // 3))
+    dir_basename = format_display_path(directory, max_length=max(12, width // 3))
     row2_left_parts = [f"[{txt}]{dir_basename}[/]"]
     branch_disp = ellipsize(branch, max(10, width // 3)) if branch else ""
     if branch_disp and diff_text and width >= 50:
