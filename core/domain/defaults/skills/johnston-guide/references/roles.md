@@ -59,7 +59,7 @@ Role instructions are wrapped inside a `<role name="...">` block in the agent's 
 Johnston ships with 3 builtin roles:
 - `worker` (scope: `any`): Default execution mode with write permissions (`create`, `edit`, `shell`).
 - `explorer` (scope: `any`): Read-only research, investigation, and action planning.
-- `reviewer` (scope: `any`): Adversarial defect-first audit of git diff and changes; executes tests and edge cases via shell to emit P0-P3 verdict.
+- `reviewer` (scope: `any`): Adversarial defect-first audit of git diff/changes; executes tests and edge cases via shell to emit P0-P3 verdict. Use for complex diffs or critical logic (auth, permissions, concurrency); skip for docs, typos, styles, and test mocks.
 
 ## Tool Isolation & Worktree Modes
 Subagents are invoked via `invoke_subagent(title="...", prompt="...", type="<role_key>")`:

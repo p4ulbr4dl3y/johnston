@@ -74,7 +74,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
         key="reviewer",
         name="Reviewer",
         description=(
-            "Adversarial defect-first audit of git diff and changes; executes tests and edge cases via shell to emit P0-P3 verdict."
+            "Adversarial defect-first audit of git diff/changes; executes tests and edge cases via shell to emit "
+            "P0-P3 verdict. Use for complex diffs or critical logic (auth, permissions, concurrency); skip for "
+            "docs, typos, styles, and test mocks."
         ),
         prompt=(
             "<scope>\n"
