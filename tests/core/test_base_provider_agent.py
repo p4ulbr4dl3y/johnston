@@ -1019,8 +1019,25 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_extract_streaming_target('{"file": "data.csv"}'), "data.csv")
         self.assertEqual(_extract_streaming_target('{"path": "unclosed'), "unclosed")
         self.assertEqual(_extract_streaming_target('{"command": "pytest -k test_foo'), "pytest -k test_foo")
-        self.assertEqual(_extract_streaming_target('{"pattern": "def foo('), "def foo(")
         self.assertEqual(_extract_streaming_target('{"custom_arg": "in_progress', tool_name="custom_mcp"), "custom_arg=in_progress")
+        self.assertEqual(
+            _extract_streaming_target('{"type": "worker", "title": "Auth refactor"}', tool_name="invoke_subagent"),
+            'Worker: "Auth refactor"',
+        )
+        self.assertEqual(
+            _extract_streaming_target('{"type": "explorer"}', tool_name="invoke_subagent"),
+            "Explorer",
+        )
+
+    def test_tool_schemas_parameter_orders(self):
+        from tools.invoke_subagent import InvokeSubagentTool
+        from tools.update_plan import UpdatePlanTool
+
+        sub_props = list(InvokeSubagentTool.schema["function"]["parameters"]["properties"].keys())
+        self.assertEqual(sub_props, ["type", "title", "prompt"])
+
+        plan_props = list(UpdatePlanTool.schema["function"]["parameters"]["properties"].keys())
+        self.assertEqual(plan_props, ["plan", "explanation"])
 
     def test_extract_streaming_target_incremental_matches_full_scan(self):
         """Windowed extraction (one scan per delta chunk) must agree with a

@@ -19,10 +19,6 @@ class UpdatePlanTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "explanation": {
-                        "type": "string",
-                        "description": "Optional reason for plan update (why this step is in_progress, etc.).",
-                    },
                     "plan": {
                         "type": "array",
                         "description": "Full ordered list of all steps. Send the WHOLE plan each call.",
@@ -41,6 +37,10 @@ class UpdatePlanTool(BaseTool):
                             },
                             "required": ["step", "status"],
                         },
+                    },
+                    "explanation": {
+                        "type": "string",
+                        "description": "Optional reason for plan update (why this step is in_progress, etc.).",
                     },
                 },
                 "required": ["plan"],

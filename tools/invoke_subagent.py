@@ -22,6 +22,11 @@ class InvokeSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": ["worker", "explorer", "reviewer"],
+                        "description": "Subagent role name from available roles (default: 'worker')",
+                    },
                     "title": {
                         "type": "string",
                         "description": (
@@ -33,11 +38,6 @@ class InvokeSubagentTool(BaseTool):
                         "description": (
                             "Actionable task instructions, acceptance criteria, and expected verification."
                         ),
-                    },
-                    "type": {
-                        "type": "string",
-                        "enum": ["worker", "explorer", "reviewer"],
-                        "description": "Subagent role name from available roles (default: 'worker')",
                     },
                 },
                 "required": ["title", "prompt"],

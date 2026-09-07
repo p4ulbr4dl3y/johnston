@@ -16,7 +16,23 @@ Design principles (token-efficient, powerful):
 # REUSABLE PROMPT SNIPPETS
 # =============================================================================
 
-_SHARED_PARALLELISM = "- **Parallelism**: Safe, independent tool calls in the same turn run concurrently."
+_SHARED_SILENT_INVOCATION = (
+    "- **Silent Invocation**: Invoke tools directly with ZERO conversational preamble "
+    '(no "Let me read...", "I will now search..."). Reserve chat text for questions, '
+    "architecture decisions, or final answers."
+)
+
+_SHARED_ARG_ORDER = (
+    "- **Argument Order**: Output tool arguments strictly in schema property order "
+    "(target/path/command/type first, body/content/prompt last) for instant streaming UI display."
+)
+
+_SHARED_BATCHING = (
+    "- **Batching & Concurrency**:\n"
+    "  - Batch independent calls (`read`, `search`, `web_fetch`, independent checks) in a single turn to save roundtrips. "
+    "Read-only tools execute concurrently; mutating tools run sequentially.\n"
+    "  - NEVER batch dependent steps (e.g. `read` then `edit` same file in one turn) — tool results are visible only on the next turn."
+)
 
 _SHARED_PLANNING = (
     "- **Planning**: Use `update_plan` for non-trivial multi-step tasks (≥3 steps). "
@@ -26,9 +42,18 @@ _SHARED_PLANNING = (
 
 _SHARED_FILE_EDITS = (
     "- **File Edits**:\n"
-    "  - `edit`: localized changes via unique `old_str`/`new_str` context (or `replace_all=true`).\n"
+    "  - `edit`: localized changes via unique `old_str`/`new_str` context (or `replace_all=true`). "
+    "Batch non-overlapping edits in one turn (ensure disjoint context lines).\n"
     "  - `create`: new files or wholesale file rewrites (>40% changed).\n"
     "  - `shell`: mass repetitive transformations across many files (e.g. scripts, batch transforms)."
+)
+
+_SHARED_SHELL_EXECUTION = (
+    "- **Shell Execution**:\n"
+    "  - Chain dependent commands with `&&` in a single call (e.g. `build && test`) to short-circuit on failure. "
+    "NEVER pipe (`|`) commands in any shell (e.g. no `| grep`, `| tail`): piping masks exit codes, breaks log files, and blocks live streaming. "
+    "Runtime auto-truncates large output to tail and saves full log to file (`[truncated | log <path>]`). Run raw; inspect log files via `read`.\n"
+    "  - Run commands directly. NEVER use 'cd' (state does not persist); use 'cwd' parameter for subdirectories."
 )
 
 _SHARED_WEB = "- **Web**: `web_fetch` for public web documentation and HTTP(S) data."
@@ -53,9 +78,12 @@ _SHARED_NON_INTERACTIVE_LIMITS = (
     "- No unrequested files: Do NOT generate unrequested report or summary files (e.g. `REPORT.md`, `SUMMARY.md`, `NOTES.md`) in workspace."
 )
 
-_SHARED_BASE_TOOL_IO = f"""{_SHARED_PARALLELISM}
+_SHARED_BASE_TOOL_IO = f"""{_SHARED_SILENT_INVOCATION}
+{_SHARED_ARG_ORDER}
+{_SHARED_BATCHING}
 {_SHARED_PLANNING}
 {_SHARED_FILE_EDITS}
+{_SHARED_SHELL_EXECUTION}
 {_SHARED_WEB}"""
 
 
@@ -79,9 +107,7 @@ DEFAULT_SYSTEM_PROMPT = f"""<identity>{{model_name}} in Johnston CLI. Solve codi
 
 <tool_io>
 {_SHARED_BASE_TOOL_IO}
-- **Background & Shell Execution**:
-  - Run commands directly. NEVER use 'cd' (state does not persist); use 'cwd' parameter for subdirectories.
-  - NEVER pipe (`|`) commands in any shell (e.g. no `| grep`, `| Select-String`, `| tail`). Piping swallows exit codes and discards logs. Runtime auto-truncates large output and saves full log to file.
+- **Background Tasks & Subagents**:
   - For servers/daemons, set `wait_seconds=0`.
   - For long jobs (tests/builds), set `wait_seconds=5` for fast return or auto-backgrounding.
   - Shell background tasks and subagents are reactive. After launching, STOP calling tools immediately to yield the turn.
@@ -118,11 +144,9 @@ HEADLESS_DEFAULT_SYSTEM_PROMPT = f"""<identity>{{model_name}} in Johnston CLI (h
 
 <tool_io>
 {_SHARED_BASE_TOOL_IO}
-- **Shell & Command Execution**:
+- **Headless Execution**:
   - Run commands synchronously. Strict timeouts terminate hung commands.
   - Always use non-interactive flags (e.g. `-y`, `--non-interactive`, `--no-pager`, `CI=1`). NEVER launch interactive pagers, prompts, or editors (`vim`, `nano`, `less`, `python -i`, `node`) — they hang indefinitely in headless mode.
-  - Run commands directly. NEVER use 'cd' (state does not persist); use 'cwd' parameter for subdirectories.
-  - NEVER pipe (`|`) commands in any shell (e.g. no `| grep`, `| Select-String`, `| tail`). Piping swallows exit codes and discards logs. Runtime auto-truncates large output and saves full log to file.
   - Background processes and `wait_seconds` are disabled (no background task runner in headless mode).
 </tool_io>
 
