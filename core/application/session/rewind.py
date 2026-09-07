@@ -376,7 +376,7 @@ def _cleanup_rewound_shell_tasks(dropped_msgs: list[dict], task_manager: Any = N
     for task_id in dropped_task_ids:
         task = tasks_dict.get(task_id)
         if task:
-            if getattr(task, "is_running", False):
+            if getattr(task, "is_active", getattr(task, "is_running", False)):
                 try:
                     asyncio.create_task(task.kill())
                 except Exception:

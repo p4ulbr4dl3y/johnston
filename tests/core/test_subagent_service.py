@@ -54,13 +54,13 @@ class TestSubagentServiceStatus(unittest.TestCase):
         s2 = AgentSession(session_id="sub-2", status="active")
         self.assertEqual(resolve_subagent_display_status(s2), "running")
 
-        s3 = AgentSession(session_id="sub-3", status="finished")
+        s3 = AgentSession(session_id="sub-3", status=SessionStatus.COMPLETED)
         self.assertEqual(resolve_subagent_display_status(s3), "completed")
 
         s4 = AgentSession(session_id="sub-4", status=SessionStatus.CANCELLED)
         self.assertEqual(resolve_subagent_display_status(s4), "cancelled")
 
-        s5 = AgentSession(session_id="sub-5", status="killed")
+        s5 = AgentSession(session_id="sub-5", status="cancelled")
         self.assertEqual(resolve_subagent_display_status(s5), "cancelled")
 
         s6 = AgentSession(session_id="sub-6", status="error")

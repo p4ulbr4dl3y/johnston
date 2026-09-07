@@ -20,6 +20,7 @@ build/
 .serena/
 .codegraph/
 .johnston/
+.worktrees/
 probe.txt
 scripts/
 

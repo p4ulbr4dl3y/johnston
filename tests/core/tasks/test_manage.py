@@ -11,7 +11,7 @@ def _mk_task(tid: str, sid: str = None, running: bool = True) -> MagicMock:
     t.command = f"cmd {tid}"
     t.is_running = running
     t.session_id = sid
-    t.status = "running" if running else "finished"
+    t.status = "running" if running else "completed"
     t.created_at = None
     t.completed_at = None
     t.exit_code = None

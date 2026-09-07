@@ -59,9 +59,10 @@ class ActionsMixin(PlanActionsMixin):
 
         count = 0
         shell_tasks = [t for t in self.task_manager if getattr(t, "kind", "") == "shell"]
-        shell_tasks = filter_to_session(shell_tasks, getattr(self, "current_session_id", None))
-        for t in list(shell_tasks):
-            if getattr(t, "is_running", False) and not getattr(t, "is_background", False):
+        fg_tasks = list(getattr(self, "_foreground_shell_tasks", {}).values())
+        all_tasks = filter_to_session(shell_tasks + fg_tasks, getattr(self, "current_session_id", None))
+        for t in list(all_tasks):
+            if getattr(t, "is_active", getattr(t, "is_running", False)) and not getattr(t, "is_background", False):
                 if hasattr(t, "move_to_background"):
                     t.move_to_background()
                     count += 1

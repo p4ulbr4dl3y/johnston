@@ -429,7 +429,11 @@ class ShellTool(BaseTool):
             _attach_shell_widget(ctx.host, task_id, target_widget, is_background=False)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
         progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
-        ctx.add_background_task(task)
+        if ctx.host:
+            fg_tasks = getattr(ctx.host, "_foreground_shell_tasks", None)
+            if not isinstance(fg_tasks, dict):
+                fg_tasks = ctx.host._foreground_shell_tasks = {}
+            fg_tasks[task_id] = task
         read_task = task.start_reading(on_completed=callback, on_progress=progress_cb)
 
         start_time = time.monotonic()
@@ -458,6 +462,7 @@ class ShellTool(BaseTool):
                     if hard_timeout is not None and elapsed >= hard_timeout:
                         raise asyncio.TimeoutError()
                     task.move_to_background()
+                    ctx.add_background_task(task)
                     if target_widget is not None and not getattr(ctx, "is_subagent", False):
                         if hasattr(target_widget, "mark_background"):
                             target_widget.mark_background(task_id, task.log_path)
@@ -486,6 +491,7 @@ class ShellTool(BaseTool):
 
             if task.background_event.is_set() or getattr(task, "is_background", False):
                 task.move_to_background()
+                ctx.add_background_task(task)
                 if target_widget is not None and not getattr(ctx, "is_subagent", False):
                     if hasattr(target_widget, "mark_background"):
                         target_widget.mark_background(task_id, task.log_path)
@@ -547,6 +553,10 @@ class ShellTool(BaseTool):
             await terminate_process(p)
             raise
         finally:
+            if ctx.host:
+                fg_tasks = getattr(ctx.host, "_foreground_shell_tasks", None)
+                if isinstance(fg_tasks, dict):
+                    fg_tasks.pop(task_id, None)
             if not getattr(task, "is_background", False):
                 mgr = getattr(ctx, "task_manager", None)
                 if mgr is not None and hasattr(mgr, "drop"):

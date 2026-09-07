@@ -7,6 +7,8 @@ and TaskManager tasks.
 import time
 from typing import Any, List
 
+from core.infrastructure.tasks.task import TaskStatus
+
 
 def filter_to_session(tasks: List[Any], current_session_id: str) -> List[Any]:
     """Return only tasks belonging to the active session.
@@ -49,33 +51,42 @@ def extract_task_status_details(task: Any) -> tuple[str, str]:
     if task is None:
         return "finished", "-"
 
-    is_running = bool(getattr(task, "is_running", False))
+    raw_running = getattr(task, "is_running", False)
+    is_running = raw_running is True
+    raw_active = getattr(task, "is_active", False)
+    is_active = (raw_active is True) or is_running
     now = time.time()
     created_at = getattr(task, "created_at", None)
     completed_at = getattr(task, "completed_at", None)
 
     dur_str = "-"
     if isinstance(created_at, (int, float)) and not isinstance(created_at, bool) and created_at > 0:
-        if is_running:
+        if is_active:
             dur_str = format_duration(max(0.0, now - created_at)) or "-"
         elif isinstance(completed_at, (int, float)) and not isinstance(completed_at, bool) and completed_at > 0:
             dur_str = format_duration(max(0.0, completed_at - created_at)) or "-"
 
     if is_running:
-        return "running", dur_str
+        return TaskStatus.RUNNING.value, dur_str
 
     st_raw = getattr(task, "status", None)
-    st_str = ""
-    if isinstance(st_raw, str):
-        st_str = st_raw.lower()
-    elif hasattr(st_raw, "value") and isinstance(getattr(st_raw, "value", None), str):
-        st_str = st_raw.value.lower()
+    status_val = None
+    if isinstance(st_raw, TaskStatus):
+        status_val = st_raw
+    elif isinstance(st_raw, str):
+        try:
+            status_val = TaskStatus(st_raw.lower())
+        except ValueError:
+            pass
 
-    was_killed = bool(getattr(task, "was_killed", False)) or st_str == "killed"
+    if status_val == TaskStatus.QUEUED:
+        return TaskStatus.QUEUED.value, dur_str
+
+    was_killed = bool(getattr(task, "was_killed", False)) or status_val == TaskStatus.KILLED
     if was_killed:
-        return "killed", dur_str
-    if st_str == "timeout":
-        return "timeout", dur_str
+        return TaskStatus.KILLED.value, dur_str
+    if status_val == TaskStatus.TIMEOUT:
+        return TaskStatus.TIMEOUT.value, dur_str
 
     exit_code = getattr(task, "exit_code", None)
     if exit_code is None and getattr(task, "process", None) is not None:
@@ -84,12 +95,12 @@ def extract_task_status_details(task: Any) -> tuple[str, str]:
     if isinstance(exit_code, int) and not isinstance(exit_code, bool):
         return f"exit:{exit_code}", dur_str
 
-    if st_str in ("completed", "finished", "done"):
+    if status_val == TaskStatus.COMPLETED:
         return "exit:0", dur_str
-    if st_str == "error":
+    if status_val == TaskStatus.ERROR:
         return "exit:1", dur_str
 
-    return st_str if st_str in ("running", "finished", "completed", "done", "error", "killed", "timeout") else "finished", dur_str
+    return "finished" if status_val is None else status_val.value, dur_str
 
 
 def list_lines(tasks: List[Any], *, header: str = "Active Background Tasks:") -> str:
@@ -126,7 +137,7 @@ def not_found_message(task_id: str, tasks: List[Any], manager_name: str) -> str:
     """Build a scoped not-found error with a hint of the active task ids."""
     from core.domain.defaults.errors import format_tool_error
 
-    active_ids = [t.task_id for t in tasks if getattr(t, "is_running", True)]
+    active_ids = [t.task_id for t in tasks if getattr(t, "is_active", getattr(t, "is_running", True))]
     if active_ids:
         ids_str = ", ".join(f"'{i}'" for i in active_ids)
         return format_tool_error("notfound", detail=f"active IDs: {ids_str}", name=task_id)

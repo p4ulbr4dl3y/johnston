@@ -23,28 +23,30 @@ def is_active_subagent(session: Any) -> bool:
     if getattr(session, "async_task", None) and not session.async_task.done():
         return True
     raw_st = getattr(session, "status", None)
-    st = raw_st.value.lower() if hasattr(raw_st, "value") else str(raw_st or "").lower()
-    return st in ("active", "running")
+    if isinstance(raw_st, SessionStatus):
+        return raw_st in (SessionStatus.ACTIVE, SessionStatus.RUNNING)
+    st = str(raw_st or "").lower()
+    return st in (SessionStatus.ACTIVE.value, SessionStatus.RUNNING.value)
 
 
 def resolve_subagent_display_status(session: Any) -> str:
     """Map internal session state to canonical subagent status string."""
     raw_st = getattr(session, "status", None)
     if isinstance(raw_st, SessionStatus):
-        st = raw_st.value.lower()
+        st = raw_st.value
     else:
         st = str(raw_st or "").lower()
 
-    if st in ("cancelled", "canceled", "killed"):
-        return "cancelled"
-    if st in ("error", "failed"):
-        return "error"
-    if st in ("completed", "done", "finished"):
-        return "completed"
+    if st == SessionStatus.CANCELLED.value:
+        return SessionStatus.CANCELLED.value
+    if st == SessionStatus.ERROR.value:
+        return SessionStatus.ERROR.value
+    if st == SessionStatus.COMPLETED.value:
+        return SessionStatus.COMPLETED.value
     if getattr(session, "async_task", None) and not session.async_task.done():
-        return "running"
-    if st in ("active", "running"):
-        return "running"
+        return SessionStatus.RUNNING.value
+    if st in (SessionStatus.ACTIVE.value, SessionStatus.RUNNING.value):
+        return SessionStatus.RUNNING.value
     return st or "unknown"
 
 
@@ -106,8 +108,6 @@ class SubagentService:
         if not subagent:
             return ToolResult.error("context", name="app", detail="unavailable")
 
-        record_subagent_session(ctx.host, session_id)
-
         wt_path = None
         wt_branch = None
         project_dir = ctx.project_dir
@@ -136,13 +136,17 @@ class SubagentService:
                     branch_name = f"subagent/{role_key}-{session_id[:8]}"
 
             if branch_name != current_branch:
-                wt_path, wt_branch = await worktree_manager_cls.create_worktree_async(
-                    project_dir, session_id, branch_name
-                )
-                if wt_path:
-                    subagent.project_dir = wt_path
-                    subagent.cwd = wt_path
-                    subagent.worktree_branch = wt_branch
+                try:
+                    wt_path, wt_branch = await worktree_manager_cls.create_worktree_async(
+                        project_dir, session_id, branch_name
+                    )
+                except Exception as exc:
+                    return ToolResult.error("worktree", detail=f"Failed to create git worktree: {exc}")
+                if not wt_path:
+                    return ToolResult.error("worktree", detail=f"Failed to create git worktree for branch '{branch_name}'")
+                subagent.project_dir = wt_path
+                subagent.cwd = wt_path
+                subagent.worktree_branch = wt_branch
 
         from core.application.session.stream import configure_subagent_agent
 
@@ -161,7 +165,7 @@ class SubagentService:
             role=canonical_role,
             title=title,
             prompt=prompt,
-            status="running",
+            status=SessionStatus.RUNNING,
             project_dir=wt_path or "",
             branch_name=wt_branch or "",
         )
@@ -190,6 +194,7 @@ class SubagentService:
             )
         )
         session.async_task = bg_task
+        record_subagent_session(ctx.host, session_id)
         ctx.refresh_status()
 
         branch_info = f" | branch {escape_xml_attr(wt_branch)}" if wt_branch else ""

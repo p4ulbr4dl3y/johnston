@@ -82,6 +82,7 @@ class TestShellTaskRunEdge(unittest.IsolatedAsyncioTestCase):
                 return b""
 
         proc = self._make_proc()
+        proc.returncode = None
         proc.stdout = _HangReader()
         t = ShellTask("t_hang", "cmd", proc)
         t.start_reading()

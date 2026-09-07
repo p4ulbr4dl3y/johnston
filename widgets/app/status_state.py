@@ -162,7 +162,7 @@ def build_status_kwargs(app, widget=None) -> dict:
     sessions = tasks.subagent_tasks
 
     active_bg_tasks = len(
-        [t for t in bg_tasks if getattr(t, "is_running", False) and getattr(t, "is_background", True)]
+        [t for t in bg_tasks if getattr(t, "is_active", getattr(t, "is_running", False)) and getattr(t, "is_background", True)]
     )
 
     subagents_active = len([s for s in sessions if getattr(s, "status", "") == "running"])

@@ -25,6 +25,10 @@ class TaskStatus(str, Enum):
 
     @property
     def is_running(self) -> bool:
+        return self == TaskStatus.RUNNING
+
+    @property
+    def is_active(self) -> bool:
         return self in (TaskStatus.QUEUED, TaskStatus.RUNNING)
 
 
@@ -65,18 +69,16 @@ class BaseTask(ABC):
 
     @property
     def is_running(self) -> bool:
-        """True while the task status is running OR the backing process is alive.
+        """True while the task status is RUNNING."""
+        return self.status == TaskStatus.RUNNING
 
-        The process check keeps tasks with a replaced/dead status (e.g. a timed
-        out task moved to background) responsive to manage_shell/ctrl+b as long
-        as their subprocess still lives.
-        """
-        return self._status.is_running or self._process_alive()
+    @property
+    def is_active(self) -> bool:
+        """True while the task status is QUEUED or RUNNING."""
+        return self.status in (TaskStatus.QUEUED, TaskStatus.RUNNING)
 
     @property
     def status(self) -> TaskStatus:
-        if self._status.is_running or self._process_alive():
-            return TaskStatus.RUNNING
         return self._status
 
     @status.setter
@@ -84,10 +86,18 @@ class BaseTask(ABC):
         self._status = value
 
     def _process_alive(self) -> bool:
-        proc = self.process
+        proc = getattr(self, "process", None)
         if proc is None:
             return False
-        return getattr(proc, "returncode", None) is None
+        try:
+            rc = getattr(proc, "returncode", None)
+            if rc is None:
+                return True
+            if isinstance(rc, int):
+                return False
+            return True
+        except Exception:
+            return False
 
     # -- io -----------------------------------------------------------------
 

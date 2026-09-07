@@ -305,8 +305,9 @@ async def test_worktree_create_raises_crashes_instead_of_err(monkeypatch):
 
     monkeypatch.setattr("tools.invoke_subagent.SubagentWorktreeManager", _BadWorktree)
     try:
-        with pytest.raises(RuntimeError, match="git worktree failed"):
-            await tool.execute({"prompt": "do", "title": "t", "branch": "dev"})
+        res = await tool.execute({"prompt": "do", "title": "t", "branch": "dev"})
+        assert res.is_error
+        assert "git worktree failed" in res.content
         assert store.list(kind="subagent") == [], (
             "BUG: no session must exist, but none expected here since worktree raised first"
         )

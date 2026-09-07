@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.infrastructure.tasks.manager import TaskManager
+from core.infrastructure.tasks.shell_task import ShellTask
 from tools.base import resolve_path
 from tools.shell import ShellTool, _new_task_id
 
@@ -208,19 +209,27 @@ async def test_move_to_background_during_sync_execution(tool, make_app_mock, mak
     ctx = make_tool_context(app=app)
 
     p = _process(wait_result=asyncio.Future(), stdout=None)
-    task_registered = asyncio.Event()
-    orig_register = app.task_manager.register
-    app.task_manager.register = lambda t: (orig_register(t), task_registered.set())[0]
+    task_started = asyncio.Event()
+
+    orig_start = ShellTask.start_reading
+
+    def _start(self, *args, **kwargs):
+        res = orig_start(self, *args, **kwargs)
+        task_started.set()
+        return res
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
+        patch.object(ShellTask, "start_reading", _start),
         patch("tools.shell.shell_executable", return_value="/bin/sh"),
         patch("tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
-        await task_registered.wait()
+        await task_started.wait()
 
-        tasks = [t for t in app.task_manager]
+        # Foreground sync task is isolated from TaskManager while running
+        assert len([t for t in app.task_manager]) == 0
+        tasks = list(getattr(app, "_foreground_shell_tasks", {}).values())
         assert len(tasks) == 1
         task = tasks[0]
         task.output.append("server started on port 8080\n")
@@ -239,25 +248,32 @@ async def test_move_to_background_no_output(tool, make_app_mock, make_tool_conte
     p = _process(wait_result=asyncio.Future(), stdout=None)
     p.returncode = None
 
-    task_registered = asyncio.Event()
-    orig_register = app.task_manager.register
-    app.task_manager.register = lambda t: (orig_register(t), task_registered.set())[0]
+    task_started = asyncio.Event()
+
+    orig_start = ShellTask.start_reading
+
+    def _start(self, *args, **kwargs):
+        res = orig_start(self, *args, **kwargs)
+        task_started.set()
+        return res
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
+        patch.object(ShellTask, "start_reading", _start),
         patch("tools.shell.shell_executable", return_value="/bin/sh"),
         patch("tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
-        await task_registered.wait()
+        await task_started.wait()
 
-        tasks = [t for t in app.task_manager]
+        tasks = list(getattr(app, "_foreground_shell_tasks", {}).values())
         assert len(tasks) == 1
         tasks[0].move_to_background()
 
         res = await exec_task
         assert "task backgrounded" in res.content
         assert "no output yet" in res.content
+        assert len([t for t in app.task_manager]) == 1
 
 
 async def test_move_to_background_truncated_output(tool, make_app_mock, make_tool_context):
@@ -266,55 +282,66 @@ async def test_move_to_background_truncated_output(tool, make_app_mock, make_too
     p = _process(wait_result=asyncio.Future(), stdout=None)
     p.returncode = None
 
-    task_registered = asyncio.Event()
-    orig_register = app.task_manager.register
-    app.task_manager.register = lambda t: (orig_register(t), task_registered.set())[0]
+    task_started = asyncio.Event()
+
+    orig_start = ShellTask.start_reading
+
+    def _start(self, *args, **kwargs):
+        res = orig_start(self, *args, **kwargs)
+        task_started.set()
+        return res
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
+        patch.object(ShellTask, "start_reading", _start),
         patch("tools.shell.shell_executable", return_value="/bin/sh"),
         patch("tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
-        await task_registered.wait()
+        await task_started.wait()
 
-        tasks = [t for t in app.task_manager]
+        tasks = list(getattr(app, "_foreground_shell_tasks", {}).values())
+        assert len(tasks) == 1
         tasks[0].output.append("line\n" * 1000)
         tasks[0].move_to_background()
 
         res = await exec_task
         assert "task backgrounded" in res.content
         assert "last 2000 chars" in res.content
+        assert len([t for t in app.task_manager]) == 1
 
 
-async def test_main_sync_task_visible_and_running_while_alive(tool, make_app_mock, make_tool_context):
-    # While a sync shell runs, it must be visible in the task manager and
-    # report is_running=True (process still alive) so ctrl+b / manage_shell
-    # can act on it; after completion it must be dropped.
+async def test_main_sync_task_isolated_from_task_manager(tool, make_app_mock, make_tool_context):
     app = _app(make_app_mock, task_manager=TaskManager())
     ctx = make_tool_context(app=app)
 
     p = _process(wait_result=asyncio.Future(), stdout=None)
     p.returncode = None
 
-    task_registered = asyncio.Event()
-    orig_register = app.task_manager.register
-    app.task_manager.register = lambda t: (orig_register(t), task_registered.set())[0]
+    task_started = asyncio.Event()
+
+    orig_start = ShellTask.start_reading
+
+    def _start(self, *args, **kwargs):
+        res = orig_start(self, *args, **kwargs)
+        task_started.set()
+        return res
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
+        patch.object(ShellTask, "start_reading", _start),
         patch("tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "long_running_sync_cmd"}, ctx=ctx))
-        await task_registered.wait()
-        tasks = [t for t in app.task_manager]
-        assert len(tasks) == 1
-        assert tasks[0].is_running
-        assert not tasks[0].is_background
+        await task_started.wait()
+        # Foreground sync task is isolated from TaskManager while running
+        assert len([t for t in app.task_manager]) == 0
+        assert len(getattr(app, "_foreground_shell_tasks", {})) == 1
         exec_task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await exec_task
     assert len([t for t in app.task_manager]) == 0
+    assert len(getattr(app, "_foreground_shell_tasks", {})) == 0
 
 
 async def test_execute_cancelled_terminates_process(tool, make_app_mock, make_tool_context):
@@ -323,16 +350,22 @@ async def test_execute_cancelled_terminates_process(tool, make_app_mock, make_to
 
     p = _process(wait_result=asyncio.Future())
 
-    task_registered = asyncio.Event()
-    orig_register = app.task_manager.register
-    app.task_manager.register = lambda t: (orig_register(t), task_registered.set())[0]
+    task_started = asyncio.Event()
+
+    orig_start = ShellTask.start_reading
+
+    def _start(self, *args, **kwargs):
+        res = orig_start(self, *args, **kwargs)
+        task_started.set()
+        return res
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
+        patch.object(ShellTask, "start_reading", _start),
         patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
-        await task_registered.wait()
+        await task_started.wait()
         exec_task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await exec_task
@@ -345,15 +378,15 @@ async def test_main_sync_timeout_with_output(tool, make_app_mock, make_tool_cont
 
     p = _process(wait_result=asyncio.Future(), stdout=None)
 
-    orig_reg = app.task_manager.register
+    orig_start = ShellTask.start_reading
 
-    def _reg(task):
-        task.output.append("A" * 5000)
-        return orig_reg(task)
+    def _start(self, *args, **kwargs):
+        self.output.append("A" * 5000)
+        return orig_start(self, *args, **kwargs)
 
-    app.task_manager.register = _reg
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
+        patch.object(ShellTask, "start_reading", _start),
         patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
     ):
         res = await tool.execute({"command": "tail -f x", "timeout": 1}, ctx=ctx)

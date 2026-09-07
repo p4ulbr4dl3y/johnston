@@ -49,8 +49,8 @@ class TestExtractTaskStatusDetails(unittest.TestCase):
         )
         self.assertEqual(extract_task_status_details(t), ("exit:0", "5.0s"))
 
-    def test_finished_exit_zero_without_exit_code(self):
-        t = _mk_task(status="finished", created_at=None)
+    def test_completed_exit_zero_without_exit_code(self):
+        t = _mk_task(status="completed", created_at=None)
         self.assertEqual(extract_task_status_details(t), ("exit:0", "-"))
 
     def test_error_exit_one(self):

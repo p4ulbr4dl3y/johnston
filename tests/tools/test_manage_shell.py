@@ -34,6 +34,7 @@ def _make_task(
     t.is_background = background
     if proc is not None and alive:
         proc.returncode = None  # simulate a live process (returncode None while running)
+        t.status = TaskStatus.RUNNING
     if status is not None:
         t.status = status
     if output:

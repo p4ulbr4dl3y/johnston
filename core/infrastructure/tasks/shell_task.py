@@ -32,7 +32,7 @@ class ShellTask(BaseTask):
         idle_timeout: Optional[int] = int(DEFAULT_SHELL_IDLE_TIMEOUT),
         hard_timeout: Optional[int] = None,
     ) -> None:
-        super().__init__(task_id, kind="shell", command=command, status=TaskStatus.RUNNING)
+        super().__init__(task_id, kind="shell", command=command, status=TaskStatus.QUEUED)
         self.process = process
         self.session_id = session_id
         self.output = OutputBuffer()
@@ -151,6 +151,8 @@ class ShellTask(BaseTask):
         ``on_progress`` (callable, optional) is fired with (task_id, command,
         formatted_output, event, idle_seconds) on inactivity or progress.
         """
+        if self._process_alive():
+            self.status = TaskStatus.RUNNING
 
         def _append_chunk(text: str) -> None:
             self.output.append(text)
@@ -302,7 +304,7 @@ class ShellTask(BaseTask):
     # -- input --------------------------------------------------------------
 
     async def send_input(self, text: str) -> str:
-        if not self.is_running:
+        if not self.is_active:
             return format_tool_error("task", f"{self.task_id} not running")
         data = (text + "\n").encode("utf-8")
         try:

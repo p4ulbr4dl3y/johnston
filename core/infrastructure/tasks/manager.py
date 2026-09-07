@@ -36,17 +36,17 @@ class TaskManager:
         completed = [
             t
             for t in self._tasks.values()
-            if not getattr(t, "is_running", False)
+            if not getattr(t, "is_active", getattr(t, "is_running", False))
             or getattr(t, "status", None)
             in (
                 TaskStatus.COMPLETED,
                 TaskStatus.ERROR,
                 TaskStatus.KILLED,
                 TaskStatus.TIMEOUT,
-                "completed",
-                "error",
-                "killed",
-                "timeout",
+                TaskStatus.COMPLETED.value,
+                TaskStatus.ERROR.value,
+                TaskStatus.KILLED.value,
+                TaskStatus.TIMEOUT.value,
             )
         ]
         if len(completed) > limit:

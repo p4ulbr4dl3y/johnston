@@ -76,7 +76,7 @@ class ManageShellTool(BaseTool):
             self._breaker_state = {}
 
         if action == "list":
-            fp = [(getattr(t, "id", None), getattr(t, "is_running", None)) for t in (tasks or [])]
+            fp = [(getattr(t, "id", None), getattr(t, "status", None), getattr(t, "is_active", getattr(t, "is_running", None))) for t in (tasks or [])]
             last_fp, count = self._breaker_state.get(curr_sid, (None, 0))
             if last_fp == fp and count >= 1:
                 return ToolResult.error(
@@ -110,7 +110,7 @@ class ManageShellTool(BaseTool):
             t = find_any(tasks, task_id)
             if t is None:
                 return ToolResult(content=not_found_message(task_id, tasks, "background"), display="", status=ToolResultStatus.ERROR)
-            if not getattr(t, "is_running", False):
+            if not getattr(t, "is_active", getattr(t, "is_running", False)):
                 return ToolResult.error("notrunning", name=task_id)
             if hasattr(t, "send_input"):
                 res = await t.send_input(input_text)
@@ -129,7 +129,7 @@ class ManageShellTool(BaseTool):
                 if ctx.host and hasattr(ctx.host, "_background_shell_widgets") and isinstance(ctx.host._background_shell_widgets, dict):
                     ctx.host._background_shell_widgets.pop(task_id, None)
                 return ToolResult(content=not_found_message(task_id, tasks, "background"), display="", status=ToolResultStatus.ERROR)
-            if getattr(t, "is_running", False):
+            if getattr(t, "is_active", getattr(t, "is_running", False)):
                 try:
                     setattr(t, "suppress_notification", True)
                     if hasattr(t, "kill"):

@@ -632,13 +632,13 @@ class TestTasksScreensCoverage(unittest.IsolatedAsyncioTestCase):
         task_err.created_at = None
         self.assertEqual(extract_shell_task_progress(task_err), "exit 1")
 
-        # Terminal state: status finished
+        # Terminal state: status completed
         task_fin = MagicMock()
         task_fin.is_running = False
         task_fin.was_killed = False
         task_fin.exit_code = None
         task_fin.process = None
-        task_fin.status = "finished"
+        task_fin.status = "completed"
         task_fin.created_at = None
         self.assertEqual(extract_shell_task_progress(task_fin), "exit 0")
 
