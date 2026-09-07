@@ -28,7 +28,7 @@ _SHARED_FILE_EDITS = (
     "- **File Edits**:\n"
     "  - `edit`: localized changes via unique `old_str`/`new_str` context (or `replace_all=true`).\n"
     "  - `create`: new files or wholesale file rewrites (>40% changed).\n"
-    "  - `shell`: mass repetitive transformations across many files (e.g. scripts, sed)."
+    "  - `shell`: mass repetitive transformations across many files (e.g. scripts, batch transforms)."
 )
 
 _SHARED_WEB = "- **Web**: `web_fetch` for public web documentation and HTTP(S) data."
@@ -81,7 +81,7 @@ DEFAULT_SYSTEM_PROMPT = f"""<identity>{{model_name}} in Johnston CLI. Solve codi
 {_SHARED_BASE_TOOL_IO}
 - **Background & Shell Execution**:
   - Run commands directly. NEVER use 'cd' (state does not persist); use 'cwd' parameter for subdirectories.
-  - NEVER pipe (`|`) commands (e.g. no `| grep`, `| tail`, `| head`). Piping swallows exit codes and discards logs. Runtime auto-truncates large output and saves full log to file.
+  - NEVER pipe (`|`) commands in any shell (e.g. no `| grep`, `| Select-String`, `| tail`). Piping swallows exit codes and discards logs. Runtime auto-truncates large output and saves full log to file.
   - For servers/daemons, set `wait_seconds=0`.
   - For long jobs (tests/builds), set `wait_seconds=5` for fast return or auto-backgrounding.
   - Shell background tasks and subagents are reactive. After launching, STOP calling tools immediately to yield the turn.
@@ -122,7 +122,7 @@ HEADLESS_DEFAULT_SYSTEM_PROMPT = f"""<identity>{{model_name}} in Johnston CLI (h
   - Run commands synchronously. Strict timeouts terminate hung commands.
   - Always use non-interactive flags (e.g. `-y`, `--non-interactive`, `--no-pager`, `CI=1`). NEVER launch interactive pagers, prompts, or editors (`vim`, `nano`, `less`, `python -i`, `node`) — they hang indefinitely in headless mode.
   - Run commands directly. NEVER use 'cd' (state does not persist); use 'cwd' parameter for subdirectories.
-  - NEVER pipe (`|`) commands (e.g. no `| grep`, `| tail`, `| head`). Piping swallows exit codes and discards logs. Runtime auto-truncates large output and saves full log to file.
+  - NEVER pipe (`|`) commands in any shell (e.g. no `| grep`, `| Select-String`, `| tail`). Piping swallows exit codes and discards logs. Runtime auto-truncates large output and saves full log to file.
   - Background processes and `wait_seconds` are disabled (no background task runner in headless mode).
 </tool_io>
 
@@ -238,7 +238,7 @@ You are generating a structured handoff summary so an AI agent can seamlessly co
 [Unanswered ambiguities, decisions deferred to user, or "(none)"]
 
 ### Key Files
-- `path/to/file.py#L10-L25`: [why it matters, current state, last edit]
+- `path/to/file.ext#L10-L25`: [why it matters, current state, last edit]
 [Relative paths. For worktrees, paths are relative to worktree root.]
 
 # Rules
@@ -306,7 +306,7 @@ CODEBASE_NAVIGATION_SNIPPET = """<codebase_navigation>
 Token-efficient discovery rules (apply to all inspection):
 1. **Directories & Files**: `search(query, mode="filename")` to locate files by name/glob; `read(dir_path)` to inspect folder structure. NEVER run `ls`, `dir`, or `find` in shell.
 2. **Symbols & API**: `search(query, mode="outline")` to inspect class/function signatures without reading bodies.
-3. **Content search**: `search(query)` scoped via `glob` (e.g. `glob="*.py"`, `glob="!*test*"`) and specific `path`. NEVER grep/rg via shell.
+3. **Content search**: `search(query)` scoped via `glob` (e.g. `glob="*.py"` or `glob="*.ts"`, `glob="!*test*"`) and specific `path`. NEVER grep/rg via shell.
 4. **Windowed read**: read only needed slices via `read(path, start_line=N, end_line=M)`. Full-file reads only for small files (<200 lines) or wholesale rewrites.
 5. **Shell boundary**: `shell` is strictly for build, tests, git, and execution. NEVER inspect codebase state via shell. Runs in project root by default: NEVER use 'cd' or inline `(cd ...)`; pass 'cwd' parameter for subdirectories. NEVER pipe (`|`) commands: piping swallows exit codes and full logs.
 </codebase_navigation>"""

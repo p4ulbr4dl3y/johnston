@@ -60,11 +60,11 @@ Output the handoff in this structured format matching Johnston's compaction sche
 [Unanswered ambiguities, decisions deferred to user, or "(none)"]
 
 ### Key Files
-- `path/to/file.py#L10-L25`: [why it matters, current state, last edit]
-- `tests/test_foo.py`: [relevant test suite]
+- `path/to/file.ext#L10-L25`: [why it matters, current state, last edit]
+- `tests/test_foo.ext`: [relevant test suite]
 
 ### Quick Resume Command
-```bash
+```shell
 [Exact command to run tests or resume work for project stack, e.g. uv run pytest -k test_name, cargo test test_name, npm test -- -t test_name]
 ```
 ```
@@ -79,4 +79,4 @@ Output the handoff in this structured format matching Johnston's compaction sche
 1. **Default Delivery**: Present the handoff directly in the chat response (avoids cluttering Git status with unrequested files).
 2. **File Storage (when persisting to disk)**:
    - **Default File Path**: Write to `.johnston/HANDOFF.md` using `create` (keeps the project workspace clean and git-isolated).
-   - **Root Override**: Write to `./HANDOFF.md` only if the user explicitly asks to save it in the repository root.
+   - **Root Override**: Write to `HANDOFF.md` only if the user explicitly asks to save it in the repository root.

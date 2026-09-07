@@ -37,13 +37,13 @@ Skills use a 3-tier loading architecture to minimize token overhead:
 ├── references/              # Tier 3: Specialized docs loaded on-demand
 │   ├── framework-a.md
 │   └── framework-b.md
-└── scripts/                 # Tier 3: Deterministic helper scripts (Python/bash/Node/binary)
+└── scripts/                 # Tier 3: Deterministic helper scripts (Python/Node/bash/PowerShell/binary)
 ```
 
 ### Rules of Architecture:
 - **Tier 1 (Frontmatter)**: `name` and `description` are loaded into every turn's system prompt inside `<skills>`. Keep description concise (~20–40 words), covering both capabilities and triggers.
 - **Tier 2 (SKILL.md)**: Target under 500 lines. Focus on decision trees, main steps, and pointers to references.
-- **Tier 3 (References & Scripts)**: Split by domain/variant. If a workflow has repetitive data extraction or boilerplate generation, bundle a script (Python/bash/Node) in `scripts/` instead of asking the LLM to write it every turn.
+- **Tier 3 (References & Scripts)**: Split by domain/variant. If a workflow has repetitive data extraction or boilerplate generation, bundle a script (Python/Node/bash/PowerShell) in `scripts/` instead of asking the LLM to write it every turn.
 
 ## 3. Authoring SKILL.md
 
@@ -90,7 +90,7 @@ The `description` field is the primary routing mechanism that decides whether Jo
 
 1. Write files using `create`:
    - Project: `.johnston/skills/<name>/SKILL.md`
-   - Global: `~/.johnston/skills/<name>/SKILL.md`
+   - Global: `~/.johnston/skills/<name>/SKILL.md` (or `%USERPROFILE%/.johnston/skills/<name>/SKILL.md` on Windows)
 2. Inspect discovery:
    - CLI: `johnston skills` or `johnston skills --json` via `shell`.
    - TUI: Open `/skills` screen to verify registration and toggle `hidden` status with `Tab`.

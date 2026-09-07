@@ -44,7 +44,7 @@ Before declaring the goal achieved:
 Output a factual, dense completion summary:
 - **Objective**: Stated goal.
 - **Evidence**: Executed commands, test results, and exit codes proving success.
-- **Key Files Modified**: `path/to/file.py#L10-L45`.
+- **Key Files Modified**: `path/to/file.ext#L10-L45`.
 - **Residual Risks**: Any remaining limitations or follow-up items.
 
 ## Stopping Invariants

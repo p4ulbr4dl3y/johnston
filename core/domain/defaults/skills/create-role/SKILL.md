@@ -161,7 +161,7 @@ Application security auditor. Identify vulnerabilities and risk patterns without
 
 ### Good Practices
 - **Least Privilege Principle**: Set `read_only: true` for analytical, auditing, and review roles. The runtime strips mutating tools (`create`, `edit`), guaranteeing safety.
-- **Isolate Shell for Pure Readers**: If a role is strictly read-only, omit `shell` from `allowed_tools` (`allowed_tools: [read, search]`). Otherwise, the agent can still execute mutating CLI commands like `rm` or `sed -i` through shell.
+- **Isolate Shell for Pure Readers**: If a role is strictly read-only, omit `shell` from `allowed_tools` (`allowed_tools: [read, search]`). Otherwise, the agent can still execute mutating CLI commands like `rm`, `del`, or `sed -i` through shell.
 - **Accurate Scope**: Set `scope: subagent` for single-purpose subagents so they do not clutter interactive `Tab` cycling in the TUI.
 - **Explain the "Why"**: Structure prompts with `<scope>`, `<rules>`, and rationales instead of dogmatic `NEVER`/`ALWAYS` shouting. LLMs adhere better when the reason is clear.
 - **Cost/Latency Optimization**: Pin lightweight models (`model: provider/fast-model`) for mechanical subagent tasks (linting, test execution, typo checking).
