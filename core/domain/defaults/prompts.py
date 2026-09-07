@@ -28,7 +28,7 @@ _SHARED_FILE_EDITS = (
     "- **File Edits**:\n"
     "  - `edit`: localized changes via unique `old_str`/`new_str` context (or `replace_all=true`).\n"
     "  - `create`: new files or wholesale file rewrites (>40% changed).\n"
-    "  - `shell`: mass repetitive transformations across many files (e.g. Python scripts)."
+    "  - `shell`: mass repetitive transformations across many files (e.g. scripts, sed)."
 )
 
 _SHARED_WEB = "- **Web**: `web_fetch` for public web documentation and HTTP(S) data."
@@ -120,7 +120,7 @@ HEADLESS_DEFAULT_SYSTEM_PROMPT = f"""<identity>{{model_name}} in Johnston CLI (h
 {_SHARED_BASE_TOOL_IO}
 - **Shell & Command Execution**:
   - Run commands synchronously. Strict timeouts terminate hung commands.
-  - Always use non-interactive flags (e.g. `-y`, `--non-interactive`, `--no-pager`, `CI=1`). NEVER launch interactive pagers, prompts, or editors (`vim`, `nano`, `less`, `python -i`) — they hang indefinitely in headless mode.
+  - Always use non-interactive flags (e.g. `-y`, `--non-interactive`, `--no-pager`, `CI=1`). NEVER launch interactive pagers, prompts, or editors (`vim`, `nano`, `less`, `python -i`, `node`) — they hang indefinitely in headless mode.
   - Run commands directly. NEVER use 'cd' (state does not persist); use 'cwd' parameter for subdirectories.
   - NEVER pipe (`|`) commands (e.g. no `| grep`, `| tail`, `| head`). Piping swallows exit codes and discards logs. Runtime auto-truncates large output and saves full log to file.
   - Background processes and `wait_seconds` are disabled (no background task runner in headless mode).
@@ -288,7 +288,7 @@ Wire format conventions for ALL tool outputs (apply consistently):
 
 Errors: prefix `ERR: <kind> ['<target>']: <detail>` (target is omitted if general). Common kinds: `not_found`, `params`, `permission`, `match`, `timeout`, `execute`, `unavailable`. Diagnose from `detail`, never retry unchanged.
 
-Truncation marker: `[truncated | log <p> | next read(path=<log>, start_line=N)]` — for tracebacks, read ~50 lines around N; for mass output/JSON/lists, filter with `rg`/`jq` on log or re-run with flags (e.g. `pytest -k`, `git log -n 5`). Do NOT paginate large logs via read.
+Truncation marker: `[truncated | log <p> | next read(path=<log>, start_line=N)]` — for tracebacks, read ~50 lines around N; for mass output/JSON/lists, filter with `rg`/`jq` on log or re-run with flags (e.g. `pytest -k` / `cargo test`, `git log -n 5`). Do NOT paginate large logs via read.
 
 Pagination: `[<p> | lines N..M of T]` then `N|line content`. Use `read(path, start_line=N, end_line=M)` (window up to max lines per call) or `read(path, content_offset=N)` for binary.
 

@@ -69,7 +69,7 @@ Use `create` (or `edit` if updating) to write `# Repository Guidelines` to `AGEN
 ## Build & Test
 - Build / run command.
 - Test suite command (e.g. parallel flags, excluded suites).
-- Focused single test command (e.g. `uv run pytest path/to/test.py -k test_name`).
+- Focused single test command (e.g. `uv run pytest path/to/test.py -k test_name`, `cargo test test_name`, `npm test -- -t test_name`, `go test -run TestName`).
 - Linter / typecheck commands.
 
 ## Architecture
@@ -77,7 +77,7 @@ Use `create` (or `edit` if updating) to write `# Repository Guidelines` to `AGEN
 - High-level data flow and entrypoint wiring.
 
 ## Style & Conventions
-- Language version, package manager constraints (e.g. "use `uv` only").
+- Language version, package manager constraints (e.g. "use `uv` only", "pnpm only", "cargo only").
 - Code style, naming conventions, import ordering.
 - Non-obvious gotchas or framework quirks.
 

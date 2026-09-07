@@ -65,7 +65,7 @@ Output the handoff in this structured format matching Johnston's compaction sche
 
 ### Quick Resume Command
 ```bash
-[Exact command to run tests or resume work, e.g. uv run pytest tests/path/test_foo.py -k test_name]
+[Exact command to run tests or resume work for project stack, e.g. uv run pytest -k test_name, cargo test test_name, npm test -- -t test_name]
 ```
 ```
 

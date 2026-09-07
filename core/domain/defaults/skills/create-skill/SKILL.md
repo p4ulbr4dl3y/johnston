@@ -37,13 +37,13 @@ Skills use a 3-tier loading architecture to minimize token overhead:
 ├── references/              # Tier 3: Specialized docs loaded on-demand
 │   ├── framework-a.md
 │   └── framework-b.md
-└── scripts/                 # Tier 3: Deterministic helper scripts (Python/bash)
+└── scripts/                 # Tier 3: Deterministic helper scripts (Python/bash/Node/binary)
 ```
 
 ### Rules of Architecture:
 - **Tier 1 (Frontmatter)**: `name` and `description` are loaded into every turn's system prompt inside `<skills>`. Keep description concise (~20–40 words), covering both capabilities and triggers.
 - **Tier 2 (SKILL.md)**: Target under 500 lines. Focus on decision trees, main steps, and pointers to references.
-- **Tier 3 (References & Scripts)**: Split by domain/variant. If a workflow has repetitive data extraction or boilerplate generation, bundle a Python script in `scripts/` instead of asking the LLM to write it every turn.
+- **Tier 3 (References & Scripts)**: Split by domain/variant. If a workflow has repetitive data extraction or boilerplate generation, bundle a script (Python/bash/Node) in `scripts/` instead of asking the LLM to write it every turn.
 
 ## 3. Authoring SKILL.md
 
