@@ -398,7 +398,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
                 mock_worker.cancel.assert_called_once()
                 event.prevent_default.assert_called_once()
 
-    async def test_escape_cancels_workers_and_subagents_of_current_session(self):
+    async def test_escape_cancels_workers_without_cancelling_subagents(self):
         ci = ChatInput()
         app = DummyChatApp(ci)
         app.current_session_id = "session-main"
@@ -409,46 +409,44 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             with patch.object(App, "workers", new_callable=PropertyMock, return_value=[mock_worker]):
                 with patch(
                     "core.application.session.stream.cancel_running_subagents",
-                    return_value=2,
                 ) as mock_cancel:
                     event = Key("escape", "escape")
                     event.prevent_default = MagicMock()
                     event.stop = MagicMock()
                     await ci._on_key(event)
                     mock_worker.cancel.assert_called_once()
-                    mock_cancel.assert_called_once_with(app.sm, parent_id="session-main")
+                    mock_cancel.assert_not_called()
                     event.prevent_default.assert_called_once()
                     event.stop.assert_called_once()
 
-    async def test_escape_cancels_subagents_without_workers(self):
+    async def test_escape_does_not_cancel_subagents_without_workers(self):
         ci = ChatInput()
         app = DummyChatApp(ci)
         app.current_session_id = "session-main"
         app.sm = MagicMock()
         async with app.run_test():
-            with patch("core.application.session.stream.cancel_running_subagents", return_value=2) as mock_cancel:
+            with patch("core.application.session.stream.cancel_running_subagents") as mock_cancel:
                 with patch.object(App, "workers", new_callable=PropertyMock, return_value=[]):
                     event = Key("escape", "escape")
                     event.prevent_default = MagicMock()
                     event.stop = MagicMock()
                     await ci._on_key(event)
-                    mock_cancel.assert_called_once_with(app.sm, parent_id="session-main")
-                    event.prevent_default.assert_called_once()
-                    event.stop.assert_called_once()
+                    mock_cancel.assert_not_called()
+                    event.prevent_default.assert_not_called()
+                    event.stop.assert_not_called()
 
     async def test_escape_no_generation_does_not_consume_event(self):
         ci = ChatInput()
         app = DummyChatApp(ci)
         app.sm = MagicMock()
         async with app.run_test():
-            with patch("core.application.session.stream.cancel_running_subagents", return_value=0):
-                with patch.object(App, "workers", new_callable=PropertyMock, return_value=[]):
-                    event = Key("escape", "escape")
-                    event.prevent_default = MagicMock()
-                    event.stop = MagicMock()
-                    await ci._on_key(event)
-                    event.prevent_default.assert_not_called()
-                    event.stop.assert_not_called()
+            with patch.object(App, "workers", new_callable=PropertyMock, return_value=[]):
+                event = Key("escape", "escape")
+                event.prevent_default = MagicMock()
+                event.stop = MagicMock()
+                await ci._on_key(event)
+                event.prevent_default.assert_not_called()
+                event.stop.assert_not_called()
 
     async def test_escape_cancels_registered_compact_task(self):
         """Esc must cancel a running /compact (tracked as app._compact_task).
@@ -462,14 +460,13 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         app._compact_task = compact_task
         async with app.run_test():
             with patch.object(App, "workers", new_callable=PropertyMock, return_value=[]):
-                with patch("core.application.session.stream.cancel_running_subagents", return_value=0):
-                    event = Key("escape", "escape")
-                    event.prevent_default = MagicMock()
-                    event.stop = MagicMock()
-                    await ci._on_key(event)
-                    compact_task.cancel.assert_called_once()
-                    event.prevent_default.assert_called_once()
-                    event.stop.assert_called_once()
+                event = Key("escape", "escape")
+                event.prevent_default = MagicMock()
+                event.stop = MagicMock()
+                await ci._on_key(event)
+                compact_task.cancel.assert_called_once()
+                event.prevent_default.assert_called_once()
+                event.stop.assert_called_once()
 
     async def test_escape_does_not_consume_event_when_compact_task_finished(self):
         """Esc must not consume the event when the compact task already
@@ -482,14 +479,13 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         app._compact_task = compact_task
         async with app.run_test():
             with patch.object(App, "workers", new_callable=PropertyMock, return_value=[]):
-                with patch("core.application.session.stream.cancel_running_subagents", return_value=0):
-                    event = Key("escape", "escape")
-                    event.prevent_default = MagicMock()
-                    event.stop = MagicMock()
-                    await ci._on_key(event)
-                    compact_task.cancel.assert_not_called()
-                    event.prevent_default.assert_not_called()
-                    event.stop.assert_not_called()
+                event = Key("escape", "escape")
+                event.prevent_default = MagicMock()
+                event.stop = MagicMock()
+                await ci._on_key(event)
+                compact_task.cancel.assert_not_called()
+                event.prevent_default.assert_not_called()
+                event.stop.assert_not_called()
 
     async def test_enter_submits_message(self):
         ci = ChatInput()

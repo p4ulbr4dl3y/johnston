@@ -1117,15 +1117,17 @@ class TestSubagentStepAndErrorHandling:
 
 # ---------------------------------------------------------------------------
 # Parent interruption propagates cancellation to running subagent children
-# (audit A1: Esc//stop on the parent generation must not orphan subagents)
+# ---------------------------------------------------------------------------
+# Parent generation interruption must NOT cancel background subagents
+# (subagents run independently in background, only ctrl+k in their screen kills them)
 # ---------------------------------------------------------------------------
 
 
-class TestParentInterruptCancelsSubagents:
-    """Parent generation cancelled mid-stream -> subagent children cancelled."""
+class TestParentInterruptLeavesSubagentsRunning:
+    """Parent generation cancelled mid-stream -> subagent children keep running."""
 
     @pytest.mark.asyncio
-    async def test_cancel_parent_generation_cancels_pending_subagent_task(self):
+    async def test_cancel_parent_generation_leaves_pending_subagent_task_running(self):
         async def mock_stream(prompt, attachments=None):
             yield ("thinking_start", "Thinking...", "")
             raise asyncio.CancelledError()
@@ -1139,8 +1141,7 @@ class TestParentInterruptCancelsSubagents:
         session = AgentSession(session_id=parent_session_id, role="assistant")
 
         # Live subagent child of this parent session: a REAL streaming task
-        # suspended mid-run (so cancel() delivers CancelledError to its own
-        # teardown, whose handler owns the terminal finish + save — M6).
+        # suspended mid-run.
         async def suspending_stream(*a, **k):
             yield ("thinking_start", "Thinking...", "")
             await asyncio.sleep(30)
@@ -1158,8 +1159,6 @@ class TestParentInterruptCancelsSubagents:
         child.async_task = child_task
         cancelled_parent_ids = []
 
-        # Mirrors the production wiring from widgets/mixins/message_flow.py:
-        # the canvas hook ends in cancel_running_subagents(store, parent_id=sid).
         def cancel_cb(sid):
             cancelled_parent_ids.append(sid)
             cancel_running_subagents(store, parent_id=sid)
@@ -1190,24 +1189,17 @@ class TestParentInterruptCancelsSubagents:
                 show_in_ui=True,
             )
 
-        # (a) The canvas cancellation hook fired with the parent session id.
-        assert cancelled_parent_ids == [parent_session_id]
-        # (b) The child task received cancel() — NO sync write (M6); the
-        # cancelled task's own teardown owns the terminal finish + save, so
-        # status is still live at this instant (no duplicate status_change).
+        # The parent cancellation does NOT invoke subagent cancellation
+        assert cancelled_parent_ids == []
         assert child.status == SessionStatus.RUNNING
-        assert store.saved == []
+        assert not child_task.done()
 
-        # Drive the child teardown to completion: its CancelledError handler
-        # records the interruption, finishes CANCELLED and saves exactly once.
+        # Clean up the background task
+        child_task.cancel()
         try:
-            await asyncio.wait_for(child_task, timeout=5)
+            await child_task
         except asyncio.CancelledError:
-            pass  # A7: a real pending cancellation may re-raise through teardown
-        assert child_task.cancelled() or child_task.done()
-        assert child.status == STATUS_CANCELLED
-        # Exactly one writer persisted the terminal state.
-        assert store.saved == [child]
+            pass
 
 
 

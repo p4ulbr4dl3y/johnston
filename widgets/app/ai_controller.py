@@ -6,7 +6,6 @@ footer state, finally teardown, queue drain) stays in the mixin.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any, Callable, Optional
 
@@ -62,36 +61,19 @@ async def run_ai_generation(
 ) -> None:
     """Thin wrapper over the generation engine, forwarding the call unchanged.
 
-    On cancellation (Esc / /stop) the engine has already run its interruption
-    teardown (divider recorded, partial reply finalized) and re-raises
-    ``asyncio.CancelledError``. Before propagating, cancel any subagent tasks
-    spawned by this parent session via the canvas callback, so orphaned
-    background children do not keep running. ``asyncio.CancelledError`` /
-    generic exceptions otherwise propagate to the caller (mixin) which owns
-    teardown. Keeps the mixin free of direct engine invocation while
-    preserving cancellation semantics.
+    CancelledError / generic exceptions propagate to the caller (mixin) which
+    owns teardown. Keeps the mixin free of direct engine invocation while
+    preserving cancellation semantics. Background tasks and subagents continue
+    running in background.
     """
-    try:
-        await _engine(
-            agent,
-            session,
-            canvas,
-            session_id=session_id,
-            user_text=user_text,
-            show_in_ui=show_in_ui,
-            attachments=attachments,
-            project_path=project_path,
-            display_text=display_text,
-        )
-    except asyncio.CancelledError:
-        # _handle_interruption already recorded the "Response Interrupted"
-        # divider; cancelling children here (sync per child) is minimal and
-        # avoids threading the store into the engine core. Never raise from
-        # the cancellation path.
-        try:
-            cancel = getattr(canvas, "cancel_subagents", None)
-            if callable(cancel) and session_id:
-                cancel(session_id)
-        except Exception:  # noqa: BLE001
-            logger.warning("Subagent cancellation on interrupt failed", exc_info=True)
-        raise
+    await _engine(
+        agent,
+        session,
+        canvas,
+        session_id=session_id,
+        user_text=user_text,
+        show_in_ui=show_in_ui,
+        attachments=attachments,
+        project_path=project_path,
+        display_text=display_text,
+    )

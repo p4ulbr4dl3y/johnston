@@ -246,15 +246,11 @@ class ChatInput(ChatInputHistoryMixin, ChatInputSuggestionsMixin, ChatInputPaste
             except Exception:
                 pass
 
-            # Stop generation: Textual workers, the registered compaction task
+            # Stop generation: Textual workers and the registered compaction task
             # (if any; /compact runs in a plain asyncio task, so it is tracked
-            # separately on the app) AND subagent tasks of the current session.
-            # Subagents run outside the Textual worker pool, so they are
-            # cancelled via the session store (mirrors /new). Scoping to
-            # current_session_id leaves OTHER sessions' subagents untouched; when
-            # no session id is set, None cancels all subagents (matches /new).
-            # Esc is consumed only when it actually stopped generation work, so
-            # plain-typing Esc still falls through to the other key handlers.
+            # separately on the app). Subagents and background tasks run in the
+            # background and are NOT cancelled via Esc in chat (only explicitly
+            # via ctrl+k in their console/modal screens).
             active_workers = [w for w in self.app.workers if w.is_running]
             for w in active_workers:
                 w.cancel()
@@ -263,18 +259,7 @@ class ChatInput(ChatInputHistoryMixin, ChatInputSuggestionsMixin, ChatInputPaste
             if compact_task is not None and not compact_task.done():
                 compact_task.cancel()
                 compact_cancelled = True
-            cancelled_subagents = 0
-            try:
-                if getattr(self.app, "sm", None) is not None:
-                    from core.application.session.stream import cancel_running_subagents
-
-                    cancelled_subagents = cancel_running_subagents(
-                        self.app.sm,
-                        parent_id=getattr(self.app, "current_session_id", None) or None,
-                    )
-            except Exception:
-                pass
-            if active_workers or cancelled_subagents > 0 or compact_cancelled:
+            if active_workers or compact_cancelled:
                 event.prevent_default()
                 event.stop()
                 return
