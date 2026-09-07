@@ -181,7 +181,7 @@ class TestPromptBuilder(unittest.TestCase):
         prompt = builder.build_system_prompt()
         self.assertIn("<worktree>", prompt)
         self.assertIn("Branch: `feature-x`", prompt)
-        self.assertIn("Relative paths ONLY", prompt)
+        self.assertIn("Always use relative paths for tools", prompt)
         self.assertIn("git checkout/switch", prompt)
 
 

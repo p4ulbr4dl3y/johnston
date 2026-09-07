@@ -212,7 +212,7 @@ Session history is persisted. Parent may send follow-up messages to resume this 
 
 WORKTREE_PROMPT = """<worktree>
 - Branch: `{branch_name}` (isolated git worktree).
-- Relative paths ONLY. Absolute worktree path is irrelevant.
+- Always use relative paths for tools. If given an absolute path from repo root, strip root prefix and use relative path (e.g. `/repo/path/file.ext` -> `path/file.ext`).
 - Do NOT `git checkout/switch`, merge, or push.
 - Do NOT `git commit` unless explicitly instructed by user.
 </worktree>"""
