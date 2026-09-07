@@ -134,7 +134,31 @@ def _clean_cd_command(cmd: str, workspace_dir: str) -> tuple[str, Optional[str]]
 
 
 _ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-_PREFIX_WRAPPERS = {"sudo", "env", "time", "nice", "nohup", "exec"}
+_PREFIX_WRAPPERS = {"sudo", "env", "time", "nice", "nohup", "exec", "xargs"}
+_WRAPPER_OPTS_WITH_ARG = {
+    "-u",
+    "-g",
+    "-p",
+    "-r",
+    "-t",
+    "-T",
+    "-U",
+    "-C",
+    "-D",
+    "-R",
+    "-n",
+    "-o",
+    "-f",
+    "-S",
+    "-a",
+    "--user",
+    "--group",
+    "--adjustment",
+    "--chdir",
+    "--unset",
+    "--output",
+    "--format",
+}
 _GIT_OPTS_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 _MUTATING_GIT = {
     "commit",
@@ -147,6 +171,19 @@ _MUTATING_GIT = {
     "revert",
     "clean",
     "cherry-pick",
+    "restore",
+    "rm",
+    "mv",
+    "pull",
+    "apply",
+    "stash",
+    "init",
+    "clone",
+    "am",
+    "format-patch",
+    "repack",
+    "prune",
+    "gc",
 }
 
 
@@ -156,19 +193,17 @@ def _check_read_only_command_mutations(cmd: str) -> Optional[str]:
 
     is_win = platform.system() == "Windows"
     try:
-        raw_tokens = [t.strip("\"'") for t in shlex.split(cmd, posix=not is_win)]
+        lexer = shlex.shlex(cmd, posix=not is_win, punctuation_chars=True)
+        lexer.whitespace_split = True
+        raw_tokens = [t.strip("\"'") for t in lexer]
     except Exception:
         raw_tokens = cmd.split()
 
     if not raw_tokens:
         return None
 
-    # Strip grouping parentheses from tokens e.g. (git -> git
-    tokens = []
-    for t in raw_tokens:
-        clean_t = t.strip("()")
-        if clean_t:
-            tokens.append(clean_t)
+    # Strip grouping parentheses
+    tokens = [t for t in raw_tokens if t not in ("(", ")")]
 
     subcmds: list[list[str]] = []
     curr: list[str] = []
@@ -186,20 +221,38 @@ def _check_read_only_command_mutations(cmd: str) -> Optional[str]:
         if not sc:
             continue
 
-        # Skip leading env assignments (e.g. VAR=val) and wrapper commands (sudo, env, etc.)
+        # Skip leading env assignments (e.g. VAR=val)
         idx = 0
         while idx < len(sc) and _ENV_VAR_RE.match(sc[idx]):
             idx += 1
+
+        # Skip wrapper commands (sudo, env, nice, etc.) and their arguments/flags
         while idx < len(sc):
             cand = sc[idx].replace("\\", "/").rsplit("/", 1)[-1].lower()
             if cand.endswith(".exe"):
                 cand = cand[:-4]
             if cand in _PREFIX_WRAPPERS:
                 idx += 1
-                while idx < len(sc) and _ENV_VAR_RE.match(sc[idx]):
-                    idx += 1
+                while idx < len(sc):
+                    tok = sc[idx]
+                    if tok == "--":
+                        idx += 1
+                        break
+                    if _ENV_VAR_RE.match(tok):
+                        idx += 1
+                        continue
+                    if tok.startswith("-"):
+                        if "=" in tok:
+                            idx += 1
+                        elif tok in _WRAPPER_OPTS_WITH_ARG:
+                            idx += 2
+                        else:
+                            idx += 1
+                        continue
+                    break
                 continue
             break
+
         if idx >= len(sc):
             continue
 
@@ -219,8 +272,49 @@ def _check_read_only_command_mutations(cmd: str) -> Optional[str]:
                     else:
                         i += 1
                 else:
-                    if t.lower() in _MUTATING_GIT:
-                        return f"git {t.lower()} is not permitted in read-only role"
+                    t_low = t.lower()
+                    if t_low in _MUTATING_GIT:
+                        return f"git {t_low} is not permitted in read-only role"
+                    if t_low == "branch":
+                        has_list = any(x in ("-l", "--list", "-a", "-r", "--remotes", "--all") for x in sc[i + 1 :])
+                        for b_tok in sc[i + 1 :]:
+                            if b_tok in (
+                                "-d",
+                                "-D",
+                                "-m",
+                                "-M",
+                                "-c",
+                                "-C",
+                                "--delete",
+                                "--move",
+                                "--copy",
+                                "-u",
+                                "--set-upstream-to",
+                                "--unset-upstream",
+                            ):
+                                return f"git branch {b_tok} is not permitted in read-only role"
+                            if not b_tok.startswith("-") and not has_list:
+                                return "git branch creation is not permitted in read-only role"
+                    elif t_low == "tag":
+                        has_list = any(x in ("-l", "--list") for x in sc[i + 1 :])
+                        for tag_tok in sc[i + 1 :]:
+                            if tag_tok in ("-d", "--delete", "-a", "-s", "-u", "-f", "--force"):
+                                return f"git tag {tag_tok} is not permitted in read-only role"
+                            if not tag_tok.startswith("-") and not has_list:
+                                return "git tag creation is not permitted in read-only role"
+                    elif t_low == "remote":
+                        for r_tok in sc[i + 1 :]:
+                            if r_tok.lower() in (
+                                "add",
+                                "rename",
+                                "remove",
+                                "rm",
+                                "set-url",
+                                "set-head",
+                                "set-branches",
+                                "prune",
+                            ):
+                                return f"git remote {r_tok} is not permitted in read-only role"
                     break
 
         if platform.system() == "Windows":

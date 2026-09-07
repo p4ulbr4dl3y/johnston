@@ -681,6 +681,24 @@ async def test_shell_readonly_blocks_mutating_git_commands(tool, make_tool_conte
         r'"C:\Program Files\Git\bin\git.exe" commit -m "test"',
         "sudo git push",
         "env VAR=1 time git rebase main",
+        "true;git commit -m 'test'",
+        "echo hi|git push origin main",
+        "false||git commit -m 'test'",
+        "true&&git commit -m 'test'",
+        "sudo -u root git commit -m 'test'",
+        "sudo -E git commit -m 'test'",
+        "nice -n 10 git commit -m 'test'",
+        "env -i git commit -m 'test'",
+        "git restore .",
+        "git rm file.txt",
+        "git mv file.txt file2.txt",
+        "git pull origin main",
+        "git apply patch.diff",
+        "git branch -D main",
+        "git tag -d v1.0",
+        "git branch new-feature",
+        "git tag v1.0",
+        "git remote add origin https://example.com",
     ]
     for cmd in bypasses:
         res = await tool.execute({"command": cmd}, ctx=ctx)
@@ -697,6 +715,9 @@ async def test_shell_readonly_windows_mutations_blocked():
         assert _check_read_only_command_mutations("rmdir /s /q bar") is not None
         assert _check_read_only_command_mutations("echo test > output.txt") is not None
         assert _check_read_only_command_mutations("echo test >> output.txt") is not None
+        assert _check_read_only_command_mutations("echo test>output.txt") is not None
+        assert _check_read_only_command_mutations("echo test>>output.txt") is not None
+        assert _check_read_only_command_mutations("echo test 2>err.txt") is not None
         assert _check_read_only_command_mutations("type foo.txt") is None
 
 
@@ -705,6 +726,10 @@ async def test_shell_readonly_allows_grep_with_commit_word(tool, make_tool_conte
     res = await tool.execute({"command": "echo 'git commit is good'"}, ctx=ctx)
     assert not res.is_error
     assert "git commit is good" in str(res)
+
+    for safe_cmd in ("git status", "git diff", "git log -n 1", "git branch", "git branch -a", "git tag -l"):
+        res_safe = await tool.execute({"command": safe_cmd}, ctx=ctx)
+        assert not res_safe.is_error or "not permitted in read-only role" not in str(res_safe)
 
 
 
