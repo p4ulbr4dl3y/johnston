@@ -87,6 +87,8 @@ Output the handoff in this structured format matching Johnston's compaction sche
 
 ---
 
-### Step 4: Deliver
-1. Present the handoff directly in the chat response.
-2. If the user requested a file or running in headless mode, write to `HANDOFF.md` using `create`.
+### Step 4: Deliver & Storage Location
+1. **Default Delivery**: Present the handoff directly in the chat response (avoids cluttering Git status with unrequested files).
+2. **File Storage (when persisting to disk)**:
+   - **Default File Path**: Write to `.johnston/HANDOFF.md` using `create` (keeps the project workspace clean and git-isolated).
+   - **Root Override**: Write to `./HANDOFF.md` only if the user explicitly asks to save it in the repository root.
