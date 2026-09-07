@@ -135,6 +135,7 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
                 {
                     "type": "tool",
                     "tool_type": "shell",
+                    "task_id": "shell_123_1",
                     "result_text": "[Background Task ID: shell_123_1] 'ls' moved to background.",
                     "status": "running",
                 }
