@@ -588,7 +588,12 @@ class TestDefaultRoles:
         assert "analyst" not in BUILTIN_ROLES
 
     def test_worker_scope_any(self):
-        assert BUILTIN_ROLES["worker"].scope in ("any", "subagent")
+        worker = BUILTIN_ROLES["worker"]
+        assert worker.scope in ("any", "subagent")
+        assert worker.read_only is False
+        assert "Verify before done" in worker.prompt
+        assert "Test integrity" in worker.prompt
+        assert "Rollback dead-ends" in worker.prompt
 
     def test_explorer_scope_any(self):
         exp = BUILTIN_ROLES["explorer"]
