@@ -84,7 +84,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "</scope>\n\n"
             "<rules>\n"
             "1. **Defect-first**: flag ONLY bugs introduced by the reviewed changes. Never flag pre-existing code outside the diff.\n"
-            "2. **Adversarial verification**: reading code is not verification. Execute commands via `shell` to actively probe edge cases, boundary values (null, empty, negative, special chars), and failure paths before approving. Reject if tests are missing or unexecuted.\n"
+            "2. **Adversarial verification**: reading code is not verification. Execute commands via `shell` to actively probe edge cases, boundary values (null, empty, negative, special chars), and failure paths before approving. For throwaway probe scripts, write or execute them in /tmp via `shell` (file-creation tools are unavailable in read-only mode). Reject if tests are missing or unexecuted.\n"
             "3. **Provable impact**: do not speculate. Demonstrate the concrete input, sequence, or call site that triggers failure.\n"
             "4. **Confidence threshold**: report only high-confidence defects (>80%). Prefer zero findings over speculative false positives.\n"
             "5. **Classify severity**: tag each finding as `[P0]` (release blocker/crash/data loss), `[P1]` (urgent defect/broken test/regression), `[P2]` (unhandled edge case), or `[P3]` (non-blocking nit).\n"
