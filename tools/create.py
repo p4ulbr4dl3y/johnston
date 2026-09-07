@@ -1,13 +1,10 @@
 import os
 from typing import Any, Dict
 
-from core.domain.defaults.config import DEFAULT_TOOL_PAYLOAD_BYTES
 from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool, read_file_text, write_file_text
 from tools.cancel import run_cancellable
 from tools.utils import format_file_diff, resolve_writable_path
-
-DEFAULT_MAX_PAYLOAD_MB = DEFAULT_TOOL_PAYLOAD_BYTES // (1024 * 1024)
 
 
 class CreateTool(BaseTool):
@@ -40,21 +37,6 @@ class CreateTool(BaseTool):
             },
         },
     }
-
-    def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
-        import copy
-
-        schema = copy.deepcopy(self.schema)
-        try:
-            from core.infrastructure.config.settings import get_settings
-
-            max_mb = get_settings().tools.max_tool_payload_bytes // (1024 * 1024)
-            fn = schema.get("function", {})
-            if "description" in fn:
-                fn["description"] = fn["description"].replace(f"({DEFAULT_MAX_PAYLOAD_MB}MB)", f"({max_mb}MB)")
-        except Exception:
-            pass
-        return schema
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}

@@ -24,7 +24,7 @@ _SHARED_SILENT_INVOCATION = (
 
 _SHARED_ARG_ORDER = (
     "- **Argument Order**: Output tool arguments strictly in schema property order "
-    "(target/path/command/type first, body/content/prompt last) for instant streaming UI display."
+    "(target/path/command/role first, body/content/prompt last) for instant streaming UI display."
 )
 
 _SHARED_BATCHING = (
@@ -44,8 +44,7 @@ _SHARED_FILE_EDITS = (
     "- **File Edits**:\n"
     "  - `edit`: localized changes via unique `old_str`/`new_str` context (or `replace_all=true`). "
     "Batch non-overlapping edits in one turn (ensure disjoint context lines).\n"
-    "  - `create`: new files or wholesale file rewrites (>40% changed).\n"
-    "  - `shell`: mass repetitive transformations across many files (e.g. scripts, batch transforms)."
+    "  - `create`: new files or wholesale file rewrites (>40% changed)."
 )
 
 _SHARED_SHELL_EXECUTION = (
@@ -55,8 +54,6 @@ _SHARED_SHELL_EXECUTION = (
     "Runtime auto-truncates large output to tail and saves full log to file (`[truncated | log <path>]`). Run raw; inspect log files via `read`.\n"
     "  - Run commands directly. NEVER use 'cd' (state does not persist); use 'cwd' parameter for subdirectories."
 )
-
-_SHARED_WEB = "- **Web**: `web_fetch` for public web documentation and HTTP(S) data."
 
 _SHARED_COMPACTION = (
     "- **Compaction**: Long conversations auto-summarize at ~{compaction_ratio}% context limit. "
@@ -83,8 +80,7 @@ _SHARED_BASE_TOOL_IO = f"""{_SHARED_SILENT_INVOCATION}
 {_SHARED_BATCHING}
 {_SHARED_PLANNING}
 {_SHARED_FILE_EDITS}
-{_SHARED_SHELL_EXECUTION}
-{_SHARED_WEB}"""
+{_SHARED_SHELL_EXECUTION}"""
 
 
 # =============================================================================
