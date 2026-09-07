@@ -101,7 +101,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        await tool.execute({"prompt": "search codebase", "type": "explorer", "branch": "main"})
+        await tool.execute({"prompt": "search codebase", "role": "explorer", "branch": "main"})
 
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
         self.assertIn("read", tool_names)

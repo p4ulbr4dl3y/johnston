@@ -46,10 +46,10 @@ class TestToolSchemas(unittest.TestCase):
 
         tool = InvokeSubagentTool()
         schema = tool.get_schema()
-        type_prop = schema["function"]["parameters"]["properties"]["type"]
-        self.assertIn("enum", type_prop)
-        self.assertIn("worker", type_prop["enum"])
-        self.assertIn("explorer", type_prop["enum"])
+        role_prop = schema["function"]["parameters"]["properties"]["role"]
+        self.assertIn("enum", role_prop)
+        self.assertIn("worker", role_prop["enum"])
+        self.assertIn("explorer", role_prop["enum"])
 
     def test_read_content_offset_schema(self):
         from tools.read import ReadTool

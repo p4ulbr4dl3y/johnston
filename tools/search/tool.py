@@ -36,8 +36,6 @@ def search_sync(
     glob_pattern: Optional[str] = None,
     case_sensitive: bool = False,
     max_results: int = 50,
-    before_lines: Optional[int] = None,
-    after_lines: Optional[int] = None,
     context_lines: int = 0,
     include_hidden: bool = False,
     progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
@@ -70,11 +68,6 @@ def search_sync(
     if mode == "content" and not query.strip():
         return fail(ERROR_KIND_PARAMS, "query parameter is required for content search", name="query")
 
-    if before_lines is None:
-        before_lines = context_lines
-    if after_lines is None:
-        after_lines = context_lines
-
     if progress_callback:
         progress_callback({"stage": "start", "mode": mode})
 
@@ -94,8 +87,7 @@ def search_sync(
             query=query,
             cwd=cwd,
             case_sensitive=case_sensitive,
-            before_lines=before_lines,
-            after_lines=after_lines,
+            context_lines=context_lines,
             glob_pattern=glob_pattern,
             max_results=max_results,
             include_hidden=include_hidden,
@@ -109,8 +101,7 @@ def search_sync(
                 query=query,
                 cwd=cwd,
                 case_sensitive=case_sensitive,
-                before_lines=before_lines,
-                after_lines=after_lines,
+                context_lines=context_lines,
                 glob_pattern=glob_pattern,
                 max_results=max_results,
                 include_hidden=include_hidden,
@@ -225,20 +216,8 @@ class SearchTool(BaseTool):
                     "context_lines": {
                         "type": "integer",
                         "minimum": 0,
-                        "maximum": 10,
-                        "description": "Symmetric context lines before and after matches (mode='content' only, default: 0). Overridden by before/after if set.",
-                    },
-                    "before": {
-                        "type": "integer",
-                        "minimum": 0,
                         "maximum": 20,
-                        "description": "Context lines before each match (mode='content' only). Overrides context_lines.",
-                    },
-                    "after": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 20,
-                        "description": "Context lines after each match (mode='content' only). Overrides context_lines.",
+                        "description": "Number of context lines before and after matches (mode='content' only, default: 0).",
                     },
                     "include_hidden": {
                         "type": "boolean",
@@ -277,12 +256,7 @@ class SearchTool(BaseTool):
         max_results = try_int(args.get("max_results"), 50)
         max_results = max(1, min(max_results, 500))
         context_lines = try_int(args.get("context_lines"), 0)
-        context_lines = max(0, min(context_lines, 10))
-
-        before_val = try_int(args.get("before"), None)
-        before_lines = max(0, min(before_val, 20)) if before_val is not None else None
-        after_val = try_int(args.get("after"), None)
-        after_lines = max(0, min(after_val, 20)) if after_val is not None else None
+        context_lines = max(0, min(context_lines, 20))
 
         include_hidden = bool(args.get("include_hidden", False))
 
@@ -297,8 +271,6 @@ class SearchTool(BaseTool):
             glob_pattern=glob_pattern,
             case_sensitive=case_sensitive,
             max_results=max_results,
-            before_lines=before_lines,
-            after_lines=after_lines,
             context_lines=context_lines,
             include_hidden=include_hidden,
         )

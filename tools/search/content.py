@@ -26,8 +26,7 @@ def _search_content_ripgrep(
     query: str,
     cwd: str,
     case_sensitive: bool = False,
-    before_lines: int = 0,
-    after_lines: int = 0,
+    context_lines: int = 0,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
     include_hidden: bool = False,
@@ -61,10 +60,8 @@ def _search_content_ripgrep(
     if not case_sensitive:
         cmd.append("-i")
 
-    if before_lines > 0:
-        cmd.extend(["-B", str(before_lines)])
-    if after_lines > 0:
-        cmd.extend(["-A", str(after_lines)])
+    if context_lines > 0:
+        cmd.extend(["-C", str(context_lines)])
 
     if include_hidden:
         cmd.append("--hidden")
@@ -137,7 +134,7 @@ def _search_content_ripgrep(
                             grouped_results.setdefault(rel, []).append((lineno, sep, text))
                             if match_count >= max_results:
                                 stopping = True
-                                after_remaining = after_lines
+                                after_remaining = context_lines
                                 if after_remaining <= 0:
                                     break
                         elif stopping:
@@ -190,8 +187,7 @@ def _search_content_python(
     query: str,
     cwd: str,
     case_sensitive: bool = False,
-    before_lines: int = 0,
-    after_lines: int = 0,
+    context_lines: int = 0,
     glob_pattern: Optional[str] = None,
     max_results: int = 50,
     include_hidden: bool = False,
@@ -258,8 +254,8 @@ def _search_content_python(
         entries: List[Tuple[int, str, str]] = []
         ctx_set: Set[int] = set()
         for idx in matches:
-            start_ctx = max(0, idx - before_lines)
-            end_ctx = min(len(file_lines), idx + after_lines + 1)
+            start_ctx = max(0, idx - context_lines)
+            end_ctx = min(len(file_lines), idx + context_lines + 1)
             for c in range(start_ctx, end_ctx):
                 ctx_set.add(c)
 

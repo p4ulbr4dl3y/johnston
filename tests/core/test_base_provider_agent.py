@@ -1034,7 +1034,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         from tools.update_plan import UpdatePlanTool
 
         sub_props = list(InvokeSubagentTool.schema["function"]["parameters"]["properties"].keys())
-        self.assertEqual(sub_props, ["type", "title", "prompt"])
+        self.assertEqual(sub_props, ["role", "title", "prompt"])
 
         plan_props = list(UpdatePlanTool.schema["function"]["parameters"]["properties"].keys())
         self.assertEqual(plan_props, ["plan", "explanation"])

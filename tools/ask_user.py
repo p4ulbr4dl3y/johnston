@@ -70,20 +70,28 @@ class AskUserTool(BaseTool):
                                 },
                                 "options": {
                                     "type": "array",
-                                    "description": "2-4 options. Add '(Recommended)' to suggested choice.",
+                                    "description": "2-4 options. Either list of strings (e.g. ['Option A', 'Option B']) or objects with label and description. Add '(Recommended)' to suggested choice.",
                                     "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "label": {
+                                        "anyOf": [
+                                            {
                                                 "type": "string",
-                                                "description": "Short choice text (1-5 words).",
+                                                "description": "Option label.",
                                             },
-                                            "description": {
-                                                "type": "string",
-                                                "description": "Trade-offs or implications.",
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "label": {
+                                                        "type": "string",
+                                                        "description": "Short choice text (1-5 words).",
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "description": "Trade-offs or implications.",
+                                                    },
+                                                },
+                                                "required": ["label"],
                                             },
-                                        },
-                                        "required": ["label"],
+                                        ]
                                     },
                                 },
                             },
@@ -124,13 +132,17 @@ class AskUserTool(BaseTool):
             valid_options = []
             seen_labels: set[str] = set()
             for opt in options:
-                if not isinstance(opt, dict):
+                if isinstance(opt, str):
+                    label = opt.strip()
+                    desc = ""
+                elif isinstance(opt, dict):
+                    label = str(opt.get("label") or "").strip()
+                    desc = str(opt.get("description") or "").strip()
+                else:
                     continue
-                label = str(opt.get("label") or "").strip()
                 if not label or label in seen_labels:
                     continue
                 seen_labels.add(label)
-                desc = str(opt.get("description") or "").strip()
                 valid_options.append({"label": label, "description": desc})
             sorted_options = _sort_recommended_first(valid_options)
             validated_questions.append({

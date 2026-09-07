@@ -132,10 +132,9 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("case_sensitive", params["properties"])
         self.assertIn("max_results", params["properties"])
         self.assertIn("context_lines", params["properties"])
-        # New parameters
-        self.assertIn("before", params["properties"])
-        self.assertIn("after", params["properties"])
         self.assertIn("include_hidden", params["properties"])
+        self.assertNotIn("before", params["properties"])
+        self.assertNotIn("after", params["properties"])
         self.assertEqual(params["required"], [])
 
     def test_binary_file_detection(self):
@@ -277,8 +276,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             target_path=self.tmpdir,
             query="AppRunner",
             cwd=self.tmpdir,
-            before_lines=1,
-            after_lines=1,
+            context_lines=1,
         )
         self.assertIsNotNone(res)
         lines, count, files = res
@@ -310,20 +308,6 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("main.py:", res.content)
         self.assertIn("7:     def run(self)", res.content)
-        self.assertIn("6-", res.content)
-        self.assertIn("8-", res.content)
-
-    async def test_content_search_before_after(self):
-        ctx = ToolContext(cwd=self.tmpdir)
-        # Test asymmetric context
-        res = await self.tool.execute(
-            {"query": "def run", "path": "main.py", "before": 2, "after": 1},
-            ctx=ctx,
-        )
-        self.assertIn("main.py:", res.content)
-        self.assertIn("7:     def run(self)", res.content)
-        # Should have 2 lines before and 1 after
-        self.assertIn("5-", res.content)
         self.assertIn("6-", res.content)
         self.assertIn("8-", res.content)
 
@@ -701,31 +685,18 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("path=sample.py", res.content)
         self.assertIn("0 matches found", res.content)
 
-    async def test_context_lines_override_precedence(self):
+    async def test_context_lines_symmetric(self):
         fpath = os.path.join(self.tmpdir, "ctx.txt")
         with open(fpath, "w") as f:
             f.write("line 1\nline 2\nTARGET\nline 4\nline 5\n")
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "TARGET", "before": 1, "context_lines": 2, "path": "ctx.txt"}, ctx=ctx)
+        res = await self.tool.execute({"query": "TARGET", "context_lines": 1, "path": "ctx.txt"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertNotIn("line 1", res.content)
         self.assertIn("line 2", res.content)
         self.assertIn("TARGET", res.content)
         self.assertIn("line 4", res.content)
-        self.assertIn("line 5", res.content)
-
-    async def test_context_lines_override_zero_before(self):
-        fpath = os.path.join(self.tmpdir, "zero_before.txt")
-        with open(fpath, "w") as f:
-            f.write("line 1\nline 2\nTARGET\nline 4\nline 5\n")
-        ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "TARGET", "before": 0, "context_lines": 2, "path": "zero_before.txt"}, ctx=ctx)
-        self.assertEqual(res.status, ToolResultStatus.DONE)
-        self.assertNotIn("line 1", res.content)
-        self.assertNotIn("line 2", res.content)
-        self.assertIn("TARGET", res.content)
-        self.assertIn("line 4", res.content)
-        self.assertIn("line 5", res.content)
+        self.assertNotIn("line 5", res.content)
 
     def test_ripgrep_delimiter_during_stopping(self):
         import unittest.mock as mock
@@ -749,8 +720,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
                 query="match",
                 cwd=self.tmpdir,
                 case_sensitive=False,
-                before_lines=0,
-                after_lines=2,
+                context_lines=2,
                 max_results=1,
             )
             self.assertIsNotNone(res)

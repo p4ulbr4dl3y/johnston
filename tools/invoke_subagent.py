@@ -22,7 +22,7 @@ class InvokeSubagentTool(BaseTool):
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "type": {
+                    "role": {
                         "type": "string",
                         "enum": ["worker", "explorer", "reviewer"],
                         "description": "Subagent role name from available roles (default: 'worker')",
@@ -51,8 +51,8 @@ class InvokeSubagentTool(BaseTool):
         schema = copy.deepcopy(self.schema)
         try:
             roles = sorted(RoleRegistry.get_instance().list_subagent_roles().keys())
-            if roles and "type" in schema.get("function", {}).get("parameters", {}).get("properties", {}):
-                schema["function"]["parameters"]["properties"]["type"]["enum"] = roles
+            if roles and "role" in schema.get("function", {}).get("parameters", {}).get("properties", {}):
+                schema["function"]["parameters"]["properties"]["role"]["enum"] = roles
         except Exception:
             pass
         return schema
@@ -65,7 +65,7 @@ class InvokeSubagentTool(BaseTool):
         return await SubagentService.spawn_subagent(
             prompt=args.get("prompt") or "",
             title=args.get("title") or "",
-            subagent_type=args.get("type") or "worker",
+            subagent_type=args.get("role") or args.get("type") or "worker",
             branch_override=args.get("branch") or "",
             ctx=ctx,
             worktree_manager_cls=SubagentWorktreeManager,

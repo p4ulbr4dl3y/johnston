@@ -122,6 +122,22 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Question: Choose item", res.display)
         self.assertIn("Answer: Option A", res.display)
 
+    async def test_string_options_supported(self):
+        tool = AskUserTool()
+        mock_app = MagicMock()
+        mock_app.ask_user = AsyncMock(return_value="Question: Choose item\nAnswer: Choice A")
+        res = await tool.execute(
+            {"questions": [{"question": "Choose item", "options": ["Choice A", "Choice B"]}]},
+            ctx=mock_app,
+        )
+        self.assertIn("Choice A", res.display)
+        mock_app.ask_user.assert_awaited_once()
+        passed_qs = mock_app.ask_user.call_args[0][0]
+        self.assertEqual(
+            passed_qs[0]["options"],
+            [{"label": "Choice A", "description": ""}, {"label": "Choice B", "description": ""}],
+        )
+
     async def test_cancelled_flow(self):
         tool = AskUserTool()
         mock_app = MagicMock()
@@ -189,7 +205,7 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
                         "options": [
                             {"label": "A", "description": "Desc A"},
                             {"label": "B (Recommended)", "description": "Desc B"},
-                            "invalid_string_option",
+                            123,
                             None,
                             {"label": ""},
                         ],
