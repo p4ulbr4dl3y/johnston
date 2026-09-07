@@ -132,7 +132,7 @@ class TurnExecutionMixin:
 
                 # Execute concurrently and preserve original order
                 batch_results = await asyncio.gather(*(self._execute_single_tool(tc, role_def) for tc, _ in batch))
-                for (tc, _), (t_id, display_result, resolved) in zip(batch, batch_results):
+                for (tc, _), (t_id, display_result, resolved) in zip(batch, batch_results, strict=True):
                     cur_name = tc.get("name", "")
                     tid = getattr(resolved, "task_id", None) or getattr(resolved, "background_task_id", None)
                     log_p = getattr(resolved, "log_path", None)

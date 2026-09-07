@@ -668,13 +668,36 @@ async def test_shell_readonly_sandbox_unsupported_fails_closed(tool, make_tool_c
 
 async def test_shell_readonly_blocks_mutating_git_commands(tool, make_tool_context):
     ctx = make_tool_context(is_subagent=True, sandbox_enabled=True, is_read_only=True)
-    res = await tool.execute({"command": "git commit -m 'test'"}, ctx=ctx)
-    assert res.is_error
-    assert "git commit is not permitted in read-only role" in str(res)
+    bypasses = [
+        "git commit -m 'test'",
+        "git push origin main",
+        "VAR=val git commit -m 'test'",
+        "(git commit -m 'test')",
+        "( git commit -m 'test' )",
+        "git --exec-path /usr/bin commit",
+        "git -C /tmp commit -m 'test'",
+        "git -c user.name=foo commit -m 'test'",
+        "git.exe commit -m 'test'",
+        r'"C:\Program Files\Git\bin\git.exe" commit -m "test"',
+        "sudo git push",
+        "env VAR=1 time git rebase main",
+    ]
+    for cmd in bypasses:
+        res = await tool.execute({"command": cmd}, ctx=ctx)
+        assert res.is_error, f"Expected {cmd} to be blocked"
+        assert "not permitted in read-only role" in str(res)
 
-    res_push = await tool.execute({"command": "git push origin main"}, ctx=ctx)
-    assert res_push.is_error
-    assert "git push is not permitted in read-only role" in str(res_push)
+
+async def test_shell_readonly_windows_mutations_blocked():
+    from tools.shell import _check_read_only_command_mutations
+
+    with patch("platform.system", return_value="Windows"):
+        assert _check_read_only_command_mutations(r"C:\Git\bin\git.exe commit -m test") is not None
+        assert _check_read_only_command_mutations("del /f foo.txt") is not None
+        assert _check_read_only_command_mutations("rmdir /s /q bar") is not None
+        assert _check_read_only_command_mutations("echo test > output.txt") is not None
+        assert _check_read_only_command_mutations("echo test >> output.txt") is not None
+        assert _check_read_only_command_mutations("type foo.txt") is None
 
 
 async def test_shell_readonly_allows_grep_with_commit_word(tool, make_tool_context):

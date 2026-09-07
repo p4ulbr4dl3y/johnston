@@ -133,17 +133,42 @@ def _clean_cd_command(cmd: str, workspace_dir: str) -> tuple[str, Optional[str]]
     return (cleaned, None)
 
 
+_ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_PREFIX_WRAPPERS = {"sudo", "env", "time", "nice", "nohup", "exec"}
+_GIT_OPTS_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
+_MUTATING_GIT = {
+    "commit",
+    "push",
+    "checkout",
+    "switch",
+    "reset",
+    "merge",
+    "rebase",
+    "revert",
+    "clean",
+    "cherry-pick",
+}
+
+
 def _check_read_only_command_mutations(cmd: str) -> Optional[str]:
     """Inspect shell command for mutating operations in read-only mode using shlex."""
     import shlex
 
+    is_win = platform.system() == "Windows"
     try:
-        tokens = shlex.split(cmd)
+        raw_tokens = [t.strip("\"'") for t in shlex.split(cmd, posix=not is_win)]
     except Exception:
-        tokens = cmd.split()
+        raw_tokens = cmd.split()
 
-    if not tokens:
+    if not raw_tokens:
         return None
+
+    # Strip grouping parentheses from tokens e.g. (git -> git
+    tokens = []
+    for t in raw_tokens:
+        clean_t = t.strip("()")
+        if clean_t:
+            tokens.append(clean_t)
 
     subcmds: list[list[str]] = []
     curr: list[str] = []
@@ -157,40 +182,50 @@ def _check_read_only_command_mutations(cmd: str) -> Optional[str]:
     if curr:
         subcmds.append(curr)
 
-    mutating_git = {
-        "commit",
-        "push",
-        "checkout",
-        "switch",
-        "reset",
-        "merge",
-        "rebase",
-        "revert",
-        "clean",
-        "cherry-pick",
-    }
-
     for sc in subcmds:
         if not sc:
             continue
-        base = os.path.basename(sc[0]).lower()
+
+        # Skip leading env assignments (e.g. VAR=val) and wrapper commands (sudo, env, etc.)
+        idx = 0
+        while idx < len(sc) and _ENV_VAR_RE.match(sc[idx]):
+            idx += 1
+        while idx < len(sc):
+            cand = sc[idx].replace("\\", "/").rsplit("/", 1)[-1].lower()
+            if cand.endswith(".exe"):
+                cand = cand[:-4]
+            if cand in _PREFIX_WRAPPERS:
+                idx += 1
+                while idx < len(sc) and _ENV_VAR_RE.match(sc[idx]):
+                    idx += 1
+                continue
+            break
+        if idx >= len(sc):
+            continue
+
+        base = sc[idx].replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if base.endswith(".exe"):
+            base = base[:-4]
+
         if base == "git":
-            i = 1
+            i = idx + 1
             while i < len(sc):
                 t = sc[i]
                 if t.startswith("-"):
-                    if t in ("-C", "-c", "--git-dir", "--work-tree"):
+                    if "=" in t:
+                        i += 1
+                    elif t in _GIT_OPTS_WITH_ARG:
                         i += 2
                     else:
                         i += 1
                 else:
-                    if t.lower() in mutating_git:
+                    if t.lower() in _MUTATING_GIT:
                         return f"git {t.lower()} is not permitted in read-only role"
                     break
 
         if platform.system() == "Windows":
             if base in ("del", "erase", "rmdir", "rd", "move", "ren", "rename"):
-                return f"mutating command '{base}' is not permitted in read-only role"
+                return f"mutating command {base} is not permitted in read-only role"
             for t in sc:
                 if t in (">", ">>", "1>", "2>"):
                     return "file write redirects are not permitted in read-only role on Windows"
