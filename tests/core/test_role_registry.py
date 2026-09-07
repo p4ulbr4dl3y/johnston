@@ -599,6 +599,8 @@ class TestDefaultRoles:
         assert rev.read_only is True
         assert "<scope>" in rev.prompt
         assert "<rules>" in rev.prompt
+        assert "Adversarial verification" in rev.prompt
+        assert "reading code is not verification" in rev.prompt
         assert "VERDICT: APPROVE" in rev.prompt
 
 

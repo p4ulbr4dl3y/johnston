@@ -47,13 +47,13 @@ Use the builtin `reviewer` role via `invoke_subagent`:
 
 ```python
 invoke_subagent(
-    title="Code Review - Iteration N",
-    prompt="Audit current changes via git diff and relevant tests. Return findings with severity P0-P3 and final VERDICT.",
+    title="Review & Verification - Iteration N",
+    prompt="Audit current changes via git diff and execute adversarial verification via shell (probe edge cases, boundary inputs, failure paths). Return findings with severity P0-P3 and final VERDICT.",
     type="reviewer",
 )
 ```
 
-*Note: The `reviewer` role is read-only (`read_only: true`), runs directly in the current workspace without worktree branching, and enforces defect-first rules (>80% confidence, ignore style nits, require provable impact).*
+*Note: The `reviewer` role is read-only (`read_only: true`), runs directly in the current workspace without worktree branching, and enforces defect-first rules (>80% confidence, ignore style nits, require provable impact, and run active adversarial verification via shell before approving).*
 
 ### Step 3: Handling Verdicts
 
@@ -74,5 +74,6 @@ invoke_subagent(
 
 ## Loop Invariants
 - **Stateless Reviewer**: Never pass previous review transcripts to new reviewer subagents. Each reviewer must evaluate the codebase with fresh eyes.
+- **Adversarial Verification**: Reading code is not verification. Reviewer must actively run tests and edge-case commands via `shell` before emitting `VERDICT: APPROVE`.
 - **Diff Grounding**: Findings must strictly cite lines introduced by the reviewed change. Pre-existing issues outside the diff are out of scope.
 - **Hard Cap**: Exactly 3 iterations maximum.
