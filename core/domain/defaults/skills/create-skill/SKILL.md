@@ -1,6 +1,7 @@
 ---
-name: skill-creator
-description: Create new Johnston skills, iterate on existing skills, structure multi-tier references, and optimize triggering descriptions. Use when users want to create a skill from scratch, edit or optimize an existing skill, or design test cases for skills.
+name: create-skill
+description: Create new Johnston skills, iterate on existing skills, structure multi-tier references, and optimize triggering descriptions. Use when user says /create-skill, wants to create a skill from scratch, or edit an existing skill.
+hidden: true
 ---
 
 # Skill Creator

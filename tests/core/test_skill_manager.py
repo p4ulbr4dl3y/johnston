@@ -68,7 +68,7 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
             shutil.rmtree(global_tmp)
 
     def test_matching_global_and_project_dir_scope(self):
-        sm = SkillManager(project_dir=self.test_dir)
+        sm = SkillManager(project_dir=self.test_dir, include_bundled=False)
         sm.global_dir = sm.project_dir_skills
 
         g_skill_dir = os.path.join(sm.global_dir, "home-skill")
@@ -130,8 +130,12 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
 
     def test_johnston_guide_references_created(self):
         sm = get_skill_manager()
-        guide_dir = os.path.join(sm.global_dir, "johnston-guide")
-        self.assertTrue(os.path.exists(os.path.join(guide_dir, "SKILL.md")))
+        guide = sm.get_skill("johnston-guide")
+        self.assertIsNotNone(guide)
+        self.assertEqual(guide.scope.value, "bundled")
+        self.assertTrue(guide.location.endswith("SKILL.md"))
+        self.assertTrue(os.path.exists(guide.location))
+        guide_dir = os.path.dirname(guide.location)
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "cli_flags.md")))
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "mcp.md")))
         self.assertTrue(os.path.exists(os.path.join(guide_dir, "references", "roles.md")))
@@ -204,18 +208,44 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
             SkillManager(project_dir=self.test_dir)
         mock_makedirs.assert_not_called()
 
-    def test_get_skill_manager_provisions_bundled_skill(self):
+    def test_get_skill_manager_bundled_skills_no_disk_copy(self):
         _reset_skill_managers()
         with patch(
             "core.application.skills.manager.GLOBAL_SKILLS_DIR",
             os.path.join(self.test_dir, "global-skills"),
         ):
-            get_skill_manager()
+            sm = get_skill_manager()
             guide_md = os.path.join(self.test_dir, "global-skills", "johnston-guide", "SKILL.md")
-            self.assertTrue(os.path.exists(guide_md))
-            # Second call must not re-provision (flag set), and returns the cached manager.
+            self.assertFalse(os.path.exists(guide_md))
+            skill_names = [s.name for s in sm.list_skills()]
+            self.assertIn("johnston-guide", skill_names)
+            guide = sm.get_skill("johnston-guide")
+            self.assertEqual(guide.scope.value, "bundled")
             sm_cached = get_skill_manager()
-            self.assertIs(get_skill_manager(), sm_cached)
+            self.assertIs(sm, sm_cached)
+
+    def test_three_tier_precedence(self):
+        sm = SkillManager(project_dir=self.test_dir)
+        # 1. Base bundled skill
+        self.assertEqual(sm.get_skill("goal").scope.value, "bundled")
+
+        # 2. Override with Global
+        g_skill_dir = os.path.join(sm.global_dir, "goal")
+        os.makedirs(g_skill_dir, exist_ok=True)
+        with open(os.path.join(g_skill_dir, "SKILL.md"), "w") as f:
+            f.write("---\nname: goal\ndescription: Global goal\n---\nGlobal body.")
+        sm.invalidate_cache()
+        self.assertEqual(sm.get_skill("goal").scope.value, "global")
+        self.assertEqual(sm.get_skill("goal").description, "Global goal")
+
+        # 3. Override with Project
+        p_skill_dir = os.path.join(sm.project_dir_skills, "goal")
+        os.makedirs(p_skill_dir, exist_ok=True)
+        with open(os.path.join(p_skill_dir, "SKILL.md"), "w") as f:
+            f.write("---\nname: goal\ndescription: Project goal\n---\nProject body.")
+        sm.invalidate_cache()
+        self.assertEqual(sm.get_skill("goal").scope.value, "project")
+        self.assertEqual(sm.get_skill("goal").description, "Project goal")
 
     def test_toggle_hidden_unknown_skill_raises_key_error(self):
         sm = SkillManager(project_dir=self.test_dir)

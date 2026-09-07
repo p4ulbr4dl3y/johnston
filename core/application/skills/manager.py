@@ -12,10 +12,10 @@ import time
 from typing import Dict, List, Optional
 
 from core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
-from core.domain.defaults.skills.loader import BundledSkill, get_bundled_skill, list_bundled_skills
+from core.domain.defaults.skills.loader import load_bundled_skills
 from core.domain.entities.skills import Skill, SkillScope
+from core.infrastructure.config.settings import SkillsSettings, get_settings, patch_settings
 from core.infrastructure.platform.paths import CONFIG_DIR
-from core.infrastructure.platform.platform_utils import atomic_write_text
 from core.infrastructure.runtime.frontmatter import parse_frontmatter
 from core.infrastructure.runtime.fs_signature import compute_dir_signature_recursive
 
@@ -43,10 +43,11 @@ class SkillManager:
 
     _CACHE_TTL = 2.0  # seconds
 
-    def __init__(self, project_dir: Optional[str] = None):
+    def __init__(self, project_dir: Optional[str] = None, include_bundled: bool = True):
         self.project_dir = os.path.realpath(project_dir or os.getcwd())
         self.global_dir = GLOBAL_SKILLS_DIR
         self.project_dir_skills = os.path.join(self.project_dir, PROJECT_SKILLS_DIR_NAME)
+        self.include_bundled = include_bundled
         self._scan_signature: Optional[tuple] = None
         self._scan_cache: Optional[List[Skill]] = None
         self._scan_ts: float = 0.0
@@ -104,18 +105,27 @@ class SkillManager:
             filenames=["SKILL.md"],
             skip_dir=_skip,
         )
-        return tuple(entries)
+        try:
+            hidden_sig = tuple(sorted(get_settings().skills.hidden.items()))
+        except Exception:
+            hidden_sig = ()
+        return (tuple(entries), hidden_sig)
 
     def _scan_skills(self) -> tuple:
-        """Scans both skill trees in a single walk, returning (skills, signature).
-        The signature is computed from the same walk that discovers skills, so a
-        cache miss costs exactly one full tree traversal instead of two or three.
+        """Scans bundled, global and project skills, returning (skills, signature).
+        Project skills override global skills, which in turn override bundled skills.
         """
         skills_map: Dict[str, Skill] = {}
         signature_entries: List[tuple] = []
         real_global = os.path.realpath(self.global_dir)
         real_project = os.path.realpath(self.project_dir_skills)
 
+        # 1. Base layer: bundled skills directly from package data
+        if self.include_bundled:
+            for b_skill in load_bundled_skills():
+                skills_map[b_skill.name.lower()] = b_skill
+
+        # 2. Overlays: Global then Project
         for scope, dir_path in [("global", self.global_dir), ("project", self.project_dir_skills)]:
             if scope == "project" and real_project == real_global:
                 continue
@@ -151,7 +161,7 @@ class SkillManager:
                 cached_entry = parsed_cache.get(filepath)
                 if cached_entry and cached_entry[1] == mtime_ns and cached_entry[2] == size:
                     skill = cached_entry[0]
-                    skills_map[skill.name] = skill
+                    skills_map[skill.name.lower()] = skill
                     continue
 
                 try:
@@ -190,7 +200,24 @@ class SkillManager:
                     hidden=is_hidden,
                 )
                 parsed_cache[filepath] = (skill, mtime_ns, size)
-                skills_map[name] = skill
+                skills_map[name.lower()] = skill
+
+        # 3. Apply hidden status overrides from settings without mutating cached instances
+        try:
+            hidden_overrides = get_settings().skills.hidden
+            for name_lower, skill in list(skills_map.items()):
+                override = hidden_overrides.get(name_lower)
+                if override is not None and skill.hidden != bool(override):
+                    skills_map[name_lower] = Skill(
+                        name=skill.name,
+                        description=skill.description,
+                        location=skill.location,
+                        content=skill.content,
+                        scope=skill.scope,
+                        hidden=bool(override),
+                    )
+        except Exception:
+            logger.debug("Failed to apply skills.hidden settings override", exc_info=True)
 
         skills = list(skills_map.values())
         return skills, tuple(signature_entries)
@@ -209,57 +236,25 @@ class SkillManager:
         return None
 
     def toggle_hidden(self, name: str) -> bool:
-        """
-        Toggles the 'hidden' attribute of a skill in its frontmatter.
-        Returns the new hidden state (True = hidden, False = visible).
+        """Toggles the 'hidden' attribute of a skill in user settings (config.json).
 
-        Raises KeyError for an unknown skill. Write failures are logged and
-        re-raised so callers stay in sync with disk instead of silently
-        diverging from it.
+        Returns the new hidden state (True = hidden, False = visible).
+        Raises KeyError for an unknown skill.
         """
         skill = self.get_skill(name, include_hidden=True)
-        if not skill or not skill.location:
+        if not skill:
             raise KeyError(f"Unknown skill: {name!r}")
 
-        filepath = skill.location
+        new_hidden = not skill.hidden
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            new_hidden = not skill.hidden
-
-            if content.startswith("---"):
-                parts = content.split("---", 2)
-                if len(parts) >= 3:
-                    fm_lines = parts[1].splitlines()
-                    new_fm_lines = []
-                    found_hidden = False
-
-                    for line in fm_lines:
-                        sline = line.strip().lower()
-                        if sline.startswith("hidden:"):
-                            found_hidden = True
-                            new_fm_lines.append(f"hidden: {str(new_hidden).lower()}")
-                        else:
-                            new_fm_lines.append(line)
-
-                    if not found_hidden:
-                        new_fm_lines.append(f"hidden: {str(new_hidden).lower()}")
-
-                    new_fm_str = "\n".join(line_item for line_item in new_fm_lines if line_item.strip())
-                    body = parts[2].lstrip("\r\n")
-                    new_content = f"---\n{new_fm_str}\n---\n{body}"
-                else:
-                    new_content = f"---\nhidden: {str(new_hidden).lower()}\n---\n{content}"
-            else:
-                new_content = f"---\nhidden: {str(new_hidden).lower()}\n---\n{content}"
-
-            atomic_write_text(filepath, new_content)
+            settings = get_settings()
+            current_dict = dict(settings.skills.hidden)
+            current_dict[skill.name.lower()] = new_hidden
+            patch_settings(skills=SkillsSettings(hidden=current_dict))
             self.invalidate_cache()
-
             return new_hidden
         except Exception:
-            logger.warning("Failed to toggle hidden for skill %r (%s)", name, filepath, exc_info=True)
+            logger.warning("Failed to toggle hidden in settings for skill %r", name, exc_info=True)
             raise
 
     def get_system_prompt_skills(self) -> List[Skill]:
@@ -272,29 +267,9 @@ class SkillManager:
 
 
 # Shared per-process managers keyed by resolved project dir, so every consumer
-# (UI screens, command providers, prompt builder) shares one scan cache and one
-# provisioning step instead of each instantiating its own manager.
-_SKILL_MANAGERS: Dict[str, SkillManager] = {}
+# (UI screens, command providers, prompt builder) shares one scan cache.
+_SKILL_MANAGERS: Dict[tuple, SkillManager] = {}
 _registry_lock = threading.Lock()
-_bundled_provisioned = False
-
-
-def _provision_skill_files(skill: BundledSkill) -> None:
-    """Write a bundled skill's files into the global skills dir if missing.
-
-    Existing files are left untouched so users can edit/remove their local
-    copies. Individual failures are logged and skipped.
-    """
-    skill_dir = os.path.join(GLOBAL_SKILLS_DIR, skill.name)
-    for rel_path, content in skill.files.items():
-        target_path = os.path.join(skill_dir, rel_path)
-        if os.path.exists(target_path):
-            continue
-        try:
-            os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            atomic_write_text(target_path, content)
-        except Exception:
-            logger.warning("Failed to write skill file: %s", target_path, exc_info=True)
 
 
 def get_skill_manager(project_dir: Optional[str] = None) -> SkillManager:
@@ -303,9 +278,6 @@ def get_skill_manager(project_dir: Optional[str] = None) -> SkillManager:
     Managers are cached by (resolved project dir, global skills dir) so that a
     change in configuration/global skills directory (e.g. per-test isolation)
     yields a fresh manager instead of reusing one that scans a stale directory.
-    Bundled default skills are provisioned into the global skills dir whenever a
-    new manager is created; ``_provision_skill_files`` is idempotent per file, so
-    this is cheap and only ever happens once per configuration in production.
     """
     key = (
         os.path.realpath(project_dir or os.getcwd()),
@@ -314,9 +286,6 @@ def get_skill_manager(project_dir: Optional[str] = None) -> SkillManager:
     with _registry_lock:
         mgr = _SKILL_MANAGERS.get(key)
         if mgr is None:
-            os.makedirs(GLOBAL_SKILLS_DIR, exist_ok=True)
-            for name in list_bundled_skills():
-                _provision_skill_files(get_bundled_skill(name))
             mgr = SkillManager(project_dir=key[0])
             _SKILL_MANAGERS[key] = mgr
         return mgr

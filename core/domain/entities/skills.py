@@ -9,6 +9,7 @@ class SkillScope(Enum):
 
     GLOBAL = "global"
     PROJECT = "project"
+    BUNDLED = "bundled"
 
 
 @dataclass

@@ -579,6 +579,31 @@ class SandboxSettings:
 
 
 @dataclass
+class SkillsSettings:
+    hidden: Dict[str, bool] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> SkillsSettings:
+        sec = data.get("skills") if isinstance(data.get("skills"), dict) else {}
+        raw = sec.get("hidden")
+        if raw is None and "hidden_skills" in data:
+            raw = data.get("hidden_skills")
+
+        mapping: Dict[str, bool] = {}
+        if isinstance(raw, list):
+            for item in raw:
+                s = str(item).strip().lower()
+                if s:
+                    mapping[s] = True
+        elif isinstance(raw, dict):
+            for k, v in raw.items():
+                s = str(k).strip().lower()
+                if s:
+                    mapping[s] = bool(v)
+        return cls(hidden=mapping)
+
+
+@dataclass
 class JohnstonSettings:
     model: Optional[str] = None
     theme: Optional[str] = None
@@ -589,6 +614,7 @@ class JohnstonSettings:
     subagents: SubagentsSettings = field(default_factory=SubagentsSettings)
     ui: UISettings = field(default_factory=UISettings)
     storage: StorageSettings = field(default_factory=StorageSettings)
+    skills: SkillsSettings = field(default_factory=SkillsSettings)
 
 
     @property
@@ -629,6 +655,7 @@ class JohnstonSettings:
             subagents=SubagentsSettings.from_dict(data),
             ui=UISettings.from_dict(data),
             storage=StorageSettings.from_dict(data),
+            skills=SkillsSettings.from_dict(data),
         )
 
 
@@ -722,9 +749,14 @@ def save_settings(settings: JohnstonSettings, config_file: Optional[str] = None)
             ("tools", settings.tools, ToolsSettings()),
             ("ui", settings.ui, UISettings()),
             ("storage", settings.storage, StorageSettings()),
+            ("skills", settings.skills, SkillsSettings()),
         ]:
             diff = _diff_dataclass(cur_obj, def_obj)
             if diff:
+                if sec_name == "skills" and isinstance(diff.get("hidden"), dict):
+                    h_dict = diff["hidden"]
+                    if all(v is True for v in h_dict.values()):
+                        diff = {"hidden": sorted(list(h_dict.keys()))}
                 data[sec_name] = diff
             else:
                 data.pop(sec_name, None)

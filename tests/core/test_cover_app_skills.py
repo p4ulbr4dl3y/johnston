@@ -15,9 +15,9 @@ from core.application.skills.manager import (
     Skill,
     SkillManager,
     SkillScope,
-    _provision_skill_files,
 )
-from core.domain.defaults.skills.loader import get_bundled_skill
+from core.domain.defaults.skills.loader import load_bundled_skills
+from core.infrastructure.config.settings import get_settings
 
 
 def _write_skill(dir_path, rel_dir, name_hint, frontmatter_lines, body="Body text."):
@@ -40,6 +40,7 @@ class _SkillManagerHarness:
         self.sm.project_dir = project_dir
         self.sm.global_dir = global_dir
         self.sm.project_dir_skills = os.path.join(project_dir, ".johnston", "skills")
+        self.sm.include_bundled = False
         self.sm._scan_signature = None
         self.sm._scan_cache = None
         self.sm._scan_ts = 0.0
@@ -51,15 +52,12 @@ def harness(tmp_path):
     return _SkillManagerHarness(tmp_path)
 
 
-def test_provision_skill_write_error_is_swallowed(tmp_path):
-    skill = get_bundled_skill("johnston-guide")
-
-    with patch("core.application.skills.manager.GLOBAL_SKILLS_DIR", str(tmp_path)), patch(
-        "core.application.skills.manager.atomic_write_text", side_effect=OSError("disk full")
-    ):
-        # Any files that raised simply get logged; no exception propagates.
-        _provision_skill_files(skill)
-    assert skill.files  # sanity: bundled skill has files to attempt
+def test_load_bundled_skills_returns_bundled_scope():
+    bundled = load_bundled_skills()
+    assert len(bundled) > 0
+    for s in bundled:
+        assert s.scope == SkillScope.BUNDLED
+        assert s.name
 
 
 def test_list_skills_reuses_cache_when_signature_unchanged(harness):
@@ -144,69 +142,36 @@ def test_toggle_hidden_missing_skill_raises_key_error(harness):
         harness.sm.toggle_hidden("nonexistent")
 
 
-def test_toggle_hidden_updates_user_invocable(harness):
+def test_toggle_hidden_updates_settings_without_modifying_file(harness):
     sm = harness.sm
     skill_dir = _write_skill(
         sm.global_dir,
         "invoc",
         None,
-        ["name: invoc", "description: d", "hidden: true", "user_invocable: true"],
+        ["name: invoc", "description: d", "hidden: true"],
     )
     target = os.path.join(skill_dir, "SKILL.md")
+    before_content = open(target, encoding="utf-8").read()
+
     result = sm.toggle_hidden("invoc")
     assert result is False  # was hidden -> now visible
-    with open(target, encoding="utf-8") as f:
-        content = f.read()
-    assert "hidden: false" in content
-    assert "user_invocable: true" in content  # user_invocable mirrors the new visible state
+    # File on disk must NOT be modified
+    assert open(target, encoding="utf-8").read() == before_content
+    assert get_settings().skills.hidden.get("invoc") is False
+
+    # Toggle back to hidden
+    result2 = sm.toggle_hidden("invoc")
+    assert result2 is True
+    assert open(target, encoding="utf-8").read() == before_content
+    assert get_settings().skills.hidden.get("invoc") is True
 
 
-def test_toggle_hidden_appends_hidden_when_not_present(harness):
+def test_toggle_hidden_error_in_settings_raises(harness):
     sm = harness.sm
-    skill_dir = _write_skill(sm.global_dir, "nohidden", None, ["name: nohidden", "description: d"])
-    target = os.path.join(skill_dir, "SKILL.md")
-    result = sm.toggle_hidden("nohidden")
-    assert result is True  # was visible -> now hidden
-    with open(target, encoding="utf-8") as f:
-        assert "hidden: true" in f.read()
-
-
-def test_toggle_hidden_truncated_frontmatter(harness):
-    sm = harness.sm
-    skill_dir = os.path.join(sm.global_dir, "truncated")
-    os.makedirs(skill_dir, exist_ok=True)
-    target = os.path.join(skill_dir, "SKILL.md")
-    with open(target, "w", encoding="utf-8") as f:
-        f.write("---\nname: truncated")  # only one '---' -> len(parts) < 3
-    assert sm.toggle_hidden("truncated") is True
-    with open(target, encoding="utf-8") as f:
-        assert f.read().startswith("---\nhidden: true")
-
-
-def test_toggle_hidden_no_frontmatter(harness):
-    sm = harness.sm
-    skill_dir = os.path.join(sm.global_dir, "plain")
-    os.makedirs(skill_dir, exist_ok=True)
-    target = os.path.join(skill_dir, "SKILL.md")
-    with open(target, "w", encoding="utf-8") as f:
-        f.write("just some plain markdown")
-    assert sm.toggle_hidden("plain") is True
-    with open(target, encoding="utf-8") as f:
-        assert f.read().startswith("---\nhidden: true\n---")
-
-
-def test_toggle_hidden_write_error_raises_and_keeps_disk_state(harness):
-    sm = harness.sm
-    skill_dir = _write_skill(sm.global_dir, "errorskill", None, ["name: errorskill", "description: d", "hidden: true"])
-    target = os.path.join(skill_dir, "SKILL.md")
-    before = open(target, encoding="utf-8").read()
-    with patch(
-        "core.application.skills.manager.atomic_write_text", side_effect=OSError("nope")
-    ):
-        # Write failure must surface to the caller instead of returning stale state.
-        with pytest.raises(OSError):
+    _write_skill(sm.global_dir, "errorskill", None, ["name: errorskill", "description: d"])
+    with patch("core.application.skills.manager.patch_settings", side_effect=RuntimeError("settings save error")):
+        with pytest.raises(RuntimeError):
             sm.toggle_hidden("errorskill")
-    assert open(target, encoding="utf-8").read() == before  # disk untouched
 
 
 def test_system_prompt_skills_empty(harness):

@@ -87,7 +87,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         self.filtered_skills = []
         self.filtered_options = []
         first_group = True
-        for scope in ("global", "project"):
+        for scope in ("global", "project", "bundled"):
             group = []
             for s, opt in zip(self.skills, self.options):
                 s_scope = getattr(s, "scope", None)
@@ -193,6 +193,12 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         new_opt = f"{stat_t} {s_name}"
         if highlighted < len(self.filtered_options):
             self.filtered_options[highlighted] = new_opt
+        for i, s in enumerate(self.skills):
+            if getattr(s, "name", "") == s_name:
+                setattr(s, "hidden", now_hidden)
+                if i < len(self.options):
+                    self.options[i] = new_opt
+                break
         try:
             opt_list.replace_option_prompt_at_index(highlighted, new_opt)
         except Exception:

@@ -2,24 +2,18 @@
 
 Each default skill lives as a directory ``<skill_name>/`` under
 ``core/domain/defaults/skills/`` containing ``SKILL.md`` and optional extra files
-(e.g. ``johnston-guide/references/*.md``). These are provisioned into the
-user's global skills directory on first run. Bundled files are read via
-:mod:`importlib.resources` so they also work from an installed wheel.
+(e.g. ``johnston-guide/references/*.md``). Bundled skills are loaded on the fly
+as domain Skill entities (with SkillScope.BUNDLED) without copying files to disk.
 """
 
-from dataclasses import dataclass
+import os
 from importlib import resources
-from typing import Dict, List
+from typing import List
+
+from core.domain.entities.skills import Skill, SkillScope
+from core.infrastructure.runtime.frontmatter import parse_frontmatter
 
 _PACKAGE = __package__
-
-
-@dataclass(frozen=True)
-class BundledSkill:
-    """A bundled default skill directory."""
-
-    name: str
-    files: Dict[str, str]  # rel_path within skill dir -> content
 
 
 def _is_skill_dir(name: str) -> bool:
@@ -35,24 +29,45 @@ def list_bundled_skills() -> List[str]:
     return sorted(names)
 
 
-def _collect_files(base) -> Dict[str, str]:
-    """Recursively collect {rel_path: content} under a Traversable dir."""
-    files: Dict[str, str] = {}
-    for entry in base.iterdir():
-        if entry.name.endswith(".pyc") or entry.name.startswith("."):
+def load_bundled_skills() -> List[Skill]:
+    """Load all bundled default skills as domain Skill entities."""
+    skills = []
+    for name in list_bundled_skills():
+        base = resources.files(_PACKAGE).joinpath(name)
+        skill_md = base.joinpath("SKILL.md")
+        try:
+            raw_content = skill_md.read_text(encoding="utf-8")
+        except Exception:
             continue
-        rel_path = entry.name
-        if entry.is_dir():
-            for sub_rel, content in _collect_files(entry).items():
-                files[f"{rel_path}/{sub_rel}"] = content
-        else:
-            files[rel_path] = entry.read_text(encoding="utf-8").strip()
-    return files
+        fm, body = parse_frontmatter(raw_content)
+        skill_name = fm.get("name") or name
+        desc = fm.get("description", "").strip()
+        if not desc and body:
+            lines = [
+                line.strip("# ").strip()
+                for line in body.splitlines()
+                if line.strip() and not line.startswith("#")
+            ]
+            desc = lines[0] if lines else ""
+        is_hidden = str(fm.get("hidden", "")).lower() in ("true", "1", "yes")
 
+        loc_str = ""
+        try:
+            p_str = str(skill_md)
+            if os.path.exists(p_str):
+                loc_str = p_str
+        except Exception:
+            pass
 
-def get_bundled_skill(name: str) -> BundledSkill:
-    """Return a bundled skill's files as {rel_path: content}."""
-    base = resources.files(_PACKAGE).joinpath(name)
-    if not base.is_dir() or not _is_skill_dir(name):
-        raise KeyError(f"No bundled skill named {name!r}")
-    return BundledSkill(name=name, files=_collect_files(base))
+        skills.append(
+            Skill(
+                name=skill_name,
+                description=desc,
+                location=loc_str,
+                content=body.strip(),
+                scope=SkillScope.BUNDLED,
+                hidden=is_hidden,
+            )
+        )
+    return skills
+

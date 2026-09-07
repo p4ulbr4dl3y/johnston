@@ -54,10 +54,10 @@ class ProviderManagerConfigMixin:
 
         if not os.path.exists(pm.PROVIDERS_JSON_FILE):
             try:
-                self._save_providers_json(pm.DEFAULT_JSON_PROVIDERS)
+                self._save_providers_json({})
                 self.invalidate_cache()
             except Exception:
-                logger.warning("Failed to save default providers JSON", exc_info=True)
+                logger.warning("Failed to initialize providers JSON", exc_info=True)
 
     def _load_json_providers(self) -> Dict[str, Dict[str, Any]]:
         """Merge user providers.json over built-in defaults.
@@ -102,8 +102,16 @@ class ProviderManagerConfigMixin:
             prov_data = cfg.get(key)
             if not isinstance(prov_data, dict):
                 prov_data = {}
-            prov_data["enabled"] = not disabled
-            cfg[key] = prov_data
+            if disabled:
+                prov_data["enabled"] = False
+                cfg[key] = prov_data
+            else:
+                prov_data.pop("enabled", None)
+                if not prov_data and key in pm.DEFAULT_JSON_PROVIDERS:
+                    cfg.pop(key, None)
+                else:
+                    prov_data["enabled"] = True
+                    cfg[key] = prov_data
 
         pm.update_json_config(pm.PROVIDERS_JSON_FILE, _mutate, indent=2)
         self.invalidate_cache()

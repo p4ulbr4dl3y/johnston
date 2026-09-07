@@ -1,6 +1,7 @@
 ---
-name: role-creator
-description: Create and configure specialized Johnston roles and subagents. Use when users want to create a new role or subagent, customize allowed tools or read-only access, pin a specific provider/model, or set up task-specific agent personas.
+name: create-role
+description: Create and configure specialized Johnston roles and subagents. Use when user says /create-role, wants to create a new role or subagent, customize allowed tools, or set up task-specific agent personas.
+hidden: true
 ---
 
 # Role Creator

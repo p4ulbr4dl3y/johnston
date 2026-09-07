@@ -92,7 +92,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "</anti_patterns>"
         ),
         read_only=True,
-        scope="any",
+        scope="subagent",
         source="builtin",
     ),
 }

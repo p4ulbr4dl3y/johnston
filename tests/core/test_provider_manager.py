@@ -74,7 +74,11 @@ class TestProviderManager(unittest.TestCase):
 
     def test_ensure_config_dir(self):
         self.assertTrue(os.path.exists(self.test_dir))
-        self.assertTrue(os.path.exists(os.path.join(self.test_dir, "providers.json")))
+        prov_file = os.path.join(self.test_dir, "providers.json")
+        self.assertTrue(os.path.exists(prov_file))
+        import json
+        with open(prov_file) as f:
+            self.assertEqual(json.load(f), {})
 
     def test_load_providers(self):
         providers = self.pm.load_providers()
@@ -149,11 +153,21 @@ class TestProviderManager(unittest.TestCase):
         disabled = self.pm.get_disabled_providers()
         self.assertIn("groq", disabled)
 
+        prov_file = os.path.join(self.test_dir, "providers.json")
+        import json
+        with open(prov_file) as f:
+            data = json.load(f)
+            self.assertEqual(data.get("groq"), {"enabled": False})
+            self.assertNotIn("openai", data)
+
         provs = self.pm.load_providers(include_disabled=False)
         self.assertNotIn("groq", provs)
 
         self.pm.set_provider_disabled("groq", False)
         self.assertNotIn("groq", self.pm.get_disabled_providers())
+        with open(prov_file) as f:
+            data = json.load(f)
+            self.assertNotIn("groq", data)
 
     def test_thinking_effort(self):
         self.pm.set_provider_thinking_effort("openai", "gpt-4o", "high")

@@ -247,6 +247,29 @@ class TestSkillsScreen(unittest.IsolatedAsyncioTestCase):
                 mock_exit.assert_called_once()
             break
 
+    async def test_bundled_skills_displayed_in_section(self):
+        skills_with_bundled = sample_skills() + [
+            Skill(
+                name="johnston-guide",
+                description="Builtin guide",
+                location="",
+                content="",
+                scope=SkillScope.BUNDLED,
+                hidden=False,
+            )
+        ]
+        with patch.object(SkillManager, "list_skills", return_value=skills_with_bundled):
+            screen = SkillsScreen()
+            app = DummyHostApp(screen)
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                opt_list = screen.query_one("#skills-option-list", OptionList)
+                # Option prompts must contain Bundled header and the bundled skill
+                prompts = [str(opt_list.get_option_at_index(i).prompt) for i in range(opt_list.option_count)]
+                self.assertIn("Bundled", prompts)
+                self.assertTrue(any("johnston-guide" in p for p in prompts))
+
 
 if __name__ == "__main__":
     unittest.main()
+
