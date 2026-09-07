@@ -135,6 +135,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Additional allowed workspace root directory",
     )
     parser.add_argument("-C", "--cwd", default=None, help="Change working directory")
+    parser.add_argument("-b", "--branch", default=None, help="Switch to git branch in an isolated worktree")
     parser.add_argument("--theme", default=None, help="UI theme override")
     parser.add_argument("--debug", action="store_true", help="Enable DEBUG logging level")
     parser.add_argument("-v", "--version", action="store_true", help="Show application version")
@@ -312,6 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Additional allowed workspace root directory",
     )
     run_p.add_argument("-C", "--cwd", default=None, help="Change working directory")
+    run_p.add_argument("-b", "--branch", default=None, help="Switch to git branch in an isolated worktree")
     run_p.add_argument(
         "-s",
         "--skill",
@@ -355,6 +357,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             from core.permission_manager import PermissionManager
 
             PermissionManager.get_instance().add_workspace_root(ws)
+
+    branch_wt_path = None
+    branch_name = None
+    if getattr(args, "branch", None):
+        raw_b = args.branch.strip()
+        if raw_b:
+            from core.infrastructure.runtime.git_worktree import GitWorktreeManager
+            from core.permission_manager import PermissionManager
+
+            cur_dir = os.getcwd()
+            if not GitWorktreeManager.is_git_repo(cur_dir):
+                sys.stderr.write(f"Error: Directory '{cur_dir}' is not a git repository.\n")
+                sys.exit(1)
+            repo_root = GitWorktreeManager.get_repo_root(cur_dir)
+            wt_path, actual_b = GitWorktreeManager.create_worktree(repo_root, raw_b)
+            if not wt_path or not os.path.exists(wt_path):
+                sys.stderr.write(f"Error: Failed to create or attach worktree for branch '{raw_b}'.\n")
+                sys.exit(1)
+            os.chdir(wt_path)
+            PermissionManager.get_instance().set_project_dir(wt_path)
+            branch_wt_path = wt_path
+            branch_name = actual_b
 
     if args.version:
         print(f"johnston {_dispatch_version()}")
@@ -415,6 +439,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         sandbox=sandbox_val,
         theme=getattr(args, "theme", None),
     )
+    if branch_wt_path and branch_name and hasattr(app, "switch_project_dir"):
+        app.switch_project_dir(branch_wt_path, branch_name)
     try:
         app.run()
     except KeyboardInterrupt:

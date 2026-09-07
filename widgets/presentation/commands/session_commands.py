@@ -428,7 +428,7 @@ class RewindCommand(BaseCommand):
 
 class ForkCommand(BaseCommand):
     name = "/fork"
-    aliases = ["/branch"]
+    aliases = []
     description = "Fork session from a selected message"
 
     async def execute(self, app) -> None:

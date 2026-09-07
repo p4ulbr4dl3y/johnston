@@ -191,7 +191,7 @@ def build_status_kwargs(app, widget=None) -> dict:
         "model_name": model_name,
         "clean_model": clean_model,
         "agent_role": agent_role,
-        "directory": os.getcwd(),
+        "directory": getattr(app, "project_dir", None) or os.getcwd(),
         "active_bg_tasks": active_bg_tasks,
         "subagents_active": subagents_active,
         "subagents_total": subagents_total,

@@ -245,6 +245,9 @@ def _setup_provider_and_agent(
 
         agent.sandbox_enabled = load_sandbox_config()
 
+    if getattr(args, "branch", None):
+        agent.worktree_branch = str(args.branch).strip()
+
     return (agent, provider_key, role, model, None)
 
 

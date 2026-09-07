@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from widgets.presentation.commands.base import BaseCommand
+from widgets.presentation.commands.branch_command import BranchCommand
 from widgets.presentation.commands.helpers import (
     cancel_active_workers,
     cancel_active_workers_and_tasks,
@@ -43,6 +44,7 @@ COMMAND_CLASSES = [
     ThinkingEffortCommand,
     ProvidersCommand,
     WorkspaceCommand,
+    BranchCommand,
     NewCommand,
     ResumeCommand,
     CompactCommand,
@@ -73,6 +75,7 @@ __all__ = [
     "ThinkingEffortCommand",
     "ProvidersCommand",
     "WorkspaceCommand",
+    "BranchCommand",
     "NewCommand",
     "ResumeCommand",
     "CompactCommand",

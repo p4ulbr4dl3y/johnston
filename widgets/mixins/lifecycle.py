@@ -297,3 +297,18 @@ class LifecycleMixin:
             footer.refresh_footer()
         except Exception as e:
             logger.debug(f"Error refreshing status footer: {e}")
+
+    def switch_project_dir(self, new_dir: str, branch: str = "") -> None:
+        self.project_dir = new_dir
+        try:
+            os.chdir(new_dir)
+        except Exception:
+            pass
+        from core.permission_manager import PermissionManager
+
+        PermissionManager.get_instance().set_project_dir(new_dir)
+        if getattr(self, "agent", None):
+            self.agent.project_dir = new_dir
+            self.agent.worktree_branch = branch
+        if hasattr(self, "refresh_status_footer"):
+            self.refresh_status_footer()

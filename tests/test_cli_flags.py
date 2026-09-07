@@ -57,6 +57,12 @@ class TestCLIRootParserFlags(unittest.TestCase):
         args2 = self.parser.parse_args(["--role", "reviewer"])
         self.assertEqual(args2.role, "reviewer")
 
+    def test_branch_flag(self):
+        args = self.parser.parse_args(["-b", "feat/test"])
+        self.assertEqual(args.branch, "feat/test")
+        args2 = self.parser.parse_args(["--branch", "feat/my-branch"])
+        self.assertEqual(args2.branch, "feat/my-branch")
+
     def test_mode_flag(self):
         for mode in ("review", "edits", "yolo"):
             args = self.parser.parse_args(["--mode", mode])
@@ -520,3 +526,26 @@ class TestMainEntrypointFlagDispatch(unittest.TestCase):
                 sandbox=True,
                 theme="zinc-dark",
             )
+
+    @patch("app.JohnstonApp.run")
+    def test_main_branch_flag_switches_worktree(self, mock_run):
+        with patch("app.JohnstonApp.__init__", return_value=None), \
+             patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=True), \
+             patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.get_repo_root", return_value="/fake/repo"), \
+             patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.create_worktree", return_value=("/fake/wt", "feat/cool")), \
+             patch("os.path.exists", return_value=True), \
+             patch("os.chdir") as mock_chdir, \
+             patch("app.JohnstonApp.switch_project_dir") as mock_switch:
+            with self.assertRaises(SystemExit) as cm:
+                main(["-b", "feat/cool"])
+            self.assertEqual(cm.exception.code, 0)
+            mock_chdir.assert_called_with("/fake/wt")
+            mock_switch.assert_called_once_with("/fake/wt", "feat/cool")
+
+    def test_main_branch_flag_not_git_repo(self):
+        with patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=False), \
+             patch("sys.stderr", new_callable=io.StringIO) as mock_err:
+            with self.assertRaises(SystemExit) as cm:
+                main(["-b", "feat/fail"])
+            self.assertEqual(cm.exception.code, 1)
+            self.assertIn("is not a git repository", mock_err.getvalue())

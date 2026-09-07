@@ -40,6 +40,7 @@ from core.domain.defaults.prompts import (
     SUBAGENT_DEFAULT_SYSTEM_PROMPT,
     SUBAGENT_WORKTREE_PROMPT,
     TOOL_OUTPUT_FORMAT_SNIPPET,
+    WORKTREE_PROMPT,
 )
 from core.infrastructure.runtime.lru import LruCache
 from core.infrastructure.runtime.xml_utils import escape_xml
@@ -48,6 +49,7 @@ __all__ = [
     "DEFAULT_SYSTEM_PROMPT",
     "SUBAGENT_DEFAULT_SYSTEM_PROMPT",
     "SUBAGENT_WORKTREE_PROMPT",
+    "WORKTREE_PROMPT",
     "PromptBuilder",
     "INSTRUCTION_FILES",
 ]
@@ -241,13 +243,12 @@ class PromptBuilder:
         )
 
     def _base_sys_prompt(self) -> str:
-        """Identity/contract prefix of the stable core: base prompt, model-name
-        substitution and (for subagents) the worktree-guidelines block.
+        """Identity/contract prefix of the stable core: base prompt and model-name substitution.
 
-        The role block is intentionally NOT included: it is represented in the
-        stable-core cache key by the role-definition identity (``_role_ident``)
-        instead, so the key can be computed before the disk-backed role
-        definition is loaded.
+        The role block and worktree guidelines are intentionally NOT included:
+        the role is represented in the stable-core cache key by role-definition identity,
+        and worktree guidelines are appended at the end of stable core to preserve
+        prompt prefix caching across branches.
         """
         sys_prompt = self.base_system_prompt if self.base_system_prompt else ""
         if "{model_name}" in sys_prompt:
@@ -271,13 +272,6 @@ class PromptBuilder:
                 ratio = int(DEFAULT_COMPACTION_THRESHOLD_RATIO * 100)
             sys_prompt = sys_prompt.replace("{compaction_ratio}", str(ratio))
 
-        if self.is_subagent and self.worktree_branch and "<worktree>" not in sys_prompt:
-            # Branch name is user-controlled and gets interpolated into the
-            # system prompt. Escape it so a name containing literal
-            # `</worktree>` cannot truncate the wrapper and inject
-            # arbitrary content.
-            safe_branch = escape_xml(self.worktree_branch)
-            sys_prompt += f"\n\n{SUBAGENT_WORKTREE_PROMPT.format(branch_name=safe_branch)}"
         return sys_prompt
 
     def _stable_core_key(
@@ -350,13 +344,13 @@ class PromptBuilder:
         Block order is designed for prompt-cache stability AND model attention:
         - identity+contract first (most-cacheable, most-anchoring)
         - role prompt (if main agent; user-customized)
-        - hard limits (if subagent)
-        - worktree guidelines (if subagent+worktree)
         - tool_io reference (so it caches once per session, not per turn)
+        - codebase navigation
         - rules (project can override defaults; ordered project > global)
         - skills (rarely changes; read-once)
         - subagents (only main)
         - mcp (only when mcp tools are present)
+        - worktree guidelines (if worktree_branch is active; placed at tail of stable core)
         """
         from core.role_registry import RoleRegistry
 
@@ -411,6 +405,14 @@ class PromptBuilder:
             sys_prompt = f"{sys_prompt}\n\n{subagents_snippet}"
         if mcp_snippet:
             sys_prompt = f"{sys_prompt}\n\n{mcp_snippet}"
+        if self.worktree_branch and "<worktree>" not in sys_prompt:
+            # Branch name is user-controlled and gets interpolated into the
+            # system prompt. Escape it so a name containing literal
+            # `</worktree>` cannot truncate the wrapper and inject
+            # arbitrary content. Placed at the end of stable_core (before env_block)
+            # to maximize prompt prefix cache hits across different branches.
+            safe_branch = escape_xml(self.worktree_branch)
+            sys_prompt = f"{sys_prompt}\n\n{WORKTREE_PROMPT.format(branch_name=safe_branch)}"
 
         _STABLE_CORE_CACHE.put(key, sys_prompt)
         return sys_prompt

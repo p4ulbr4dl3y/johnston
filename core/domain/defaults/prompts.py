@@ -207,15 +207,17 @@ Session history is persisted. Parent may send follow-up messages to resume this 
 
 
 # =============================================================================
-# WORKTREE GUIDELINES (concatenated when subagent has worktree)
+# WORKTREE GUIDELINES (concatenated when worktree is active)
 # =============================================================================
 
-SUBAGENT_WORKTREE_PROMPT = """<worktree>
+WORKTREE_PROMPT = """<worktree>
 - Branch: `{branch_name}` (isolated git worktree).
 - Relative paths ONLY. Absolute worktree path is irrelevant.
 - Do NOT `git checkout/switch`, merge, or push.
-- Uncommitted changes auto-commit on completion. No manual `git commit` needed.
+- Do NOT `git commit` unless explicitly instructed by user.
 </worktree>"""
+
+SUBAGENT_WORKTREE_PROMPT = WORKTREE_PROMPT
 
 
 # =============================================================================
