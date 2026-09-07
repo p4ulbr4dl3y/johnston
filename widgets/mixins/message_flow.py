@@ -40,6 +40,16 @@ class MessageFlowMixin:
 
     """Chat input handling, AI response generation and message queueing for JohnstonApp."""
 
+    _is_compacting: bool = False
+
+    @property
+    def is_compacting(self) -> bool:
+        return getattr(self, "_is_compacting", False)
+
+    @is_compacting.setter
+    def is_compacting(self, value: bool) -> None:
+        self._is_compacting = bool(value)
+
     async def on_paste(self, event: events.Paste) -> None:
         """Forward application-level paste/drag-and-drop events to ChatInput"""
         from textual.screen import ModalScreen
@@ -163,7 +173,7 @@ class MessageFlowMixin:
             norm_word = normalize_homoglyphs(first_word)
             from widgets.presentation.commands.session_commands import CompactCommand
 
-            if self.is_generating and COMMAND_REGISTRY.get(norm_word) is CompactCommand:
+            if (self.is_generating or getattr(self, "is_compacting", False)) and COMMAND_REGISTRY.get(norm_word) is CompactCommand:
                 self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
                 return
             asyncio.create_task(self._exec_slash_command(user_text, attachments=attachments))
@@ -174,7 +184,7 @@ class MessageFlowMixin:
             if not cmd:
                 self.notify("No shell command specified", severity="warning")
                 return
-            if self.is_generating:
+            if self.is_generating or getattr(self, "is_compacting", False):
                 self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
             else:
                 asyncio.create_task(self._exec_shell_command(cmd, user_text=user_text))
@@ -201,7 +211,7 @@ class MessageFlowMixin:
                 pass
 
         kwargs = {"attachments": attachments} if attachments else {}
-        if self.is_generating:
+        if self.is_generating or getattr(self, "is_compacting", False):
             self._queue_message_ui(user_text, show_in_ui=True, attachments=attachments)
         else:
             self.trigger_ai_response(user_text, show_in_ui=True, **kwargs)
@@ -210,10 +220,9 @@ class MessageFlowMixin:
         self, prompt: str, show_in_ui: bool = False, attachments: list = None, **kwargs
     ) -> None:
         """Safely trigger AI response generation, or queue prompt if currently generating."""
-        if getattr(self, "is_generating", False):
+        if getattr(self, "is_generating", False) or getattr(self, "is_compacting", False):
             self._queue_message_ui(prompt, show_in_ui=show_in_ui, attachments=attachments, **kwargs)
         else:
-            self.is_generating = True
             kw = {}
             if attachments:
                 kw["attachments"] = attachments
@@ -233,6 +242,7 @@ class MessageFlowMixin:
         # ---- connectivity check (mixin-level) ----
         state = ensure_provider_ready(self.pm, self.agent)
         if state is not ProviderReadyState.READY:
+            self.is_generating = False
             if state is ProviderReadyState.NEEDS_PROVIDER:
                 from widgets.presentation.commands import ProvidersCommand
 
@@ -241,7 +251,6 @@ class MessageFlowMixin:
                 from widgets.presentation.commands import ModelsCommand
 
                 await ModelsCommand().execute(self)
-            self.is_generating = False
             return
 
         self._apply_pending_fork_or_readonly()

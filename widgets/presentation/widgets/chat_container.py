@@ -83,8 +83,9 @@ class ChatView(ChatViewHintsMixin, ChatViewScrollMixin, ChatViewHistoryMixin, Ve
         thinking_text: str = "Thinking...",
         animate: bool = False,
         before: Any = None,
+        is_active: bool = True,
     ) -> ThinkingWidget:
-        widget = ThinkingWidget(thinking_text)
+        widget = ThinkingWidget(thinking_text, is_active=is_active)
         if self.auto_expand_all and widget.is_expandable():
             widget.is_expanded = True
         should_scroll = not self._is_loading_session and self.is_at_bottom() if before is None else False

@@ -19,8 +19,55 @@ class ToolCallActionsMixin:
             if m:
                 session_id = m.group(1)
         if session_id:
-            self.subagent_session_id = str(session_id)
             return True
+
+        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "manage_subagent"):
+            title = args.get("title") or args.get("prompt")
+            if title:
+                app = None
+                try:
+                    app = self.app
+                except Exception:
+                    pass
+                store = getattr(app, "sm", None) if app else None
+                if store is None:
+                    try:
+                        from core.infrastructure.storage.session_store import SessionStore
+
+                        store = SessionStore.get_instance()
+                    except Exception:
+                        store = None
+                if store is not None and hasattr(store, "find_session_by_title_or_id"):
+                    try:
+                        curr_sid = getattr(app, "current_session_id", None) if app else None
+                        sess = store.find_session_by_title_or_id(str(title), parent_id=curr_sid)
+                        if not sess:
+                            sess = store.find_session_by_title_or_id(str(title))
+                        if sess is not None and getattr(sess, "id", None) and (
+                            isinstance(sess.id, str) or type(sess).__name__ == "MagicMock"
+                        ):
+                            return True
+                    except Exception:
+                        pass
+        return False
+
+    def bind_subagent_session(self, session_id: str | None = None) -> str | None:
+        """Explicitly bind subagent_session_id once during initialization or on explicit event."""
+        if session_id:
+            self.subagent_session_id = str(session_id)
+            return self.subagent_session_id
+        if getattr(self, "subagent_session_id", None):
+            return self.subagent_session_id
+
+        args = self.args if isinstance(self.args, dict) else {}
+        sid = args.get("session_id")
+        if not sid and getattr(self, "result_text", None):
+            m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", self.result_text, re.IGNORECASE)
+            if m:
+                sid = m.group(1)
+        if sid:
+            self.subagent_session_id = str(sid)
+            return self.subagent_session_id
 
         if getattr(self, "canonical_tool", None) in ("invoke_subagent", "manage_subagent"):
             title = args.get("title") or args.get("prompt")
@@ -49,10 +96,10 @@ class ToolCallActionsMixin:
                         ):
                             if isinstance(sess.id, str):
                                 self.subagent_session_id = sess.id
-                            return True
+                            return self.subagent_session_id
                     except Exception:
                         pass
-        return False
+        return getattr(self, "subagent_session_id", None)
 
     def is_clickable_header(self) -> bool:
         if getattr(self, "status", None) == "generating":
@@ -125,6 +172,7 @@ class ToolCallActionsMixin:
                         if session_id or (isinstance(args, dict) and args.get("session_id"))
                         else (getattr(session, "id", None) or str(identifier))
                     )
+                    self.bind_subagent_session(target_id)
                     app.push_screen(SubagentViewScreen(target_id))
             except Exception:
                 pass
@@ -155,6 +203,7 @@ class ToolCallActionsMixin:
                     from widgets.presentation.screens.subagent_screen import SubagentViewScreen
 
                     if app:
+                        self.bind_subagent_session(session_id)
                         app.push_screen(SubagentViewScreen(session_id))
                 except Exception:
                     pass

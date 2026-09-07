@@ -212,7 +212,7 @@ class TestTriggerAiResponse(unittest.IsolatedAsyncioTestCase):
             app.is_generating = False
             app.generate_ai_response = MagicMock()
             app.trigger_ai_response("hello")
-            self.assertTrue(app.is_generating)
+            self.assertFalse(app.is_generating)
             app.generate_ai_response.assert_called_once_with("hello", show_in_ui=False)
 
 

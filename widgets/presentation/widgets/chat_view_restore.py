@@ -43,7 +43,7 @@ async def restore_message_item(
     elif mtype == "thinking":
         dur = msg.get("duration", 0.0)
         txt = msg.get("text", "")
-        tw = await chat_view.add_thinking_widget(animate=False, **kw)
+        tw = await chat_view.add_thinking_widget(animate=False, is_active=False, **kw)
         if hasattr(tw, "finish_thinking"):
             tw.finish_thinking(dur, txt)
         return tw
@@ -100,8 +100,6 @@ async def restore_message_item(
                                 )
                     except Exception:
                         pass
-        if sub_id:
-            msg["subagent_session_id"] = str(sub_id)
 
         widget = await chat_view.add_tool_call(
             ttype,
@@ -111,7 +109,7 @@ async def restore_message_item(
             status=status,
             returncode=msg.get("returncode"),
             animate=False,
-            subagent_session_id=sub_id,
+            subagent_session_id=str(sub_id) if sub_id is not None else None,
             background_task_id=task_id,
             log_path=msg.get("log_path"),
             **kw,

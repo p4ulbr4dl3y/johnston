@@ -91,6 +91,7 @@ def reset_app_state(
     app,
     *,
     is_generating: bool = False,
+    is_compacting: bool = False,
     is_read_only: bool = False,
     clear_queue: bool = True,
     session_id: str | None = None,
@@ -99,6 +100,8 @@ def reset_app_state(
 ) -> None:
     """Reset standard UI state flags and message queues."""
     app.is_generating = is_generating
+    app._is_compacting = is_compacting
+    app.is_compacting = is_compacting
     app.is_read_only = is_read_only
     if clear_pending_fork and hasattr(app, "pending_fork"):
         app.pending_fork = None

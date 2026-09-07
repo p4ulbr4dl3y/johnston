@@ -421,19 +421,21 @@ class ThinkingWidget(Vertical):
     ALLOW_SELECT = False
     HINT_DEBOUNCE_SECONDS: float = 0.25
 
-    def __init__(self, thinking_text: str = ""):
-        super().__init__(classes="thinking-widget thinking-active")
+    def __init__(self, thinking_text: str = "", is_active: bool = True):
+        classes = "thinking-widget thinking-active" if is_active else "thinking-widget"
+        super().__init__(classes=classes)
         initial = "" if thinking_text == "Thinking..." else thinking_text
         self._thinking_parts: list[str] = [initial] if initial else []
         self._cached_thinking_text: str | None = initial
         self.duration_seconds = 0.0
-        self.is_thinking = True
+        self.is_thinking = is_active
         self.is_expanded = False
         self._update_scheduled = False
         self._update_handle: asyncio.TimerHandle | None = None
         self._show_hints = False
         self._hint_handle: asyncio.TimerHandle | None = None
-        self._schedule_hint_timer()
+        if is_active:
+            self._schedule_hint_timer()
 
         self.header_label = Label("", classes="thinking-header")
         self.content_widget = Static("", markup=False, classes="thinking-content")

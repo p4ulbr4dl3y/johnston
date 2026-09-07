@@ -51,6 +51,8 @@ def build_agent(app) -> None:
     app.selection_copy_active = False
     app.message_queue = []
     app.is_generating = False
+    app._is_compacting = False
+    app.is_compacting = False
     app._background_tasks: set[asyncio.Task] = set()
 
 

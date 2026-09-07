@@ -167,7 +167,11 @@ class CompactCommand(BaseCommand):
     description = "Compact session conversation history"
 
     async def execute(self, app) -> None:
-        if getattr(app, "is_generating", False):
+        if (
+            getattr(app, "is_generating", False)
+            or getattr(app, "is_compacting", False)
+            or getattr(app, "_is_compacting", False)
+        ):
             if hasattr(app, "_queue_message_ui"):
                 app._queue_message_ui(self.name, show_in_ui=True)
             elif hasattr(app, "notify"):
@@ -187,7 +191,8 @@ class CompactCommand(BaseCommand):
 
     async def _run_compaction(self, app) -> None:
         """Run the compaction body; cancellation is recorded, never leaks state."""
-        app.is_generating = True
+        app._is_compacting = True
+        app.is_compacting = True
         try:
             if not hasattr(app, "agent") or not app.agent:
                 app.notify("No active agent found", severity="error")
@@ -211,7 +216,8 @@ class CompactCommand(BaseCommand):
                         pass
 
             def on_begin() -> None:
-                app.is_generating = True
+                app._is_compacting = True
+                app.is_compacting = True
 
             def on_divider_update(title: str) -> None:
                 nonlocal divider
@@ -236,7 +242,8 @@ class CompactCommand(BaseCommand):
             if not outcome.success:
                 app.notify(outcome.message or "Context compaction failed", severity="warning")
         finally:
-            app.is_generating = False
+            app._is_compacting = False
+            app.is_compacting = False
             is_active = bool(
                 getattr(app, "is_app_active", True)
                 and not getattr(app, "_exit", False)

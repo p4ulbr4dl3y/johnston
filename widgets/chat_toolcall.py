@@ -112,7 +112,9 @@ class ToolCallWidget(
         self.background_task_id = background_task_id
         self.log_path: str | None = log_path
         self.task_id: str | None = None
-        self.subagent_session_id: str | None = subagent_session_id
+        self.subagent_session_id: str | None = str(subagent_session_id) if subagent_session_id is not None else None
+        if not self.subagent_session_id and hasattr(self, "bind_subagent_session"):
+            self.bind_subagent_session()
         self.tool_call_id: str | None = None
         self.tool_call_index: int | None = None
         self._shell_update_scheduled = False
@@ -270,6 +272,10 @@ class ToolCallWidget(
             self.background_task_id = background_task_id
         if log_path:
             self.log_path = log_path
+
+        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "manage_subagent") and not self.subagent_session_id:
+            if hasattr(self, "bind_subagent_session"):
+                self.bind_subagent_session()
 
         if self.canonical_tool == "shell":
             if status != "running":

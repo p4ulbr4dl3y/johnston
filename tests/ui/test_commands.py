@@ -96,6 +96,9 @@ class MockApp:
         self.ai_kwargs = []
         self.chat_view = MockChatView()
         self.task_manager = TaskManager()
+        self.is_generating = False
+        self.is_compacting = False
+        self._is_compacting = False
 
     def notify(self, msg: str, severity: str = "info"):
         self.notified.append((msg, severity))
