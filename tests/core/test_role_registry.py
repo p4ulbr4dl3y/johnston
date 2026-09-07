@@ -591,7 +591,12 @@ class TestDefaultRoles:
         assert BUILTIN_ROLES["worker"].scope in ("any", "subagent")
 
     def test_explorer_scope_any(self):
-        assert BUILTIN_ROLES["explorer"].scope in ("any", "subagent")
+        exp = BUILTIN_ROLES["explorer"]
+        assert exp.scope in ("any", "subagent")
+        assert exp.read_only is True
+        assert "Outline before reading" in exp.prompt
+        assert "Reuse existing patterns" in exp.prompt
+        assert "Read-only shell" in exp.prompt
 
     def test_reviewer_builtin_properties(self):
         rev = BUILTIN_ROLES["reviewer"]
