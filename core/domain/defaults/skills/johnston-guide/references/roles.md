@@ -55,8 +55,14 @@ Role instructions are wrapped inside a `<role name="...">` block in the agent's 
 - Launch with specific role: `johnston -r <role>` / `johnston --role <role>`.
 - Switch role in TUI: press `Tab` to cycle between active `any`, `main`, and `interactive` roles (there is no `/role` slash command).
 
+## Builtin Roles
+Johnston ships with 3 builtin roles:
+- `worker` (scope: `any`): Default execution mode with write permissions (`create`, `edit`, `shell`).
+- `explorer` (scope: `any`): Read-only research, investigation, and action planning.
+- `reviewer` (scope: `any`): Read-only defect-first code review and verification (`[P0]`-`[P3]`, `VERDICT: APPROVE`/`REJECT`).
+
 ## Tool Isolation & Worktree Modes
 Subagents are invoked via `invoke_subagent(title="...", prompt="...", type="<role_key>")`:
 - **Write roles (e.g. `worker`)**: automatically execute inside an isolated Git worktree on an auto-generated branch (`subagent/<title>-<id>`), auto-committing on completion. Requires workspace to be a Git repository; in non-Git directories, runs directly in the workspace.
-- **Read-only roles (e.g. `explorer`)**: execute directly in the main workspace without worktree isolation, with OS sandbox enabled.
+- **Read-only roles (e.g. `explorer`, `reviewer`)**: execute directly in the main workspace without worktree isolation, with OS sandbox enabled.
 - **Non-Interactive Exclusions**: `invoke_subagent`, `manage_subagent`, `manage_shell`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in all non-interactive contexts (subagent roles and headless mode).

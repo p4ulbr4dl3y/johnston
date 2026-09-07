@@ -579,7 +579,7 @@ class TestSingletonAndCache:
 # --------------------------------------------------------------------------- #
 class TestDefaultRoles:
     def test_builtin_keys_present(self):
-        for k in ("worker", "explorer"):
+        for k in ("worker", "explorer", "reviewer"):
             assert k in BUILTIN_ROLES, f"missing builtin role {k}"
 
     def test_analyst_NOT_builtin(self):
@@ -592,6 +592,14 @@ class TestDefaultRoles:
 
     def test_explorer_scope_any(self):
         assert BUILTIN_ROLES["explorer"].scope in ("any", "subagent")
+
+    def test_reviewer_builtin_properties(self):
+        rev = BUILTIN_ROLES["reviewer"]
+        assert rev.scope in ("any", "subagent")
+        assert rev.read_only is True
+        assert "<scope>" in rev.prompt
+        assert "<rules>" in rev.prompt
+        assert "VERDICT: APPROVE" in rev.prompt
 
 
 class TestRoleToolWildcards:

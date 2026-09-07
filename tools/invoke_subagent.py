@@ -36,7 +36,7 @@ class InvokeSubagentTool(BaseTool):
                     },
                     "type": {
                         "type": "string",
-                        "enum": ["worker", "explorer"],
+                        "enum": ["worker", "explorer", "reviewer"],
                         "description": "Subagent role name from available roles (default: 'worker')",
                     },
                 },

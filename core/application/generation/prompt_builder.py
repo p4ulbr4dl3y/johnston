@@ -505,11 +505,16 @@ class PromptBuilder:
 
         # Identity key lets us reuse the last pre-sorted build when the tool
         # objects (and role flags) are unchanged this turn, skipping the
-        # per-schema deepcopy + re-sort. A fresh build always happens after any
-        # tool swap because old object ids drop out of the key.
+        # per-schema deepcopy + re-sort. Pair object id with tool name to prevent
+        # collisions when CPython reallocates a freed dictionary at the same address.
+        def _tool_ident(t: Dict[str, Any]) -> tuple:
+            fn = t.get("function") if isinstance(t, dict) else None
+            name = fn.get("name", "") if isinstance(fn, dict) else ""
+            return (name, id(t))
+
         key = (
-            tuple(id(t) for t in filtered_base),
-            tuple(id(t) for t in filtered_mcp),
+            tuple(_tool_ident(t) for t in filtered_base),
+            tuple(_tool_ident(t) for t in filtered_mcp),
             self.mode,
             self.allow_task,
         )
