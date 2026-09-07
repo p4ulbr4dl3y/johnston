@@ -4,7 +4,7 @@ description: Analyze repository and generate or update concise, high-signal AGEN
 hidden: true
 ---
 
-# Project Initialization (/init)
+# Project Initialization
 
 Automate codebase discovery and generate a surgical, high-density `AGENTS.md` contributor guide for AI coding assistants.
 
@@ -13,15 +13,9 @@ Automate codebase discovery and generate a surgical, high-density `AGENTS.md` co
 > 
 > Exclude generic software advice ("write clean code", "handle errors gracefully", "do not commit API keys"), exhaustive file trees, and obvious language defaults. Target length: **200–400 words**.
 
----
-
 ## Execution Workflow
 
-```
 1. Pre-flight -> 2. Autonomous Survey -> 3. Command Verification -> 4. Gap-Fill -> 5. Generate
-```
-
----
 
 ### Phase 1: Pre-flight Check
 1. Check for existing instruction files:
@@ -31,8 +25,6 @@ Automate codebase discovery and generate a surgical, high-density `AGENTS.md` co
 2. **Strategy**:
    - If `AGENTS.md` (or `CLAUDE.md`) exists: update in place. Preserve verified repository-specific facts; strip fluff, stale claims, or overly verbose tutorials.
    - If absent: create fresh `AGENTS.md` at repository root.
-
----
 
 ### Phase 2: Autonomous Survey (Explorer Subagent)
 Launch an autonomous explorer subagent using `invoke_subagent` to prevent main chat context bloat:
@@ -51,8 +43,6 @@ The surveyor must inspect executable sources of truth first:
 4. **Application Wiring**: Locate the real application entry points (e.g. `main.py`, `app.py`, `src/index.ts`) and major boundaries. Note how layers communicate.
 5. **Git Conventions**: Run `git log -n 20 --oneline` via `shell` to determine commit message format (e.g. Conventional Commits, ticket prefixes).
 
----
-
 ### Phase 3: Command Verification
 Before writing commands into `AGENTS.md`, verify them via `shell`:
 - How to run the full test suite.
@@ -60,16 +50,12 @@ Before writing commands into `AGENTS.md`, verify them via `shell`:
 - Lint and typecheck commands.
 - Verify they exit with code 0 or return expected feedback. Trust verified commands over README claims.
 
----
-
 ### Phase 4: Gap-Fill (Ask User)
 Only ask the user if the codebase cannot answer an essential operational detail:
 - Undocumented deployment or PR branching conventions.
 - Required external test services (Docker, local databases, mock servers).
 
 Use `ask_user` for a single concise question batch. **Do NOT ask questions the code already answers.**
-
----
 
 ### Phase 5: Generate AGENTS.md
 
@@ -103,8 +89,6 @@ Use `create` (or `edit` if updating) to write `# Repository Guidelines` to `AGEN
 - Commit message format (e.g. `type(scope): description` <= 72 chars).
 - PR requirements (tests passing, linter passing).
 ```
-
----
 
 ## Completion Checklist
 - [ ] Document is concise (200–400 words).

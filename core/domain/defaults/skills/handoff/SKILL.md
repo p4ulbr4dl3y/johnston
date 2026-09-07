@@ -4,37 +4,27 @@ description: Summarize session progress, uncommitted changes, architectural deci
 hidden: true
 ---
 
-# Session Handoff (/handoff)
+# Session Handoff
 
 Produce a high-density, actionable session handoff to transfer context into a fresh session without information loss.
 
 ## The Heuristic
 > **"Provide everything the next agent needs to resume instantly without reading the entire previous conversation history."**
 
----
-
 ## Execution Workflow
 
-```
 1. Workspace State Check -> 2. Review Trajectory -> 3. Synthesize Handoff -> 4. Deliver
-```
-
----
 
 ### Step 1: Workspace State Check
 Gather empirical workspace truth before writing the summary:
 1. **Git State**: Run `git status -s` and `git diff --stat` via `shell` to identify modified, added, or deleted files.
 2. **Verification State**: Run the test runner or linter to verify whether the workspace is currently clean or broken.
 
----
-
 ### Step 2: Review Session Trajectory
 Analyze what happened during the session:
 - What was the initial user request and intent?
 - What dead-ends were explored and discarded (to prevent the next agent from repeating them)?
 - What technical decisions were made and why?
-
----
 
 ### Step 3: Structure the Handoff Document
 
@@ -84,8 +74,6 @@ Output the handoff in this structured format matching Johnston's compaction sche
 - Preserve EXACT paths, line numbers, error strings, exit codes, and test names.
 - If a section has no content, write `(none)` — never omit a mandatory section.
 - Ground state in actual `git status -s` and tool outputs.
-
----
 
 ### Step 4: Deliver & Storage Location
 1. **Default Delivery**: Present the handoff directly in the chat response (avoids cluttering Git status with unrequested files).

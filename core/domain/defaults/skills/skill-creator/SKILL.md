@@ -3,7 +3,7 @@ name: skill-creator
 description: Create new Johnston skills, iterate on existing skills, structure multi-tier references, and optimize triggering descriptions. Use when users want to create a skill from scratch, edit or optimize an existing skill, or design test cases for skills.
 ---
 
-# Skill Creator for Johnston
+# Skill Creator
 
 Guide the user through creating, refining, and testing high-quality skills for Johnston.
 
@@ -12,8 +12,6 @@ Guide the user through creating, refining, and testing high-quality skills for J
 ```
 Capture Intent -> Structure & Draft -> Verification -> Optimize Description -> Install
 ```
-
----
 
 ## 1. Capture Intent & Scope
 
@@ -27,8 +25,6 @@ Identify what the skill should accomplish and where it should live:
 4. **Output Expectations**: Fixed template, code snippet, report, or interactive guide?
 
 Use `ask_user` if requirements are ambiguous or require design choices from the user.
-
----
 
 ## 2. Structure & Progressive Disclosure
 
@@ -48,8 +44,6 @@ Skills use a 3-tier loading architecture to minimize token overhead:
 - **Tier 2 (SKILL.md)**: Target under 500 lines. Focus on decision trees, main steps, and pointers to references.
 - **Tier 3 (References & Scripts)**: Split by domain/variant. If a workflow has repetitive data extraction or boilerplate generation, bundle a Python script in `scripts/` instead of asking the LLM to write it every turn.
 
----
-
 ## 3. Authoring SKILL.md
 
 ### Frontmatter Template
@@ -67,8 +61,6 @@ hidden: false
 - **Imperative Voice**: Direct, actionable steps (`Parse input`, `Validate schema`, `Output report`).
 - **File System Safety**: Respect Johnston permission modes (`review`, `edits`, `yolo`).
 
----
-
 ## 4. Verification & Testing
 
 Verify skill effectiveness using test prompts:
@@ -83,8 +75,6 @@ Verify skill effectiveness using test prompts:
 4. **Refine instructions**:
    - Fix ambiguities or failure modes discovered during test runs.
 
----
-
 ## 5. Description Optimization
 
 The `description` field is the primary routing mechanism that decides whether Johnston invokes the skill.
@@ -94,8 +84,6 @@ The `description` field is the primary routing mechanism that decides whether Jo
 - Does it include explicit trigger verbs/phrases (`Use when...`, `create...`, `debug...`)?
 - Is it narrow enough to prevent false positives (over-triggering on unrelated tasks)?
 - Is it broad enough to prevent undertriggering when user doesn't use the exact skill name?
-
----
 
 ## 6. Saving and Verification in Johnston
 

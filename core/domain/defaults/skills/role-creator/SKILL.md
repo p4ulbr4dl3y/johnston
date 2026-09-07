@@ -3,7 +3,7 @@ name: role-creator
 description: Create and configure specialized Johnston roles and subagents. Use when users want to create a new role or subagent, customize allowed tools or read-only access, pin a specific provider/model, or set up task-specific agent personas.
 ---
 
-# Role Creator for Johnston
+# Role Creator
 
 Guide the user through creating and configuring custom unified agent roles and subagents in Johnston.
 
@@ -12,8 +12,6 @@ Guide the user through creating and configuring custom unified agent roles and s
 Roles are Markdown files with YAML frontmatter stored in:
 - **Project roles**: `.johnston/roles/<key>.md` (precedence over global)
 - **Global roles**: `~/.johnston/roles/<key>.md` (available in all projects)
-
----
 
 ## 2. Configuration Schema
 
@@ -53,9 +51,6 @@ Senior code reviewer. Read-only analysis of changes. Do not perform edits or cre
 | `allowed_tools` | No | Whitelist of tools or glob patterns (`[read, search, shell]` or `read, search, shell`). Omit to allow all. **Note: YAML bullet lists (`- tool`) are NOT supported; use bracketed or comma-separated lists.** |
 | `disallowed_tools` | No | Blacklist of tools or glob patterns (`[create, edit]` or `create, edit`). |
 
-
----
-
 ## 3. Available Builtin Tools
 
 Johnston provides 11 builtin tools:
@@ -72,8 +67,6 @@ Johnston provides 11 builtin tools:
 - `web_fetch`: Retrieve URL contents as markdown or HTML.
 
 *Note: Non-interactive contexts (subagents and headless runs) automatically disable `invoke_subagent`, `manage_subagent`, `manage_shell`, `ask_user`, and `shell(wait_seconds=...)`.*
-
----
 
 ## 4. Role Templates
 
@@ -141,8 +134,6 @@ Application security auditor. Identify vulnerabilities and risk patterns without
 </rules>
 ```
 
----
-
 ## 5. Execution Semantics & Tool Isolation
 
 - **Worktree Isolation**:
@@ -150,8 +141,6 @@ Application security auditor. Identify vulnerabilities and risk patterns without
   - Subagents running with **read-only roles** (`read_only: true`) execute directly within the current workspace without worktree creation, with OS-level sandbox enforced.
 - **Non-Interactive Exclusions**:
   - `invoke_subagent`, `manage_subagent`, `manage_shell`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in subagent roles to prevent recursive agent loops.
-
----
 
 ## 6. Creation & Verification Steps
 
@@ -167,14 +156,12 @@ Application security auditor. Identify vulnerabilities and risk patterns without
    - For subagent roles: launch a test task with `invoke_subagent(title="Test <key> execution", prompt="...", type="<key>")`.
    - For interactive roles: cycle with `Tab` in the TUI, or launch with CLI flag `johnston -r <key>` (note: there is no `/role` slash command).
 
----
-
 ## 7. Good vs Bad Practices
 
 ### Good Practices
 - **Least Privilege Principle**: Set `read_only: true` for analytical, auditing, and review roles. The runtime strips mutating tools (`create`, `edit`), guaranteeing safety.
 - **Isolate Shell for Pure Readers**: If a role is strictly read-only, omit `shell` from `allowed_tools` (`allowed_tools: [read, search]`). Otherwise, the agent can still execute mutating CLI commands like `rm` or `sed -i` through shell.
-- **Accurate Scope**: Set `scope: subagent` for single-purpose subagents so they do not clutter the interactive TUI `/role` switcher or `Tab` cycling.
+- **Accurate Scope**: Set `scope: subagent` for single-purpose subagents so they do not clutter interactive `Tab` cycling in the TUI.
 - **Explain the "Why"**: Structure prompts with `<scope>`, `<rules>`, and rationales instead of dogmatic `NEVER`/`ALWAYS` shouting. LLMs adhere better when the reason is clear.
 - **Cost/Latency Optimization**: Pin lightweight models (`model: provider/fast-model`) for mechanical subagent tasks (linting, test execution, typo checking).
 
