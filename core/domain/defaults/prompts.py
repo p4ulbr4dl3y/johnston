@@ -22,11 +22,6 @@ _SHARED_SILENT_INVOCATION = (
     "architecture decisions, or final answers."
 )
 
-_SHARED_ARG_ORDER = (
-    "- **Argument Order**: Output tool arguments strictly in schema property order "
-    "(target/path/command/role first, body/content/prompt last) for instant streaming UI display."
-)
-
 _SHARED_BATCHING = (
     "- **Batching & Concurrency**:\n"
     "  - Batch independent calls (`read`, `search`, `web_fetch`, independent checks) in a single turn to save roundtrips. "
@@ -76,7 +71,6 @@ _SHARED_NON_INTERACTIVE_LIMITS = (
 )
 
 _SHARED_BASE_TOOL_IO = f"""{_SHARED_SILENT_INVOCATION}
-{_SHARED_ARG_ORDER}
 {_SHARED_BATCHING}
 {_SHARED_PLANNING}
 {_SHARED_FILE_EDITS}
@@ -303,7 +297,7 @@ Wire format conventions for ALL tool outputs (apply consistently):
 | Status    | Prefix                                                   | Meaning                           |
 |-----------|----------------------------------------------------------|-----------------------------------|
 | DONE      | `[<action/target> | <metadata>]` then content            | Tool succeeded                    |
-| SHELL     | `[exit N]` then stdout/stderr                            | Process exit code (N!=0 is fail)  |
+| SHELL     | `[exit N]` then output (if N!=0); raw stdout (if exit 0) | Process exit code (N!=0 is fail)  |
 | ERROR     | `ERR: <kind> ['<target>']: <detail>`                     | Tool failed; diagnose from kind   |
 | RUNNING   | `[task started ...]` / `[task moved to background ...]` / `[task backgrounded by user ...]` | Async; running; do not re-run     |
 | CANCELLED | `[cancelled by user]`                                    | User/timeout aborted              |

@@ -250,8 +250,12 @@ class SearchTool(BaseTool):
                     name=resolved_path,
                 )
 
-        mode = str(args.get("mode") or "content").strip()
+        raw_mode = args.get("mode")
         glob_pattern = str(args.get("glob") or "").strip() or None
+        if not raw_mode and not query.strip() and glob_pattern:
+            mode = "filename"
+        else:
+            mode = str(raw_mode or "content").strip()
         case_sensitive = bool(args.get("case_sensitive", False))
         max_results = try_int(args.get("max_results"), 50)
         max_results = max(1, min(max_results, 500))

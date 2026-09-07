@@ -1170,4 +1170,31 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res[0]["content"], "Root prompt")
         self.assertEqual([m["content"] for m in res], ["Root prompt", "Second prompt", "Third prompt"])
 
+    async def test_concurrent_tool_execution_preserves_distinct_tool_names(self):
+        agent = BaseAgent(api_key="k", model="m", base_url="http://t", provider_key="p")
+        agent._is_tool_concurrency_safe = lambda name, args: True
+
+        async def mock_executor(name, args, agent_inst):
+            return f"result of {name}"
+
+        agent.tool_executor = mock_executor
+        messages = [{"role": "user", "content": "run concurrent tools"}]
+        tool_calls_dict = {
+            0: {"id": "call_1", "name": "read", "arguments": '{"path": "a.py"}'},
+            1: {"id": "call_2", "name": "search", "arguments": '{"query": "foo"}'},
+        }
+        res = {}
+        events = []
+        async for event in agent._execute_tool_calls(
+            messages, tool_calls_dict, ["running tools"], [], 1000, res
+        ):
+            events.append(event)
+
+        tool_msgs = [m for m in messages if m.get("role") == "tool"]
+        self.assertEqual(len(tool_msgs), 2)
+        self.assertEqual(tool_msgs[0]["name"], "read")
+        self.assertEqual(tool_msgs[0]["tool_call_id"], "call_1")
+        self.assertEqual(tool_msgs[1]["name"], "search")
+        self.assertEqual(tool_msgs[1]["tool_call_id"], "call_2")
+
 

@@ -121,6 +121,8 @@ class ToolContext:
         """Returns whether shell command sandboxing is active."""
         if hasattr(self, "_sandbox_enabled") and self._sandbox_enabled is not None:
             return bool(self._sandbox_enabled)
+        if self.is_read_only:
+            return True
         if self.host is None:
             return False
         val = getattr(self.host, "sandbox_enabled", False)

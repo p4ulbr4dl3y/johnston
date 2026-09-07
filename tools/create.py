@@ -10,16 +10,14 @@ from tools.utils import format_file_diff, resolve_writable_path
 class CreateTool(BaseTool):
     name = "create"
     description = (
-        "Create a new file or completely overwrite an existing file. Always specify `path` first before `content`. "
-        "Parent directories created automatically."
+        "Create a new file or completely overwrite an existing file. Parent directories created automatically."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "create",
             "description": (
-                "Create a new file or completely overwrite an existing file. Always specify `path` first before `content`. "
-                "Parent directories created automatically."
+                "Create a new file or completely overwrite an existing file. Parent directories created automatically."
             ),
             "parameters": {
                 "type": "object",

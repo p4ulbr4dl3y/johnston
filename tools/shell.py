@@ -133,6 +133,71 @@ def _clean_cd_command(cmd: str, workspace_dir: str) -> tuple[str, Optional[str]]
     return (cleaned, None)
 
 
+def _check_read_only_command_mutations(cmd: str) -> Optional[str]:
+    """Inspect shell command for mutating operations in read-only mode using shlex."""
+    import shlex
+
+    try:
+        tokens = shlex.split(cmd)
+    except Exception:
+        tokens = cmd.split()
+
+    if not tokens:
+        return None
+
+    subcmds: list[list[str]] = []
+    curr: list[str] = []
+    for tok in tokens:
+        if tok in ("&&", ";", "|", "||", "&"):
+            if curr:
+                subcmds.append(curr)
+                curr = []
+        else:
+            curr.append(tok)
+    if curr:
+        subcmds.append(curr)
+
+    mutating_git = {
+        "commit",
+        "push",
+        "checkout",
+        "switch",
+        "reset",
+        "merge",
+        "rebase",
+        "revert",
+        "clean",
+        "cherry-pick",
+    }
+
+    for sc in subcmds:
+        if not sc:
+            continue
+        base = os.path.basename(sc[0]).lower()
+        if base == "git":
+            i = 1
+            while i < len(sc):
+                t = sc[i]
+                if t.startswith("-"):
+                    if t in ("-C", "-c", "--git-dir", "--work-tree"):
+                        i += 2
+                    else:
+                        i += 1
+                else:
+                    if t.lower() in mutating_git:
+                        return f"git {t.lower()} is not permitted in read-only role"
+                    break
+
+        if platform.system() == "Windows":
+            if base in ("del", "erase", "rmdir", "rd", "move", "ren", "rename"):
+                return f"mutating command '{base}' is not permitted in read-only role"
+            for t in sc:
+                if t in (">", ">>", "1>", "2>"):
+                    return "file write redirects are not permitted in read-only role on Windows"
+
+    return None
+
+
 class ShellTool(BaseTool):
     name = "shell"
     description = (
@@ -259,6 +324,10 @@ class ShellTool(BaseTool):
             proc_cwd = workspace_dir
 
         allow_workspace_writes = not bool(getattr(ctx, "is_read_only", False))
+        if not allow_workspace_writes:
+            ro_err = _check_read_only_command_mutations(cmd)
+            if ro_err:
+                return ToolResult.error("permission", name="shell", detail=ro_err)
         sandbox_enabled = bool(getattr(ctx, "sandbox_enabled", False))
         if sandbox_enabled:
             from core.infrastructure.platform.sandbox import (

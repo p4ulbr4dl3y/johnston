@@ -422,6 +422,12 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ERR: params", res.content)
         self.assertIn("query parameter is required", res.content)
 
+    async def test_search_omitted_mode_with_glob_infers_filename(self):
+        ctx = ToolContext(cwd=self.tmpdir)
+        res = await self.tool.execute({"glob": "*.py"}, ctx=ctx)
+        self.assertEqual(res.status, ToolResultStatus.DONE)
+        self.assertIn("search=filename", res.content)
+
     async def test_sandbox_permission_block(self):
         ctx = MagicMock()
         ctx.cwd = self.tmpdir

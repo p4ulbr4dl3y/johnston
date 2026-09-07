@@ -666,6 +666,25 @@ async def test_shell_readonly_sandbox_unsupported_fails_closed(tool, make_tool_c
     assert "read-only role requires sandbox isolation" in (res.display or res.content or "")
 
 
+async def test_shell_readonly_blocks_mutating_git_commands(tool, make_tool_context):
+    ctx = make_tool_context(is_subagent=True, sandbox_enabled=True, is_read_only=True)
+    res = await tool.execute({"command": "git commit -m 'test'"}, ctx=ctx)
+    assert res.is_error
+    assert "git commit is not permitted in read-only role" in str(res)
+
+    res_push = await tool.execute({"command": "git push origin main"}, ctx=ctx)
+    assert res_push.is_error
+    assert "git push is not permitted in read-only role" in str(res_push)
+
+
+async def test_shell_readonly_allows_grep_with_commit_word(tool, make_tool_context):
+    ctx = make_tool_context(is_subagent=True, sandbox_enabled=True, is_read_only=True)
+    res = await tool.execute({"command": "echo 'git commit is good'"}, ctx=ctx)
+    assert not res.is_error
+    assert "git commit is good" in str(res)
+
+
+
 
 _SANDBOX_NOTICE = "[sandbox unavailable | executed unsandboxed]\n"
 
