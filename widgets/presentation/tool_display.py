@@ -6,6 +6,7 @@ own rendering-format output, so these helpers live in the infrastructure
 presentation area consumed by core widgets and UI tests.
 """
 import json
+import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -73,9 +74,96 @@ def format_compact_dict(d: dict, max_total_len: int = 70) -> str:
         return "{...}"
 
 
+_SUFFIX_RE = re.compile(r":(?:(?:\d+(?:-\d+|\+)?(?::\d+)?)|(?:\+[\d.]+[KMG]?B))$")
+_HOME_DIR = os.path.abspath(os.path.expanduser("~"))
+_HOME_REAL = os.path.realpath(_HOME_DIR)
+
+
+def split_path_suffix(path: str) -> Tuple[str, str]:
+    """Split path and line/offset suffix (e.g. 'file.py:10-20' -> ('file.py', ':10-20'))."""
+    if not isinstance(path, str) or not path:
+        return (path if isinstance(path, str) else "", "")
+    match = _SUFFIX_RE.search(path)
+    if match:
+        idx = match.start()
+        return path[:idx], path[idx:]
+    return path, ""
+
+
+def _is_child_relpath(rel: str) -> bool:
+    """True if rel is a child path and not traversing upward (excluding false positive '..foo')."""
+    return rel != ".." and not rel.startswith(f"..{os.sep}") and not rel.startswith("../")
+
+
+def shorten_path(path: str, cwd: Optional[str] = None) -> str:
+    """Shorten path for display: relative to CWD if inside, or ~/ if inside $HOME."""
+    if not isinstance(path, str) or not path.strip():
+        return path if isinstance(path, str) else ""
+
+    raw_path = path.strip()
+    base_path, suffix = split_path_suffix(raw_path)
+    if not base_path:
+        return raw_path.replace("\\", "/")
+
+    if base_path in ("./", ".\\"):
+        base_path = "."
+    elif base_path.startswith("./") or base_path.startswith(".\\"):
+        base_path = base_path[2:]
+
+    is_home_start = base_path == "~" or base_path.startswith("~/") or base_path.startswith("~\\")
+    if not os.path.isabs(base_path) and not is_home_start:
+        return (base_path.replace("\\", "/") if base_path != "." else ".") + suffix
+
+    try:
+        norm = os.path.abspath(os.path.expanduser(base_path))
+        curr_dir = os.path.abspath(cwd or os.getcwd())
+
+        # 1. Check relative to CWD / workspace (fast path without realpath)
+        try:
+            rel = os.path.relpath(norm, curr_dir)
+            if _is_child_relpath(rel):
+                return (rel.replace("\\", "/") if rel != "." else ".") + suffix
+        except (ValueError, OSError):
+            pass
+
+        # Check symlink-resolved CWD
+        try:
+            norm_real = os.path.realpath(norm)
+            curr_real = os.path.realpath(curr_dir)
+            if norm_real != norm or curr_real != curr_dir:
+                rel = os.path.relpath(norm_real, curr_real)
+                if _is_child_relpath(rel):
+                    return (rel.replace("\\", "/") if rel != "." else ".") + suffix
+        except (ValueError, OSError):
+            pass
+
+        # 2. Check relative to HOME
+        try:
+            rel = os.path.relpath(norm, _HOME_DIR)
+            if _is_child_relpath(rel):
+                return (f"~/{rel.replace(os.sep, '/')}" if rel != "." else "~") + suffix
+        except (ValueError, OSError):
+            pass
+
+        try:
+            norm_real = os.path.realpath(norm)
+            if norm_real != norm:
+                rel = os.path.relpath(norm_real, _HOME_REAL)
+                if _is_child_relpath(rel):
+                    return (f"~/{rel.replace(os.sep, '/')}" if rel != "." else "~") + suffix
+        except (ValueError, OSError):
+            pass
+    except Exception:
+        pass
+    return raw_path.replace("\\", "/")
+
+
 def truncate_path(path: str, max_len: int = 60) -> str:
     """Truncate path preserving filename and innermost directories."""
-    if not isinstance(path, str) or len(path) <= max_len:
+    if not isinstance(path, str):
+        return ""
+    path = shorten_path(path)
+    if len(path) <= max_len:
         return path
     parts = path.replace("\\", "/").split("/")
     if len(parts) <= 1:
@@ -109,12 +197,13 @@ def truncate(target: str, max_len: int = 60, mode: str = "middle") -> str:
     if not isinstance(target, str):
         return escape_markup(str(target)) if target else ""
     target = re.sub(r"\s+", " ", target).strip()
+    if mode == "path":
+        target = truncate_path(target, max_len)
+        return escape_markup(target)
     if len(target) <= max_len:
         return escape_markup(target)
     if mode == "right":
         target = target[: max(0, max_len - 3)] + "..."
-    elif mode == "path":
-        target = truncate_path(target, max_len)
     else:
         if max_len == 60:
             target = target[:25] + "..." + target[-32:]
@@ -140,7 +229,11 @@ def _canonical_args(args: Dict[str, Any]) -> tuple:
 
 
 def _display_cache_key(tool_name: str, args: Dict[str, Any], max_len: int = 60, mode: str = "middle") -> tuple:
-    return (str(tool_name), _canonical_args(args), max_len, mode)
+    try:
+        cwd = os.getcwd()
+    except Exception:
+        cwd = ""
+    return (str(tool_name), _canonical_args(args), max_len, mode, cwd)
 
 
 def extract_tool_display(tool_name: str, args: Dict[str, Any], max_len: int = 60, mode: str = "middle") -> str:
@@ -236,7 +329,7 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: i
     if name == "read":
         val = args.get("path")
         if isinstance(val, str) and val:
-            path_str = val.strip()
+            path_str = shorten_path(val.strip())
 
             def _to_int(v: Any) -> Optional[int]:
                 if isinstance(v, int):
@@ -275,7 +368,7 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: i
     if name in ("create", "edit"):
         val = args.get("path")
         if isinstance(val, str) and val:
-            return truncate(val.strip(), max_len=max_len, mode=file_mode)
+            return truncate(shorten_path(val.strip()), max_len=max_len, mode=file_mode)
         return ""
 
     if name == "shell":
@@ -301,8 +394,10 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: i
             parts.append(search_mode)
         if q:
             parts.append(f'"{q}"')
-        if p and p != ".":
-            parts.append(f"in {p}")
+        if p:
+            short_p = shorten_path(p)
+            if short_p and short_p != ".":
+                parts.append(f"in {short_p}")
         if glob_pat:
             parts.append(f"[{glob_pat}]")
         if include_hidden:

@@ -50,10 +50,13 @@ def generate_chunk_unified_diff(
 def build_edit_diff_text(args: dict, file_path: str = "file") -> str:
     if not isinstance(args, dict):
         return ""
+    from widgets.presentation.tool_display import shorten_path
+
+    disp_path = shorten_path(file_path) if file_path else "file"
     old_s = args.get("old_str", "")
     new_s = args.get("new_str", "")
     start_l = args.get("start_line") or 1
     if old_s or new_s:
-        diff_parts = generate_chunk_unified_diff(old_s or "", new_s or "", file_path, start_l)
+        diff_parts = generate_chunk_unified_diff(old_s or "", new_s or "", disp_path, start_l)
         return "\n".join(diff_parts) if diff_parts else ""
     return ""

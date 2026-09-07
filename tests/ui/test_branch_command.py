@@ -155,7 +155,7 @@ class TestBranchScreen(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
             self.assertEqual(app.switched_dirs, [("/tmp/repo-wt-1", "feat/existing-wt")])
-            self.assertTrue(any("Switched to worktree" in n for n in app.notifications))
+            self.assertEqual(len(app.notifications), 0)
 
     async def test_branch_screen_switch_repo_root(self) -> None:
         screen = BranchScreen(project_dir="/tmp/repo", manager=self.mock_mgr)

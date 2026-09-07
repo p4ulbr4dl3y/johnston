@@ -1,7 +1,7 @@
 import os
 
 
-def read_file_content(file_path: str) -> str | None:
+def read_file_content(file_path: str, max_bytes: int = 2 * 1024 * 1024) -> str | None:
     """Read a file from disk for display purposes.
 
     Returns the file content (utf-8, errors='replace') or *None* when the
@@ -10,10 +10,11 @@ def read_file_content(file_path: str) -> str | None:
     """
     if not file_path:
         return None
-    if not os.path.isfile(file_path):
+    expanded = os.path.expanduser(file_path)
+    if not os.path.isfile(expanded):
         return None
     try:
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
+        with open(expanded, "r", encoding="utf-8", errors="replace") as f:
+            return f.read(max_bytes)
     except Exception:
         return None

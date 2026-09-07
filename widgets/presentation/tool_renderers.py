@@ -65,11 +65,14 @@ def format_truncation_for_ui(text: str, *, strip_edges: bool = True) -> str:
 
 def build_synthetic_create_diff(file_path: str, content: str) -> str:
     """Build a synthetic ``--- a/… / +++ b/… / @@ -1,N +1,N @@`` diff for create/write tools."""
+    from widgets.presentation.tool_display import shorten_path
+
+    disp_path = shorten_path(file_path).lstrip("/") if file_path else "file"
     new_lines = content.splitlines() if content else []
     cnt = len(new_lines) or 1
     d_lines = [
-        f"--- a/{file_path or 'file'}",
-        f"+++ b/{file_path or 'file'}",
+        f"--- a/{disp_path}",
+        f"+++ b/{disp_path}",
         f"@@ -1,{cnt} +1,{cnt} @@",
     ] + [f"+{line_str}" for line_str in new_lines]
     return "\n".join(d_lines)

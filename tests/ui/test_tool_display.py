@@ -1,3 +1,4 @@
+import os
 import sys
 import unittest
 
@@ -244,6 +245,102 @@ class TestToolDisplay(unittest.TestCase):
         # Verify line 29 (-) and line 29 (+) match the modified line symbol
         self.assertTrue(any("29 -" in line_item for line_item in plain_lines))
         self.assertTrue(any("29 +" in line_item for line_item in plain_lines))
+
+    def test_shorten_path_rules(self):
+        import os
+
+        from widgets.presentation.tool_display import shorten_path, split_path_suffix
+
+        # Suffix splitting
+        self.assertEqual(split_path_suffix("foo.py:10-20"), ("foo.py", ":10-20"))
+        self.assertEqual(split_path_suffix("foo.py:+512B"), ("foo.py", ":+512B"))
+        self.assertEqual(split_path_suffix("foo.py:42:15"), ("foo.py", ":42:15"))
+        self.assertEqual(split_path_suffix("foo.py"), ("foo.py", ""))
+        self.assertEqual(split_path_suffix(None), ("", ""))
+        self.assertEqual(split_path_suffix(123), ("", ""))
+
+        home = os.path.abspath(os.path.expanduser("~"))
+        cwd = os.path.abspath(os.getcwd())
+
+        # Inside CWD
+        in_cwd = os.path.join(cwd, "src", "code.py")
+        self.assertEqual(shorten_path(in_cwd), "src/code.py")
+        self.assertEqual(shorten_path(f"{in_cwd}:10-20"), "src/code.py:10-20")
+
+        # Double-dot prefix filename inside CWD (e.g. ..env) must NOT be rejected
+        dotdot_file = os.path.join(cwd, "..env")
+        self.assertEqual(shorten_path(dotdot_file), "..env")
+
+        # Leading ./ or .\ and pure ./
+        self.assertEqual(shorten_path("./src/code.py"), "src/code.py")
+        self.assertEqual(shorten_path(".\\src\\code.py"), "src/code.py")
+        self.assertEqual(shorten_path("./"), ".")
+        self.assertEqual(shorten_path(".\\"), ".")
+
+        # Windows-style backslashes normalized
+        self.assertEqual(shorten_path("src\\sub\\code.py"), "src/sub/code.py")
+
+        # In HOME but outside CWD (if possible)
+        outside_cwd = os.path.join(home, ".johnston", "config.toml")
+        if not outside_cwd.startswith(cwd):
+            self.assertEqual(shorten_path(outside_cwd), "~/.johnston/config.toml")
+            self.assertEqual(shorten_path(f"{outside_cwd}:42"), "~/.johnston/config.toml:42")
+
+        # Explicit CWD argument test
+        fake_cwd = os.path.abspath("/custom/project")
+        self.assertEqual(shorten_path("/custom/project/a/b.py", cwd=fake_cwd), "a/b.py")
+
+        # Empty / non-string
+        self.assertEqual(shorten_path(""), "")
+        self.assertEqual(shorten_path(None), "")
+
+    def test_extract_tool_display_shortens_paths(self):
+        import os
+
+        cwd = os.path.abspath(os.getcwd())
+        in_cwd = os.path.join(cwd, "tests", "test_foo.py")
+
+        # Read
+        self.assertEqual(extract_tool_display("read", {"path": in_cwd, "start_line": 5}), "tests/test_foo.py:5+")
+        # Create
+        self.assertEqual(extract_tool_display("create", {"path": in_cwd}), "tests/test_foo.py")
+        # Edit
+        self.assertEqual(extract_tool_display("edit", {"path": in_cwd}), "tests/test_foo.py")
+        # Search
+        self.assertEqual(extract_tool_display("search", {"query": "fn", "path": in_cwd}), '"fn" in tests/test_foo.py')
+        self.assertEqual(extract_tool_display("search", {"query": "fn", "path": cwd}), '"fn"')
+        self.assertEqual(extract_tool_display("search", {"query": "fn", "path": "./"}), '"fn"')
+
+        home = os.path.abspath(os.path.expanduser("~"))
+        in_home = os.path.join(home, ".test_cfg.json")
+        if not in_home.startswith(cwd):
+            self.assertEqual(extract_tool_display("read", {"path": in_home}), "~/.test_cfg.json")
+
+    def test_read_file_content_with_tilde_and_limit(self):
+        import tempfile
+
+        from widgets.utils.file_reader import read_file_content
+
+        self.assertIsNone(read_file_content(""))
+        self.assertIsNone(read_file_content(None))
+        self.assertIsNone(read_file_content("/non/existent/path/for/sure.txt"))
+
+        with tempfile.NamedTemporaryFile("w+", suffix=".txt", delete=False) as f:
+            f.write("a" * 100)
+            f.flush()
+            temp_name = f.name
+
+        try:
+            self.assertEqual(read_file_content(temp_name, max_bytes=10), "a" * 10)
+        finally:
+            os.remove(temp_name)
+
+    def test_build_synthetic_create_diff_clean_header(self):
+        from widgets.presentation.tool_renderers import build_synthetic_create_diff
+
+        diff = build_synthetic_create_diff("/var/log/syslog", "line 1")
+        self.assertNotIn("a//var", diff)
+        self.assertIn("--- a/var/log/syslog", diff)
 
 
 if __name__ == "__main__":

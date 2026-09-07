@@ -461,8 +461,6 @@ class BranchScreen(BaseModalScreen[Any]):
             if target_dir:
                 if hasattr(self.app, "switch_project_dir"):
                     self.app.switch_project_dir(target_dir, branch)
-                if hasattr(self.app, "notify"):
-                    self.app.notify(f"Switched to worktree: {target_dir}", severity="information")
                 self.dismiss(target_dir)
             else:
                 if hasattr(self.app, "notify"):
@@ -477,8 +475,6 @@ class BranchScreen(BaseModalScreen[Any]):
             if (is_root or is_worktree) and path:
                 if hasattr(self.app, "switch_project_dir"):
                     self.app.switch_project_dir(path, branch)
-                if hasattr(self.app, "notify"):
-                    self.app.notify(f"Switched to worktree: {path}", severity="information")
                 self.dismiss(path)
             else:
                 wt_res = await self._create_wt(mgr, pdir, branch)
@@ -486,8 +482,6 @@ class BranchScreen(BaseModalScreen[Any]):
                 if target_dir:
                     if hasattr(self.app, "switch_project_dir"):
                         self.app.switch_project_dir(target_dir, branch)
-                    if hasattr(self.app, "notify"):
-                        self.app.notify(f"Switched to worktree: {target_dir}", severity="information")
                     self.dismiss(target_dir)
                 else:
                     if hasattr(self.app, "notify"):
