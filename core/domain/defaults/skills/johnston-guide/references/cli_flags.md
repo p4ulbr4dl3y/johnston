@@ -43,6 +43,10 @@ Start the interactive Textual UI application:
   johnston --sandbox
   johnston --no-sandbox
   ```
+- `-w`, `--workspace <dir>`: Additional allowed workspace root directory (repeatable for multi-root workspaces).
+  ```bash
+  johnston -w /path/to/extra/root
+  ```
 - `-C`, `--cwd <dir>`: Change working directory before running.
   ```bash
   johnston -C /path/to/project
@@ -101,9 +105,29 @@ Execute an agent turn directly in the terminal without launching the Textual TUI
   ```bash
   johnston run --role planner "Draft implementation plan"
   ```
+- `--mode {review,edits,yolo}`: Permission mode (`review`, `edits`, `yolo`).
+  ```bash
+  johnston run --mode yolo "Run automated test suite"
+  ```
+- `-y`, `--yolo`: Shortcut for `--mode yolo` (allow all tool actions without confirmation).
+  ```bash
+  johnston run -y "Install dependencies and run tests"
+  ```
+- `-w`, `--workspace <dir>`: Additional allowed workspace root directory (repeatable for multi-root workspaces).
+  ```bash
+  johnston run -w /path/to/extra/root "Analyze code across workspaces"
+  ```
+- `-s`, `--skill <name>`: Activate skill(s) by name (repeatable).
+  ```bash
+  johnston run -s refactoring "Clean up models"
+  ```
 - `--json`: Output final structured JSON payload containing `response`, `tool_calls`, and `usage`.
   ```bash
   johnston run --json "List the top 3 files in src"
+  ```
+- `--stream-json`: Stream real-time NDJSON events to stdout.
+  ```bash
+  johnston run --stream-json "Generate implementation plan"
   ```
 - `-q`, `--quiet`: Output only assistant response text, suppressing tool call status lines.
   ```bash
@@ -114,14 +138,14 @@ Execute an agent turn directly in the terminal without launching the Textual TUI
 
 ### 1. `johnston config` — Application Settings
 Inspect and modify settings stored in `~/.johnston/config.json`:
-- `johnston config list`: Show all settings, current values, and sources (default vs config).
-- `johnston config get <key>`: Print setting value (e.g. `llm.context_limit`, `theme`, `sandbox.enabled`).
+- `johnston config list [--json]`: Show all settings, current values, and sources (default vs config; `--json` for structured output).
+- `johnston config get <key> [--json]`: Print setting value (e.g. `llm.context_limit`, `theme`, `sandbox.enabled`; `--json` for structured output).
 - `johnston config set <key> <value>`: Validate and update setting value.
 - `johnston config unset <key>`: Reset setting to system default.
 
 ### 2. `johnston provider` — LLM Providers & Models
 Manage provider profiles and API keys in `~/.johnston/providers.json`:
-- `johnston provider list`: Show table of providers, active models, key status, and states.
+- `johnston provider list [--json]`: Show table of providers, active models, key status, and states (`--json` for structured output).
 - `johnston provider set-key <name> [key]`: Set provider API key (secure masked prompt if omitted; reads stdin if `-`).
 - `johnston provider set-model <name> <model>`: Set active model for provider.
 - `johnston provider add <name> --model <model> [--api-key <k>] [--base-url <u>]`: Register custom provider.
@@ -131,7 +155,7 @@ Manage provider profiles and API keys in `~/.johnston/providers.json`:
 
 ### 3. `johnston mcp` — Model Context Protocol Servers
 Manage MCP server configs in `~/.johnston/mcp.json` (global) or `.johnston/mcp.json` (project):
-- `johnston mcp list`: Show configured servers, scope, status (enabled/disabled), tool counts, and commands.
+- `johnston mcp list [--json]`: Show configured servers, scope, status (enabled/disabled), tool counts, and commands (`--json` for structured output).
 - `johnston mcp add <name> (--cmd <cmd> | --url <url>) [--args ...] [--scope global|project]`: Add/update MCP server.
 - `johnston mcp rm <name> [--scope global|project]`: Remove MCP server definition.
 - `johnston mcp enable <name> [--scope global|project]`: Enable MCP server.
@@ -139,13 +163,13 @@ Manage MCP server configs in `~/.johnston/mcp.json` (global) or `.johnston/mcp.j
 
 ### 4. `johnston session` — Conversation Sessions
 Inspect and manage persisted chat sessions:
-- `johnston session list [--limit N]`: Show table of recent sessions (ID, title, message count, updated time).
+- `johnston session list [--limit N] [--all] [--json]`: Show table of sessions (ID, title, message count, updated time; `--all` lists without limit, `--json` for structured output).
 - `johnston session rm <id>`: Delete session.
 - `johnston session prune [--days N]`: Prune sessions older than N days (default: 14).
 - `johnston session export <id> [--format md|json] [--output file]`: Export conversation transcript.
 
 ### 5. `johnston doctor` — Diagnostics
-- `johnston doctor`: Run comprehensive health check:
+- `johnston doctor [--json]`: Run comprehensive health check (`--json` for structured output):
   - Python runtime (3.10+) and `uv` package manager
   - Global and project config directories write access
   - Git repository detection and working tree status
@@ -153,9 +177,9 @@ Inspect and manage persisted chat sessions:
   - MCP servers command/URL validation and tool count checks
 
 ### 6. Inspection Commands
-- `johnston roles`: List available agent roles (execution modes and subagent roles).
-- `johnston skills`: List registered global and project skills.
-- `johnston rules`: List active project instructions and rules.
+- `johnston roles [--json]`: List available agent roles (execution modes and subagent roles; `--json` for structured output).
+- `johnston skills [--json]`: List registered global and project skills (`--json` for structured output).
+- `johnston rules [--json]`: List active project instructions and rules (`--json` for structured output).
 
 ## Session Resume Hint
 Upon exiting an active conversation session in TUI mode, Johnston prints:

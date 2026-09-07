@@ -83,7 +83,6 @@ class AgentRole:
         disallowed_tools: Optional[List[str]] = None,
         allowed_tools: Optional[List[str]] = None,
         model: str = "",
-        provider: str = "",
         scope: str = "any",
         source: str = "builtin",
         tool_name_normalizer: Optional[Callable[[str], str]] = None,
@@ -96,12 +95,21 @@ class AgentRole:
         self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
         self.allowed_tools = [t.strip() for t in (allowed_tools or [])]
         raw_model = (model or "").strip()
-        raw_provider = (provider or "").strip().lower()
-        if not raw_provider and "/" in raw_model:
-            self.provider, self.model = split_provider_model(raw_model)
+        if raw_model:
+            if "/" not in raw_model:
+                raise ValueError(
+                    f"Invalid model format '{raw_model}' for role '{self.key}': must be 'provider/model'"
+                )
+            p, m = split_provider_model(raw_model)
+            if not p or not m:
+                raise ValueError(
+                    f"Invalid model format '{raw_model}' for role '{self.key}': must be 'provider/model'"
+                )
+            self.provider = p
+            self.model = m
         else:
-            self.provider = raw_provider
-            self.model = raw_model
+            self.provider = ""
+            self.model = ""
         self.scope = normalize_role_scope(scope)
         self.source = source
         self.tool_name_normalizer = tool_name_normalizer

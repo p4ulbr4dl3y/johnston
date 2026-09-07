@@ -68,7 +68,7 @@ You are a senior code reviewer role.""")
 name: tester
 description: Automated testing role
 allowed_tools: shell
-model: gpt-4o
+model: openai/gpt-4o
 ---
 You run tests and report coverage.""")
 
@@ -226,24 +226,20 @@ class TestAgentRoleConstruction:
         r = AgentRole(key="x", scope="not-a-real-scope")
         assert r.scope == "not-a-real-scope"
 
-    def test_provider_stripped_lower(self):
-        r = AgentRole(key="x", provider="  OpenAi  ")
-        assert r.provider == "openai"
-
     def test_model_with_provider_prefix_splits(self):
         r = AgentRole(key="x", model="anthropic/claude-3-5-sonnet")
         assert r.provider == "anthropic"
         assert r.model == "claude-3-5-sonnet"
 
-    def test_model_without_provider_prefix_leaves_provider_empty(self):
-        r = AgentRole(key="x", model="gpt-4o")
-        assert r.provider == ""
-        assert r.model == "gpt-4o"
+    def test_model_without_provider_prefix_raises(self):
+        import pytest
+        with pytest.raises(ValueError, match="must be 'provider/model'"):
+            AgentRole(key="x", model="gpt-4o")
 
-    def test_explicit_provider_takes_precedence_over_model_slash(self):
-        r = AgentRole(key="x", provider="openrouter", model="meta-llama/llama-3")
-        assert r.provider == "openrouter"
-        assert r.model == "meta-llama/llama-3"
+    def test_model_empty_allows_empty_provider_and_model(self):
+        r = AgentRole(key="x", model="")
+        assert r.provider == ""
+        assert r.model == ""
 
     def test_unicode_prompt_roundtrip(self):
         prompt = "Привет, мир! Роль: 🧠 测试 テスト"
@@ -447,6 +443,13 @@ class TestRoleFiles:
             assert roles["p"].provider == "openai"
             assert roles["p"].model == "gpt-4o"
             assert roles["worker"].provider == ""
+
+    def test_role_file_with_separate_provider_is_skipped(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self._make_role(tmpdir, "bad.md", "---\nname: bad\nprovider: openai\nmodel: gpt-4o\n---\nbody")
+            reg = RoleRegistry()
+            roles = reg.load_roles(project_dir=tmpdir, include_global=False)
+            assert "bad" not in roles
 
     def test_unicode_system_prompt_from_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -697,10 +700,21 @@ class TestRoleDisplayAndInjection:
         assert normalize_role_scope("MAIN") == "main"
         assert normalize_role_scope("SUBAGENT") == "subagent"
 
-    def test_parse_role_separate_provider_field(self):
+    def test_parse_role_separate_provider_field_rejected(self):
         reg = RoleRegistry.get_instance()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
             f.write("---\nname: Test Provider\nprovider: anthropic\nmodel: claude-3-5\n---\nPrompt")
+            f_name = f.name
+        try:
+            role = reg._parse_md_role(f_name, "test")
+            assert role is None
+        finally:
+            os.remove(f_name)
+
+    def test_parse_role_provider_model_format_accepted(self):
+        reg = RoleRegistry.get_instance()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+            f.write("---\nname: Test Model\nmodel: anthropic/claude-3-5\n---\nPrompt")
             f_name = f.name
         try:
             role = reg._parse_md_role(f_name, "test")

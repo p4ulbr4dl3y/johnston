@@ -141,7 +141,11 @@ class RoleRegistry:
             if not scope:
                 return dict(self.roles)
             clean_scope = normalize_role_scope(scope)
-            return {k: v for k, v in self.roles.items() if v.scope in (RoleScope.BOTH, clean_scope)}
+            if clean_scope in (RoleScope.MAIN, "interactive"):
+                allowed = (RoleScope.BOTH, RoleScope.MAIN, "interactive")
+            else:
+                allowed = (RoleScope.BOTH, clean_scope)
+            return {k: v for k, v in self.roles.items() if getattr(v, "scope", "") in allowed}
 
     def list_subagent_roles(self, project_dir: Optional[str] = None) -> Dict[str, AgentRole]:
         return self.list_roles(scope=RoleScope.SUBAGENT, project_dir=project_dir)
@@ -179,11 +183,13 @@ class RoleRegistry:
             base_key = os.path.splitext(os.path.basename(fpath))[0]
             meta, prompt = parse_frontmatter(raw)
             prompt = prompt.strip()
-
             key = meta.get("key") or base_key
             name = meta.get("name") or key.replace("_", " ").replace("-", " ").title()
             desc = meta.get("description", "")
-            provider = meta.get("provider", "")
+            if "provider" in meta:
+                raise ValueError(
+                    f"Role '{fpath}' specifies separate 'provider' field; only 'model: provider/model' format is accepted"
+                )
             model = meta.get("model", "")
             scope = meta.get("scope", "any")
 
@@ -203,7 +209,6 @@ class RoleRegistry:
                 disallowed_tools=disallowed_tools,
                 allowed_tools=allowed_tools,
                 model=model,
-                provider=provider,
                 scope=scope,
                 source=source,
                 tool_name_normalizer=self.tool_name_normalizer,

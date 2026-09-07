@@ -1,7 +1,7 @@
 # Configuration & Security Reference
 
 ## Overview
-Johnston separates application settings, provider profiles, secrets, and project configurations across dedicated files.
+Johnston separates application settings, provider profiles, secrets, and project configurations across dedicated files. Application configuration is strictly JSON formatted (`~/.johnston/config.json`).
 
 ## Configuration Files & Locations
 - App Settings: `~/.johnston/config.json` (blocked from agent modification in sandbox mode)
@@ -47,10 +47,13 @@ Credential resolution precedence (`get_secret`):
     },
     "patterns": {
       "rm -rf *": "deny"
-    }
+    },
+    "writable_roots": [],
+    "outside_workspace_action": "ask"
   },
   "llm": {
     "context_limit": 128000,
+    "auto_compact_token_limit": null,
     "compaction_threshold_ratio": 0.75,
     "compaction_summarize_ratio": 0.90,
     "compaction_user_budget": 20000,
@@ -78,6 +81,7 @@ Credential resolution precedence (`get_secret`):
   "tools": {
     "shell_default_timeout": 120.0,
     "shell_max_cap": 600.0,
+    "shell_idle_timeout": 60,
     "max_shell_output_chars": 4000,
     "max_tool_output_chars": 8000,
     "max_tool_payload_bytes": 10485760,
@@ -88,7 +92,7 @@ Credential resolution precedence (`get_secret`):
     "mcp_miss_ttl": 30.0,
     "mcp_miss_max": 512,
     "web_fetch_timeout": 20.0,
-    "web_user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Johnston/0.1",
+    "web_user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Johnston/0.1",
     "dns_cache_ttl": 60.0,
     "dns_cache_max": 512,
     "read_line_window": 800,
@@ -105,13 +109,14 @@ Credential resolution precedence (`get_secret`):
   "subagents": {
     "max_concurrent": 5,
     "max_result_chars": 15000,
-    "worktree_timeout": 15.0
+    "worktree_timeout": 15.0,
+    "auto_compact_token_limit": 200000
   },
   "ui": {
     "max_prompt_history": 500,
     "max_chat_input_lines": 6,
     "stream_flush_interval": 0.05,
-    "chat_page_size": 25,
+    "chat_page_size": 100,
     "paste_line_threshold": 10,
     "autocomplete_max_files": 1000
   },
@@ -125,9 +130,9 @@ Credential resolution precedence (`get_secret`):
 
 ## Environment Variable Overrides (`JOHNSTON_*`)
 Parameters can be overridden via environment variables:
-- **LLM**: `JOHNSTON_CONTEXT_LIMIT`, `JOHNSTON_COMPACTION_RATIO`, `JOHNSTON_COMPACTION_SUMMARIZE_RATIO`, `JOHNSTON_COMPACTION_USER_BUDGET`, `JOHNSTON_STREAM_TIMEOUT`, `JOHNSTON_CHUNK_TIMEOUT`, `JOHNSTON_MAX_TOKENS`, `JOHNSTON_MAX_RETRIES`, `JOHNSTON_RETRY_DELAY`, `JOHNSTON_RETRY_BACKOFF`, `JOHNSTON_MAX_RETRY_DELAY`, `JOHNSTON_CB_THRESHOLD`, `JOHNSTON_CB_COOLDOWN`, `JOHNSTON_AUTO_TITLE`, `JOHNSTON_AUTO_TITLE_TIMEOUT`, `JOHNSTON_AUTO_TITLE_MAX_LEN`, `JOHNSTON_AUTO_TITLE_MODEL`, `JOHNSTON_CATALOG_CACHE_TTL`, `JOHNSTON_AGENT_MD_MAX_CHARS`.
-- **Tools**: `JOHNSTON_SHELL_TIMEOUT`, `JOHNSTON_SHELL_MAX_CAP`, `JOHNSTON_SHELL_OUTPUT_CHARS`, `JOHNSTON_MAX_TOOL_OUTPUT_CHARS`, `JOHNSTON_MAX_TOOL_PAYLOAD_BYTES`, `JOHNSTON_MAX_SNAPSHOT_LOG_BYTES`, `JOHNSTON_MCP_CALL_TIMEOUT`, `JOHNSTON_MCP_INIT_TIMEOUT`, `JOHNSTON_WEB_FETCH_TIMEOUT`, `JOHNSTON_READ_LINE_WINDOW`, `JOHNSTON_MAX_DIR_ENTRIES`, `JOHNSTON_DOC_CONVERSION_TIMEOUT`, `JOHNSTON_IMAGE_MAX_DIMENSION`, `JOHNSTON_IMAGE_DIMENSION_LOW`, `JOHNSTON_IMAGE_DIMENSION_HIGH`, `JOHNSTON_IMAGE_PNG_KEEP_BYTES`, `JOHNSTON_MAX_DOC_CACHE`, `JOHNSTON_DOC_CACHE_TTL`, `JOHNSTON_LINE_COUNT_CACHE_MAX`, `JOHNSTON_DNS_CACHE_TTL`, `JOHNSTON_DNS_CACHE_MAX`, `JOHNSTON_MCP_MISS_TTL`, `JOHNSTON_MCP_MISS_MAX`, `JOHNSTON_SHELL_STREAM_BUFFER_BYTES`, `JOHNSTON_WEB_USER_AGENT`.
-- **Subagents**: `JOHNSTON_MAX_CONCURRENT_SUBAGENTS`, `JOHNSTON_SUBAGENT_RESULT_MAX_CHARS`, `JOHNSTON_SUBAGENT_WORKTREE_TIMEOUT`.
+- **LLM**: `JOHNSTON_CONTEXT_LIMIT`, `JOHNSTON_AUTO_COMPACT_TOKEN_LIMIT`, `JOHNSTON_COMPACTION_RATIO`, `JOHNSTON_COMPACTION_SUMMARIZE_RATIO`, `JOHNSTON_COMPACTION_USER_BUDGET`, `JOHNSTON_STREAM_TIMEOUT`, `JOHNSTON_CHUNK_TIMEOUT`, `JOHNSTON_MAX_TOKENS`, `JOHNSTON_MAX_RETRIES`, `JOHNSTON_RETRY_DELAY`, `JOHNSTON_RETRY_BACKOFF`, `JOHNSTON_MAX_RETRY_DELAY`, `JOHNSTON_CB_THRESHOLD`, `JOHNSTON_CB_COOLDOWN`, `JOHNSTON_AUTO_TITLE`, `JOHNSTON_AUTO_TITLE_TIMEOUT`, `JOHNSTON_AUTO_TITLE_MAX_LEN`, `JOHNSTON_AUTO_TITLE_MODEL`, `JOHNSTON_CATALOG_CACHE_TTL`, `JOHNSTON_AGENT_MD_MAX_CHARS`.
+- **Tools**: `JOHNSTON_SHELL_TIMEOUT`, `JOHNSTON_SHELL_MAX_CAP`, `JOHNSTON_SHELL_IDLE_TIMEOUT`, `JOHNSTON_SHELL_OUTPUT_CHARS`, `JOHNSTON_MAX_TOOL_OUTPUT_CHARS`, `JOHNSTON_MAX_TOOL_PAYLOAD_BYTES`, `JOHNSTON_MAX_SNAPSHOT_LOG_BYTES`, `JOHNSTON_MCP_CALL_TIMEOUT`, `JOHNSTON_MCP_INIT_TIMEOUT`, `JOHNSTON_WEB_FETCH_TIMEOUT`, `JOHNSTON_READ_LINE_WINDOW`, `JOHNSTON_MAX_DIR_ENTRIES`, `JOHNSTON_DOC_CONVERSION_TIMEOUT`, `JOHNSTON_IMAGE_MAX_DIMENSION`, `JOHNSTON_IMAGE_DIMENSION_LOW`, `JOHNSTON_IMAGE_DIMENSION_HIGH`, `JOHNSTON_IMAGE_PNG_KEEP_BYTES`, `JOHNSTON_MAX_DOC_CACHE`, `JOHNSTON_DOC_CACHE_TTL`, `JOHNSTON_LINE_COUNT_CACHE_MAX`, `JOHNSTON_DNS_CACHE_TTL`, `JOHNSTON_DNS_CACHE_MAX`, `JOHNSTON_MCP_MISS_TTL`, `JOHNSTON_MCP_MISS_MAX`, `JOHNSTON_SHELL_STREAM_BUFFER_BYTES`, `JOHNSTON_WEB_USER_AGENT`.
+- **Subagents**: `JOHNSTON_MAX_CONCURRENT_SUBAGENTS`, `JOHNSTON_SUBAGENT_RESULT_MAX_CHARS`, `JOHNSTON_SUBAGENT_WORKTREE_TIMEOUT`, `JOHNSTON_SUBAGENT_AUTO_COMPACT_TOKEN_LIMIT`.
 - **UI**: `JOHNSTON_MAX_PROMPT_HISTORY`, `JOHNSTON_CHAT_INPUT_MAX_LINES`, `JOHNSTON_STREAM_FLUSH_INTERVAL`, `JOHNSTON_CHAT_PAGE_SIZE`, `JOHNSTON_PASTE_LINE_THRESHOLD`, `JOHNSTON_AUTOCOMPLETE_MAX_FILES`.
 - **Storage & Security**: `JOHNSTON_LOG_MAX_BYTES`, `JOHNSTON_LOG_MAX_AGE_DAYS`, `JOHNSTON_DISK_CACHE_TTL`, `JOHNSTON_SANDBOX_ENABLED`.
 
@@ -138,6 +143,9 @@ Parameters can be overridden via environment variables:
   - `edits`: Auto-allows `create`/`edit`, prompts for `shell`/`mcp`.
   - `yolo`: Auto-allows all standard tool executions.
 - **Permission Actions**: `allow` (auto-execute), `ask` (prompt user), `deny` (block execution).
+- **Workspace Boundaries (`permissions`)**:
+  - `permissions.writable_roots` (`list[str]`, default `[]`): Additional directory paths allowed for write and edit operations outside the primary project workspace.
+  - `permissions.outside_workspace_action` (`"ask" | "allow" | "deny"`, default `"ask"`): Action to take when a tool attempts to read or write files outside the workspace roots and `writable_roots`.
 - **Read-Only Roles**: The `explorer` role enforces kernel sandbox. Roles with `read_only: true` disable `create` and `edit` tools.
 
 ## CLI Configuration Management (`johnston config`)

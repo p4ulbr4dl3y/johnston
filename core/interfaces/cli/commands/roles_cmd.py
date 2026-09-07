@@ -22,6 +22,8 @@ def run_roles(args: Any = None) -> int:
                 "scope": r.scope,
                 "source": r.source,
                 "description": r.description or "",
+                "model": f"{r.provider}/{r.model}" if r.provider and r.model else (r.model or ""),
+                "read_only": r.read_only,
                 "allowed_tools": r.allowed_tools or [],
                 "disallowed_tools": r.disallowed_tools or [],
             }

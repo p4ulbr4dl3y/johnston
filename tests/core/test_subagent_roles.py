@@ -59,7 +59,7 @@ You are a senior code reviewer subagent. Analyze diffs carefully.""")
 name: tester
 description: Automated testing subagent
 allowed_tools: shell
-model: gpt-4o
+model: openai/gpt-4o
 ---
 You run tests and report coverage.""")
 
@@ -80,7 +80,7 @@ You run tests and report coverage.""")
             tester_def = registry.get_role("tester")
             self.assertEqual(tester_def.description, "Automated testing subagent")
             self.assertEqual(tester_def.allowed_tools, ["shell"])
-            self.assertEqual(tester_def.provider, "")
+            self.assertEqual(tester_def.provider, "openai")
             self.assertEqual(tester_def.model, "gpt-4o")
             self.assertIn("run tests and report coverage", tester_def.prompt)
 
@@ -91,7 +91,7 @@ You run tests and report coverage.""")
                 snippet,
             )
             self.assertIn(
-                "- tester (tools: shell, model: gpt-4o): Automated testing subagent",
+                "- tester (tools: shell, model: openai/gpt-4o): Automated testing subagent",
                 snippet,
             )
 
