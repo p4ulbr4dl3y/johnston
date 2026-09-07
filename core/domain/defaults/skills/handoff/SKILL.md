@@ -38,41 +38,55 @@ Analyze what happened during the session:
 
 ### Step 3: Structure the Handoff Document
 
-Output the handoff in this structured format:
+Output the handoff in this structured format matching Johnston's compaction schema:
 
 ```markdown
-# Session Handoff: [Brief Task Title]
+# Session Handoff
 
-## 1. Goal
-[1-2 sentences: what we set out to accomplish].
+### Objective
+[1-2 sentences: primary goal + user intent + success criteria if stated]
 
-## 2. Completed Work
-- [Component / File modified]: [Specific change made].
-- [Tests added or updated].
+### User Decisions & Preferences
+[Architecture/style choices, explicit do/don't, "(none)" if none]
 
-## 3. Current Workspace State
-- **Branch / Worktree**: `[branch name]`
-- **Uncommitted Changes**: `[list of modified files]`
-- **Test Status**: `[Passing / Failing - quote specific failing test if any]`
+### Constraints
+[Hard limits, sandbox, read-only, "do not modify X", or "(none)"]
 
-## 4. Key Decisions & Rationales
-- **Decision**: [What was chosen].
-  **Why**: [Technical reason or constraint].
-- **Discarded Approaches**: [What was tried and why it failed].
+### State
+- Completed: [finished tasks with verification evidence; cite test names/exit codes]
+- Active: [in-flight work; current investigation state]
+- Pending: [tasks user deferred for later; "(none)" if none]
+- Blocked: [blockers + EXACT error strings, or "(none)"]
+- Failed approaches: [what was tried, why rejected, or "(none)"]
 
-## 5. Next Steps (Prioritized)
-1. [Immediate next action item].
-2. [Subsequent task].
-3. [Edge cases or verification remaining].
+### Tool Output Anchors
+[CRITICAL — preserve verbatim: exit codes, file:line refs, error strings, URLs, test names]
 
-## 6. Quick Resume Command
+### Next Steps
+1. [Single immediate action — the very next tool call or test run]
+2. [Subsequent action]
+
+### Open Questions
+[Unanswered ambiguities, decisions deferred to user, or "(none)"]
+
+### Key Files
+- `path/to/file.py#L10-L25`: [why it matters, current state, last edit]
+- `tests/test_foo.py`: [relevant test suite]
+
+### Quick Resume Command
 ```bash
-[Exact command to run tests or start app, e.g. uv run pytest tests/path/test_foo.py]
+[Exact command to run tests or resume work, e.g. uv run pytest tests/path/test_foo.py -k test_name]
 ```
 ```
+
+## Rules
+- DENSE, FACTUAL, CONCISE. No conversational filler or preamble.
+- Preserve EXACT paths, line numbers, error strings, exit codes, and test names.
+- If a section has no content, write `(none)` — never omit a mandatory section.
+- Ground state in actual `git status -s` and tool outputs.
 
 ---
 
 ### Step 4: Deliver
 1. Present the handoff directly in the chat response.
-2. If the user explicitly requested saving to disk or working in a headless flow, write to `HANDOFF.md` or `.johnston/HANDOFF.md` using `create`.
+2. If the user requested a file or running in headless mode, write to `HANDOFF.md` using `create`.
