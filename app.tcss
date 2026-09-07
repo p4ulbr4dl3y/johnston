@@ -436,6 +436,25 @@ MarkdownFence .fence-scroll-box {
 CustomMarkdownFence.diagram-mode .fence-scroll-box,
 MarkdownFence.diagram-mode .fence-scroll-box {
     overflow-x: auto;
+    scrollbar-size-horizontal: 1 !important;
+    scrollbar-color: $fg-muted;
+    scrollbar-background: $bg-surface;
+    scrollbar-color-hover: $fg-muted;
+    scrollbar-background-hover: $bg-surface;
+    scrollbar-color-active: $fg-muted;
+    scrollbar-background-active: $bg-surface;
+}
+
+CustomMarkdownFence.diagram-mode .fence-scroll-box > ScrollBar,
+MarkdownFence.diagram-mode .fence-scroll-box > ScrollBar {
+    display: block !important;
+    visibility: visible !important;
+    height: 1 !important;
+}
+
+CustomMarkdownFence.diagram-mode .fence-scroll-box > ScrollBar > .scroll-bar--arrow,
+MarkdownFence.diagram-mode .fence-scroll-box > ScrollBar > .scroll-bar--arrow {
+    display: none !important;
 }
 
 CustomMarkdownFence #code-content,
@@ -452,6 +471,7 @@ MarkdownFence.diagram-mode #code-content {
     width: auto;
     min-width: 100%;
     text-wrap: nowrap;
+    padding: 0 1 1 1;
 }
 
 /* OptionList Base Styles */

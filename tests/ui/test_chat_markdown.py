@@ -534,4 +534,35 @@ class TestFenceHighlightCache(unittest.TestCase):
         self.assertNotEqual(bullets[2].symbol, "")
         self.assertNotEqual(bullets[2].styles.display, "none")
 
+    def test_diagram_scroll_box_ignores_wheel(self):
+        from unittest.mock import MagicMock
+
+        from textual import events
+
+        from widgets.presentation.widgets.chat_markdown import DiagramScrollBox
+
+        box = DiagramScrollBox()
+        self.assertFalse(box._scroll_left_for_pointer())
+        self.assertFalse(box._scroll_right_for_pointer())
+
+        ev_down = MagicMock(spec=events.MouseScrollDown)
+        box._on_mouse_scroll_down(ev_down)
+        ev_down.prevent_default.assert_called_once()
+        ev_down.stop.assert_not_called()
+
+        ev_up = MagicMock(spec=events.MouseScrollUp)
+        box._on_mouse_scroll_up(ev_up)
+        ev_up.prevent_default.assert_called_once()
+        ev_up.stop.assert_not_called()
+
+        ev_left = MagicMock(spec=events.MouseScrollLeft)
+        box._on_mouse_scroll_left(ev_left)
+        ev_left.prevent_default.assert_called_once()
+        ev_left.stop.assert_called_once()
+
+        ev_right = MagicMock(spec=events.MouseScrollRight)
+        box._on_mouse_scroll_right(ev_right)
+        ev_right.prevent_default.assert_called_once()
+        ev_right.stop.assert_called_once()
+
 

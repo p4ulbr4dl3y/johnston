@@ -11,6 +11,7 @@ from pygments.token import Token
 from rich.segment import Segment
 from rich.syntax import PygmentsSyntaxTheme, Syntax
 from rich.text import Text
+from textual import events
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.content import Content
@@ -265,6 +266,30 @@ class CustomMarkdownBulletList(MarkdownBulletList):
         self._blocks.clear()
 
 
+class DiagramScrollBox(Vertical):
+    """Scroll container for code fences that only scrolls via scrollbar drag, ignoring wheel/trackpad."""
+
+    def _on_mouse_scroll_down(self, event: events.MouseScrollDown) -> None:
+        event.prevent_default()
+
+    def _on_mouse_scroll_up(self, event: events.MouseScrollUp) -> None:
+        event.prevent_default()
+
+    def _on_mouse_scroll_left(self, event: events.MouseScrollLeft) -> None:
+        event.prevent_default()
+        event.stop()
+
+    def _on_mouse_scroll_right(self, event: events.MouseScrollRight) -> None:
+        event.prevent_default()
+        event.stop()
+
+    def _scroll_left_for_pointer(self, animate: bool = False) -> bool:
+        return False
+
+    def _scroll_right_for_pointer(self, animate: bool = False) -> bool:
+        return False
+
+
 class CustomMarkdownFence(MarkdownFence):
     """Markdown code block with a header line and Copy button."""
 
@@ -496,7 +521,7 @@ class CustomMarkdownFence(MarkdownFence):
         else:
             initial_content = self._highlighted_code
 
-        with Vertical(classes="fence-scroll-box"):
+        with DiagramScrollBox(classes="fence-scroll-box"):
             yield Label(initial_content, id="code-content", expand=True)
 
     def toggle_diagram_view(self) -> None:
