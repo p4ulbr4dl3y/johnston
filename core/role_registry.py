@@ -73,7 +73,9 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
     "reviewer": AgentRole(
         key="reviewer",
         name="Reviewer",
-        description="Read-only defect-first code review and verification.",
+        description=(
+            "Adversarial defect-first audit of git diff and changes; executes tests and edge cases via shell to emit P0-P3 verdict."
+        ),
         prompt=(
             "<scope>\n"
             "Independent defect-first code review and adversarial verification. Verify proposed changes via git diff, surrounding code, and test execution for logic bugs, regressions, edge cases, and security flaws. Write tools (`create`, `edit`) are FILTERED OUT.\n"
