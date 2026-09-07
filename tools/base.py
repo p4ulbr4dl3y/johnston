@@ -546,18 +546,13 @@ def fail(
 def async_start(task_kind: str, task_id: str, log_path: Optional[str] = None, **extra: Any) -> "ToolResult":
     """Build the standard async-started message (background shell, subagent).
 
-    Emits the canonical ``[<task_kind> started | id <tid> | log <p> ...]``
+    Emits the canonical ``[<task_kind> started | id <tid>]``
     line that the model can detect to know the call is non-blocking.
     """
     from core.domain.defaults.errors import ToolResultStatus
 
-    body = format_header(**{"task_kind started": task_kind, "id": task_id, "log": log_path, **extra})
-    # Use the human-friendly form
-    if log_path:
-        body = f"[{task_kind} started | id {task_id} | log {log_path}]"
-    else:
-        body = f"[{task_kind} started | id {task_id}]"
-    return ToolResult(status=ToolResultStatus.RUNNING, content=body, display=body)
+    body = f"[{task_kind} started | id {task_id}]"
+    return ToolResult(status=ToolResultStatus.RUNNING, content=body, display=body, log_path=log_path)
 
 
 class BaseTool:
