@@ -249,6 +249,7 @@ def compute_tool_call_content(
     clean_hints: Callable[[str], str],
     clean_bash_output: Callable[[str], str],
     format_json_result_fn: Callable[[str], str | None],
+    log_path: str | None = None,
 ) -> tuple[str, Any]:
     """Compute (kind, value) representation for expanded tool-call content."""
     try:
@@ -330,18 +331,15 @@ def compute_tool_call_content(
             return "markup", clean_markup(clean_res)
         elif tool_type == "shell":
             output_text = clean_bash_output(result_text)
-            log_match = re.search(r"Full Log:\s*([^\s\(\)\]]+)", result_text or "")
-            if log_match:
-                log_path = log_match.group(1).rstrip(".]")
-                if os.path.isfile(log_path):
-                    try:
-                        from widgets.utils.file_reader import read_file_content
+            if log_path and os.path.isfile(log_path):
+                try:
+                    from widgets.utils.file_reader import read_file_content
 
-                        log_content = read_file_content(log_path)
-                        if log_content and log_content.strip():
-                            output_text = log_content.rstrip("\r\n")
-                    except Exception:
-                        pass
+                    log_content = read_file_content(log_path)
+                    if log_content and log_content.strip():
+                        output_text = log_content.rstrip("\r\n")
+                except Exception:
+                    pass
             if not output_text.strip():
                 output_text = "(No output)"
             return "markup", clean_markup(output_text)

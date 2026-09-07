@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Any, Dict, Type
 
-from core.domain.defaults.errors import ToolResult, normalize_tool_result
+from core.domain.defaults.errors import ToolResult, ToolResultStatus, normalize_tool_result
 from core.domain.ports.tool_registry import set_default_tool_registry
 from core.infrastructure.runtime.tool_name import normalize_tool_name
 from tools.ask_user import AskUserTool
@@ -349,7 +349,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
         target_server = target_entry.get("_mcp_server") if isinstance(target_entry, dict) else None
         mcp_res = await execute_mcp_tool(mcp_mgr, name, args, target_server=target_server)
         if mcp_res is not None:
-            tool_res = await normalize_tool_result(mcp_res)
+            if isinstance(mcp_res, str) and mcp_res.lstrip().lower().startswith("err:"):
+                tool_res = ToolResult(content=mcp_res, status=ToolResultStatus.ERROR)
+            else:
+                tool_res = await normalize_tool_result(mcp_res)
             max_chars = get_settings().tools.max_tool_output_chars
             if not tool_res.is_error and tool_res.content and len(tool_res.content) > max_chars:
                 tool_res.content = truncate_output(

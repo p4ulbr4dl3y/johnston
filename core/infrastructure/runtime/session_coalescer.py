@@ -75,7 +75,7 @@ def add_event(session: Any, event: Dict[str, Any]) -> None:
             session._next_unmatched_tool_idx = len(session.messages)
         if target_msg is not None:
             target_msg["result_text"] = event["result_text"]
-            for key in ("status", "is_error", "returncode"):
+            for key in ("status", "is_error", "returncode", "task_id", "background_task_id", "subagent_session_id", "log_path"):
                 if key in event:
                     target_msg[key] = event[key]
             if event.get("tool_id"):
@@ -106,6 +106,19 @@ def add_event(session: Any, event: Dict[str, Any]) -> None:
             # by replay consumers (and by result-correlation in the branch
             # above), so a tool/result pairing survives across replays.
             msg_to_store["tool_call_id"] = msg_to_store.pop("tool_id")
+        if msg_to_store.get("type") == MessageType.TOOL:
+            t_type = msg_to_store.get("tool_type") or msg_to_store.get("name")
+            if t_type == "update_plan" and isinstance(msg_to_store.get("args"), dict):
+                p_items = msg_to_store["args"].get("plan")
+                if p_items:
+                    try:
+                        from core.base_provider.compaction import _clean_plan_items
+
+                        cleaned = _clean_plan_items(p_items)
+                        if cleaned:
+                            session.plan = cleaned
+                    except Exception:
+                        pass
         session.messages.append(msg_to_store)
         session.updated_at = _now()
 

@@ -351,7 +351,7 @@ class ShellTool(BaseTool):
             if target_widget is not None and not getattr(ctx, "is_subagent", False):
                 task.add_listener(target_widget.append_shell_output)
             if getattr(ctx, "session", None) and hasattr(ctx.session, "add_event"):
-                task.add_listener(lambda chunk: ctx.session.add_event({"type": "tool_shell_output", "text": chunk}))
+                task.add_listener(lambda chunk, tid=task_id: ctx.session.add_event({"type": "tool_shell_output", "text": chunk, "task_id": tid}))
             callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
             progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
             task.is_background = True
@@ -367,7 +367,21 @@ class ShellTool(BaseTool):
             notice = _sandbox_fallback_notice(ctx)
             if notice:
                 plain_content = notice + plain_content
-            return ToolResult(status=ToolResultStatus.RUNNING, content=plain_content)
+            if getattr(ctx, "session", None) and hasattr(ctx.session, "messages"):
+                for msg in reversed(ctx.session.messages):
+                    if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "shell":
+                        msg["task_id"] = task_id
+                        msg["background_task_id"] = task_id
+                        if task.log_path:
+                            msg["log_path"] = task.log_path
+                        break
+            return ToolResult(
+                status=ToolResultStatus.RUNNING,
+                content=plain_content,
+                task_id=task_id,
+                background_task_id=task_id,
+                log_path=task.log_path,
+            )
 
         # Synchronous execution mode (default or wait_seconds > 0): stream
         # output into a bounded tail buffer. If wait_seconds is specified, wait
@@ -424,7 +438,7 @@ class ShellTool(BaseTool):
         if target_widget is not None and not getattr(ctx, "is_subagent", False):
             task.add_listener(target_widget.append_shell_output)
         if getattr(ctx, "session", None) and hasattr(ctx.session, "add_event"):
-            task.add_listener(lambda chunk: ctx.session.add_event({"type": "tool_shell_output", "text": chunk}))
+            task.add_listener(lambda chunk, tid=task_id: ctx.session.add_event({"type": "tool_shell_output", "text": chunk, "task_id": tid}))
         if not getattr(ctx, "is_subagent", False):
             _attach_shell_widget(ctx.host, task_id, target_widget, is_background=False)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
@@ -468,8 +482,17 @@ class ShellTool(BaseTool):
                             target_widget.mark_background(task_id, task.log_path)
                         else:
                             setattr(target_widget, "background_task_id", task_id)
+                            setattr(target_widget, "task_id", task_id)
                             if task.log_path:
                                 setattr(target_widget, "log_path", task.log_path)
+                    if getattr(ctx, "session", None) and hasattr(ctx.session, "messages"):
+                        for msg in reversed(ctx.session.messages):
+                            if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "shell":
+                                msg["task_id"] = task_id
+                                msg["background_task_id"] = task_id
+                                if task.log_path:
+                                    msg["log_path"] = task.log_path
+                                break
                     raw_out = task.get_formatted_output().strip()
                     if raw_out:
                         truncated = truncate_output(
@@ -486,6 +509,9 @@ class ShellTool(BaseTool):
                     return ToolResult(
                         status=ToolResultStatus.RUNNING,
                         content=plain_content,
+                        task_id=task_id,
+                        background_task_id=task_id,
+                        log_path=task.log_path,
                     )
                 raise asyncio.TimeoutError()
 
@@ -497,8 +523,17 @@ class ShellTool(BaseTool):
                         target_widget.mark_background(task_id, task.log_path)
                     else:
                         setattr(target_widget, "background_task_id", task_id)
+                        setattr(target_widget, "task_id", task_id)
                         if task.log_path:
                             setattr(target_widget, "log_path", task.log_path)
+                if getattr(ctx, "session", None) and hasattr(ctx.session, "messages"):
+                    for msg in reversed(ctx.session.messages):
+                        if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "shell":
+                            msg["task_id"] = task_id
+                            msg["background_task_id"] = task_id
+                            if task.log_path:
+                                msg["log_path"] = task.log_path
+                            break
                 elapsed = max(0.1, round(time.monotonic() - start_time, 1))
                 raw_out = task.get_formatted_output().strip()
                 if raw_out:
@@ -516,6 +551,9 @@ class ShellTool(BaseTool):
                 return ToolResult(
                     status=ToolResultStatus.RUNNING,
                     content=plain_content,
+                    task_id=task_id,
+                    background_task_id=task_id,
+                    log_path=task.log_path,
                 )
 
             if read_task:

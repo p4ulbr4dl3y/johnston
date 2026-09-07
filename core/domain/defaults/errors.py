@@ -51,6 +51,9 @@ class ToolResultEvent:
     is_error: bool = False
     status: Optional[ToolResultStatus] = None
     returncode: Optional[int] = None
+    task_id: Optional[str] = None
+    background_task_id: Optional[str] = None
+    log_path: Optional[str] = None
 
 
 def format_tool_error(kind: str, detail: str = "", name: str = "") -> str:
@@ -125,11 +128,16 @@ def parse_tool_result_step(step: Sequence) -> ToolResultEvent:
     is_error = bool(step[3]) if len(step) > 3 else False
     status = step[4] if len(step) > 4 else None
     returncode = step[5] if len(step) > 5 else None
+    task_id = step[7] if len(step) > 7 else None
+    log_path = step[8] if len(step) > 8 else None
     return ToolResultEvent(
         content=content,
         is_error=is_error,
         status=ToolResultStatus(status) if status is not None else None,
         returncode=returncode,
+        task_id=task_id,
+        background_task_id=task_id,
+        log_path=log_path,
     )
 
 
@@ -145,15 +153,35 @@ class ToolResult:
     display: Optional[str] = None
     status: ToolResultStatus = ToolResultStatus.DONE
     returncode: Optional[int] = None
+    task_id: Optional[str] = None
+    background_task_id: Optional[str] = None
+    log_path: Optional[str] = None
 
     @property
     def is_error(self) -> bool:
         return bool(self.status == ToolResultStatus.ERROR)
 
     @classmethod
-    def done(cls, content: str = "", display: Optional[str] = None, returncode: Optional[int] = None) -> "ToolResult":
+    def done(
+        cls,
+        content: str = "",
+        display: Optional[str] = None,
+        returncode: Optional[int] = None,
+        task_id: Optional[str] = None,
+        background_task_id: Optional[str] = None,
+        log_path: Optional[str] = None,
+    ) -> "ToolResult":
         c = content or ""
-        return cls(content=c, display=display if display is not None else c, status=ToolResultStatus.DONE, returncode=returncode)
+        tid = task_id or background_task_id
+        return cls(
+            content=c,
+            display=display if display is not None else c,
+            status=ToolResultStatus.DONE,
+            returncode=returncode,
+            task_id=tid,
+            background_task_id=tid,
+            log_path=log_path,
+        )
 
     @classmethod
     def error(
@@ -163,19 +191,42 @@ class ToolResult:
         name: str = "",
         returncode: Optional[int] = None,
         display: Optional[str] = None,
+        task_id: Optional[str] = None,
+        background_task_id: Optional[str] = None,
+        log_path: Optional[str] = None,
     ) -> "ToolResult":
         formatted = format_tool_error(kind, detail=detail, name=name)
+        tid = task_id or background_task_id
         return cls(
             content=formatted,
             display=display if display is not None else formatted,
             status=ToolResultStatus.ERROR,
             returncode=returncode,
+            task_id=tid,
+            background_task_id=tid,
+            log_path=log_path,
         )
 
     @classmethod
-    def cancelled(cls, content: str = "", display: Optional[str] = None) -> "ToolResult":
+    def cancelled(
+        cls,
+        content: str = "",
+        display: Optional[str] = None,
+        task_id: Optional[str] = None,
+        background_task_id: Optional[str] = None,
+        log_path: Optional[str] = None,
+    ) -> "ToolResult":
         c = content or ""
-        return cls(content=c, display=display if display is not None else c, status=ToolResultStatus.CANCELLED, returncode=None)
+        tid = task_id or background_task_id
+        return cls(
+            content=c,
+            display=display if display is not None else c,
+            status=ToolResultStatus.CANCELLED,
+            returncode=None,
+            task_id=tid,
+            background_task_id=tid,
+            log_path=log_path,
+        )
 
     def __str__(self) -> str:
         return self.content or ""
@@ -187,9 +238,9 @@ async def normalize_tool_result(result: Any) -> ToolResult:
     Single shared implementation for every execution path (native tools via
     ``tools.registry``, MCP adapter output, agent-side normalization). Accepts
     one result value or an awaitable. Structured ``ToolResult`` objects pass
-    through unchanged; raw ``str``/``None``/dict values (e.g. MCP adapter
-    output) are normalized by inspecting the ``ERR:`` prefix convention, never
-    treated as errors otherwise.
+    through unchanged; raw ``str``/``None``/dict values are normalized without
+    string heuristics. Status is governed strictly via ToolResult.error() or
+    explicit returncode != 0.
     """
     if inspect.isawaitable(result):
         result = await result
@@ -201,7 +252,7 @@ async def normalize_tool_result(result: Any) -> ToolResult:
         return ToolResult.error("execute", detail=str(result))
     if isinstance(result, (dict, list)):
         return ToolResult.done(json.dumps(result, ensure_ascii=False))
-    text = str(result)
-    if text.lstrip().lower().startswith("err:"):
-        return ToolResult(content=text, status=ToolResultStatus.ERROR)
-    return ToolResult.done(text)
+    rc = getattr(result, "returncode", None)
+    if rc is not None and rc != 0:
+        return ToolResult(content=str(result), status=ToolResultStatus.ERROR, returncode=rc)
+    return ToolResult.done(str(result))

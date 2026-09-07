@@ -63,6 +63,11 @@ def stream_step_to_session_event(
             # Carry the tool_call_id so consumers can pair a result with its
             # exact start event instead of relying on FIFO order alone.
             evt["tool_id"] = step[6]
+        if parsed_tr.task_id:
+            evt["task_id"] = parsed_tr.task_id
+            evt["background_task_id"] = parsed_tr.background_task_id
+        if parsed_tr.log_path:
+            evt["log_path"] = parsed_tr.log_path
     elif etype == "bot_delta":
         if text_accumulator is not None:
             text_accumulator[0] = text_accumulator[0] + val1

@@ -140,6 +140,7 @@ class ToolCallContentMixin:
             clean_hints=self._clean_hints_for_ui,
             clean_bash_output=self._clean_bash_output,
             format_json_result_fn=self._format_json_result,
+            log_path=getattr(self, "log_path", None),
         )
 
     def _apply_content(self, kind: str, value: Any) -> None:

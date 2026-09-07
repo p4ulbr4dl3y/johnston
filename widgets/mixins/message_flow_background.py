@@ -69,9 +69,15 @@ def update_background_shell_widget(app: Any, task_id: str, result: str) -> None:
             session = app.sm.get(sid, reload=False)
             if session:
                 for msg in session.messages:
-                    if isinstance(msg, dict) and msg.get("type") == "tool" and task_id in msg.get("result_text", ""):
+                    if isinstance(msg, dict) and msg.get("type") == "tool" and (
+                        msg.get("task_id") == task_id or msg.get("background_task_id") == task_id
+                    ):
                         msg["result_text"] = final_result
                         msg["status"] = status
+                        msg["task_id"] = task_id
+                        msg["background_task_id"] = task_id
+                        if task_log:
+                            msg["log_path"] = task_log
                         break
                 schedule_session_save(app, session)
         except Exception as e:

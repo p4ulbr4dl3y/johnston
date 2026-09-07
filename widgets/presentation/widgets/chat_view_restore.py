@@ -1,5 +1,4 @@
 """Restore a saved transcript event dict into a rendered ChatView widget."""
-import re
 import sys
 from typing import Any
 
@@ -56,21 +55,13 @@ async def restore_message_item(
         status = msg.get("status")
         if not ttype and not target and not targs and status == "cancelled":
             return None
+        task_id = msg.get("task_id") or msg.get("background_task_id")
         if status == "running":
-            task_id = None
-            if "[Background Task ID:" in (rtext or ""):
-                bg_m = re.search(r"Background Task ID:\s*([^\s\]]+)", rtext)
-                if bg_m:
-                    task_id = bg_m.group(1)
             mgr = task_manager
             is_live = bool(task_id and mgr is not None and getattr(mgr, "_tasks", {}).get(task_id) is not None)
             if not is_live:
                 status = "done" if rtext else "cancelled"
         sub_id = msg.get("subagent_session_id") or (targs.get("session_id") if isinstance(targs, dict) else None)
-        if not sub_id and rtext:
-            m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", rtext, re.IGNORECASE)
-            if m:
-                sub_id = m.group(1)
         if not sub_id and ttype in ("invoke_subagent", "manage_subagent"):
             title = targs.get("title") or targs.get("prompt")
             if title:
@@ -121,6 +112,8 @@ async def restore_message_item(
             returncode=msg.get("returncode"),
             animate=False,
             subagent_session_id=sub_id,
+            background_task_id=task_id,
+            log_path=msg.get("log_path"),
             **kw,
         )
         return widget

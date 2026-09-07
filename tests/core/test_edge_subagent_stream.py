@@ -1012,21 +1012,17 @@ class TestSubagentStepAndErrorHandling:
         assert sess.messages[0]["text"] == "New prompt"
 
     @pytest.mark.asyncio
-    async def test_api_error_divider_marks_status_error_and_returns_error_text(self):
-        error_msg = "API Error: Failed to create stream: model overloaded"
-        sub = FakeSubagent(steps=[("event_divider", error_msg, "")])
+    async def test_event_divider_does_not_mark_status_error(self):
+        divider_msg = "Session Compacted"
+        sub = FakeSubagent(steps=[("event_divider", divider_msg, "")])
         sess = make_session()
         ctx = FakeCtx()
         store = FakeStore()
-        result = await run_subagent_stream_bg(
+        await run_subagent_stream_bg(
             sub, "initial prompt", sess, ctx, store, notification_template=True
         )
-        assert sess.status == STATUS_ERROR
-        assert f"[{error_msg}]" in result
-        assert ctx.subagent_statuses
-        assert ctx.subagent_statuses[0][1] == STATUS_ERROR
-        assert ctx.messages and f"[{error_msg}]" in ctx.messages[0]
-        assert 'status="error"' in ctx.messages[0]
+        assert sess.status == STATUS_COMPLETED
+        assert ctx.subagent_statuses[0][1] == STATUS_COMPLETED
 
     @pytest.mark.asyncio
     async def test_error_step_marks_status_error_and_returns_error_text(self):

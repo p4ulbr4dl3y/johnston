@@ -74,11 +74,8 @@ async def execute_session_turn(
 
     try:
         async for step in agent.stream_steps(message):
-            if step and (
-                step[0] == "error"
-                or (step[0] == "event_divider" and len(step) > 1 and str(step[1]).startswith("API Error:"))
-            ):
-                last_api_error[0] = str(step[1])
+            if step and step[0] == "error":
+                last_api_error[0] = str(step[1]) if len(step) > 1 else "Error"
             record_session_step(step, session, acc)
             if step_callback:
                 step_callback(step, session, acc)

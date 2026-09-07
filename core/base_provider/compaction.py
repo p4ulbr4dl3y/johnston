@@ -703,10 +703,13 @@ class CompactionMixin:
             compact_out = estimate_tokens(sanitized_summary)
             self._accumulate_usage(prompt_tokens_est=compact_in, output_tokens_est=compact_out)
 
-            # Preserve active plan in checkpoint if available
-            active_plan = getattr(self, "current_plan", None)
-            if not active_plan and getattr(self, "session", None):
-                active_plan = getattr(self.session, "current_plan", None)
+            # Preserve active plan in checkpoint if available: prefer domain session.plan
+            sess = getattr(self, "session", None)
+            active_plan = getattr(sess, "plan", None) if sess is not None else None
+            if not active_plan and sess is not None:
+                active_plan = getattr(sess, "current_plan", None)
+            if not active_plan:
+                active_plan = getattr(self, "current_plan", None)
             if not active_plan and hasattr(self, "history"):
                 active_plan = extract_plan_from_history(self.history)
 

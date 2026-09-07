@@ -661,7 +661,8 @@ class TestGeneratorStreamInterruptionFlow:
         w = ToolCallWidget(
             "shell",
             "pytest -m slow",
-            result_text=f"[Background Task ID: 123] moved to background.\nFull Log: {log_f} (live)",
+            result_text="[task moved to background | id 123]",
+            log_path=str(log_f),
             status="done",
         )
         kind, content = w._compute_content()

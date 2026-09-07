@@ -180,17 +180,29 @@ class ChatStreamDriver:
                 return child
         return None
 
-    def _find_shell_output_target(self) -> Optional[ToolCallWidget]:
+    def _find_shell_output_target(self, task_id: Optional[str] = None) -> Optional[ToolCallWidget]:
         """Locate the tool card that owns a shell output chunk.
 
-        Prefers a mounted child linked to a background shell task, then the
-        newest live shell card, then any live (running/generating) card, then a
-        live mounted child — never a completed card, so output from a
-        background shell cannot land on a stale neighbour.
+        If task_id is specified, finds the widget strictly by task_id:
+        child.background_task_id == task_id or getattr(child, "task_id", None) == task_id.
+        Otherwise falls back to live handles or children without guessing an arbitrary
+        background shell.
         """
-        for child in reversed(list(getattr(self.chat_view, "children", []))):
-            if isinstance(child, ToolCallWidget) and getattr(child, "background_task_id", None):
-                return child
+        if task_id:
+            for child in reversed(list(getattr(self.chat_view, "children", []))):
+                if (
+                    getattr(child, "background_task_id", None) == task_id
+                    or getattr(child, "task_id", None) == task_id
+                ):
+                    return child
+            for th in reversed(self.tool_handles):
+                if (
+                    getattr(th, "background_task_id", None) == task_id
+                    or getattr(th, "task_id", None) == task_id
+                ):
+                    return th
+            return None
+
         for th in reversed(self.tool_handles):
             st = getattr(th, "status", None)
             if st in ("running", "generating") and getattr(th, "canonical_tool", None) == "shell":
@@ -310,7 +322,8 @@ class ChatStreamDriver:
                         break
         elif etype == "tool_shell_output":
             txt = evt.get("text", "")
-            target_th = self._find_shell_output_target()
+            task_id = evt.get("task_id")
+            target_th = self._find_shell_output_target(task_id)
             if target_th is not None and hasattr(target_th, "append_shell_output"):
                 target_th.append_shell_output(txt)
         elif etype == "tool":
@@ -322,11 +335,17 @@ class ChatStreamDriver:
             if "result_text" in evt:
                 w = self._match_tool_result_widget(evt)
                 if w is not None:
+                    extra_res_kw = {}
+                    if evt.get("background_task_id") or evt.get("task_id"):
+                        extra_res_kw["background_task_id"] = evt.get("background_task_id") or evt.get("task_id")
+                    if evt.get("log_path"):
+                        extra_res_kw["log_path"] = evt.get("log_path")
                     w.set_result(
                         evt.get("result_text", ""),
                         is_error=bool(evt.get("is_error", False)),
                         status=evt.get("status"),
                         returncode=evt.get("returncode"),
+                        **extra_res_kw,
                     )
                     result_handled = True
                 elif not evt.get("tool_type"):
@@ -406,6 +425,12 @@ class ChatStreamDriver:
                             tool_kw["status"] = evt.get("status")
                             tool_kw["returncode"] = evt.get("returncode")
                             tool_kw["animate"] = animate
+                        if evt.get("background_task_id") or evt.get("task_id"):
+                            tool_kw["background_task_id"] = evt.get("background_task_id") or evt.get("task_id")
+                        if evt.get("subagent_session_id"):
+                            tool_kw["subagent_session_id"] = evt.get("subagent_session_id")
+                        if evt.get("log_path"):
+                            tool_kw["log_path"] = evt.get("log_path")
                         widget = await self.chat_view.add_tool_call(
                             tool_type,
                             target,

@@ -168,6 +168,29 @@ class AgentSession:
     def role_name(self, value: str) -> None:
         self._role_name = value
 
+    @property
+    def plan(self) -> Optional[List[Dict[str, Any]]]:
+        if getattr(self, "_plan", None) is not None:
+            return self._plan
+        if getattr(self, "current_plan", None) is not None:
+            return self.current_plan
+        if getattr(self, "messages", None):
+            try:
+                from core.application.session.rewind import restore_plan_from_messages
+
+                p, _ = restore_plan_from_messages(self.messages)
+                if p:
+                    self._plan = p
+                    return p
+            except Exception:
+                pass
+        return None
+
+    @plan.setter
+    def plan(self, value: Optional[List[Dict[str, Any]]]) -> None:
+        self._plan = value
+        self.current_plan = value
+
     # -- live event streaming (delegated to session_coalescer) -------------
 
     def add_event(self, event: Dict[str, Any]) -> None:

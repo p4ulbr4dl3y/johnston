@@ -133,6 +133,8 @@ class TurnExecutionMixin:
                 # Execute concurrently and preserve original order
                 batch_results = await asyncio.gather(*(self._execute_single_tool(tc, role_def) for tc, _ in batch))
                 for t_id, display_result, resolved in batch_results:
+                    tid = getattr(resolved, "task_id", None) or getattr(resolved, "background_task_id", None)
+                    log_p = getattr(resolved, "log_path", None)
                     yield (
                         "tool_result",
                         display_result,
@@ -141,6 +143,8 @@ class TurnExecutionMixin:
                         resolved.status,
                         resolved.returncode,
                         t_id,
+                        tid,
+                        log_p,
                     )
                     messages.append(
                         {"role": "tool", "name": t_name, "tool_call_id": t_id, "content": resolved.content or ""}
@@ -158,6 +162,8 @@ class TurnExecutionMixin:
                     yield ("tool", t_name, str(target), args, tc.get("id"))
 
                     t_id, display_result, resolved = await self._execute_single_tool(tc, role_def)
+                    tid = getattr(resolved, "task_id", None) or getattr(resolved, "background_task_id", None)
+                    log_p = getattr(resolved, "log_path", None)
                     yield (
                         "tool_result",
                         display_result,
@@ -166,6 +172,8 @@ class TurnExecutionMixin:
                         resolved.status,
                         resolved.returncode,
                         t_id,
+                        tid,
+                        log_p,
                     )
                     messages.append(
                         {"role": "tool", "name": t_name, "tool_call_id": t_id, "content": resolved.content or ""}
