@@ -70,7 +70,9 @@ def update_background_shell_widget(app: Any, task_id: str, result: str) -> None:
             if session:
                 for msg in session.messages:
                     if isinstance(msg, dict) and msg.get("type") == "tool" and (
-                        msg.get("task_id") == task_id or msg.get("background_task_id") == task_id
+                        msg.get("task_id") == task_id
+                        or msg.get("background_task_id") == task_id
+                        or task_id in msg.get("result_text", "")
                     ):
                         msg["result_text"] = final_result
                         msg["status"] = status
