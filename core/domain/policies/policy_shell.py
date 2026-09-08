@@ -3,9 +3,12 @@
 Moved verbatim from ``core.domain.policies.permission_policy``.
 """
 import os
+import platform
 import re
 import shlex
 from typing import List, Optional
+
+from core.infrastructure.platform.command_sanitizer import strip_wrapper_tokens
 
 _MULTI_COMMAND_TOOLS = frozenset(
     {
@@ -303,3 +306,140 @@ def extract_command_signature(cmd: str) -> str:
     if binary in _MULTI_COMMAND_TOOLS and len(meaningful) > 1 and not meaningful[1].startswith("-"):
         return f"{binary} {meaningful[1]} *"
     return f"{binary} *"
+
+
+_GIT_OPTS_WITH_ARG = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"})
+_MUTATING_GIT = frozenset({
+    "commit",
+    "push",
+    "checkout",
+    "switch",
+    "reset",
+    "merge",
+    "rebase",
+    "revert",
+    "clean",
+    "cherry-pick",
+    "restore",
+    "rm",
+    "mv",
+    "pull",
+    "apply",
+    "stash",
+    "init",
+    "clone",
+    "am",
+    "format-patch",
+    "repack",
+    "prune",
+    "gc",
+})
+
+
+def check_read_only_command_mutations(cmd: str) -> Optional[str]:
+    """Inspect shell command for mutating operations in read-only mode using shlex."""
+    is_win = platform.system() == "Windows"
+    try:
+        lexer = shlex.shlex(cmd, posix=not is_win, punctuation_chars=True)
+        lexer.whitespace_split = True
+        raw_tokens = [t.strip("\"'") for t in lexer]
+    except Exception:
+        raw_tokens = cmd.split()
+
+    if not raw_tokens:
+        return None
+
+    # Strip grouping parentheses
+    tokens = [t for t in raw_tokens if t not in ("(", ")")]
+
+    subcmds: List[List[str]] = []
+    curr: List[str] = []
+    for tok in tokens:
+        if tok in ("&&", ";", "|", "||", "&"):
+            if curr:
+                subcmds.append(curr)
+                curr = []
+        else:
+            curr.append(tok)
+    if curr:
+        subcmds.append(curr)
+
+    for sc in subcmds:
+        if not sc:
+            continue
+
+        sc = strip_wrapper_tokens(sc)
+        if not sc:
+            continue
+
+        idx = 0
+        base = sc[idx].replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if base.endswith(".exe"):
+            base = base[:-4]
+
+        if base == "git":
+            i = idx + 1
+            while i < len(sc):
+                t = sc[i]
+                if t.startswith("-"):
+                    if "=" in t:
+                        i += 1
+                    elif t in _GIT_OPTS_WITH_ARG:
+                        i += 2
+                    else:
+                        i += 1
+                else:
+                    t_low = t.lower()
+                    if t_low in _MUTATING_GIT:
+                        return f"git {t_low} is not permitted in read-only role"
+                    if t_low == "branch":
+                        has_list = any(x in ("-l", "--list", "-a", "-r", "--remotes", "--all") for x in sc[i + 1 :])
+                        for b_tok in sc[i + 1 :]:
+                            if b_tok in (
+                                "-d",
+                                "-D",
+                                "-m",
+                                "-M",
+                                "-c",
+                                "-C",
+                                "--delete",
+                                "--move",
+                                "--copy",
+                                "-u",
+                                "--set-upstream-to",
+                                "--unset-upstream",
+                            ):
+                                return f"git branch {b_tok} is not permitted in read-only role"
+                            if not b_tok.startswith("-") and not has_list:
+                                return "git branch creation is not permitted in read-only role"
+                    elif t_low == "tag":
+                        has_list = any(x in ("-l", "--list") for x in sc[i + 1 :])
+                        for tag_tok in sc[i + 1 :]:
+                            if tag_tok in ("-d", "--delete", "-a", "-s", "-u", "-f", "--force"):
+                                return f"git tag {tag_tok} is not permitted in read-only role"
+                            if not tag_tok.startswith("-") and not has_list:
+                                return "git tag creation is not permitted in read-only role"
+                    elif t_low == "remote":
+                        for r_tok in sc[i + 1 :]:
+                            if r_tok.lower() in (
+                                "add",
+                                "rename",
+                                "remove",
+                                "rm",
+                                "set-url",
+                                "set-head",
+                                "set-branches",
+                                "prune",
+                            ):
+                                return f"git remote {r_tok} is not permitted in read-only role"
+                    break
+
+        if platform.system() == "Windows":
+            if base in ("del", "erase", "rmdir", "rd", "move", "ren", "rename"):
+                return f"mutating command {base} is not permitted in read-only role"
+            for t in sc:
+                if t in (">", ">>", "1>", "2>"):
+                    return "file write redirects are not permitted in read-only role on Windows"
+
+    return None
+

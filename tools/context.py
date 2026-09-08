@@ -192,3 +192,58 @@ class ToolContext:
         if pm is not None and hasattr(pm, "create_active_agent"):
             return pm.create_active_agent()
         return None
+
+    @property
+    def target_tool_widget(self) -> Any | None:
+        """Return the current tool widget from the host if not a subagent."""
+        if self.is_subagent or not self.host:
+            return None
+        return getattr(self.host, "current_tool_widget", None)
+
+    def attach_shell_widget(
+        self,
+        task_id: str,
+        widget: Any,
+        log_path: str | None = None,
+        is_background: bool = False,
+    ) -> None:
+        """Link the shell tool card to the task for the completion repaint."""
+        if not self.host or widget is None:
+            return
+        if is_background:
+            if hasattr(widget, "mark_background"):
+                widget.mark_background(task_id, log_path)
+            else:
+                setattr(widget, "background_task_id", task_id)
+                setattr(widget, "task_id", task_id)
+                if log_path:
+                    setattr(widget, "log_path", log_path)
+        reg = getattr(self.host, "_background_shell_widgets", None)
+        if reg is None:
+            reg = self.host._background_shell_widgets = {}
+        reg[task_id] = widget
+
+    def detach_shell_widget(self, task_id: str) -> None:
+        """Unregister widget handle for shell task upon completion or drop."""
+        if self.host:
+            reg = getattr(self.host, "_background_shell_widgets", None)
+            if isinstance(reg, dict):
+                reg.pop(task_id, None)
+
+    def register_foreground_shell_task(self, task_id: str, task: Any) -> None:
+        """Register active foreground shell task so UI/actions mixin can cancel or background it."""
+        if not self.host:
+            return
+        fg = getattr(self.host, "_foreground_shell_tasks", None)
+        if not isinstance(fg, dict):
+            fg = self.host._foreground_shell_tasks = {}
+        fg[task_id] = task
+
+    def cleanup_foreground_shell_task(self, task_id: str) -> None:
+        """Unregister foreground shell task upon exit or conversion."""
+        if not self.host:
+            return
+        fg = getattr(self.host, "_foreground_shell_tasks", None)
+        if isinstance(fg, dict):
+            fg.pop(task_id, None)
+

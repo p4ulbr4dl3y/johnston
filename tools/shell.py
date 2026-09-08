@@ -12,17 +12,15 @@ from core.domain.defaults.config import (
     DEFAULT_SHELL_TIMEOUT,
 )
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
-from core.infrastructure.platform.command_sanitizer import (
-    clean_cd_command,
-    strip_wrapper_tokens,
-)
+from core.domain.policies.policy_shell import check_read_only_command_mutations
+from core.infrastructure.platform.command_sanitizer import clean_cd_command
 from core.infrastructure.platform.platform_utils import (
     is_windows,
     shell_env,
     shell_executable,
-    shell_subprocess_kwargs,
     terminate_process,
 )
+from core.infrastructure.platform.process import spawn_shell_process, spawn_windows_process
 from core.infrastructure.tasks.shell_task import ShellTask
 from tools.base import BaseTool, resolve_path, truncate_output
 
@@ -59,25 +57,16 @@ def _attach_shell_widget(
     log_path: str | None = None,
     is_background: bool = False,
 ) -> None:
-    """Link the shell tool card to the task for the completion repaint.
+    """Link the shell tool card to the task for the completion repaint."""
+    from tools.context import ToolContext
 
-    Live chunks stream to the card through the task's output listeners; this
-    registry only keeps a handle so the host can flip the card to its terminal
-    status (spinner -> done/error) once the task exits.
-    """
-    if host is None or widget is None:
-        return
-    if is_background:
-        if hasattr(widget, "mark_background"):
-            widget.mark_background(task_id, log_path)
-        else:
-            setattr(widget, "background_task_id", task_id)
-            if log_path:
-                setattr(widget, "log_path", log_path)
-    reg = getattr(host, "_background_shell_widgets", None)
-    if reg is None:
-        reg = host._background_shell_widgets = {}
-    reg[task_id] = widget
+    ToolContext(app=host).attach_shell_widget(
+        task_id=task_id,
+        widget=widget,
+        log_path=log_path,
+        is_background=is_background,
+    )
+
 
 
 def _truncate_output(res: str) -> str:
@@ -93,142 +82,8 @@ def _truncate_output(res: str) -> str:
 
 _clean_cd_command = clean_cd_command
 
-_GIT_OPTS_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
-_MUTATING_GIT = {
-    "commit",
-    "push",
-    "checkout",
-    "switch",
-    "reset",
-    "merge",
-    "rebase",
-    "revert",
-    "clean",
-    "cherry-pick",
-    "restore",
-    "rm",
-    "mv",
-    "pull",
-    "apply",
-    "stash",
-    "init",
-    "clone",
-    "am",
-    "format-patch",
-    "repack",
-    "prune",
-    "gc",
-}
+_check_read_only_command_mutations = check_read_only_command_mutations
 
-
-def _check_read_only_command_mutations(cmd: str) -> Optional[str]:
-    """Inspect shell command for mutating operations in read-only mode using shlex."""
-    import shlex
-
-    is_win = platform.system() == "Windows"
-    try:
-        lexer = shlex.shlex(cmd, posix=not is_win, punctuation_chars=True)
-        lexer.whitespace_split = True
-        raw_tokens = [t.strip("\"'") for t in lexer]
-    except Exception:
-        raw_tokens = cmd.split()
-
-    if not raw_tokens:
-        return None
-
-    # Strip grouping parentheses
-    tokens = [t for t in raw_tokens if t not in ("(", ")")]
-
-    subcmds: list[list[str]] = []
-    curr: list[str] = []
-    for tok in tokens:
-        if tok in ("&&", ";", "|", "||", "&"):
-            if curr:
-                subcmds.append(curr)
-                curr = []
-        else:
-            curr.append(tok)
-    if curr:
-        subcmds.append(curr)
-
-    for sc in subcmds:
-        if not sc:
-            continue
-
-        sc = strip_wrapper_tokens(sc)
-        if not sc:
-            continue
-
-        idx = 0
-        base = sc[idx].replace("\\", "/").rsplit("/", 1)[-1].lower()
-        if base.endswith(".exe"):
-            base = base[:-4]
-
-        if base == "git":
-            i = idx + 1
-            while i < len(sc):
-                t = sc[i]
-                if t.startswith("-"):
-                    if "=" in t:
-                        i += 1
-                    elif t in _GIT_OPTS_WITH_ARG:
-                        i += 2
-                    else:
-                        i += 1
-                else:
-                    t_low = t.lower()
-                    if t_low in _MUTATING_GIT:
-                        return f"git {t_low} is not permitted in read-only role"
-                    if t_low == "branch":
-                        has_list = any(x in ("-l", "--list", "-a", "-r", "--remotes", "--all") for x in sc[i + 1 :])
-                        for b_tok in sc[i + 1 :]:
-                            if b_tok in (
-                                "-d",
-                                "-D",
-                                "-m",
-                                "-M",
-                                "-c",
-                                "-C",
-                                "--delete",
-                                "--move",
-                                "--copy",
-                                "-u",
-                                "--set-upstream-to",
-                                "--unset-upstream",
-                            ):
-                                return f"git branch {b_tok} is not permitted in read-only role"
-                            if not b_tok.startswith("-") and not has_list:
-                                return "git branch creation is not permitted in read-only role"
-                    elif t_low == "tag":
-                        has_list = any(x in ("-l", "--list") for x in sc[i + 1 :])
-                        for tag_tok in sc[i + 1 :]:
-                            if tag_tok in ("-d", "--delete", "-a", "-s", "-u", "-f", "--force"):
-                                return f"git tag {tag_tok} is not permitted in read-only role"
-                            if not tag_tok.startswith("-") and not has_list:
-                                return "git tag creation is not permitted in read-only role"
-                    elif t_low == "remote":
-                        for r_tok in sc[i + 1 :]:
-                            if r_tok.lower() in (
-                                "add",
-                                "rename",
-                                "remove",
-                                "rm",
-                                "set-url",
-                                "set-head",
-                                "set-branches",
-                                "prune",
-                            ):
-                                return f"git remote {r_tok} is not permitted in read-only role"
-                    break
-
-        if platform.system() == "Windows":
-            if base in ("del", "erase", "rmdir", "rd", "move", "ren", "rename"):
-                return f"mutating command {base} is not permitted in read-only role"
-            for t in sc:
-                if t in (">", ">>", "1>", "2>"):
-                    return "file write redirects are not permitted in read-only role on Windows"
-
-    return None
 
 
 class ShellTool(BaseTool):
@@ -445,8 +300,8 @@ class ShellTool(BaseTool):
                 idle_timeout=idle_timeout,
                 hard_timeout=hard_timeout,
             )
-            target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
-            if target_widget is not None and not getattr(ctx, "is_subagent", False):
+            target_widget = ctx.target_tool_widget
+            if target_widget is not None:
                 task.add_listener(target_widget.append_shell_output)
             if getattr(ctx, "session", None) and hasattr(ctx.session, "add_event"):
                 task.add_listener(lambda chunk, tid=task_id: ctx.session.add_event({"type": "tool_shell_output", "text": chunk, "task_id": tid}))
@@ -457,7 +312,7 @@ class ShellTool(BaseTool):
             # log path (task.log_path is only populated by open_log()).
             task.open_log()
             if not getattr(ctx, "is_subagent", False):
-                _attach_shell_widget(ctx.host, task_id, target_widget, log_path=task.log_path, is_background=True)
+                ctx.attach_shell_widget(task_id, target_widget, log_path=task.log_path, is_background=True)
             ctx.add_background_task(task)
             task.start_reading(on_completed=callback, on_progress=progress_cb)
 
@@ -533,20 +388,16 @@ class ShellTool(BaseTool):
             idle_timeout=idle_timeout,
             hard_timeout=task_hard_timeout,
         )
-        target_widget = getattr(ctx.host, "current_tool_widget", None) if ctx.host else None
-        if target_widget is not None and not getattr(ctx, "is_subagent", False):
+        target_widget = ctx.target_tool_widget
+        if target_widget is not None:
             task.add_listener(target_widget.append_shell_output)
         if getattr(ctx, "session", None) and hasattr(ctx.session, "add_event"):
             task.add_listener(lambda chunk, tid=task_id: ctx.session.add_event({"type": "tool_shell_output", "text": chunk, "task_id": tid}))
         if not getattr(ctx, "is_subagent", False):
-            _attach_shell_widget(ctx.host, task_id, target_widget, is_background=False)
+            ctx.attach_shell_widget(task_id, target_widget, is_background=False)
         callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
         progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
-        if ctx.host:
-            fg_tasks = getattr(ctx.host, "_foreground_shell_tasks", None)
-            if not isinstance(fg_tasks, dict):
-                fg_tasks = ctx.host._foreground_shell_tasks = {}
-            fg_tasks[task_id] = task
+        ctx.register_foreground_shell_task(task_id, task)
         read_task = task.start_reading(on_completed=callback, on_progress=progress_cb)
 
         start_time = time.monotonic()
@@ -577,13 +428,7 @@ class ShellTool(BaseTool):
                     task.move_to_background()
                     ctx.add_background_task(task)
                     if target_widget is not None and not getattr(ctx, "is_subagent", False):
-                        if hasattr(target_widget, "mark_background"):
-                            target_widget.mark_background(task_id, task.log_path)
-                        else:
-                            setattr(target_widget, "background_task_id", task_id)
-                            setattr(target_widget, "task_id", task_id)
-                            if task.log_path:
-                                setattr(target_widget, "log_path", task.log_path)
+                        ctx.attach_shell_widget(task_id, target_widget, log_path=task.log_path, is_background=True)
                     if getattr(ctx, "session", None) and hasattr(ctx.session, "messages"):
                         for msg in reversed(ctx.session.messages):
                             if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "shell":
@@ -618,13 +463,7 @@ class ShellTool(BaseTool):
                 task.move_to_background()
                 ctx.add_background_task(task)
                 if target_widget is not None and not getattr(ctx, "is_subagent", False):
-                    if hasattr(target_widget, "mark_background"):
-                        target_widget.mark_background(task_id, task.log_path)
-                    else:
-                        setattr(target_widget, "background_task_id", task_id)
-                        setattr(target_widget, "task_id", task_id)
-                        if task.log_path:
-                            setattr(target_widget, "log_path", task.log_path)
+                    ctx.attach_shell_widget(task_id, target_widget, log_path=task.log_path, is_background=True)
                 if getattr(ctx, "session", None) and hasattr(ctx.session, "messages"):
                     for msg in reversed(ctx.session.messages):
                         if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "shell":
@@ -690,10 +529,7 @@ class ShellTool(BaseTool):
             await terminate_process(p)
             raise
         finally:
-            if ctx.host:
-                fg_tasks = getattr(ctx.host, "_foreground_shell_tasks", None)
-                if isinstance(fg_tasks, dict):
-                    fg_tasks.pop(task_id, None)
+            ctx.cleanup_foreground_shell_task(task_id)
             if not getattr(task, "is_background", False):
                 mgr = getattr(ctx, "task_manager", None)
                 if mgr is not None and hasattr(mgr, "drop"):
@@ -701,8 +537,7 @@ class ShellTool(BaseTool):
                         mgr.drop(task.task_id)
                     except Exception:
                         pass
-                if ctx.host and getattr(ctx.host, "_background_shell_widgets", None):
-                    ctx.host._background_shell_widgets.pop(task.task_id, None)
+                ctx.detach_shell_widget(task.task_id)
 
     async def _create_std_process(
         self,
@@ -713,82 +548,23 @@ class ShellTool(BaseTool):
         sandbox_enabled: bool = False,
         allow_workspace_writes: bool = True,
     ):
-        if sandbox_enabled:
-            from core.infrastructure.platform.sandbox import build_sandboxed_command
-
-            exe, args, is_sandboxed = build_sandboxed_command(
-                command,
-                cwd=cwd,
-                workspace_dir=workspace_dir,
-                allow_workspace_writes=allow_workspace_writes,
-            )
-            if is_sandboxed:
-                return await asyncio.create_subprocess_exec(
-                    exe,
-                    *args,
-                    stdin=asyncio.subprocess.DEVNULL,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                    env=env,
-                    cwd=cwd,
-                    **shell_subprocess_kwargs(),
-                )
-        if is_windows():
-            return await self._create_windows_process(command, env, cwd=cwd)
-        return await asyncio.create_subprocess_shell(
-            command,
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+        return await spawn_shell_process(
+            command=command,
             env=env,
             cwd=cwd,
+            workspace_dir=workspace_dir,
+            sandbox_enabled=sandbox_enabled,
+            allow_workspace_writes=allow_workspace_writes,
             executable=shell_executable(),
-            **shell_subprocess_kwargs(),
+            is_win=is_windows(),
+            windows_spawner=self._create_windows_process,
         )
 
     async def _create_windows_process(self, command: str, env: dict[str, str], cwd: str = None):
-        shell = shell_executable()
-        if shell and shell.lower().endswith(("pwsh.exe", "pwsh", "powershell.exe", "powershell")):
-            full_command = (
-                f"$OutputEncoding = [System.Text.Encoding]::UTF8; "
-                f"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-                f"{command}"
-            )
-            return await asyncio.create_subprocess_exec(
-                shell,
-                "-NoProfile",
-                "-NonInteractive",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                full_command,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                env=env,
-                cwd=cwd,
-                **shell_subprocess_kwargs(),
-            )
-        if shell and shell.lower().endswith(("cmd.exe", "cmd")):
-            return await asyncio.create_subprocess_exec(
-                shell,
-                "/d",
-                "/s",
-                "/c",
-                command,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                env=env,
-                cwd=cwd,
-                **shell_subprocess_kwargs(),
-            )
-        return await asyncio.create_subprocess_shell(
-            command,
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+        return await spawn_windows_process(
+            command=command,
             env=env,
             cwd=cwd,
-            **shell_subprocess_kwargs(),
+            executable=shell_executable(),
         )
+
