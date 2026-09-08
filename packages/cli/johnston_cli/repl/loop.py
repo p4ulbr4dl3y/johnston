@@ -7,7 +7,12 @@ from typing import Any, Optional
 
 from johnston_cli.repl.runner import AgentReplRunner
 from johnston_cli.repl.session import create_repl_prompt_session, get_current_git_branch
-from johnston_cli.repl.terminal import print_banner, print_top_separator
+from johnston_cli.repl.terminal import (
+    format_input_hint,
+    pad_to_bottom,
+    print_banner,
+    print_top_separator,
+)
 from johnston_core.interfaces.cli.entrypoint import get_version
 
 
@@ -25,6 +30,7 @@ async def run_repl_loop(
     display_model = f"{runner.provider_key}/{runner.model_name}"
 
     print_banner(version=version, model_name=display_model, branch=branch)
+    pad_to_bottom()
 
     def _get_status() -> tuple[str, int]:
         return display_model, runner.total_session_tokens
@@ -42,6 +48,13 @@ async def run_repl_loop(
             print_top_separator()
             text = await session.prompt_async([("class:prompt", "❯ ")])
             text = text.strip()
+
+            print_top_separator()
+            sys.stdout.write(
+                format_input_hint(display_model, branch, runner.total_session_tokens)
+            )
+            sys.stdout.write("\n")
+            sys.stdout.flush()
 
             if not text:
                 continue

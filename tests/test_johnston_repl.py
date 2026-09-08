@@ -10,8 +10,10 @@ from johnston_cli.repl.loop import run_repl_loop, start_repl
 from johnston_cli.repl.runner import AgentReplRunner
 from johnston_cli.repl.session import create_repl_prompt_session, get_current_git_branch
 from johnston_cli.repl.terminal import (
+    format_input_hint,
     format_turn_footer,
     get_term_width,
+    pad_to_bottom,
     print_banner,
     print_top_separator,
 )
@@ -41,6 +43,18 @@ def test_terminal_helpers():
     with patch("sys.stdout", f2):
         print_top_separator()
     assert "─" in f2.getvalue()
+
+    # Input hint
+    hint = format_input_hint("test-model", "main", 1500)
+    assert "test-model" in hint
+    assert "1,500 tokens" in hint
+    assert "[Enter: send, Esc+Enter: newline]" in hint
+
+    # Pad to bottom
+    f3 = io.StringIO()
+    with patch("sys.stdout", f3):
+        pad_to_bottom()
+    # verify it runs without error
 
 
 def test_git_branch_detection():
