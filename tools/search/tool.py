@@ -162,20 +162,16 @@ def search_sync(
 class SearchTool(BaseTool):
     name = "search"
     description = (
-        "Fast codebase search. Modes: 'content' (regex/text grep across files), "
-        "'filename' (find files/directories by pattern), or 'outline' (AST symbol definitions: classes, functions, methods). "
-        "Uses Tree-sitter for perfect outline parsing (Python, TS/TSX, JS, Go, Rust), ripgrep for fast content search, "
-        "with automatic regex fallback. Supports LRU caching and streaming progress."
+        "Fast codebase search across files by content (regex/text grep), "
+        "filename (glob), or symbol outline (AST classes/functions)."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "search",
             "description": (
-                "Fast codebase search. Modes: 'content' (regex/text grep across files), "
-                "'filename' (find files/directories by pattern), or 'outline' (AST symbol definitions: classes, functions, methods). "
-                "Uses Tree-sitter for perfect outline parsing (Python, TS/TSX, JS, Go, Rust), ripgrep for fast content search, "
-                "with automatic regex fallback. Supports LRU caching and streaming progress."
+                "Fast codebase search across files by content (regex/text grep), "
+                "filename (glob), or symbol outline (AST classes/functions)."
             ),
             "parameters": {
                 "type": "object",

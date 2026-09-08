@@ -139,8 +139,7 @@ class ShellTool(BaseTool):
                     "command": {
                         "type": "string",
                         "description": (
-                            "Non-interactive shell command to execute. For subdirectories, use 'cwd'. "
-                            "Do not use 'cd' or interactive pagers/REPLs."
+                            "Non-interactive shell command to execute. Do not launch interactive pagers or REPLs."
                         ),
                     },
                     "cwd": {

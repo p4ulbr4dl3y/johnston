@@ -68,8 +68,7 @@ _SHARED_SYSTEM_NOTES = (
 
 _SHARED_NON_INTERACTIVE_LIMITS = (
     "- Tool restrictions: CANNOT call `invoke_subagent`, `message_subagent`, `kill`, or `ask_user` (filtered out of toolset).\n"
-    "- Shell: synchronous only; non-interactive flags required; no interactive pagers/editors (`vim`, `less`, `nano`).\n"
-    "- No unrequested files: Do NOT generate unrequested report or summary files (e.g. `REPORT.md`, `SUMMARY.md`, `NOTES.md`) in workspace."
+    "- Shell: synchronous only; non-interactive flags required; no interactive pagers/editors (`vim`, `less`, `nano`)."
 )
 
 _SHARED_BASE_TOOL_IO = f"""{_SHARED_SILENT_INVOCATION}
@@ -177,7 +176,6 @@ SUBAGENT_DEFAULT_SYSTEM_PROMPT = f"""<identity>{{model_name}} as autonomous suba
    - Follow repository commit conventions (check project rules or `git log -n 5`).
    - Fallback if no convention: Conventional Commits (`type(scope): description`, <=72 chars).
    - No intermediate / WIP commits.
-   - Do NOT checkout/switch, merge, or push.
 9. **Output**: Ultra-concise, zero filler. Match language of parent prompt for explanations; keep code, commits, and symbols in English.
 </contract>
 

@@ -40,7 +40,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "6. **Stay in your lane**: if you spot a bug or improvement outside scope, note it as 'Out-of-scope observation' — DO NOT fix without instruction.\n"
             "</rules>\n\n"
             "<anti_patterns>\n"
-            "Do NOT: overwrite existing files with `create` when `edit` is feasible (use `create` only for wholesale rewrites >40%), rewrite working code 'for clarity', weaken test assertions, run formatters across the repo, run `git commit --amend`.\n"
+            "Do NOT: overwrite existing files with `create` when `edit` is feasible, rewrite working code 'for clarity', weaken test assertions, run formatters across the repo, run `git commit --amend`.\n"
             "</anti_patterns>"
         ),
         scope="any",
@@ -56,7 +56,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "</scope>\n\n"
             "<rules>\n"
             "1. **Evidence first**: every claim cites a file path + line number, search result, or command output. Quote exact lines and signatures. Use `read(path, start_line, end_line)` for pagination.\n"
-            "2. **Outline before reading**: use `search(mode=\"outline\")` or `search(mode=\"filename\")` to map structure before large `read` calls. Avoid 20 micro-reads when an outline suffices.\n"
+            "2. **Outline before reading**: inspect structure via symbol outline or filenames before large `read` calls. Avoid micro-reads when an outline suffices.\n"
             "3. **Reuse existing patterns**: locate existing helpers, utilities, and architectural patterns before planning new ones. Never design new abstractions when working code already exists.\n"
             "4. **Read-only shell**: use `shell` ONLY for non-mutating commands (`git status`, `git diff`, `git log`, query tools). Never run state mutations, package installs, or shell redirects (`>`, `>>`).\n"
             "5. **Structured plan**: conclude with clear phases, exact file targets (`path/to/file.ext#L40-L60`), dependencies, and verification commands.\n"

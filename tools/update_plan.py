@@ -9,14 +9,14 @@ VALID_STATUSES = {"pending", "in_progress", "completed"}
 class UpdatePlanTool(BaseTool):
     name = "update_plan"
     description = (
-        "Update multi-step task checklist. Critical for session compaction recovery. Exactly one step must be 'in_progress'. Update before/after taking actions."
+        "Update multi-step task checklist and progress. Exactly one step must be 'in_progress'."
     )
     schema = {
         "type": "function",
         "function": {
             "name": "update_plan",
             "description": (
-                "Update multi-step task checklist. Critical for session compaction recovery. Exactly one step must be 'in_progress'. Update before/after taking actions."
+                "Update multi-step task checklist and progress. Exactly one step must be 'in_progress'."
             ),
             "parameters": {
                 "type": "object",
