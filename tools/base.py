@@ -559,6 +559,19 @@ class BaseTool:
     name: str = ""
     description: str = ""
     schema: Optional[Dict[str, Any]] = None
+    interactive_only: bool = False
+    subagent_restriction_detail: str = ""
+
+    def check_context_permissions(self, ctx: Any) -> Optional[ToolResult]:
+        """Validate if this tool is allowed to execute in the given context."""
+        if self.interactive_only:
+            tool_name = self.name or getattr(self, "canonical_name", "")
+            if getattr(ctx, "is_subagent", False) is True:
+                detail = self.subagent_restriction_detail or f"subagents cannot use {tool_name}"
+                return ToolResult.error("permission", name=tool_name, detail=detail)
+            if getattr(ctx, "is_headless", False) is True or getattr(ctx, "is_interactive", None) is False:
+                return ToolResult.error("permission", name=tool_name, detail=f"{tool_name} disabled in headless mode")
+        return None
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

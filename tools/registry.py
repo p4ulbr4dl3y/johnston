@@ -248,6 +248,10 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             if err:
                 return err
 
+            perm_err = tool_inst.check_context_permissions(ctx)
+            if perm_err:
+                return perm_err
+
             return await normalize_tool_result(tool_inst.execute(args, ctx))
         except Exception as e:
             logger.warning("Tool '%s' execution failed: %s", name, e, exc_info=True)

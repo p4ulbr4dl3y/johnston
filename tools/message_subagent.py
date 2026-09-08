@@ -6,6 +6,8 @@ from tools.base import BaseTool
 
 class MessageSubagentTool(BaseTool):
     name = "message_subagent"
+    interactive_only = True
+    subagent_restriction_detail = "subagents cannot message other subagents"
     description = (
         "Send follow-up instructions to an existing subagent session (resumes subagent with its worktree branch and history). "
         "Use when: previous task needs refinement, fixes on partial/failed output, or next steps in the same scope. "
@@ -42,12 +44,9 @@ class MessageSubagentTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         ctx = self._ensure_context(ctx)
-        if getattr(ctx, "is_subagent", False) is True:
-            return ToolResult.error(
-                "permission",
-                name="message_subagent",
-                detail="subagents cannot message other subagents",
-            )
+        err = self.check_context_permissions(ctx)
+        if err:
+            return err
 
         args = args or {}
         raw_id = args.get("id") if "id" in args else args.get("session_id")

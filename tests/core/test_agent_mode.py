@@ -186,3 +186,79 @@ class TestAgentMode(unittest.TestCase):
         result = asyncio.run(tool.execute({"command": "echo test", "wait_seconds": 0}, ctx=ctx))
         self.assertIn("wait_seconds", str(result))
 
+    def test_agent_tool_policy_error_honors_mode(self):
+        from core.base_provider.agent import BaseAgent
+
+        class DummyAgent(BaseAgent):
+            def _create_client(self, *args, **kwargs):
+                return MagicMock()
+
+            def _get_model_name(self):
+                return "test"
+
+            async def _run_stream(self, *args, **kwargs):
+                if False:
+                    yield
+
+        role_def = AgentRole(key="worker")
+
+        # Headless agent
+        agent_headless = DummyAgent(provider_key="anthropic", api_key="k")
+        agent_headless.mode = AgentMode.HEADLESS
+        err_headless = agent_headless._tool_policy_error("invoke_subagent", role_def)
+        self.assertIsNotNone(err_headless)
+        self.assertIn("disabled for headless mode", err_headless.content)
+
+        # Subagent
+        agent_sub = DummyAgent(provider_key="anthropic", api_key="k")
+        agent_sub.mode = AgentMode.SUBAGENT
+        err_sub = agent_sub._tool_policy_error("kill", role_def)
+        self.assertIsNotNone(err_sub)
+        self.assertIn("disabled for subagent roles", err_sub.content)
+
+        # Interactive agent
+        agent_interactive = DummyAgent(provider_key="anthropic", api_key="k")
+        agent_interactive.mode = AgentMode.INTERACTIVE
+        err_interactive = agent_interactive._tool_policy_error("invoke_subagent", role_def)
+        self.assertIsNone(err_interactive)
+
+    def test_interactive_only_tools_context_guards(self):
+        import asyncio
+
+        from tools.ask_user import AskUserTool
+        from tools.context import ToolContext
+        from tools.invoke_subagent import InvokeSubagentTool
+        from tools.kill import KillTool
+        from tools.message_subagent import MessageSubagentTool
+
+        tools = [
+            (InvokeSubagentTool(), {"task": "t", "title": "tit"}),
+            (MessageSubagentTool(), {"id": "sub-1", "message": "msg"}),
+            (KillTool(), {"id": "sub-1"}),
+            (AskUserTool(), {"questions": [{"question": "q?", "options": [{"label": "opt"}]}]}),
+        ]
+
+        # 1. Subagent context
+        sub_agent = MagicMock()
+        sub_agent.is_subagent = True
+        sub_agent.is_headless = False
+        sub_ctx = ToolContext(sub_agent)
+
+        for tool_inst, args in tools:
+            self.assertTrue(tool_inst.interactive_only)
+            res = asyncio.run(tool_inst.execute(args, ctx=sub_ctx))
+            self.assertTrue(res.is_error)
+            self.assertIn("subagent", res.content.lower())
+
+        # 2. Headless context
+        headless_agent = MagicMock()
+        headless_agent.is_subagent = False
+        headless_agent.is_headless = True
+        headless_ctx = ToolContext(headless_agent)
+
+        for tool_inst, args in tools:
+            res = asyncio.run(tool_inst.execute(args, ctx=headless_ctx))
+            self.assertTrue(res.is_error)
+            self.assertIn("headless", res.content.lower())
+
+

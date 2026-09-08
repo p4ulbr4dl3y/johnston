@@ -33,14 +33,15 @@ class ToolMixin:
     def _tool_policy_error(self, tool_name: str, mode_def: Any) -> Any:
         from core.domain.policies.role_policy import role_tool_error
 
-        # Cross-call memo keyed by (role identity, canonical tool name) so the
-        # agent loop doesn't re-evaluate the role policy for the same tool on
-        # every tool_result of a multi-tool turn.
+        mode = getattr(self, "mode", None)
+        is_subagent = getattr(self, "is_subagent", False) is True
+
+        # Cross-call memo keyed by (role identity, canonical tool name, mode, is_subagent)
         try:
             role_key = id(mode_def)
         except Exception:
             role_key = repr(mode_def)
-        key = (role_key, tool_name or "")
+        key = (role_key, tool_name or "", mode, is_subagent)
         cache = getattr(self, "_tool_policy_cache", None)
         if cache is None:
             cache = {}
@@ -50,7 +51,7 @@ class ToolMixin:
             return cached
 
         clean_name = self._canonical_tool_name(tool_name).lower()
-        result = role_tool_error(mode_def, clean_name)
+        result = role_tool_error(mode_def, clean_name, is_subagent=is_subagent, mode=mode)
         cache[key] = result
         if len(cache) > 256:
             # Bounded cache: drop the oldest entries by order of insertion.

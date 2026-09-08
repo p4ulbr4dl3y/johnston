@@ -9,6 +9,8 @@ from tools.base import BaseTool
 
 class InvokeSubagentTool(BaseTool):
     name = "invoke_subagent"
+    interactive_only = True
+    subagent_restriction_detail = "subagents cannot spawn nested subagents"
     description = (
         "Launch an autonomous subagent in the background to execute an isolated task. Yield turn immediately after launch."
     )
@@ -62,12 +64,9 @@ class InvokeSubagentTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         ctx = self._ensure_context(ctx)
-        if getattr(ctx, "is_subagent", False) is True:
-            return ToolResult.error(
-                "permission",
-                name="invoke_subagent",
-                detail="subagents cannot spawn nested subagents",
-            )
+        err = self.check_context_permissions(ctx)
+        if err:
+            return err
 
         args = args or {}
         from core.application.session.subagent_service import SubagentService

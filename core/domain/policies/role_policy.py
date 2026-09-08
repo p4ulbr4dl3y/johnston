@@ -149,6 +149,12 @@ def _tool_policy_result(
     except Exception:
         resolved = clean
 
+    if mode is not None and not isinstance(mode, AgentMode):
+        try:
+            mode = AgentMode(str(mode).lower().strip())
+        except ValueError:
+            mode = None
+
     effective_mode = mode if mode is not None else (AgentMode.SUBAGENT if is_subagent else AgentMode.INTERACTIVE)
     if not effective_mode.is_interactive and (clean in SUBAGENT_EXCLUDED_TOOLS or resolved in SUBAGENT_EXCLUDED_TOOLS):
         mode_label = "subagent roles" if effective_mode == AgentMode.SUBAGENT else f"{effective_mode.value} mode"
