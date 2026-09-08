@@ -19,9 +19,8 @@ class TestJohnstonCLI(unittest.TestCase):
         self.assertEqual(p_johnston.description, "Johnston Coding Agent (TUI & CLI)")
 
     def test_start_repl(self):
-        with patch("johnston_cli.repl.loop.run_repl_loop", return_value=0):
-            code = start_repl("hello")
-            self.assertEqual(code, 0)
+        code = start_repl("hello")
+        self.assertEqual(code, 0)
 
     def test_main_j_no_args_starts_repl(self):
         with patch("sys.stdin.isatty", return_value=True):

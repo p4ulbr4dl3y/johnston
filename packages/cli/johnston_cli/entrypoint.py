@@ -285,7 +285,7 @@ def main_j(argv: Sequence[str] | None = None) -> int:
         except Exception:
             has_stdin_data = False
 
-    if has_stdin_data or (prompt and not sys.stdin.isatty()):
+    if prompt or has_stdin_data:
         if prompt:
             args.headless_prompt = prompt
         return run_headless(args)
