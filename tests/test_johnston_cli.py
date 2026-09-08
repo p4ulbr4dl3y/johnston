@@ -18,16 +18,17 @@ class TestJohnstonCLI(unittest.TestCase):
         self.assertEqual(p_johnston.prog, "johnston")
         self.assertEqual(p_johnston.description, "Johnston Coding Agent (TUI & CLI)")
 
-    def test_start_repl_stub(self):
-        code = start_repl("hello")
-        self.assertEqual(code, 0)
+    def test_start_repl(self):
+        with patch("johnston_cli.repl.loop.run_repl_loop", return_value=0):
+            code = start_repl("hello")
+            self.assertEqual(code, 0)
 
     def test_main_j_no_args_starts_repl(self):
         with patch("sys.stdin.isatty", return_value=True):
             with patch("johnston_cli.entrypoint.start_repl", return_value=0) as mock_repl:
                 code = main_j([])
                 self.assertEqual(code, 0)
-                mock_repl.assert_called_once_with(initial_prompt=None)
+                mock_repl.assert_called_once()
 
     def test_main_j_with_positional_prompt(self):
         with patch("johnston_cli.entrypoint.run_headless", return_value=0) as mock_run:

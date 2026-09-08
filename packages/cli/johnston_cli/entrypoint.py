@@ -285,12 +285,12 @@ def main_j(argv: Sequence[str] | None = None) -> int:
         except Exception:
             has_stdin_data = False
 
-    if prompt or has_stdin_data:
+    if has_stdin_data or (prompt and not sys.stdin.isatty()):
         if prompt:
             args.headless_prompt = prompt
         return run_headless(args)
 
-    return start_repl(initial_prompt=prompt)
+    return start_repl(initial_prompt=prompt, args=args)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
