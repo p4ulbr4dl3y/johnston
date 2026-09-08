@@ -107,3 +107,38 @@ async def test_send_subagent_followup_returns_running_status():
     res = await send_subagent_followup(session, "continue", ctx=ctx, store=None)
     assert res.status == ToolResultStatus.RUNNING
     assert "[subagent resumed | id sub-active]" in res.content
+
+
+def test_message_subagent_is_concurrency_safe():
+    tool = MessageSubagentTool()
+    assert not tool.is_concurrency_safe()
+
+
+@pytest.mark.asyncio
+async def test_message_subagent_blocked_for_subagents(msg_tool):
+    ctx = MagicMock()
+    ctx.is_subagent = True
+    msg_tool._ensure_context = lambda app=None: ctx
+
+    res = await msg_tool.execute({"id": "sub-1", "message": "hello"})
+    assert res.is_error
+    assert "subagents cannot message other subagents" in res.content
+
+
+@pytest.mark.asyncio
+async def test_message_subagent_non_string_args_coerced(msg_tool, monkeypatch):
+    session = MagicMock()
+    session.id = "123"
+
+    store = MagicMock()
+    store.find_session_by_title_or_id.return_value = session
+    monkeypatch.setattr("core.infrastructure.storage.session_store.get_session_store", lambda host: store)
+
+    send_mock = AsyncMock(return_value=ToolResult.done(content="[resumed 123]"))
+    monkeypatch.setattr("core.application.session.subagent_service.SubagentService.send_message", send_mock)
+
+    ctx = ToolContext(app=MagicMock())
+    res = await msg_tool.execute({"id": 123, "message": 456}, ctx=ctx)
+    assert res.status == ToolResultStatus.DONE
+    send_mock.assert_awaited_once_with(session, "456", ANY, store)
+

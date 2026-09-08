@@ -37,11 +37,24 @@ class MessageSubagentTool(BaseTool):
         },
     }
 
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return False
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
-        args = args or {}
         ctx = self._ensure_context(ctx)
-        session_id = (args.get("id") or args.get("session_id") or "").strip()
-        message = (args.get("message") or "").strip()
+        if getattr(ctx, "is_subagent", False) is True:
+            return ToolResult.error(
+                "permission",
+                name="message_subagent",
+                detail="subagents cannot message other subagents",
+            )
+
+        args = args or {}
+        raw_id = args.get("id") if "id" in args else args.get("session_id")
+        session_id = str(raw_id).strip() if raw_id is not None else ""
+
+        raw_message = args.get("message")
+        message = str(raw_message).strip() if raw_message is not None else ""
 
         from core.infrastructure.storage.session_store import get_session_store
 
