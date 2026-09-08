@@ -131,7 +131,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         from unittest.mock import patch
 
-        with patch("tools.read.convert_doc_to_markdown_sync", return_value="# Converted PDF Header\nPDF body text"):
+        with patch("tools.read.tool.convert_doc_to_markdown_sync", return_value="# Converted PDF Header\nPDF body text"):
             res_pdf = str(await tool.execute({"path": pdf_path}))
             self.assertIn("Converted PDF Header", res_pdf)
 
@@ -424,7 +424,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         from unittest.mock import patch
 
-        with patch("tools.read.set_cached_doc_markdown") as mock_set:
+        with patch("tools.read.doc.set_cached_doc_markdown") as mock_set:
             with patch("core.infrastructure.converter.convert_file", return_value="# Cached Doc Header\nDoc text"):
                 res1 = convert_doc_to_markdown_sync(pdf_path)
                 self.assertIn("Cached Doc Header", res1)

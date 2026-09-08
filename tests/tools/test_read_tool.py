@@ -73,14 +73,14 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
     # --- Document Conversion Tests ---
     def test_convert_doc_to_markdown_sync_cache_hit(self):
         fake_path = "/tmp/cached.docx"
-        with patch("tools.read.get_cached_doc_markdown", return_value="# Cached Doc"):
+        with patch("tools.read.doc.get_cached_doc_markdown", return_value="# Cached Doc"):
             res = convert_doc_to_markdown_sync(fake_path)
             self.assertEqual(res, "# Cached Doc")
 
     def test_convert_doc_to_markdown_sync_success(self):
         fake_path = "/tmp/doc.docx"
         with (
-            patch("tools.read.get_cached_doc_markdown", return_value=None),
+            patch("tools.read.doc.get_cached_doc_markdown", return_value=None),
             patch("core.infrastructure.converter.convert_file", return_value="# Doc Output"),
         ):
             res = convert_doc_to_markdown_sync(fake_path)
@@ -89,7 +89,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
     def test_convert_doc_to_markdown_sync_failure_raises(self):
         fake_path = "/tmp/failed.docx"
         with (
-            patch("tools.read.get_cached_doc_markdown", return_value=None),
+            patch("tools.read.doc.get_cached_doc_markdown", return_value=None),
             patch("core.infrastructure.converter.convert_file", side_effect=RuntimeError("fail")),
         ):
             with self.assertRaises(RuntimeError) as ctx:
@@ -102,7 +102,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
             del _DOC_CACHE[fake_path]
         try:
             with (
-                patch("tools.read.get_cached_doc_markdown", return_value=None),
+                patch("tools.read.doc.get_cached_doc_markdown", return_value=None),
                 patch("core.infrastructure.converter.convert_file", return_value=""),
             ):
                 res = convert_doc_to_markdown_sync(fake_path)
@@ -119,7 +119,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         cancel_event.set()
         fake_path = "/tmp/cancel_doc.docx"
         with (
-            patch("tools.read.get_cached_doc_markdown", return_value=None),
+            patch("tools.read.doc.get_cached_doc_markdown", return_value=None),
             patch("core.infrastructure.converter.convert_file", side_effect=RuntimeError("fail")),
         ):
             res = convert_doc_to_markdown_sync(fake_path, cancel_event=cancel_event)
@@ -230,7 +230,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         with open(doc_path, "w") as f:
             f.write("not a real docx")
 
-        with patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("Doc convert fail")):
+        with patch("tools.read.tool.convert_doc_to_markdown_sync", side_effect=RuntimeError("Doc convert fail")):
             res = str(await tool.execute({"path": doc_path}))
             self.assertIn("ERR: doc", res)
 
@@ -289,7 +289,7 @@ class TestReadToolCoverage(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"path": "https://example.com/page.html"}))
         self.assertIn("not found", res)
 
-    @patch("tools.read.convert_doc_to_markdown_sync")
+    @patch("tools.read.tool.convert_doc_to_markdown_sync")
     async def test_read_doc_truncation_saves_markdown_snapshot(self, mock_convert):
         long_md = "\n".join([f"# Header {i}\nParagraph content line {i}" for i in range(1, 600)])
         mock_convert.return_value = long_md

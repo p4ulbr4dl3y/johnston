@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from typing import Any, Dict
@@ -5,9 +6,25 @@ from typing import Any, Dict
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.converter import DOC_EXTENSIONS
 from core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
-from tools.base import BaseTool, get_fuzzy_matches, resolve_path, try_int
+from tools.base import BaseTool, _write_output_log, get_fuzzy_matches, resolve_path, try_int
 from tools.cancel import run_cancellable
-from tools.utils import DEFAULT_LINE_WINDOW, format_line_pagination
+from tools.read.archive import (
+    _inspect_archive,
+    is_archive_file,
+    read_archive_member,
+    split_archive_path,
+)
+from tools.read.cache import get_max_dir_entries
+from tools.read.directory import _inspect_directory
+from tools.read.doc import convert_doc_to_markdown_sync
+from tools.read.image import process_image_file_sync
+from tools.read.text import _read_file_lines
+from tools.utils import (
+    DEFAULT_LINE_WINDOW,
+    DEFAULT_READ_MAX_CHARS,
+    format_line_pagination,
+    get_max_tool_payload_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +102,6 @@ class ReadTool(BaseTool):
         return True
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
-        import tools.read as read_pkg
-
         args = args or {}
         ctx = self._ensure_context(ctx)
         raw_path = str(args.get("path") or "").strip()
@@ -135,7 +150,7 @@ class ReadTool(BaseTool):
 
         def _inspect_path() -> ToolResult | tuple[str, Any]:
             if not os.path.exists(path):
-                archive_split = read_pkg.split_archive_path(path)
+                archive_split = split_archive_path(path)
                 if archive_split:
                     return ("archive_member", archive_split)
 
@@ -153,16 +168,15 @@ class ReadTool(BaseTool):
                 return ToolResult.error("not_found", detail="not found" + hint, name=path)
 
             if os.path.isdir(path):
-                return read_pkg._inspect_directory(path, start_line_int, end_line_int)
+                return _inspect_directory(path, start_line_int, end_line_int)
 
-            if read_pkg.is_archive_file(path):
-                tools_cfg = read_pkg._tools_settings()
-                max_dir_entries = tools_cfg.max_dir_entries if tools_cfg else 60
-                return read_pkg._inspect_archive(path, max_dir_entries, start_line_int, end_line_int)
+            if is_archive_file(path):
+                max_dir_entries = get_max_dir_entries()
+                return _inspect_archive(path, max_dir_entries, start_line_int, end_line_int)
 
             try:
                 file_size = os.path.getsize(path)
-                limit = read_pkg.get_max_tool_payload_bytes()
+                limit = get_max_tool_payload_bytes()
                 if file_size > limit:
                     return ToolResult.error(
                         "size_exceeded", detail=f"exceeds {limit // (1024 * 1024)}MB", name=path
@@ -178,10 +192,9 @@ class ReadTool(BaseTool):
             return probe_res
         if probe_res[0] == "archive_member":
             archive_path, inner_path = probe_res[1]
-            tools_cfg = read_pkg._tools_settings()
-            max_dir_entries = tools_cfg.max_dir_entries if tools_cfg else 60
+            max_dir_entries = get_max_dir_entries()
             member_res = await run_cancellable(
-                read_pkg.read_archive_member,
+                read_archive_member,
                 archive_path,
                 inner_path,
                 max_entries=max_dir_entries,
@@ -197,7 +210,7 @@ class ReadTool(BaseTool):
                 end_line=end_line,
                 total_lines=total_lines,
                 window_start=1,
-                max_chars=100000,
+                max_chars=DEFAULT_READ_MAX_CHARS,
                 path=path,
             )
         _, ext = probe_res
@@ -206,9 +219,7 @@ class ReadTool(BaseTool):
         if ext in IMAGE_EXTENSIONS:
             try:
                 detail_arg = args.get("detail")
-                image_json = await run_cancellable(read_pkg.process_image_file_sync, path, detail_arg)
-                import json
-
+                image_json = await run_cancellable(process_image_file_sync, path, detail_arg)
                 try:
                     summary = json.loads(image_json).get("summary")
                 except Exception:
@@ -222,12 +233,10 @@ class ReadTool(BaseTool):
         if ext in DOC_EXTENSIONS:
             try:
                 md_text = await run_cancellable(
-                    read_pkg.convert_doc_to_markdown_sync,
+                    convert_doc_to_markdown_sync,
                     path,
                 )
                 lines = [ln.rstrip("\r\n") for ln in md_text.splitlines(keepends=True)]
-                from tools.base import _write_output_log
-
                 converted_path = _write_output_log(md_text, tool_name="read", ext=".md")
             except Exception as e:
                 return ToolResult.error("doc", detail=str(e), name=path)
@@ -238,7 +247,7 @@ class ReadTool(BaseTool):
                     content_offset = max(0, try_int(content_offset, 0))
 
                 lines = await run_cancellable(
-                    read_pkg._read_file_lines, path, content_offset, start_line_int, end_line_int
+                    _read_file_lines, path, content_offset, start_line_int, end_line_int
                 )
             except Exception as e:
                 return ToolResult.error("execute", detail=f"read failed: {e}", name=path)
@@ -256,7 +265,7 @@ class ReadTool(BaseTool):
             end_line=end_line,
             total_lines=total_lines,
             window_start=window_start,
-            max_chars=100000,
+            max_chars=DEFAULT_READ_MAX_CHARS,
             path=path,
             converted_path=converted_path,
         )

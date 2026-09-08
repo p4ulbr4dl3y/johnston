@@ -17,6 +17,9 @@ from tools.read.cache import (
     _get_file_line_count,
     _tools_settings,
     get_cached_doc_markdown,
+    get_image_dimension_bounds,
+    get_max_dir_entries,
+    get_read_line_window,
     set_cached_doc_markdown,
 )
 from tools.read.directory import _inspect_directory
@@ -49,5 +52,8 @@ __all__ = [
     "_get_file_line_count",
     "get_cached_doc_markdown",
     "set_cached_doc_markdown",
+    "get_max_dir_entries",
+    "get_read_line_window",
+    "get_image_dimension_bounds",
     "get_max_tool_payload_bytes",
 ]
