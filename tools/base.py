@@ -675,6 +675,12 @@ class BaseTool:
                 else:
                     normalized[k] = v_str
             else:
+                if prop_type == "integer":
+                    if isinstance(v, bool) or not isinstance(v, int):
+                        return {}, ToolResult.error("params", name=k, detail="must be integer")
+                elif prop_type == "boolean":
+                    if not isinstance(v, bool):
+                        return {}, ToolResult.error("params", name=k, detail="must be boolean")
                 normalized[k] = v
 
         for req in required_fields:

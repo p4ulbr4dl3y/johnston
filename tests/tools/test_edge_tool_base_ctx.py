@@ -341,6 +341,22 @@ class TestBaseToolNormalizeArgs(unittest.TestCase):
         self.assertIsNone(err)
         self.assertEqual(args["content"], code)
 
+    def test_normalize_non_string_type_mismatch_returns_error(self):
+        # bool passed where integer expected
+        args, err = self.tool.normalize_args({"path": "x", "count": True})
+        self.assertIsNotNone(err)
+        self.assertIn("must be integer", err.content)
+
+        # list passed where integer expected
+        args, err = self.tool.normalize_args({"path": "x", "count": [1, 2]})
+        self.assertIsNotNone(err)
+        self.assertIn("must be integer", err.content)
+
+        # int passed where boolean expected
+        args, err = self.tool.normalize_args({"path": "x", "flag": 123})
+        self.assertIsNotNone(err)
+        self.assertIn("must be boolean", err.content)
+
 
 if __name__ == "__main__":
     unittest.main()
