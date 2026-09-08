@@ -43,7 +43,10 @@ class InlinePromptSession(PromptSession[str]):
     def _create_layout(self):
         layout = super()._create_layout()
         try:
-            main_hsplit = layout.container.children[0].content
+            c0 = layout.container.children[0]
+            target_hsplit = getattr(c0, "alternative_content", c0)
+            if hasattr(target_hsplit, "content"):
+                target_hsplit = target_hsplit.content
 
             def _get_bottom_hint_fragments() -> StyleAndTextTuples:
                 width = get_term_width()
@@ -68,9 +71,10 @@ class InlinePromptSession(PromptSession[str]):
 
             hint_window = Window(
                 FormattedTextControl(_get_bottom_hint_fragments),
+                height=2,
                 dont_extend_height=True,
             )
-            main_hsplit.children.append(hint_window)
+            target_hsplit.children.append(hint_window)
         except Exception:
             pass
         return layout
