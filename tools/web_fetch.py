@@ -9,7 +9,9 @@ from typing import Any, Dict
 import httpx
 
 from core.domain.defaults.errors import ToolResult
-from tools.base import BaseTool
+from core.infrastructure.converter import DOC_EXTENSIONS
+from core.infrastructure.runtime.lru import LruCache
+from tools.base import BaseTool, truncate_output
 from tools.cancel import run_cancellable
 from tools.utils import get_max_tool_payload_bytes
 
@@ -18,41 +20,40 @@ DEFAULT_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/124.0.0.0 Safari/537.36 Johnston/0.1"
 )
-
-
+DEFAULT_WEB_FETCH_TIMEOUT = 20.0
 _FAKE_IP_NET = ipaddress.ip_network("198.18.0.0/15")
-_DNS_CACHE: dict[str, tuple[float, bool]] = {}
 _DNS_CACHE_TTL = 60.0
 _MAX_DNS_CACHE = 512
-_DNS_CACHE_LOCK: asyncio.Lock | None = None
+_DNS_CACHE: "LruCache[str, tuple[float, bool]]" = LruCache(_MAX_DNS_CACHE)
 
 
-def _get_dns_cache_lock() -> asyncio.Lock:
-    global _DNS_CACHE_LOCK
-    if _DNS_CACHE_LOCK is None:
-        _DNS_CACHE_LOCK = asyncio.Lock()
-    return _DNS_CACHE_LOCK
+def _tools_settings() -> Any:
+    try:
+        from core.infrastructure.config.settings import get_settings
+
+        return get_settings().tools
+    except Exception:
+        return None
 
 
 def _dns_cache_policy() -> tuple[float, int]:
     """Return the configured (ttl, max) for the SSRF DNS cache."""
-    try:
-        from core.infrastructure.config.settings import get_settings
-
-        tools = get_settings().tools
+    tools = _tools_settings()
+    if tools:
         return tools.dns_cache_ttl, tools.dns_cache_max
-    except Exception:
-        return _DNS_CACHE_TTL, _MAX_DNS_CACHE
+    return _DNS_CACHE_TTL, _MAX_DNS_CACHE
 
 
 def _web_user_agent() -> str:
     """Return the configured User-Agent for HTTP fetches."""
-    try:
-        from core.infrastructure.config.settings import get_settings
+    tools = _tools_settings()
+    return tools.web_user_agent if tools else DEFAULT_USER_AGENT
 
-        return get_settings().tools.web_user_agent
-    except Exception:
-        return DEFAULT_USER_AGENT
+
+def _web_fetch_timeout() -> float:
+    """Return the configured timeout for HTTP fetches."""
+    tools = _tools_settings()
+    return tools.web_fetch_timeout if tools else DEFAULT_WEB_FETCH_TIMEOUT
 
 
 def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
@@ -83,14 +84,13 @@ async def _is_private_host(url: str) -> bool:
 
     now = time.monotonic()
     cache_ttl, cache_max = _dns_cache_policy()
-    lock = _get_dns_cache_lock()
-    async with lock:
-        cached = _DNS_CACHE.get(host)
-        if cached is not None:
-            cached_ts, cached_res = cached
-            if now - cached_ts < cache_ttl:
-                return cached_res
-            _DNS_CACHE.pop(host, None)
+    _DNS_CACHE.maxsize = cache_max
+    cached = _DNS_CACHE.get(host)
+    if cached is not None:
+        cached_ts, cached_res = cached
+        if now - cached_ts < cache_ttl:
+            return cached_res
+        del _DNS_CACHE[host]
 
     # Hostname: resolve; block any private/loopback result.
     try:
@@ -112,20 +112,30 @@ async def _is_private_host(url: str) -> bool:
             is_blocked = True
             break
 
-    async with lock:
-        if len(_DNS_CACHE) >= cache_max:
-            _DNS_CACHE.clear()
-        _DNS_CACHE[host] = (now, is_blocked)
+    _DNS_CACHE.put(host, (now, is_blocked))
     return is_blocked
 
 
-
-_SCRIPT_TAG_RE = re.compile(r"<\s*/?\s*script\b[^>]*>", re.IGNORECASE)
+_SCRIPT_BLOCK_RE = re.compile(r"<\s*script\b[^>]*>.*?<\s*/\s*script\s*>", re.IGNORECASE | re.DOTALL)
+_STYLE_BLOCK_RE = re.compile(r"<\s*style\b[^>]*>.*?<\s*/\s*style\s*>", re.IGNORECASE | re.DOTALL)
+_LEFTOVER_TAG_RE = re.compile(r"<\s*/?\s*(?:script|style)\b[^>]*>", re.IGNORECASE)
 
 
 def _sanitize_web_content(text: str) -> str:
-    """Strip <script>-style tags from fetched content to avoid script passthrough."""
-    return _SCRIPT_TAG_RE.sub("", text)
+    """Strip script and style blocks (including inner content) to avoid script/style noise."""
+    text = _SCRIPT_BLOCK_RE.sub("", text)
+    text = _STYLE_BLOCK_RE.sub("", text)
+    return _LEFTOVER_TAG_RE.sub("", text)
+
+
+def _decode_response_bytes(content_bytes: bytes, encoding: Any = None) -> str:
+    """Decode HTTP payload bytes using response encoding when valid, with UTF-8 fallback."""
+    if isinstance(encoding, str) and encoding.strip():
+        try:
+            return content_bytes.decode(encoding, errors="replace")
+        except (LookupError, UnicodeDecodeError):
+            pass
+    return content_bytes.decode("utf-8", errors="replace")
 
 
 def _convert_content_to_md_sync(
@@ -179,12 +189,7 @@ class WebFetchTool(BaseTool):
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or getattr(self._client, "is_closed", False) is True:
-            from core.infrastructure.config.settings import get_settings
-
-            try:
-                timeout = get_settings().tools.web_fetch_timeout
-            except Exception:
-                timeout = 20.0
+            timeout = _web_fetch_timeout()
             self._client = httpx.AsyncClient(
                 follow_redirects=True, timeout=timeout, event_hooks={"request": [_guard_request]}
             )
@@ -228,6 +233,7 @@ class WebFetchTool(BaseTool):
             async with client.stream("GET", url, headers=headers) as response:
                 response.raise_for_status()
                 content_type = response.headers.get("content-type", "").lower()
+                response_encoding = getattr(response, "encoding", None)
                 # Pre-check Content-Length to fail fast on oversized responses.
                 cl = response.headers.get("content-length")
                 if cl:
@@ -258,10 +264,8 @@ class WebFetchTool(BaseTool):
             return ToolResult.error("network", detail=str(e), name=url)
 
         if raw_mode:
-            text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
+            text_content = _sanitize_web_content(_decode_response_bytes(content_bytes, response_encoding))
         else:
-            from core.infrastructure.converter import DOC_EXTENSIONS
-
             url_path_ext = url.lower().split("?", 1)[0]
             url_ext = url_path_ext.rsplit(".", 1)[-1] if "." in url_path_ext else ""
             ext_map = {ext.lstrip("."): ext for ext in DOC_EXTENSIONS}
@@ -282,7 +286,7 @@ class WebFetchTool(BaseTool):
                 suffix = ".html"
 
             if "json" in content_type or "text/plain" in content_type:
-                text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
+                text_content = _sanitize_web_content(_decode_response_bytes(content_bytes, response_encoding))
             else:
                 try:
                     # run_cancellable auto-wires its own cancel_event into
@@ -290,7 +294,7 @@ class WebFetchTool(BaseTool):
                     # fetch aborts the subprocess/worker promptly without explicit wiring.
                     text_content = await run_cancellable(_convert_content_to_md_sync, content_bytes, suffix)
                 except Exception:
-                    text_content = _sanitize_web_content(content_bytes.decode("utf-8", errors="replace"))
+                    text_content = _sanitize_web_content(_decode_response_bytes(content_bytes, response_encoding))
 
         if raw_mode:
             if "json" in content_type:
@@ -313,8 +317,6 @@ class WebFetchTool(BaseTool):
 
         type_name = out_ext.lstrip(".")
         header = f"[url {url} | status 200 | type {type_name}]"
-        from tools.base import truncate_output
-
         body = truncate_output(text_content, tool_name="web_fetch", ext=out_ext)
         plain_content = f"{header}\n\n{body}"
         return ToolResult.done(content=plain_content, display="")

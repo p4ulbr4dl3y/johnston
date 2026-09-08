@@ -333,6 +333,59 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
             res = str(await tool.execute({"url": "http://internal-service.local/"}))
             self.assertIn("blocked", res)
 
+    def test_sanitize_web_content_strips_script_and_style_blocks(self):
+        from tools.web_fetch import _sanitize_web_content
+
+        html = """
+        <html>
+            <head>
+                <style type="text/css">body { color: red; }</style>
+                <script>console.log("secret token", 123);</script>
+            </head>
+            <body>
+                <p>Hello World</p>
+                <script src="app.js">alert(1);</script>
+            </body>
+        </html>
+        """
+        cleaned = _sanitize_web_content(html)
+        self.assertNotIn("color: red", cleaned)
+        self.assertNotIn("secret token", cleaned)
+        self.assertNotIn("alert(1)", cleaned)
+        self.assertIn("Hello World", cleaned)
+
+    def test_decode_response_bytes_encoding_and_fallback(self):
+        from tools.web_fetch import _decode_response_bytes
+
+        win1251_bytes = "Привет".encode("windows-1251")
+        decoded_win = _decode_response_bytes(win1251_bytes, "windows-1251")
+        self.assertEqual(decoded_win, "Привет")
+
+        bad_bytes = b"hello \xff world"
+        decoded_fallback = _decode_response_bytes(bad_bytes, "invalid-charset-name")
+        self.assertIn("hello", decoded_fallback)
+        self.assertIn("\ufffd", decoded_fallback)
+
+    @patch("tools.web_fetch._dns_cache_policy", return_value=(60.0, 2))
+    @patch("socket.getaddrinfo")
+    async def test_dns_lru_cache_eviction(self, mock_gai, mock_policy):
+        from tools.web_fetch import _DNS_CACHE, _is_private_host
+
+        mock_gai.return_value = [(2, 1, 6, "", ("8.8.8.8", 0))]
+        _DNS_CACHE.clear()
+
+        await _is_private_host("https://host1.com")
+        await _is_private_host("https://host2.com")
+        self.assertIn("host1.com", _DNS_CACHE)
+        self.assertIn("host2.com", _DNS_CACHE)
+
+        await _is_private_host("https://host3.com")
+        self.assertEqual(len(_DNS_CACHE), 2)
+        self.assertNotIn("host1.com", _DNS_CACHE)
+        self.assertIn("host2.com", _DNS_CACHE)
+        self.assertIn("host3.com", _DNS_CACHE)
+        _DNS_CACHE.clear()
+
 
 if __name__ == "__main__":
     unittest.main()
