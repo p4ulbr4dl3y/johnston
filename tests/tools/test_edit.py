@@ -157,3 +157,28 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Closest match", res.content)
         self.assertTrue("'test.py'" in res.content or "&apos;test.py&apos;" in res.content)
 
+    def test_bom_tolerance_and_preservation(self):
+        # File has UTF-8 BOM, model omitted BOM in target
+        content = "\ufeffdef start():\n    pass\n"
+        new_content, _ = apply_edit(content, "def start():", "def begin():", False, "test.py")
+        self.assertTrue(new_content.startswith("\ufeff"))
+        self.assertIn("def begin():", new_content)
+
+        # Deleting the first line preserving or handling BOM
+        del_content, _ = apply_edit(content, "def start():\n    pass\n", "", False, "test.py")
+        self.assertEqual(del_content, "")
+
+    def test_concurrency_safe_explicit_false(self):
+        tool = EditTool()
+        self.assertFalse(tool.is_concurrency_safe())
+
+    def test_fuzzy_hint_window_capped(self):
+        # 100 lines target should not produce 100 lines snippet in error hint
+        content = "line 1\nline 2 target\nline 3\n"
+        long_target = "line 2 targeX\n" + "\n".join(f"subline {i}" for i in range(50))
+        res = apply_edit(content, long_target, "replacement", False, "dummy.py")
+        self.assertTrue(res.is_error)
+        self.assertIn("Closest match", res.content)
+        # Should be bounded, not containing subline 49
+        self.assertNotIn("subline 49", res.content)
+
