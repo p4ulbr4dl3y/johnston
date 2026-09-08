@@ -219,12 +219,14 @@ version = "0.30.0"
 source = { editable = "packages/cli" }
 dependencies = [
     { name = "johnston-core" },
+    { name = "johnston-tui" },
     { name = "prompt-toolkit" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "johnston-core", editable = "packages/core" },
+    { name = "johnston-tui", editable = "packages/tui" },
     { name = "prompt-toolkit", specifier = ">=3.0.38" },
 ]
 
