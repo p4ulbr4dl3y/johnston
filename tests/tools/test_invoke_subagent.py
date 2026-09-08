@@ -480,6 +480,46 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         result = truncate_subagent_result(long_text, session_id="subagent-3a1f9b")
         self.assertIn("subagent-3a1f9b.md", result)
 
+    def test_invoke_subagent_is_concurrency_safe_explicit_false(self):
+        tool = InvokeSubagentTool()
+        self.assertFalse(tool.is_concurrency_safe())
+
+    async def test_subagent_cannot_spawn_nested_subagents(self):
+        from unittest.mock import MagicMock
+        tool = InvokeSubagentTool()
+        mock_ctx = MagicMock()
+        mock_ctx.is_subagent = True
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        res = await tool.execute({"task": "do something", "title": "nested"})
+        self.assertTrue(res.is_error)
+        self.assertIn("cannot spawn nested subagents", res.content)
+
+    async def test_invoke_subagent_coerces_non_string_args(self):
+        from unittest.mock import MagicMock, patch
+        tool = InvokeSubagentTool()
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [{"function": {"name": "read"}}]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+        mock_ctx.project_dir = self.temp_dir.name
+        mock_ctx.is_subagent = False
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        with (
+            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=False),
+        ):
+            res = await tool.execute({"task": "valid task", "title": 12345, "role": 999})
+            self.assertFalse(res.is_error)
+
 
 if __name__ == "__main__":
     unittest.main()
