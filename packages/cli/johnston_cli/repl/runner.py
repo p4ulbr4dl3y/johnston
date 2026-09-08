@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import sys
-import time
 from typing import Any, Optional
 
-from johnston_cli.repl.terminal import format_turn_footer
 from johnston_core.domain.defaults.errors import parse_stream_step
 from johnston_core.provider_manager import ProviderManager
 
@@ -48,7 +46,6 @@ class AgentReplRunner:
         if not user_prompt.strip():
             return
 
-        start_time = time.perf_counter()
         has_written = False
 
         try:
@@ -79,16 +76,11 @@ class AgentReplRunner:
             sys.stderr.write(f"\n\033[31mError during stream: {exc}\033[0m\n")
             sys.stderr.flush()
 
-        duration_s = max(0.0, time.perf_counter() - start_time)
-
         # Token accounting from agent turn
         turn_tokens = getattr(self.agent, "last_context_tokens", 0)
         if not turn_tokens:
             turn_tokens = getattr(self.agent, "total_tokens", 0)
         self.total_session_tokens = turn_tokens
 
-        # Render turn summary footer
-        display_model = f"{self.provider_key}/{self.model_name}" if self.provider_key else self.model_name
-        footer = format_turn_footer(display_model, self.total_session_tokens, duration_s)
-        sys.stdout.write(footer)
+        sys.stdout.write("\n")
         sys.stdout.flush()

@@ -109,7 +109,6 @@ async def test_agent_repl_runner_run_turn():
         await runner.run_turn("hi")
     val = f.getvalue()
     assert "Hello, world!" in val
-    assert "test_prov/test_mod" in val
     assert runner.total_session_tokens == 50
 
 
