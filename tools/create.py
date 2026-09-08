@@ -1,10 +1,19 @@
 import os
+from dataclasses import dataclass
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool, read_file_text, write_file_text
 from tools.cancel import run_cancellable
-from tools.utils import format_file_diff, resolve_writable_path
+from tools.utils import format_file_diff, get_max_tool_payload_bytes, resolve_writable_path
+
+
+@dataclass(frozen=True)
+class _ProbeResult:
+    is_dir: bool
+    existed: bool
+    old_content: str
+    diff_skipped: bool
 
 
 class CreateTool(BaseTool):
@@ -36,6 +45,9 @@ class CreateTool(BaseTool):
         },
     }
 
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return False
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
@@ -44,42 +56,62 @@ class CreateTool(BaseTool):
         if err is not None:
             return err
 
-        def _probe():
-            """Run sync filesystem checks off the event loop, returning (existed, old_content)."""
+        def _probe() -> _ProbeResult:
+            """Run sync filesystem checks off the event loop."""
             if os.path.isdir(path):
-                return (False, "isdir")
-            existed = os.path.isfile(path)
-            old = ""
-            if existed:
-                try:
-                    old = read_file_text(path)
-                except Exception:
-                    old = ""
-            return (existed, old)
+                return _ProbeResult(is_dir=True, existed=False, old_content="", diff_skipped=False)
+            if not os.path.isfile(path):
+                return _ProbeResult(is_dir=False, existed=False, old_content="", diff_skipped=False)
 
-        file_existed, old_content = await run_cancellable(_probe)
-        if not file_existed and old_content == "isdir":
+            try:
+                if os.path.getsize(path) > get_max_tool_payload_bytes():
+                    return _ProbeResult(is_dir=False, existed=True, old_content="", diff_skipped=True)
+            except OSError:
+                pass
+
+            old = ""
+            try:
+                old = read_file_text(path)
+            except Exception:
+                old = ""
+            return _ProbeResult(is_dir=False, existed=True, old_content=old, diff_skipped=False)
+
+        probe = await run_cancellable(_probe)
+        if probe.is_dir:
             return ToolResult.error("is_directory", name=path, detail="path is an existing directory")
 
-        content = (args.get("content") or "")
-        if isinstance(content, bytes):
-            content = content.decode("utf-8", errors="replace")
+        raw_content = args.get("content")
+        if raw_content is None:
+            content = ""
+        elif isinstance(raw_content, bytes):
+            content = raw_content.decode("utf-8", errors="replace")
+        elif not isinstance(raw_content, str):
+            content = str(raw_content)
+        else:
+            content = raw_content
         content = content.rstrip("\r\n")
 
-        def _write_and_diff():
+        def _write() -> None:
             write_file_text(path, content)
-            new_lines = content.splitlines()
-            cnt = len(new_lines) if content else 0
-            if not file_existed:
-                return f"[created {path_arg} | {cnt} lines]"
-            diff_text = format_file_diff(old_content, content, str(path_arg))
-            if not diff_text:
-                return f"[unchanged {path_arg} | {cnt} lines]"
-            return diff_text
 
         try:
-            result_str = await run_cancellable(_write_and_diff)
-            result_str = result_str.strip() if result_str else ""
-            return ToolResult.done(content=result_str, display=result_str)
+            await run_cancellable(_write)
         except Exception as e:
             return ToolResult.error("execute", detail=f"write failed: {e}", name=path_arg or path)
+
+        new_lines = content.splitlines()
+        cnt = len(new_lines) if content else 0
+
+        if not probe.existed:
+            result_str = f"[created {path_arg} | {cnt} lines]"
+        elif probe.diff_skipped:
+            result_str = f"[overwritten {path_arg} | {cnt} lines (diff skipped: file exceeds payload limit)]"
+        else:
+            try:
+                diff_text = format_file_diff(probe.old_content, content, str(path_arg))
+                result_str = diff_text if diff_text else f"[unchanged {path_arg} | {cnt} lines]"
+            except Exception:
+                result_str = f"[overwritten {path_arg} | {cnt} lines]"
+
+        result_str = result_str.strip() if result_str else ""
+        return ToolResult.done(content=result_str, display=result_str)
