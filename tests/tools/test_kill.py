@@ -182,3 +182,41 @@ async def test_kill_process_fallback(kill_tool, monkeypatch):
     assert res.status == ToolResultStatus.DONE
     term_mock.assert_awaited_once_with(proc)
 
+
+def test_kill_is_concurrency_safe():
+    tool = KillTool()
+    assert not tool.is_concurrency_safe()
+
+
+@pytest.mark.asyncio
+async def test_kill_blocked_for_subagents(kill_tool):
+    ctx = MagicMock()
+    ctx.is_subagent = True
+    kill_tool._ensure_context = lambda app=None: ctx
+
+    res = await kill_tool.execute({"id": "shell-1"})
+    assert res.is_error
+    assert "subagents cannot terminate tasks or subagents" in res.content
+
+
+@pytest.mark.asyncio
+async def test_kill_coerces_non_string_id(kill_tool):
+    task = MagicMock()
+    task.id = "123"
+    task.task_id = "123"
+    task.session_id = "sess-1"
+    task.is_active = True
+    task.is_running = True
+    task.kill = AsyncMock()
+
+    app = MagicMock()
+    app.task_manager = [task]
+    app.current_session_id = "sess-1"
+    app._background_shell_widgets = {}
+    ctx = ToolContext(app=app)
+
+    res = await kill_tool.execute({"id": 123}, ctx=ctx)
+    assert res.status == ToolResultStatus.DONE
+    assert "[killed 123]" in res.content
+
+

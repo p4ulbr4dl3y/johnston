@@ -28,10 +28,25 @@ class KillTool(BaseTool):
         },
     }
 
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return False
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
-        args = args or {}
         ctx = self._ensure_context(ctx)
-        target_id = (args.get("id") or args.get("task_id") or args.get("session_id") or "").strip()
+        if getattr(ctx, "is_subagent", False) is True:
+            return ToolResult.error(
+                "permission",
+                name="kill",
+                detail="subagents cannot terminate tasks or subagents",
+            )
+
+        args = args or {}
+        raw_id = (
+            args.get("id")
+            if "id" in args
+            else (args.get("task_id") if "task_id" in args else args.get("session_id"))
+        )
+        target_id = str(raw_id).strip() if raw_id is not None else ""
 
         if not target_id:
             return ToolResult.error("params", name="id", detail="required")
