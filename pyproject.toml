@@ -42,7 +42,9 @@ source = [
     "packages/core/tools",
     "packages/tui/widgets",
     "packages/tui/app",
-    "packages/tui/cli",
+    "packages/cli/johnston_cli",
+    "cli",
+    "app",
 ]
 omit = ["*/__init__.py", "*/core/domain/defaults/skills/*"]
 
@@ -52,4 +54,4 @@ show_missing = true
 skip_covered = true
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "tools", "widgets", "app", "cli"]
+known-first-party = ["core", "tools", "widgets", "app", "cli", "johnston_cli"]

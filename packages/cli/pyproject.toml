@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "johnston-tui"
+name = "johnston-cli"
 version = "0.30.0"
-description = "Textual AI Johnston Application"
+description = "Command-line interface and interactive agent for Johnston"
 readme = "README.md"
 license = "MIT"
 authors = [
@@ -14,18 +14,17 @@ authors = [
 requires-python = ">=3.10, <3.14"
 dependencies = [
     "johnston-core",
-    "textual>=8.0.0,<9",
 ]
 
 [project.scripts]
-johnston-tui = "app:main"
+j = "johnston_cli.entrypoint:main_j"
+jc = "johnston_cli.entrypoint:main_j"
+johnston = "johnston_cli.entrypoint:main_johnston"
 
 [tool.uv.sources]
 johnston-core = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 only-include = [
-    "app.py",
-    "app.tcss",
-    "widgets",
+    "johnston_cli",
 ]

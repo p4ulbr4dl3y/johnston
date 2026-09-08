@@ -1,4 +1,4 @@
-"""CLI entry module for Johnston (re-exporting from core.interfaces.cli)."""
+"""CLI entry module for Johnston (re-exporting from johnston_cli)."""
 from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
@@ -16,17 +16,26 @@ from core.interfaces.cli.commands.roles_cmd import print_roles
 from core.interfaces.cli.commands.rules_cmd import print_rules
 from core.interfaces.cli.commands.skills_cmd import print_skills
 from core.interfaces.cli.entrypoint import (
+    build_parser,
+)
+from core.interfaces.cli.entrypoint import (
     main as _entrypoint_main,
 )
+from johnston_cli.entrypoint import main_j, main_johnston
 
 __all__ = [
+    "build_parser",
     "get_version",
     "main",
+    "main_j",
+    "main_johnston",
     "print_mcp",
     "print_models",
     "print_roles",
     "print_rules",
     "print_skills",
+    "tomllib",
+    "version",
 ]
 
 
@@ -47,7 +56,7 @@ def get_version() -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Main CLI entry delegating to core.interfaces.cli.entrypoint."""
+    """Main CLI entry delegating to core entrypoint."""
     return _entrypoint_main(argv)
 
 

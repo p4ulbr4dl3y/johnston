@@ -14,8 +14,9 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "johnston",
+    "johnston-cli",
     "johnston-core",
+    "johnston-tui",
 ]
 
 [manifest.dependency-groups]
@@ -213,19 +214,15 @@ wheels = [
 ]
 
 [[package]]
-name = "johnston"
+name = "johnston-cli"
 version = "0.30.0"
-source = { editable = "packages/tui" }
+source = { editable = "packages/cli" }
 dependencies = [
     { name = "johnston-core" },
-    { name = "textual" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "johnston-core", editable = "packages/core" },
-    { name = "textual", specifier = ">=8.0.0,<9" },
-]
+requires-dist = [{ name = "johnston-core", editable = "packages/core" }]
 
 [[package]]
 name = "johnston-core"
@@ -264,6 +261,21 @@ requires-dist = [
     { name = "tree-sitter-python", specifier = ">=0.23.0" },
     { name = "tree-sitter-rust", specifier = ">=0.23.0" },
     { name = "tree-sitter-typescript", specifier = ">=0.23.0" },
+]
+
+[[package]]
+name = "johnston-tui"
+version = "0.30.0"
+source = { editable = "packages/tui" }
+dependencies = [
+    { name = "johnston-core" },
+    { name = "textual" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "johnston-core", editable = "packages/core" },
+    { name = "textual", specifier = ">=8.0.0,<9" },
 ]
 
 [[package]]
