@@ -40,6 +40,10 @@ def _format_entry_size(size_bytes: int) -> str:
 
 def split_archive_path(path: str) -> tuple[str, str] | None:
     """If path refers to a file or folder inside an archive, returns (archive_path, inner_path)."""
+    lower = path.lower()
+    if not any(ext in lower for ext in ARCHIVE_EXTENSIONS):
+        return None
+
     if ":" in path and "://" not in path:
         parts = path.split(":", 1)
         if os.path.isfile(parts[0]) and is_archive_file(parts[0]):

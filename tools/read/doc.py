@@ -2,6 +2,8 @@ import logging
 import threading
 from typing import Any
 
+from tools.read.cache import get_cached_doc_markdown, set_cached_doc_markdown
+
 logger = logging.getLogger(__name__)
 
 
@@ -11,9 +13,7 @@ def convert_doc_to_markdown_sync(
     **_kwargs: Any,
 ) -> str:
     """Synchronous CPU worker to convert rich documents to markdown."""
-    import tools.read as read_pkg
-
-    cached = read_pkg.get_cached_doc_markdown(path)
+    cached = get_cached_doc_markdown(path)
     if cached is not None:
         return cached
 
@@ -36,7 +36,7 @@ def convert_doc_to_markdown_sync(
         return ""
     if result_text is not None:
         if result_text.strip():
-            read_pkg.set_cached_doc_markdown(path, result_text)
+            set_cached_doc_markdown(path, result_text)
         return result_text
 
     raise RuntimeError(f"Unable to convert '{path}' to markdown.")

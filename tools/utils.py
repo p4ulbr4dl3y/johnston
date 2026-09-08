@@ -5,6 +5,7 @@ from core.domain.defaults.errors import ToolResult
 from tools.base import try_int
 
 DEFAULT_LINE_WINDOW = 800
+DEFAULT_READ_MAX_CHARS = 100_000
 
 # Unified cap for any single file/web response fetched by a tool (read, web_fetch).
 # The effective value reads tools.max_tool_payload_bytes from config; this

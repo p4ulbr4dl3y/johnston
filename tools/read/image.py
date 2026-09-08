@@ -17,13 +17,9 @@ def process_image_file_sync(path: str, detail: str | None = None, cancel_event: 
 
     from PIL import Image
 
-    import tools.read as read_pkg
+    from tools.read.cache import get_image_dimension_bounds
 
-    tools_cfg = read_pkg._tools_settings()
-    dim_low = tools_cfg.image_dimension_low if tools_cfg else 512
-    dim_high = tools_cfg.image_dimension_high if tools_cfg else 2048
-    dim_default = tools_cfg.max_image_dimension if tools_cfg else 1568
-    png_keep_bytes = tools_cfg.image_png_keep_bytes if tools_cfg else 1 * 1024 * 1024
+    dim_low, dim_high, dim_default, png_keep_bytes = get_image_dimension_bounds()
 
     try:
         with Image.open(path) as img:

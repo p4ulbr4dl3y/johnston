@@ -2,16 +2,15 @@ import os
 
 from core.domain.defaults.errors import ToolResult
 from core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
+from tools.read.archive import _format_entry_size
+from tools.read.cache import get_max_dir_entries
 
 
 def _inspect_directory(path: str, start_line_int: int | None, end_line_int: int | None) -> ToolResult:
-    import tools.read as read_pkg
-
     try:
         raw_entries = sorted(os.listdir(path))
         total_count = len(raw_entries)
-        tools_cfg = read_pkg._tools_settings()
-        max_dir_entries = tools_cfg.max_dir_entries if tools_cfg else 60
+        max_dir_entries = get_max_dir_entries()
 
         normal_dirs, normal_files = [], []
         hidden_dirs, hidden_files = [], []
@@ -37,7 +36,7 @@ def _inspect_directory(path: str, start_line_int: int | None, end_line_int: int 
             else:
                 try:
                     sz = os.path.getsize(full_p)
-                    label = f"{entry} ({read_pkg._format_entry_size(sz)})"
+                    label = f"{entry} ({_format_entry_size(sz)})"
                 except Exception:
                     label = entry
                 if is_hidden:

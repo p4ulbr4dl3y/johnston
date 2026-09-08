@@ -3,10 +3,16 @@ import time
 from typing import Any, Tuple
 
 from core.infrastructure.runtime.lru import LruCache
+from tools.utils import DEFAULT_LINE_WINDOW
 
 MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes
 MAX_LINE_COUNT_CACHE = 500
+DEFAULT_MAX_DIR_ENTRIES = 60
+DEFAULT_IMAGE_DIM_LOW = 512
+DEFAULT_IMAGE_DIM_HIGH = 2048
+DEFAULT_IMAGE_MAX_DIM = 1568
+DEFAULT_IMAGE_PNG_KEEP_BYTES = 1024 * 1024
 
 _DOC_CACHE: "LruCache[str, Tuple[float, float, str]]" = LruCache(MAX_DOC_CACHE)  # key: path, val: (mtime, timestamp, md_text)
 _LINE_COUNT_CACHE: "LruCache[Tuple[str, float, int], int]" = LruCache(MAX_LINE_COUNT_CACHE)
@@ -20,6 +26,33 @@ def _tools_settings() -> Any:
         return get_settings().tools
     except Exception:
         return None
+
+
+def get_max_dir_entries() -> int:
+    cfg = _tools_settings()
+    return int(getattr(cfg, "max_dir_entries", DEFAULT_MAX_DIR_ENTRIES)) if cfg else DEFAULT_MAX_DIR_ENTRIES
+
+
+def get_read_line_window() -> int:
+    cfg = _tools_settings()
+    return int(getattr(cfg, "read_line_window", DEFAULT_LINE_WINDOW)) if cfg else DEFAULT_LINE_WINDOW
+
+
+def get_image_dimension_bounds() -> tuple[int, int, int, int]:
+    cfg = _tools_settings()
+    if cfg:
+        return (
+            getattr(cfg, "image_dimension_low", DEFAULT_IMAGE_DIM_LOW),
+            getattr(cfg, "image_dimension_high", DEFAULT_IMAGE_DIM_HIGH),
+            getattr(cfg, "max_image_dimension", DEFAULT_IMAGE_MAX_DIM),
+            getattr(cfg, "image_png_keep_bytes", DEFAULT_IMAGE_PNG_KEEP_BYTES),
+        )
+    return (
+        DEFAULT_IMAGE_DIM_LOW,
+        DEFAULT_IMAGE_DIM_HIGH,
+        DEFAULT_IMAGE_MAX_DIM,
+        DEFAULT_IMAGE_PNG_KEEP_BYTES,
+    )
 
 
 def _get_file_line_count(file_path: str, mtime: float, size: int) -> int:
