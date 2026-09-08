@@ -53,7 +53,7 @@ class ReadTool(BaseTool):
                         "type": "string",
                         "description": (
                             "File, directory, archive (ZIP/TAR/WHL/JAR), path inside archive ('pkg.whl/mod.py'), "
-                            "or `scheme://...` MCP resource path. Relative paths resolve against cwd (from <environment>)."
+                            "or `scheme://...` MCP resource path. Relative to cwd by default; absolute for external files."
                         ),
                     },
                     "start_line": {

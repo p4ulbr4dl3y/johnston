@@ -33,7 +33,10 @@ class CreateTool(BaseTool):
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Relative file path to create or overwrite.",
+                        "description": (
+                            "File path to create or overwrite (relative to cwd by default, "
+                            "or absolute for external files)."
+                        ),
                     },
                     "content": {
                         "type": "string",

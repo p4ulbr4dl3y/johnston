@@ -351,7 +351,10 @@ class EditTool(BaseTool):
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Relative file path of an existing regular file.",
+                        "description": (
+                            "Path of an existing regular file (relative to cwd by default, "
+                            "or absolute for external files)."
+                        ),
                     },
                     "old_str": {
                         "type": "string",
