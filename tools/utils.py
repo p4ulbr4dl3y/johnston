@@ -60,11 +60,24 @@ def validate_file_for_edit(path: str) -> ToolResult | None:
     return None
 
 
-def format_file_diff(old_content: str, new_content: str, path: str) -> str:
+DEFAULT_MAX_DIFF_LINES = 500
+
+
+def format_file_diff(
+    old_content: str, new_content: str, path: str, max_lines: int = DEFAULT_MAX_DIFF_LINES
+) -> str:
     """Generate git-style unified diff for file modifications."""
     from core.infrastructure.runtime.git_utils import make_git_diff
 
-    return make_git_diff(old_content, new_content, fromfile=f"a/{path}", tofile=f"b/{path}")
+    diff_text = make_git_diff(old_content, new_content, fromfile=f"a/{path}", tofile=f"b/{path}")
+    if not diff_text or max_lines <= 0:
+        return diff_text
+
+    diff_lines = diff_text.splitlines()
+    if len(diff_lines) > max_lines:
+        omitted = len(diff_lines) - max_lines
+        return "\n".join(diff_lines[:max_lines]) + f"\n... [diff truncated: {omitted} lines omitted]"
+    return diff_text
 
 
 

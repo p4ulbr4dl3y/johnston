@@ -433,6 +433,46 @@ class TestCreateTool(_Base):
         self.assertIn("sandbox restriction", res_edit)
 
 
+    async def test_create_non_string_content_coerced(self):
+        tool = CreateTool()
+        p = os.path.join(self.tmp, "num.txt")
+        res = str(await tool.execute({"path": p, "content": 12345}))
+        self.assertNotIn("ERR:", res)
+        self.assertEqual(open(p, encoding="utf-8").read(), "12345")
+
+    async def test_create_concurrency_safe_explicit_false(self):
+        tool = CreateTool()
+        self.assertFalse(tool.is_concurrency_safe())
+
+    async def test_create_overwrite_large_file_skips_diff(self):
+        from unittest.mock import patch
+        tool = CreateTool()
+        p = self.write("big_old.txt", "old content\n")
+        with patch("tools.create.get_max_tool_payload_bytes", return_value=5):
+            res = str(await tool.execute({"path": p, "content": "new content\n"}))
+        self.assertNotIn("ERR:", res)
+        self.assertIn("diff skipped", res)
+        self.assertEqual(self.read("big_old.txt"), "new content")
+
+    async def test_create_diff_generation_failure_still_reports_success(self):
+        from unittest.mock import patch
+        tool = CreateTool()
+        p = self.write("fail_diff.txt", "line1\n")
+        with patch("tools.create.format_file_diff", side_effect=RuntimeError("diff broke")):
+            res = str(await tool.execute({"path": p, "content": "line2\n"}))
+        self.assertNotIn("ERR:", res)
+        self.assertIn("[overwritten", res)
+        self.assertEqual(self.read("fail_diff.txt"), "line2")
+
+    def test_format_file_diff_truncation(self):
+        from tools.utils import format_file_diff
+        old = "\n".join(f"old_{i}" for i in range(20))
+        new = "\n".join(f"new_{i}" for i in range(20))
+        diff = format_file_diff(old, new, "test.txt", max_lines=5)
+        self.assertIn("[diff truncated:", diff)
+        self.assertIn("lines omitted]", diff)
+
+
 if __name__ == "__main__":
     unittest.main()
 
