@@ -890,7 +890,8 @@ class TestTasksScreensCoverage(unittest.IsolatedAsyncioTestCase):
 
                 # Test kill item with cancel exception
                 await screen._kill_item({"raw_obj": s3})
-                s3.finish.assert_called_with("cancelled", "Terminated from subagents menu")
+                s3.async_task.cancel.assert_called_once()
+                self.assertTrue(getattr(s3, "suppress_notification", False))
 
                 # Test session event
                 screen._on_session_event()

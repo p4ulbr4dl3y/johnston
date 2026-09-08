@@ -186,3 +186,66 @@ class TestSubagentServiceOperations(unittest.IsolatedAsyncioTestCase):
         res = await SubagentService.spawn_subagent(prompt="", title="test", ctx=ctx)
         self.assertTrue(res.is_error)
         self.assertIn("prompt", str(res.content))
+
+    async def test_spawn_registers_subagent_task_in_task_manager(self):
+        from unittest.mock import AsyncMock, patch
+
+        from core.infrastructure.tasks.manager import TaskManager
+        from core.infrastructure.tasks.subagent_task import SubagentTask
+
+        task_mgr = TaskManager()
+        ctx = MagicMock()
+        ctx.task_manager = task_mgr
+        ctx.host = MagicMock()
+        ctx.session_id = "parent-1"
+        ctx.project_dir = "/tmp/fake"
+        agent = MagicMock()
+        ctx.create_agent.return_value = agent
+
+        store = MagicMock()
+        sess = AgentSession(session_id="sub-task-1", status=SessionStatus.RUNNING)
+        store.create_subagent.return_value = sess
+        store.list.return_value = []
+        store.children.return_value = []
+
+        wt_mgr = MagicMock()
+        wt_mgr.is_git_repo.return_value = False
+
+        with (
+            patch("core.application.session.subagent_service.get_session_store", return_value=store),
+            patch("core.application.session.subagent_service.record_subagent_session"),
+            patch("core.application.session.stream.configure_subagent_agent"),
+            patch("core.application.session.stream.run_subagent_stream_bg", new_callable=AsyncMock),
+        ):
+            res = await SubagentService.spawn_subagent(
+                prompt="work on task",
+                title="worker subagent",
+                ctx=ctx,
+                worktree_manager_cls=wt_mgr,
+            )
+            self.assertFalse(res.is_error)
+            registered = task_mgr.get("sub-task-1")
+            self.assertIsNotNone(registered)
+            self.assertIsInstance(registered, SubagentTask)
+            self.assertEqual(registered.session, sess)
+
+
+class TestSubagentTaskUnit(unittest.IsolatedAsyncioTestCase):
+    async def test_subagent_task_lifecycle_and_status(self):
+        from core.infrastructure.tasks.subagent_task import SubagentTask
+        from core.infrastructure.tasks.task import TaskStatus
+
+        sess = AgentSession(session_id="sub-task-2", status=SessionStatus.RUNNING, title="My Subagent")
+        task_mock = FakeTask(done=False)
+        sess.async_task = task_mock
+        store = MagicMock()
+
+        task = SubagentTask(sess, store, task_mock)
+        self.assertEqual(task.kind, "subagent")
+        self.assertEqual(task.status, TaskStatus.RUNNING)
+        self.assertTrue(task.is_running)
+
+        await task.kill()
+        self.assertEqual(task.status, TaskStatus.KILLED)
+        self.assertFalse(task.is_running)
+        self.assertTrue(task_mock.cancelled)

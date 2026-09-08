@@ -540,12 +540,10 @@ class SubagentsScreen(BaseTasksListScreen):
     async def _kill_item(self, item: dict) -> None:
         sess = item["raw_obj"]
         if is_subagent_running(sess):
-            if getattr(sess, "async_task", None) and not sess.async_task.done():
-                try:
-                    sess.async_task.cancel()
-                except Exception:
-                    pass
-            if hasattr(sess, "finish"):
-                sess.finish("cancelled", "Terminated from subagents menu")
+            from core.application.session.subagent_service import SubagentService
+            from core.infrastructure.storage.session_store import get_session_store
+
+            store = get_session_store(self.app)
+            SubagentService.kill_subagent(sess, store)
         self._invalidate_tasks_cache()
         self._on_session_event()

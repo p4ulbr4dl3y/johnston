@@ -60,6 +60,8 @@ class SubagentWorktreeManager(GitWorktreeManager):
         else:
             res = run_git(["worktree", "add", "-b", branch_name, wt_path, "HEAD"], cwd=project_dir, timeout=wt_timeout)
         if res.returncode == 0 and os.path.exists(wt_path):
+            repo_root = SubagentWorktreeManager.get_repo_root(project_dir) or project_dir
+            GitWorktreeManager._symlink_env_files(repo_root, wt_path)
             return wt_path, branch_name
 
         return None, None
@@ -82,6 +84,8 @@ class SubagentWorktreeManager(GitWorktreeManager):
 
         wt_path = os.path.join(base_worktree_dir, session_id)
         if os.path.exists(wt_path):
+            repo_root = SubagentWorktreeManager.get_repo_root(project_dir) or project_dir
+            GitWorktreeManager._symlink_env_files(repo_root, wt_path)
             return wt_path
 
         # Clean up any leftover worktree registration with same session_id (keep branch)
@@ -96,6 +100,8 @@ class SubagentWorktreeManager(GitWorktreeManager):
         else:
             res = run_git(["worktree", "add", "-b", branch_name, wt_path, "HEAD"], cwd=project_dir, timeout=wt_timeout)
         if res.returncode == 0 and os.path.exists(wt_path):
+            repo_root = SubagentWorktreeManager.get_repo_root(project_dir) or project_dir
+            GitWorktreeManager._symlink_env_files(repo_root, wt_path)
             return wt_path
 
         return None
@@ -129,6 +135,8 @@ class SubagentWorktreeManager(GitWorktreeManager):
             if changes:
                 # Stage & commit uncommitted worktree changes to the branch with fallback git author config
                 run_git(["add", "-A"], cwd=wt_path, timeout=10)
+                # Unstage symlinked env/venv to prevent committing secrets or broken symlinks
+                run_git(["rm", "--cached", "-f", "--ignore-unmatch", ".env", ".venv"], cwd=wt_path, timeout=5)
                 run_git(
                     [
                         "-c",
@@ -198,6 +206,9 @@ class SubagentWorktreeManager(GitWorktreeManager):
         if not project_dir or not branch_name:
             return project_dir
         if os.path.isdir(project_dir):
+            if parent_dir:
+                repo_root = SubagentWorktreeManager.get_repo_root(parent_dir) or parent_dir
+                GitWorktreeManager._symlink_env_files(repo_root, project_dir)
             return project_dir
         reattached = None
         if parent_dir:

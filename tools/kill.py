@@ -1,7 +1,6 @@
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
-from core.infrastructure.tasks.manage import filter_to_session
 from tools.base import BaseTool
 
 
@@ -39,49 +38,49 @@ class KillTool(BaseTool):
 
         curr_sid = ctx.session_id or ""
 
-        # 1. Check background shell tasks
-        tasks = ctx.background_tasks
-        if tasks is not None:
-            tasks = filter_to_session(tasks, curr_sid)
-            t = next(
-                (
-                    task
-                    for task in tasks
-                    if getattr(task, "task_id", None) == target_id or getattr(task, "id", None) == target_id
-                ),
-                None,
-            )
-            if t is not None:
-                if getattr(t, "is_active", getattr(t, "is_running", False)):
-                    try:
-                        setattr(t, "suppress_notification", True)
-                        if hasattr(t, "kill"):
-                            await t.kill()
-                        elif getattr(t, "process", None) and t.process.returncode is None:
-                            t.process.kill()
-                        ctx.refresh_status()
-                        return ToolResult.done(content=f"[killed {target_id}]", display="")
-                    except Exception as e:
-                        return ToolResult.error("kill", detail=str(e), name=target_id)
-                    finally:
-                        if ctx.host and hasattr(ctx.host, "_background_shell_widgets") and isinstance(
-                            ctx.host._background_shell_widgets, dict
-                        ):
-                            widget = ctx.host._background_shell_widgets.pop(target_id, None)
-                            if widget is not None and hasattr(widget, "set_result"):
-                                try:
-                                    widget.set_result(
-                                        t.get_formatted_output() if hasattr(t, "get_formatted_output") else "[killed]",
-                                        status="done",
-                                    )
-                                except Exception:
-                                    pass
-                else:
+        # 1. Check background tasks
+        from core.infrastructure.tasks.manage import filter_to_session
+
+        tasks = filter_to_session(ctx.background_tasks or [], curr_sid)
+        t = next(
+            (
+                task
+                for task in tasks
+                if getattr(task, "task_id", None) == target_id or getattr(task, "id", None) == target_id
+            ),
+            None,
+        )
+        if t is not None:
+            if getattr(t, "is_active", getattr(t, "is_running", False)):
+                try:
+                    setattr(t, "suppress_notification", True)
+                    if hasattr(t, "kill"):
+                        await t.kill()
+                    elif getattr(t, "process", None) and t.process.returncode is None:
+                        t.process.kill()
+                    ctx.refresh_status()
+                    return ToolResult.done(content=f"[killed {target_id}]", display="")
+                except Exception as e:
+                    return ToolResult.error("kill", detail=str(e), name=target_id)
+                finally:
                     if ctx.host and hasattr(ctx.host, "_background_shell_widgets") and isinstance(
                         ctx.host._background_shell_widgets, dict
                     ):
-                        ctx.host._background_shell_widgets.pop(target_id, None)
-                    return ToolResult.error("notrunning", name=target_id)
+                        widget = ctx.host._background_shell_widgets.pop(target_id, None)
+                        if widget is not None and hasattr(widget, "set_result"):
+                            try:
+                                widget.set_result(
+                                    t.get_formatted_output() if hasattr(t, "get_formatted_output") else "[killed]",
+                                    status="done",
+                                )
+                            except Exception:
+                                pass
+            else:
+                if ctx.host and hasattr(ctx.host, "_background_shell_widgets") and isinstance(
+                    ctx.host._background_shell_widgets, dict
+                ):
+                    ctx.host._background_shell_widgets.pop(target_id, None)
+                return ToolResult.error("notrunning", name=target_id)
 
         # 2. Check subagent sessions
         from core.application.session.subagent_service import SubagentService

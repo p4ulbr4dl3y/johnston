@@ -165,7 +165,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             with patch.object(screen, "query_one", return_value=mock_opt_list):
                 await screen.action_kill_task()
             sub_session.async_task.cancel.assert_called_once()
-            sub_session.finish.assert_called_once_with("cancelled", "Terminated from subagents menu")
+            self.assertTrue(getattr(sub_session, "suppress_notification", False))
 
             # Kill header row -> noop
             mock_opt_list.highlighted = 0
@@ -387,9 +387,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("ctrl+k")
             await pilot.pause()
             task_mock.cancel.assert_called_once()
-            sub_session.finish.assert_called_once_with("cancelled", "Terminated from subagent view")
-            self.assertEqual(sub_session.status, "cancelled")
-            self.assertIsNone(sub_session.async_task)
+            self.assertTrue(getattr(sub_session, "suppress_notification", False))
 
     async def test_help_screen_pilot(self):
         screen = HelpScreen()

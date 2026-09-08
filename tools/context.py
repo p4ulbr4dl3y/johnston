@@ -170,10 +170,10 @@ class ToolContext:
 
     @property
     def background_tasks(self) -> List[Any]:
-        """Live shell tasks currently managed by the app's TaskManager."""
+        """Live tasks currently managed by the app's TaskManager."""
         mgr = self.task_manager
         if mgr is not None:
-            return [t for t in mgr if getattr(t, "kind", "") == "shell"]
+            return list(mgr)
         return []
 
     def add_background_task(self, task: Any) -> None:

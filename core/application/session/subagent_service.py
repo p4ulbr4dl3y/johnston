@@ -89,7 +89,7 @@ class SubagentService:
 
         store = get_session_store(ctx.host)
         gen_sub_id = getattr(store, "generate_subagent_id", None)
-        session_id = gen_sub_id() if callable(gen_sub_id) else uuid.uuid4().hex[:8]
+        session_id = gen_sub_id() if callable(gen_sub_id) else f"subagent-{uuid.uuid4().hex[:8]}"
 
         parent_session_id = ctx.session_id
         if not isinstance(parent_session_id, str) or not parent_session_id:
@@ -130,10 +130,11 @@ class SubagentService:
             if not branch_name:
                 slug = re.sub(r"[^a-zA-Z0-9]+", "-", title).strip("-").lower()[:30]
                 role_key = getattr(role_def, "key", "worker") or "worker"
+                id_tail = session_id.split("-")[-1] if "-" in session_id else session_id[:8]
                 if len(slug) >= 3:
-                    branch_name = f"subagent/{slug}-{session_id[:8]}"
+                    branch_name = f"subagent/{slug}-{id_tail}"
                 else:
-                    branch_name = f"subagent/{role_key}-{session_id[:8]}"
+                    branch_name = f"subagent/{role_key}-{id_tail}"
 
             if branch_name != current_branch:
                 try:
@@ -194,6 +195,16 @@ class SubagentService:
             )
         )
         session.async_task = bg_task
+
+        task_manager = getattr(ctx, "task_manager", None)
+        if task_manager is None and getattr(ctx, "host", None):
+            task_manager = getattr(ctx.host, "task_manager", None)
+        if task_manager is not None:
+            from core.infrastructure.tasks.subagent_task import SubagentTask
+
+            task = SubagentTask(session, store, bg_task)
+            task_manager.register(task)
+
         record_subagent_session(ctx.host, session_id)
         ctx.refresh_status()
 
@@ -261,6 +272,8 @@ class SubagentService:
         (async_task missing or already done — the finished-but-stale case,
         audit A6) the sync finish+save finalizes the session as a fallback.
         """
+        if not session:
+            return ToolResult.error("session", detail="Session not found")
         setattr(session, "suppress_notification", True)
         if hasattr(session, "pending_messages") and session.pending_messages:
             session.pending_messages.clear()

@@ -18,6 +18,7 @@ class TaskManager:
     def __init__(self, max_completed: int = MAX_COMPLETED_TASKS) -> None:
         self._tasks: Dict[str, BaseTask] = {}
         self._max_completed = max_completed
+        self._watch_tasks: set[asyncio.Task] = set()
 
     # -- registration -------------------------------------------------------
 
@@ -29,6 +30,14 @@ class TaskManager:
 
     def drop(self, task_id: str) -> None:
         self._tasks.pop(task_id, None)
+
+    def get(self, task_id: str) -> Optional[BaseTask]:
+        return self._tasks.get(task_id)
+
+    def list(self, kind: Optional[str] = None) -> list[BaseTask]:
+        if kind:
+            return [t for t in self._tasks.values() if getattr(t, "kind", None) == kind]
+        return list(self._tasks.values())
 
     def prune_completed(self, max_retained: Optional[int] = None) -> None:
         """Prune finished tasks when count of completed tasks exceeds limit."""
@@ -71,12 +80,14 @@ class TaskManager:
         async def _watch() -> None:
             try:
                 await task.wait()
-            except Exception:
+            except (asyncio.CancelledError, Exception):
                 pass
             self.prune_completed()
 
         try:
-            loop.create_task(_watch())
+            w_task = loop.create_task(_watch())
+            self._watch_tasks.add(w_task)
+            w_task.add_done_callback(self._watch_tasks.discard)
         except Exception:
             pass
 

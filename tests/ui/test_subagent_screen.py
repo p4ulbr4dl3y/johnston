@@ -799,9 +799,9 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(tc.status, "cancelled")
 
     async def test_subagent_kill_sets_suppress_notification_and_clears_async_task(self):
-        """Audit A5: killing from the screen must suppress the background
-        notification BEFORE the cancel (mirroring subagent_service.kill_subagent)
-        and null the async_task reference so late probes see a dead task."""
+        """Single-writer: killing from screen delegates to SubagentService.kill_subagent,
+        suppressing notification and cancelling async_task without directly nulling it
+        or prematurely writing terminal status."""
         from unittest.mock import MagicMock
 
         sess = self._mk("task-kill-order", "Kill Order", "prompt")
@@ -830,14 +830,10 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(screen._kill_finalized)
             # suppress_notification set, exactly like kill_subagent
             self.assertTrue(getattr(sess, "suppress_notification", False))
-            # async_task reference nulled (pending-cancelled task gone)
-            self.assertIsNone(sess.async_task)
-            # Status flip preserved ("Terminated from subagent view" message)
-            self.assertEqual(sess.status, "cancelled")
-            status_change = [m for m in sess.messages if m.get("type") == "status_change"]
-            self.assertEqual(len(status_change), 1)
-            self.assertEqual(status_change[0]["status"], "cancelled")
-            self.assertEqual(status_change[0]["error"], "Terminated from subagent view")
+            # pending_messages cleared
+            self.assertEqual(sess.pending_messages, [])
+            # async_task is NOT nulled directly — task teardown owns lifecycle
+            self.assertIsNotNone(sess.async_task)
 
     async def test_subagent_kill_drops_late_listener_events_from_chat_view(self):
         """Audit A5: events emitted by the cancelled task's teardown AFTER the

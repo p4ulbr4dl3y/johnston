@@ -17,7 +17,7 @@ class SessionStorePathsMixin:
                 return sid
 
     def generate_subagent_id(self) -> str:
-        return uuid.uuid4().hex[:8]
+        return f"subagent-{uuid.uuid4().hex[:8]}"
 
     # -- paths -------------------------------------------------------------
 

@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 import platform
-import re
 import time
 import uuid
 from typing import Any, Dict, Optional
@@ -13,6 +12,10 @@ from core.domain.defaults.config import (
     DEFAULT_SHELL_TIMEOUT,
 )
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
+from core.infrastructure.platform.command_sanitizer import (
+    clean_cd_command,
+    strip_wrapper_tokens,
+)
 from core.infrastructure.platform.platform_utils import (
     is_windows,
     shell_env,
@@ -88,77 +91,8 @@ def _truncate_output(res: str) -> str:
     )
 
 
-_REDUNDANT_CD_PATTERN = re.compile(r"^\s*cd\s+(?:\"([^\"]+)\"|'([^']+)'|([^\s;&|]+))\s*(?:&&|;)\s*")
-_STANDALONE_CD_PATTERN = re.compile(r"^\s*cd(?:\s+(?:\"([^\"]+)\"|'([^']+)'|([^\s;&|]+)))?\s*$")
+_clean_cd_command = clean_cd_command
 
-
-def _clean_cd_command(cmd: str, workspace_dir: str) -> tuple[str, Optional[str]]:
-    """Clean redundant cd commands and catch unsupported standalone cd calls.
-
-    Returns:
-        (cleaned_cmd, error_message_or_none)
-    """
-    cleaned = cmd.strip()
-    norm_ws = os.path.normcase(workspace_dir)
-
-    while True:
-        m = _REDUNDANT_CD_PATTERN.match(cleaned)
-        if not m:
-            break
-        target = m.group(1) or m.group(2) or m.group(3)
-        norm_target = os.path.normpath(target.replace("\\", "/"))
-        if norm_target == ".":
-            cleaned = cleaned[m.end():].strip()
-            continue
-        try:
-            abs_target = os.path.realpath(os.path.abspath(os.path.join(workspace_dir, target)))
-            if os.path.normcase(abs_target) == norm_ws:
-                cleaned = cleaned[m.end():].strip()
-                continue
-        except Exception:
-            pass
-        break
-
-    m_alone = _STANDALONE_CD_PATTERN.match(cleaned)
-    if m_alone:
-        target = m_alone.group(1) or m_alone.group(2) or m_alone.group(3)
-        # Standalone `cd .` or `cd .\` is allowed as no-op (used on Windows/tests)
-        if target is not None and os.path.normpath(target.replace("\\", "/")) == ".":
-            return (cleaned, None)
-        return (
-            cleaned,
-            "Directory changes via 'cd' do not persist across shell calls. Shell runs in project root by default. Use 'cwd' parameter to run in a subdirectory.",
-        )
-
-    return (cleaned, None)
-
-
-_ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-_PREFIX_WRAPPERS = {"sudo", "env", "time", "nice", "nohup", "exec", "xargs"}
-_WRAPPER_OPTS_WITH_ARG = {
-    "-u",
-    "-g",
-    "-p",
-    "-r",
-    "-t",
-    "-T",
-    "-U",
-    "-C",
-    "-D",
-    "-R",
-    "-n",
-    "-o",
-    "-f",
-    "-S",
-    "-a",
-    "--user",
-    "--group",
-    "--adjustment",
-    "--chdir",
-    "--unset",
-    "--output",
-    "--format",
-}
 _GIT_OPTS_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 _MUTATING_GIT = {
     "commit",
@@ -221,41 +155,11 @@ def _check_read_only_command_mutations(cmd: str) -> Optional[str]:
         if not sc:
             continue
 
-        # Skip leading env assignments (e.g. VAR=val)
-        idx = 0
-        while idx < len(sc) and _ENV_VAR_RE.match(sc[idx]):
-            idx += 1
-
-        # Skip wrapper commands (sudo, env, nice, etc.) and their arguments/flags
-        while idx < len(sc):
-            cand = sc[idx].replace("\\", "/").rsplit("/", 1)[-1].lower()
-            if cand.endswith(".exe"):
-                cand = cand[:-4]
-            if cand in _PREFIX_WRAPPERS:
-                idx += 1
-                while idx < len(sc):
-                    tok = sc[idx]
-                    if tok == "--":
-                        idx += 1
-                        break
-                    if _ENV_VAR_RE.match(tok):
-                        idx += 1
-                        continue
-                    if tok.startswith("-"):
-                        if "=" in tok:
-                            idx += 1
-                        elif tok in _WRAPPER_OPTS_WITH_ARG:
-                            idx += 2
-                        else:
-                            idx += 1
-                        continue
-                    break
-                continue
-            break
-
-        if idx >= len(sc):
+        sc = strip_wrapper_tokens(sc)
+        if not sc:
             continue
 
+        idx = 0
         base = sc[idx].replace("\\", "/").rsplit("/", 1)[-1].lower()
         if base.endswith(".exe"):
             base = base[:-4]
@@ -427,7 +331,7 @@ class ShellTool(BaseTool):
         )
         workspace_dir = os.path.realpath(os.path.abspath(workspace_dir))
 
-        cmd, cd_err = _clean_cd_command(cmd, workspace_dir)
+        cmd, cd_err = clean_cd_command(cmd, workspace_dir)
         if cd_err:
             return ToolResult.error("params", name="command", detail=cd_err)
         if not cmd:

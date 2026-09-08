@@ -57,6 +57,8 @@ class GitWorktreeManager:
     @staticmethod
     def _symlink_env_files(repo_root: str, wt_path: str) -> None:
         """Symlinks .env and .venv from repo_root to wt_path if they exist."""
+        if not repo_root or not wt_path or os.path.realpath(repo_root) == os.path.realpath(wt_path):
+            return
         for item in [".env", ".venv"]:
             src = os.path.join(repo_root, item)
             dst = os.path.join(wt_path, item)

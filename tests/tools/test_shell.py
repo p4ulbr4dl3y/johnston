@@ -678,6 +678,7 @@ async def test_shell_readonly_blocks_mutating_git_commands(tool, make_tool_conte
         "sudo -E git commit -m 'test'",
         "nice -n 10 git commit -m 'test'",
         "env -i git commit -m 'test'",
+        'sudo git commit -m "feat; fix bug && something"',
         "git restore .",
         "git rm file.txt",
         "git mv file.txt file2.txt",

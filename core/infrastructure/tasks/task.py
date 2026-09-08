@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Optional
 
 # Literal kind strings a background task may carry.
-TASK_KINDS = ("shell",)
+TASK_KINDS = ("shell", "subagent")
 
 
 class TaskStatus(str, Enum):

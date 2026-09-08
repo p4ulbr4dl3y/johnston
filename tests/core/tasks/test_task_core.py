@@ -422,7 +422,7 @@ def test_make_log_path_custom_extension(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_task_kind_literals():
-    assert ("shell",) == TASK_KINDS
+    assert ("shell", "subagent") == TASK_KINDS
     assert TaskStatus.RUNNING.value == "running"
 
 

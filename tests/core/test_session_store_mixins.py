@@ -23,7 +23,8 @@ def test_paths_mixin_standalone():
         sid = paths.generate_session_id()
         assert len(sid) == 8
         sub_id = paths.generate_subagent_id()
-        assert len(sub_id) == 8
+        assert sub_id.startswith("subagent-")
+        assert len(sub_id) == len("subagent-") + 8
 
         m_path = paths._main_path(sid)
         assert m_path.endswith(f"{sid}.jsonl")

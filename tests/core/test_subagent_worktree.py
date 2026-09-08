@@ -425,6 +425,34 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         self.assertEqual((wt, branch), (None, None))
         self.assertEqual(acc[0], "")
 
+    def test_create_and_attach_worktree_symlinks_env_files(self):
+        env_file = os.path.join(self.repo_dir, ".env")
+        with open(env_file, "w", encoding="utf-8") as f:
+            f.write("SECRET_KEY=12345\n")
+
+        venv_dir = os.path.join(self.repo_dir, ".venv")
+        os.makedirs(venv_dir, exist_ok=True)
+
+        session_id = "test-wt-symlinks"
+        branch_name = "feature-symlinks"
+        wt_path, returned_branch = SubagentWorktreeManager.create_worktree(self.repo_dir, session_id, branch_name)
+
+        try:
+            self.assertIsNotNone(wt_path)
+            self.assertTrue(os.path.exists(wt_path))
+            wt_env = os.path.join(wt_path, ".env")
+            wt_venv = os.path.join(wt_path, ".venv")
+            self.assertTrue(os.path.islink(wt_env))
+            self.assertTrue(os.path.islink(wt_venv))
+
+            # Test attach_worktree also ensures symlinks
+            attached_path = SubagentWorktreeManager.attach_worktree(self.repo_dir, session_id, branch_name)
+            self.assertEqual(attached_path, wt_path)
+            self.assertTrue(os.path.islink(wt_env))
+            self.assertTrue(os.path.islink(wt_venv))
+        finally:
+            SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=False)
+
 
 if __name__ == "__main__":
     unittest.main()
