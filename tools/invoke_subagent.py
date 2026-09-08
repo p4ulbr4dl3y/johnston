@@ -45,6 +45,9 @@ class InvokeSubagentTool(BaseTool):
         },
     }
 
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return False
+
     def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
         from core.role_registry import RoleRegistry
 
@@ -59,17 +62,33 @@ class InvokeSubagentTool(BaseTool):
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         ctx = self._ensure_context(ctx)
+        if getattr(ctx, "is_subagent", False) is True:
+            return ToolResult.error(
+                "permission",
+                name="invoke_subagent",
+                detail="subagents cannot spawn nested subagents",
+            )
+
         args = args or {}
         from core.application.session.subagent_service import SubagentService
 
         raw_task = args.get("task") if "task" in args else args.get("prompt")
         param_name = "task" if "task" in args else "prompt"
 
+        raw_title = args.get("title")
+        title_str = str(raw_title) if raw_title is not None else ""
+
+        raw_role = args.get("role") or args.get("type") or "worker"
+        role_str = str(raw_role)
+
+        raw_branch = args.get("branch")
+        branch_str = str(raw_branch) if raw_branch is not None else ""
+
         return await SubagentService.spawn_subagent(
             prompt=raw_task if raw_task is not None else "",
-            title=args.get("title") or "",
-            subagent_type=args.get("role") or args.get("type") or "worker",
-            branch_override=args.get("branch") or "",
+            title=title_str,
+            subagent_type=role_str,
+            branch_override=branch_str,
             ctx=ctx,
             worktree_manager_cls=SubagentWorktreeManager,
             settings_provider=get_settings,
