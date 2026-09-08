@@ -308,6 +308,39 @@ class TestBaseToolNormalizeArgs(unittest.TestCase):
         self.assertIsNone(err)
         self.assertIs(args["flag"], False)
 
+    def test_normalize_invalid_integer_returns_error(self):
+        args, err = self.tool.normalize_args({"path": "x", "count": "not_int"})
+        self.assertIsNotNone(err)
+        self.assertIn("must be integer", err.content)
+
+    def test_normalize_preserves_whitespace_for_code_content(self):
+        class CreateDummy(BaseTool):
+            schema = {
+                "type": "function",
+                "function": {
+                    "name": "create",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "content": {"type": "string"},
+                        },
+                        "required": ["path", "content"],
+                    },
+                },
+            }
+        tool = CreateDummy()
+        # Empty string content for create is valid
+        args, err = tool.normalize_args({"path": "foo.py", "content": ""})
+        self.assertIsNone(err)
+        self.assertEqual(args["content"], "")
+
+        # Code indentation must NOT be stripped
+        code = "    def foo():\n        pass\n"
+        args, err = tool.normalize_args({"path": "foo.py", "content": code})
+        self.assertIsNone(err)
+        self.assertEqual(args["content"], code)
+
 
 if __name__ == "__main__":
     unittest.main()

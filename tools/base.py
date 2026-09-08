@@ -646,6 +646,9 @@ class BaseTool:
         properties = params_meta.get("properties") if isinstance(params_meta, dict) else {}
         required_fields = set(params_meta.get("required", [])) if isinstance(params_meta, dict) else set()
 
+        # Fields representing code, content, or free-form text that must NOT be stripped:
+        NO_STRIP_FIELDS = {"content", "old_str", "new_str", "message", "explanation"}
+
         normalized: Dict[str, Any] = {}
 
         for k, v in raw_args.items():
@@ -655,19 +658,20 @@ class BaseTool:
             prop_type = prop_def.get("type") if isinstance(prop_def, dict) else None
 
             if isinstance(v, str):
-                v_str = v.strip()
+                v_str = v if k in NO_STRIP_FIELDS else v.strip()
                 if prop_type == "integer":
                     try:
-                        normalized[k] = int(v_str)
+                        normalized[k] = int(v.strip())
                     except ValueError:
-                        normalized[k] = v
+                        return {}, ToolResult.error("params", name=k, detail="must be integer")
                 elif prop_type == "boolean":
-                    if v_str.lower() in ("true", "1"):
+                    s_low = v.strip().lower()
+                    if s_low in ("true", "1"):
                         normalized[k] = True
-                    elif v_str.lower() in ("false", "0"):
+                    elif s_low in ("false", "0"):
                         normalized[k] = False
                     else:
-                        normalized[k] = v
+                        return {}, ToolResult.error("params", name=k, detail="must be boolean")
                 else:
                     normalized[k] = v_str
             else:
@@ -675,8 +679,15 @@ class BaseTool:
 
         for req in required_fields:
             val = normalized.get(req)
-            if val is None or (isinstance(val, str) and not val.strip()):
+            if val is None:
                 return normalized, ToolResult.error("params", name=req, detail="required")
+            req_prop = properties.get(req, {}) if isinstance(properties, dict) else {}
+            min_len = req_prop.get("minLength", 0) if isinstance(req_prop, dict) else 0
+            if isinstance(val, str):
+                if min_len > 0 and len(val.strip()) < min_len:
+                    return normalized, ToolResult.error("params", name=req, detail="required")
+                elif min_len == 0 and req not in NO_STRIP_FIELDS and not val.strip():
+                    return normalized, ToolResult.error("params", name=req, detail="required")
 
         return normalized, None
 

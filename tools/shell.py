@@ -298,7 +298,7 @@ class ShellTool(BaseTool):
                 wait_seconds = None
 
         if wait_seconds is not None and not getattr(ctx, "is_interactive", True):
-            return ToolResult.error("wait_seconds", name="shell")
+            return ToolResult.error("permission", name="shell", detail="wait_seconds disabled in subagent/headless mode")
 
         # Auto-derived idle timeout: 0 for persistent services (wait_seconds=0),
         # hang-detection heartbeat for batch tasks (wait_seconds > 0) or user Ctrl+B.

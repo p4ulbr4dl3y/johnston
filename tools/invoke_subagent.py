@@ -80,14 +80,11 @@ class InvokeSubagentTool(BaseTool):
         raw_role = args.get("role") or "worker"
         role_str = str(raw_role)
 
-        raw_branch = args.get("branch")
-        branch_str = str(raw_branch) if raw_branch is not None else ""
-
         return await SubagentService.spawn_subagent(
             prompt=task_str,
             title=title_str,
             subagent_type=role_str,
-            branch_override=branch_str,
+            branch_override="",
             ctx=ctx,
             worktree_manager_cls=SubagentWorktreeManager,
             settings_provider=get_settings,

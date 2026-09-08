@@ -545,7 +545,7 @@ async def test_subagent_explicit_run_in_background_rejected(tool, make_app_mock,
 
     with patch.object(ShellTool, "_create_std_process") as mock_create:
         res = str(await tool.execute({"command": "tail -f log.txt", "wait_seconds": 0}, ctx=ctx))
-        assert "ERR: wait_seconds 'shell'" in res
+        assert "ERR: permission 'shell': wait_seconds disabled in subagent/headless mode" in res
         mock_create.assert_not_called()
         assert len([t for t in app.task_manager]) == 0
 

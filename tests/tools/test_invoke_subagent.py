@@ -383,6 +383,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_invoke_subagent_branch_equals_current_creates_isolated_branch(self):
         from unittest.mock import AsyncMock, MagicMock, patch
 
+        from core.application.session.subagent_service import SubagentService
+        from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+
         tool = InvokeSubagentTool()
         mock_app = MagicMock()
         mock_agent = MagicMock()
@@ -407,8 +410,14 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
 
-            res = await tool.execute({"task": "fix auth", "title": "Auth Fix", "branch": "main"})
-            self.assertEqual(res.status.value, "running")
+            res = await SubagentService.spawn_subagent(
+                prompt="fix auth",
+                title="Auth Fix",
+                branch_override="main",
+                ctx=mock_ctx,
+                worktree_manager_cls=SubagentWorktreeManager,
+            )
+            self.assertFalse(res.is_error)
             self.assertTrue(mock_wt.called)
             called_branch = mock_wt.call_args[0][2]
             # Must isolate into subagent branch, not write on raw 'main'

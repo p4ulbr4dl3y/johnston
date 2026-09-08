@@ -218,8 +218,7 @@ class ReadTool(BaseTool):
         # Handle image files
         if ext in IMAGE_EXTENSIONS:
             try:
-                detail_arg = args.get("detail")
-                image_json = await run_cancellable(process_image_file_sync, path, detail_arg)
+                image_json = await run_cancellable(process_image_file_sync, path)
                 try:
                     summary = json.loads(image_json).get("summary")
                 except Exception:

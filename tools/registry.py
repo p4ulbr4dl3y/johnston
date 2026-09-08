@@ -181,7 +181,7 @@ async def check_and_confirm_permission(
             return ToolResult.error(
                 "denied", name=display_name, detail=f"requires user confirmation ({decision.reason})"
             )
-    return None
+        return None
 
 
 _TOOL_INSTANCES: Dict[Type[BaseTool], BaseTool] = {}
