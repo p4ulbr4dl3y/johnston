@@ -555,7 +555,8 @@ class ShellTool(BaseTool):
             ctx.add_background_task(task)
             task.start_reading(on_completed=callback, on_progress=progress_cb)
 
-            plain_content = f"[task started | id {task_id} | wait for notification]"
+            log_part = f" | log {task.log_path}" if task.log_path else ""
+            plain_content = f"[task started | id {task_id}{log_part} | wait for notification]"
             notice = _sandbox_fallback_notice(ctx)
             if notice:
                 plain_content = notice + plain_content
@@ -733,12 +734,12 @@ class ShellTool(BaseTool):
                         raw_out, max_chars=2000, tool_name="shell", save_log=False, from_end=True
                     ).strip()
                     plain_content = (
-                        f"[task backgrounded by user | id {task_id} | log {task.log_path} | elapsed {elapsed}s | wait for notification]\n\n"
+                        f"[task backgrounded by user | id {task_id} | elapsed {elapsed}s | wait for notification]\n\n"
                         f"{truncated}"
                     )
                 else:
                     plain_content = (
-                        f"[task backgrounded by user | id {task_id} | log {task.log_path} | elapsed {elapsed}s | no output yet (buffered) | wait for notification]"
+                        f"[task backgrounded by user | id {task_id} | elapsed {elapsed}s | no output yet (buffered) | wait for notification]"
                     )
                 return ToolResult(
                     status=ToolResultStatus.RUNNING,

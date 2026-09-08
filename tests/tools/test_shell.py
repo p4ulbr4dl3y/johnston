@@ -237,6 +237,7 @@ async def test_move_to_background_during_sync_execution(tool, make_app_mock, mak
 
         res = await exec_task
         assert "task backgrounded" in res.content
+        assert " | log " not in res.content
         assert "server started on port 8080" in res.content
         assert task.is_background
         assert len([t for t in app.task_manager]) == 1
@@ -565,6 +566,7 @@ async def test_explicit_run_in_background(tool, make_app_mock, make_tool_context
     ):
         res = await tool.execute({"command": "tail -f log.txt", "wait_seconds": 0}, ctx=ctx)
         assert "task started" in res.content
+        assert " | log " in res.content
         assert len([t for t in app.task_manager]) == 1
 
 
@@ -1253,6 +1255,7 @@ async def test_shell_wait_seconds_positive_transitions_to_background(tool, make_
         res = await tool.execute({"command": "sleep 100", "wait_seconds": 1}, ctx=ctx)
         assert not res.is_error
         assert "task moved to background" in res.content
+        assert " | log " not in res.content
         tasks = [t for t in app.task_manager]
         assert len(tasks) == 1
         assert tasks[0].is_background
