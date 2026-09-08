@@ -66,7 +66,12 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             yield ModalHeader("Manage MCP Servers", esc_hint="")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id="mcp-option-list")
-            yield ModalHint("enter Select • tab Toggle • esc Close", id=MODAL_HINT_ID)
+            total = len(self.servers)
+            yield ModalHint(
+                "enter Select • tab Toggle • esc Close",
+                right_text=f"{total}/{total}" if total > 0 else "",
+                id=MODAL_HINT_ID,
+            )
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -195,19 +200,25 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             if not self.filtered_servers:
                 opt_list.highlighted = None
-                return
-
-            if prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
+            elif prev_highlighted is not None and 0 <= prev_highlighted < len(self.filtered_servers):
                 server = self.filtered_servers[prev_highlighted]
                 if server is not None:
                     opt_list.highlighted = prev_highlighted
-                    return
+            else:
+                # First selectable (non-header) row — like SkillsScreen does
+                for i, s in enumerate(self.filtered_servers):
+                    if s is not None:
+                        opt_list.highlighted = i
+                        break
 
-            # First selectable (non-header) row — like SkillsScreen does
-            for i, s in enumerate(self.filtered_servers):
-                if s is not None:
-                    opt_list.highlighted = i
-                    break
+            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
+
+            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
+            hint_lbl = self.query_one(MODAL_HINT, ModalHint)
+            total = len(self.servers)
+            shown = sum(1 for s in self.filtered_servers if s is not None)
+            base_hint = "enter • tab • esc" if is_compact else "enter Select • tab Toggle • esc Close"
+            hint_lbl.update(base_hint, right_text=f"{shown}/{total}" if total > 0 else "")
         except Exception:
             pass
 
@@ -246,18 +257,6 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             else:
                 stag = status_tag("ERR") if (not cmd and not url) else status_tag("ON")
                 opt_list.add_option(_row(stag, name))
-
-        try:
-            from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
-
-            is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
-            hint_lbl = self.query_one(MODAL_HINT, ModalHint)
-            total = len(self.servers_info)
-            shown = sum(1 for s in self.filtered_servers if s is not None)
-            base_hint = "enter • tab • esc" if is_compact else "enter Select • tab Toggle • esc Close"
-            hint_lbl.update(base_hint, right_text=f"{shown}/{total}")
-        except Exception:
-            pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
         if event.input.id == MODAL_SEARCH_INPUT_ID:

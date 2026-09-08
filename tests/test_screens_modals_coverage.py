@@ -724,3 +724,53 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
         screen = ProvidersScreen({}, "", {})
         w = screen._row_width()
         self.assertGreater(w, 0)
+
+
+class TestSkillsAndMCPScreenHint(unittest.IsolatedAsyncioTestCase):
+    """Test hint right_text counter in SkillsScreen and MCPScreen."""
+
+    async def test_skills_screen_hint_right_text(self):
+        from core.application.skills.manager import Skill, SkillScope
+        from widgets.presentation.screens.skills import SkillsScreen
+
+        with patch("widgets.presentation.screens.skills.get_skill_manager") as mock_get_sm:
+            mock_sm = MagicMock()
+            mock_sm.list_skills.return_value = [
+                Skill("skill-a", "A", "", "", SkillScope.GLOBAL, False),
+                Skill("skill-b", "B", "", "", SkillScope.GLOBAL, False),
+            ]
+            mock_get_sm.return_value = mock_sm
+            app = ModalTestApp()
+            async with app.run_test() as pilot:
+                screen = SkillsScreen()
+                await app.push_screen(screen)
+                await pilot.pause()
+                hint = screen.query_one(MODAL_HINT, ModalHint)
+                self.assertEqual(hint.right_text, "2/2")
+
+                # Filter search
+                inp = screen.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+                inp.value = "skill-a"
+                await pilot.pause()
+                hint = screen.query_one(MODAL_HINT, ModalHint)
+                self.assertEqual(hint.right_text, "1/2")
+
+    async def test_mcp_screen_hint_right_text(self):
+        from widgets.presentation.screens.mcp import MCPScreen
+
+        with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get_mm:
+            mock_mm = MagicMock()
+            mock_mm.load_servers.return_value = [
+                {"name": "srv-1", "scope": "global", "enabled": True},
+                {"name": "srv-2", "scope": "global", "enabled": True},
+            ]
+            mock_mm.ensure_tools_ready_async = MagicMock(return_value=asyncio.sleep(0))
+            mock_get_mm.return_value = mock_mm
+            app = ModalTestApp()
+            async with app.run_test() as pilot:
+                screen = MCPScreen()
+                await app.push_screen(screen)
+                await pilot.pause()
+                hint = screen.query_one(MODAL_HINT, ModalHint)
+                self.assertEqual(hint.right_text, "2/2")
+

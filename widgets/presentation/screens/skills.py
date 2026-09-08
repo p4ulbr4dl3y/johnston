@@ -65,7 +65,13 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             yield ModalHeader("Available Skills", esc_hint="")
             yield Input(placeholder="Search...", id=MODAL_SEARCH_INPUT_ID, classes="modal-input")
             yield HeaderWrapOptionList(id="skills-option-list")
-            yield ModalHint("enter Select • tab Toggle • esc Close", id=MODAL_HINT_ID)
+            total = len(self.skills)
+            shown = sum(1 for s in self.filtered_skills if s is not None)
+            yield ModalHint(
+                "enter Select • tab Toggle • esc Close",
+                right_text=f"{shown}/{total}" if total > 0 else "",
+                id=MODAL_HINT_ID,
+            )
 
     def on_mount(self) -> None:
         self.refresh_list(force_load=False)
@@ -122,25 +128,24 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
                 opt_list.add_option(
                     Text(f"No skills found in {CONFIG_DIR}/skills/ or .johnston/skills/.", style=t_muted)
                 )
-                return
-            if not any(s is not None for s in self.filtered_skills):
+            elif not any(s is not None for s in self.filtered_skills):
                 opt_list.highlighted = None
-                return
-            opt_list.add_options(self.filtered_options)
-            # First selectable row
-            for i, s in enumerate(self.filtered_skills):
-                if s is not None:
-                    opt_list.highlighted = i
-                    break
+            else:
+                opt_list.add_options(self.filtered_options)
+                # First selectable row
+                for i, s in enumerate(self.filtered_skills):
+                    if s is not None:
+                        opt_list.highlighted = i
+                        break
 
             from widgets.utils.responsive import BREAKPOINT_HINT, resolve_screen_width
 
             is_compact = resolve_screen_width(self) < BREAKPOINT_HINT
             hint_lbl = self.query_one(MODAL_HINT, ModalHint)
-            total = len(self.all_skills)
+            total = len(self.skills)
             shown = sum(1 for s in self.filtered_skills if s is not None)
             base_hint = "enter • tab • esc" if is_compact else "enter Select • tab Toggle • esc Close"
-            hint_lbl.update(base_hint, right_text=f"{shown}/{total}")
+            hint_lbl.update(base_hint, right_text=f"{shown}/{total}" if total > 0 else "")
         except Exception:
             pass
 
