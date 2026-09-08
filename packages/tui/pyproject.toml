@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "johnston"
+version = "0.30.0"
+description = "Textual AI Johnston Application"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "p4ulbr4dl3y" },
+]
+requires-python = ">=3.10, <3.14"
+dependencies = [
+    "johnston-core",
+    "textual>=8.0.0,<9",
+]
+
+[project.scripts]
+johnston = "cli:main"
+
+[tool.uv.sources]
+johnston-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+only-include = [
+    "app.py",
+    "app.tcss",
+    "cli.py",
+    "widgets",
+]

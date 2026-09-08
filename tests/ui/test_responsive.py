@@ -480,7 +480,9 @@ class TestFitModalDialog:
         assert fit_modal_dialog(_Boom(), 50) == 48
 
 
-_APP_CSS_PATH = str(Path(__file__).resolve().parents[2] / "app.tcss")
+_repo_root = Path(__file__).resolve().parents[2]
+_tui_css = _repo_root / "packages" / "tui" / "app.tcss"
+_APP_CSS_PATH = str(_tui_css if _tui_css.exists() else _repo_root / "app.tcss")
 
 
 class _ModalHostApp(App[None]):

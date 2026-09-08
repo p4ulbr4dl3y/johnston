@@ -14,7 +14,9 @@ from pathlib import Path
 
 from core.domain.defaults.errors import format_tool_error
 
-TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
+_repo_root = Path(__file__).resolve().parents[2]
+_core_tools = _repo_root / "packages" / "core" / "tools"
+TOOLS_DIR = _core_tools if _core_tools.exists() else _repo_root / "tools"
 
 
 class TestFormatToolError(unittest.TestCase):

@@ -1,68 +1,5 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[project]
-name = "johnston"
-version = "0.30.0"
-description = "Textual AI Johnston Application"
-readme = "README.md"
-license = "MIT"
-authors = [
-    { name = "p4ulbr4dl3y" },
-]
-keywords = ["ai", "assistant", "cli", "terminal", "llm"]
-requires-python = ">=3.10, <3.14"
-dependencies = [
-    "textual>=8.0.0,<9",
-    "httpx>=0.25.0,<1",
-    "rich>=13.0.0,<16",
-    "pygments>=2.18.0,<3",
-    "markdown-it-py>=3.0.0,<5",
-    "pillow>=12.3.0,<13",
-    "tomli>=2.0,<3; python_version < '3.11'",
-    "pypdf>=5.0.0",
-    "tree-sitter>=0.23.0",
-    "tree-sitter-python>=0.23.0",
-    "tree-sitter-javascript>=0.23.0",
-    "tree-sitter-typescript>=0.23.0",
-    "tree-sitter-go>=0.23.0",
-    "tree-sitter-rust>=0.23.0",
-    "mermaid-ascii>=1.2.0",
-]
-
-[project.urls]
-Homepage = "https://github.com/p4ulbr4dl3y/johnston"
-Repository = "https://github.com/p4ulbr4dl3y/johnston"
-Issues = "https://github.com/p4ulbr4dl3y/johnston/issues"
-Changelog = "https://github.com/p4ulbr4dl3y/johnston/blob/main/CHANGELOG.md"
-
-[project.scripts]
-johnston = "cli:main"
-
-[tool.hatch.build]
-exclude = [
-    ".github",
-    ".johnston",
-    ".ruff_cache",
-    ".serena",
-    "AGENTS.md",
-    "dist",
-    "install.ps1",
-    "install.sh",
-    "tests",
-    "uv.lock",
-]
-
-[tool.hatch.build.targets.wheel]
-only-include = [
-    "app.py",
-    "app.tcss",
-    "cli.py",
-    "core",
-    "tools",
-    "widgets",
-]
+[tool.uv.workspace]
+members = ["packages/*"]
 
 [dependency-groups]
 dev = [
@@ -94,14 +31,25 @@ select = ["E", "F", "W", "I"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"app.py" = ["E402"]
+"packages/tui/app.py" = ["E402"]
+"packages/tui/widgets/app/app.py" = ["E402"]
+"widgets/app/app.py" = ["E402"]
 "scripts/preview_system_prompt.py" = ["E402"]
 
 [tool.coverage.run]
-source = ["app", "cli", "core", "tools", "widgets"]
-omit = ["*/__init__.py", "core/domain/defaults/skills/*"]
+source = [
+    "packages/core/core",
+    "packages/core/tools",
+    "packages/tui/widgets",
+    "packages/tui/app",
+    "packages/tui/cli",
+]
+omit = ["*/__init__.py", "*/core/domain/defaults/skills/*"]
 
 [tool.coverage.report]
 fail_under = 90
 show_missing = true
 skip_covered = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "tools", "widgets", "app", "cli"]

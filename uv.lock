@@ -12,6 +12,21 @@ resolution-markers = [
     "python_full_version < '3.11' and sys_platform != 'win32'",
 ]
 
+[manifest]
+members = [
+    "johnston",
+    "johnston-core",
+]
+
+[manifest.dependency-groups]
+dev = [
+    { name = "coverage", specifier = ">=7.0.0,<8" },
+    { name = "pytest", specifier = ">=8.0.0,<10" },
+    { name = "pytest-asyncio", specifier = ">=0.23.0" },
+    { name = "pytest-xdist", specifier = ">=3.0.0" },
+    { name = "ruff", specifier = ">=0.15.22" },
+]
+
 [[package]]
 name = "anyio"
 version = "4.14.2"
@@ -200,7 +215,22 @@ wheels = [
 [[package]]
 name = "johnston"
 version = "0.30.0"
-source = { editable = "." }
+source = { editable = "packages/tui" }
+dependencies = [
+    { name = "johnston-core" },
+    { name = "textual" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "johnston-core", editable = "packages/core" },
+    { name = "textual", specifier = ">=8.0.0,<9" },
+]
+
+[[package]]
+name = "johnston-core"
+version = "0.30.0"
+source = { editable = "packages/core" }
 dependencies = [
     { name = "httpx" },
     { name = "markdown-it-py" },
@@ -209,7 +239,6 @@ dependencies = [
     { name = "pygments" },
     { name = "pypdf" },
     { name = "rich" },
-    { name = "textual" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "tree-sitter" },
     { name = "tree-sitter-go" },
@@ -217,15 +246,6 @@ dependencies = [
     { name = "tree-sitter-python" },
     { name = "tree-sitter-rust" },
     { name = "tree-sitter-typescript" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "coverage" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -237,7 +257,6 @@ requires-dist = [
     { name = "pygments", specifier = ">=2.18.0,<3" },
     { name = "pypdf", specifier = ">=5.0.0" },
     { name = "rich", specifier = ">=13.0.0,<16" },
-    { name = "textual", specifier = ">=8.0.0,<9" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0,<3" },
     { name = "tree-sitter", specifier = ">=0.23.0" },
     { name = "tree-sitter-go", specifier = ">=0.23.0" },
@@ -245,15 +264,6 @@ requires-dist = [
     { name = "tree-sitter-python", specifier = ">=0.23.0" },
     { name = "tree-sitter-rust", specifier = ">=0.23.0" },
     { name = "tree-sitter-typescript", specifier = ">=0.23.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "coverage", specifier = ">=7.0.0,<8" },
-    { name = "pytest", specifier = ">=8.0.0,<10" },
-    { name = "pytest-asyncio", specifier = ">=0.23.0" },
-    { name = "pytest-xdist", specifier = ">=3.0.0" },
-    { name = "ruff", specifier = ">=0.15.22" },
 ]
 
 [[package]]
