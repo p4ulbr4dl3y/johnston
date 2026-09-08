@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import os
-from typing import Callable
 
 from prompt_toolkit import PromptSession
-from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 
@@ -24,10 +22,8 @@ def get_current_git_branch() -> str:
     return "main"
 
 
-def create_repl_prompt_session(
-    get_status_info: Callable[[], tuple[str, int]],
-) -> PromptSession[str]:
-    """Create a configured prompt_toolkit PromptSession with keybindings and status bar."""
+def create_repl_prompt_session() -> PromptSession[str]:
+    """Create a configured prompt_toolkit PromptSession with keybindings."""
     kb = KeyBindings()
 
     @kb.add("enter")
@@ -40,25 +36,14 @@ def create_repl_prompt_session(
         """Insert newline on Esc+Enter."""
         event.current_buffer.insert_text("\n")
 
-    def _bottom_toolbar() -> HTML:
-        model_name, tokens = get_status_info()
-        branch = get_current_git_branch()
-        tok_str = f"{tokens:,} tokens" if tokens else "0 tokens"
-        return HTML(
-            f" <b>{model_name}</b> | {branch} | {tok_str} "
-            f"<style color='#888888'>[Enter: send, Esc+Enter: newline, /help: commands]</style>"
-        )
-
     style = Style.from_dict(
         {
             "prompt": "#00d7ff bold",
-            "bottom-toolbar": "bg:#222222 #cccccc",
         }
     )
 
     return PromptSession[str](
         key_bindings=kb,
-        bottom_toolbar=_bottom_toolbar,
         style=style,
         multiline=True,
     )

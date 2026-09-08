@@ -50,14 +50,9 @@ def test_git_branch_detection():
 
 
 def test_create_repl_prompt_session():
-    def _status():
-        return "openai/gpt-4o", 1200
-
-    session = create_repl_prompt_session(_status)
+    session = create_repl_prompt_session()
     assert session.multiline is True
-    # Verify toolbar call
-    toolbar_res = session.bottom_toolbar()
-    assert "openai/gpt-4o" in str(toolbar_res)
+    assert session.bottom_toolbar is None
 
 
 def test_agent_repl_runner_init():
