@@ -19,7 +19,7 @@ def print_banner(version: str, model_name: str, branch: str | None) -> None:
 
     branch_part = f" · branch: {branch}" if branch else ""
     header = f"{bold}{cyan}Johnston{reset} (v{version}) · {model_name}{branch_part}"
-    hint = f"{dim}Type /help for commands, Ctrl+C to cancel, Ctrl+D to exit.{reset}"
+    hint = f"{dim}Команды: /help, выход: Ctrl+D или exit.{reset}"
 
     sys.stdout.write(f"\n{header}\n{hint}\n\n")
     sys.stdout.flush()

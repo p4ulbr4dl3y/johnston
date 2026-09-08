@@ -26,7 +26,10 @@ async def run_repl_loop(
 
     print_banner(version=version, model_name=display_model, branch=branch)
 
-    session = create_repl_prompt_session()
+    def _get_status() -> tuple[str, int]:
+        return display_model, runner.total_session_tokens
+
+    session = create_repl_prompt_session(get_status_info=_get_status)
 
     # Process initial prompt if passed via `j "prompt"`
     if initial_prompt and initial_prompt.strip():
@@ -39,7 +42,6 @@ async def run_repl_loop(
             print_top_separator()
             text = await session.prompt_async([("class:prompt", "❯ ")])
             text = text.strip()
-            print_top_separator()
 
             if not text:
                 continue
