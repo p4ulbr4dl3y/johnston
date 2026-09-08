@@ -59,7 +59,7 @@ def format_skills_markdown(skills: List[Any]) -> str:
         items.append(f"- {name_safe}{path_part}{desc_part}")
 
     header = (
-        "Skills: read SKILL.md via `read` if relevant. Project overrides global overrides bundled.\n"
+        "Skills: when a task matches a skill, MUST read its SKILL.md via `read` before acting. Project overrides global overrides bundled.\n"
     )
     return "<skills>\n" + header + "\n".join(items) + "\n</skills>"
 

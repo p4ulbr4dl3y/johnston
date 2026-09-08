@@ -32,7 +32,7 @@ _SHARED_BATCHING = (
 _SHARED_PLANNING = (
     "- **Planning**: Use `update_plan` for non-trivial multi-step tasks (≥3 steps). "
     "Keep updated as steps progress — critical for state recovery after session compaction. "
-    "Keep exactly one step in progress. Resume existing plan from `<compaction_checkpoint>` if present."
+    "Keep exactly one step in progress; mark all steps completed before finishing. Resume existing plan from `<compaction_checkpoint>` if present."
 )
 
 _SHARED_FILE_EDITS = (
@@ -311,7 +311,7 @@ Wire format conventions for ALL tool outputs (apply consistently):
 | RUNNING   | `[task started ...]` / `[task moved to background ...]` / `[task backgrounded by user ...]` | Async; running; do not re-run     |
 | CANCELLED | `[cancelled by user]`                                    | User/timeout aborted              |
 
-Errors: prefix `ERR: <kind> ['<target>']: <detail>` (target is omitted if general). Common kinds: `not_found`, `params`, `permission`, `match`, `timeout`, `execute`, `unavailable`. Diagnose from `detail`, never retry unchanged.
+Errors: prefix `ERR: <kind> ['<target>']: <detail>` (target is omitted if general). Common kinds: `not_found`, `params`, `permission`, `match_not_found`, `match_ambiguous`, `timeout`, `execute`, `unavailable`. Diagnose from `detail`, never retry unchanged.
 
 Truncation marker: `[truncated | log <p> | next read(path=<log>, start_line=N)]` — for tracebacks, read ~50 lines around N; for mass output/JSON/lists, filter with `rg`/`jq` on log or re-run with flags (e.g. `pytest -k` / `cargo test`, `git log -n 5`). Do NOT paginate large logs via read.
 
