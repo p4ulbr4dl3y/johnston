@@ -380,7 +380,8 @@ class _GitignoreMatcher:
 def _load_gitignore_spec(root: str) -> Optional[_GitignoreMatcher]:
     patterns: List[Tuple[str, str]] = []
 
-    for dirpath, dirnames, filenames in os.walk(root):
+    scan_root = root if os.path.isdir(root) else (os.path.dirname(root) or ".")
+    for dirpath, dirnames, filenames in os.walk(scan_root):
         dirnames[:] = [
             d for d in dirnames
             if d not in DEFAULT_EXCLUDE_DIRS and not d.startswith(".git")

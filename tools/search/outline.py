@@ -2,10 +2,10 @@ import ast
 import os
 import re
 import threading
-from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+from core.infrastructure.runtime.lru import LruCache
 from tools.search.common import (
     CODE_EXTENSIONS,
     MAX_OUTLINE_FILE_BYTES,
@@ -24,35 +24,32 @@ from tools.search.treesitter import GLOBAL_TREE_SITTER
 class _OutlineCache:
     """Thread-safe LRU cache for extracted file symbols keyed by (abs_path, mtime)."""
 
-    def __init__(self, max_size: int = 100):
-        self._cache: "OrderedDict[str, Tuple[float, List[Tuple[str, int, str]]]]" = OrderedDict()
-        self._lock = threading.Lock()
-        self._max_size = max_size
+    def __init__(self, max_size: int = 500):
+        self._lru: LruCache[str, Tuple[float, List[Tuple[str, int, str]]]] = LruCache(max_size)
+
+    @property
+    def _cache(self):
+        return self._lru._data
 
     def get(self, key: str, file_mtime: float) -> Optional[List[Tuple[str, int, str]]]:
         """Get cached full symbols list if mtime matches."""
-        with self._lock:
-            if key in self._cache:
-                cached_mtime, symbols = self._cache[key]
-                if cached_mtime == file_mtime:
-                    self._cache.move_to_end(key)
-                    return symbols
-                else:
-                    del self._cache[key]
-            return None
+        cached = self._lru.get(key)
+        if cached is not None:
+            cached_mtime, symbols = cached
+            if cached_mtime == file_mtime:
+                return symbols
+            try:
+                del self._lru[key]
+            except KeyError:
+                pass
+        return None
 
     def put(self, key: str, file_mtime: float, symbols: List[Tuple[str, int, str]]) -> None:
         """Store extracted symbols in cache."""
-        with self._lock:
-            if key in self._cache:
-                del self._cache[key]
-            self._cache[key] = (file_mtime, symbols)
-            while len(self._cache) > self._max_size:
-                self._cache.popitem(last=False)
+        self._lru.put(key, (file_mtime, symbols))
 
     def clear(self) -> None:
-        with self._lock:
-            self._cache.clear()
+        self._lru.clear()
 
 
 _OUTLINE_CACHE = _OutlineCache(max_size=500)
