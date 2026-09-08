@@ -291,6 +291,45 @@ class TestPermissionCascadeMultitier(unittest.TestCase):
         roots = self.pm.get_workspace_roots(self.project_dir)
         self.assertIn(os.path.realpath(sibling_path), roots)
 
+    def test_writable_roots_ancestor_entries_ignored(self):
+        """Regression: writable_roots resolving to a strict ancestor of the
+        project (bare '..' or '/' or a '..' chain) must not widen the workspace."""
+        project_config = os.path.join(self.project_dir, ".johnston", "config.json")
+        self._write_json(
+            project_config,
+            {"permissions": {"writable_roots": ["..", os.path.dirname(self.project_dir), "/"]}},
+        )
+
+        roots = self.pm.get_workspace_roots(self.project_dir)
+        self.assertNotIn(os.path.realpath(os.path.dirname(self.project_dir)), roots)
+        self.assertNotIn(os.path.abspath("/"), roots)
+        self.assertIn(os.path.realpath(self.project_dir), roots)  # primary root kept
+
+    def test_same_mtime_same_size_rewrite_cascade(self):
+        """Regression: effective-permissions cache keyed only by (mtime, size)
+        would keep a stale ALLOW after an equal-size same-mtime config rewrite
+        to DENY."""
+        from core.infrastructure.platform.platform_utils import invalidate_json_read_cache
+
+        project_config = os.path.join(self.project_dir, ".johnston", "config.json")
+        self._write_json(project_config, {"permissions": {"tools": {"edit": "allow"}}})
+
+        self.assertEqual(self.pm.check_permission("edit", {"path": os.path.join(self.project_dir, "f.py")}).action, "allow")
+
+        # Rewrite to deny with identical byte size and restored original mtime_ns.
+        deny_text = json.dumps({"permissions": {"tools": {"edit": "deny"}}}, indent=2)
+        allow_text = json.dumps({"permissions": {"tools": {"edit": "allow"}}}, indent=2)
+        deny_padded = deny_text + " " * (len(allow_text) - len(deny_text))
+        self.assertEqual(len(deny_padded), len(allow_text))
+        st = os.stat(project_config)
+        with open(project_config, "w", encoding="utf-8") as f:
+            f.write(deny_padded)
+        os.utime(project_config, ns=(st.st_atime_ns, st.st_mtime_ns))
+        invalidate_json_read_cache(project_config)  # bypass only the shared json read cache
+
+        dec = self.pm.check_permission("edit", {"path": os.path.join(self.project_dir, "f.py")})
+        self.assertEqual(dec.action, PermissionAction.DENY, "same-mtime same-size rewrite must invalidate the cascade cache")
+
 
 if __name__ == "__main__":
     unittest.main()

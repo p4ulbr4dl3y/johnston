@@ -1,4 +1,5 @@
 """Permission config persistence: JSON I/O, cache, and effective-permissions cascade."""
+import hashlib
 import json
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -9,15 +10,20 @@ from core.domain.policies.permission_policy import (
     merge_perms,
     normalize_execution_mode,
 )
-from core.infrastructure.platform.platform_utils import cached_json_read
+from core.infrastructure.platform.platform_utils import read_json
 from core.infrastructure.runtime.tool_name import normalize_tool_name
 
 __all__ = ["PermissionConfigStore", "ensure_gitignore"]
 
-# Effective-permissions cache entry: (tuple of 3 file paths, tuple of 3 mtimes, merged perms).
+# Effective-permissions cache entry: (paths, stamps, digests, merged perms).
+# Stamps are (st_mtime_ns, st_size) so same-mtime/same-second rewrites still
+# invalidate via the content digest component.
+_FileStamp = Tuple[int, int]
+
 _EffectiveCache = Tuple[
     Tuple[str, str, str],
-    Tuple[Optional[float], Optional[float], Optional[float]],
+    Tuple[Optional[_FileStamp], Optional[_FileStamp], Optional[_FileStamp]],
+    Tuple[Optional[int], Optional[int], Optional[int]],
     Dict[str, Any],
 ]
 
@@ -30,10 +36,22 @@ def _git_repo(pdir: str) -> bool:
     return is_git_repository(pdir)
 
 
-def _file_mtime(path: str) -> Optional[float]:
-    """Returns the file mtime used as a cache key, or None when unreadable/missing."""
+def _file_mtime(path: str) -> Optional[_FileStamp]:
+    """Returns (st_mtime_ns, st_size) used as a cache key, or None when unreadable/missing."""
     try:
-        return os.path.getmtime(path)
+        st = os.stat(path)
+        return (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+
+
+def _file_digest(path: str) -> Optional[int]:
+    """Returns a content hash (sha1 truncated to int) for a config file, or None."""
+    if path is None:
+        return None
+    try:
+        with open(path, "rb") as f:
+            return int.from_bytes(hashlib.sha1(f.read()).digest()[:8], "big")
     except OSError:
         return None
 
@@ -87,7 +105,11 @@ class PermissionConfigStore:
         self.tool_name_normalizer = tool_name_normalizer
         self._effective_cache: Optional[_EffectiveCache] = None
         self._effective_cache_by_key: Dict[
-            Tuple[Tuple[str, str, str], Tuple[Optional[float], Optional[float], Optional[float]]],
+            Tuple[
+                Tuple[str, str, str],
+                Tuple[Optional[_FileStamp], Optional[_FileStamp], Optional[_FileStamp]],
+                Tuple[Optional[int], Optional[int], Optional[int]],
+            ],
             Dict[str, Any],
         ] = {}
 
@@ -107,8 +129,14 @@ class PermissionConfigStore:
         return os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
 
     def _load_json_config(self, filepath: str) -> Dict[str, Any]:
-        """Loads a JSON config file, returning a dict (empty dict on error/non-dict)."""
-        data = cached_json_read(filepath, {})
+        """Loads a JSON config file, returning a dict (empty dict on error/non-dict).
+
+        Reads directly from disk (no mtime/size memoization): the permission
+        cascade must observe even an identical-size, timestamp-preserved rewrite.
+        The effective-permissions cache (keyed by path+stamp+content digest)
+        still avoids re-merging on unchanged configs.
+        """
+        data = read_json(filepath, {})
         return data if isinstance(data, dict) else {}
 
     # ── public: workspace-root persistence ──────────────────────────────────
@@ -414,20 +442,29 @@ class PermissionConfigStore:
         shared_mtime = _file_mtime(shared_path)
         local_mtime = _file_mtime(local_path)
 
+        # Content digests make the cache robust even when an attacker/admin
+        # rewrites the config with an identical size and restored mtime_ns —
+        # (mtime, size) alone would silently serve the stale, more permissive
+        # snapshot.
+        global_digest = _file_digest(global_path)
+        shared_digest = _file_digest(shared_path)
+        local_digest = _file_digest(local_path)
+
         paths = (global_path, shared_path, local_path)
         stamps = (global_mtime, shared_mtime, local_mtime)
-        cache_key = (paths, stamps)
+        cache_key = (paths, stamps, (global_digest, shared_digest, local_digest))
 
         if (
             self._effective_cache is not None
             and self._effective_cache[0] == paths
             and self._effective_cache[1] == stamps
+            and self._effective_cache[2] == (global_digest, shared_digest, local_digest)
         ):
-            return self._effective_cache[2]
+            return self._effective_cache[3]
 
         if cache_key in self._effective_cache_by_key:
             merged = self._effective_cache_by_key[cache_key]
-            self._effective_cache = (paths, stamps, merged)
+            self._effective_cache = (paths, stamps, (global_digest, shared_digest, local_digest), merged)
             return merged
 
         # Auto-gitignore helper: when <project_dir>/.johnston/config.local.json exists or is updated,
@@ -457,6 +494,6 @@ class PermissionConfigStore:
                 merged["mode"] = normalize_execution_mode(cfg_data["mode"]).value
             merge_perms(merged, perms)
 
-        self._effective_cache = (paths, stamps, merged)
+        self._effective_cache = (paths, stamps, (global_digest, shared_digest, local_digest), merged)
         self._effective_cache_by_key[cache_key] = merged
         return merged

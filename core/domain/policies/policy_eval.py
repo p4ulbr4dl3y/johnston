@@ -16,6 +16,7 @@ from core.domain.policies.policy_shell import (
     extract_shell_subcommands,
     has_unsafe_shell_syntax,
     normalize_action,
+    strip_command_wrappers,
 )
 
 
@@ -60,12 +61,27 @@ def _evaluate_shell_rules(cmd: str, rules: List[Dict[str, Any]]) -> Optional[Per
     rule_pairs = _iter_rules(rules)
     for sub in subcmds:
         sig = extract_command_signature(sub)
+        stripped = strip_command_wrappers(sub)
         deny_hit = next(
             (
                 pair
                 for pair in rule_pairs
                 if pair[1] == PermissionAction.DENY
-                and (match_pattern(sub, pair[0]) or match_pattern(sig, pair[0]))
+                and (
+                    match_pattern(sub, pair[0])
+                    or match_pattern(stripped, pair[0])
+                    or match_pattern(sig, pair[0])
+                    # Deny patterns ending in ' *' also cover the bare command
+                    # prefix (token-delimited), e.g. 'rm -rf *' must deny
+                    # 'rm -rf' from 'xargs rm -rf' as well as 'rm -rf /tmp/x'.
+                    or (
+                        pair[0].endswith(" *")
+                        and (
+                            stripped == pair[0][:-2]
+                            or stripped.startswith(pair[0][:-2] + " ")
+                        )
+                    )
+                )
             ),
             None,
         )
@@ -78,7 +94,15 @@ def _evaluate_shell_rules(cmd: str, rules: List[Dict[str, Any]]) -> Optional[Per
     matched: List[Tuple[PermissionAction, str]] = []
     for sub in subcmds:
         sig = extract_command_signature(sub)
-        hit = next((pair for pair in rule_pairs if match_pattern(sub, pair[0]) or match_pattern(sig, pair[0])), None)
+        stripped = strip_command_wrappers(sub)
+        hit = next(
+            (
+                pair
+                for pair in rule_pairs
+                if match_pattern(sub, pair[0]) or match_pattern(stripped, pair[0]) or match_pattern(sig, pair[0])
+            ),
+            None,
+        )
         if hit is None:
             # If any subcommand is not covered by pattern rules, fall back to tool level
             return None

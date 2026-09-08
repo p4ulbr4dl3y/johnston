@@ -22,6 +22,18 @@ from core.permission_config import PermissionConfigStore
 __all__ = ["PermissionManager", "CONFIG_FILE", "LOGS_DIR", "SECRETS_FILE"]
 
 
+def _is_strict_ancestor(ancestor: str, target: str) -> bool:
+    """True when ``target`` is a strict parent directory of ``ancestor``
+    (e.g. '/' or a configured ``..`` entry). Such roots unboundedly widen the
+    workspace, so they are ignored when resolving configured writable_roots."""
+    if ancestor == target:
+        return False
+    try:
+        return os.path.commonpath([ancestor, target]) == target
+    except ValueError:
+        return False
+
+
 class PermissionManager:
     """Manages tool execution permissions (allow, ask, deny) and execution modes with config cascade."""
 
@@ -151,7 +163,9 @@ class PermissionManager:
                     norm = os.path.realpath(os.path.join(pdir, val))
                 else:
                     norm = os.path.realpath(os.path.abspath(val))
-                if norm not in roots:
+                # Ignore configured roots that resolve to a strict ancestor of the
+                # project (e.g. a bare '..' or '/'); they unboundedly widen the workspace.
+                if norm and norm not in roots and not _is_strict_ancestor(pdir, norm):
                     roots.append(norm)
         return roots
 
@@ -295,10 +309,11 @@ class PermissionManager:
             return PermissionDecision(PermissionAction.DENY, "No tool name given")
 
         effective_perms = self.get_effective_permissions(project_dir)
+        tools_cfg = effective_perms.get("tools", {})
 
         # 1. Config DENY patterns: an explicit admin-configured DENY pattern
-        # must never be bypassed by session tool/pattern overrides or tool settings.
-        tools_cfg = effective_perms.get("tools", {})
+        # must never be bypassed by session tool/pattern overrides — not even
+        # an exact same-tool session override (wildcard denies are absolute).
         for pat, act in tools_cfg.items():
             if ("__" in pat and ("*" in pat or "?" in pat)) and act == "deny" and fnmatch.fnmatch(canonical_name, pat):
                 return PermissionDecision(
@@ -308,15 +323,12 @@ class PermissionManager:
 
         # 1b. Config explicit tool-level DENY: an admin-configured tool deny
         # (literal or wildcard) must never be bypassed by runtime session
-        # *pattern* overrides (approval-path "allow once" grants). An explicit
-        # session tool-level override remains above the config layer by
-        # documented cascade contract (see test_session_override_overrides_*).
+        # *pattern* overrides (approval-path "allow once" grants) nor by a
+        # session *wildcard* override. Only an exact session tool-level override
+        # may lift it (documented cascade contract, see test_session_override_overrides_*).
         explicit_action = self._config_tool_action(tools_cfg, canonical_name)
         if explicit_action == "deny":
-            has_session_tool_grant = canonical_name in self.session_overrides or any(
-                ("__" in pat and ("*" in pat or "?" in pat)) and fnmatch.fnmatch(canonical_name, pat)
-                for pat in self.session_overrides
-            )
+            has_session_tool_grant = canonical_name in self.session_overrides
             if not has_session_tool_grant:
                 return PermissionDecision(
                     PermissionAction.DENY,

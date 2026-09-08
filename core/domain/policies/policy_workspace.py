@@ -178,8 +178,10 @@ def merge_perms(base: Dict[str, Any], override: Dict[str, Any]) -> None:
         if "tools" not in base or not isinstance(base["tools"], dict):
             base["tools"] = {}
         for t, act in override["tools"].items():
-            if isinstance(act, str):
-                base["tools"][t.lower()] = normalize_action(act)
+            # Non-string tool entries (null, numbers, lists, dicts) are invalid
+            # config and must fail closed to 'ask' — silently dropping them
+            # would let the tool fall through to the (possibly ALLOW) baseline.
+            base["tools"][t.lower()] = normalize_action(act) if isinstance(act, str) else "ask"
     if "patterns" in override and isinstance(override["patterns"], dict):
         if "patterns" not in base or not isinstance(base["patterns"], dict):
             base["patterns"] = {}

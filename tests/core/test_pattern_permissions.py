@@ -111,6 +111,52 @@ class TestPatternPolicyHelpers(unittest.TestCase):
                 f"deterministic interpreter invocation must stay safe: {cmd!r}",
             )
 
+    def test_unsafe_shell_osascript_and_awk(self):
+        """Regression: code-executing interpreters invoked via -e / system()
+        must be flagged unsafe even though they are not shells."""
+        for cmd in (
+            "osascript -e 'do shell script \"id\"'",
+            "/usr/bin/osascript -e 'tell app \"Finder\" to quit'",
+            "osascript  -e 'return 1'",
+            "awk 'BEGIN{system(\"rm -rf /tmp/x\")}'",
+            "gawk '{system(\"id\")}'",
+            "mawk 'END{system(\"whoami\")}'",
+            "awk '{print 1; system(\"rm -rf /\"); print 2}'",
+            "echo x | gawk -v cmd=id '{system(cmd)}'",
+        ):
+            self.assertTrue(
+                has_unsafe_shell_syntax(cmd),
+                f"code-executing interpreter must be unsafe: {cmd!r}",
+            )
+
+    def test_osascript_without_code_flag_stays_safe(self):
+        """osascript launching a compiled app/script (no -e) stays safe."""
+        for cmd in (
+            "osascript my.scpt",
+            "osascript -l JavaScript script.js",
+        ):
+            self.assertFalse(
+                has_unsafe_shell_syntax(cmd),
+                f"non-code osascript invocation must stay safe: {cmd!r}",
+            )
+
+    def test_strip_command_wrappers(self):
+        import shlex
+
+        from core.domain.policies.policy_shell import strip_command_wrappers
+
+        self.assertEqual(strip_command_wrappers("sudo rm -rf /tmp/x"), "rm -rf /tmp/x")
+        self.assertEqual(strip_command_wrappers("env FOO=1 sudo git status"), "git status")
+        # Pipes are not wrappers: token set preserved (shlex round-trip may re-quote '|').
+        self.assertEqual(
+            shlex.split(strip_command_wrappers("echo x | xargs rm -rf")),
+            ["echo", "x", "|", "xargs", "rm", "-rf"],
+        )
+        self.assertEqual(strip_command_wrappers("sudo -u root whoami"), "whoami")
+        self.assertEqual(strip_command_wrappers("xargs rm -rf"), "rm -rf")
+        self.assertEqual(strip_command_wrappers(""), "")
+        self.assertEqual(strip_command_wrappers("git status"), "git status")
+
     def test_extract_command_signature(self):
         self.assertEqual(extract_command_signature("cat file.txt"), "cat *")
         self.assertEqual(extract_command_signature("/usr/bin/cat file.txt"), "cat *")
@@ -334,6 +380,58 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
                 pm.set_session_pattern_override("read", "/app/.env.local", "allow")
                 dec = pm.check_permission("read", {"path": "/app/.env.local"})
                 self.assertEqual(dec.action, PermissionAction.DENY)
+
+    def test_wrapper_commands_do_not_bypass_shell_deny_patterns(self):
+        """Regression: sudo/env/xargs-wrapped commands must still match DENY patterns
+        (deny matching runs against the wrapper-stripped command too)."""
+        pm = PermissionManager()
+        pm.clear_session_overrides()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "permissions": {
+                            "tools": {"shell": "allow"},
+                            "patterns": {"shell": [{"pattern": "rm -rf *", "action": "deny"}]},
+                        }
+                    },
+                    f,
+                )
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                for cmd in (
+                    "rm -rf /tmp/x",
+                    "sudo rm -rf /tmp/x",
+                    "env rm -rf /tmp/x",
+                    "echo x | xargs rm -rf",
+                    "xargs rm -rf",
+                    "sudo -u root rm -rf /tmp/x",
+                    # Regression: POSIX-only prefix wrappers must not hide a deny.
+                    "builtin rm -rf /tmp/x",
+                    "command rm -rf /tmp/x",
+                    "builtin command rm -rf /tmp/x",
+                    # Regression: xargs placeholder flags consume their arg and
+                    # must not leave the real command stripped away.
+                    "xargs -I {} rm -rf /tmp/x",
+                    "xargs -I{} rm -rf /tmp/x",
+                    "xargs -L 5 rm -rf /tmp/x",
+                    "xargs -n 1 rm -rf /tmp/x",
+                    "sudo -n rm -rf /tmp/x",  # -n takes no arg: keep the command
+                ):
+                    dec = pm.check_permission("shell", {"command": cmd})
+                    self.assertEqual(
+                        dec.action,
+                        PermissionAction.DENY,
+                        f"wrapper must not bypass deny pattern: {cmd!r}",
+                    )
+
+    def test_wrapper_command_allow_pattern_matches_stripped(self):
+        """Session pattern allow on the stripped command still applies under a wrapper."""
+        pm = PermissionManager()
+        pm.clear_session_overrides()
+        pm.set_session_pattern_override("shell", "git status *", "allow")
+        dec = pm.check_permission("shell", {"command": "sudo git status"})
+        self.assertEqual(dec.action, PermissionAction.ALLOW)
 
     def test_session_allow_still_overrides_config_ask(self):
         pm = PermissionManager()

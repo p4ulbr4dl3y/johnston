@@ -190,19 +190,16 @@ class TestPermissionManager(unittest.TestCase):
         self.assertEqual(normalize_action(None), "ask")
 
     def test_config_read_cached_across_checks(self):
-        """Repeated checks must not re-read config from disk (mtime cache)."""
+        """Repeated checks must not re-merge config from disk (result memoized)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
-                from core.infrastructure.platform.platform_utils import _json_read_cache
-
-                self.pm.check_permission("web_fetch")
-                self.pm.check_permission("web_fetch")
-                after = _json_read_cache.get(cfg_file)
-                # Config file was read once and memoized despite two checks.
-                self.assertIsNotNone(after)
+                first = self.pm.get_effective_permissions()
+                second = self.pm.get_effective_permissions()
+                # Merge result is memoized (same object), no re-merge per call.
+                self.assertIs(first, second)
 
     def test_check_permission_reflects_config_change(self):
         """Editing config on disk (new mtime) must invalidate the permission cache."""
@@ -219,6 +216,31 @@ class TestPermissionManager(unittest.TestCase):
                 st = os.stat(cfg_file)
                 os.utime(cfg_file, (st.st_atime, st.st_mtime + 2))
                 self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
+
+    def test_same_mtime_rewrite_invalidates_cache(self):
+        """Regression: a config rewrite with identical (st_mtime_ns, st_size)
+        must still be observed — otherwise a stale ALLOW persists after the admin
+        locked the tool down to DENY."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"web_fetch": "allow"}}}, f)
+            st = os.stat(cfg_file)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
+                with open(cfg_file, "w", encoding="utf-8") as f:
+                    json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
+                # Restore exact mtime_ns and byte size so both cache keys match
+                # what was seen before the rewrite.
+                deny_size = os.path.getsize(cfg_file)
+                with open(cfg_file, "ab") as f:
+                    f.write(b" " * (st.st_size - deny_size))  # re-pad to original size (may be 0)
+                os.utime(cfg_file, ns=(st.st_atime_ns, st.st_mtime_ns))
+                self.assertEqual(
+                    self.pm.check_permission("web_fetch").action,
+                    "deny",
+                    "same-mtime same-size rewrite must invalidate the permission cache",
+                )
 
     def test_deleted_config_falls_back_to_defaults(self):
         """Removing the config file must drop the cached snapshot (no stale deny)."""
@@ -260,10 +282,12 @@ class TestPermissionManager(unittest.TestCase):
             with patch("core.permission_manager.CONFIG_FILE", cfg_file):
                 self.pm.get_effective_permissions()
                 self.assertIsNotNone(self.pm._effective_cache)
-                self.assertEqual(len(self.pm._effective_cache), 3)
-                paths, stamps, perms = self.pm._effective_cache
+                self.assertEqual(len(self.pm._effective_cache), 4)
+                paths, stamps, digests, perms = self.pm._effective_cache
                 self.assertEqual(paths[0], cfg_file)
-                self.assertIsInstance(stamps[0], float)
+                self.assertIsInstance(stamps[0], tuple)
+                self.assertEqual(len(stamps[0]), 2)
+                self.assertIsInstance(digests[0], int)
                 self.assertIsInstance(perms, dict)
 
     def test_logs_dir_read_allowed(self):
@@ -402,6 +426,75 @@ class TestPermissionManager(unittest.TestCase):
         self.pm.set_session_override("github__delete*", "deny")
         self.assertEqual(self.pm.check_permission("github__create_issue").action, PermissionAction.ALLOW)
         self.assertEqual(self.pm.check_permission("github__delete_repo").action, PermissionAction.DENY)
+
+    def test_config_wildcard_deny_not_bypassed_by_session_wildcard_allow(self):
+        """Regression: an admin config wildcard DENY (danger__* -> deny) must not
+        be lifted by a session wildcard ALLOW (danger__* -> allow) or by a sibling
+        wildcard like danger__run* -> allow. Only an exact session override of the
+        same tool name may override a configured tool-level deny."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"danger__*": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.pm.set_session_override("danger__*", "allow")
+                dec = self.pm.check_permission("danger__delete")
+                self.assertEqual(dec.action, PermissionAction.DENY, "wildcard session allow must not bypass config wildcard deny")
+
+                self.pm.set_session_override("danger__*", "allow")  # exact key still not a grant
+                dec2 = self.pm.check_permission("danger__delete")
+                self.assertEqual(dec2.action, PermissionAction.DENY)
+
+        # Exact same-tool session override still lifts the config deny (documented contract)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"danger__run": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.pm.set_session_override("danger__run", "allow")
+                self.assertEqual(self.pm.check_permission("danger__run").action, PermissionAction.ALLOW)
+
+    def test_config_wildcard_deny_is_absolute(self):
+        """Regression: an admin config wildcard DENY (danger__* -> deny) is
+        absolute — it cannot be lifted by a session wildcard allow NOR by an
+        exact same-tool session override."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"danger__*": "deny"}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                self.pm.set_session_override("danger__run", "allow")
+                dec = self.pm.check_permission("danger__run")
+                self.assertEqual(dec.action, PermissionAction.DENY, "exact same-tool session override must not lift a config wildcard deny")
+
+                dec2 = self.pm.check_permission("danger__delete")
+                self.assertEqual(dec2.action, PermissionAction.DENY)
+
+    def test_non_string_tool_config_fails_closed(self):
+        """Regression: non-string tool permission values (null, numbers, lists,
+        dicts) must fail closed to 'ask', never silently fall open to ALLOW."""
+        for junk in (None, 12345, False, [], {}):
+            with self.subTest(junk=junk):
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    cfg_file = os.path.join(tmpdir, "config.json")
+                    with open(cfg_file, "w", encoding="utf-8") as f:
+                        json.dump({"permissions": {"tools": {"read": junk}}}, f)
+                    with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                        dec = self.pm.check_permission("read", {"path": os.path.join(tmpdir, "x.py")})
+                        self.assertEqual(
+                            dec.action,
+                            PermissionAction.ASK,
+                            f"non-string tool config {junk!r} must fail closed to ask",
+                        )
+        # Explicit reason distinguishes invalid config from a real ask baseline
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_file = os.path.join(tmpdir, "config.json")
+            with open(cfg_file, "w", encoding="utf-8") as f:
+                json.dump({"permissions": {"tools": {"read": 999}}}, f)
+            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                dec = self.pm.check_permission("read", {"path": os.path.join(tmpdir, "x.py")})
+                self.assertEqual(dec.action, PermissionAction.ASK)
+                self.assertIn("Explicit tool permission", dec.reason)
 
 
 class TestWorkspaceRootPersistence(unittest.TestCase):

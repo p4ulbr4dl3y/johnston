@@ -6,10 +6,10 @@ import os
 import platform
 import re
 import shlex
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 _ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-_PREFIX_WRAPPERS = frozenset({"sudo", "env", "time", "nice", "nohup", "exec", "xargs"})
+_PREFIX_WRAPPERS = frozenset({"sudo", "env", "time", "nice", "nohup", "exec", "xargs", "builtin", "command"})
 _WRAPPER_OPTS_WITH_ARG = frozenset({
     "-u",
     "-g",
@@ -35,6 +35,20 @@ _WRAPPER_OPTS_WITH_ARG = frozenset({
     "--format",
 })
 
+# Flags that take NO argument for a specific wrapper (the shared set is the
+# default; these subtract from it). E.g. sudo -n/-S/-s are no-arg flags, while
+# the same letters under nice/xargs DO take an argument (-n 10, -S maxbytes).
+_WRAPPER_MINUS_OPTS_WITH_ARG: Dict[str, frozenset] = {"sudo": frozenset({"-n", "-S", "-s"})}
+
+# Per-wrapper extra flags that take an argument (union with the shared set).
+_XARGS_OPTS_WITH_ARG = frozenset({"-I", "-L", "-E", "-P", "-s", "-n", "-d", "-a", "-x", "-0", "-r"})
+_WRAPPER_EXTRA_OPTS_WITH_ARG: Dict[str, frozenset] = {"xargs": _XARGS_OPTS_WITH_ARG}
+
+
+def _wrapper_option_set(cand: str) -> frozenset:
+    base = _WRAPPER_OPTS_WITH_ARG | _WRAPPER_EXTRA_OPTS_WITH_ARG.get(cand, frozenset())
+    return base - _WRAPPER_MINUS_OPTS_WITH_ARG.get(cand, frozenset())
+
 
 def strip_wrapper_tokens(tokens: list[str]) -> list[str]:
     """Strip leading env assignments (VAR=val) and wrapper commands (sudo, env, nice, etc.) from token stream."""
@@ -48,6 +62,7 @@ def strip_wrapper_tokens(tokens: list[str]) -> list[str]:
             cand = cand[:-4]
         if cand in _PREFIX_WRAPPERS:
             idx += 1
+            wrapper_opts = _wrapper_option_set(cand)
             while idx < len(tokens):
                 tok = tokens[idx]
                 if tok == "--":
@@ -59,8 +74,13 @@ def strip_wrapper_tokens(tokens: list[str]) -> list[str]:
                 if tok.startswith("-"):
                     if "=" in tok:
                         idx += 1
-                    elif tok in _WRAPPER_OPTS_WITH_ARG:
+                    elif tok in wrapper_opts:
                         idx += 2
+                    elif len(tok) > 2 and tok[:2] in wrapper_opts:
+                        # Attached-value short flag (xargs -I{}, -L5, -P3, -n10):
+                        # the value is fused into the flag token; do not swallow
+                        # the following token (it is the real command).
+                        idx += 1
                     else:
                         idx += 1
                     continue
@@ -69,6 +89,23 @@ def strip_wrapper_tokens(tokens: list[str]) -> list[str]:
         break
 
     return tokens[idx:]
+
+
+def strip_command_wrappers(cmd: str) -> str:
+    """Returns the command with leading env assignments and wrapper commands
+    (sudo, env, nohup, time, nice, xargs, builtin, command) removed, preserving
+    the remaining tokens verbatim (flags included). Used to match deny/allow
+    patterns against the effective command hidden inside a wrapper."""
+    if not cmd or not isinstance(cmd, str):
+        return cmd or ""
+    try:
+        tokens = shlex.split(cmd)
+    except Exception:
+        tokens = cmd.strip().split()
+    stripped = strip_wrapper_tokens(tokens)
+    if not stripped:
+        return ""
+    return shlex.join(stripped)
 
 
 _MULTI_COMMAND_TOOLS = frozenset(
@@ -144,7 +181,11 @@ _UNSAFE_SHELL_REGEX = re.compile(
     r"|\|\s*(?:bash|sh|zsh|dash|powershell|pwsh|python(?:\d+(?:\.\d+)?)?|node|ruby|perl|php)\b"
     r"|<\s*(?:bash|sh|zsh|dash)\b"
     r"|\beval\s+|\bexec\s+"
-    r"|\bbase64\s+-(?:d|-decode)\b)",
+    r"|\bbase64\s+-(?:d|-decode)\b"
+    r"|\bosascript\b[^\n]*\s+-e\b"
+    # awk/gawk/mawk program text may contain ';' (or any quoted content)
+    # before a system() call — only shell-level separators terminate the scan.
+    r"|\b(?:awk|gawk|mawk)\b[^\n|&]*\bsystem\s*\()",
     re.IGNORECASE,
 )
 

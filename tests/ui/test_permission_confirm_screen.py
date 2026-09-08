@@ -443,6 +443,13 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
         screen_create = PermissionConfirmScreen("create", {"TargetFile": "/external/repo/new.py", "content": "x=1"})
         self.assertIn("add_root:/external/repo", screen_create._option_keys)
 
+    def test_add_to_roots_not_offered_for_filesystem_root(self):
+        """Regression: a nonexistent top-level file must not offer '/' as a
+        workspace root (that would unboundedly widen the workspace)."""
+        screen = PermissionConfirmScreen("read", {"path": "/nonexistent_top_file"})
+        self.assertNotIn("add_root:/", screen._option_keys)
+        self.assertFalse(any(k.startswith("add_root:") for k in screen._option_keys))
+
 
 if __name__ == "__main__":
     unittest.main()

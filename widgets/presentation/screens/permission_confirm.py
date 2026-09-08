@@ -176,7 +176,18 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 root_to_add = target_path
             else:
                 root_to_add = os.path.dirname(target_path) or target_path
-            raw_options.append((f'Add "{ellipsize(root_to_add, 36)}" to roots [dim](workspace)[/]', f"add_root:{root_to_add}"))
+            norm_root = os.path.realpath(os.path.abspath(os.path.expanduser(root_to_add)))
+            # Never offer the filesystem root (e.g. "/" for a nonexistent
+            # top-level file — it would unboundedly widen the workspace), and
+            # never offer a path already inside the workspace.
+            if (
+                norm_root
+                and norm_root != os.path.abspath(os.sep)
+                and not is_path_within_workspace(norm_root, pm.get_workspace_roots())
+            ):
+                raw_options.append(
+                    (f'Add "{ellipsize(root_to_add, 36)}" to roots [dim](workspace)[/]', f"add_root:{root_to_add}")
+                )
 
         raw_options.append(("Deny", "deny"))
         raw_options.append(("Reject with feedback...", "reject_reason"))
