@@ -50,6 +50,26 @@ def _new_task_id() -> str:
     return f"shell-{uuid.uuid4().hex[:4]}"
 
 
+def _promote_task_to_background(
+    task: ShellTask,
+    ctx: Any,
+    target_widget: Any = None,
+) -> None:
+    """Move task to background, register it in context, attach widget and update session."""
+    task.move_to_background()
+    ctx.add_background_task(task)
+    if target_widget is not None and not getattr(ctx, "is_subagent", False):
+        ctx.attach_shell_widget(task.task_id, target_widget, log_path=task.log_path, is_background=True)
+    if getattr(ctx, "session", None) and hasattr(ctx.session, "messages"):
+        for msg in reversed(ctx.session.messages):
+            if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "shell":
+                msg["task_id"] = task.task_id
+                msg["background_task_id"] = task.task_id
+                if task.log_path:
+                    msg["log_path"] = task.log_path
+                break
+
+
 def _attach_shell_widget(
     host: Any,
     task_id: str,
@@ -66,6 +86,16 @@ def _attach_shell_widget(
         log_path=log_path,
         is_background=is_background,
     )
+
+
+async def _cancel_read_task(read_task: Optional[asyncio.Task]) -> None:
+    """Safely cancel stdout reader task, swallowing CancelledError."""
+    if read_task and not read_task.done():
+        read_task.cancel()
+        try:
+            await asyncio.wait_for(read_task, timeout=0.2)
+        except (asyncio.CancelledError, Exception):
+            pass
 
 
 
@@ -171,13 +201,19 @@ class ShellTool(BaseTool):
             pass
         return base_s
 
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return False
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         from core.infrastructure.config.settings import get_settings
 
         settings = get_settings()
         args = args or {}
         ctx = self._ensure_context(ctx)
-        cmd = (args.get("command") or "").strip()
+        raw_cmd = args.get("command")
+        if raw_cmd is None:
+            return ToolResult.error("params", name="command", detail="missing or empty")
+        cmd = str(raw_cmd).strip()
         if not cmd:
             return ToolResult.error("params", name="command", detail="missing or empty")
 
@@ -307,13 +343,7 @@ class ShellTool(BaseTool):
                 task.add_listener(lambda chunk, tid=task_id: ctx.session.add_event({"type": "tool_shell_output", "text": chunk, "task_id": tid}))
             callback = getattr(ctx.host, "on_background_shell_completed", None) if ctx.host else None
             progress_cb = getattr(ctx.host, "on_background_shell_progress", None) if ctx.host else None
-            task.is_background = True
-            # Open the log BEFORE attaching so the widget/registry receive the real
-            # log path (task.log_path is only populated by open_log()).
-            task.open_log()
-            if not getattr(ctx, "is_subagent", False):
-                ctx.attach_shell_widget(task_id, target_widget, log_path=task.log_path, is_background=True)
-            ctx.add_background_task(task)
+            _promote_task_to_background(task, ctx, target_widget)
             task.start_reading(on_completed=callback, on_progress=progress_cb)
 
             log_part = f" | log {task.log_path}" if task.log_path else ""
@@ -321,14 +351,6 @@ class ShellTool(BaseTool):
             notice = _sandbox_fallback_notice(ctx)
             if notice:
                 plain_content = notice + plain_content
-            if getattr(ctx, "session", None) and hasattr(ctx.session, "messages"):
-                for msg in reversed(ctx.session.messages):
-                    if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "shell":
-                        msg["task_id"] = task_id
-                        msg["background_task_id"] = task_id
-                        if task.log_path:
-                            msg["log_path"] = task.log_path
-                        break
             return ToolResult(
                 status=ToolResultStatus.RUNNING,
                 content=plain_content,
@@ -425,18 +447,7 @@ class ShellTool(BaseTool):
                     elapsed = max(0.1, round(time.monotonic() - start_time, 1))
                     if hard_timeout is not None and elapsed >= hard_timeout:
                         raise asyncio.TimeoutError()
-                    task.move_to_background()
-                    ctx.add_background_task(task)
-                    if target_widget is not None and not getattr(ctx, "is_subagent", False):
-                        ctx.attach_shell_widget(task_id, target_widget, log_path=task.log_path, is_background=True)
-                    if getattr(ctx, "session", None) and hasattr(ctx.session, "messages"):
-                        for msg in reversed(ctx.session.messages):
-                            if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "shell":
-                                msg["task_id"] = task_id
-                                msg["background_task_id"] = task_id
-                                if task.log_path:
-                                    msg["log_path"] = task.log_path
-                                break
+                    _promote_task_to_background(task, ctx, target_widget)
                     raw_out = task.get_formatted_output().strip()
                     if raw_out:
                         truncated = truncate_output(
@@ -460,18 +471,7 @@ class ShellTool(BaseTool):
                 raise asyncio.TimeoutError()
 
             if task.background_event.is_set() or getattr(task, "is_background", False):
-                task.move_to_background()
-                ctx.add_background_task(task)
-                if target_widget is not None and not getattr(ctx, "is_subagent", False):
-                    ctx.attach_shell_widget(task_id, target_widget, log_path=task.log_path, is_background=True)
-                if getattr(ctx, "session", None) and hasattr(ctx.session, "messages"):
-                    for msg in reversed(ctx.session.messages):
-                        if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "shell":
-                            msg["task_id"] = task_id
-                            msg["background_task_id"] = task_id
-                            if task.log_path:
-                                msg["log_path"] = task.log_path
-                            break
+                _promote_task_to_background(task, ctx, target_widget)
                 elapsed = max(0.1, round(time.monotonic() - start_time, 1))
                 raw_out = task.get_formatted_output().strip()
                 if raw_out:
@@ -514,27 +514,14 @@ class ShellTool(BaseTool):
                 await asyncio.shield(terminate_process(p))
             except Exception:
                 pass
-            if read_task and not read_task.done():
-                read_task.cancel()
-                try:
-                    # CancelledError is a BaseException since py3.8 and is not
-                    # caught by `except Exception`; swallowing the expected
-                    # cancellation of the stdout reader is required.
-                    await asyncio.wait_for(read_task, timeout=0.2)
-                except (asyncio.CancelledError, Exception):
-                    pass
+            await _cancel_read_task(read_task)
             raw_out = _truncate_output(task.get_formatted_output()).strip()
             partial_str = f"\n\n{raw_out}" if raw_out else ""
             effective_timeout = hard_timeout if (wait_seconds is not None and hard_timeout is not None) else timeout
             disp = f"ERR: timeout 'shell': timed out after {effective_timeout}s{partial_str}"
             return ToolResult.error("timeout", f"timed out after {effective_timeout}s{partial_str}", name="shell", display=disp)
         except asyncio.CancelledError:
-            if read_task and not read_task.done():
-                read_task.cancel()
-                try:
-                    await asyncio.wait_for(read_task, timeout=0.2)
-                except (asyncio.CancelledError, Exception):
-                    pass
+            await _cancel_read_task(read_task)
             try:
                 await asyncio.shield(terminate_process(p))
             except Exception:
@@ -555,8 +542,8 @@ class ShellTool(BaseTool):
         self,
         command: str,
         env: dict[str, str],
-        cwd: str = None,
-        workspace_dir: str = None,
+        cwd: Optional[str] = None,
+        workspace_dir: Optional[str] = None,
         sandbox_enabled: bool = False,
         allow_workspace_writes: bool = True,
     ):
@@ -572,7 +559,7 @@ class ShellTool(BaseTool):
             windows_spawner=self._create_windows_process,
         )
 
-    async def _create_windows_process(self, command: str, env: dict[str, str], cwd: str = None):
+    async def _create_windows_process(self, command: str, env: dict[str, str], cwd: Optional[str] = None):
         return await spawn_windows_process(
             command=command,
             env=env,
