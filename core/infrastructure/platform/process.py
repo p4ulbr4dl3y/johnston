@@ -148,7 +148,7 @@ async def terminate_process_tree(process: Any, timeout: float = 1.0) -> None:
                 stderr=asyncio.subprocess.DEVNULL,
             )
             await asyncio.wait_for(p.wait(), timeout=timeout)
-        except Exception:
+        except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
             try:
                 if hasattr(process, "kill"):
                     process.kill()
@@ -165,14 +165,14 @@ async def terminate_process_tree(process: Any, timeout: float = 1.0) -> None:
             res = process.wait()
             if asyncio.iscoroutine(res):
                 await asyncio.wait_for(res, timeout=timeout)
-    except (asyncio.TimeoutError, Exception):
+    except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
         try:
             os.killpg(pid, signal.SIGKILL)
             if hasattr(process, "wait"):
                 res = process.wait()
                 if asyncio.iscoroutine(res):
                     await asyncio.wait_for(res, timeout=0.5)
-        except Exception:
+        except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
             try:
                 if hasattr(process, "kill"):
                     process.kill()

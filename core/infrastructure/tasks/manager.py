@@ -94,13 +94,10 @@ class TaskManager:
     # -- lifecycle ----------------------------------------------------------
 
     async def kill_all(self) -> None:
-        for task in list(self._tasks.values()):
-            try:
-                await task.kill()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                pass
+        tasks = list(self._tasks.values())
+        if not tasks:
+            return
+        await asyncio.gather(*[asyncio.shield(t.kill()) for t in tasks], return_exceptions=True)
 
     def __iter__(self):
         return iter(list(self._tasks.values()))

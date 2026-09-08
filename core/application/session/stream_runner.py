@@ -229,6 +229,7 @@ async def run_subagent_stream_bg(
                 except Exception:
                     pass
 
+            if not is_suppressed and not session_switched:
                 if notification_template:
                     try:
                         sid = session_id or session.id

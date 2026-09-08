@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from core.infrastructure.platform.paths import WORKTREES_DIR
 from core.infrastructure.runtime.git_utils import run_git
@@ -143,7 +143,10 @@ class SubagentWorktreeManager(GitWorktreeManager):
                         "user.name=Johnston Subagent",
                         "-c",
                         "user.email=subagent@johnston.local",
+                        "-c",
+                        "commit.gpgsign=false",
                         "commit",
+                        "--no-verify",
                         "-m",
                         f"subagent: automatic save for {branch_name}",
                     ],
@@ -242,22 +245,32 @@ class SubagentWorktreeManager(GitWorktreeManager):
 
     @staticmethod
     def make_worktree_cleanup_fn(
-        parent_dir: str, wt_path: Optional[str], wt_branch: Optional[str], is_followup: bool = False
+        parent_dir: str,
+        wt_path: Optional[str],
+        wt_branch: Optional[str],
+        is_followup: bool = False,
+        session: Any = None,
     ):
         """Builds a cleanup callback that appends branch notice to acc and removes the worktree."""
         if is_followup:
 
             def _cleanup_followup(acc):
+                kwargs = {"is_followup": True}
+                if session is not None:
+                    kwargs["session"] = session
                 SubagentWorktreeManager.append_worktree_diff_to_acc(
-                    parent_dir, wt_path, wt_branch, acc, is_followup=True
+                    parent_dir, wt_path, wt_branch, acc, **kwargs
                 )
 
             return _cleanup_followup
 
         def _cleanup_worktree_and_append_diff(acc):
             nonlocal wt_path, wt_branch
+            kwargs = {"is_followup": False}
+            if session is not None:
+                kwargs["session"] = session
             wt_path, wt_branch = SubagentWorktreeManager.append_worktree_diff_to_acc(
-                parent_dir, wt_path, wt_branch, acc, is_followup=False
+                parent_dir, wt_path, wt_branch, acc, **kwargs
             )
 
         return _cleanup_worktree_and_append_diff
@@ -269,9 +282,19 @@ class SubagentWorktreeManager(GitWorktreeManager):
         wt_branch: Optional[str],
         acc: list[str],
         is_followup: bool = False,
+        session: Any = None,
     ) -> Tuple[Optional[str], Optional[str]]:
         """Appends branch merge notice to acc if changes exist, and cleans up worktree."""
         if wt_path and wt_branch and os.path.isdir(wt_path):
+            is_cancelled = False
+            if session is not None:
+                st = str(getattr(session, "status", "")).lower()
+                is_cancelled = "cancel" in st or bool(getattr(session, "was_killed", False))
+
+            if is_cancelled:
+                SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=False)
+                return None, None
+
             summary_text, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
                 parent_dir, wt_path, wt_branch
             )

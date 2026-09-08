@@ -510,7 +510,10 @@ class ShellTool(BaseTool):
             content_str = f"[exit {returncode}]\n{truncated}" if (returncode is not None and returncode != 0) else truncated
             return ToolResult.done(content=content_str, display=content_str, returncode=returncode)
         except asyncio.TimeoutError:
-            await terminate_process(p)
+            try:
+                await asyncio.shield(terminate_process(p))
+            except Exception:
+                pass
             if read_task and not read_task.done():
                 read_task.cancel()
                 try:
@@ -526,7 +529,16 @@ class ShellTool(BaseTool):
             disp = f"ERR: timeout 'shell': timed out after {effective_timeout}s{partial_str}"
             return ToolResult.error("timeout", f"timed out after {effective_timeout}s{partial_str}", name="shell", display=disp)
         except asyncio.CancelledError:
-            await terminate_process(p)
+            if read_task and not read_task.done():
+                read_task.cancel()
+                try:
+                    await asyncio.wait_for(read_task, timeout=0.2)
+                except (asyncio.CancelledError, Exception):
+                    pass
+            try:
+                await asyncio.shield(terminate_process(p))
+            except Exception:
+                pass
             raise
         finally:
             ctx.cleanup_foreground_shell_task(task_id)

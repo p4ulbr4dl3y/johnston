@@ -182,9 +182,11 @@ class ShellTask(BaseTask):
                         self.timed_out = True
                         if self.process is not None:
                             try:
-                                await terminate_process(self.process)
+                                from core.infrastructure.platform.process import terminate_process_tree
+
+                                await asyncio.shield(terminate_process_tree(self.process))
                             except Exception:
-                                pass
+                                await terminate_process(self.process)
                         break
 
                 # 2. Inactivity check
@@ -226,7 +228,10 @@ class ShellTask(BaseTask):
                 if self.watcher_task is not None and not self.watcher_task.done():
                     self.watcher_task.cancel()
 
-                await self.close_log_async()
+                try:
+                    await asyncio.shield(self.close_log_async())
+                except (asyncio.CancelledError, Exception):
+                    pass
 
                 # Reap the process BEFORE publishing the terminal status so a
                 # just-finished process is never reported as RUNNING by the
@@ -243,7 +248,10 @@ class ShellTask(BaseTask):
 
                 # Final notification signal: empty string tells subscribers that
                 # stream closed so they can flush buffered partial lines.
-                self._notify_listeners("")
+                try:
+                    self._notify_listeners("")
+                except Exception:
+                    pass
                 self._listeners.clear()
 
                 exit_code = 0
@@ -287,7 +295,16 @@ class ShellTask(BaseTask):
         if self.completed_at is None:
             self.completed_at = time.time()
         self.status = status
-        self._done_future().set_result(True)
+        if self._done is not None:
+            if not self._done.done():
+                self._done.set_result(True)
+        else:
+            try:
+                fut = self._done_future()
+                if not fut.done():
+                    fut.set_result(True)
+            except RuntimeError:
+                pass
 
     # -- BaseTask API -------------------------------------------------------
 
@@ -311,7 +328,7 @@ class ShellTask(BaseTask):
             try:
                 from core.infrastructure.platform.process import terminate_process_tree
 
-                await terminate_process_tree(self.process)
+                await asyncio.shield(terminate_process_tree(self.process))
             except Exception:
                 await terminate_process(self.process)
         if self.read_task is not None and not self.read_task.done():

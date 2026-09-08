@@ -6,6 +6,13 @@ import re
 import shlex
 from typing import Optional
 
+from core.domain.policies.policy_shell import (
+    _ENV_VAR_RE,
+    _PREFIX_WRAPPERS,
+    _WRAPPER_OPTS_WITH_ARG,
+    strip_wrapper_tokens,
+)
+
 _REDUNDANT_CD_PATTERN = re.compile(r"^\s*cd\s+(?:\"([^\"]+)\"|'([^']+)'|([^\s;&|]+))\s*(?:&&|;)\s*")
 _STANDALONE_CD_PATTERN = re.compile(r"^\s*cd(?:\s+(?:\"([^\"]+)\"|'([^']+)'|([^\s;&|]+)))?\s*$")
 
@@ -50,68 +57,6 @@ def clean_cd_command(cmd: str, workspace_dir: str) -> tuple[str, Optional[str]]:
 
     return (cleaned, None)
 
-
-_ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-_PREFIX_WRAPPERS = {"sudo", "env", "time", "nice", "nohup", "exec", "xargs"}
-_WRAPPER_OPTS_WITH_ARG = {
-    "-u",
-    "-g",
-    "-p",
-    "-r",
-    "-t",
-    "-T",
-    "-U",
-    "-C",
-    "-D",
-    "-R",
-    "-n",
-    "-o",
-    "-f",
-    "-S",
-    "-a",
-    "--user",
-    "--group",
-    "--adjustment",
-    "--chdir",
-    "--unset",
-    "--output",
-    "--format",
-}
-
-
-def strip_wrapper_tokens(tokens: list[str]) -> list[str]:
-    """Strip leading env assignments (VAR=val) and wrapper commands (sudo, env, nice, etc.) from token stream."""
-    idx = 0
-    while idx < len(tokens) and _ENV_VAR_RE.match(tokens[idx]):
-        idx += 1
-
-    while idx < len(tokens):
-        cand = tokens[idx].replace("\\", "/").rsplit("/", 1)[-1].lower()
-        if cand.endswith(".exe"):
-            cand = cand[:-4]
-        if cand in _PREFIX_WRAPPERS:
-            idx += 1
-            while idx < len(tokens):
-                tok = tokens[idx]
-                if tok == "--":
-                    idx += 1
-                    break
-                if _ENV_VAR_RE.match(tok):
-                    idx += 1
-                    continue
-                if tok.startswith("-"):
-                    if "=" in tok:
-                        idx += 1
-                    elif tok in _WRAPPER_OPTS_WITH_ARG:
-                        idx += 2
-                    else:
-                        idx += 1
-                    continue
-                break
-            continue
-        break
-
-    return tokens[idx:]
 
 
 def _clean_one_command_segment(cmd_segment: str) -> str:

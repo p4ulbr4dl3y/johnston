@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 def is_active_subagent(session: Any) -> bool:
     """True if subagent has an active async task or running status."""
+    if getattr(session, "_loaded_from_disk", False):
+        task = getattr(session, "async_task", None)
+        return bool(task and hasattr(task, "done") and not task.done())
     if getattr(session, "async_task", None) and not session.async_task.done():
         return True
     raw_st = getattr(session, "status", None)
@@ -179,7 +182,7 @@ class SubagentService:
         from core.application.session.stream import run_subagent_stream_bg
 
         cleanup_fn = worktree_manager_cls.make_worktree_cleanup_fn(
-            project_dir, wt_path, wt_branch, is_followup=False
+            project_dir, wt_path, wt_branch, is_followup=False, session=session
         )
 
         bg_task = asyncio.create_task(
@@ -261,22 +264,13 @@ class SubagentService:
         return cancelled
 
     @classmethod
-    def kill_subagent(cls, session: AgentSession, store: Any) -> ToolResult:
-        """Terminate a running subagent session and cancel its background task.
-
-        Single-writer principle (audit M6): for a live async_task the sync
-        path only cancels + sets ``suppress_notification`` — the cancelled
-        task's own teardown (``run_subagent_stream_bg`` /
-        ``execute_session_turn`` CancelledError handler) owns the terminal
-        ``finish(CANCELLED)`` + save, so exactly one status_change and one
-        divider land in the persisted file. When no task teardown can run
-        (async_task missing or already done — the finished-but-stale case,
-        audit A6) the sync finish+save finalizes the session as a fallback.
-        """
+    def kill_subagent(cls, session: AgentSession, store: Any = None) -> ToolResult:
+        """Kill a running subagent session and cleanup its worktree."""
         if not session:
             return ToolResult.error("session", detail="Session not found")
         setattr(session, "suppress_notification", True)
-        if hasattr(session, "pending_messages") and session.pending_messages:
+        setattr(session, "was_killed", True)
+        if hasattr(session, "pending_messages") and isinstance(session.pending_messages, list):
             session.pending_messages.clear()
 
         async_task = getattr(session, "async_task", None)
@@ -287,7 +281,7 @@ class SubagentService:
                 pass
             # M6: the live task's own teardown
             # (``execute_session_turn``'s CancelledError handler inside
-            # ``run_subagent_stream_bg``) owns the terminal finish + save.
+            # ``run_subagent_stream_bg``) owns the terminal finish + save + worktree cleanup.
         else:
             # A6: no live task teardown will run. Finalize finished-but-stale
             # sessions (async_task done/missing while status is still
@@ -298,15 +292,15 @@ class SubagentService:
                 if store:
                     store.save(session)
 
-        # Cleanup worktree and discard branch on explicit kill
-        wt_path = getattr(session, "project_dir", "") or ""
-        wt_branch = getattr(session, "branch_name", "") or ""
-        parent_dir = getattr(store, "project_path", "") or ""
-        if wt_branch and parent_dir:
-            try:
-                SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=False)
-            except Exception:
-                pass
+            # Cleanup worktree and discard branch on explicit kill when no live task is running
+            wt_path = getattr(session, "project_dir", "") or ""
+            wt_branch = getattr(session, "branch_name", "") or ""
+            parent_dir = getattr(store, "project_path", "") or ""
+            if wt_branch and parent_dir:
+                try:
+                    SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=False)
+                except Exception:
+                    pass
 
         return ToolResult.done(content=f"[killed {session.id}]", display="")
 

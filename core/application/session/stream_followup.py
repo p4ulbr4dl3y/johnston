@@ -98,7 +98,7 @@ async def send_subagent_followup(
         from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
         cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
-            ctx.project_dir, session.project_dir, session.branch_name, is_followup=True
+            ctx.project_dir, session.project_dir, session.branch_name, is_followup=True, session=session
         )
 
         # The stream drains session.pending_messages inline, so only the

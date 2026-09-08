@@ -42,11 +42,16 @@ class SubagentTask(BaseTask):
 
     @property
     def async_task(self) -> Any:
-        return self._async_task or getattr(self.session, "async_task", None)
+        sess_task = getattr(self.session, "async_task", None)
+        if sess_task is not None:
+            return sess_task
+        return self._async_task
 
     @async_task.setter
     def async_task(self, val: Any) -> None:
         self._async_task = val
+        if hasattr(self.session, "async_task"):
+            self.session.async_task = val
 
     def __repr__(self) -> str:
         return f"SubagentTask(id={self.id!r}, status={self.status.value})"

@@ -417,7 +417,22 @@ async def terminate_process(process: Any, timeout: float = 1.0) -> None:
 
     try:
         if is_windows():
-            process.terminate()
+            try:
+                process.terminate()
+            except Exception:
+                pass
+            pid = getattr(process, "pid", None)
+            if isinstance(pid, int) and pid > 0:
+                try:
+                    cmd = ["taskkill", "/F", "/T", "/PID", str(pid)]
+                    p = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.DEVNULL,
+                        stderr=asyncio.subprocess.DEVNULL,
+                    )
+                    await asyncio.wait_for(p.wait(), timeout=timeout)
+                except Exception:
+                    pass
         else:
             try:
                 pid = getattr(process, "pid", None)
@@ -428,8 +443,14 @@ async def terminate_process(process: Any, timeout: float = 1.0) -> None:
             except Exception:
                 process.terminate()
         await asyncio.wait_for(process.wait(), timeout=timeout)
-    except Exception:
+    except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
         try:
+            pid = getattr(process, "pid", None)
+            if isinstance(pid, int) and pid > 0 and not is_windows():
+                try:
+                    os.killpg(pid, signal.SIGKILL)
+                except Exception:
+                    pass
             process.kill()
         except Exception:
             pass

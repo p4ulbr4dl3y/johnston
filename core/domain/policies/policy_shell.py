@@ -8,7 +8,68 @@ import re
 import shlex
 from typing import List, Optional
 
-from core.infrastructure.platform.command_sanitizer import strip_wrapper_tokens
+_ENV_VAR_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_PREFIX_WRAPPERS = frozenset({"sudo", "env", "time", "nice", "nohup", "exec", "xargs"})
+_WRAPPER_OPTS_WITH_ARG = frozenset({
+    "-u",
+    "-g",
+    "-p",
+    "-r",
+    "-t",
+    "-T",
+    "-U",
+    "-C",
+    "-D",
+    "-R",
+    "-n",
+    "-o",
+    "-f",
+    "-S",
+    "-a",
+    "--user",
+    "--group",
+    "--adjustment",
+    "--chdir",
+    "--unset",
+    "--output",
+    "--format",
+})
+
+
+def strip_wrapper_tokens(tokens: list[str]) -> list[str]:
+    """Strip leading env assignments (VAR=val) and wrapper commands (sudo, env, nice, etc.) from token stream."""
+    idx = 0
+    while idx < len(tokens) and _ENV_VAR_RE.match(tokens[idx]):
+        idx += 1
+
+    while idx < len(tokens):
+        cand = tokens[idx].replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if cand.endswith(".exe"):
+            cand = cand[:-4]
+        if cand in _PREFIX_WRAPPERS:
+            idx += 1
+            while idx < len(tokens):
+                tok = tokens[idx]
+                if tok == "--":
+                    idx += 1
+                    break
+                if _ENV_VAR_RE.match(tok):
+                    idx += 1
+                    continue
+                if tok.startswith("-"):
+                    if "=" in tok:
+                        idx += 1
+                    elif tok in _WRAPPER_OPTS_WITH_ARG:
+                        idx += 2
+                    else:
+                        idx += 1
+                    continue
+                break
+            continue
+        break
+
+    return tokens[idx:]
+
 
 _MULTI_COMMAND_TOOLS = frozenset(
     {
@@ -434,12 +495,12 @@ def check_read_only_command_mutations(cmd: str) -> Optional[str]:
                                 return f"git remote {r_tok} is not permitted in read-only role"
                     break
 
-        if platform.system() == "Windows":
-            if base in ("del", "erase", "rmdir", "rd", "move", "ren", "rename"):
-                return f"mutating command {base} is not permitted in read-only role"
-            for t in sc:
-                if t in (">", ">>", "1>", "2>"):
-                    return "file write redirects are not permitted in read-only role on Windows"
+        for t in sc:
+            if t in (">", ">>", "1>", "2>"):
+                return "file write redirects are not permitted in read-only role"
+
+        if base in ("del", "erase", "rmdir", "rd", "move", "ren", "rename", "rm", "unlink", "truncate"):
+            return f"mutating command {base} is not permitted in read-only role"
 
     return None
 

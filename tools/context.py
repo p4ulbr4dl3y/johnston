@@ -253,11 +253,18 @@ class ToolContext:
             return None
         from core.infrastructure.tasks.manage import filter_to_session
 
+        # 1. Scoped to current session
         tasks = filter_to_session(self.background_tasks or [], self.session_id or "")
         for t in tasks:
             if getattr(t, "task_id", None) == task_id or getattr(t, "id", None) == task_id:
                 return t
 
+        # 2. Fallback to global tasks (across sessions)
+        for t in self.background_tasks or []:
+            if getattr(t, "task_id", None) == task_id or getattr(t, "id", None) == task_id:
+                return t
+
+        # 3. Check active foreground tasks
         if self.host:
             fg = getattr(self.host, "_foreground_shell_tasks", None)
             if isinstance(fg, dict) and task_id in fg:
@@ -281,5 +288,8 @@ class ToolContext:
                     widget.set_result(output, status=status)
                 except Exception:
                     pass
+        sub_tools = getattr(self.host, "_subagent_tools", None)
+        if isinstance(sub_tools, dict):
+            sub_tools.pop(task_id, None)
 
 

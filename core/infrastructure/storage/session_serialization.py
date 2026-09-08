@@ -124,6 +124,7 @@ def from_file(fpath: str) -> Optional[AgentSession]:
                 return None
 
             sess = from_dict(first)
+            sess._loaded_from_disk = True
             for line in f:
                 line = line.strip()
                 if not line:
