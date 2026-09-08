@@ -214,7 +214,17 @@ def find_actual_target_and_replacement(
     actual_target = target
     actual_replacement = replacement
 
-    if target not in text:
+    if text.startswith("\ufeff") and not target.startswith("\ufeff"):
+        if text == "\ufeff" + target and replacement == "":
+            actual_target = "\ufeff" + target
+            actual_replacement = ""
+    elif target.startswith("\ufeff") and not text.startswith("\ufeff"):
+        stripped_target = target.lstrip("\ufeff")
+        if stripped_target in text:
+            actual_target = stripped_target
+            actual_replacement = replacement.lstrip("\ufeff")
+
+    if actual_target not in text:
         norm_text = normalize_quotes(text)
         norm_target = normalize_quotes(target)
         idx = norm_text.find(norm_target)
@@ -269,7 +279,8 @@ def _generate_fuzzy_match_hint(current_text: str, target: str, path: str) -> str
 
         if match_line_num is not None:
             start_snip = max(1, match_line_num - 2)
-            end_snip = min(len(file_lines), match_line_num + len(target_lines) + 2)
+            preview_len = min(len(target_lines), 10)
+            end_snip = min(len(file_lines), match_line_num + preview_len + 2)
             snippet_lines = file_lines[start_snip - 1 : end_snip]
             snippet_str = "\n".join(
                 f"{i}|{line_item}" for i, line_item in enumerate(snippet_lines, start=start_snip)
@@ -313,6 +324,9 @@ def apply_edit(
         new_content = content.replace(actual_target, actual_replacement)
     else:
         new_content = content.replace(actual_target, actual_replacement, 1)
+
+    if new_content == "\ufeff":
+        new_content = ""
 
     diff_output = format_file_diff(content, new_content, path)
     return new_content, diff_output
@@ -358,6 +372,9 @@ class EditTool(BaseTool):
             },
         },
     }
+
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return False
 
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
