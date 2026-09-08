@@ -290,6 +290,48 @@ class TestAskUserTool(unittest.IsolatedAsyncioTestCase):
             )
         self.assertIsNone(mock_app._pending_ask_user)
 
+    def test_is_concurrency_safe(self):
+        tool = AskUserTool()
+        self.assertFalse(tool.is_concurrency_safe())
+        self.assertFalse(tool.is_concurrency_safe({"questions": []}))
+
+    async def test_json_dict_wrapper_and_options_normalization(self):
+        tool = AskUserTool()
+        mock_app = MagicMock()
+
+        captured = []
+
+        async def fake_ask_user(questions):
+            captured.append(questions)
+            return "Answer: ok"
+
+        mock_app.ask_user = fake_ask_user
+
+        # 1. JSON string wrapping dict {"questions": [...]}
+        res = await tool.execute(
+            {"questions": r'{"questions": [{"question": "Q1?", "options": "[\"A\", \"B\"]", "header": "very_long_header_exceeding_twenty_four_chars"}]}'},
+            ctx=mock_app,
+        )
+        self.assertFalse(res.is_error)
+        self.assertEqual(len(captured), 1)
+        q = captured[0][0]
+        self.assertEqual(q["header"], "very_long_header_exceedi")  # 24 chars
+        self.assertEqual(len(q["options"]), 2)
+        self.assertEqual(q["options"][0]["label"], "A")
+
+        # 2. Options as dict {label: desc}
+        res2 = await tool.execute(
+            {"questions": [{"question": "Q2?", "options": {"OptA": "DescA", "OptB": "DescB"}}]},
+            ctx=mock_app,
+        )
+        self.assertFalse(res2.is_error)
+        self.assertEqual(len(captured), 2)
+        q2 = captured[1][0]
+        self.assertEqual(len(q2["options"]), 2)
+        self.assertEqual(q2["options"][0]["label"], "OptA")
+        self.assertEqual(q2["options"][0]["description"], "DescA")
+
 
 if __name__ == "__main__":
     unittest.main()
+

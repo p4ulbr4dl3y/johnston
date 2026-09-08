@@ -98,6 +98,9 @@ class AskUserTool(BaseTool):
         },
     }
 
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return False
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
@@ -112,6 +115,8 @@ class AskUserTool(BaseTool):
                 parsed = json.loads(questions_list.strip())
                 if isinstance(parsed, list):
                     questions_list = parsed
+                elif isinstance(parsed, dict) and isinstance(parsed.get("questions"), list):
+                    questions_list = parsed["questions"]
             except Exception:
                 pass
 
@@ -124,6 +129,19 @@ class AskUserTool(BaseTool):
                 continue
             q_text = str(q.get("question") or "").strip()
             options = q.get("options")
+            if isinstance(options, str) and options.strip():
+                import json
+
+                try:
+                    parsed_opt = json.loads(options.strip())
+                    if isinstance(parsed_opt, (list, dict)):
+                        options = parsed_opt
+                except Exception:
+                    pass
+
+            if isinstance(options, dict):
+                options = [{"label": str(k), "description": str(v)} for k, v in options.items()]
+
             if not q_text or not isinstance(options, list):
                 continue
             valid_options = []
@@ -142,9 +160,11 @@ class AskUserTool(BaseTool):
                 seen_labels.add(label)
                 valid_options.append({"label": label, "description": desc})
             sorted_options = _sort_recommended_first(valid_options)
+            raw_header = str(q.get("header") or "").strip()
+            header = raw_header[:24] if raw_header else ""
             validated_questions.append({
                 "question": q_text,
-                "header": str(q.get("header") or "").strip(),
+                "header": header,
                 "is_multi_select": bool(q.get("is_multi_select") or False),
                 "options": sorted_options,
             })
