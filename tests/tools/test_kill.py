@@ -117,25 +117,11 @@ async def test_kill_target_not_found(kill_tool, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_kill_accepts_task_id_or_session_id_alias(kill_tool):
-    task = MagicMock()
-    task.id = "shell-999"
-    task.task_id = "shell-999"
-    task.session_id = "sess-1"
-    task.kind = "shell"
-    task.is_active = True
-    task.is_running = True
-    task.kill = AsyncMock()
-
-    app = MagicMock()
-    app.task_manager = [task]
-    app.current_session_id = "sess-1"
-    app._background_shell_widgets = {}
-    ctx = ToolContext(app=app)
-
+async def test_kill_rejects_legacy_task_id_alias(kill_tool):
+    ctx = ToolContext(app=MagicMock())
     res = await kill_tool.execute({"task_id": "shell-999"}, ctx=ctx)
-    assert res.status == ToolResultStatus.DONE
-    assert "[killed shell-999]" in res.content
+    assert res.status == ToolResultStatus.ERROR
+    assert "ERR: params 'id': required" in res.content
 
 
 @pytest.mark.asyncio

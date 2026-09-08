@@ -253,13 +253,60 @@ class TestFormatLinePaginationEdge(unittest.TestCase):
         self.assertIn("of 5000", res.content)
 
 
-class TestPathTraversalContext(unittest.TestCase):
-    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX path semantics")
-    def test_abs_path_kept(self):
-        # resolve_path keeps absolute paths as-is (no confinement)
-        base = tempfile.mkdtemp()
-        res = resolve_path("/tmp/outside.txt", base)
-        self.assertEqual(res, os.path.abspath("/tmp/outside.txt"))
+class TestBaseToolNormalizeArgs(unittest.TestCase):
+    class DummyTool(BaseTool):
+        schema = {
+            "type": "function",
+            "function": {
+                "name": "dummy",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {"type": "string"},
+                        "count": {"type": "integer"},
+                        "flag": {"type": "boolean"},
+                    },
+                    "required": ["path"],
+                },
+            },
+        }
+
+    def setUp(self):
+        self.tool = self.DummyTool()
+
+    def test_normalize_json_string(self):
+        args, err = self.tool.normalize_args('{"path": "foo/bar.txt", "count": "10", "flag": "true"}')
+        self.assertIsNone(err)
+        self.assertEqual(args["path"], "foo/bar.txt")
+        self.assertEqual(args["count"], 10)
+        self.assertIs(args["flag"], True)
+
+    def test_normalize_missing_required(self):
+        args, err = self.tool.normalize_args('{"count": 5}')
+        self.assertIsNotNone(err)
+        self.assertEqual(err.status.value, "error")
+        self.assertIn("ERR: params 'path': required", err.content)
+
+    def test_normalize_empty_string_required(self):
+        args, err = self.tool.normalize_args({"path": "   "})
+        self.assertIsNotNone(err)
+        self.assertEqual(err.status.value, "error")
+        self.assertIn("ERR: params 'path': required", err.content)
+
+    def test_normalize_invalid_json_string(self):
+        args, err = self.tool.normalize_args("not-json")
+        self.assertIsNotNone(err)
+        self.assertIn("invalid JSON", err.content)
+
+    def test_normalize_non_dict_json(self):
+        args, err = self.tool.normalize_args("[1, 2, 3]")
+        self.assertIsNotNone(err)
+        self.assertIn("must be a JSON dictionary", err.content)
+
+    def test_normalize_coerces_boolean_false(self):
+        args, err = self.tool.normalize_args({"path": "x", "flag": "0"})
+        self.assertIsNone(err)
+        self.assertIs(args["flag"], False)
 
 
 if __name__ == "__main__":

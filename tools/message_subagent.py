@@ -49,7 +49,7 @@ class MessageSubagentTool(BaseTool):
             return err
 
         args = args or {}
-        raw_id = args.get("id") if "id" in args else args.get("session_id")
+        raw_id = args.get("id")
         session_id = str(raw_id).strip() if raw_id is not None else ""
 
         raw_message = args.get("message")

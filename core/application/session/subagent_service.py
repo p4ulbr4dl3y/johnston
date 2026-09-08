@@ -79,7 +79,6 @@ class SubagentService:
         ctx: Any,
         worktree_manager_cls: Any = SubagentWorktreeManager,
         settings_provider: Any = get_settings,
-        param_name: str = "prompt",
     ) -> ToolResult:
         """Spawn an autonomous background subagent with isolated git worktree and session."""
         prompt = (prompt or "").strip()
@@ -88,7 +87,7 @@ class SubagentService:
         branch_override = (branch_override or "").strip()
 
         if not prompt:
-            return ToolResult.error("params", name=param_name, detail="required")
+            return ToolResult.error("params", name="task", detail="required")
 
         store = get_session_store(ctx.host)
         gen_sub_id = getattr(store, "generate_subagent_id", None)

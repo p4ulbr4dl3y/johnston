@@ -620,6 +620,66 @@ class BaseTool:
         """Whether this tool invocation is safe to run concurrently with other safe tools."""
         return False
 
+    def normalize_args(self, raw_args: Any) -> tuple[Dict[str, Any], Optional["ToolResult"]]:
+        """Normalize, coerce types, and validate tool arguments strictly against tool schema."""
+        if raw_args is None:
+            raw_args = {}
+        elif isinstance(raw_args, str):
+            raw_args = raw_args.strip()
+            if not raw_args:
+                raw_args = {}
+            else:
+                try:
+                    parsed = json.loads(raw_args)
+                    if isinstance(parsed, dict):
+                        raw_args = parsed
+                    else:
+                        return {}, ToolResult.error("params", detail="arguments must be a JSON dictionary")
+                except Exception:
+                    return {}, ToolResult.error("params", detail="invalid JSON arguments")
+        elif not isinstance(raw_args, dict):
+            return {}, ToolResult.error("params", detail="arguments must be a dictionary")
+
+        schema = self.get_schema() or self.schema or {}
+        fn_meta = schema.get("function") if isinstance(schema, dict) else {}
+        params_meta = fn_meta.get("parameters") if isinstance(fn_meta, dict) else {}
+        properties = params_meta.get("properties") if isinstance(params_meta, dict) else {}
+        required_fields = set(params_meta.get("required", [])) if isinstance(params_meta, dict) else set()
+
+        normalized: Dict[str, Any] = {}
+
+        for k, v in raw_args.items():
+            if not isinstance(k, str):
+                continue
+            prop_def = properties.get(k) if isinstance(properties, dict) else None
+            prop_type = prop_def.get("type") if isinstance(prop_def, dict) else None
+
+            if isinstance(v, str):
+                v_str = v.strip()
+                if prop_type == "integer":
+                    try:
+                        normalized[k] = int(v_str)
+                    except ValueError:
+                        normalized[k] = v
+                elif prop_type == "boolean":
+                    if v_str.lower() in ("true", "1"):
+                        normalized[k] = True
+                    elif v_str.lower() in ("false", "0"):
+                        normalized[k] = False
+                    else:
+                        normalized[k] = v
+                else:
+                    normalized[k] = v_str
+            else:
+                normalized[k] = v
+
+        for req in required_fields:
+            val = normalized.get(req)
+            if val is None or (isinstance(val, str) and not val.strip()):
+                return normalized, ToolResult.error("params", name=req, detail="required")
+
+        return normalized, None
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> "ToolResult":
         raise NotImplementedError
 

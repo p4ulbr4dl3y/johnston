@@ -143,7 +143,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool(
-            "invoke_subagent", {"prompt": "do research", "title": "research task", "branch": "main"}, app=app
+            "invoke_subagent", {"task": "do research", "title": "research task", "branch": "main"}, app=app
         )
         self.assertIn("subagent started", res.content)
         self.assertIn("role worker", res.content)
@@ -187,7 +187,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         app = DummyApp()
         res = await execute_tool(
             "invoke_subagent",
-            {"prompt": "bg task", "title": "bg job", "branch": "main"},
+            {"task": "bg task", "title": "bg job", "branch": "main"},
             app=app,
         )
         self.assertIn("subagent started", res.content)

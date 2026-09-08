@@ -185,7 +185,7 @@ class TestSubagentServiceOperations(unittest.IsolatedAsyncioTestCase):
         ctx = MagicMock()
         res = await SubagentService.spawn_subagent(prompt="", title="test", ctx=ctx)
         self.assertTrue(res.is_error)
-        self.assertIn("prompt", str(res.content))
+        self.assertIn("task", str(res.content))
 
     async def test_spawn_registers_subagent_task_in_task_manager(self):
         from unittest.mock import AsyncMock, patch

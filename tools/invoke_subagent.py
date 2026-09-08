@@ -71,25 +71,24 @@ class InvokeSubagentTool(BaseTool):
         args = args or {}
         from core.application.session.subagent_service import SubagentService
 
-        raw_task = args.get("task") if "task" in args else args.get("prompt")
-        param_name = "task" if "task" in args else "prompt"
+        raw_task = args.get("task")
+        task_str = str(raw_task) if raw_task is not None else ""
 
         raw_title = args.get("title")
         title_str = str(raw_title) if raw_title is not None else ""
 
-        raw_role = args.get("role") or args.get("type") or "worker"
+        raw_role = args.get("role") or "worker"
         role_str = str(raw_role)
 
         raw_branch = args.get("branch")
         branch_str = str(raw_branch) if raw_branch is not None else ""
 
         return await SubagentService.spawn_subagent(
-            prompt=raw_task if raw_task is not None else "",
+            prompt=task_str,
             title=title_str,
             subagent_type=role_str,
             branch_override=branch_str,
             ctx=ctx,
             worktree_manager_cls=SubagentWorktreeManager,
             settings_provider=get_settings,
-            param_name=param_name,
         )

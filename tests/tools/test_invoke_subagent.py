@@ -43,7 +43,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             )
 
         # Attempt to spawn one more
-        res = str(await tool.execute({"prompt": "another task", "title": "Over limit", "branch": "main"}))
+        res = str(await tool.execute({"task": "another task", "title": "Over limit", "branch": "main"}))
         self.assertIn("ERR: limit: 5 concurrent max", res)
 
     async def test_custom_max_concurrent_subagents_limit(self):
@@ -72,7 +72,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         # With limit=2, spawning should fail with "2 concurrent max"
         with patch("tools.invoke_subagent.get_settings") as mock_st:
             mock_st.return_value.subagents.max_concurrent = 2
-            res = str(await tool.execute({"prompt": "another task", "title": "Over limit", "branch": "main"}))
+            res = str(await tool.execute({"task": "another task", "title": "Over limit", "branch": "main"}))
             self.assertIn("ERR: limit: 2 concurrent max", res)
 
     async def test_explore_subagent_tool_filtering(self):
@@ -101,7 +101,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        await tool.execute({"prompt": "search codebase", "role": "explorer", "branch": "main"})
+        await tool.execute({"task": "search codebase", "role": "explorer", "branch": "main"})
 
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
         self.assertIn("read", tool_names)
@@ -136,7 +136,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        await tool.execute({"prompt": "run task", "type": "worker", "branch": "main"})
+        await tool.execute({"task": "run task", "role": "worker", "branch": "main"})
 
         self.assertTrue(mock_agent.is_subagent)
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
@@ -167,7 +167,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        res = await tool.execute({"prompt": "inspect repo", "title": "inspect"})
+        res = await tool.execute({"task": "inspect repo", "title": "inspect"})
         self.assertEqual(res.status.value, "running")
         sessions = self.store.list(kind="subagent")
         self.assertEqual(len(sessions), 1)
@@ -195,7 +195,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
 
         tool._ensure_context = lambda app=None: mock_ctx
 
-        res = await tool.execute({"prompt": "inspect repo", "description": "inspect", "branch": "feat-x"})
+        res = await tool.execute({"task": "inspect repo", "description": "inspect", "branch": "feat-x"})
         self.assertEqual(res.status.value, "running")
         sessions = self.store.list(kind="subagent")
         self.assertEqual(sessions[0].branch_name, "")
@@ -229,7 +229,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
 
-            res = await tool.execute({"prompt": "refactor auth", "title": "Auth Token Refactor", "type": "worker"})
+            res = await tool.execute({"task": "refactor auth", "title": "Auth Token Refactor", "role": "worker"})
             self.assertEqual(res.status.value, "running")
             self.assertTrue(mock_wt.called)
             called_branch = mock_wt.call_args[0][2]
@@ -266,7 +266,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
 
-            res = await tool.execute({"prompt": "refactor auth", "title": "Рефакторинг токена", "type": "worker"})
+            res = await tool.execute({"task": "refactor auth", "title": "Рефакторинг токена", "role": "worker"})
             self.assertEqual(res.status.value, "running")
             self.assertTrue(mock_wt.called)
             called_branch = mock_wt.call_args[0][2]
@@ -301,7 +301,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         ):
             mock_git.return_value.stdout = "main\n"
 
-            res = await tool.execute({"prompt": "investigate auth", "title": "Audit Auth", "type": "explorer"})
+            res = await tool.execute({"task": "investigate auth", "title": "Audit Auth", "role": "explorer"})
             self.assertEqual(res.status.value, "running")
             self.assertFalse(mock_wt.called)
             sessions = self.store.list(kind="subagent")
@@ -331,16 +331,16 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
                 status="active",
             )
 
-        res = str(await tool.execute({"prompt": "another task", "title": "Over limit", "branch": "main"}))
+        res = str(await tool.execute({"task": "another task", "title": "Over limit", "branch": "main"}))
         self.assertIn("ERR: limit: 5 concurrent max", res)
 
     async def test_invoke_subagent_none_type_and_branch_does_not_crash(self):
         tool = InvokeSubagentTool()
         mock_ctx = None
         # Passing type=None, branch=None should not raise AttributeError on strip
-        res = await tool.execute({"prompt": "", "type": None, "branch": None}, ctx=mock_ctx)
+        res = await tool.execute({"task": "", "role": None, "branch": None}, ctx=mock_ctx)
         self.assertTrue(res.is_error)
-        self.assertIn("ERR: params 'prompt'", str(res))
+        self.assertIn("ERR: params 'task'", str(res))
 
     async def test_invoke_subagent_with_task_param(self):
         from unittest.mock import MagicMock

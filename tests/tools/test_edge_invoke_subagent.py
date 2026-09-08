@@ -111,12 +111,12 @@ async def _launch_and_wait(tool, args, app, store, wait=True):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("args", [None, {}, {"prompt": ""}, {"prompt": "   \t\n"}])
+@pytest.mark.parametrize("args", [None, {}, {"task": ""}, {"task": "   \t\n"}])
 async def test_missing_or_blank_prompt_returns_error(args):
     store, app, tool, tmp = _make_env(_agent_with_stream(_empty_gen))
     try:
         res = str(await tool.execute(args))
-        assert res.startswith("ERR: params 'prompt': required")
+        assert res.startswith("ERR: params 'task': required")
         assert store.list(kind="subagent") == []  # nothing spawned
     finally:
         tmp.cleanup()
@@ -128,25 +128,25 @@ async def _empty_gen(prompt):
 
 
 @pytest.mark.asyncio
-async def test_prompt_non_string_crashes_instead_of_clean_error():
-    """BUG: non-string prompt (int) reaches .strip() and raises AttributeError.
-    red test — tool should return ERR for a non-string prompt, not crash."""
+async def test_prompt_non_string_handled_cleanly():
+    """Non-string prompt (int) is coerced or returns clean error without unhandled exception."""
     agent = _agent_with_stream(_empty_gen)
     store, app, tool, tmp = _make_env(agent)
     try:
-        with pytest.raises((AttributeError, TypeError)):
-            await tool.execute({"prompt": 123, "title": "bad"})
+        res = await tool.execute({"task": 123, "title": "bad"})
+        assert res is not None
     finally:
         tmp.cleanup()
 
 
 @pytest.mark.asyncio
-async def test_prompt_list_crashes():
+async def test_prompt_list_handled_cleanly():
+    """List prompt is coerced or returns clean error without unhandled exception."""
     agent = _agent_with_stream(_empty_gen)
     store, app, tool, tmp = _make_env(agent)
     try:
-        with pytest.raises((AttributeError, TypeError)):
-            await tool.execute({"prompt": ["a", "b"], "title": "bad"})
+        res = await tool.execute({"task": ["a", "b"], "title": "bad"})
+        assert res is not None
     finally:
         tmp.cleanup()
 
@@ -173,7 +173,7 @@ async def test_role_falls_back_or_accepts(role, monkeypatch):
 
     store, app, tool, tmp = _make_env(agent)
     try:
-        args = {"prompt": "do thing", "title": "t", "branch": "main"}
+        args = {"task": "do thing", "title": "t", "branch": "main"}
         if role is not None:
             args["type"] = role
         await tool.execute(args)
@@ -204,7 +204,7 @@ async def test_main_scope_role_falls_back_to_worker(monkeypatch):
 
     store, app, tool, tmp = _make_env(agent)
     try:
-        await tool.execute({"prompt": "do thing", "title": "t", "type": "orchestrator", "branch": "main"})
+        await tool.execute({"task": "do thing", "title": "t", "role": "orchestrator", "branch": "main"})
         sess = store.list(kind="subagent")[0]
         # main-only role must fall back to worker on the agent, not run as main
         assert agent.role == "worker", "main-only role must fall back to worker, not spawn as main"
@@ -245,7 +245,7 @@ async def test_role_pinned_provider_not_connected_raises(monkeypatch):
     store, app, tool, tmp = _make_env(agent)
     try:
         with pytest.raises(ValueError, match="not connected"):
-            await tool.execute({"prompt": "do", "title": "t", "type": "heavymetal", "branch": "main"})
+            await tool.execute({"task": "do", "title": "t", "role": "heavymetal", "branch": "main"})
         # Fixed: role is applied BEFORE session creation, so a failed role
         # (provider not connected) no longer persists an orphan 'running' session.
         running = [s for s in store.list(kind="subagent") if s.status == "running"]
@@ -263,7 +263,7 @@ async def test_role_pinned_provider_not_connected_raises(monkeypatch):
 async def test_create_agent_returns_none():
     store, app, tool, tmp = _make_env(None)
     try:
-        res = str(await tool.execute({"prompt": "do", "title": "t", "branch": "main"}))
+        res = str(await tool.execute({"task": "do", "title": "t", "branch": "main"}))
         assert res.startswith("ERR: context")
         assert store.list(kind="subagent") == []
     finally:
@@ -276,7 +276,7 @@ async def test_create_agent_crashes_leaks_nothing():
     app.pm.create_active_agent.side_effect = RuntimeError("boom agent")
     try:
         with pytest.raises(RuntimeError):
-            await tool.execute({"prompt": "do", "title": "t", "branch": "main"})
+            await tool.execute({"task": "do", "title": "t", "branch": "main"})
     finally:
         tmp.cleanup()
 
@@ -305,7 +305,7 @@ async def test_worktree_create_raises_crashes_instead_of_err(monkeypatch):
 
     monkeypatch.setattr("tools.invoke_subagent.SubagentWorktreeManager", _BadWorktree)
     try:
-        res = await tool.execute({"prompt": "do", "title": "t", "branch": "dev"})
+        res = await tool.execute({"task": "do", "title": "t", "branch": "dev"})
         assert res.is_error
         assert "git worktree failed" in res.content
         assert store.list(kind="subagent") == [], (
@@ -329,7 +329,7 @@ async def test_stream_completes_and_marks_completed():
     agent = _agent_with_stream(_gen_ok)
     store, app, tool, tmp = _make_env(agent)
     try:
-        res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "greet", "branch": "main"}, app, store)
+        res, sess = await _launch_and_wait(tool, {"task": "hi", "title": "greet", "branch": "main"}, app, store)
         assert sess.status == STATUS_COMPLETED
         assert "[subagent" in res or "subagent" in res or "launched" in res
         app.trigger_ai_response.assert_called()  # notification fired
@@ -347,7 +347,7 @@ async def test_stream_empty_result():
     agent = _agent_with_stream(_gen_empty_result)
     store, app, tool, tmp = _make_env(agent)
     try:
-        _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
+        _, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
         assert sess.status == STATUS_COMPLETED
         msg = app.trigger_ai_response.call_args.args[0]
         assert "Completed with no text output." in msg
@@ -365,7 +365,7 @@ async def test_stream_throws_propagates_to_notification_not_caller():
     agent = _agent_with_stream(_gen_crash)
     store, app, tool, tmp = _make_env(agent)
     try:
-        _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
+        _, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
         assert sess.status == STATUS_ERROR
         msg = app.trigger_ai_response.call_args.args[0]
         assert "Subagent error: provider exploded" in msg
@@ -382,7 +382,7 @@ async def test_stream_huge_result_truncates():
     agent = _agent_with_stream(_gen_huge)
     store, app, tool, tmp = _make_env(agent)
     try:
-        _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
+        _, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
         assert sess.status == STATUS_COMPLETED
         msg = app.trigger_ai_response.call_args.args[0]
         assert "truncated" in msg
@@ -402,7 +402,7 @@ async def test_cancel_mid_stream_marks_cancelled():
     agent = _agent_with_stream(_gen_mid_cancel)
     store, app, tool, tmp = _make_env(agent)
     try:
-        await tool.execute({"prompt": "hi", "title": "t", "branch": "main"})
+        await tool.execute({"task": "hi", "title": "t", "branch": "main"})
         sess = store.list(kind="subagent")[-1]
         assert sess.async_task is not None
         # Give the bg task time to enter the stream and block on the Event.
@@ -453,7 +453,7 @@ async def test_session_create_returns_none_crashes(monkeypatch):
         sm.SessionStore.create_subagent = lambda *a, **k: None
         try:
             with pytest.raises(AttributeError):
-                await tool.execute({"prompt": "hi", "title": "t", "branch": "main"})
+                await tool.execute({"task": "hi", "title": "t", "branch": "main"})
         finally:
             sm.SessionStore.create_subagent = real
     finally:
@@ -487,7 +487,7 @@ async def test_save_fails_mid_stream_does_not_escape():
     store, app, tool, tmp = _make_env(agent)
     try:
         app.sm = _DieSaveStore(store)
-        await tool.execute({"prompt": "hi", "title": "t", "branch": "main"})
+        await tool.execute({"task": "hi", "title": "t", "branch": "main"})
         sess = store.list(kind="subagent")[-1]
         assert sess.async_task is not None
         # The task returns its normal result string; the save failure is swallowed.
@@ -509,7 +509,7 @@ async def test_no_parent_session_id_uses_global_running_scan():
             store.create_subagent(
                 parent_id=f"other-parent-{i}", role="worker", title=f"foreign {i}", prompt="p", status="running"
             )
-        res = str(await tool.execute({"prompt": "hi", "title": "t", "branch": "main"}))
+        res = str(await tool.execute({"task": "hi", "title": "t", "branch": "main"}))
         assert "ERR: limit" in res, (
             "BUG: got no limit error, yet this parent has ZERO running and all "
             "running sessions belong to other parents/windows"
@@ -532,7 +532,7 @@ async def test_ctx_app_none_falls_back_to_singleton_store():
     try:
         app.sm = None
         with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
-            res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
+            res, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
             assert "[subagent" in res or res.startswith("subagent ") or "subagent" in res
     finally:
@@ -549,7 +549,7 @@ async def test_app_has_no_sm_uses_singleton():
         app.sm = None
         tool._ensure_context = lambda ctx=None: ToolContext(app=app)
         with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
-            res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
+            res, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
             assert "[subagent" in res or "subagent" in res
     finally:
@@ -575,7 +575,7 @@ async def test_metrics_merge_missing_subagent_attrs_no_crash():
 
     store, app, tool, tmp = _make_env(agent)
     try:
-        _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
+        _, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
         assert sess.status == STATUS_COMPLETED
     finally:
         tmp.cleanup()
@@ -590,7 +590,7 @@ async def test_metrics_merge_none_values_no_crash():
         agent.tokens_output = None
         agent.total_tokens = None
         agent.cost_usd = float("nan")
-        _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
+        _, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
         assert sess.status == STATUS_COMPLETED
     finally:
         tmp.cleanup()
@@ -614,7 +614,7 @@ async def test_metrics_merged_into_app_agent():
         app.agent.tokens_output = 5
         app.agent.total_tokens = 15
         app.agent.cost_usd = 0.001
-        _, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "t", "branch": "main"}, app, store)
+        _, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
         assert sess.status == STATUS_COMPLETED
         assert app.agent.tokens_input == 110
         assert app.agent.tokens_output == 55
@@ -634,7 +634,7 @@ async def test_launch_return_contains_description_and_id():
     agent = _agent_with_stream(_gen_ok)
     store, app, tool, tmp = _make_env(agent)
     try:
-        res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "  Greet me  ", "branch": "main"}, app, store)
+        res, sess = await _launch_and_wait(tool, {"task": "hi", "title": "  Greet me  ", "branch": "main"}, app, store)
         res = res[0] if isinstance(res, tuple) else res
         assert "<subagent" in res or "subagent" in res
         assert sess.id in res
@@ -646,8 +646,8 @@ async def test_launch_return_contains_description_and_id():
 async def test_error_format_matches_err_convention():
     store, app, tool, tmp = _make_env(_agent_with_stream(_gen_ok))
     try:
-        res = str(await tool.execute({"prompt": "  "}))
-        assert res == "ERR: params 'prompt': required", res
+        res = str(await tool.execute({"task": "  "}))
+        assert res == "ERR: params 'task': required", res
     finally:
         tmp.cleanup()
 
@@ -657,7 +657,7 @@ async def test_launch_without_branch_defaults_to_main_dir():
     agent = _agent_with_stream(_gen_ok)
     store, app, tool, tmp = _make_env(agent)
     try:
-        res, sess = await _launch_and_wait(tool, {"prompt": "hi", "title": "no branch"}, app, store)
+        res, sess = await _launch_and_wait(tool, {"task": "hi", "title": "no branch"}, app, store)
         assert sess.branch_name == ""
         assert sess.project_dir == ""
     finally:

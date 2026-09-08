@@ -244,7 +244,11 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             tool_inst = _get_tool_instance(tool_cls)
             ctx = tool_inst._ensure_context(context or app)
 
-            err = await check_and_confirm_permission(resolved_name, name, args, context or app)
+            norm_args, norm_err = tool_inst.normalize_args(args)
+            if norm_err:
+                return norm_err
+
+            err = await check_and_confirm_permission(resolved_name, name, norm_args, context or app)
             if err:
                 return err
 
@@ -252,7 +256,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
             if perm_err:
                 return perm_err
 
-            return await normalize_tool_result(tool_inst.execute(args, ctx))
+            return await normalize_tool_result(tool_inst.execute(norm_args, ctx))
         except Exception as e:
             logger.warning("Tool '%s' execution failed: %s", name, e, exc_info=True)
             return ToolResult.error("execute", detail=str(e), name=name)

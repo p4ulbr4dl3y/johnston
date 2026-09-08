@@ -62,22 +62,11 @@ async def test_message_subagent_success(msg_tool, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_message_subagent_accepts_session_id_alias(msg_tool, monkeypatch):
-    session = MagicMock()
-    session.id = "sub-777"
-
-    store = MagicMock()
-    store.find_session_by_title_or_id.return_value = session
-    monkeypatch.setattr("core.infrastructure.storage.session_store.get_session_store", lambda host: store)
-
-    send_mock = AsyncMock(return_value=ToolResult.done(content="[resumed sub-777]"))
-    monkeypatch.setattr("core.application.session.subagent_service.SubagentService.send_message", send_mock)
-
+async def test_message_subagent_rejects_legacy_session_id_alias(msg_tool, monkeypatch):
     ctx = ToolContext(app=MagicMock())
-
     res = await msg_tool.execute({"session_id": "sub-777", "message": "alias test"}, ctx=ctx)
-    assert res.status == ToolResultStatus.DONE
-    send_mock.assert_awaited_once_with(session, "alias test", ANY, store)
+    assert res.status == ToolResultStatus.ERROR
+    assert "ERR: params 'id': required" in res.content
 
 
 @pytest.mark.asyncio

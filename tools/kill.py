@@ -40,11 +40,7 @@ class KillTool(BaseTool):
             return err
 
         args = args or {}
-        raw_id = (
-            args.get("id")
-            if "id" in args
-            else (args.get("task_id") if "task_id" in args else args.get("session_id"))
-        )
+        raw_id = args.get("id")
         target_id = str(raw_id).strip() if raw_id is not None else ""
 
         if not target_id:
