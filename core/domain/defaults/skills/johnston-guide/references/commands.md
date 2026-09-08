@@ -32,7 +32,7 @@ Johnston TUI provides slash commands entered directly in the message input and k
 - `/help` (aliases: `/h`, `/?`): Display interactive help screen and keybindings overview.
 
 ## Dynamic Slash Capabilities
-- **Skill Invocations**: Execute single or multiple skills directly via `/<skill_name> <prompt>` or `/<skill1> /<skill2> <prompt>`. Includes bundled workflow skills (`/init`, `/handoff`, `/goal`, `/review-loop`).
+- **Skill Invocations**: Execute single or multiple skills directly via `/<skill_name> <prompt>` or `/<skill1> /<skill2> <prompt>`. Includes bundled workflow skills (`/init`, `/handoff`, `/goal`, `/review`).
 - **MCP Prompts**: Run registered MCP prompts via `/<prompt_name>` or `/<server>__<prompt_name>` with optional `key=value` args.
 - **Homoglyph Normalization**: Auto-translates accidental Cyrillic homoglyphs (`с`, `а`, `о`, `е`...) in slash commands to Latin.
 

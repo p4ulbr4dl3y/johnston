@@ -1,6 +1,6 @@
 ---
-name: review-loop
-description: Autonomous defect-first review-fix loop. Spawns stateless reviewer subagents to audit uncommitted changes or target modules until approval or max iterations. Use when user asks for a review loop, self-healing code review, audit of a subsystem, or iterative fixes.
+name: review
+description: Autonomous defect-first review-fix loop. Spawns stateless reviewer subagents to audit uncommitted changes or target modules until approval or max iterations. Use when user says /review, asks for a code review, self-healing audit of a subsystem, or iterative fixes.
 ---
 
 # Review Loop
@@ -19,7 +19,7 @@ Execute an automated Actor-Critic cycle: Main agent coordinates and fixes code d
 ### Step 1: Pre-flight & Scope Resolution
 
 1. **Resolve Review Scope**:
-   - **User argument provided** (e.g. `/review-loop <path/module>`): Target specified files/modules directly.
+   - **User argument provided** (e.g. `/review <path/module>`): Target specified files/modules directly.
    - **Uncommitted changes exist**: Use working tree (`git status -s` and `git diff`).
    - **Branch diff exists**: Use branch changes (`git diff origin/main...HEAD`).
    - **Clean working tree & no argument**: Ask user for target scope via `ask_user`. **DO NOT** scan `git log` or speculate.
