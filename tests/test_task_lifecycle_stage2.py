@@ -29,8 +29,6 @@ class ConcreteTask(BaseTask):
     async def tail(self, max_chars: int = 4000) -> str:
         return ""
 
-    async def send_input(self, text: str) -> str:
-        return ""
 
     async def kill(self) -> None:
         self.status = TaskStatus.KILLED

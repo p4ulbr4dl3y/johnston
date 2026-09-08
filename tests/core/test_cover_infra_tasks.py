@@ -189,23 +189,6 @@ async def test_tail_returns_buffered_output():
     assert await task.tail(5) == "fghij"
 
 
-@pytest.mark.asyncio
-async def test_send_input_stdin_not_writable():
-    task = ShellTask(task_id="t10", command="echo")
-    task.process = None
-    res = await task.send_input("x")
-    assert "stdin not writable" in res
-
-
-@pytest.mark.asyncio
-async def test_send_input_stdin_write_raises():
-    task = ShellTask(task_id="t11", command="echo")
-    proc = MagicMock()
-    proc.stdin.write = MagicMock(side_effect=OSError("write fail"))
-    task.process = proc
-    res = await task.send_input("x")
-    assert "send input" in res
-
 
 @pytest.mark.asyncio
 async def test_kill_sync_process_kill_raises_and_cancels_read_task():

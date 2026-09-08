@@ -13,7 +13,7 @@ class ToolCallActionsMixin:
         if getattr(self, "subagent_session_id", None):
             return True
         args = self.args if isinstance(self.args, dict) else {}
-        session_id = args.get("session_id")
+        session_id = args.get("id") or args.get("session_id")
         if not session_id and getattr(self, "result_text", None):
             m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", self.result_text, re.IGNORECASE)
             if m:
@@ -21,7 +21,7 @@ class ToolCallActionsMixin:
         if session_id:
             return True
 
-        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "manage_subagent"):
+        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "message_subagent"):
             title = args.get("title") or args.get("prompt")
             if title:
                 app = None
@@ -69,7 +69,7 @@ class ToolCallActionsMixin:
             self.subagent_session_id = str(sid)
             return self.subagent_session_id
 
-        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "manage_subagent"):
+        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "message_subagent"):
             title = args.get("title") or args.get("prompt")
             if title:
                 app = None
@@ -105,7 +105,7 @@ class ToolCallActionsMixin:
         if getattr(self, "status", None) == "generating":
             return False
         canonical = getattr(self, "canonical_tool", "")
-        if canonical in ("invoke_subagent", "manage_subagent"):
+        if canonical in ("invoke_subagent", "message_subagent"):
             if self.has_subagent_session():
                 return True
             if getattr(self, "status", None) in ("error", "cancelled"):
@@ -178,9 +178,9 @@ class ToolCallActionsMixin:
                 pass
             return
 
-        if canonical == "manage_subagent":
+        if canonical == "message_subagent":
             args = self.args if isinstance(self.args, dict) else {}
-            session_id = getattr(self, "subagent_session_id", None) or args.get("session_id")
+            session_id = getattr(self, "subagent_session_id", None) or args.get("id") or args.get("session_id")
             if session_id:
                 store = getattr(app, "sm", None) if app else None
                 if store is None:

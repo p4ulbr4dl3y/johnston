@@ -110,7 +110,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("edit", tool_names)
         self.assertIn('<role name="explorer"', mock_agent.system_prompt)
 
-    async def test_subagent_tool_exclusion_of_manage_shell_and_recursion_guards(self):
+    async def test_subagent_tool_exclusion_of_kill_and_recursion_guards(self):
         from unittest.mock import MagicMock
 
         tool = InvokeSubagentTool()
@@ -121,7 +121,8 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             {"function": {"name": "read"}},
             {"function": {"name": "shell"}},
             {"function": {"name": "invoke_subagent"}},
-            {"function": {"name": "manage_shell"}},
+            {"function": {"name": "message_subagent"}},
+            {"function": {"name": "kill"}},
         ]
         mock_agent.system_prompt = "Base prompt"
         mock_agent.stream_steps.return_value = (x for x in [])
@@ -142,7 +143,8 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("read", tool_names)
         self.assertIn("shell", tool_names)
         self.assertNotIn("invoke_subagent", tool_names)
-        self.assertNotIn("manage_shell", tool_names)
+        self.assertNotIn("message_subagent", tool_names)
+        self.assertNotIn("kill", tool_names)
 
     async def test_invoke_subagent_without_branch_succeeds(self):
         from unittest.mock import MagicMock

@@ -169,7 +169,7 @@ class TestShellTaskStateAndCleanup(unittest.TestCase):
         self.assertTrue(t.is_background)
         self.assertTrue(t.background_event.is_set())
 
-    def test_send_input_after_finish_returns_not_running(self):
+    def test_task_after_finish_returns_not_running(self):
         t = ShellTask("t_s", "cmd", None)
         t.status = TaskStatus.COMPLETED
         self.assertFalse(t.is_running)

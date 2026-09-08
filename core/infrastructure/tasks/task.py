@@ -110,13 +110,6 @@ class BaseTask(ABC):
         """Return the trailing portion of the output, at most max_chars."""
 
     @abstractmethod
-    async def send_input(self, text: str) -> str:
-        """Send a line of input to the task.
-
-        Shell tasks write to their pty/stdin.
-        """
-
-    @abstractmethod
     async def kill(self) -> None:
         """Terminate the task and transition it to a terminal status."""
 

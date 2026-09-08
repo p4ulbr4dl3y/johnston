@@ -47,7 +47,7 @@ class TestPermissionManager(unittest.TestCase):
         # ask_user and manage tools are 'allow'
         action = self.pm.check_permission("ask_user").action
         self.assertEqual(action, "allow")
-        action = self.pm.check_permission("manage_shell", {"action": "list"}).action
+        action = self.pm.check_permission("kill", {"id": "t1"}).action
         self.assertEqual(action, "allow")
 
     def test_execution_modes(self):

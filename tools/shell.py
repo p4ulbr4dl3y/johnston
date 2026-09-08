@@ -819,7 +819,7 @@ class ShellTool(BaseTool):
                 return await asyncio.create_subprocess_exec(
                     exe,
                     *args,
-                    stdin=asyncio.subprocess.PIPE,
+                    stdin=asyncio.subprocess.DEVNULL,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                     env=env,
@@ -830,7 +830,7 @@ class ShellTool(BaseTool):
             return await self._create_windows_process(command, env, cwd=cwd)
         return await asyncio.create_subprocess_shell(
             command,
-            stdin=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             env=env,
@@ -855,7 +855,7 @@ class ShellTool(BaseTool):
                 "Bypass",
                 "-Command",
                 full_command,
-                stdin=asyncio.subprocess.PIPE,
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
@@ -869,7 +869,7 @@ class ShellTool(BaseTool):
                 "/s",
                 "/c",
                 command,
-                stdin=asyncio.subprocess.PIPE,
+                stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
                 env=env,
@@ -878,7 +878,7 @@ class ShellTool(BaseTool):
             )
         return await asyncio.create_subprocess_shell(
             command,
-            stdin=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             env=env,

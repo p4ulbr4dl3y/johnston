@@ -2,7 +2,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from textual.app import App
 from textual.widgets import Input, OptionList, RichLog
@@ -325,7 +325,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         task_run.is_running = True
         task_run.session_id = "main-1"
         task_run.output.history = ["prompt: "]
-        task_run.send_input = AsyncMock()
 
         async def mock_kill_async():
             task_run.is_running = False
@@ -347,14 +346,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
             self.assertIsInstance(app.screen, TaskConsoleScreen)
             console_screen = app.screen
-            stdin_inp = console_screen.query_one("#shell-stdin-input", Input)
-            self.assertTrue(stdin_inp.display)
-
-            # send input
-            stdin_inp.value = "my-input"
-            console_screen.on_input_submitted(Input.Submitted(stdin_inp, "my-input"))
-            await pilot.pause()
-            task_run.send_input.assert_called_once_with("my-input")
 
             # live output chunk
             console_screen._handle_live_chunk("output line\n")
@@ -364,7 +355,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await console_screen.action_kill_task()
             await pilot.pause()
             task_run.kill.assert_called_once()
-            self.assertFalse(stdin_inp.display)
 
             # escape back to list
             await pilot.press("escape")
@@ -481,7 +471,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(opt_list.highlighted, 1)
 
     async def test_write_in_input_down_key_does_not_advance_page(self):
-        from textual.widgets import Input
 
         from widgets.presentation.screens.ask_user import AskUserWizardScreen
 
@@ -509,7 +498,6 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(input_field.value, "abc")
 
     async def test_write_in_input_cleared_between_questions(self):
-        from textual.widgets import Input
 
         from widgets.presentation.screens.ask_user import AskUserWizardScreen
 

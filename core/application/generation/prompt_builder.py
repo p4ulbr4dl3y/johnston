@@ -455,7 +455,7 @@ class PromptBuilder:
             filtered_base = [
                 t
                 for t in filtered_base
-                if t.get("function", {}).get("name", "").lower() not in ("invoke_subagent", "manage_subagent")
+                if t.get("function", {}).get("name", "").lower() not in ("invoke_subagent", "message_subagent")
             ]
 
         filtered_mcp = [

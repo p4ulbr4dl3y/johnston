@@ -89,7 +89,7 @@ class TestActionsRole(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(task.is_background)
 
     async def test_action_background_all_scoped_to_session(self):
-        """ctrl+b must only background tasks of the current session (like manage_shell)."""
+        """ctrl+b must only background tasks of the current session."""
         app = JohnstonApp()
         async with app.run_test():
             curr = MagicMock()

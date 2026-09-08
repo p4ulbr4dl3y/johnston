@@ -11,8 +11,8 @@ from tools.base import BaseTool
 from tools.create import CreateTool
 from tools.edit import EditTool
 from tools.invoke_subagent import InvokeSubagentTool
-from tools.manage_shell import ManageShellTool
-from tools.manage_subagent import ManageSubagentTool
+from tools.kill import KillTool
+from tools.message_subagent import MessageSubagentTool
 from tools.read import ReadTool
 from tools.registry import is_tool_concurrency_safe
 from tools.shell import ShellTool
@@ -36,9 +36,9 @@ class TestToolConcurrencySafety(unittest.TestCase):
         self.assertFalse(EditTool().is_concurrency_safe())
         self.assertFalse(ShellTool().is_concurrency_safe())
         self.assertFalse(AskUserTool().is_concurrency_safe())
-        self.assertFalse(ManageShellTool().is_concurrency_safe())
+        self.assertFalse(KillTool().is_concurrency_safe())
         self.assertFalse(InvokeSubagentTool().is_concurrency_safe())
-        self.assertFalse(ManageSubagentTool().is_concurrency_safe())
+        self.assertFalse(MessageSubagentTool().is_concurrency_safe())
         self.assertFalse(UpdatePlanTool().is_concurrency_safe())
 
         self.assertFalse(is_tool_concurrency_safe("create"))

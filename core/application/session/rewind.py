@@ -308,11 +308,11 @@ def _cleanup_rewound_subagents(session: Any, dropped_msgs: list[dict], store: An
             continue
         if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in (
             "invoke_subagent",
-            "manage_subagent",
+            "message_subagent",
         ):
             args = msg.get("args") or {}
             if isinstance(args, dict):
-                sid = args.get("session_id")
+                sid = args.get("id") or args.get("session_id")
                 if sid:
                     dropped_sub_ids.add(str(sid))
             sub_id = msg.get("subagent_session_id")
@@ -325,11 +325,11 @@ def _cleanup_rewound_subagents(session: Any, dropped_msgs: list[dict], store: An
             continue
         if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in (
             "invoke_subagent",
-            "manage_subagent",
+            "message_subagent",
         ):
             args = msg.get("args") or {}
             if isinstance(args, dict):
-                sid = args.get("session_id")
+                sid = args.get("id") or args.get("session_id")
                 if sid:
                     remaining_sub_ids.add(str(sid))
             sub_id = msg.get("subagent_session_id")
@@ -364,13 +364,15 @@ def _cleanup_rewound_shell_tasks(dropped_msgs: list[dict], task_manager: Any = N
     for msg in dropped_msgs:
         if not isinstance(msg, dict):
             continue
-        if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in ("shell", "manage_shell"):
-            bg_id = msg.get("background_task_id") or msg.get("task_id")
+        if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in ("shell", "kill"):
+            bg_id = msg.get("background_task_id") or msg.get("task_id") or msg.get("id")
             if bg_id:
                 dropped_task_ids.add(str(bg_id))
             args = msg.get("args") or {}
-            if isinstance(args, dict) and args.get("task_id"):
-                dropped_task_ids.add(str(args.get("task_id")))
+            if isinstance(args, dict):
+                tid = args.get("id") or args.get("task_id")
+                if tid:
+                    dropped_task_ids.add(str(tid))
 
     tasks_dict = getattr(task_manager, "_tasks", {})
     for task_id in dropped_task_ids:

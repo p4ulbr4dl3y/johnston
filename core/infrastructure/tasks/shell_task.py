@@ -11,7 +11,6 @@ import time
 from typing import Any, Callable, Optional
 
 from core.domain.defaults.config import DEFAULT_SHELL_IDLE_TIMEOUT
-from core.domain.defaults.errors import format_tool_error
 from core.infrastructure.platform.platform_utils import decode_output, terminate_process
 from core.infrastructure.tasks.output import OutputBuffer, OutputLog, strip_ansi
 from core.infrastructure.tasks.task import BaseTask, TaskStatus
@@ -300,21 +299,6 @@ class ShellTask(BaseTask):
 
     async def wait(self) -> None:
         await self._done_future()
-
-    # -- input --------------------------------------------------------------
-
-    async def send_input(self, text: str) -> str:
-        if not self.is_active:
-            return format_tool_error("task", f"{self.task_id} not running")
-        data = (text + "\n").encode("utf-8")
-        try:
-            if self.process is not None and getattr(self.process, "stdin", None) is not None:
-                self.process.stdin.write(data)
-                await self.process.stdin.drain()
-                return f"[input sent | id {self.task_id}]"
-            return format_tool_error("task", f"{self.task_id} stdin not writable")
-        except Exception as exc:
-            return format_tool_error("task", f"send input to {self.task_id}: {exc}")
 
     # -- kill ---------------------------------------------------------------
 

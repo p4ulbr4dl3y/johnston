@@ -44,6 +44,8 @@ _SHARED_FILE_EDITS = (
 
 _SHARED_SHELL_EXECUTION = (
     "- **Shell Execution**:\n"
+    "  - Strictly non-interactive (`stdin=DEVNULL`). Always use non-interactive flags (`-y`, `--batch`, `CI=1`, heredoc). "
+    "Interactive prompts, pagers, or editors (`less`, `nano`, `python -i`, prompts without `-y`) fail immediately with EOF.\n"
     "  - Chain dependent commands with `&&` in a single call (e.g. `build && test`) to short-circuit on failure. "
     "NEVER pipe (`|`) commands in any shell (e.g. no `| grep`, `| tail`): piping masks exit codes, breaks log files, and blocks live streaming. "
     "Runtime auto-truncates large output to tail and saves full log to file (`[truncated | log <path>]`). Run raw; inspect log files via `read`.\n"
@@ -65,7 +67,7 @@ _SHARED_SYSTEM_NOTES = (
 )
 
 _SHARED_NON_INTERACTIVE_LIMITS = (
-    "- Tool restrictions: CANNOT call `invoke_subagent`, `manage_subagent`, `manage_shell`, or `ask_user` (filtered out of toolset).\n"
+    "- Tool restrictions: CANNOT call `invoke_subagent`, `message_subagent`, `kill`, or `ask_user` (filtered out of toolset).\n"
     "- Shell: synchronous only; non-interactive flags required; no interactive pagers/editors (`vim`, `less`, `nano`).\n"
     "- No unrequested files: Do NOT generate unrequested report or summary files (e.g. `REPORT.md`, `SUMMARY.md`, `NOTES.md`) in workspace."
 )
@@ -109,7 +111,7 @@ DEFAULT_SYSTEM_PROMPT = f"""<identity>{{model_name}} in Johnston CLI. Solve codi
 <context>
 {_SHARED_COMPACTION}
 {_SHARED_SYSTEM_NOTES}
-- **Notifications**: `<notification type="shell|subagent" id="..." status="completed|error|cancelled|running" [branch="..."]>` is the authoritative event stream. Body contains exit status and tool output. If `status="running"` (inactivity ping): process is ALIVE. Check for stdin hang (`manage_shell(send_input/kill)`) or yield turn immediately. ZERO conversational text to user while running. If terminal (`completed|error|cancelled`): process exited; resume next step without polling.
+- **Notifications**: `<notification type="shell|subagent" id="..." status="completed|error|cancelled|running" [branch="..."]>` is the authoritative event stream. Body contains exit status and tool output. If `status="running"` (inactivity ping): process is ALIVE. To terminate a hung or unneeded task/subagent, call `kill(id)`; otherwise yield turn immediately. ZERO conversational text to user while running. If terminal (`completed|error|cancelled`): process exited; resume next step without polling.
 </context>"""
 
 

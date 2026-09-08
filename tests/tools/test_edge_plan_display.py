@@ -168,7 +168,7 @@ class TestToolDisplayEdge(unittest.TestCase):
         for name, args in [
             ("read", {"path": "f.py"}),
             ("create", {"TargetFile": "/tmp/a.txt"}),
-            ("manage_shell", {"action": "start"}),
+            ("kill", {"id": "t1"}),
             ("unknown", {"query": "x"}),
         ]:
             self.assertIsInstance(extract_tool_display(name, args), str)

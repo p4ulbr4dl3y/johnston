@@ -311,18 +311,11 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
                 ("web_fetch", {"url": "https://api.github.com"}),
                 ("invoke_subagent", {"role": "Tester", "title": "Run Unit Tests", "prompt": "pytest"}),
                 ("invoke_subagent", {"type": "Explorer"}),
-                ("manage_shell", {"action": "kill", "task_id": "task-42"}),
-                ("manage_shell", {"action": "kill"}),
-                ("manage_shell", {"action": "list"}),
-                ("manage_shell", {"action": "send_input", "task_id": "task-42", "input": "y\n"}),
-                ("manage_shell", {"action": "status", "task_id": "task-42"}),
-                ("manage_shell", {"action": "status"}),
-                ("manage_subagent", {"action": "kill", "session_id": "sess-99"}),
-                ("manage_subagent", {"action": "kill"}),
-                ("manage_subagent", {"action": "list"}),
-                ("manage_subagent", {"action": "send_message", "session_id": "sess-99", "message": "hello"}),
-                ("manage_subagent", {"action": "info", "session_id": "sess-99"}),
-                ("manage_subagent", {"action": "info"}),
+                ("kill", {"id": "task-42"}),
+                ("kill", {}),
+                ("message_subagent", {"id": "sess-99", "message": "hello"}),
+                ("message_subagent", {"id": "sess-99"}),
+                ("message_subagent", {}),
                 ("update_plan", {"explanation": "Add security checks"}),
                 ("update_plan", {}),
                 ("ask_user", {"questions": [{"question": "Proceed with deployment?"}]}),
@@ -483,13 +476,8 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
         finally:
             os.unlink(temp_path)
 
-        # manage_shell send_input
-        screen_ms = PermissionConfirmScreen("manage_shell", {"action": "send_input", "input": "yes\nall\n"})
-        w2 = screen_ms._calculate_content_width()
-        self.assertGreaterEqual(w2, 38)
-
-        # manage_subagent send_message
-        screen_sub = PermissionConfirmScreen("manage_subagent", {"action": "send_message", "message": "hello\nworld\n"})
+        # message_subagent
+        screen_sub = PermissionConfirmScreen("message_subagent", {"id": "s1", "message": "hello\nworld\n"})
         w3 = screen_sub._calculate_content_width()
         self.assertGreaterEqual(w3, 38)
 
@@ -697,7 +685,6 @@ class TestTasksScreensCoverage(unittest.IsolatedAsyncioTestCase):
         bg_task.command = "python long_running.py"
         bg_task.is_running = True
         bg_task.output.history = []  # Empty history to cover (Waiting for command output...)
-        bg_task.send_input = AsyncMock()
         bg_task.kill = AsyncMock()  # Awaitable kill
         listeners = []
         bg_task.add_listener = lambda cb: listeners.append(cb)
@@ -716,13 +703,6 @@ class TestTasksScreensCoverage(unittest.IsolatedAsyncioTestCase):
             for listener in list(listeners):
                 listener("")
             await pilot.pause()
-
-            # Submit stdin input
-            stdin_inp = screen.query_one("#shell-stdin-input", Input)
-            stdin_inp.value = "my input"
-            screen.on_input_submitted(Input.Submitted(stdin_inp, "my input"))
-            await pilot.pause()
-            bg_task.send_input.assert_called_with("my input")
 
             # Kill task action
             await screen.action_kill_task()

@@ -24,14 +24,14 @@ Johnston equips the primary agent and subagents with a suite of 11 builtin tools
    - `cwd`: Target subdirectory to run command in (default: current workspace root). Always use this parameter instead of `cd`. Omit when working in project root.
    - `wait_seconds=0` spawns async background processes immediately (servers/daemons) and returns a task ID.
    - `wait_seconds=N` waits up to N seconds before transitioning to background with hang detection.
-6. **`manage_shell`**: Manage background shell tasks (`action` in `["send_input", "kill"]`, `task_id`, `input`).
+6. **`kill`**: Terminate a running background shell task or subagent session by ID (`id`).
 
 ## Delegation & Subagents
 7. **`invoke_subagent`**: Spawn a specialized background subagent (`title`, `prompt`, `type`, `branch`).
    - `branch`: optional branch override (`branch_override`) to check out a specific branch instead of generating `subagent/<title>-<id>`.
    - Non-read-only roles (e.g. `worker`) automatically run in an isolated git worktree with an auto-generated or overridden branch, auto-committing on completion.
    - Read-only roles (e.g. `explorer`) run directly in the main workspace.
-8. **`manage_subagent`**: Manage active subagents (`action` in `["send_message", "kill"]`, `session_id`, `message`).
+8. **`message_subagent`**: Send follow-up instructions to an active or completed subagent session (`id`, `message`).
 
 ## Workflow & Research
 9. **`ask_user`**: Prompt user with interactive modal for ambiguous requirements or decisions (`questions`).
@@ -49,8 +49,8 @@ Johnston equips the primary agent and subagents with a suite of 11 builtin tools
 ## Subagent & Non-Interactive Exclusions
 To prevent recursive spawning, interactive stalls, and process collisions, the delegation and UI-orchestration tools (`NON_INTERACTIVE_EXCLUDED_TOOLS`) are strictly disabled in all non-interactive modes (subagent + headless execution):
 - `invoke_subagent`
-- `manage_subagent`
-- `manage_shell`
+- `message_subagent`
+- `kill`
 - `ask_user`
 - `shell(wait_seconds=...)` (non-interactive modes may only run synchronous shell commands)
 

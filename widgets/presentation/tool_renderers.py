@@ -130,99 +130,6 @@ def format_ask_user_display(questions: list[dict], answers: dict[int, dict] | di
     return t
 
 
-def format_manage_shell_display(result_text: str) -> Text:
-    """Format manage_shell list output into a monochrome rich Text renderable."""
-    raw = (result_text or "").strip()
-    if not raw or raw.lower() in ("no tasks active", "no active tasks", "(no active tasks)"):
-        return Text("(No active tasks)")
-
-    t = Text()
-    lines = raw.splitlines()
-    task_lines = []
-    for line in lines:
-        line_clean = line.strip()
-        if not line_clean or line_clean.lower().startswith("active background tasks:"):
-            continue
-        # Pattern: "- ID: {id} | Status: {status} | Command: {cmd}"
-        m = re.match(
-            r"^[-\*]?\s*ID:\s*([^|]+?)\s*\|\s*Status:\s*([^|]+?)\s*\|\s*Command:\s*(.*)$",
-            line_clean,
-            re.IGNORECASE,
-        )
-        if m:
-            t_id, status, cmd = m.group(1).strip(), m.group(2).strip().upper(), m.group(3).strip()
-            if status.startswith("RUNNING"):
-                task_t = Text("[▶] ", style="bold") + Text(f"{t_id}  ", style="bold") + Text(cmd)
-            else:
-                task_t = Text("[✓] ", style="dim") + Text(f"{t_id}  ", style="dim") + Text(cmd, style="dim")
-            task_lines.append(task_t)
-        else:
-            task_lines.append(Text(line_clean))
-
-    if not task_lines:
-        return Text("(No active tasks)")
-
-    for i, tl in enumerate(task_lines):
-        t.append(tl)
-        if i < len(task_lines) - 1:
-            t.append("\n")
-    return t
-
-
-def format_manage_subagent_display(result_text: str) -> Text:
-    """Format manage_subagent list output into a monochrome rich Text renderable."""
-    raw = (result_text or "").strip()
-    if not raw or "no subagent sessions found" in raw.lower() or raw.lower() in ("no tasks active", "(no active subagents)"):
-        return Text("(No active subagents)")
-
-    t = Text()
-    lines = raw.splitlines()
-    subagent_lines = []
-    for line in lines:
-        line_clean = line.strip()
-        if not line_clean or line_clean.lower().startswith("active/past subagent sessions:"):
-            continue
-        # Pattern: "• ID: {id} | Status: {status} | Type: {role} | Title: {title}"
-        m = re.match(
-            r"^[•\-\*]?\s*ID:\s*([^\s|]+)\s*\|\s*Status:\s*([^\s|]+)\s*\|\s*Type:\s*([^|]*?)\s*\|\s*Title:\s*(.*)$",
-            line_clean,
-            re.IGNORECASE,
-        )
-        if m:
-            s_id, status, role, title = (
-                m.group(1).strip(),
-                m.group(2).strip().upper(),
-                m.group(3).strip(),
-                m.group(4).strip(),
-            )
-            from core.role_registry import get_role_display_name
-
-            role_cap = get_role_display_name(role) if role else "Worker"
-            desc = f"{role_cap}: {title}" if title else (role_cap or "(no description)")
-            if status == "RUNNING":
-                item_t = (
-                    Text("[▶] ", style="bold")
-                    + Text(f"{s_id}  ", style="bold")
-                    + Text(desc)
-                )
-            else:
-                item_t = (
-                    Text("[✓] ", style="dim")
-                    + Text(f"{s_id}  ", style="dim")
-                    + Text(desc, style="dim")
-                )
-            subagent_lines.append(item_t)
-        else:
-            subagent_lines.append(Text(line_clean))
-
-    if not subagent_lines:
-        return Text("(No active subagents)")
-
-    for i, sl in enumerate(subagent_lines):
-        t.append(sl)
-        if i < len(subagent_lines) - 1:
-            t.append("\n")
-    return t
 
 
 def format_code_with_line_numbers(code: str) -> str:
@@ -314,16 +221,7 @@ def compute_tool_call_content(
                 else:
                     t.append(block)
             return "raw", t
-        elif canonical_tool == "manage_shell":
-            action = (args.get("action") or "list").lower()
-            if action == "list":
-                return "raw", format_manage_shell_display(result_text or "")
-            clean_res = clean_hints(result_text or "(No result)")
-            return "markup", clean_markup(clean_res)
-        elif canonical_tool == "manage_subagent":
-            action = (args.get("action") or "list").lower()
-            if action == "list":
-                return "raw", format_manage_subagent_display(result_text or "")
+        elif canonical_tool in ("kill", "message_subagent"):
             clean_res = clean_hints(result_text or "(No result)")
             return "markup", clean_markup(clean_res)
         elif canonical_tool == "invoke_subagent":

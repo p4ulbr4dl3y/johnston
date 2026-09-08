@@ -25,20 +25,15 @@ def _extract_streaming_target(buffer: str, scan_from: int = 0, tool_name: str = 
     from core.infrastructure.runtime.tool_name import normalize_tool_name
 
     canonical = normalize_tool_name(tool_name) if tool_name else ""
-    if canonical in ("manage_shell", "manage_subagent"):
-        act_m = re.search(r'"action"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
-        tid_m = re.search(r'"(?:task_id|session_id)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
-        act = act_m.group(1).strip() if act_m else ""
-        tid = tid_m.group(1).strip() if tid_m else ""
-        if act and tid:
-            if act in ("send_input", "send_message"):
-                verb = "send message to" if act == "send_message" else "send input to"
-                return f"{verb} {tid}"
-            return f"{act} {tid}"
-        if tid:
-            return tid
-        if act:
-            return act
+    if canonical == "kill":
+        tid_m = re.search(r'"(?:id|task_id|session_id)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
+        if tid_m:
+            return f"kill {tid_m.group(1).strip()}"
+
+    if canonical == "message_subagent":
+        sid_m = re.search(r'"(?:id|session_id)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
+        if sid_m:
+            return f"send message to {sid_m.group(1).strip()}"
 
     if canonical == "invoke_subagent":
         type_m = re.search(r'"(?:type|role)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)

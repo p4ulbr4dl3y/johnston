@@ -14,9 +14,8 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertTrue(ToolCallWidget("read", "a.zip", result_text="[archive a.zip | total 1]\nx").is_expandable())
         self.assertTrue(ToolCallWidget("search", "x", result_text="[search=content]\nfoo:1: bar").is_expandable())
         self.assertFalse(ToolCallWidget("web_fetch", "http://x").is_expandable())
-        self.assertFalse(ToolCallWidget("invoke_subagent", "prompt").is_expandable())
-        self.assertFalse(ToolCallWidget("manage_shell", "list", args={"action": "list"}).is_expandable())
-        self.assertFalse(ToolCallWidget("manage_subagent", "list", args={"action": "list"}).is_expandable())
+        self.assertFalse(ToolCallWidget("kill", "t1").is_expandable())
+        self.assertFalse(ToolCallWidget("message_subagent", "t1", args={"id": "t1", "message": "hi"}).is_expandable())
         self.assertTrue(ToolCallWidget("shell", "cmd").is_expandable())
         self.assertTrue(ToolCallWidget("create", "f.py").is_expandable())
         self.assertTrue(ToolCallWidget("custom_tool", "x").is_expandable())
@@ -317,7 +316,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget3 = self._widget("ask_user", "", args={"questions": [{"question": "q?", "options": []}]})
         widget3.render_header()
 
-        widget4 = self._widget("manage_shell", "", args={"task_id": "t1"})
+        widget4 = self._widget("kill", "", args={"id": "t1"})
         widget4.render_header()
 
         widget5 = self._widget("my_custom_thing", "t", args={"a": 1})
@@ -505,20 +504,19 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         app.push_screen.assert_called_once()
         event.stop.assert_called_once()
 
-    def test_manage_shell_not_clickable_and_not_expandable(self):
-        for action in ("list", "kill", "send_input", "status"):
-            widget = self._widget("manage_shell", action, args={"action": action})
-            self.assertFalse(widget.is_clickable_header())
-            self.assertFalse(widget.is_expandable())
-            event = MagicMock()
-            with patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop:
-                app = MagicMock()
-                app_prop.return_value = app
-                widget.on_click(event)
-            event.stop.assert_not_called()
-            app.push_screen.assert_not_called()
-            app.notify.assert_not_called()
-            self.assertFalse(widget.is_expanded)
+    def test_kill_not_clickable_and_not_expandable(self):
+        widget = self._widget("kill", "t1", args={"id": "t1"})
+        self.assertFalse(widget.is_clickable_header())
+        self.assertFalse(widget.is_expandable())
+        event = MagicMock()
+        with patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop:
+            app = MagicMock()
+            app_prop.return_value = app
+            widget.on_click(event)
+        event.stop.assert_not_called()
+        app.push_screen.assert_not_called()
+        app.notify.assert_not_called()
+        self.assertFalse(widget.is_expanded)
 
     def test_on_click_shell_toggles_expansion(self):
         widget = self._widget("shell", "execute", args={"command": "ls -la"}, result_text="file.txt")
@@ -539,23 +537,8 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         self.assertTrue(widget.is_expanded)
         event.stop.assert_called_once()
 
-    def test_on_click_manage_subagent_list_is_not_clickable(self):
-        widget = self._widget("manage_subagent", "list", args={"action": "list"})
-        self.assertFalse(widget.is_clickable_header())
-        event = MagicMock()
-        with (
-            patch("widgets.presentation.screens.tasks.SubagentsScreen") as subagents_screen_cls,
-            patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
-        ):
-            app = MagicMock()
-            app_prop.return_value = app
-            widget.on_click(event)
-        subagents_screen_cls.assert_not_called()
-        app.push_screen.assert_not_called()
-        event.stop.assert_not_called()
-
-    def test_on_click_manage_subagent_with_session_id_opens_subagent_view_screen(self):
-        widget = self._widget("manage_subagent", "sess_123", args={"action": "send_message", "session_id": "sess_123"})
+    def test_on_click_message_subagent_with_id_opens_subagent_view_screen(self):
+        widget = self._widget("message_subagent", "sess_123", args={"id": "sess_123", "message": "hello"})
         self.assertTrue(widget.is_clickable_header())
         event = MagicMock()
         mock_store = MagicMock()
@@ -573,8 +556,8 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         app.push_screen.assert_called_once()
         event.stop.assert_called_once()
 
-    def test_on_click_manage_subagent_session_not_found_notifies(self):
-        widget = self._widget("manage_subagent", "sess_123", args={"action": "send_message", "session_id": "sess_123"})
+    def test_on_click_message_subagent_session_not_found_notifies(self):
+        widget = self._widget("message_subagent", "sess_123", args={"id": "sess_123", "message": "hello"})
         self.assertTrue(widget.is_clickable_header())
         event = MagicMock()
         mock_store = MagicMock()
@@ -839,70 +822,25 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
             self.assertFalse(w._should_scroll_on_render)
             render_mock.assert_called_once()
 
-    def test_format_manage_shell_display(self):
-        from widgets.presentation.tool_renderers import format_manage_shell_display
-
-        # Empty
-        t_empty = format_manage_shell_display("no tasks active")
-        self.assertIn("(No active tasks)", t_empty.plain)
-
-        # Active tasks
-        output = (
-            "Active Background Tasks:\n"
-            "- ID: task-1 | Status: RUNNING | Command: uv run pytest\n"
-            "- ID: task-2 | Status: FINISHED | Command: npm run build\n"
-        )
-        t = format_manage_shell_display(output)
-        self.assertIn("[▶]", t.plain)
-        self.assertIn("task-1", t.plain)
-        self.assertIn("uv run pytest", t.plain)
-        self.assertIn("[✓]", t.plain)
-        self.assertIn("task-2", t.plain)
-
-    def test_render_content_manage_shell_list(self):
+    def test_render_content_kill(self):
         w = self._widget(
-            "manage_shell",
-            "- ID: t1 | Status: RUNNING | Command: pytest",
-            args={"action": "list"},
+            "kill",
+            "Terminated background shell task t1",
+            args={"id": "t1"},
         )
         with patch.object(w.content_widget, "update") as upd:
             w.render_content()
         upd.assert_called_once()
-        text_obj = upd.call_args[0][0]
-        self.assertIn("t1", text_obj.plain)
 
-    def test_format_manage_subagent_display(self):
-        from widgets.presentation.tool_renderers import format_manage_subagent_display
-
-        # Empty
-        t_empty = format_manage_subagent_display("No subagent sessions found for current session.")
-        self.assertIn("(No active subagents)", t_empty.plain)
-
-        # Active subagents
-        output = (
-            "Active/Past Subagent Sessions:\n"
-            "• ID: sess_123 | Status: RUNNING | Type: explore | Title: search files\n"
-            "• ID: sess_456 | Status: COMPLETED | Type: code_editor | Title: refactor auth\n"
-        )
-        t = format_manage_subagent_display(output)
-        self.assertIn("[▶]", t.plain)
-        self.assertIn("sess_123", t.plain)
-        self.assertIn("Explore: search files", t.plain)
-        self.assertIn("[✓]", t.plain)
-        self.assertIn("sess_456", t.plain)
-        self.assertIn("Code Editor: refactor auth", t.plain)
-
-    def test_render_content_manage_subagent_list(self):
+    def test_render_content_message_subagent(self):
         w = self._widget(
-            "manage_subagent",
-            "• ID: s1 | Status: RUNNING | Type: explore | Title: find bugs",
-            args={"action": "list"},
+            "message_subagent",
+            "Message delivered to subagent s1",
+            args={"id": "s1", "message": "continue"},
         )
         with patch.object(w.content_widget, "update") as upd:
             w.render_content()
         upd.assert_called_once()
-        text_obj = upd.call_args[0][0]
-        self.assertIn("s1", text_obj.plain)
 
     def test_toolcall_running_hints(self):
         # 1. Foreground shell running -> has ctrl+b and ctrl+o

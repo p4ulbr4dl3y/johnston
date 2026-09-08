@@ -50,17 +50,13 @@ class TestToolDisplay(unittest.TestCase):
         # No title -> shows Worker
         self.assertEqual(extract_tool_display("invoke_subagent", {"prompt": "long prompt"}), "Worker")
 
-    def test_manage_shell_list_action(self):
-        res = extract_tool_display("manage_shell", {"action": "list"})
-        self.assertEqual(res, "list")
+    def test_kill_display(self):
+        res = extract_tool_display("kill", {"id": "task_123"})
+        self.assertEqual(res, "kill task_123")
 
-    def test_manage_shell_send_input_human_like(self):
-        res = extract_tool_display("manage_shell", {"action": "send_input", "task_id": "shell_123"})
-        self.assertEqual(res, "send input to shell_123")
-
-    def test_manage_subagent_send_message_human_like(self):
-        res = extract_tool_display("manage_subagent", {"action": "send_message", "session_id": "sub_123"})
-        self.assertEqual(res, "send message to sub_123")
+    def test_message_subagent_display(self):
+        res = extract_tool_display("message_subagent", {"id": "sub_123", "message": "hello"})
+        self.assertEqual(res, 'to sub_123: "hello"')
 
     def test_unknown_tool_compact_dict(self):
         # Non-builtin (MCP/custom) tools always render the compact dict format.
@@ -72,8 +68,8 @@ class TestToolDisplay(unittest.TestCase):
             self.assertEqual(extract_tool_display(name, {}), "")
         self.assertEqual(extract_tool_display("ask_user", {}), "")
         self.assertEqual(extract_tool_display("invoke_subagent", {}), "Worker")
-        self.assertEqual(extract_tool_display("manage_shell", {}), "")
-        self.assertEqual(extract_tool_display("manage_subagent", {}), "")
+        self.assertEqual(extract_tool_display("kill", {}), "")
+        self.assertEqual(extract_tool_display("message_subagent", {}), "")
 
     def test_builtin_no_generic_string_fallback(self):
         # edit without path, only old/new strings -> empty parens, not old_str.

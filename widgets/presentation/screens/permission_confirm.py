@@ -236,40 +236,18 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"{actor} wants to launch subagent {target_desc} with prompt:"
             else:
                 action_desc = f"{actor} wants to launch subagent {target_desc}"
-        elif self.tool_name in ("manage_shell",):
-            act = (nargs.get("action") or "manage").lower()
-            t_id = nargs.get("task_id") or ""
-
-            if act == "kill":
-                action_desc = (
-                    f"{actor} wants to cancel task `{t_id}`" if t_id else f"{actor} wants to cancel background task"
-                )
-            elif act == "list":
-                action_desc = f"{actor} wants to list background tasks"
-            elif act == "send_input":
-                target_str = f" to task `{t_id}`" if t_id else ""
-                action_desc = f"{actor} wants to send input{target_str}:"
+        elif self.tool_name == "kill":
+            target_id = nargs.get("id") or nargs.get("task_id") or nargs.get("session_id") or ""
+            target_str = f" `{target_id}`" if target_id else ""
+            action_desc = f"{actor} wants to terminate task or subagent{target_str}"
+        elif self.tool_name == "message_subagent":
+            s_id = nargs.get("id") or nargs.get("session_id") or ""
+            target_str = f" to subagent `{s_id}`" if s_id else " to subagent"
+            message = (nargs.get("message") or "").strip()
+            if message:
+                action_desc = f"{actor} wants to send follow-up message{target_str}:"
             else:
-                action_desc = (
-                    f"{actor} wants to `{act}` task `{t_id}`" if t_id else f"{actor} wants to manage background tasks"
-                )
-        elif self.tool_name in ("manage_subagent",):
-            act = (nargs.get("action") or "manage").lower()
-            s_id = nargs.get("session_id") or ""
-
-            if act == "kill":
-                action_desc = (
-                    f"{actor} wants to cancel subagent `{s_id}`" if s_id else f"{actor} wants to cancel a subagent"
-                )
-            elif act == "list":
-                action_desc = f"{actor} wants to list subagents"
-            elif act == "send_message":
-                target_str = f" to subagent `{s_id}`" if s_id else ""
-                action_desc = f"{actor} wants to send a message{target_str}:"
-            else:
-                action_desc = (
-                    f"{actor} wants to `{act}` subagent `{s_id}`" if s_id else f"{actor} wants to manage subagents"
-                )
+                action_desc = f"{actor} wants to send follow-up message{target_str}"
         elif self.tool_name == "update_plan":
             explanation = (nargs.get("explanation") or "").strip()
             if explanation:
@@ -344,15 +322,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 lang = "powershell" if is_windows() else "bash"
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
-            elif (
-                self.tool_name in ("manage_shell",) and (nargs.get("action") or "").lower() == "send_input"
-            ):
-                inp = nargs.get("input") or ""
-                with ToolScrollBox(classes="tool-scroll-box"):
-                    yield Markdown(f"```text\n{inp.strip()}\n```", classes="modal-diff-view")
-            elif (
-                self.tool_name in ("manage_subagent",) and (nargs.get("action") or "").lower() == "send_message"
-            ):
+            elif self.tool_name == "message_subagent":
                 msg = nargs.get("message") or ""
                 if msg:
                     with ToolScrollBox(classes="tool-scroll-box"):
@@ -366,8 +336,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 "shell",
                 "read",
                 "web_fetch",
-                "manage_shell",
-                "manage_subagent",
+                "kill",
+                "message_subagent",
                 "invoke_subagent",
                 "update_plan",
                 "ask_user",
@@ -432,11 +402,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             is_code_or_diff = True
             cmd = nargs.get("command") or ""
             content_lines = cmd.splitlines()
-        elif self.tool_name == "manage_shell" and (nargs.get("action") or "").lower() == "send_input":
-            is_code_or_diff = True
-            inp = nargs.get("input") or ""
-            content_lines = inp.splitlines()
-        elif self.tool_name == "manage_subagent" and (nargs.get("action") or "").lower() == "send_message":
+        elif self.tool_name == "message_subagent":
             is_code_or_diff = False
             msg = nargs.get("message") or ""
             content_lines = msg.splitlines()
@@ -448,8 +414,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             "shell",
             "read",
             "web_fetch",
-            "manage_shell",
-            "manage_subagent",
+            "kill",
+            "message_subagent",
             "invoke_subagent",
             "update_plan",
             "ask_user",

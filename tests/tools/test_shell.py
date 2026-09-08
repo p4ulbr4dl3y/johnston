@@ -167,7 +167,7 @@ async def test_create_windows_process_default_shell(tool):
         await tool._create_windows_process("echo 1", {"ENV": "1"})
         mock_shell.assert_called_once_with(
             "echo 1",
-            stdin=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             env={"ENV": "1"},
@@ -568,18 +568,17 @@ async def test_explicit_run_in_background(tool, make_app_mock, make_tool_context
         assert len([t for t in app.task_manager]) == 1
 
 
-@pytest.mark.skipif(os.name == "nt", reason="cat streaming is POSIX-only")
-async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
-    # Real end-to-end: explicit background task (cat keeps stdin/stdout
-    # open). manage_shell must list it as RUNNING (process alive), send
-    # input to its stdin, and kill it.
+@pytest.mark.skipif(os.name == "nt", reason="POSIX test")
+async def test_background_task_kill_lifecycle(tool, make_app_mock):
+    # Real end-to-end: explicit background task (sleep 30).
+    # kill tool terminates it.
     app = _app(make_app_mock, task_manager=TaskManager())
 
-    from tools.manage_shell import ManageShellTool
+    from tools.kill import KillTool
 
-    mgr = ManageShellTool()
+    killer = KillTool()
     with patch("tools.shell.shell_executable", return_value="/bin/sh"):
-        res = await tool.execute({"command": "cat", "wait_seconds": 0}, ctx=app)
+        res = await tool.execute({"command": "sleep 30", "wait_seconds": 0}, ctx=app)
     m = re.search(r'(?:Task ID: |id:\s*|id\s+|id=")(shell-[a-f0-9]+)', str(res.content) + " " + str(res.display))
     assert m is not None
     task_id = m.group(1)
@@ -587,22 +586,10 @@ async def test_background_task_manage_shell_lifecycle(tool, make_app_mock):
     tasks = [t for t in app.task_manager]
     assert len(tasks) == 1
     assert tasks[0].is_background
-
     assert tasks[0].is_running
 
-    # send_input: writes to live stdin
-    got_output = asyncio.Event()
-    tasks[0].add_listener(lambda chunk: got_output.set() if "hello_manage" in chunk else None)
-    r = await mgr.execute({"action": "send_input", "task_id": task_id, "input": "hello_manage"}, ctx=app)
-    assert "[input sent" in r.content or "input sent" in str(r.display)
-    await asyncio.wait_for(got_output.wait(), timeout=3.0)
-
-    # background output is streamed into the task buffer (file log too)
-    streamed = tasks[0].output.formatted()
-    assert "hello_manage" in streamed
-
     # kill: terminates the live process
-    r = await mgr.execute({"action": "kill", "task_id": task_id}, ctx=app)
+    r = await killer.execute({"id": task_id}, ctx=app)
     assert "killed" in r.content or "killed" in str(r.display)
 
 

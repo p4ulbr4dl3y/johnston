@@ -65,4 +65,4 @@ Johnston ships with 3 builtin roles:
 Subagents are invoked via `invoke_subagent(title="...", prompt="...", type="<role_key>")`:
 - **Write roles (e.g. `worker`)**: automatically execute inside an isolated Git worktree on an auto-generated branch (`subagent/<title>-<id>`), auto-committing on completion. Requires workspace to be a Git repository; in non-Git directories, runs directly in the workspace.
 - **Read-only roles (e.g. `explorer`, `reviewer`)**: execute directly in the main workspace without worktree isolation, with OS sandbox enabled.
-- **Non-Interactive Exclusions**: `invoke_subagent`, `manage_subagent`, `manage_shell`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in all non-interactive contexts (subagent roles and headless mode).
+- **Non-Interactive Exclusions**: `invoke_subagent`, `message_subagent`, `kill`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in all non-interactive contexts (subagent roles and headless mode).

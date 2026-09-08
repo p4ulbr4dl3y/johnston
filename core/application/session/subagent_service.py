@@ -101,7 +101,7 @@ class SubagentService:
         max_subagents = settings.subagents.max_concurrent
         if len(running_subagents) >= max_subagents:
             return ToolResult.error(
-                "limit", detail=f"{max_subagents} concurrent max; wait or manage_subagent(action='kill')"
+                "limit", detail=f"{max_subagents} concurrent max; wait or kill(id='...')"
             )
 
         subagent = ctx.create_agent()

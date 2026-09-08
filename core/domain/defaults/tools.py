@@ -5,8 +5,8 @@
 # user questions without a UI host.
 NON_INTERACTIVE_EXCLUDED_TOOLS = {
     "invoke_subagent",
-    "manage_subagent",
-    "manage_shell",
+    "message_subagent",
+    "kill",
     "ask_user",
 }
 SUBAGENT_EXCLUDED_TOOLS = NON_INTERACTIVE_EXCLUDED_TOOLS

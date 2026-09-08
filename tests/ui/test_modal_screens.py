@@ -202,19 +202,18 @@ class TestPermissionConfirmExtra(unittest.IsolatedAsyncioTestCase):
         screen = PermissionConfirmScreen("read", {"path": "x"})
         self.assertEqual(screen._build_diff_text("x"), "")
 
-    async def test_compose_manage_subagent(self):
+    async def test_compose_kill_and_message_subagent(self):
         from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         cases = [
-            {"action": "kill", "session_id": "s1"},
-            {"action": "kill"},
-            {"action": "list"},
-            {"action": "send_message", "session_id": "s1"},
-            {"action": "send_message"},
-            {"action": "manage", "session_id": "s1"},
+            ("kill", {"id": "s1"}),
+            ("kill", {}),
+            ("message_subagent", {"id": "s1", "message": "hi"}),
+            ("message_subagent", {"id": "s1"}),
+            ("message_subagent", {}),
         ]
-        for args in cases:
-            screen = PermissionConfirmScreen("manage_subagent", args)
+        for tool_name, args in cases:
+            screen = PermissionConfirmScreen(tool_name, args)
             async with _PermHostApp(screen).run_test() as pilot:
                 await pilot.pause()
 
@@ -257,7 +256,7 @@ if __name__ == "__main__":
         """'p' with no suggested pattern must NOT silently always-allow."""
         from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
 
-        screen = PermissionConfirmScreen("manage_shell", {"action": "list"})
+        screen = PermissionConfirmScreen("kill", {"id": "t1"})
         self.assertIsNone(screen.suggested_pattern)
         dismissed = []
         screen.dismiss = dismissed.append

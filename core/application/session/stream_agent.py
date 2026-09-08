@@ -57,7 +57,7 @@ def configure_subagent_agent(
     """Configures a subagent agent: binds the app, marks it as a subagent, and
     applies its role (system prompt, model, tool filtering).
 
-    Shared by invoke_subagent spawn and manage_subagent follow-ups so the setup
+    Shared by invoke_subagent spawn and message_subagent follow-ups so the setup
     stays identical (and survives process restarts in the follow-up path).
     """
     return configure_agent(

@@ -12,7 +12,7 @@ from core.infrastructure.tasks.shell_task import ShellTask
 from core.infrastructure.tasks.task import BaseTask, TaskStatus
 from core.theme_manager import ThemeManager
 from tools.context import ToolContext
-from tools.manage_shell import ManageShellTool
+from tools.kill import KillTool
 from widgets.chat_toolcall import ToolCallWidget
 from widgets.mixins.message_flow_background import on_background_shell_completed, update_background_shell_widget
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
@@ -37,9 +37,6 @@ class DummyTask(BaseTask):
         return ""
 
     async def tail(self, max_chars: int = 4000) -> str:
-        return ""
-
-    async def send_input(self, text: str) -> str:
         return ""
 
     async def kill(self) -> None:
@@ -124,9 +121,9 @@ async def test_task_manager_auto_prunes_on_task_wait():
 
 
 @pytest.mark.asyncio
-async def test_manage_shell_kill_teardown_widget():
-    """manage_shell(action='kill') ensures _background_shell_widgets is popped."""
-    tool = ManageShellTool()
+async def test_kill_tool_teardown_widget():
+    """kill tool ensures _background_shell_widgets is popped."""
+    tool = KillTool()
     app = MagicMock()
     app._background_shell_widgets = {}
 
@@ -137,7 +134,7 @@ async def test_manage_shell_kill_teardown_widget():
     ctx = ToolContext(app=app)
     app.task_manager = [task]
 
-    res = await tool.execute({"action": "kill", "task_id": "t_bg"}, ctx=ctx)
+    res = await tool.execute({"id": "t_bg"}, ctx=ctx)
     assert not res.is_error
     assert "t_bg" not in app._background_shell_widgets
     widget.set_result.assert_called_once()

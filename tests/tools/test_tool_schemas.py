@@ -31,16 +31,12 @@ class TestToolSchemas(unittest.TestCase):
         self.assertNotIn("skip_confirm", props)
         self.assertNotIn("no_background", props)
 
-    def test_manage_shell_action_has_enum_and_required(self):
-        from tools.manage_shell import ManageShellTool
+    def test_kill_schema(self):
+        from tools.kill import KillTool
 
-        params = ManageShellTool.schema["function"]["parameters"]
-        self.assertEqual(
-            params["properties"]["action"]["enum"],
-            ["send_input", "kill"],
-        )
-        self.assertIn("action", params["required"])
-        self.assertIn("task_id", params["required"])
+        props = KillTool.schema["function"]["parameters"]["properties"]
+        self.assertIn("id", props)
+        self.assertEqual(KillTool.schema["function"]["parameters"]["required"], ["id"])
 
     def test_invoke_subagent_dynamic_role_enum(self):
         from tools.invoke_subagent import InvokeSubagentTool
@@ -60,14 +56,14 @@ class TestToolSchemas(unittest.TestCase):
         self.assertIn("offset", props["content_offset"]["description"].lower())
         self.assertNotIn("detail", props)
 
-    def test_manage_shell_schema(self):
-        from tools.manage_shell import ManageShellTool
+    def test_message_subagent_schema(self):
+        from tools.message_subagent import MessageSubagentTool
 
-        props = ManageShellTool.schema["function"]["parameters"]["properties"]
-        self.assertIn("action", props)
-        self.assertIn("task_id", props)
-        self.assertIn("input", props)
-        self.assertEqual(ManageShellTool.schema["function"]["parameters"]["required"], ["action", "task_id"])
+        params = MessageSubagentTool.schema["function"]["parameters"]
+        props = params["properties"]
+        self.assertIn("id", props)
+        self.assertIn("message", props)
+        self.assertEqual(params["required"], ["id", "message"])
 
     def test_subagent_schema_has_title_and_no_branch_or_session_id(self):
         from tools.invoke_subagent import InvokeSubagentTool
@@ -79,16 +75,6 @@ class TestToolSchemas(unittest.TestCase):
         self.assertNotIn("branch", props)
         self.assertNotIn("session_id", props)
         self.assertNotIn("task_id", props)
-
-    def test_manage_subagent_schema_has_session_id(self):
-        from tools.manage_subagent import ManageSubagentTool
-
-        params = ManageSubagentTool.schema["function"]["parameters"]
-        props = params["properties"]
-        self.assertIn("session_id", props)
-        self.assertNotIn("task_id", props)
-        self.assertEqual(props["action"]["enum"], ["send_message", "kill"])
-        self.assertEqual(params["required"], ["action", "session_id"])
 
 
 class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):

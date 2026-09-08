@@ -1,0 +1,58 @@
+from typing import Any, Dict
+
+from core.domain.defaults.errors import ToolResult
+from tools.base import BaseTool
+
+
+class MessageSubagentTool(BaseTool):
+    name = "message_subagent"
+    description = "Send follow-up instructions to an existing subagent session."
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "message_subagent",
+            "description": (
+                "Send follow-up instructions to an existing subagent session "
+                "(resumes subagent with its worktree branch and history)."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Target subagent session ID or title (matches 'id' in <notification>).",
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Follow-up instruction, clarification, or feedback for the subagent.",
+                    },
+                },
+                "required": ["id", "message"],
+            },
+        },
+    }
+
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
+        args = args or {}
+        ctx = self._ensure_context(ctx)
+        session_id = (args.get("id") or args.get("session_id") or "").strip()
+        message = (args.get("message") or "").strip()
+
+        from core.infrastructure.storage.session_store import get_session_store
+
+        store = get_session_store(ctx.host)
+        curr_session_id = ctx.session_id or ""
+
+        if not session_id:
+            return ToolResult.error("params", name="id", detail="required")
+
+        if not message:
+            return ToolResult.error("params", name="message", detail="required")
+
+        from core.application.session.subagent_service import SubagentService
+
+        session = store.find_session_by_title_or_id(session_id, parent_id=curr_session_id) if store else None
+        if not session:
+            return ToolResult.error("notfound", name=session_id)
+
+        return await SubagentService.send_message(session, message, ctx, store)

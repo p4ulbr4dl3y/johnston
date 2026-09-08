@@ -30,9 +30,9 @@ DISPLAY_NAMES: dict[str, str] = {
     "shell": "Shell",
     "search": "Search",
     "ask_user": "AskUser",
-    "manage_shell": "ManageShell",
+    "kill": "Kill",
     "invoke_subagent": "InvokeSubagent",
-    "manage_subagent": "ManageSubagent",
+    "message_subagent": "MessageSubagent",
     "web_fetch": "WebFetch",
     "update_plan": "UpdatePlan",
 }
@@ -160,8 +160,8 @@ class ToolCallWidget(
         if canonical in (
             "web_fetch",
             "invoke_subagent",
-            "manage_shell",
-            "manage_subagent",
+            "kill",
+            "message_subagent",
         ):
             return False
         if canonical in self.EXPANDABLE_TOOLS:
@@ -273,7 +273,7 @@ class ToolCallWidget(
         if log_path:
             self.log_path = log_path
 
-        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "manage_subagent") and not self.subagent_session_id:
+        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "message_subagent") and not self.subagent_session_id:
             if hasattr(self, "bind_subagent_session"):
                 self.bind_subagent_session()
 

@@ -61,8 +61,10 @@ async def restore_message_item(
             is_live = bool(task_id and mgr is not None and getattr(mgr, "_tasks", {}).get(task_id) is not None)
             if not is_live:
                 status = "done" if rtext else "cancelled"
-        sub_id = msg.get("subagent_session_id") or (targs.get("session_id") if isinstance(targs, dict) else None)
-        if not sub_id and ttype in ("invoke_subagent", "manage_subagent"):
+        sub_id = msg.get("subagent_session_id") or (
+            (targs.get("id") or targs.get("session_id")) if isinstance(targs, dict) else None
+        )
+        if not sub_id and ttype in ("invoke_subagent", "message_subagent"):
             title = targs.get("title") or targs.get("prompt")
             if title:
                 app = None

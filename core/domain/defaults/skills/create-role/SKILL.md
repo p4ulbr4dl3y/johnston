@@ -60,14 +60,14 @@ Johnston provides 11 builtin tools:
 - `create`: Create new files.
 - `edit`: Surgical string replacements in existing files.
 - `shell`: Run commands in persistent session (with idle timeouts).
-- `manage_shell`: Terminate or send input to background processes.
+- `kill`: Terminate background processes or subagents.
 - `invoke_subagent`: Launch autonomous child agents in background.
-- `manage_subagent`: Terminate or send message to running subagents.
+- `message_subagent`: Send follow-up messages to running subagents.
 - `ask_user`: Interactive multiple-choice prompts for user feedback.
 - `update_plan`: Maintain persistent task list / progress tracking.
 - `web_fetch`: Retrieve URL contents as markdown or HTML.
 
-*Note: Non-interactive contexts (subagents and headless runs) automatically disable `invoke_subagent`, `manage_subagent`, `manage_shell`, `ask_user`, and `shell(wait_seconds=...)`.*
+*Note: Non-interactive contexts (subagents and headless runs) automatically disable `invoke_subagent`, `message_subagent`, `kill`, `ask_user`, and `shell(wait_seconds=...)`.*
 
 ## 4. Role Templates
 
@@ -141,7 +141,7 @@ Application security auditor. Identify vulnerabilities and risk patterns without
   - Subagents running with **write roles** (`read_only: false`) automatically execute inside an isolated Git worktree on an independent branch (`subagent/<title>-<id>`), automatically committing on completion. **Requires workspace to be inside a Git repository**; in non-Git workspaces, executes directly in place.
   - Subagents running with **read-only roles** (`read_only: true`) execute directly within the current workspace without worktree creation, with OS-level sandbox enforced.
 - **Non-Interactive Exclusions**:
-  - `invoke_subagent`, `manage_subagent`, `manage_shell`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in subagent roles to prevent recursive agent loops.
+  - `invoke_subagent`, `message_subagent`, `kill`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in subagent roles to prevent recursive agent loops.
 
 ## 6. Creation & Verification Steps
 

@@ -120,8 +120,8 @@ BUILTIN_TOOLS = frozenset(
         "ask_user",
         "web_fetch",
         "invoke_subagent",
-        "manage_subagent",
-        "manage_shell",
+        "message_subagent",
+        "kill",
         "update_plan",
         "view_file",
     }

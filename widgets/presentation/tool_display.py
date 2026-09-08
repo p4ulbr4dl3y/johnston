@@ -283,18 +283,21 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: i
         if title:
             return truncate(f'{role_cap}: "{title}"', max_len=max_len, mode=mode)
         return truncate(role_cap, max_len=max_len, mode=mode)
-    if name in ("manage_shell", "manage_subagent"):
-        act = args.get("action") or ""
-        tid = args.get("session_id" if name == "manage_subagent" else "task_id") or ""
-        if act and tid:
-            if act in ("send_input", "send_message"):
-                verb = "send message to" if act == "send_message" else "send input to"
-                return truncate(f"{verb} {tid}", max_len=max_len, mode=mode)
-            return truncate(f"{act} {tid}", max_len=max_len, mode=mode)
+    if name == "kill":
+        tid = str(args.get("id") or args.get("task_id") or args.get("session_id") or "").strip()
         if tid:
-            return truncate(tid, max_len=max_len, mode=mode)
-        if act:
-            return truncate(act, max_len=max_len, mode=mode)
+            return truncate(f"kill {tid}", max_len=max_len, mode=mode)
+        return ""
+
+    if name == "message_subagent":
+        tid = str(args.get("id") or args.get("session_id") or "").strip()
+        msg = str(args.get("message") or "").strip()
+        if tid and msg:
+            return truncate(f'to {tid}: "{msg}"', max_len=max_len, mode=mode)
+        if tid:
+            return truncate(f"to {tid}", max_len=max_len, mode=mode)
+        if msg:
+            return truncate(f'"{msg}"', max_len=max_len, mode=mode)
         return ""
 
     if name == "update_plan":

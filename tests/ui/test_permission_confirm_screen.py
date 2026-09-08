@@ -113,11 +113,8 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             ("web_fetch", {"url": "https://example.com"}),
             ("invoke_subagent", {"title": "Task 1", "role": "coder", "prompt": "fix bug"}),
             ("invoke_subagent", {"type": "worker"}),
-            ("manage_shell", {"action": "kill", "task_id": "t1"}),
-            ("manage_shell", {"action": "send_input", "task_id": "t1", "input": "hello"}),
-            ("manage_subagent", {"action": "list"}),
-            ("manage_subagent", {"action": "kill", "session_id": "s1"}),
-            ("manage_subagent", {"action": "send_message", "session_id": "s1", "message": "hello sub"}),
+            ("kill", {"id": "t1"}),
+            ("message_subagent", {"id": "s1", "message": "hello sub"}),
             ("update_plan", {"explanation": "step 1", "plan": [{"step": "Step one", "status": "completed"}]}),
             ("update_plan", {"plan": "1. Step one\n2. Step two"}),
             ("ask_user", {"questions": [{"question": "Q1", "options": ["opt1", "opt2"]}]}),
@@ -162,13 +159,13 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
             self.assertIn("Subagent (worker) wants to edit", all_md)
 
-    async def test_compose_manage_shell_list_other(self):
+    async def test_compose_kill_and_message_subagent(self):
         cases = [
-            {"action": "list"},
-            {"action": "unknown"},
+            ("kill", {"id": "t1"}),
+            ("message_subagent", {"id": "s1", "message": "hello"}),
         ]
-        for args in cases:
-            screen = PermissionConfirmScreen("manage_shell", args)
+        for t_name, args in cases:
+            screen = PermissionConfirmScreen(t_name, args)
             async with HostApp(screen).run_test() as pilot:
                 await pilot.pause()
 

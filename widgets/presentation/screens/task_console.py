@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 from typing import Optional
 
@@ -78,11 +77,8 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             with ToolScrollBox(classes="tool-scroll-box"):
                 yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
             yield RichLog(id="console-log", highlight=False, markup=False, auto_scroll=False)
-            yield TaskStdinInput(
-                placeholder="Send input to stdin (Enter)...", id="shell-stdin-input", classes="modal-input"
-            )
             yield ModalHint(
-                "enter Stdin • pgup/dn Scroll • ctrl+k Kill • esc Back"
+                "pgup/dn Scroll • ctrl+k Kill • esc Back"
                 if is_running
                 else "pgup/dn Scroll • esc Back",
                 id=MODAL_HINT_ID,
@@ -114,9 +110,9 @@ class TaskConsoleScreen(BaseModalScreen[None]):
 
         usable_h = fit_modal_dialog(dialog, screen_h)
         if screen_h < 18:
-            overhead = 8 + cmd_h + (2 if is_running else 0)
+            overhead = 8 + cmd_h
         else:
-            overhead = 11 + cmd_h + (2 if is_running else 0)
+            overhead = 11 + cmd_h
 
         target_h = max(2, min(14, usable_h - overhead))
 
@@ -135,9 +131,9 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             is_running = getattr(self.bg_task, "is_running", False)
             if is_running:
                 hint_str = (
-                    "enter Stdin • ctrl+k Kill • esc"
+                    "ctrl+k Kill • esc"
                     if is_compact
-                    else "enter Stdin • pgup/dn Scroll • ctrl+k Kill • esc Back"
+                    else "pgup/dn Scroll • ctrl+k Kill • esc Back"
                 )
             else:
                 hint_str = "pgup/dn • esc" if is_compact else "pgup/dn Scroll • esc Back"
@@ -168,18 +164,8 @@ class TaskConsoleScreen(BaseModalScreen[None]):
 
     def _update_state(self) -> None:
         self._apply_dynamic_log_height()
-        is_running = getattr(self.bg_task, "is_running", False)
-        try:
-            stdin_inp = self.query_one("#shell-stdin-input", Input)
-            if is_running:
-                stdin_inp.display = True
-                stdin_inp.focus()
-            else:
-                stdin_inp.display = False
-                if self.log_widget:
-                    self.log_widget.focus()
-        except Exception:
-            pass
+        if self.log_widget:
+            self.log_widget.focus()
         self._update_hint()
 
     def on_resize(self, event: events.Resize) -> None:
@@ -231,13 +217,6 @@ class TaskConsoleScreen(BaseModalScreen[None]):
             self.log_widget.write(process_carriage_returns(self._pending_line), scroll_end=at_bottom)
             self._pending_line = ""
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "shell-stdin-input":
-            val = event.value
-            event.input.value = ""
-            if self.bg_task and getattr(self.bg_task, "is_running", False):
-                if hasattr(self.bg_task, "send_input"):
-                    asyncio.create_task(self.bg_task.send_input(val))
 
     def action_scroll_page_up(self) -> None:
         if self.log_widget:

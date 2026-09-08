@@ -50,7 +50,7 @@ class ActionsMixin(PlanActionsMixin):
     def action_background_all(self) -> None:
         """Background all running foreground shell tasks.
 
-        Mirrors the session scoping used by manage_shell and the tasks screen:
+        Mirrors the session scoping used by the tasks screen:
         when a session is active, only its own tasks are affected. Tool cards are
         left as-is: an open expansion keeps streaming live output until the task
         completes and the completion callback repaints it.

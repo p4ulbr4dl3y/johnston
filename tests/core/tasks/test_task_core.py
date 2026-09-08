@@ -95,18 +95,6 @@ async def test_shell_task_kill_sets_killed_status():
     assert not task.is_running
 
 
-@pytest.mark.slow
-@pytest.mark.asyncio
-async def test_shell_task_send_input_missing_stdin_reports_error():
-    proc = await asyncio.create_subprocess_exec(
-        sys.executable, "-c", "print('hi')", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
-    )
-    task = ShellTask(task_id="t3", command="echo hi", process=proc)
-    task.start_reading()
-    await task.wait()
-    res = await task.send_input("nope")
-    assert "not running" in res
-
 
 @pytest.mark.asyncio
 async def test_shell_task_move_to_background_sets_flag_and_event():

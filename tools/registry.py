@@ -12,8 +12,8 @@ from tools.base import BaseTool, _resolve_app
 from tools.create import CreateTool
 from tools.edit import EditTool
 from tools.invoke_subagent import InvokeSubagentTool
-from tools.manage_shell import ManageShellTool
-from tools.manage_subagent import ManageSubagentTool
+from tools.kill import KillTool
+from tools.message_subagent import MessageSubagentTool
 from tools.read import ReadTool
 from tools.search import SearchTool
 from tools.shell import ShellTool
@@ -27,9 +27,9 @@ TOOL_CLASSES = [
     ShellTool,
     SearchTool,
     AskUserTool,
-    ManageShellTool,
+    KillTool,
     InvokeSubagentTool,
-    ManageSubagentTool,
+    MessageSubagentTool,
     UpdatePlanTool,
     WebFetchTool,
 ]

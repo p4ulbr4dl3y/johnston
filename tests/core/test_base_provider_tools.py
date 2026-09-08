@@ -23,7 +23,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         pm = PermissionManager.get_instance()
         pm.set_session_override("shell", "allow")
-        pm.set_session_override("manage_shell", "allow")
+        pm.set_session_override("kill", "allow")
         pm.set_session_override("invoke_subagent", "allow")
         # Grant the file tools that used to be 'allow' via the removed read/write groups.
         pm.set_session_override("read", "allow")
@@ -104,7 +104,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         res_shell = await execute_tool("shell", {"command": "echo 'hello shell'"})
         self.assertIn("hello shell", res_shell.content)
 
-    async def test_manage_shell_tool(self):
+    async def test_kill_tool(self):
         class DummyApp:
             def __init__(self):
                 from core.infrastructure.tasks.manager import TaskManager
@@ -112,7 +112,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
                 self.task_manager = TaskManager()
 
         app = DummyApp()
-        res = await execute_tool("manage_shell", {"action": "kill", "task_id": "not_found"}, app=app)
+        res = await execute_tool("kill", {"id": "not_found"}, app=app)
         self.assertIn("notfound", res.content.lower())
 
     async def test_task_tool_foreground(self):
