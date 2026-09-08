@@ -6,14 +6,19 @@ from tools.base import BaseTool
 
 class MessageSubagentTool(BaseTool):
     name = "message_subagent"
-    description = "Send follow-up instructions to an existing subagent session."
+    description = (
+        "Send follow-up instructions to an existing subagent session (resumes subagent with its worktree branch and history). "
+        "Use when: previous task needs refinement, fixes on partial/failed output, or next steps in the same scope. "
+        "Do NOT use for new independent tasks (call invoke_subagent instead)."
+    )
     schema = {
         "type": "function",
         "function": {
             "name": "message_subagent",
             "description": (
-                "Send follow-up instructions to an existing subagent session "
-                "(resumes subagent with its worktree branch and history)."
+                "Send follow-up instructions to an existing subagent session (resumes subagent with its worktree branch and history). "
+                "Use when: previous task needs refinement, fixes on partial/failed output, or next steps in the same scope. "
+                "Do NOT use for new independent tasks (call invoke_subagent instead)."
             ),
             "parameters": {
                 "type": "object",

@@ -21,7 +21,7 @@ System prompt instructions for the role...
 
 ## Scope
 - `any` (default): Available in all modes (interactive TUI, headless CLI, subagents).
-- `subagent`: Usable only as `type` in `invoke_subagent`.
+- `subagent`: Usable only as `role` in `invoke_subagent`.
 - `main`: Usable only as main agent execution role (interactive + headless, not selectable for subagents).
 - `interactive`: Usable only in interactive TUI sessions.
 - `headless`: Usable only in headless/non-interactive CLI runs.
@@ -62,7 +62,7 @@ Johnston ships with 3 builtin roles:
 - `reviewer` (scope: `any`): Adversarial defect-first audit of git diff/changes; executes tests and edge cases via shell to emit P0-P3 verdict. Use for complex diffs or critical logic (auth, permissions, concurrency); skip for docs, typos, styles, and test mocks.
 
 ## Tool Isolation & Worktree Modes
-Subagents are invoked via `invoke_subagent(title="...", prompt="...", type="<role_key>")`:
+Subagents are invoked via `invoke_subagent(title="...", task="...", role="<role_key>")`:
 - **Write roles (e.g. `worker`)**: automatically execute inside an isolated Git worktree on an auto-generated branch (`subagent/<title>-<id>`), auto-committing on completion. Requires workspace to be a Git repository; in non-Git directories, runs directly in the workspace.
 - **Read-only roles (e.g. `explorer`, `reviewer`)**: execute directly in the main workspace without worktree isolation, with OS sandbox enabled.
 - **Non-Interactive Exclusions**: `invoke_subagent`, `message_subagent`, `kill`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in all non-interactive contexts (subagent roles and headless mode).

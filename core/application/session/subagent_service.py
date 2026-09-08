@@ -12,7 +12,6 @@ from core.infrastructure.config.settings import get_settings
 from core.infrastructure.runtime.git_utils import run_git_async
 from core.infrastructure.runtime.subagent_tracker import record_subagent_session
 from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
-from core.infrastructure.runtime.xml_utils import escape_xml_attr
 from core.infrastructure.storage.session_store import get_session_store
 
 logger = logging.getLogger(__name__)
@@ -77,6 +76,7 @@ class SubagentService:
         ctx: Any,
         worktree_manager_cls: Any = SubagentWorktreeManager,
         settings_provider: Any = get_settings,
+        param_name: str = "prompt",
     ) -> ToolResult:
         """Spawn an autonomous background subagent with isolated git worktree and session."""
         prompt = (prompt or "").strip()
@@ -85,7 +85,7 @@ class SubagentService:
         branch_override = (branch_override or "").strip()
 
         if not prompt:
-            return ToolResult.error("params", name="prompt", detail="required")
+            return ToolResult.error("params", name=param_name, detail="required")
 
         store = get_session_store(ctx.host)
         gen_sub_id = getattr(store, "generate_subagent_id", None)
@@ -135,19 +135,21 @@ class SubagentService:
                     branch_name = f"subagent/{slug}-{id_tail}"
                 else:
                     branch_name = f"subagent/{role_key}-{id_tail}"
+            elif branch_name == current_branch:
+                id_tail = session_id.split("-")[-1] if "-" in session_id else session_id[:8]
+                branch_name = f"subagent/{branch_name}-{id_tail}"
 
-            if branch_name != current_branch:
-                try:
-                    wt_path, wt_branch = await worktree_manager_cls.create_worktree_async(
-                        project_dir, session_id, branch_name
-                    )
-                except Exception as exc:
-                    return ToolResult.error("worktree", detail=f"Failed to create git worktree: {exc}")
-                if not wt_path:
-                    return ToolResult.error("worktree", detail=f"Failed to create git worktree for branch '{branch_name}'")
-                subagent.project_dir = wt_path
-                subagent.cwd = wt_path
-                subagent.worktree_branch = wt_branch
+            try:
+                wt_path, wt_branch = await worktree_manager_cls.create_worktree_async(
+                    project_dir, session_id, branch_name
+                )
+            except Exception as exc:
+                return ToolResult.error("worktree", detail=f"Failed to create git worktree: {exc}")
+            if not wt_path:
+                return ToolResult.error("worktree", detail=f"Failed to create git worktree for branch '{branch_name}'")
+            subagent.project_dir = wt_path
+            subagent.cwd = wt_path
+            subagent.worktree_branch = wt_branch
 
         from core.application.session.stream import configure_subagent_agent
 
@@ -208,8 +210,7 @@ class SubagentService:
         record_subagent_session(ctx.host, session_id)
         ctx.refresh_status()
 
-        branch_info = f" | branch {escape_xml_attr(wt_branch)}" if wt_branch else ""
-        content_txt = f"[subagent started | id {session_id} | role {escape_xml_attr(canonical_role)}{branch_info}]"
+        content_txt = f"[subagent started | id {session_id} | role {canonical_role}]"
         return ToolResult(
             status=ToolResultStatus.RUNNING,
             content=content_txt,
@@ -296,6 +297,17 @@ class SubagentService:
                 session.finish(SessionStatus.CANCELLED, "Cancelled via subagent tool")
                 if store:
                     store.save(session)
+
+        # Cleanup worktree and discard branch on explicit kill
+        wt_path = getattr(session, "project_dir", "") or ""
+        wt_branch = getattr(session, "branch_name", "") or ""
+        parent_dir = getattr(store, "project_path", "") or ""
+        if wt_branch and parent_dir:
+            try:
+                SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=False)
+            except Exception:
+                pass
+
         return ToolResult.done(content=f"[killed {session.id}]", display="")
 
     @classmethod

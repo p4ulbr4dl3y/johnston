@@ -256,9 +256,18 @@ async def run_subagent_stream_bg(
                         else:
                             result_text = base_text or "Completed with no text output."
 
+                        branch = getattr(session, "branch_name", None) or None
+                        if status_val == "completed":
+                            if branch:
+                                hint = f"\n\n[Next: inspect diff & 'git merge {branch}'. If incomplete/broken: call message_subagent(id=\"{sid}\", message=\"...\")]"
+                            else:
+                                hint = f"\n\n[If incomplete/fixes needed: call message_subagent(id=\"{sid}\", message=\"...\")]"
+                            result_text += hint
+                        elif status_val == "error":
+                            result_text += f"\n\n[If fixable: call message_subagent(id=\"{sid}\", message=\"...\")]"
+
                         from core.domain.policies.messages import format_background_notification
 
-                        branch = getattr(session, "branch_name", None) or None
                         msg = format_background_notification(
                             type_="subagent",
                             title=session.title or "Subagent",

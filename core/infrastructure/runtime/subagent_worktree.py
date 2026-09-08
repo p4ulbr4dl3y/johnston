@@ -195,6 +195,23 @@ class SubagentWorktreeManager(GitWorktreeManager):
             delete_branch=not keep_branch if branch_name else False,
             keep_branch=keep_branch,
         )
+        SubagentWorktreeManager.prune_merged_subagent_branches(project_dir)
+
+    @staticmethod
+    def prune_merged_subagent_branches(project_dir: str) -> None:
+        """Removes local branches matching 'subagent/*' that are already merged into HEAD."""
+        if not project_dir or not SubagentWorktreeManager.is_git_repo(project_dir):
+            return
+        repo_root = SubagentWorktreeManager.get_repo_root(project_dir) or project_dir
+        try:
+            res = run_git(["branch", "--list", "subagent/*", "--merged", "HEAD"], cwd=repo_root, timeout=10)
+            if res.returncode == 0 and res.stdout.strip():
+                for line in res.stdout.splitlines():
+                    branch = line.strip().lstrip("* ")
+                    if branch and branch.startswith("subagent/"):
+                        run_git(["branch", "-d", branch], cwd=repo_root, timeout=10)
+        except Exception:
+            pass
 
     @staticmethod
     def ensure_worktree_available(session, parent_dir: Optional[str] = None) -> str:

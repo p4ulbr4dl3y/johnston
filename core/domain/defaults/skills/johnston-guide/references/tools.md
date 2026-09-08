@@ -27,9 +27,8 @@ Johnston equips the primary agent and subagents with a suite of 11 builtin tools
 6. **`kill`**: Terminate a running background shell task or subagent session by ID (`id`).
 
 ## Delegation & Subagents
-7. **`invoke_subagent`**: Spawn a specialized background subagent (`title`, `prompt`, `type`, `branch`).
-   - `branch`: optional branch override (`branch_override`) to check out a specific branch instead of generating `subagent/<title>-<id>`.
-   - Non-read-only roles (e.g. `worker`) automatically run in an isolated git worktree with an auto-generated or overridden branch, auto-committing on completion.
+7. **`invoke_subagent`**: Spawn a specialized background subagent (`title`, `task`, `role`).
+   - Non-read-only roles (e.g. `worker`) automatically run in an isolated git worktree with an auto-generated branch, auto-committing on completion.
    - Read-only roles (e.g. `explorer`) run directly in the main workspace.
 8. **`message_subagent`**: Send follow-up instructions to an active or completed subagent session (`id`, `message`).
 

@@ -78,3 +78,32 @@ async def test_message_subagent_accepts_session_id_alias(msg_tool, monkeypatch):
     res = await msg_tool.execute({"session_id": "sub-777", "message": "alias test"}, ctx=ctx)
     assert res.status == ToolResultStatus.DONE
     send_mock.assert_awaited_once_with(session, "alias test", ANY, store)
+
+
+@pytest.mark.asyncio
+async def test_send_subagent_followup_cancelled_session_rejected():
+    from core.application.session.stream_followup import send_subagent_followup
+    from core.domain.entities.session import AgentSession, SessionStatus
+
+    session = AgentSession(session_id="sub-cancelled", kind="subagent", status=SessionStatus.CANCELLED)
+    res = await send_subagent_followup(session, "try again", ctx=MagicMock(), store=MagicMock())
+    assert res.status == ToolResultStatus.ERROR
+    assert "cancelled" in res.content.lower()
+
+
+@pytest.mark.asyncio
+async def test_send_subagent_followup_returns_running_status():
+    from core.application.session.stream_followup import send_subagent_followup
+    from core.domain.entities.session import AgentSession, SessionStatus
+
+    session = AgentSession(session_id="sub-active", kind="subagent", status=SessionStatus.COMPLETED)
+    agent = MagicMock()
+    session.agent = agent
+
+    ctx = MagicMock()
+    ctx.project_dir = "/tmp/fake"
+    ctx.host = MagicMock()
+
+    res = await send_subagent_followup(session, "continue", ctx=ctx, store=None)
+    assert res.status == ToolResultStatus.RUNNING
+    assert "[subagent resumed | id sub-active]" in res.content

@@ -342,6 +342,125 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(res.is_error)
         self.assertIn("ERR: params 'prompt'", str(res))
 
+    async def test_invoke_subagent_with_task_param(self):
+        from unittest.mock import MagicMock
+
+        tool = InvokeSubagentTool()
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [{"function": {"name": "read"}}]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+        mock_ctx.project_dir = self.temp_dir.name
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        res = await tool.execute({"task": "implement feature", "title": "New Feature", "role": "worker"})
+        self.assertEqual(res.status.value, "running")
+        sessions = self.store.list(kind="subagent")
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0].title, "New Feature")
+        self.assertEqual(sessions[0].prompt, "implement feature")
+        self.assertEqual(res.content, f"[subagent started | id {sessions[0].id} | role worker]")
+
+    async def test_invoke_subagent_empty_task_returns_task_param_error(self):
+        from unittest.mock import MagicMock
+
+        tool = InvokeSubagentTool()
+        mock_ctx = MagicMock()
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        res = await tool.execute({"task": "", "title": "Empty Task"})
+        self.assertTrue(res.is_error)
+        self.assertIn("ERR: params 'task'", str(res))
+
+    async def test_invoke_subagent_branch_equals_current_creates_isolated_branch(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        tool = InvokeSubagentTool()
+        mock_app = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.tools = [{"function": {"name": "read"}}]
+        mock_agent.system_prompt = "Base prompt"
+        mock_agent.stream_steps.return_value = (x for x in [])
+
+        mock_ctx = MagicMock()
+        mock_ctx.host = mock_app
+        mock_ctx.create_agent.return_value = mock_agent
+        mock_ctx.background_tasks = []
+        mock_ctx.project_dir = self.temp_dir.name
+        mock_app.sm = self.store
+        mock_app.current_session_id = "sess-main"
+        tool._ensure_context = lambda app=None: mock_ctx
+
+        with (
+            patch("core.infrastructure.runtime.subagent_worktree.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("core.application.session.subagent_service.run_git_async", new_callable=AsyncMock) as mock_git,
+            patch("core.infrastructure.runtime.subagent_worktree.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+        ):
+            mock_git.return_value.stdout = "main\n"
+            mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
+
+            res = await tool.execute({"task": "fix auth", "title": "Auth Fix", "branch": "main"})
+            self.assertEqual(res.status.value, "running")
+            self.assertTrue(mock_wt.called)
+            called_branch = mock_wt.call_args[0][2]
+            # Must isolate into subagent branch, not write on raw 'main'
+            self.assertTrue(called_branch.startswith("subagent/main-"))
+
+    async def test_kill_subagent_cleans_up_worktree_and_branch(self):
+        from unittest.mock import patch
+
+        from core.application.session.subagent_service import SubagentService
+
+        session = self.store.create_subagent(
+            parent_id="sess-main",
+            subagent_id="task-kill-wt",
+            role="worker",
+            title="Task",
+            prompt="prompt",
+            status="running",
+            project_dir="/tmp/wt/task-kill-wt",
+            branch_name="subagent/task-kill-wt",
+        )
+
+        with patch("core.application.session.subagent_service.SubagentWorktreeManager.cleanup_worktree") as mock_cleanup:
+            res = SubagentService.kill_subagent(session, self.store)
+            self.assertEqual(res.content, f"[killed {session.id}]")
+            mock_cleanup.assert_called_once_with(
+                self.store.project_path, "/tmp/wt/task-kill-wt", "subagent/task-kill-wt", keep_branch=False
+            )
+
+    def test_prune_merged_subagent_branches(self):
+        from unittest.mock import MagicMock, patch
+
+        from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+
+        with (
+            patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
+            patch.object(SubagentWorktreeManager, "get_repo_root", return_value="/repo"),
+            patch("core.infrastructure.runtime.subagent_worktree.run_git") as mock_run_git,
+        ):
+            mock_res = MagicMock()
+            mock_res.returncode = 0
+            mock_res.stdout = "  subagent/feat-123\n  subagent/auth-456\n  main\n"
+            mock_run_git.return_value = mock_res
+
+            SubagentWorktreeManager.prune_merged_subagent_branches("/repo")
+
+            # Should delete subagent branches, but never touch 'main'
+            calls = [c[0][0] for c in mock_run_git.call_args_list if c[0][0][:2] == ["branch", "-d"]]
+            deleted_branches = [c[2] for c in calls]
+            self.assertIn("subagent/feat-123", deleted_branches)
+            self.assertIn("subagent/auth-456", deleted_branches)
+            self.assertNotIn("main", deleted_branches)
+
     def test_truncate_subagent_result_short(self):
         self.assertEqual(truncate_subagent_result("short result"), "short result")
         self.assertEqual(truncate_subagent_result(""), "")

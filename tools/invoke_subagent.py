@@ -33,14 +33,14 @@ class InvokeSubagentTool(BaseTool):
                             "Short task title in English as a noun phrase (3-5 words, e.g. 'Auth token refactor')."
                         ),
                     },
-                    "prompt": {
+                    "task": {
                         "type": "string",
                         "description": (
-                            "Actionable task instructions, acceptance criteria, and expected verification."
+                            "Actionable task instructions, context, acceptance criteria, and expected verification."
                         ),
                     },
                 },
-                "required": ["title", "prompt"],
+                "required": ["title", "task"],
             },
         },
     }
@@ -62,12 +62,16 @@ class InvokeSubagentTool(BaseTool):
         args = args or {}
         from core.application.session.subagent_service import SubagentService
 
+        raw_task = args.get("task") if "task" in args else args.get("prompt")
+        param_name = "task" if "task" in args else "prompt"
+
         return await SubagentService.spawn_subagent(
-            prompt=args.get("prompt") or "",
+            prompt=raw_task if raw_task is not None else "",
             title=args.get("title") or "",
             subagent_type=args.get("role") or args.get("type") or "worker",
             branch_override=args.get("branch") or "",
             ctx=ctx,
             worktree_manager_cls=SubagentWorktreeManager,
             settings_provider=get_settings,
+            param_name=param_name,
         )

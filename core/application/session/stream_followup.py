@@ -5,7 +5,7 @@ from typing import Any
 
 from core.application.session.stream_agent import configure_subagent_agent
 from core.application.session.stream_runner import _safe_save, run_subagent_stream_bg
-from core.domain.defaults.errors import ToolResult
+from core.domain.defaults.errors import ToolResult, ToolResultStatus
 from core.domain.entities.session import AgentSession, SessionStatus
 
 
@@ -20,7 +20,10 @@ async def send_subagent_followup(
     Resumes in the background; queues the message if the subagent is already busy.
     """
     if not message:
-        return ToolResult.error("params", name="message", detail="required for 'send_message'")
+        return ToolResult.error("params", name="message", detail="required for 'message_subagent'")
+
+    if getattr(session, "status", None) == SessionStatus.CANCELLED:
+        return ToolResult.error("status", name=session.id, detail="subagent session is cancelled")
 
     # Mirror the main agent's semantics: a follow-up can be sent in any
     # status. If the subagent is currently busy (live async_task), the
@@ -34,7 +37,7 @@ async def send_subagent_followup(
         from core.infrastructure.runtime.subagent_tracker import _mark_subagent_running
 
         _mark_subagent_running(ctx.host, session.id, text=f"follow-up queued for {session.id}")
-        return ToolResult.done(f"[queued | id {session.id}]")
+        return ToolResult(status=ToolResultStatus.RUNNING, content=f"[queued | id {session.id}]")
 
     try:
         subagent = session.agent
@@ -118,8 +121,9 @@ async def send_subagent_followup(
         session.async_task = bg_task
 
         _mark_subagent_running(ctx.host, session.id, text=f"follow-up sent to {session.id}")
-        return ToolResult.done(f"[message sent | id {session.id}]")
+        return ToolResult(status=ToolResultStatus.RUNNING, content=f"[subagent resumed | id {session.id}]")
     except Exception as err:
         session.finish(SessionStatus.ERROR, str(err))
-        store.save(session)
+        if store:
+            store.save(session)
         return ToolResult.error("subagent_setup", detail=str(err), name=session.id)
