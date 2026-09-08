@@ -31,8 +31,8 @@ Launch an autonomous explorer subagent using `invoke_subagent` to prevent main c
 ```python
 invoke_subagent(
     title="Survey codebase for init",
-    prompt="Analyze repo manifests, CI configs, entry points, linters, and git log. Return high-signal facts for AGENTS.md.",
-    type="explorer"
+    task="Analyze repo manifests, CI configs, entry points, linters, and git log. Return high-signal facts for AGENTS.md.",
+    role="explorer",
 )
 ```
 

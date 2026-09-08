@@ -68,7 +68,7 @@ Verify skill effectiveness using test prompts:
 
 1. **Define 2-3 realistic test prompts**: representative tasks a real user would execute.
 2. **Test execution via subagents**:
-   - Use `invoke_subagent(title="Test <name> workflow", prompt="Execute task using skill at <path>", type="worker")`.
+   - Use `invoke_subagent(title="Test <name> workflow", task="Execute task using skill at <path>", role="worker")`.
    - For comparative testing, run one subagent with the skill instructions and one baseline without the skill.
 3. **Inspect output**:
    - Check if the subagent followed instructions without redundant questions.

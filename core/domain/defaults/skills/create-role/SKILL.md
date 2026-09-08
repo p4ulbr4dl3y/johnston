@@ -154,7 +154,7 @@ Application security auditor. Identify vulnerabilities and risk patterns without
    - Run `johnston roles --json` via `shell`.
    - Verify the role appears with correct name, allowed/disallowed tools, model, and read_only status.
 4. **Test Role**:
-   - For subagent roles: launch a test task with `invoke_subagent(title="Test <key> execution", prompt="...", type="<key>")`.
+   - For subagent roles: launch a test task with `invoke_subagent(title="Test <key> execution", task="...", role="<key>")`.
    - For interactive roles: cycle with `Tab` in the TUI, or launch with CLI flag `johnston -r <key>` (note: there is no `/role` slash command).
 
 ## 7. Good vs Bad Practices
