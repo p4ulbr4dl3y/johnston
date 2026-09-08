@@ -3,6 +3,8 @@ from typing import Any, Dict, List
 from core.domain.defaults.errors import ToolResult
 from tools.base import BaseTool
 
+VALID_STATUSES = {"pending", "in_progress", "completed"}
+
 
 class UpdatePlanTool(BaseTool):
     name = "update_plan"
@@ -48,19 +50,25 @@ class UpdatePlanTool(BaseTool):
         },
     }
 
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return False
+
     async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
         args = args or {}
         ctx = self._ensure_context(ctx)
         raw_plan = args.get("plan")
-        explanation = str(args.get("explanation") or "").strip()
+        raw_explanation = str(args.get("explanation") or "").strip()
+        explanation = raw_explanation[:500] if raw_explanation else ""
 
-        if isinstance(raw_plan, str):
+        if isinstance(raw_plan, str) and raw_plan.strip():
             import json
 
             try:
-                parsed = json.loads(raw_plan)
+                parsed = json.loads(raw_plan.strip())
                 if isinstance(parsed, list):
                     raw_plan = parsed
+                elif isinstance(parsed, dict) and isinstance(parsed.get("plan"), list):
+                    raw_plan = parsed["plan"]
             except Exception:
                 pass
 
@@ -74,28 +82,32 @@ class UpdatePlanTool(BaseTool):
                 status = "pending"
             elif isinstance(item, dict):
                 step_text = str(item.get("step") or "").strip()
-                status = str(item.get("status") or "pending").strip().lower()
+                raw_status = str(item.get("status") or "pending").strip().lower()
+                status = raw_status if raw_status in VALID_STATUSES else "pending"
             else:
                 continue
-
-            if status not in ("pending", "in_progress", "completed"):
-                status = "pending"
 
             if not step_text:
                 continue
 
+            step_text = step_text[:200]
             validated_plan.append({"step": step_text, "status": status})
 
         if not validated_plan:
             return ToolResult.error("params", name="plan", detail="items need 'step'/'status'")
 
-        # Store active plan in app state if app exists and caller is not a subagent
-        if not getattr(ctx, "is_subagent", False):
-            host = ctx.host
-            if host:
+        host = ctx.host
+        if host:
+            setattr(host, "current_plan", validated_plan)
+            setattr(host, "current_plan_explanation", explanation)
+            if getattr(ctx, "is_subagent", False):
+                target_sess = getattr(host, "session", None)
+                if target_sess:
+                    setattr(target_sess, "current_plan", validated_plan)
+                    setattr(target_sess, "current_plan_explanation", explanation)
+                    setattr(target_sess, "plan", validated_plan)
+            else:
                 app_target = getattr(host, "app", None) or host
-                setattr(host, "current_plan", validated_plan)
-                setattr(host, "current_plan_explanation", explanation)
                 if app_target is not host:
                     setattr(app_target, "current_plan", validated_plan)
                     setattr(app_target, "current_plan_explanation", explanation)
@@ -106,16 +118,6 @@ class UpdatePlanTool(BaseTool):
                         on_plan_update(validated_plan, explanation)
                     except Exception:
                         pass
-        else:
-            host = ctx.host
-            if host:
-                setattr(host, "current_plan", validated_plan)
-                setattr(host, "current_plan_explanation", explanation)
-                target_sess = getattr(host, "session", None)
-                if target_sess:
-                    setattr(target_sess, "current_plan", validated_plan)
-                    setattr(target_sess, "current_plan_explanation", explanation)
-                    setattr(target_sess, "plan", validated_plan)
 
         if ctx and getattr(ctx, "session", None):
             try:

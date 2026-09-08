@@ -175,6 +175,56 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(subagent.current_plan, [{"step": "Sub step", "status": "completed"}])
         self.assertEqual(subagent.current_plan_explanation, "Subagent internal plan")
 
+    async def test_update_plan_status_case_insensitivity(self):
+        tool = UpdatePlanTool()
+        args = {
+            "plan": [
+                {"step": "Step 1", "status": "COMPLETED"},
+                {"step": "Step 2", "status": "Completed"},
+                {"step": "Step 3", "status": "IN_PROGRESS"},
+                {"step": "Step 4", "status": "In_Progress"},
+                {"step": "Step 5", "status": "PENDING"},
+                {"step": "Step 6", "status": "unknown_value"},
+            ]
+        }
+        res = await tool.execute(args)
+        self.assertIn("[plan updated | 2/6 done]", res.content)
+
+        class MockApp:
+            current_plan = None
+            current_plan_explanation = None
+
+        app = MockApp()
+        await tool.execute(args, ctx=app)
+        statuses = [item["status"] for item in app.current_plan]
+        self.assertEqual(
+            statuses,
+            ["completed", "completed", "in_progress", "in_progress", "pending", "pending"],
+        )
+
+    async def test_update_plan_json_dict_wrapper_and_truncation(self):
+        tool = UpdatePlanTool()
+        class MockApp:
+            current_plan = None
+            current_plan_explanation = None
+
+        app = MockApp()
+        long_step = "x" * 300
+        long_exp = "y" * 700
+        args = {
+            "explanation": long_exp,
+            "plan": f'{{"plan": [{{"step": "{long_step}", "status": "completed"}}]}}',
+        }
+        res = await tool.execute(args, ctx=app)
+        self.assertIn("[plan updated | 1/1 done", res.content)
+        self.assertEqual(len(app.current_plan[0]["step"]), 200)
+        self.assertEqual(len(app.current_plan_explanation), 500)
+
+    def test_is_concurrency_safe(self):
+        tool = UpdatePlanTool()
+        self.assertFalse(tool.is_concurrency_safe())
+        self.assertFalse(tool.is_concurrency_safe({"plan": []}))
+
 
 if __name__ == "__main__":
     unittest.main()
