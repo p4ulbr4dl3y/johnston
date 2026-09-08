@@ -2,12 +2,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.application.generation.ai_generator import ProviderReadyState
-from widgets.chat_toolcall import ToolCallWidget
-from widgets.mixins.message_flow import MessageFlowMixin
-from widgets.presentation.commands.session_commands import CompactCommand
-from widgets.presentation.widgets.chat_messages import ThinkingWidget
-from widgets.presentation.widgets.chat_view_restore import restore_message_item
+from johnston_core.application.generation.ai_generator import ProviderReadyState
+from johnston_tui.chat_toolcall import ToolCallWidget
+from johnston_tui.mixins.message_flow import MessageFlowMixin
+from johnston_tui.presentation.commands.session_commands import CompactCommand
+from johnston_tui.presentation.widgets.chat_messages import ThinkingWidget
+from johnston_tui.presentation.widgets.chat_view_restore import restore_message_item
 
 # ==============================================================================
 # 1. ToolCallActionsMixin / has_subagent_session pure predicate & explicit binding
@@ -141,10 +141,10 @@ async def test_generate_ai_response_leaves_is_generating_false_when_provider_not
     app = DummyFlowApp()
 
     with patch(
-        "core.application.generation.ai_generator.ensure_provider_ready",
+        "johnston_core.application.generation.ai_generator.ensure_provider_ready",
         return_value=ProviderReadyState.NEEDS_PROVIDER,
     ), patch(
-        "widgets.presentation.commands.ProvidersCommand.execute",
+        "johnston_tui.presentation.commands.ProvidersCommand.execute",
         new_callable=AsyncMock,
     ) as mock_prov_cmd:
         # Call the underlying coroutine of the worker method directly
@@ -189,7 +189,7 @@ async def test_compact_command_uses_is_compacting_flag_not_is_generating():
         from types import SimpleNamespace
         return SimpleNamespace(success=True, message="ok")
 
-    with patch("widgets.presentation.commands.session_commands.compact_session", new=fake_compact):
+    with patch("johnston_tui.presentation.commands.session_commands.compact_session", new=fake_compact):
         await command.execute(app)
 
     # During compaction:

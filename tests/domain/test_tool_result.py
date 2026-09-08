@@ -1,7 +1,7 @@
 """Unit tests for the ToolResult domain entity (factories, consistency, str)."""
 import unittest
 
-from core.domain.defaults.errors import ToolResult, format_tool_error
+from johnston_core.domain.defaults.errors import ToolResult, format_tool_error
 
 
 class TestToolResultFactories(unittest.TestCase):
@@ -70,7 +70,7 @@ class TestToolResultStr(unittest.TestCase):
         # Wrapper integrity: still exactly one ERR: prefix.
         self.assertTrue(r.startswith("ERR: not_found"))
         # is_system_note would NOT match (content does not start with <system_note).
-        from core.domain.policies.messages import is_system_note
+        from johnston_core.domain.policies.messages import is_system_note
         self.assertFalse(is_system_note({"role": "user", "content": r}))
 
     def test_format_tool_error_escapes_detail(self):

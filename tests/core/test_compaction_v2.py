@@ -12,8 +12,8 @@ runtime deps) by stubbing the `core.models_catalog` namespace.
 """
 import unittest
 
-from core.base_provider import compaction as mod
-from core.base_provider.compaction import (
+from johnston_core.base_provider import compaction as mod
+from johnston_core.base_provider.compaction import (
     CHECKPOINT_CLOSE_TAG,
     CHECKPOINT_OPEN_TAG,
 )

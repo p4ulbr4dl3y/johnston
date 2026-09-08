@@ -9,18 +9,18 @@ from unittest.mock import MagicMock, patch
 
 from pypdf import PdfWriter
 
-from core.infrastructure.converter import (
+from johnston_core.infrastructure.converter import (
     convert_bytes,
     convert_file,
     is_convertible,
 )
-from core.infrastructure.converter.docx import docx_to_markdown
-from core.infrastructure.converter.epub import epub_to_markdown
-from core.infrastructure.converter.html import html_to_markdown
-from core.infrastructure.converter.ipynb import ipynb_to_markdown
-from core.infrastructure.converter.pdf import pdf_to_markdown
-from core.infrastructure.converter.pptx import pptx_to_markdown
-from core.infrastructure.converter.xlsx import xlsx_to_markdown
+from johnston_core.infrastructure.converter.docx import docx_to_markdown
+from johnston_core.infrastructure.converter.epub import epub_to_markdown
+from johnston_core.infrastructure.converter.html import html_to_markdown
+from johnston_core.infrastructure.converter.ipynb import ipynb_to_markdown
+from johnston_core.infrastructure.converter.pdf import pdf_to_markdown
+from johnston_core.infrastructure.converter.pptx import pptx_to_markdown
+from johnston_core.infrastructure.converter.xlsx import xlsx_to_markdown
 
 
 class TestHTMLToMarkdown(unittest.TestCase):
@@ -962,7 +962,7 @@ class TestConverterRegressions(unittest.TestCase):
     # --- utils: dynamic fence length ---
 
     def test_fenced_code_block_dynamic_length(self):
-        from core.infrastructure.converter.utils import fenced_code_block
+        from johnston_core.infrastructure.converter.utils import fenced_code_block
 
         self.assertEqual(fenced_code_block("x = 1"), "```\nx = 1\n```")
         block = fenced_code_block("code with ``` inline", lang="python")
@@ -1339,7 +1339,7 @@ class TestConverterListQuoteAndRunFixes(unittest.TestCase):
     def test_xlsx_row_without_r_after_blank_row(self):
         import io as _io
 
-        from core.infrastructure.converter.xlsx import xlsx_to_markdown
+        from johnston_core.infrastructure.converter.xlsx import xlsx_to_markdown
 
         ss = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
         buf = _io.BytesIO()
@@ -1827,7 +1827,7 @@ class TestDocConverterSecondaryAuditFixes(unittest.TestCase):
     """
 
     def test_clean_url_inverted_parens(self):
-        from core.infrastructure.converter.utils import clean_url
+        from johnston_core.infrastructure.converter.utils import clean_url
 
         # Balanced parens kept
         self.assertEqual(clean_url("https://example.com/wiki/(term)"), "https://example.com/wiki/(term)")
@@ -1837,7 +1837,7 @@ class TestDocConverterSecondaryAuditFixes(unittest.TestCase):
         self.assertEqual(clean_url("https://example.com/a(b"), "https://example.com/a\\(b")
 
     def test_collapse_blank_lines_crlf(self):
-        from core.infrastructure.converter.utils import collapse_blank_lines
+        from johnston_core.infrastructure.converter.utils import collapse_blank_lines
 
         text = "Line 1\r\n\r\n\r\n\r\nLine 2\r\n```\r\ncode\r\n\r\n\r\nblock\r\n```"
         collapsed = collapse_blank_lines(text)

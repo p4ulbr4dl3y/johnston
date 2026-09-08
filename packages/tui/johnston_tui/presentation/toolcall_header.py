@@ -1,0 +1,104 @@
+from typing import Any, Dict, List, Optional
+
+from rich.markup import escape
+
+from johnston_tui.presentation.tool_display import extract_tool_display, format_compact_dict, truncate
+from johnston_tui.presentation.widgets.chat_markdown import to_snake_case
+from johnston_tui.presentation.widgets.footer_layout import get_theme_colors
+
+
+def build_toolcall_hints_list(
+    status: str,
+    canonical_tool: str,
+    is_subagent: bool,
+    background_task_id: Optional[str],
+    is_expandable: bool,
+    is_expanded: bool,
+    compact: bool = False,
+) -> List[str]:
+    """Return active hotkey hints for a toolcall."""
+    hints: List[str] = []
+    if status == "running" and not is_subagent and canonical_tool == "shell" and not background_task_id:
+        hints.append("ctrl+b bg" if compact else "ctrl+b to bg")
+    if is_expandable and status in ("running", "done"):
+        if compact:
+            action = "col" if is_expanded else "exp"
+            hints.append(f"ctrl+o {action}")
+        else:
+            action = "to collapse" if is_expanded else "to expand"
+            hints.append(f"ctrl+o {action}")
+    return hints
+
+
+def build_toolcall_header(
+    canonical_tool: str,
+    tool_type: Optional[str],
+    args: Dict[str, Any],
+    target: Any,
+    status: str,
+    status_color: str,
+    system_tools: frozenset[str],
+    display_names: Dict[str, str],
+    is_mcp: bool,
+    is_subagent: bool,
+    background_task_id: Optional[str],
+    is_expandable: bool,
+    is_expanded: bool,
+    show_hints: bool = True,
+    max_len: int = 60,
+    compact_hints: bool = False,
+) -> str:
+    """Builds rich markup string for toolcall header label."""
+    is_generating = status == "generating"
+    marker = "○" if is_generating else "●"
+    trunc_mode = "right" if is_generating else ("path" if canonical_tool in ("read", "edit", "create") else "middle")
+    if canonical_tool in system_tools or canonical_tool in (
+        "invoke_subagent",
+        "message_subagent",
+        "kill",
+        "ask_user",
+    ):
+        display_name = display_names.get(canonical_tool, tool_type or "Tool")
+        if canonical_tool == "update_plan":
+            target_str = extract_tool_display(canonical_tool, args, max_len=max_len, mode=trunc_mode) if args else ""
+            if not target_str and is_generating and target and target != "plan":
+                target_str = truncate(str(target), max_len=max_len, mode=trunc_mode)
+        else:
+            extracted = extract_tool_display(canonical_tool, args, max_len=max_len, mode=trunc_mode) if args else ""
+            target_str = extracted or (truncate(str(target), max_len=max_len, mode=trunc_mode) if target else "")
+        if is_generating and not target_str:
+            arg_suffix = "(...)"
+        else:
+            arg_suffix = f"({target_str})"
+        base_header = f"[{status_color}]{marker} [bold]{display_name}[/bold][/{status_color}]{arg_suffix}"
+    else:
+        compact = format_compact_dict(args, max_total_len=max_len + 10)
+        if is_generating and not compact:
+            compact = truncate(str(target), max_len=max_len, mode=trunc_mode) if target else ""
+        mcp_flag = (tool_type or "").startswith("mcp_") or is_mcp
+        tool_name_display = to_snake_case(tool_type) if mcp_flag else (tool_type or "Tool")
+        if is_generating and not compact:
+            arg_suffix = "(...)"
+        elif is_generating and not args:
+            arg_suffix = f"({compact})"
+        else:
+            arg_suffix = f"({escape(str(compact))})"
+        base_header = f"[{status_color}]{marker} [bold]{tool_name_display}[/bold][/{status_color}]{arg_suffix}"
+
+    hints: List[str] = []
+    if show_hints:
+        hints = build_toolcall_hints_list(
+            status=status,
+            canonical_tool=canonical_tool,
+            is_subagent=is_subagent,
+            background_task_id=background_task_id,
+            is_expandable=is_expandable,
+            is_expanded=is_expanded,
+            compact=compact_hints,
+        )
+
+    if hints:
+        _, _, t_muted, _ = get_theme_colors()
+        hints_str = ", ".join(hints)
+        return f"{base_header} [{t_muted}]({hints_str})[/]"
+    return base_header

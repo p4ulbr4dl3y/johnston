@@ -9,10 +9,10 @@ import os
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from johnston_tui.mixins.actions import ActionsMixin
+from johnston_tui.mixins.lifecycle import LifecycleMixin
+from johnston_tui.mixins.session_persistence import SessionPersistenceMixin
 from tests.conftest import _make_agent_mock
-from widgets.mixins.actions import ActionsMixin
-from widgets.mixins.lifecycle import LifecycleMixin
-from widgets.mixins.session_persistence import SessionPersistenceMixin
 
 
 # --------------------------------------------------------- session_persistence
@@ -250,7 +250,7 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
         fake = FakeCmd()
         with patch.dict(os.environ, {}):
             os.environ.pop("PYTEST_CURRENT_TEST", None)
-            with patch("widgets.presentation.commands.ProvidersCommand", return_value=fake):
+            with patch("johnston_tui.presentation.commands.ProvidersCommand", return_value=fake):
                 await obj._check_initial_setup()
         self.assertIs(fake.owner, obj)
 
@@ -268,7 +268,7 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
         fake = FakeCmd()
         with patch.dict(os.environ, {}):
             os.environ.pop("PYTEST_CURRENT_TEST", None)
-            with patch("widgets.presentation.commands.ModelsCommand", return_value=fake):
+            with patch("johnston_tui.presentation.commands.ModelsCommand", return_value=fake):
                 await obj._check_initial_setup()
         self.assertIs(fake.owner, obj)
 
@@ -276,8 +276,8 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
         obj = _life_host()
         obj._kill_all_tasks = AsyncMock()
         with (
-            patch("core.application.session.stream.cancel_running_subagents"),
-            patch("core.infrastructure.mcp.get_mcp_manager"),
+            patch("johnston_core.application.session.stream.cancel_running_subagents"),
+            patch("johnston_core.infrastructure.mcp.get_mcp_manager"),
         ):
             obj.on_unmount()
             obj.agent.rewind_git_restore_task.cancel.assert_called_once()
@@ -291,8 +291,8 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
         fake_loop.create_task.side_effect = Exception("closed")
         with (
             patch("asyncio.get_running_loop", return_value=fake_loop),
-            patch("core.application.session.stream.cancel_running_subagents"),
-            patch("core.infrastructure.mcp.get_mcp_manager"),
+            patch("johnston_core.application.session.stream.cancel_running_subagents"),
+            patch("johnston_core.infrastructure.mcp.get_mcp_manager"),
         ):
             obj.on_unmount()  # must not raise
 

@@ -10,16 +10,16 @@ import tempfile
 import unittest
 import unittest.mock
 
-from core.base_provider import BaseAgent
-from core.domain.defaults.errors import ToolResult
-from core.role_registry import AgentRole
+from johnston_core.base_provider import BaseAgent
+from johnston_core.domain.defaults.errors import ToolResult
+from johnston_core.role_registry import AgentRole
+from johnston_core.tools.registry import execute_tool
 from tests.core._base_provider_helpers import _MockStream, _text_chunk, _tool_call_chunk, make_agent
-from tools.registry import execute_tool
 
 
 class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        from core.permission_manager import PermissionManager
+        from johnston_core.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         pm.set_session_override("shell", "allow")
@@ -107,7 +107,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_kill_tool(self):
         class DummyApp:
             def __init__(self):
-                from core.infrastructure.tasks.manager import TaskManager
+                from johnston_core.infrastructure.tasks.manager import TaskManager
 
                 self.task_manager = TaskManager()
 
@@ -118,7 +118,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_task_tool_foreground(self):
         import tempfile
 
-        from core.infrastructure.storage.session_store import SessionStore
+        from johnston_core.infrastructure.storage.session_store import SessionStore
 
         _tmp = tempfile.TemporaryDirectory()
         self.addCleanup(_tmp.cleanup)
@@ -151,7 +151,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_task_tool_background(self):
         import tempfile
 
-        from core.infrastructure.storage.session_store import SessionStore
+        from johnston_core.infrastructure.storage.session_store import SessionStore
 
         _tmp = tempfile.TemporaryDirectory()
         self.addCleanup(_tmp.cleanup)
@@ -198,7 +198,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sessions[0].status, "running")
 
     def test_truncate_output_helper(self):
-        from tools.base import truncate_output
+        from johnston_core.tools.base import truncate_output
 
         short_text = "hello"
         self.assertEqual(truncate_output(short_text, max_chars=10), "hello")

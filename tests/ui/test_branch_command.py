@@ -9,14 +9,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from textual.app import App
 from textual.widgets import OptionList
 
-from widgets.presentation.commands.branch_command import BranchCommand
-from widgets.presentation.screens.branch import (
+from johnston_tui.presentation.commands.branch_command import BranchCommand
+from johnston_tui.presentation.screens.branch import (
     BranchInput,
     BranchOptionList,
     BranchScreen,
 )
-from widgets.presentation.screens.confirm import ConfirmScreen
-from widgets.presentation.widgets.modal_hint import ModalHint
+from johnston_tui.presentation.screens.confirm import ConfirmScreen
+from johnston_tui.presentation.widgets.modal_hint import ModalHint
 
 
 class _HostApp(App[None]):
@@ -82,7 +82,7 @@ class TestBranchCommand(unittest.IsolatedAsyncioTestCase):
         )
 
         cmd = BranchCommand()
-        with patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager", mock_mgr):
+        with patch("johnston_core.infrastructure.runtime.git_worktree.GitWorktreeManager", mock_mgr):
             await cmd.execute(app)
 
 
@@ -345,8 +345,8 @@ class TestBranchScreen(unittest.IsolatedAsyncioTestCase):
 
 class TestLifecycleAndStatusState(unittest.TestCase):
     def test_switch_project_dir(self) -> None:
-        from core.permission_manager import PermissionManager
-        from widgets.mixins.lifecycle import LifecycleMixin
+        from johnston_core.permission_manager import PermissionManager
+        from johnston_tui.mixins.lifecycle import LifecycleMixin
 
         class DummyApp(LifecycleMixin):
             def __init__(self) -> None:
@@ -373,7 +373,7 @@ class TestLifecycleAndStatusState(unittest.TestCase):
             os.chdir(orig_cwd)
 
     def test_build_status_kwargs_uses_app_project_dir(self) -> None:
-        from widgets.app.status_state import build_status_kwargs
+        from johnston_tui.app.status_state import build_status_kwargs
 
         mock_app = MagicMock()
         mock_app.project_dir = "/custom/project/dir"

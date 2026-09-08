@@ -1,0 +1,5 @@
+"""Pure presentation helpers for UI widgets.
+
+Modules in this package have NO ``from johnston_core...`` or ``from johnston_core.tools...`` imports.
+Anything that drags in core/tools lives in the UI layer (e.g. widget-local diff builders).
+"""

@@ -1,6 +1,6 @@
 import unittest
 
-from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+from johnston_tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
 
 class TestShellConfirmScreen(unittest.TestCase):

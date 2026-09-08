@@ -31,22 +31,19 @@ select = ["E", "F", "W", "I"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"packages/tui/app.py" = ["E402"]
-"packages/tui/widgets/app/app.py" = ["E402"]
-"widgets/app/app.py" = ["E402"]
+"packages/tui/johnston_tui/app.py" = ["E402"]
+"packages/tui/johnston_tui/app/app.py" = ["E402"]
+"johnston_tui/app/app.py" = ["E402"]
+"app.py" = ["E402"]
 "scripts/preview_system_prompt.py" = ["E402"]
 
 [tool.coverage.run]
 source = [
-    "packages/core/core",
-    "packages/core/tools",
-    "packages/tui/widgets",
-    "packages/tui/app",
+    "packages/core/johnston_core",
+    "packages/tui/johnston_tui",
     "packages/cli/johnston_cli",
-    "cli",
-    "app",
 ]
-omit = ["*/__init__.py", "*/core/domain/defaults/skills/*"]
+omit = ["*/__init__.py", "*/johnston_core/domain/defaults/skills/*"]
 
 [tool.coverage.report]
 fail_under = 90
@@ -54,4 +51,4 @@ show_missing = true
 skip_covered = true
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "tools", "widgets", "app", "cli", "johnston_cli"]
+known-first-party = ["johnston_core", "johnston_tui", "johnston_cli", "app", "cli"]

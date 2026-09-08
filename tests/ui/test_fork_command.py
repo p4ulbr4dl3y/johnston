@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from widgets.presentation.commands import ForkCommand
+from johnston_tui.presentation.commands import ForkCommand
 
 
 class TestForkCommand(unittest.IsolatedAsyncioTestCase):
@@ -89,7 +89,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         chat_input.load_text.assert_called_with("second turn prompt")
 
     async def test_fork_command_truncates_long_branch_title(self):
-        from core.domain.policies.session_naming import FORK_BASE_MAX_LEN
+        from johnston_core.domain.policies.session_naming import FORK_BASE_MAX_LEN
 
         app = MagicMock()
         chat_view = MagicMock()
@@ -117,7 +117,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("(fork", base)
 
     async def test_fork_command_successful_fork_current_state(self):
-        from widgets.presentation.screens.fork import FORK_CURRENT_STATE
+        from johnston_tui.presentation.screens.fork import FORK_CURRENT_STATE
 
         app = MagicMock()
         chat_view = MagicMock()
@@ -152,8 +152,8 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         chat_input.focus.assert_called()
 
     async def test_pending_fork_applied_on_message_submit(self):
-        from widgets.chat_input import ChatInput
-        from widgets.mixins.message_flow import MessageFlowMixin
+        from johnston_tui.chat_input import ChatInput
+        from johnston_tui.mixins.message_flow import MessageFlowMixin
 
         class TestApp(MessageFlowMixin):
             def __init__(self):
@@ -193,8 +193,8 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
     async def test_fork_then_rewind_cancels_pending_fork_and_executes_rewind(self):
         import inspect
 
-        from widgets.presentation.commands import RewindCommand
-        from widgets.presentation.screens.rewind import RewindSelection
+        from johnston_tui.presentation.commands import RewindCommand
+        from johnston_tui.presentation.screens.rewind import RewindSelection
 
         app = MagicMock()
         chat_view = MagicMock()
@@ -239,7 +239,7 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
     async def test_fork_then_rewind_cancel_preserves_pending_fork(self):
         import inspect
 
-        from widgets.presentation.commands import RewindCommand
+        from johnston_tui.presentation.commands import RewindCommand
 
         app = MagicMock()
         chat_view = MagicMock()

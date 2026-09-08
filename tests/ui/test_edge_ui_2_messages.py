@@ -6,7 +6,7 @@ Detectors for real bugs in empty/whitespace/None message content handling.
 import unittest
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
-from widgets.presentation.widgets.chat_messages import BotMessage, EventDivider, UserMessage
+from johnston_tui.presentation.widgets.chat_messages import BotMessage, EventDivider, UserMessage
 
 
 class TestEventHandler(unittest.TestCase):
@@ -58,7 +58,7 @@ class TestUserMessage(unittest.IsolatedAsyncioTestCase):
     async def test_attachment_text_and_unselectable_footnote(self):
         from textual.app import App, ComposeResult
 
-        from widgets.presentation.widgets.chat_messages import UserMessageAttachment
+        from johnston_tui.presentation.widgets.chat_messages import UserMessageAttachment
 
         class MsgApp(App):
             def compose(self) -> ComposeResult:

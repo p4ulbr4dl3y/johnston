@@ -36,7 +36,7 @@ class _BareHost:
 
 class TestToolContextAsyncHost(unittest.IsolatedAsyncioTestCase):
     async def test_ask_user_delegates_and_awaits(self):
-        from tools.context import ToolContext
+        from johnston_core.tools.context import ToolContext
 
         host = _AsyncHost()
         ctx = ToolContext(host)
@@ -47,7 +47,7 @@ class TestToolContextAsyncHost(unittest.IsolatedAsyncioTestCase):
 
 class TestToolContextDegradation(unittest.TestCase):
     def test_bare_host_degrades(self):
-        from tools.context import ToolContext
+        from johnston_core.tools.context import ToolContext
 
         ctx = ToolContext(_BareHost())
         ctx.refresh_status()  # no-op, no host method
@@ -61,7 +61,7 @@ class TestToolContextDegradation(unittest.TestCase):
     def test_async_mocked_host_ask_user_via_context(self):
         import asyncio
 
-        from tools.context import ToolContext
+        from johnston_core.tools.context import ToolContext
 
         host = AsyncMock()
         host.ask_user = AsyncMock(return_value="Question: Q\nAnswer: X")

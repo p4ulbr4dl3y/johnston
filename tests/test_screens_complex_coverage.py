@@ -9,24 +9,24 @@ from textual.app import App
 from textual.events import Click, Key, Resize
 from textual.widgets import Input, OptionList, RichLog, Static
 
-from widgets.presentation.screens.diff import (
+from johnston_tui.presentation.screens.diff import (
     DiffFooter,
     DiffHeader,
     DiffScreen,
     format_relative_path,
 )
-from widgets.presentation.screens.help import (
+from johnston_tui.presentation.screens.help import (
     COMMANDS_DATA,
     KEYBINDINGS_DATA,
     HelpScreen,
     _build_help_table,
     _format_help_key,
 )
-from widgets.presentation.screens.permission_confirm import (
+from johnston_tui.presentation.screens.permission_confirm import (
     PermissionConfirmScreen,
     RejectReasonInput,
 )
-from widgets.presentation.screens.tasks import (
+from johnston_tui.presentation.screens.tasks import (
     BaseTasksListScreen,
     ShellTasksScreen,
     SubagentsScreen,
@@ -77,16 +77,16 @@ class TestDiffScreenCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(header._render())
 
         # Test compact width < 52
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=40):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=40):
             header.render_header()
 
         # Test compact width between 52 and 80
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=60):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=60):
             header.render_header()
 
         # Test non-compact width with from_rewind=True
         header_rewind = DiffHeader("Title", "+1 / -1", from_rewind=True)
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=100):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=100):
             header_rewind.render_header()
 
         # Test on_mount
@@ -98,36 +98,36 @@ class TestDiffScreenCoverage(unittest.IsolatedAsyncioTestCase):
         footer.render_for_size()
 
         # No file selected
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=100):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=100):
             footer.render_footer()
 
         # File selected, non-compact, width >= BREAKPOINT_HINT (80)
         footer.update_info("core/app.py", "+5 / -2")
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=90):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=90):
             footer.render_footer()
 
         # File selected, non-compact, width < BREAKPOINT_HINT (e.g. 70)
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=70):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=70):
             footer.render_footer()
 
         # Compact width < 52, diff view
         footer.set_view_context(is_compact=True, compact_view="diff")
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=45):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=45):
             footer.render_footer()
 
         # Compact width < 52, files view
         footer.set_view_context(is_compact=True, compact_view="files")
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=45):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=45):
             footer.render_footer()
 
         # Compact width >= 52, diff view
         footer.set_view_context(is_compact=True, compact_view="diff")
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=60):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=60):
             footer.render_footer()
 
         # Compact width >= 52, files view
         footer.set_view_context(is_compact=True, compact_view="files")
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=60):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=60):
             footer.render_footer()
 
     def test_diff_screen_format_sidebar_options_truncation(self):
@@ -156,11 +156,11 @@ class TestDiffScreenCoverage(unittest.IsolatedAsyncioTestCase):
         screen = DiffScreen(items)
 
         # Compact mode
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=50):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=50):
             self.assertEqual(screen._sidebar_row_width(), 48)
 
         # Non-compact mode with mock sidebar width
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=100):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=100):
             mock_sidebar = MagicMock()
             mock_sidebar.size.width = 40
             screen.query_one = MagicMock(return_value=mock_sidebar)
@@ -215,7 +215,7 @@ class TestDiffScreenCoverage(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(screen.sidebar_visible)
 
             # Test compact mode input submitted & option selected
-            with patch("widgets.presentation.screens.diff.resolve_width", return_value=45):
+            with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=45):
                 screen.on_input_submitted(Input.Submitted(search_inp, "foo"))
                 self.assertEqual(screen.compact_view, "diff")
 
@@ -271,7 +271,7 @@ class TestDiffScreenCoverage(unittest.IsolatedAsyncioTestCase):
 
         screen.query_one = MagicMock(side_effect=fake_query)
 
-        with patch("widgets.presentation.screens.diff.format_edit_diff", side_effect=Exception("lexer fail")):
+        with patch("johnston_tui.presentation.screens.diff.format_edit_diff", side_effect=Exception("lexer fail")):
             screen._render_current_diff(0)
             content_view.update.assert_called()
 
@@ -548,7 +548,7 @@ class TestHelpScreenCoverage(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(screen.active_tab, 0)
 
             # Test compact width refresh
-            with patch("widgets.utils.responsive.resolve_screen_width", return_value=40):
+            with patch("johnston_tui.utils.responsive.resolve_screen_width", return_value=40):
                 screen._refresh_view()
 
             # Test resize event
@@ -806,7 +806,7 @@ class TestTasksScreensCoverage(unittest.IsolatedAsyncioTestCase):
             await screen.action_kill_task()
 
             # Test hint update in compact mode
-            with patch("widgets.utils.responsive.resolve_screen_width", return_value=40):
+            with patch("johnston_tui.utils.responsive.resolve_screen_width", return_value=40):
                 screen._update_hint()
 
             # Test event listener notification
@@ -870,8 +870,8 @@ class TestTasksScreensCoverage(unittest.IsolatedAsyncioTestCase):
         mock_store = MagicMock()
         mock_store.children.return_value = [s1, s2, s3]
 
-        with patch("core.infrastructure.storage.session_store.get_session_store", return_value=mock_store), \
-             patch("widgets.presentation.tool_display.is_subagent_running", side_effect=lambda s: s.id in ("sub_1", "sub_3")):
+        with patch("johnston_core.infrastructure.storage.session_store.get_session_store", return_value=mock_store), \
+             patch("johnston_tui.presentation.tool_display.is_subagent_running", side_effect=lambda s: s.id in ("sub_1", "sub_3")):
 
             async with app.run_test(size=(80, 24)) as pilot:
                 await pilot.pause()
@@ -911,7 +911,7 @@ class TestAdditionalCoverageEdgeCases(unittest.IsolatedAsyncioTestCase):
         footer = DiffFooter()
         footer.current_file = "test.py"
         footer.set_view_context(is_compact=False, compact_view="files")
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=75):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=75):
             footer.render_footer()
 
     def test_diff_screen_key_and_quit_exceptions(self):

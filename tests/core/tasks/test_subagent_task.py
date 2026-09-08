@@ -3,11 +3,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.domain.entities.session import AgentSession, SessionKind, SessionStatus
-from core.infrastructure.tasks.manager import TaskManager
-from core.infrastructure.tasks.shell_task import ShellTask
-from core.infrastructure.tasks.subagent_task import SubagentTask
-from core.infrastructure.tasks.task import TASK_KINDS, TaskStatus
+from johnston_core.domain.entities.session import AgentSession, SessionKind, SessionStatus
+from johnston_core.infrastructure.tasks.manager import TaskManager
+from johnston_core.infrastructure.tasks.shell_task import ShellTask
+from johnston_core.infrastructure.tasks.subagent_task import SubagentTask
+from johnston_core.infrastructure.tasks.task import TASK_KINDS, TaskStatus
 
 
 def _create_mock_session(
@@ -109,7 +109,7 @@ async def test_subagent_task_kill():
     store = MagicMock()
     task = SubagentTask(session, store=store)
 
-    with patch("core.application.session.subagent_service.SubagentService.kill_subagent") as mock_kill:
+    with patch("johnston_core.application.session.subagent_service.SubagentService.kill_subagent") as mock_kill:
         await task.kill()
         mock_kill.assert_called_once_with(session, store)
 
@@ -123,7 +123,7 @@ def test_subagent_task_kill_sync():
     store = MagicMock()
     task = SubagentTask(session, store=store)
 
-    with patch("core.application.session.subagent_service.SubagentService.kill_subagent") as mock_kill:
+    with patch("johnston_core.application.session.subagent_service.SubagentService.kill_subagent") as mock_kill:
         task.kill_sync()
         mock_kill.assert_called_once_with(session, store)
 

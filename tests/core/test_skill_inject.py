@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock
 
-from core.application.skills.inject import (
+from johnston_core.application.skills.inject import (
     extract_and_inject_skills,
     load_skill_blocks,
     normalize_homoglyphs,

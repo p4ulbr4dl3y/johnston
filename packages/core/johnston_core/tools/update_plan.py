@@ -1,0 +1,133 @@
+from typing import Any, Dict, List
+
+from johnston_core.domain.defaults.errors import ToolResult
+from johnston_core.tools.base import BaseTool
+
+VALID_STATUSES = {"pending", "in_progress", "completed"}
+
+
+class UpdatePlanTool(BaseTool):
+    name = "update_plan"
+    description = (
+        "Update multi-step task checklist and progress. Exactly one step must be 'in_progress'."
+    )
+    schema = {
+        "type": "function",
+        "function": {
+            "name": "update_plan",
+            "description": (
+                "Update multi-step task checklist and progress. Exactly one step must be 'in_progress'."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "plan": {
+                        "type": "array",
+                        "description": "Full ordered list of all steps. Send the WHOLE plan each call.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "step": {
+                                    "type": "string",
+                                    "description": "Short step title (≤7 words).",
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["pending", "in_progress", "completed"],
+                                    "description": "Step status. Exactly one `in_progress` at a time.",
+                                },
+                            },
+                            "required": ["step", "status"],
+                        },
+                    },
+                    "explanation": {
+                        "type": "string",
+                        "description": "Optional reason for plan update (why this step is in_progress, etc.).",
+                    },
+                },
+                "required": ["plan"],
+            },
+        },
+    }
+
+    def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
+        return False
+
+    async def execute(self, args: Dict[str, Any], ctx: Any = None) -> ToolResult:
+        args = args or {}
+        ctx = self._ensure_context(ctx)
+        raw_plan = args.get("plan")
+        raw_explanation = str(args.get("explanation") or "").strip()
+        explanation = raw_explanation[:500] if raw_explanation else ""
+
+        if isinstance(raw_plan, str) and raw_plan.strip():
+            import json
+
+            try:
+                parsed = json.loads(raw_plan.strip())
+                if isinstance(parsed, list):
+                    raw_plan = parsed
+                elif isinstance(parsed, dict) and isinstance(parsed.get("plan"), list):
+                    raw_plan = parsed["plan"]
+            except Exception:
+                pass
+
+        if not raw_plan or not isinstance(raw_plan, list):
+            return ToolResult.error("params", name="plan", detail="must be non-empty")
+
+        validated_plan: List[Dict[str, str]] = []
+        for item in raw_plan:
+            if isinstance(item, str):
+                step_text = item.strip()
+                status = "pending"
+            elif isinstance(item, dict):
+                step_text = str(item.get("step") or "").strip()
+                raw_status = str(item.get("status") or "pending").strip().lower()
+                status = raw_status if raw_status in VALID_STATUSES else "pending"
+            else:
+                continue
+
+            if not step_text:
+                continue
+
+            step_text = step_text[:200]
+            validated_plan.append({"step": step_text, "status": status})
+
+        if not validated_plan:
+            return ToolResult.error("params", name="plan", detail="items need 'step'/'status'")
+
+        host = ctx.host
+        if host:
+            setattr(host, "current_plan", validated_plan)
+            setattr(host, "current_plan_explanation", explanation)
+            if getattr(ctx, "is_subagent", False):
+                target_sess = getattr(host, "session", None)
+                if target_sess:
+                    setattr(target_sess, "current_plan", validated_plan)
+                    setattr(target_sess, "current_plan_explanation", explanation)
+                    setattr(target_sess, "plan", validated_plan)
+            else:
+                app_target = getattr(host, "app", None) or host
+                if app_target is not host:
+                    setattr(app_target, "current_plan", validated_plan)
+                    setattr(app_target, "current_plan_explanation", explanation)
+
+                on_plan_update = getattr(app_target, "on_plan_update", None) or getattr(host, "on_plan_update", None)
+                if callable(on_plan_update):
+                    try:
+                        on_plan_update(validated_plan, explanation)
+                    except Exception:
+                        pass
+
+        if ctx and getattr(ctx, "session", None):
+            try:
+                ctx.session.plan = validated_plan
+            except Exception:
+                pass
+
+        completed_count = sum(1 for p in validated_plan if p["status"] == "completed")
+        total_count = len(validated_plan)
+        exp_part = f" | {explanation}" if explanation else ""
+        summary = f"[plan updated | {completed_count}/{total_count} done{exp_part}]"
+
+        return ToolResult.done(content=summary, display=summary)

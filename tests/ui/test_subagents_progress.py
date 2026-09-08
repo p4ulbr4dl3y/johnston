@@ -2,16 +2,16 @@ import time
 import unittest
 from unittest.mock import MagicMock
 
-from widgets.presentation.screens.tasks import (
+from johnston_tui.presentation.screens.tasks import (
     extract_shell_task_progress,
     format_shell_task_row,
     format_subagent_task_row,
 )
-from widgets.presentation.tool_display import (
+from johnston_tui.presentation.tool_display import (
     _format_active_tool_progress,
     extract_subagent_progress,
 )
-from widgets.utils.row_format import format_duration
+from johnston_tui.utils.row_format import format_duration
 
 
 class TestSubagentProgressDisplay(unittest.TestCase):
@@ -325,7 +325,7 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         self.assertIn("[dim]", row)
 
     def test_fake_streaming_full_lifecycle_and_followup(self):
-        from core.domain.entities.session import AgentSession, SessionKind
+        from johnston_core.domain.entities.session import AgentSession, SessionKind
 
         sess = AgentSession(
             "sub-sim-1",
@@ -390,7 +390,7 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         self.assertEqual(extract_subagent_progress(sess), f"done • 5 turns • {dur2}")
 
     def test_subagents_screen_title_hierarchy(self):
-        from widgets.presentation.screens.tasks import SubagentsScreen
+        from johnston_tui.presentation.screens.tasks import SubagentsScreen
 
         screen = SubagentsScreen()
         mock_app = MagicMock()
@@ -417,7 +417,7 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
 
         from unittest.mock import PropertyMock, patch
         with patch.object(SubagentsScreen, "app", new_callable=PropertyMock, return_value=mock_app), \
-             patch("core.infrastructure.storage.session_store.get_session_store", return_value=mock_store):
+             patch("johnston_core.infrastructure.storage.session_store.get_session_store", return_value=mock_store):
             tasks = screen._get_filtered_tasks()
 
         self.assertEqual(len(tasks), 2)

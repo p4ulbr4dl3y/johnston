@@ -5,17 +5,21 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 import pytest
 
 from app import JohnstonApp
-from widgets.chat_toolcall import ToolCallWidget
-from widgets.presentation.widgets.chat_container import ChatView
-from widgets.presentation.widgets.chat_markdown import clean_markdown_for_rendering, safe_update_markdown, to_snake_case
-from widgets.presentation.widgets.chat_messages import (
+from johnston_tui.chat_toolcall import ToolCallWidget
+from johnston_tui.presentation.widgets.chat_container import ChatView
+from johnston_tui.presentation.widgets.chat_markdown import (
+    clean_markdown_for_rendering,
+    safe_update_markdown,
+    to_snake_case,
+)
+from johnston_tui.presentation.widgets.chat_messages import (
     BotMessage,
     ErrorMessage,
     EventDivider,
     ThinkingWidget,
     UserMessage,
 )
-from widgets.presentation.widgets.chat_welcome import WelcomeWidget
+from johnston_tui.presentation.widgets.chat_welcome import WelcomeWidget
 
 
 class TestChatView(unittest.IsolatedAsyncioTestCase):
@@ -280,7 +284,7 @@ class TestChatViewBehaviors(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(chat_view._auto_follow)
 
     async def test_rollback_to_negative_mounts_welcome(self):
-        from widgets.presentation.widgets.chat_welcome import WelcomeWidget
+        from johnston_tui.presentation.widgets.chat_welcome import WelcomeWidget
 
         app = JohnstonApp()
         async with app.run_test() as pilot:
@@ -716,7 +720,7 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
         mock_store = MagicMock()
         mock_store.find_session_by_title_or_id.return_value = mock_session
 
-        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
+        with patch("johnston_core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
             tool = await chat_view.restore_message({
                 "type": "tool",
                 "tool_type": "invoke_subagent",
@@ -915,7 +919,7 @@ class TestChatViewDividerSpacing(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test(size=(120, 20)) as pilot:
             chat_view = app.query_one(ChatView)
-            from widgets.presentation.widgets.chat_messages import UserMessage
+            from johnston_tui.presentation.widgets.chat_messages import UserMessage
 
             anchor = await chat_view.add_user_message("Anchor message")
             await pilot.pause()

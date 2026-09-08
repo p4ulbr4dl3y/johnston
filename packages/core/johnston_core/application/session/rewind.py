@@ -1,0 +1,524 @@
+"""Pure-core session rewind/rollback actions — NO widget/Textual imports.
+
+Functions: rewind_session.
+Callers (commands.py) handle UI orchestration (push_screen, callback, focus, notify).
+"""
+import asyncio
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional
+
+from johnston_core.domain.policies.messages import (
+    count_history_user_turns,
+    drop_stale_system_notes,
+    find_visible_user_cutoff,
+    is_ui_visible_user_message,
+)
+
+logger = logging.getLogger("johnston_core.application.session.actions")
+
+
+# ---------------------------------------------------------------------------
+# get_rewind_git_stats
+# ---------------------------------------------------------------------------
+
+@dataclass
+class RewindEntry:
+    """A single rollback candidate: index, user message text, git stat and changed files."""
+
+    index: int
+    text: str
+    git_stats: str = ""
+    changed_files: list[str] = field(default_factory=list)
+
+
+async def get_rewind_git_stats(
+    current_session_id: str | None,
+    user_msgs: list[tuple[int, str]],
+    project_path: str | None,
+    checkpoint_manager: Optional[Any] = None,
+    session: Optional[Any] = None,
+) -> list[RewindEntry]:
+    """Fetch git-checkpoint stats for each user message in the rewind list.
+
+    Returns a list of :class:`RewindEntry` where ``git_stats`` is a formatted
+    string like '+12 / -4', 'no changes', or ''.
+    """
+    from johnston_core.domain.ports.checkpoint import get_checkpoint_manager
+
+    cm = checkpoint_manager or get_checkpoint_manager()
+    msgs_with_stats: list[RewindEntry] = []
+    checkpoints_enabled = False
+
+    try:
+        checkpoints_enabled = await asyncio.to_thread(cm.is_valid_checkpoint_target, project_path)
+    except Exception:
+        checkpoints_enabled = False
+
+    if current_session_id and checkpoints_enabled:
+        seq_indices = list(range(len(user_msgs)))
+        scoped_files_map: Optional[dict[int, list[str]]] = None
+
+        if session and getattr(session, "messages", None):
+            user_events = [m for m in session.messages if is_ui_visible_user_message(m)]
+            if _touched_files(user_events, 0) is not None:
+                scoped_files_map = {
+                    seq_idx: _touched_files(user_events, seq_idx) for seq_idx in seq_indices
+                }
+
+        try:
+            details_map = await asyncio.wait_for(
+                asyncio.to_thread(
+                    cm.get_diff_details_batch,
+                    current_session_id,
+                    seq_indices,
+                    project_path=project_path,
+                    scoped_files=scoped_files_map,
+                ),
+                timeout=3.0,
+            )
+        except Exception:
+            details_map = {idx: ("diff unavailable", []) for idx in seq_indices}
+        for seq_idx, (child_idx, text) in enumerate(user_msgs):
+            item = details_map.get(seq_idx)
+            stat = item[0] if item else ""
+            files = item[1] if item else []
+            msgs_with_stats.append(RewindEntry(index=child_idx, text=text, git_stats=stat, changed_files=files))
+    else:
+        msgs_with_stats = [RewindEntry(index=child_idx, text=text) for child_idx, text in user_msgs]
+
+    return msgs_with_stats
+
+
+# ---------------------------------------------------------------------------
+# get_session_diff
+# ---------------------------------------------------------------------------
+
+async def get_session_diff(
+    current_session_id: str | None,
+    message_index: Optional[int] = None,
+    project_path: str | None = None,
+    checkpoint_manager: Optional[Any] = None,
+    scoped_files: Optional[list[str]] = None,
+) -> list[tuple[str, str, int, int]]:
+    """Fetch git-checkpoint full diff between checkpoint and current workspace.
+
+    Returns a list of tuples: (file_path, diff_text, added_lines, deleted_lines).
+    """
+    from johnston_core.domain.ports.checkpoint import get_checkpoint_manager
+
+    if not current_session_id:
+        return []
+
+    cm = checkpoint_manager or get_checkpoint_manager()
+
+    try:
+        checkpoints_enabled = await asyncio.to_thread(cm.is_valid_checkpoint_target, project_path)
+    except Exception:
+        checkpoints_enabled = False
+
+    if not checkpoints_enabled:
+        return []
+
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(
+                cm.get_checkpoint_diff,
+                current_session_id,
+                message_index,
+                project_path=project_path,
+                scoped_files=scoped_files,
+            ),
+            timeout=5.0,
+        )
+    except Exception as e:
+        logger.warning("Failed to fetch session diff: %s", e)
+        return []
+
+
+# ---------------------------------------------------------------------------
+# rewind helpers (reset_token_counters, _truncate_transcript, _touched_files)
+# ---------------------------------------------------------------------------
+
+def reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
+    """Reset cumulative token/cost metrics after a rollback.
+
+    ``reset_context=False`` keeps the freshly recomputed
+    ``last_context_tokens`` (callers that truncate history recompute it first).
+    """
+    for attr, value in (
+        ("tokens_input", 0),
+        ("tokens_output", 0),
+        ("tokens_cache_read", 0),
+        ("last_context_tokens", 0),
+        ("total_tokens", 0),
+        ("cost_usd", 0.0),
+    ):
+        if attr == "last_context_tokens" and not reset_context:
+            continue
+        if hasattr(agent, attr):
+            setattr(agent, attr, value)
+
+
+def find_selected_user_message(
+    user_msgs: list[tuple[int, str]],
+    selected_child_idx: int,
+) -> tuple[bool, str, int]:
+    """Locate the selected child index in the user-message list.
+
+    Returns ``(found, msg_text, seq_idx)`` where ``seq_idx`` is the position
+    in ``user_msgs`` (0-indexed) of the first message whose child index matches.
+    """
+    found = False
+    msg_text = ""
+    seq_idx = 0
+    for i, (child_idx, text) in enumerate(user_msgs):
+        if child_idx == selected_child_idx:
+            msg_text = text
+            seq_idx = i
+            found = True
+            break
+    return found, msg_text, seq_idx
+
+
+def truncate_agent_history(
+    agent: Any,
+    user_msgs: list[tuple[int, str]],
+    up_to_idx: int,
+) -> None:
+    """Clear or truncate the agent's history up to the selected user message.
+
+    ``up_to_idx == 0`` fully clears history and resets all token counters.
+    Otherwise the tail (the last ``real_tail`` UI-visible turns that map 1:1 to
+    real history messages) is truncated to the selected turn, falling back to a
+    clean slate when the selection falls inside the compacted region. Token
+    counters are reset keeping ``last_context_tokens``.
+    """
+    if up_to_idx == 0:
+        if hasattr(agent, "clear_history"):
+            agent.clear_history()
+        elif hasattr(agent, "history"):
+            agent.history = []
+        reset_token_counters(agent)
+    else:
+        # Map UI sequence index to a history index: the last ``real_tail``
+        # visible user turns map 1:1 to real (non-checkpoint, non-note) user
+        # messages in history, so only the tail can be truncated by index.
+        # A selection inside the compacted region cannot be restored from
+        # history and is rolled back to a clean slate.
+        real_tail = count_history_user_turns(agent.history) if (agent and hasattr(agent, "history")) else 0
+        tail_start = len(user_msgs) - real_tail
+        if up_to_idx >= tail_start:
+            truncate_idx = max(0, up_to_idx - tail_start)
+            if hasattr(agent, "truncate_history_to_user_message"):
+                agent.truncate_history_to_user_message(truncate_idx)
+            elif hasattr(agent, "history"):
+                agent.history = []
+        else:
+            if hasattr(agent, "clear_history"):
+                agent.clear_history()
+            elif hasattr(agent, "history"):
+                agent.history = []
+        reset_token_counters(agent, reset_context=False)
+
+
+def _touched_files(user_events: list[dict], seq_idx: int) -> Optional[list[str]]:
+    """Sorted files touched from turn ``seq_idx`` onward, or None when untracked.
+
+    Both rewind callers use the same UI-visible turn model, so the merge lives
+    in one place.
+    """
+    if not user_events:
+        return None
+    turns = user_events[seq_idx:]
+    if not turns:
+        return []
+    if any(u.get("touched_files") is None for u in turns):
+        return None
+    f_set: set[str] = set()
+    for u in turns:
+        f_set.update(u.get("touched_files") or [])
+    return sorted(f_set)
+
+
+def restore_plan_from_messages(messages: list[dict] | None) -> tuple[list[dict] | None, str]:
+    """Extract the latest active plan and explanation from a list of messages."""
+    import json
+
+    restored_plan = None
+    restored_explanation = ""
+    if not messages:
+        return None, ""
+    has_subsequent_user_msg = False
+    for msg in reversed(messages):
+        if not isinstance(msg, dict):
+            continue
+        m_type = msg.get("type")
+        if m_type == "user":
+            has_subsequent_user_msg = True
+        elif m_type == "tool" and (msg.get("tool_type") == "update_plan" or msg.get("name") == "update_plan"):
+            args = msg.get("args") or {}
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except Exception:
+                    args = {}
+            if isinstance(args, dict):
+                plan_raw = args.get("plan")
+                if isinstance(plan_raw, str):
+                    try:
+                        plan_raw = json.loads(plan_raw)
+                    except Exception:
+                        plan_raw = []
+                if isinstance(plan_raw, list):
+                    candidate_plan = [p for p in plan_raw if isinstance(p, dict)]
+                    candidate_explanation = str(args.get("explanation") or "").strip()
+                    if (
+                        candidate_plan
+                        and all(p.get("status") == "completed" for p in candidate_plan)
+                        and has_subsequent_user_msg
+                    ):
+                        restored_plan = None
+                        restored_explanation = ""
+                    else:
+                        restored_plan = candidate_plan
+                        restored_explanation = candidate_explanation
+                    break
+    return restored_plan, restored_explanation
+
+
+def _cleanup_rewound_subagents(session: Any, dropped_msgs: list[dict], store: Any = None) -> None:
+    """Cancel and remove orphaned subagents that were spawned in dropped turns."""
+    if not session:
+        return
+    curr_sid = getattr(session, "id", None)
+    if not curr_sid:
+        return
+    if store is None:
+        try:
+            from johnston_core.infrastructure.storage.session_store import SessionStore
+
+            store = SessionStore.get_instance()
+        except Exception:
+            return
+
+    dropped_sub_ids: set[str] = set()
+    for msg in dropped_msgs:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in (
+            "invoke_subagent",
+            "message_subagent",
+        ):
+            args = msg.get("args") or {}
+            if isinstance(args, dict):
+                sid = args.get("id") or args.get("session_id")
+                if sid:
+                    dropped_sub_ids.add(str(sid))
+            sub_id = msg.get("subagent_session_id")
+            if sub_id:
+                dropped_sub_ids.add(str(sub_id))
+
+    remaining_sub_ids: set[str] = set()
+    for msg in getattr(session, "messages", []):
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in (
+            "invoke_subagent",
+            "message_subagent",
+        ):
+            args = msg.get("args") or {}
+            if isinstance(args, dict):
+                sid = args.get("id") or args.get("session_id")
+                if sid:
+                    remaining_sub_ids.add(str(sid))
+            sub_id = msg.get("subagent_session_id")
+            if sub_id:
+                remaining_sub_ids.add(str(sub_id))
+
+    try:
+        children = store.children(curr_sid)
+    except Exception:
+        children = []
+
+    for child in children:
+        c_id = str(child.id)
+        if c_id in dropped_sub_ids or (c_id not in remaining_sub_ids and dropped_msgs):
+            async_task = getattr(child, "async_task", None)
+            if async_task and not async_task.done():
+                try:
+                    async_task.cancel()
+                except Exception:
+                    pass
+            try:
+                store.delete(c_id)
+            except Exception as e:
+                logger.warning("Failed to delete rewound subagent session %s: %s", c_id, e)
+
+
+def _cleanup_rewound_shell_tasks(dropped_msgs: list[dict], task_manager: Any = None) -> None:
+    """Kill and drop shell background tasks created in dropped turns."""
+    if not task_manager:
+        return
+    dropped_task_ids: set[str] = set()
+    for msg in dropped_msgs:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in ("shell", "kill"):
+            bg_id = msg.get("background_task_id") or msg.get("task_id") or msg.get("id")
+            if bg_id:
+                dropped_task_ids.add(str(bg_id))
+            args = msg.get("args") or {}
+            if isinstance(args, dict):
+                tid = args.get("id") or args.get("task_id")
+                if tid:
+                    dropped_task_ids.add(str(tid))
+
+    tasks_dict = getattr(task_manager, "_tasks", {})
+    for task_id in dropped_task_ids:
+        task = tasks_dict.get(task_id)
+        if task:
+            if getattr(task, "is_active", getattr(task, "is_running", False)):
+                try:
+                    asyncio.create_task(task.kill())
+                except Exception:
+                    pass
+            if hasattr(task_manager, "drop"):
+                task_manager.drop(task_id)
+
+
+def _truncate_transcript(
+    session: Any,
+    seq_idx: int,
+    store: Any = None,
+    task_manager: Any = None,
+) -> None:
+    """Drop stored transcript events from the selected UI-visible user turn onward.
+
+    ``seq_idx`` is the UI position of the selected user message (0-indexed over
+    visible user widgets). Which events count as a visible turn is defined by
+    the shared policy in ``core.domain.policies.messages``, keeping this index
+    space aligned with fork, checkpoints and the chat UI. A selection beyond
+    the last turn is a no-op.
+    """
+    if session is None or not getattr(session, "messages", None):
+        return
+    if seq_idx == 0:
+        dropped = list(session.messages)
+        session.messages = []
+        _cleanup_rewound_subagents(session, dropped, store=store)
+        _cleanup_rewound_shell_tasks(dropped, task_manager=task_manager)
+        return
+    cutoff = find_visible_user_cutoff(session.messages, seq_idx)
+    if cutoff is not None:
+        dropped = session.messages[cutoff:]
+        session.messages = drop_stale_system_notes(session.messages[:cutoff])
+        _cleanup_rewound_subagents(session, dropped, store=store)
+        _cleanup_rewound_shell_tasks(dropped, task_manager=task_manager)
+
+
+# ---------------------------------------------------------------------------
+# rewind_session
+# ---------------------------------------------------------------------------
+
+def rewind_session(
+    agent: Any,
+    curr_sid: str | None,
+    project_path: str | None,
+    user_msgs: list[tuple[int, str]],
+    selected_child_idx: int,
+    *,
+    restore_git: bool = True,
+    session: Any = None,
+    rollback_ui: Callable[[int], None],
+    load_text_into_input: Callable[[str], None],
+    save_session_cb: Callable[[], None],
+    refresh_footer_cb: Callable[[], None],
+    checkpoint_manager: Optional[Any] = None,
+    store: Optional[Any] = None,
+    task_manager: Optional[Any] = None,
+) -> None:
+    """Execute a rewind/rollback for a selected user message.
+
+    Does NOT import Textual widgets.  UI callbacks handle ChatView operations:
+    * ``rollback_ui(target_idx)`` — calls ``chat_view.rollback_to(target_idx)``.
+    * ``load_text_into_input(text)`` — loads msg text into input, moves cursor.
+    * ``save_session_cb()`` — saves session (async or sync) after rollback.
+    * ``refresh_footer_cb()`` — refreshes the status footer after rollback.
+
+    Core logic performed:
+    * Walk user_msgs to find the text and sequence index of the message.
+    * Compute target_idx = selected_child_idx - 1 (the position to rollback to).
+    * Clear or truncate agent history depending on seq_idx.
+    * Truncate the store transcript (``session.messages``) at the same turn.
+    * Reset token counters.
+    * Restore Git checkpoints in background if ``restore_git=True``.
+    """
+    found, msg_text, seq_idx = find_selected_user_message(user_msgs, selected_child_idx)
+    if not found and user_msgs:
+        logger.warning("Selected child index %s not in user messages", selected_child_idx)
+        return
+
+    # Agent history: full clear or truncate
+    truncate_agent_history(agent, user_msgs, seq_idx)
+
+    # Collect touched files to restore before truncating transcript
+    files_to_restore: Optional[list[str]] = None
+    if session and getattr(session, "messages", None):
+        user_events = [m for m in session.messages if is_ui_visible_user_message(m)]
+        files_to_restore = _touched_files(user_events, seq_idx)
+
+    # Store transcript: drop events from the selected turn onward so a later
+    # /resume does not resurrect rolled-back turns.
+    _truncate_transcript(session, seq_idx, store=store, task_manager=task_manager)
+
+    target_idx = -1 if seq_idx == 0 else selected_child_idx - 1
+    rollback_ui(target_idx)
+
+    # Restore Git checkpoints in background
+    if curr_sid:
+        # Capture BEFORE creating the new task so the chain never awaits itself.
+        pending_restore = getattr(agent, "rewind_git_restore_task", None)
+
+        async def _restore_git_bg():
+            # Chain after any still-running restore from a previous rewind: two
+            # restores racing for the worktree lock could apply in reverse order
+            # and resurrect stale state over newer files. Note that cancelling
+            # the previous task would NOT stop its in-flight to_thread git calls,
+            # so awaiting it is the only safe serialization.
+            if pending_restore is not None and not pending_restore.done():
+                try:
+                    await pending_restore
+                except asyncio.CancelledError:
+                    pass
+                except Exception as e:
+                    logger.warning("Previous git checkpoint restore failed: %s", e)
+            try:
+                from johnston_core.domain.ports.checkpoint import get_checkpoint_manager
+
+                cm = checkpoint_manager or get_checkpoint_manager()
+                if restore_git:
+                    await asyncio.to_thread(
+                        cm.restore_checkpoint,
+                        curr_sid,
+                        seq_idx,
+                        project_path=project_path,
+                        files_to_restore=files_to_restore,
+                    )
+                await asyncio.to_thread(
+                    cm.purge_checkpoints_after, curr_sid, seq_idx, project_path=project_path
+                )
+            except Exception as e:
+                logger.warning("Git checkpoint restore failed: %s", e)
+
+        git_restore_task = asyncio.create_task(_restore_git_bg())
+        # Kept on the agent so a follow-up rewind can chain onto it and app
+        # shutdown can cancel/await it.
+        if agent is not None:
+            agent.rewind_git_restore_task = git_restore_task
+
+    refresh_footer_cb()
+    save_session_cb()
+
+    # Load text into input
+    load_text_into_input(msg_text)

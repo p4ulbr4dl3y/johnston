@@ -2,9 +2,9 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from core.interfaces.cli.commands.run_cmd import run_headless
-from core.interfaces.cli.entrypoint import build_parser, main
-from core.permission_manager import PermissionManager
+from johnston_core.interfaces.cli.commands.run_cmd import run_headless
+from johnston_core.interfaces.cli.entrypoint import build_parser, main
+from johnston_core.permission_manager import PermissionManager
 
 
 class TestCliWorkspaceFlag(unittest.TestCase):
@@ -45,7 +45,7 @@ class TestCliWorkspaceFlag(unittest.TestCase):
         parser = build_parser()
         args = parser.parse_args(["run", "test prompt", "-w", ws])
 
-        with patch("core.interfaces.cli.commands.run_cmd.run_headless_async") as mock_async:
+        with patch("johnston_core.interfaces.cli.commands.run_cmd.run_headless_async") as mock_async:
             mock_async.return_value = 0
             code = run_headless(args)
             self.assertEqual(code, 0)

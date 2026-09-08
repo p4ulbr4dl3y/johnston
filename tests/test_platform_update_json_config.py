@@ -2,7 +2,7 @@
 
 import json
 
-from core.infrastructure.platform.platform_utils import (
+from johnston_core.infrastructure.platform.platform_utils import (
     cached_json_read,
     update_json_config,
 )

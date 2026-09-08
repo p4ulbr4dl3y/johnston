@@ -2,8 +2,8 @@ import os
 import tempfile
 import unittest
 
-from tools.base import resolve_path
-from tools.context import ToolContext
+from johnston_core.tools.base import resolve_path
+from johnston_core.tools.context import ToolContext
 
 
 def _cwd_cmd() -> str:
@@ -33,7 +33,7 @@ class MockTextualApp:
 
 def make_agent(app, cwd=None, is_subagent=False):
     """Build a real BaseAgent wired like a (sub)agent with an optional worktree cwd."""
-    from core.base_provider import BaseAgent
+    from johnston_core.base_provider import BaseAgent
 
     agent = BaseAgent(api_key="", base_url="", model="")
     agent.app = app
@@ -94,7 +94,7 @@ class TestResolvePathCwd(unittest.TestCase):
 class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
     async def test_shell_uses_ctx_cwd_as_process_cwd(self):
 
-        from tools.shell import ShellTool
+        from johnston_core.tools.shell import ShellTool
 
         tool = ShellTool()
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
@@ -105,7 +105,7 @@ class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
 
     async def test_shell_uses_cwd_from_agent(self):
 
-        from tools.shell import ShellTool
+        from johnston_core.tools.shell import ShellTool
 
         tool = ShellTool()
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
@@ -118,7 +118,7 @@ class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
 
 class TestCreateToolCwd(unittest.IsolatedAsyncioTestCase):
     async def test_create_writes_to_rel_path_under_agent_cwd(self):
-        from tools.create import CreateTool
+        from johnston_core.tools.create import CreateTool
 
         tool = CreateTool()
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
@@ -134,7 +134,7 @@ class TestCreateToolCwd(unittest.IsolatedAsyncioTestCase):
 
 class TestPromptBuilderCwd(unittest.TestCase):
     def test_system_prompt_shows_agent_cwd(self):
-        from core.application.generation.prompt_builder import PromptBuilder
+        from johnston_core.application.generation.prompt_builder import PromptBuilder
 
         with tempfile.TemporaryDirectory() as base:
             with open(os.path.join(base, "AGENTS.md"), "w", encoding="utf-8") as f:
@@ -147,7 +147,7 @@ class TestPromptBuilderCwd(unittest.TestCase):
 
     def test_system_prompt_loads_project_rules_from_cwd(self):
         """Project rules (.johnston/rules) are read from the agent cwd, not main checkout."""
-        from core.application.generation.prompt_builder import PromptBuilder
+        from johnston_core.application.generation.prompt_builder import PromptBuilder
 
         with tempfile.TemporaryDirectory() as base:
             rules_dir = os.path.join(base, ".johnston", "rules")
@@ -162,7 +162,7 @@ class TestPromptBuilderCwd(unittest.TestCase):
 
 class TestGetRulesSnippetCwd(unittest.TestCase):
     def test_get_rules_snippet_respects_cwd(self):
-        from core.application.generation.prompt_builder import get_rules_snippet
+        from johnston_core.application.generation.prompt_builder import get_rules_snippet
 
         with tempfile.TemporaryDirectory() as main, tempfile.TemporaryDirectory() as wt:
             proj_rules = os.path.join(wt, ".johnston", "rules")
@@ -181,8 +181,8 @@ class TestSubagentBranchContextPersistence(unittest.TestCase):
     def test_session_persists_project_dir_and_branch(self):
         import tempfile
 
-        from core.domain.entities.session import AgentSession
-        from core.infrastructure.storage.session_store import SessionStore
+        from johnston_core.domain.entities.session import AgentSession
+        from johnston_core.infrastructure.storage.session_store import SessionStore
 
         with tempfile.TemporaryDirectory() as tmpdir:
             store = SessionStore(project_path=tmpdir)
@@ -204,7 +204,7 @@ class TestSubagentBranchContextPersistence(unittest.TestCase):
             self.assertEqual(restored.branch_name, "subagent-sub-abc")
 
     def test_from_dict_defaults_empty(self):
-        from core.domain.entities.session import AgentSession
+        from johnston_core.domain.entities.session import AgentSession
 
         restored = AgentSession.from_dict({"id": "x", "kind": "subagent"})
         self.assertEqual(restored.project_dir, "")

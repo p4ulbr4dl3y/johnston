@@ -2,8 +2,8 @@ import unittest
 
 import pytest
 
-from widgets.app.app import JohnstonApp
-from widgets.presentation.widgets.plan_notch import PlanNotch, PlanNotchContainer
+from johnston_tui.app.app import JohnstonApp
+from johnston_tui.presentation.widgets.plan_notch import PlanNotch, PlanNotchContainer
 
 
 class TestPlanNotch(unittest.TestCase):
@@ -200,7 +200,7 @@ async def test_action_toggle_plan_hidden_pilot():
 
 @pytest.mark.asyncio
 async def test_app_on_plan_update_and_auto_clear_pilot():
-    from widgets.chat_input import ChatInput
+    from johnston_tui.chat_input import ChatInput
 
     app = JohnstonApp()
     async with app.run_test():
@@ -230,7 +230,7 @@ async def test_app_on_plan_update_and_auto_clear_pilot():
 
 @pytest.mark.asyncio
 async def test_session_persistence_restores_plan():
-    from core.domain.entities.session import AgentSession
+    from johnston_core.domain.entities.session import AgentSession
 
     app = JohnstonApp()
     sess = AgentSession("test-plan-sess")
@@ -266,8 +266,8 @@ async def test_session_persistence_restores_plan():
 
 @pytest.mark.asyncio
 async def test_session_persistence_does_not_restore_completed_plan_if_subsequent_user_message():
-    from core.domain.entities.session import AgentSession
-    from widgets.presentation.widgets.chat_container import ChatView
+    from johnston_core.domain.entities.session import AgentSession
+    from johnston_tui.presentation.widgets.chat_container import ChatView
 
     app = JohnstonApp()
     sess = AgentSession("test-completed-plan-sess")
@@ -303,7 +303,7 @@ async def test_session_persistence_does_not_restore_completed_plan_if_subsequent
 
 @pytest.mark.asyncio
 async def test_session_persistence_restores_completed_plan_if_no_subsequent_user_message():
-    from core.domain.entities.session import AgentSession
+    from johnston_core.domain.entities.session import AgentSession
 
     app = JohnstonApp()
     sess = AgentSession("test-completed-plan-latest-sess")
@@ -336,7 +336,7 @@ async def test_session_persistence_restores_completed_plan_if_no_subsequent_user
 
 @pytest.mark.asyncio
 async def test_app_on_chat_input_submitted_malformed_plan_does_not_crash():
-    from widgets.chat_input import ChatInput
+    from johnston_tui.chat_input import ChatInput
 
     app = JohnstonApp()
     async with app.run_test():

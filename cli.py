@@ -10,18 +10,18 @@ try:
 except ImportError:  # pragma: no cover
     import tomli as tomllib  # type: ignore[no-redef]
 
-from core.interfaces.cli.commands.mcp_cmd import print_mcp
-from core.interfaces.cli.commands.provider_cmd import print_models
-from core.interfaces.cli.commands.roles_cmd import print_roles
-from core.interfaces.cli.commands.rules_cmd import print_rules
-from core.interfaces.cli.commands.skills_cmd import print_skills
-from core.interfaces.cli.entrypoint import (
+from johnston_cli.entrypoint import main_j, main_johnston
+from johnston_core.interfaces.cli.commands.mcp_cmd import print_mcp
+from johnston_core.interfaces.cli.commands.provider_cmd import print_models
+from johnston_core.interfaces.cli.commands.roles_cmd import print_roles
+from johnston_core.interfaces.cli.commands.rules_cmd import print_rules
+from johnston_core.interfaces.cli.commands.skills_cmd import print_skills
+from johnston_core.interfaces.cli.entrypoint import (
     build_parser,
 )
-from core.interfaces.cli.entrypoint import (
+from johnston_core.interfaces.cli.entrypoint import (
     main as _entrypoint_main,
 )
-from johnston_cli.entrypoint import main_j, main_johnston
 
 __all__ = [
     "build_parser",

@@ -1,7 +1,7 @@
 import asyncio
 import unittest
 
-from widgets.presentation.screens.resume import ResumeScreen, _order_sessions_hierarchically
+from johnston_tui.presentation.screens.resume import ResumeScreen, _order_sessions_hierarchically
 
 
 class TestResumeScreen(unittest.TestCase):
@@ -136,7 +136,7 @@ class TestResumeScreen(unittest.TestCase):
 
         from textual.widgets import OptionList
 
-        from widgets.presentation.screens.session_conflict import SessionConflictScreen
+        from johnston_tui.presentation.screens.session_conflict import SessionConflictScreen
 
         sessions = [
             {"id": "s1", "title": "Free Session", "message_count": 2, "is_locked": False},
@@ -266,7 +266,7 @@ class TestResumeScreenPilot(unittest.IsolatedAsyncioTestCase):
     async def test_resume_screen_locked_flow_pilot(self):
         from textual.app import App
 
-        from widgets.presentation.screens.session_conflict import SessionConflictScreen
+        from johnston_tui.presentation.screens.session_conflict import SessionConflictScreen
 
         class PilotApp(App):
             def __init__(self, sessions):
@@ -343,7 +343,7 @@ class TestResumeScreenPilot(unittest.IsolatedAsyncioTestCase):
             # Press ctrl+r to trigger rename modal
             await pilot.press("ctrl+r")
             await pilot.pause()
-            from widgets.presentation.screens.rename_session import RenameSessionScreen
+            from johnston_tui.presentation.screens.rename_session import RenameSessionScreen
 
             self.assertIsInstance(app.screen, RenameSessionScreen)
 
@@ -389,7 +389,7 @@ class TestResumeScreenPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.press("ctrl+d")
             await pilot.pause()
 
-            from widgets.presentation.screens.confirm import ConfirmScreen
+            from johnston_tui.presentation.screens.confirm import ConfirmScreen
 
             self.assertIsInstance(app.screen, ConfirmScreen)
 

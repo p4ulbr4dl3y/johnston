@@ -3,7 +3,7 @@ import asyncio
 import unittest
 from unittest.mock import MagicMock
 
-from core.application.session.actions import (
+from johnston_core.application.session.actions import (
     compact_session,
     new_session,
     rewind_session,
@@ -427,7 +427,7 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
     async def test_rewind_without_git_restore(self):
         from unittest.mock import patch
 
-        from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+        from johnston_core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
         agent = MockAgent()
         agent.history = [{"role": "user", "content": "Msg 0"}]
@@ -458,7 +458,7 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
     async def test_get_rewind_git_stats_with_session(self):
         from unittest.mock import MagicMock
 
-        from core.application.session.actions import get_rewind_git_stats
+        from johnston_core.application.session.actions import get_rewind_git_stats
 
         mock_cm = MagicMock()
         mock_cm.is_valid_checkpoint_target.return_value = True
@@ -501,7 +501,7 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
     async def test_rewind_session_passes_files_to_restore(self):
         from unittest.mock import patch
 
-        from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+        from johnston_core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
         agent = MockAgent()
         agent.history = [{"role": "user", "content": "turn 0"}, {"role": "user", "content": "turn 1"}]
@@ -542,7 +542,7 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
     async def test_forked_session_rewind_keeps_parent_intact(self):
         import tempfile
 
-        from core.infrastructure.storage.session_store import SessionStore
+        from johnston_core.infrastructure.storage.session_store import SessionStore
 
         with tempfile.TemporaryDirectory() as tmpdir:
             sm = SessionStore(project_path=tmpdir)
@@ -600,7 +600,7 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
     async def test_rewind_session_cleans_up_subagents_and_tasks(self):
         from unittest.mock import MagicMock
 
-        from core.application.session.actions import restore_plan_from_messages
+        from johnston_core.application.session.actions import restore_plan_from_messages
 
         # Test restore_plan_from_messages
         plan_msgs = [
@@ -661,7 +661,7 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
         mock_tm.drop.assert_called_once_with("task-123")
 
     def test_touched_files_untracked_turn_returns_none(self):
-        from core.application.session.actions import _touched_files
+        from johnston_core.application.session.actions import _touched_files
 
         # When all turns have tracked lists, returns sorted union
         events_tracked = [

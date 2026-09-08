@@ -1,6 +1,6 @@
 import unittest
 
-from widgets.chat_toolcall import ToolCallWidget
+from johnston_tui.chat_toolcall import ToolCallWidget
 
 
 class TestEdgeToolCallInit(unittest.TestCase):
@@ -55,7 +55,7 @@ class TestEdgeToolCallMalformedArgs(unittest.TestCase):
         self.assertIsNotNone(widget.header_label)
 
     def test_malformed_json_repair_returns_valid(self):
-        from widgets.chat_toolcall import ParsingMixin
+        from johnston_tui.chat_toolcall import ParsingMixin
 
         obj = ParsingMixin()
         self.assertEqual(obj._parse_json('{"a": "b'), {"a": "b"})

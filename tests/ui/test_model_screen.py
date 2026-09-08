@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from textual.app import App
 from textual.widgets.option_list import Option
 
-from widgets.presentation.screens.model import ModelScreen
+from johnston_tui.presentation.screens.model import ModelScreen
 
 
 class TestModelScreenBuildData(unittest.TestCase):
@@ -20,11 +20,11 @@ class TestModelScreenBuildData(unittest.TestCase):
         self.assertTrue(ModelScreen._is_active_model("p1", "model-a", "p1", "model-a"))
 
     def test_is_active_model_display_name_match(self):
-        with patch("core.models_catalog.catalog.get_model_display_name", return_value="display name"):
+        with patch("johnston_core.models_catalog.catalog.get_model_display_name", return_value="display name"):
             self.assertTrue(ModelScreen._is_active_model("p1", "model-a", "p1", "Model A"))
 
     def test_is_active_model_display_name_no_match(self):
-        with patch("core.models_catalog.catalog.get_model_display_name", side_effect=["foo", "bar"]):
+        with patch("johnston_core.models_catalog.catalog.get_model_display_name", side_effect=["foo", "bar"]):
             self.assertFalse(ModelScreen._is_active_model("p1", "model-a", "", "Model A"))
 
     def test_build_data_dict_single_provider_active(self):
@@ -60,7 +60,7 @@ class TestModelScreenBuildData(unittest.TestCase):
         self.assertNotIn("●", screen.raw_options[1])
 
     def test_build_data_vision_badge(self):
-        with patch("core.models_catalog.catalog.has_vision", side_effect=lambda prov, m: m == "gpt-4o"):
+        with patch("johnston_core.models_catalog.catalog.has_vision", side_effect=lambda prov, m: m == "gpt-4o"):
             data = {"openai": {"name": "OpenAI", "models": ["gpt-4o", "gpt-3.5-turbo"]}}
             screen = ModelScreen(models_data=data, current_model="", current_provider="openai")
             self.assertIn("vision", screen.raw_options[1])

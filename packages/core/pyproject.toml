@@ -30,7 +30,4 @@ dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-only-include = [
-    "core",
-    "tools",
-]
+only-include = ["johnston_core"]

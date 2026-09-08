@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from core.application.generation import ai_generator as ai_generator_module
-from core.application.generation.ai_generator import GenCanvas, generate_ai_response
+from johnston_core.application.generation import ai_generator as ai_generator_module
+from johnston_core.application.generation.ai_generator import GenCanvas, generate_ai_response
 
 
 class _FakeAgent:
@@ -103,7 +103,7 @@ async def test_generation_failure_logged_with_exception(caplog):
         raise ValueError("boom")
 
     canvas = _canvas()
-    with caplog.at_level(logging.ERROR, logger="core.application.generation.ai_generator"):
+    with caplog.at_level(logging.ERROR, logger="johnston_core.application.generation.ai_generator"):
         await generate_ai_response(_FakeAgent(stream), _fake_session(), canvas, session_id="s1", user_text="hi")
 
     canvas.notify.assert_called_once()
@@ -116,7 +116,7 @@ async def test_generation_failure_logged_with_exception(caplog):
 
 @pytest.mark.asyncio
 async def test_git_checkpoint_called_for_queued_message():
-    from core.infrastructure.storage import git_checkpoint
+    from johnston_core.infrastructure.storage import git_checkpoint
 
     created = []
     real_create = git_checkpoint.GitCheckpointManager.create_checkpoint
@@ -331,7 +331,7 @@ async def test_user_message_with_display_text():
 async def test_await_pending_git_restore_barrier():
     from types import SimpleNamespace
 
-    from core.application.generation.ai_generator import _await_pending_git_restore
+    from johnston_core.application.generation.ai_generator import _await_pending_git_restore
 
     # Agent without the attribute: no-op.
     await _await_pending_git_restore(object())

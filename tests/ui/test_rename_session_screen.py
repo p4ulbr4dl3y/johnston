@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from textual.widgets import Input
 
-from widgets.presentation.screens.rename_session import RenameSessionScreen
+from johnston_tui.presentation.screens.rename_session import RenameSessionScreen
 
 
 class TestRenameSessionScreen(unittest.TestCase):

@@ -3,7 +3,7 @@ import base64
 import os
 from unittest.mock import patch
 
-from core.infrastructure.platform import win_sandbox_runner as r
+from johnston_core.infrastructure.platform import win_sandbox_runner as r
 
 
 def test_encode_ps_command_roundtrip():

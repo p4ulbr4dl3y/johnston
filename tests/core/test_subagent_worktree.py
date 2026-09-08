@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import unittest
 
-from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+from johnston_core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
 
 class TestSubagentWorktreeManager(unittest.TestCase):
@@ -197,7 +197,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
             patch(
-                "core.infrastructure.runtime.subagent_worktree.run_git",
+                "johnston_core.infrastructure.runtime.subagent_worktree.run_git",
                 return_value=subprocess.CompletedProcess([], returncode=128, stdout="", stderr="err"),
             ),
         ):
@@ -213,7 +213,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
             non_git_dir.cleanup()
 
     def test_attach_worktree_existing_path_returns_it(self):
-        from core.infrastructure.platform.paths import WORKTREES_DIR
+        from johnston_core.infrastructure.platform.paths import WORKTREES_DIR
 
         wt_path = os.path.join(WORKTREES_DIR, "attach-existing")
         os.makedirs(wt_path, exist_ok=True)
@@ -231,7 +231,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
             patch(
-                "core.infrastructure.runtime.subagent_worktree.run_git",
+                "johnston_core.infrastructure.runtime.subagent_worktree.run_git",
                 return_value=subprocess.CompletedProcess([], returncode=128, stdout="", stderr="err"),
             ),
         ):
@@ -241,7 +241,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
     def test_attach_worktree_success(self):
         from unittest.mock import patch
 
-        from core.infrastructure.platform.paths import WORKTREES_DIR
+        from johnston_core.infrastructure.platform.paths import WORKTREES_DIR
 
         wt_path = os.path.join(WORKTREES_DIR, "attach-ok")
         os.makedirs(wt_path, exist_ok=True)
@@ -249,7 +249,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
             with (
                 patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
                 patch(
-                    "core.infrastructure.runtime.subagent_worktree.run_git",
+                    "johnston_core.infrastructure.runtime.subagent_worktree.run_git",
                     return_value=subprocess.CompletedProcess([], returncode=0, stdout="", stderr=""),
                 ),
             ):
@@ -263,7 +263,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
     def test_attach_worktree_recreates_branch_if_missing(self):
         from unittest.mock import patch
 
-        from core.infrastructure.platform.paths import WORKTREES_DIR
+        from johnston_core.infrastructure.platform.paths import WORKTREES_DIR
 
         wt_path = os.path.join(WORKTREES_DIR, "attach-recreate")
         calls = []
@@ -280,7 +280,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         try:
             with (
                 patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
-                patch("core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake_run_git),
+                patch("johnston_core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake_run_git),
             ):
                 result = SubagentWorktreeManager.attach_worktree(self.repo_dir, "attach-recreate", "missing-b")
             self.assertEqual(result, wt_path)
@@ -345,7 +345,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
 
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
-            patch("core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake_run),
+            patch("johnston_core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake_run),
         ):
             diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
                 self.repo_dir, self.repo_dir, "branch-x"
@@ -356,7 +356,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
     def test_get_worktree_diff_summary_exception(self):
         from unittest.mock import patch
 
-        with patch("core.infrastructure.runtime.subagent_worktree.run_git", side_effect=Exception("boom")):
+        with patch("johnston_core.infrastructure.runtime.subagent_worktree.run_git", side_effect=Exception("boom")):
             diff_summary, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
                 self.repo_dir, self.repo_dir, "branch-x"
             )

@@ -12,8 +12,8 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from tools import ask_user, edit
-from tools.registry import execute_tool
+from johnston_core.tools import ask_user, edit
+from johnston_core.tools.registry import execute_tool
 
 
 class TestEditBareValueError(unittest.IsolatedAsyncioTestCase):
@@ -51,7 +51,7 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
         mock_role.disallowed_tools = []
         reg = MagicMock()
         reg.get_role.return_value = mock_role
-        return patch("core.role_registry.RoleRegistry.get_instance", return_value=reg)
+        return patch("johnston_core.role_registry.RoleRegistry.get_instance", return_value=reg)
 
     async def test_get_active_tools_exception_wrapped(self):
         mock_mgr = MagicMock()
@@ -61,7 +61,7 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
         # Explicit caps miss so the flow reaches the full active-tools listing.
         mock_mgr.get_capabilities_for_exposed_tool.return_value = None
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
+            patch("johnston_core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
             self._mode(),
         ):
             res = await execute_tool("recent_tool", {"arg": 1})
@@ -79,7 +79,7 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
         mock_mgr.get_active_tools_async = AsyncMock(return_value=[])
         mock_mgr.get_capabilities_for_exposed_tool.side_effect = RuntimeError("policy crash")
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
+            patch("johnston_core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
             self._mode(),
         ):
             res = await execute_tool("gh__search", {"q": "x"})
@@ -110,7 +110,7 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
     every agent turn: a failed full listing is remembered briefly."""
 
     def setUp(self):
-        from tools import registry
+        from johnston_core.tools import registry
 
         registry._mcp_name_misses.clear()
 
@@ -128,12 +128,12 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
         mock_role.disallowed_tools = []
         reg = MagicMock()
         reg.get_role.return_value = mock_role
-        return patch("core.role_registry.RoleRegistry.get_instance", return_value=reg)
+        return patch("johnston_core.role_registry.RoleRegistry.get_instance", return_value=reg)
 
     async def test_first_miss_lists_second_hits_negative_cache(self):
         mock_mgr = self._mock_mgr()
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
+            patch("johnston_core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr),
             self._mode(),
         ):
             r1 = await execute_tool("totally_hallucinated_tool", {})
@@ -145,7 +145,7 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
         mock_mgr.get_active_tools_async.assert_called_once()
 
     def test_remember_and_forget_helpers(self):
-        from tools import registry
+        from johnston_core.tools import registry
 
         registry._remember_mcp_miss("srv__x")
         self.assertTrue(registry._mcp_name_recently_missed("srv__x"))
@@ -153,7 +153,7 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(registry._mcp_name_recently_missed("srv__x"))
 
     def test_ttl_expiry_forgets(self):
-        from tools import registry
+        from johnston_core.tools import registry
 
         registry._mcp_name_misses.clear()
         registry._mcp_name_misses["stale"] = 0.0  # long past TTL

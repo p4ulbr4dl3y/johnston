@@ -15,7 +15,7 @@ from textual.app import App
 from textual.events import Key
 from textual.widgets import OptionList
 
-from widgets.presentation.screens.mcp import MCPScreen
+from johnston_tui.presentation.screens.mcp import MCPScreen
 
 
 class _MCPScreenHost(App[None]):
@@ -69,13 +69,13 @@ def _mock_mgr(servers):
 
 
 def _make_screen(mgr):
-    with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get:
+    with patch("johnston_tui.presentation.screens.mcp.get_mcp_manager") as mock_get:
         mock_get.return_value = mgr
         return MCPScreen()
 
 
 class TestMCPScreen(unittest.TestCase):
-    @patch("widgets.presentation.screens.mcp.get_mcp_manager")
+    @patch("johnston_tui.presentation.screens.mcp.get_mcp_manager")
     def test_init(self, mock_get_mgr):
         mock_mgr = MagicMock()
         mock_mgr.load_servers.return_value = []
@@ -481,7 +481,7 @@ class TestMCPScreenCoverage(unittest.IsolatedAsyncioTestCase):
         # schedules a mock coroutine instead of a real one (avoids an unraised
         # "coroutine never awaited" warning when the test finishes).
         screen._warmup_tools = AsyncMock()
-        with patch("widgets.presentation.screens.mcp.asyncio.create_task", return_value=MagicMock()):
+        with patch("johnston_tui.presentation.screens.mcp.asyncio.create_task", return_value=MagicMock()):
             screen.on_mount()
 
     async def test_warmup_tools_success_mounted(self):
@@ -685,7 +685,7 @@ class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
     def test_init_load_servers_exception(self):
         mgr = MagicMock()
         mgr.load_servers.side_effect = Exception("boom")
-        with patch("widgets.presentation.screens.mcp.get_mcp_manager", return_value=mgr):
+        with patch("johnston_tui.presentation.screens.mcp.get_mcp_manager", return_value=mgr):
             screen = MCPScreen()
         self.assertEqual(screen.servers, [])
 
@@ -811,7 +811,7 @@ class TestMCPScreenExtra(unittest.IsolatedAsyncioTestCase):
         screen._is_mounted = True
         host = _MCPToggleHost()
         async with host.run_test():
-            with patch("widgets.presentation.screens.mcp.asyncio.to_thread", side_effect=asyncio.CancelledError()):
+            with patch("johnston_tui.presentation.screens.mcp.asyncio.to_thread", side_effect=asyncio.CancelledError()):
                 with self.assertRaises(asyncio.CancelledError):
                     await screen._do_toggle("s")
         self.assertNotIn("s", screen._pending_toggles)

@@ -5,18 +5,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.application.session.subagent_service import (
+from johnston_core.application.session.subagent_service import (
     SubagentService,
     is_active_subagent,
     resolve_subagent_display_status,
 )
-from core.domain.entities.session import AgentSession, SessionStatus
-from core.infrastructure.tasks.manage import extract_task_status_details
-from core.infrastructure.tasks.manager import TaskManager
-from core.infrastructure.tasks.shell_task import ShellTask
-from core.infrastructure.tasks.task import BaseTask, TaskStatus
-from tools.context import ToolContext
-from tools.shell import ShellTool
+from johnston_core.domain.entities.session import AgentSession, SessionStatus
+from johnston_core.infrastructure.tasks.manage import extract_task_status_details
+from johnston_core.infrastructure.tasks.manager import TaskManager
+from johnston_core.infrastructure.tasks.shell_task import ShellTask
+from johnston_core.infrastructure.tasks.task import BaseTask, TaskStatus
+from johnston_core.tools.context import ToolContext
+from johnston_core.tools.shell import ShellTool
 
 
 class ConcreteTask(BaseTask):
@@ -102,7 +102,7 @@ async def test_foreground_sync_isolated_from_task_manager():
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("johnston_core.tools.shell.shell_executable", return_value="/bin/sh"),
     ):
         res = await tool.execute({"command": "echo sync"}, ctx=ctx)
         assert not res.is_error
@@ -136,8 +136,8 @@ async def test_foreground_sync_moves_to_background_registers_in_task_manager():
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch.object(ShellTask, "start_reading", _start),
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+        patch("johnston_core.tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("johnston_core.tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f x"}, ctx=ctx))
         await task_started.wait()
@@ -175,8 +175,8 @@ async def test_subagent_transactional_spawn_failure_leaves_no_zombie_session():
     mock_agent = MagicMock()
     ctx.create_agent.return_value = mock_agent
 
-    with patch("core.application.session.subagent_service.get_session_store", return_value=mock_store):
-        with patch("core.application.session.subagent_service.record_subagent_session") as mock_record:
+    with patch("johnston_core.application.session.subagent_service.get_session_store", return_value=mock_store):
+        with patch("johnston_core.application.session.subagent_service.record_subagent_session") as mock_record:
             res = await SubagentService.spawn_subagent(
                 prompt="test prompt",
                 title="test task",

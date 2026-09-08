@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from core.adapters.base import (
+from johnston_core.adapters.base import (
     ImageDetails,
     build_adapter_usage_event,
     check_httpx_response_status,

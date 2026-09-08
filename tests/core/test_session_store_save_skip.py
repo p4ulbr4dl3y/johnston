@@ -12,9 +12,9 @@ from unittest.mock import patch
 
 import pytest
 
-from core.infrastructure.storage import session_store as session_store_mod
-from core.infrastructure.storage.session_serialization import from_file as _session_from_file
-from core.infrastructure.storage.session_store import SessionStore
+from johnston_core.infrastructure.storage import session_store as session_store_mod
+from johnston_core.infrastructure.storage.session_serialization import from_file as _session_from_file
+from johnston_core.infrastructure.storage.session_store import SessionStore
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def store(tmp_path):
     projects_dir.mkdir(exist_ok=True)
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
-    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
+    with patch("johnston_core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
         s = SessionStore(project_path=str(project))
         yield s
 
@@ -186,7 +186,7 @@ def test_restart_new_store_reads_multiple_saves(tmp_path):
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
 
-    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
+    with patch("johnston_core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
         s1 = SessionStore(project_path=str(project))
         sess = s1.create_main("restart")
         sess.messages = [{"type": "user", "text": "q1"}]

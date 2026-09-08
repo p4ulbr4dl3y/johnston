@@ -2,9 +2,9 @@ import os
 import tempfile
 import time
 
-from core.domain.entities.session import AgentSession, SessionKind
-from core.infrastructure.storage.session_index_db import SessionIndexDb
-from core.infrastructure.storage.session_store import SessionStore
+from johnston_core.domain.entities.session import AgentSession, SessionKind
+from johnston_core.infrastructure.storage.session_index_db import SessionIndexDb
+from johnston_core.infrastructure.storage.session_store import SessionStore
 
 
 def test_session_index_db_crud():

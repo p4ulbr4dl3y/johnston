@@ -13,16 +13,16 @@ from unittest.mock import patch
 
 import pytest
 
-from core.infrastructure.config.config_helpers import ensure_json_config
-from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
-from core.infrastructure.runtime.git_utils import make_git_diff, run_git
-from core.provider_manager import ProviderManager
+from johnston_core.infrastructure.config.config_helpers import ensure_json_config
+from johnston_core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from johnston_core.infrastructure.runtime.git_utils import make_git_diff, run_git
+from johnston_core.provider_manager import ProviderManager
 
 
 def test_atomic_write_text_with_background_fsync(tmp_path):
     """atomic_write_text must persist content; fsync hardening is done on a
     background thread so the write returns without blocking the caller."""
-    from core.infrastructure.platform import platform_utils
+    from johnston_core.infrastructure.platform import platform_utils
 
     target = str(tmp_path / "note.txt")
     platform_utils.atomic_write_text(target, "hello fsync")
@@ -50,7 +50,7 @@ def make_repo(tmp_path):
 def test_returns_124_timeout_when_git_hangs():
     """A hanging git must be turned into rc=124, never raise."""
     with patch(
-        "core.infrastructure.runtime.git_utils.subprocess.run",
+        "johnston_core.infrastructure.runtime.git_utils.subprocess.run",
         side_effect=subprocess.TimeoutExpired(cmd=["git", "fetch"], timeout=0.01),
     ):
         res = run_git(["fetch"], timeout=0.01)
@@ -60,7 +60,7 @@ def test_returns_124_timeout_when_git_hangs():
 
 def test_timeout_none_passes_through_and_completes():
     """timeout=None must not raise and must reach subprocess."""
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run") as m:
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok", stderr="")
         res = run_git(["rev-parse", "HEAD"])
     assert res.returncode == 0
@@ -69,7 +69,7 @@ def test_timeout_none_passes_through_and_completes():
 
 def test_empty_args_passes_git_alone():
     """run_git([]) must invoke bare `git` (help screen), not crash."""
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run") as m:
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(args=["git"], returncode=0, stdout="usage", stderr="")
         res = run_git([])
     assert res.returncode == 0
@@ -91,7 +91,7 @@ def test_nonstring_arg_does_not_crash():
 
 def test_unicode_args_invoked_as_literal_list():
     """Unicode args must be passed intact as a list element (no shell)."""
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run") as m:
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
         run_git(["log", "--format=%s", "мой-коммит 🎉"])
     assert m.call_args.args[0] == ["git", "log", "--format=%s", "мой-коммит 🎉"]
@@ -100,7 +100,7 @@ def test_unicode_args_invoked_as_literal_list():
 
 def test_args_with_spaces_preserved_as_single_element():
     """Spaces in an arg must NOT be split — passed as one list element."""
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run") as m:
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
         run_git(["commit", "-m", "feat: hello world"])
     assert m.call_args.args[0] == ["git", "commit", "-m", "feat: hello world"]
@@ -108,7 +108,7 @@ def test_args_with_spaces_preserved_as_single_element():
 
 def test_injection_metachars_not_executed_via_shell():
     """`; && | $(...)` in args must not execute as shell commands."""
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run") as m:
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
         run_git(["rev-parse", "HEAD; echo pwned"])
     assert m.call_args.args[0] == ["git", "rev-parse", "HEAD; echo pwned"]
@@ -130,7 +130,7 @@ def test_injection_metachars_real_git_errors(tmp_path):
 
 def test_nonzero_rc_stderr_parsed():
     """Non-zero rc must keep stderr, not crash."""
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run") as m:
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=["git", "x"], returncode=128, stdout="", stderr="fatal: unknown command"
         )
@@ -140,7 +140,7 @@ def test_nonzero_rc_stderr_parsed():
 
 
 def test_env_none_vs_empty_dict_vs_git_dir_passthrough():
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run") as m:
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
         run_git(["status"])
         run_git(["status"], env={})
@@ -154,7 +154,7 @@ def test_env_none_vs_empty_dict_vs_git_dir_passthrough():
 def test_large_stdout_returned_in_full():
     """A very large stdout must be returned un-truncated by run_git."""
     big = "x" * (2_000_000)
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run") as m:
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(args=["git", "log"], returncode=0, stdout=big, stderr="")
         res = run_git(["log"])
     assert len(res.stdout) == len(big)
@@ -166,7 +166,7 @@ def test_binary_bytes_stdout_handled():
     Feed str output (as CompletedProcess returns after text=True decoding);
     ensure run_git likewise returns str and doesn't crash.
     """
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run") as m:
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=["git", "cat-file"], returncode=0, stdout="\ufffd\ufffd\ufffd garbage", stderr=""
         )
@@ -175,7 +175,7 @@ def test_binary_bytes_stdout_handled():
 
 
 def test_git_missing_in_path_returns_1():
-    with patch("core.infrastructure.runtime.git_utils.subprocess.run", side_effect=FileNotFoundError("No such file: git")):
+    with patch("johnston_core.infrastructure.runtime.git_utils.subprocess.run", side_effect=FileNotFoundError("No such file: git")):
         res = run_git(["status"])
     assert res.returncode == 1
     assert "git" in res.stderr
@@ -304,8 +304,8 @@ def test_read_json_binary_garbage_returns_default(tmp_path):
 
 def test_provider_manager_read_config_non_dict_returns_empty(tmp_path):
     """A config file holding a non-dict (e.g. a list) must not poison the manager."""
-    with patch("core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
-        with patch("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
+    with patch("johnston_core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
+        with patch("johnston_core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
             cfg = tmp_path / "cfg.json"
             cfg.write_text("[1,2,3]", encoding="utf-8")
             pm = ProviderManager()
@@ -314,8 +314,8 @@ def test_provider_manager_read_config_non_dict_returns_empty(tmp_path):
 
 
 def test_provider_manager_broken_config_file_returns_empty(tmp_path):
-    with patch("core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
-        with patch("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
+    with patch("johnston_core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
+        with patch("johnston_core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
             cfg = tmp_path / "cfg.json"
             cfg.write_text("{broken", encoding="utf-8")
             pm = ProviderManager()
@@ -323,8 +323,8 @@ def test_provider_manager_broken_config_file_returns_empty(tmp_path):
 
 
 def test_provider_manager_missing_config_returns_empty(tmp_path):
-    with patch("core.provider_manager.CONFIG_FILE", str(tmp_path / "absent.json")):
-        with patch("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
+    with patch("johnston_core.provider_manager.CONFIG_FILE", str(tmp_path / "absent.json")):
+        with patch("johnston_core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
             pm = ProviderManager()
             assert pm._read_config() == {}
             assert pm._get_config_data() == {}
@@ -332,8 +332,8 @@ def test_provider_manager_missing_config_returns_empty(tmp_path):
 
 def test_provider_manager_nested_missing_key_no_keyerror(tmp_path):
     """Absent nested key via .get() chains must not raise KeyError."""
-    with patch("core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
-        with patch("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
+    with patch("johnston_core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
+        with patch("johnston_core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
             cfg = tmp_path / "cfg.json"
             cfg.write_text('{"model": ""}', encoding="utf-8")
             pm = ProviderManager()

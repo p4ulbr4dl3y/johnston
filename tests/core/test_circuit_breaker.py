@@ -1,8 +1,8 @@
 import time
 import unittest
 
-from core.base_provider import BaseAgent
-from core.infrastructure.runtime.circuit_breaker import CircuitBreaker, circuit_breaker
+from johnston_core.base_provider import BaseAgent
+from johnston_core.infrastructure.runtime.circuit_breaker import CircuitBreaker, circuit_breaker
 
 
 class TestCircuitBreaker(unittest.TestCase):

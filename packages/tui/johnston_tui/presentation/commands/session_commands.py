@@ -1,0 +1,635 @@
+"""Session-related slash commands (new, resume, compact, rewind, fork, rename, diff)."""
+from __future__ import annotations
+
+import asyncio
+import inspect
+from typing import Any
+
+from johnston_core.application.session.actions import (
+    compact_session,
+    find_selected_user_message,
+    get_rewind_git_stats,
+    new_session,
+    rewind_session,
+    truncate_agent_history,
+)
+from johnston_core.application.session.auto_title import clean_heuristic_title
+from johnston_core.domain.policies.session_naming import FORK_BASE_MAX_LEN
+from johnston_tui.chat_input import ChatInput
+from johnston_tui.presentation.commands.base import BaseCommand
+from johnston_tui.presentation.commands.helpers import (
+    WORKER_TEARDOWN_TIMEOUT,
+    await_workers_finished,
+    cancel_active_workers_and_tasks,
+    reset_app_state,
+)
+from johnston_tui.presentation.screens.constants import MESSAGE_INPUT
+from johnston_tui.presentation.screens.diff import DiffScreen
+from johnston_tui.presentation.screens.fork import FORK_CURRENT_STATE, ForkScreen
+from johnston_tui.presentation.screens.rename_session import RenameSessionScreen
+from johnston_tui.presentation.screens.resume import ResumeScreen
+from johnston_tui.presentation.screens.rewind import RewindScreen, RewindSelection
+from johnston_tui.presentation.widgets.chat_container import ChatView
+
+
+class NewCommand(BaseCommand):
+    name = "/new"
+    aliases = ["/clear", "/reset"]
+    description = "Start a new chat session"
+
+    async def execute(self, app) -> None:
+        def cancel_workers():
+            for w in [w for w in getattr(app, "workers", []) if w.is_running]:
+                w.cancel()
+            # /compact runs as a plain asyncio task tracked on the app, so
+            # cancel it alongside the workers (mirrors helpers.cancel_active_workers).
+            compact_task = getattr(app, "_compact_task", None)
+            if compact_task is not None and not compact_task.done():
+                compact_task.cancel()
+
+        async def kill_all_tasks():
+            # Cancelled generation workers still run teardown (interruption
+            # divider, tool cancellation) after cancel_workers() above. Wait
+            # for it here so none of that lands in the fresh chat view.
+            await await_workers_finished(app)
+            await app.task_manager.kill_all()
+
+        def cancel_subagents():
+            from johnston_core.application.session.stream import cancel_running_subagents
+
+            cancel_running_subagents(app.sm)
+
+        old_id = getattr(app, "current_session_id", None)
+        if old_id and hasattr(app.sm, "release_session_lock"):
+            app.sm.release_session_lock(old_id)
+
+        new_id = await new_session(
+            app.sm,
+            app.agent,
+            cancel_workers=cancel_workers,
+            kill_all_tasks=kill_all_tasks,
+            cancel_subagents=cancel_subagents,
+        )
+
+        if hasattr(app.sm, "acquire_session_lock"):
+            app.sm.acquire_session_lock(new_id)
+
+        role = getattr(app.agent, "role", "worker") if app.agent else "worker"
+        reset_app_state(app, is_generating=False, is_read_only=False, clear_queue=True, session_id=new_id, role=role)
+
+        chat_view = app.query_one(ChatView)
+        if hasattr(chat_view, "_unloaded_messages"):
+            chat_view._unloaded_messages = []
+        if hasattr(chat_view, "_is_loading_older"):
+            chat_view._is_loading_older = False
+        await chat_view.remove_children()
+        chat_view.check_welcome()
+        app.refresh_status_footer()
+
+
+class ResumeCommand(BaseCommand):
+    name = "/resume"
+    aliases = ["/sessions", "/continue", "/load"]
+    description = "Resume a saved session"
+
+    async def execute(self, app) -> None:
+        sessions = await asyncio.to_thread(app.sm.list_main_sessions)
+        if not sessions:
+            app.notify("No saved sessions in this project", severity="warning")
+            return
+
+        for s in sessions:
+            sid = str(s.get("id"))
+            if sid == getattr(app, "current_session_id", None) and getattr(app, "is_generating", False):
+                s["is_running"] = True
+            if hasattr(app, "active_subagents") and isinstance(app.active_subagents, dict):
+                sub_count = sum(
+                    1
+                    for sub in app.active_subagents.values()
+                    if getattr(sub, "parent_id", None) == sid and getattr(sub, "status", "") == "running"
+                )
+                if sub_count:
+                    s["subagent_count"] = sub_count
+            if hasattr(app, "task_manager") and hasattr(app.task_manager, "tasks"):
+                task_count = sum(
+                    1
+                    for t in app.task_manager.tasks.values()
+                    if getattr(t, "session_id", None) == sid and getattr(t, "status", "") == "running"
+                )
+                if task_count:
+                    s["task_count"] = task_count
+
+        async def _apply_selected(sid: str, read_only: bool = False) -> None:
+            # Wait out cancelled-worker teardown (the "Response Interrupted"
+            # divider) before switching views, so it cannot land in the
+            # resumed session; only old-session subagents are cancelled.
+            await cancel_active_workers_and_tasks(
+                app,
+                wait_workers=True,
+                timeout=WORKER_TEARDOWN_TIMEOUT,
+                kill_tasks=True,
+                cancel_subagents=True,
+                session_id=curr_sid,
+            )
+            reset_app_state(app, is_generating=False, clear_queue=True)
+            if read_only:
+                app.load_session_ui(sid, read_only=True)
+            else:
+                app.load_session_ui(sid)
+            app.query_one(MESSAGE_INPUT, ChatInput).focus()
+
+        async def on_resume_selected(result: str | None) -> None:
+            if not result:
+                app.query_one(MESSAGE_INPUT, ChatInput).focus()
+                return
+
+            if ":" in result and (result.startswith("steal:") or result.startswith("readonly:")):
+                choice, sid = result.split(":", 1)
+                if choice == "steal":
+                    if hasattr(app, "sm"):
+                        app.sm.steal_session_lock(sid)
+                    await _apply_selected(sid)
+                elif choice == "readonly":
+                    await _apply_selected(sid, read_only=True)
+                return
+
+            await _apply_selected(result)
+
+        curr_sid = getattr(app, "current_session_id", None)
+        result = app.push_screen(ResumeScreen(sessions, current_session_id=curr_sid), callback=on_resume_selected)
+        if asyncio.iscoroutine(result):
+            await result
+
+
+class CompactCommand(BaseCommand):
+    name = "/compact"
+    aliases = ["/compress", "/summarize", "/smol"]
+    description = "Compact session conversation history"
+
+    async def execute(self, app) -> None:
+        if (
+            getattr(app, "is_generating", False)
+            or getattr(app, "is_compacting", False)
+            or getattr(app, "_is_compacting", False)
+        ):
+            if hasattr(app, "_queue_message_ui"):
+                app._queue_message_ui(self.name, show_in_ui=True)
+            elif hasattr(app, "notify"):
+                app.notify("Model is generating. Compaction deferred.", severity="warning")
+            return
+
+        # The slash-command dispatch runs compaction in a plain asyncio task
+        # (not a Textual worker), so Esc / cancel_active_workers cannot reach
+        # it. Register the running compaction on the app so Esc, /new and
+        # resume/fork/rewind can cancel it; cleared in finally so a stale
+        # reference never cancels a later run.
+        app._compact_task = asyncio.create_task(self._run_compaction(app))
+        try:
+            await app._compact_task
+        finally:
+            app._compact_task = None
+
+    async def _run_compaction(self, app) -> None:
+        """Run the compaction body; cancellation is recorded, never leaks state."""
+        app._is_compacting = True
+        app.is_compacting = True
+        try:
+            if not hasattr(app, "agent") or not app.agent:
+                app.notify("No active agent found", severity="error")
+                return
+
+            divider = None
+
+            if hasattr(app, "query_one"):
+                try:
+                    cv = app.query_one(ChatView)
+                    if cv and hasattr(cv, "add_event_divider"):
+                        divider = await cv.add_event_divider("Compacting session...")
+                except Exception:
+                    pass
+
+            def save_cb() -> None:
+                if hasattr(app, "save_current_session"):
+                    try:
+                        app.save_current_session()
+                    except Exception:
+                        pass
+
+            def on_begin() -> None:
+                app._is_compacting = True
+                app.is_compacting = True
+
+            def on_divider_update(title: str) -> None:
+                nonlocal divider
+                if divider and hasattr(divider, "update_title"):
+                    divider.update_title(title)
+
+            sess = None
+            if hasattr(app, "sm") and hasattr(app, "current_session_id") and app.current_session_id:
+                try:
+                    sess = app.sm.get(app.current_session_id, reload=False)
+                except Exception:
+                    pass
+
+            outcome = await compact_session(
+                app.agent,
+                save_session_cb=save_cb,
+                on_begin=on_begin,
+                on_divider_update=on_divider_update,
+                refresh_footer_cb=lambda: app.refresh_status_footer(),
+                session=sess,
+            )
+            if not outcome.success:
+                app.notify(outcome.message or "Context compaction failed", severity="warning")
+        finally:
+            app._is_compacting = False
+            app.is_compacting = False
+            is_active = bool(
+                getattr(app, "is_app_active", True)
+                and not getattr(app, "_exit", False)
+                and not getattr(app, "_closing", False)
+                and not getattr(app, "_closed", False)
+            )
+            if is_active:
+                if hasattr(app, "_pop_queued_for_current_session") and hasattr(app, "_process_queued_message"):
+                    next_item = app._pop_queued_for_current_session()
+                    if next_item is not None:
+                        kw = {}
+                        if len(next_item) > 4 and next_item[4]:
+                            kw["display_text"] = next_item[4]
+                        asyncio.create_task(
+                            app._process_queued_message(
+                                next_item[0],
+                                next_item[1],
+                                next_item[2],
+                                **kw,
+                            )
+                        )
+                elif getattr(app, "message_queue", None):
+                    next_item = app.message_queue.pop(0)
+                    prompt = next_item[0]
+                    show_in_ui = next_item[1] if len(next_item) > 1 else True
+                    kwargs = {"attachments": next_item[2]} if len(next_item) > 2 else {}
+                    if len(next_item) > 4 and next_item[4]:
+                        kwargs["display_text"] = next_item[4]
+                    if hasattr(app, "trigger_ai_response"):
+                        app.trigger_ai_response(prompt, show_in_ui=show_in_ui, **kwargs)
+
+
+def _extract_user_messages(app, session=None) -> list[tuple[int, str]]:
+    """Extract list of (idx, text) user messages from session transcript or chat view."""
+    user_msgs: list[tuple[int, str]] = []
+    if session and getattr(session, "messages", None):
+        from johnston_core.domain.policies.messages import USER_EVENT_TYPE, is_ui_visible_user_message
+
+        for i, m in enumerate(session.messages):
+            if isinstance(m, dict) and m.get("type") == USER_EVENT_TYPE and is_ui_visible_user_message(m):
+                text = m.get("display_text") or m.get("text", "")
+                user_msgs.append((i, text))
+        if user_msgs:
+            return user_msgs
+
+    # Fallback to chat_view if session transcript has no messages
+    if hasattr(app, "query_one"):
+        try:
+            chat_view = app.query_one(ChatView)
+            return chat_view.get_user_messages()
+        except Exception:
+            pass
+    return user_msgs
+
+
+class RewindCommand(BaseCommand):
+    name = "/rewind"
+    aliases = ["/undo", "/history"]
+    description = "Rollback chat history to a message"
+
+    async def execute(self, app) -> None:
+        curr_sid = getattr(app, "current_session_id", None)
+        proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
+        sm = getattr(app, "sm", None)
+        session = sm.get(curr_sid, reload=False) if (sm and curr_sid) else None
+
+        user_msgs = _extract_user_messages(app, session=session)
+        if not user_msgs:
+            app.notify("History is empty: no messages to rollback", severity="warning")
+            return
+
+        msgs_with_stats = await get_rewind_git_stats(curr_sid, user_msgs, proj_path, session=session)
+        checkpoints_enabled = any(m.git_stats for m in msgs_with_stats)
+
+        async def on_rewind_selected(selection: Any) -> None:
+            if selection is None or not isinstance(selection, RewindSelection):
+                app.query_one(MESSAGE_INPUT).focus()
+                return
+
+            selected_idx = selection.index
+            restore_code = selection.restore_code
+
+            if selected_idx >= 0:
+                await cancel_active_workers_and_tasks(
+                    app,
+                    wait_workers=True,
+                    timeout=WORKER_TEARDOWN_TIMEOUT,
+                    kill_tasks=True,
+                    cancel_subagents=True,
+                    session_id=curr_sid,
+                )
+                reset_app_state(app, is_generating=False, clear_queue=True)
+
+                def rollback_ui(target_idx: int) -> None:
+                    try:
+                        cv = app.query_one(ChatView)
+                        target_msgs = (
+                            session.messages
+                            if (session and getattr(session, "messages", None) is not None)
+                            else []
+                        )
+                        raw_page_size = getattr(cv, "PAGE_SIZE", 50)
+                        page_size = raw_page_size if isinstance(raw_page_size, int) else 50
+                        if len(target_msgs) > page_size:
+                            cv._unloaded_messages = target_msgs[:-page_size]
+                        else:
+                            cv._unloaded_messages = []
+                        if hasattr(cv, "reset_to_messages") and callable(cv.reset_to_messages):
+                            task_mgr = getattr(app, "task_manager", None)
+                            res = cv.reset_to_messages(target_msgs, task_manager=task_mgr)
+                            if inspect.isawaitable(res):
+                                try:
+                                    asyncio.create_task(res)
+                                except RuntimeError:
+                                    pass
+                        else:
+                            cv.rollback_to(target_idx)
+                        try:
+                            from johnston_core.application.session.actions import restore_plan_from_messages
+                            from johnston_tui.presentation.widgets.plan_notch import PlanNotch
+
+                            restored_plan, restored_explanation = restore_plan_from_messages(target_msgs)
+                            app.current_plan = restored_plan
+                            app.current_plan_explanation = restored_explanation
+                            notches = list(app.query(PlanNotch))
+                            if not notches and hasattr(app, "screen") and app.screen:
+                                notches = list(app.screen.query(PlanNotch))
+                            for notch in notches:
+                                if restored_plan:
+                                    notch.set_plan(restored_plan, restored_explanation)
+                                else:
+                                    notch.clear_plan()
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+
+                def load_text_into_input(text: str) -> None:
+                    chat_input = app.query_one(MESSAGE_INPUT)
+                    chat_input.load_text(text)
+                    lines = chat_input.text.split("\n")
+                    chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+
+                def save_cb() -> None:
+                    if hasattr(app, "save_current_session_async"):
+                        asyncio.create_task(app.save_current_session_async())
+                    elif hasattr(app, "save_current_session"):
+                        app.save_current_session()
+
+                sm = getattr(app, "sm", None)
+                session = sm.get(curr_sid, reload=False) if (sm and curr_sid) else None
+
+                rewind_session(
+                    app.agent,
+                    curr_sid,
+                    proj_path,
+                    user_msgs,
+                    selected_idx,
+                    restore_git=restore_code,
+                    session=session,
+                    rollback_ui=rollback_ui,
+                    load_text_into_input=load_text_into_input,
+                    save_session_cb=save_cb,
+                    refresh_footer_cb=lambda: app.refresh_status_footer(),
+                    store=sm,
+                    task_manager=getattr(app, "task_manager", None),
+                )
+            app.query_one(MESSAGE_INPUT).focus()
+
+        result = app.push_screen(
+            RewindScreen(
+                msgs_with_stats,
+                checkpoints_enabled=checkpoints_enabled,
+                session_id=curr_sid,
+                project_path=proj_path,
+            ),
+            callback=on_rewind_selected,
+        )
+        if asyncio.iscoroutine(result):
+            await result
+
+
+class ForkCommand(BaseCommand):
+    name = "/fork"
+    aliases = []
+    description = "Fork session from a selected message"
+
+    async def execute(self, app) -> None:
+        curr_sid = getattr(app, "current_session_id", None)
+        if not curr_sid or not hasattr(app, "sm"):
+            app.notify("No active session to fork", severity="warning")
+            return
+
+        session = app.sm.get(curr_sid, reload=False) if (hasattr(app, "sm") and app.sm and curr_sid) else None
+        user_msgs = _extract_user_messages(app, session=session)
+        if not user_msgs:
+            app.notify("History is empty: no messages to fork", severity="warning")
+            return
+
+        async def on_fork_selected(selected_child_idx: int | None) -> None:
+            if selected_child_idx is None:
+                app.query_one(MESSAGE_INPUT).focus()
+                return
+
+            if selected_child_idx == FORK_CURRENT_STATE:
+                up_to_idx = None
+                msg_text = ""
+                # No branch point: the store falls back to the parent title.
+                fork_base: str | None = None
+            else:
+                found, msg_text, seq_idx = find_selected_user_message(user_msgs, selected_child_idx)
+
+                if not found:
+                    app.query_one(MESSAGE_INPUT).focus()
+                    return
+
+                up_to_idx = seq_idx
+                # Base hint only: the store strips any old marker, numbers the
+                # fork among its siblings and appends the "(fork N)" marker.
+                fork_base = clean_heuristic_title(msg_text, max_len=FORK_BASE_MAX_LEN) or None
+
+            # Wait out cancelled-worker teardown (the "Response Interrupted"
+            # divider) before re-rendering the view, so it cannot land
+            # mid-fork-render; only old-session subagents are cancelled.
+            await cancel_active_workers_and_tasks(
+                app,
+                wait_workers=True,
+                timeout=WORKER_TEARDOWN_TIMEOUT,
+                kill_tasks=True,
+                cancel_subagents=True,
+                session_id=curr_sid,
+            )
+            reset_app_state(app, is_generating=False, clear_queue=True)
+
+            app.pending_fork = {
+                "parent_session_id": curr_sid,
+                "up_to_msg_index": up_to_idx,
+                "title": fork_base,
+            }
+
+            if up_to_idx is not None:
+                try:
+                    cv = app.query_one(ChatView)
+                    from johnston_core.domain.policies.messages import transcript_before_turn
+
+                    target_msgs = []
+                    if up_to_idx > 0 and session and isinstance(getattr(session, "messages", None), list):
+                        target_msgs = transcript_before_turn(session.messages, up_to_idx)
+                    raw_page_size = getattr(cv, "PAGE_SIZE", 50)
+                    page_size = raw_page_size if isinstance(raw_page_size, int) else 50
+                    if len(target_msgs) > page_size:
+                        cv._unloaded_messages = target_msgs[:-page_size]
+                    else:
+                        cv._unloaded_messages = []
+                    if hasattr(cv, "reset_to_messages") and callable(cv.reset_to_messages):
+                        task_mgr = getattr(app, "task_manager", None)
+                        res = cv.reset_to_messages(target_msgs, task_manager=task_mgr)
+                        if inspect.isawaitable(res):
+                            try:
+                                asyncio.create_task(res)
+                            except RuntimeError:
+                                pass
+                    else:
+                        cv.rollback_to(-1 if up_to_idx == 0 else selected_child_idx - 1)
+                    try:
+                        from johnston_core.application.session.actions import restore_plan_from_messages
+                        from johnston_tui.presentation.widgets.plan_notch import PlanNotch
+
+                        restored_plan, restored_explanation = restore_plan_from_messages(target_msgs)
+                        app.current_plan = restored_plan
+                        app.current_plan_explanation = restored_explanation
+                        notches = list(app.query(PlanNotch))
+                        if not notches and hasattr(app, "screen") and app.screen:
+                            notches = list(app.screen.query(PlanNotch))
+                        for notch in notches:
+                            if restored_plan:
+                                notch.set_plan(restored_plan, restored_explanation)
+                            else:
+                                notch.clear_plan()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+                agent = getattr(app, "agent", None)
+                if agent:
+                    truncate_agent_history(agent, user_msgs, up_to_idx)
+
+            if hasattr(app, "refresh_status_footer"):
+                app.refresh_status_footer()
+
+            chat_input = app.query_one(MESSAGE_INPUT, ChatInput)
+            if msg_text:
+                chat_input.load_text(msg_text)
+                lines = chat_input.text.split("\n")
+                chat_input.move_cursor((len(lines) - 1, len(lines[-1])))
+            else:
+                chat_input.load_text("")
+            chat_input.focus()
+
+        result = app.push_screen(
+            ForkScreen(user_msgs),
+            callback=on_fork_selected,
+        )
+        if asyncio.iscoroutine(result):
+            await result
+
+
+class RenameCommand(BaseCommand):
+    name = "/rename"
+    aliases = ["/title", "/name"]
+    description = "Rename the active chat session"
+
+    async def execute(self, app) -> None:
+        curr_sid = getattr(app, "current_session_id", None)
+        if not curr_sid or not hasattr(app, "sm"):
+            app.notify("No active session to rename", severity="warning")
+            return
+
+        sess = app.sm.get(curr_sid)
+        if not sess:
+            try:
+                role = getattr(app, "role", "worker") or "worker"
+                sess = app.sm.create_main(curr_sid, role=role)
+            except Exception:
+                sess = None
+        if not sess:
+            app.notify("Session not found", severity="error")
+            return
+
+        current_title = sess.title
+        if current_title == "Untitled":
+            current_title = ""
+
+        def on_renamed(new_title: str | None) -> None:
+            if new_title is not None:
+                new_title = new_title.strip()
+                if new_title:
+                    sess.title = new_title
+                    sess.auto_titled = True
+                    if hasattr(app, "agent") and getattr(app.agent, "history", None):
+                        sess.agent_history = list(app.agent.history)
+                    app.sm.save(sess)
+                    if hasattr(app, "refresh_status_footer"):
+                        app.refresh_status_footer()
+                    app.notify("Session renamed", severity="information", timeout=1.5)
+            app.query_one(MESSAGE_INPUT).focus()
+
+        result = app.push_screen(
+            RenameSessionScreen(current_title=current_title),
+            callback=on_renamed,
+        )
+        if asyncio.iscoroutine(result):
+            await result
+
+
+class DiffCommand(BaseCommand):
+    name = "/diff"
+    aliases = ["/changes", "/patch"]
+    description = "View workspace diff for files modified in this session"
+
+    async def execute(self, app) -> None:
+        from johnston_core.application.session.actions import _touched_files, get_session_diff
+        from johnston_core.domain.policies.messages import is_ui_visible_user_message
+
+        curr_sid = getattr(app, "current_session_id", None)
+        proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
+
+        if not curr_sid:
+            app.notify("No active session found", severity="warning")
+            return
+
+        scoped_files: list[str] | None = None
+        session = app.sm.get(curr_sid, reload=False) if (hasattr(app, "sm") and app.sm and curr_sid) else None
+        if session and getattr(session, "messages", None):
+            user_events = [m for m in session.messages if is_ui_visible_user_message(m)]
+            scoped = _touched_files(user_events, 0)
+            if scoped is not None:
+                if not scoped:
+                    app.notify("No files were modified during this session", severity="information")
+                    return
+                scoped_files = scoped
+
+        diff_items = await get_session_diff(curr_sid, project_path=proj_path, scoped_files=scoped_files)
+        if not diff_items:
+            app.notify("No workspace changes found for session files", severity="information")
+            return
+
+        app.push_screen(DiffScreen(diff_items, title="Session Changes"))

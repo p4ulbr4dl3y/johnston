@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 from textual.events import Key
 
-from widgets.presentation.screens.base_selection import BaseSelectionScreen
+from johnston_tui.presentation.screens.base_selection import BaseSelectionScreen
 
 
 class RaisingList(list):

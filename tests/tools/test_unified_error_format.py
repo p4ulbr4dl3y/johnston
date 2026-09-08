@@ -12,10 +12,10 @@ import os
 import unittest
 from pathlib import Path
 
-from core.domain.defaults.errors import format_tool_error
+from johnston_core.domain.defaults.errors import format_tool_error
 
 _repo_root = Path(__file__).resolve().parents[2]
-_core_tools = _repo_root / "packages" / "core" / "tools"
+_core_tools = _repo_root / "packages" / "core" / "johnston_core" / "tools"
 TOOLS_DIR = _core_tools if _core_tools.exists() else _repo_root / "tools"
 
 

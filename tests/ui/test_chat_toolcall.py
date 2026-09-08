@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from widgets.chat_toolcall import ToolCallWidget
+from johnston_tui.chat_toolcall import ToolCallWidget
 
 
 class TestToolCallWidgetHelpers(unittest.TestCase):
@@ -69,7 +69,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget._clean_markup_text(None), "")
 
     def test_format_truncation_for_ui(self):
-        from widgets.presentation.tool_renderers import format_truncation_for_ui
+        from johnston_tui.presentation.tool_renderers import format_truncation_for_ui
 
         # Shell truncation header with log path & LLM hint
         header = (
@@ -167,7 +167,7 @@ class TestToolCallWidgetHelpers(unittest.TestCase):
         self.assertEqual(widget.status, "error")
 
     def test_format_compact_dict(self):
-        from widgets.presentation.tool_display import format_compact_dict
+        from johnston_tui.presentation.tool_display import format_compact_dict
 
         self.assertEqual(format_compact_dict({}), "")
         self.assertEqual(format_compact_dict("nope"), "")
@@ -363,7 +363,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         mock_store = MagicMock()
         mock_store.find_session_by_title_or_id.return_value = MagicMock(status="running")
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app = MagicMock()
@@ -380,7 +380,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         mock_store = MagicMock()
         mock_store.find_session_by_title_or_id.return_value = MagicMock(status="completed")
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app = MagicMock()
@@ -398,7 +398,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         mock_store = MagicMock()
         mock_store.find_session_by_title_or_id.return_value = None
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app = MagicMock()
@@ -419,7 +419,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         mock_store = MagicMock()
         mock_store.find_session_by_title_or_id.return_value = MagicMock(status="error")
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app = MagicMock()
@@ -440,7 +440,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         mock_store = MagicMock()
         mock_store.find_session_by_title_or_id.return_value = MagicMock(status="cancelled")
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app = MagicMock()
@@ -459,7 +459,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         self.assertNotIn("tool-header-expandable", widget.header_label.classes)
         event = MagicMock()
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app_prop.return_value = MagicMock()
@@ -474,7 +474,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         self.assertNotIn("tool-header-expandable", widget.header_label.classes)
         event = MagicMock()
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app_prop.return_value = MagicMock()
@@ -492,7 +492,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         mock_store = MagicMock()
         mock_store.find_session_by_title_or_id.return_value = MagicMock(id="sess_err_123", status="error")
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app = MagicMock()
@@ -525,7 +525,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         event = MagicMock()
         dummy_task = MagicMock(kind="shell", is_background=True, is_running=True, session_id=None)
         with (
-            patch("widgets.presentation.screens.tasks.ShellTasksScreen") as shell_screen_cls,
+            patch("johnston_tui.presentation.screens.tasks.ShellTasksScreen") as shell_screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app = MagicMock()
@@ -544,7 +544,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         mock_store = MagicMock()
         mock_store.find_session_by_title_or_id.return_value = MagicMock(status="running")
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as subagent_view_screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as subagent_view_screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app = MagicMock()
@@ -563,7 +563,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         mock_store = MagicMock()
         mock_store.find_session_by_title_or_id.return_value = None
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen") as subagent_view_screen_cls,
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen") as subagent_view_screen_cls,
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app = MagicMock()
@@ -625,7 +625,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget = self._widget("invoke_subagent", "prompt", args={"session_id": "abc"})
         event = MagicMock()
         with (
-            patch("widgets.presentation.screens.subagent_screen.SubagentViewScreen", side_effect=Exception("boom")),
+            patch("johnston_tui.presentation.screens.subagent_screen.SubagentViewScreen", side_effect=Exception("boom")),
             patch.object(ToolCallWidget, "app", new_callable=PropertyMock) as app_prop,
         ):
             app_prop.return_value = MagicMock()
@@ -706,7 +706,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
 
     def test_render_content_create_syntax_exception_fallback(self):
         w = self._widget("create", "", args={"content": "print(1)", "path": "f.py"})
-        with patch("widgets.chat_toolcall.TransparentSyntax", side_effect=Exception("boom")):
+        with patch("johnston_tui.chat_toolcall.TransparentSyntax", side_effect=Exception("boom")):
             w.render_content()
         self.assertTrue(w.content_widget.display)
 
@@ -895,7 +895,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
             self.assertIn("ctrl+o", label_sub)
 
     def test_thinking_widget_hints(self):
-        from widgets.presentation.widgets.chat_messages import ThinkingWidget
+        from johnston_tui.presentation.widgets.chat_messages import ThinkingWidget
 
         tw = ThinkingWidget()
         label_running = str(tw.header_label.render())
@@ -1039,7 +1039,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
         self.assertIn("...", rendered)
 
     def test_truncate_path_small_max_len_no_slashes(self):
-        from widgets.presentation.tool_display import truncate_path
+        from johnston_tui.presentation.tool_display import truncate_path
         res = truncate_path("single_long_filename_without_slashes.txt", max_len=10)
         self.assertLessEqual(len(res), 10)
         self.assertIn("...", res)
@@ -1151,7 +1151,7 @@ class TestHintDebounce(unittest.IsolatedAsyncioTestCase):
         w.on_unmount()
 
     async def test_thinking_hints_debounce_fast(self):
-        from widgets.presentation.widgets.chat_messages import ThinkingWidget
+        from johnston_tui.presentation.widgets.chat_messages import ThinkingWidget
 
         tw = ThinkingWidget()
         tw.HINT_DEBOUNCE_SECONDS = 0.05
@@ -1164,7 +1164,7 @@ class TestHintDebounce(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("ctrl+o", rendered_done)
 
     async def test_thinking_hints_debounce_slow(self):
-        from widgets.presentation.widgets.chat_messages import ThinkingWidget
+        from johnston_tui.presentation.widgets.chat_messages import ThinkingWidget
 
         tw = ThinkingWidget()
         tw.HINT_DEBOUNCE_SECONDS = 0.05
@@ -1179,7 +1179,7 @@ class TestHintDebounce(unittest.IsolatedAsyncioTestCase):
 
 class TestHintCoordination(unittest.IsolatedAsyncioTestCase):
     async def test_hint_relay_between_expandable_tools(self):
-        from widgets.presentation.widgets.chat_container import ChatView
+        from johnston_tui.presentation.widgets.chat_container import ChatView
 
         cv = ChatView()
         cv.HINT_FADE_SECONDS = 0.05
@@ -1233,8 +1233,8 @@ class TestHintCoordination(unittest.IsolatedAsyncioTestCase):
         cv.on_unmount()
 
     async def test_hint_relay_thinking_to_tool(self):
-        from widgets.presentation.widgets.chat_container import ChatView
-        from widgets.presentation.widgets.chat_messages import ThinkingWidget
+        from johnston_tui.presentation.widgets.chat_container import ChatView
+        from johnston_tui.presentation.widgets.chat_messages import ThinkingWidget
 
         cv = ChatView()
         tw = ThinkingWidget()
@@ -1257,7 +1257,7 @@ class TestHintCoordination(unittest.IsolatedAsyncioTestCase):
         cv.on_unmount()
 
     async def test_clear_hints_on_user_message(self):
-        from widgets.presentation.widgets.chat_container import ChatView
+        from johnston_tui.presentation.widgets.chat_container import ChatView
 
         cv = ChatView()
         cv._mount_and_scroll = unittest.mock.AsyncMock()
@@ -1272,7 +1272,7 @@ class TestHintCoordination(unittest.IsolatedAsyncioTestCase):
         cv.on_unmount()
 
     async def test_non_expandable_slow_tool_does_not_hijack_hint(self):
-        from widgets.presentation.widgets.chat_container import ChatView
+        from johnston_tui.presentation.widgets.chat_container import ChatView
 
         cv = ChatView()
         cv.HINT_FADE_SECONDS = 0.5
@@ -1297,7 +1297,7 @@ class TestHintCoordination(unittest.IsolatedAsyncioTestCase):
         cv.on_unmount()
 
     async def test_dynamic_expandable_read_dir_lingers(self):
-        from widgets.presentation.widgets.chat_container import ChatView
+        from johnston_tui.presentation.widgets.chat_container import ChatView
 
         cv = ChatView()
         cv.HINT_FADE_SECONDS = 0.5
@@ -1314,7 +1314,7 @@ class TestHintCoordination(unittest.IsolatedAsyncioTestCase):
         cv.on_unmount()
 
     async def test_mark_cancelled_and_unmount_cleanup(self):
-        from widgets.presentation.widgets.chat_container import ChatView
+        from johnston_tui.presentation.widgets.chat_container import ChatView
 
         cv = ChatView()
         t1 = ToolCallWidget("shell", "pytest")

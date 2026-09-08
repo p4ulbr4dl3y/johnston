@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, patch
 
 from textual.app import App, ComposeResult
 
-from widgets.chat_input import ChatInput
-from widgets.command_suggestions import CommandSuggestions
+from johnston_tui.chat_input import ChatInput
+from johnston_tui.command_suggestions import CommandSuggestions
 
 
 class SuggestionGateApp(App[None]):

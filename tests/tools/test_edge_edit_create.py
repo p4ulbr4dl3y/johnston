@@ -11,8 +11,8 @@ import unittest
 
 import pytest
 
-from tools.create import CreateTool
-from tools.edit import EditTool, apply_edit
+from johnston_core.tools.create import CreateTool
+from johnston_core.tools.edit import EditTool, apply_edit
 
 
 class _Base(unittest.IsolatedAsyncioTestCase):
@@ -448,7 +448,7 @@ class TestCreateTool(_Base):
         from unittest.mock import patch
         tool = CreateTool()
         p = self.write("big_old.txt", "old content\n")
-        with patch("tools.create.get_max_tool_payload_bytes", return_value=5):
+        with patch("johnston_core.tools.create.get_max_tool_payload_bytes", return_value=5):
             res = str(await tool.execute({"path": p, "content": "new content\n"}))
         self.assertNotIn("ERR:", res)
         self.assertIn("diff skipped", res)
@@ -458,14 +458,14 @@ class TestCreateTool(_Base):
         from unittest.mock import patch
         tool = CreateTool()
         p = self.write("fail_diff.txt", "line1\n")
-        with patch("tools.create.format_file_diff", side_effect=RuntimeError("diff broke")):
+        with patch("johnston_core.tools.create.format_file_diff", side_effect=RuntimeError("diff broke")):
             res = str(await tool.execute({"path": p, "content": "line2\n"}))
         self.assertNotIn("ERR:", res)
         self.assertIn("[overwritten", res)
         self.assertEqual(self.read("fail_diff.txt"), "line2")
 
     def test_format_file_diff_truncation(self):
-        from tools.utils import format_file_diff
+        from johnston_core.tools.utils import format_file_diff
         old = "\n".join(f"old_{i}" for i in range(20))
         new = "\n".join(f"new_{i}" for i in range(20))
         diff = format_file_diff(old, new, "test.txt", max_lines=5)

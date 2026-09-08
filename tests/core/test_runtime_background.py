@@ -2,7 +2,7 @@
 
 import asyncio
 
-from core.infrastructure.runtime.background import _background_tasks, spawn_background_task
+from johnston_core.infrastructure.runtime.background import _background_tasks, spawn_background_task
 
 
 def test_spawn_without_running_loop_closes_coroutine():

@@ -10,23 +10,23 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app import JohnstonApp
-from widgets.chat_input import ChatInput
-from widgets.command_suggestions import CommandSuggestions
-from widgets.presentation.screens.help import HelpScreen
-from widgets.presentation.screens.model import ModelScreen
-from widgets.presentation.screens.providers import ProvidersScreen
-from widgets.presentation.screens.resume import ResumeScreen
-from widgets.presentation.screens.rewind import RewindScreen
-from widgets.presentation.screens.tasks import SubagentsScreen
-from widgets.presentation.widgets.chat_container import ChatView
-from widgets.presentation.widgets.chat_messages import UserMessage
+from johnston_tui.chat_input import ChatInput
+from johnston_tui.command_suggestions import CommandSuggestions
+from johnston_tui.presentation.screens.help import HelpScreen
+from johnston_tui.presentation.screens.model import ModelScreen
+from johnston_tui.presentation.screens.providers import ProvidersScreen
+from johnston_tui.presentation.screens.resume import ResumeScreen
+from johnston_tui.presentation.screens.rewind import RewindScreen
+from johnston_tui.presentation.screens.tasks import SubagentsScreen
+from johnston_tui.presentation.widgets.chat_container import ChatView
+from johnston_tui.presentation.widgets.chat_messages import UserMessage
 
 
 class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.slow
     async def test_chat_app_flow(self):
         app = JohnstonApp()
-        from core.base_provider import BaseAgent
+        from johnston_core.base_provider import BaseAgent
 
         app.agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
         async with app.run_test() as pilot:
@@ -34,7 +34,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             chat_input.focus()
 
             # 1. Test /help
-            from widgets.app.dispatch import handle_slash_command
+            from johnston_tui.app.dispatch import handle_slash_command
 
             await handle_slash_command(app, "/help")
             await pilot.pause(0.2)
@@ -70,7 +70,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             await pilot.press("up")
             await pilot.press("enter")
             await pilot.pause(0.3)
-            from widgets.presentation.screens.rewind_action import RewindActionScreen
+            from johnston_tui.presentation.screens.rewind_action import RewindActionScreen
             if isinstance(app.screen, RewindActionScreen):
                 await pilot.press("enter")
                 await pilot.pause(0.5)
@@ -170,7 +170,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             calls.append(text)
 
         with patch("textual.app.App.copy_to_clipboard") as sc, patch(
-            "core.infrastructure.platform.platform_utils.copy_to_os_clipboard_async",
+            "johnston_core.infrastructure.platform.platform_utils.copy_to_os_clipboard_async",
             side_effect=fake_clip,
         ), patch.object(app, "notify") as mock_notify:
             app.copy_to_clipboard("hello")
@@ -194,7 +194,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             calls.append(text)
 
         with patch("textual.app.App.copy_to_clipboard", side_effect=Exception("boom")), patch(
-            "core.infrastructure.platform.platform_utils.copy_to_os_clipboard_async",
+            "johnston_core.infrastructure.platform.platform_utils.copy_to_os_clipboard_async",
             side_effect=fake_clip,
         ), patch.object(app, "notify") as mock_notify:
             app.copy_to_clipboard("hello")  # must not raise
@@ -257,7 +257,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_generate_ai_response_queue_draining_and_attachments(self):
         from unittest.mock import MagicMock, patch
 
-        from core.base_provider import BaseAgent
+        from johnston_core.base_provider import BaseAgent
 
         app = JohnstonApp()
 
@@ -278,7 +278,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
 
         fake_att = MagicMock()
 
-        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("johnston_core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
@@ -306,7 +306,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         import asyncio
         from unittest.mock import MagicMock, patch
 
-        from core.base_provider import BaseAgent
+        from johnston_core.base_provider import BaseAgent
 
         app = JohnstonApp()
 
@@ -317,7 +317,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             yield ("thinking_start", "Thinking...", "")
             await asyncio.sleep(5.0)
 
-        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("johnston_core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
@@ -390,7 +390,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         app.pm.fetch_models_grouped = AsyncMock(return_value={"openai": {"name": "OpenAI", "models": ["gpt-4o"]}})
         async with app.run_test() as pilot:
-            from widgets.app.dispatch import handle_slash_command
+            from johnston_tui.app.dispatch import handle_slash_command
 
             await handle_slash_command(app, "/models")
             await pilot.pause(0.2)
@@ -427,7 +427,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_session_drift_prevention(self):
         from unittest.mock import MagicMock, patch
 
-        from core.base_provider import BaseAgent
+        from johnston_core.base_provider import BaseAgent
 
         app = JohnstonApp()
         ran_prompts = []
@@ -445,7 +445,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             if False:
                 yield
 
-        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("johnston_core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
@@ -484,7 +484,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_queued_system_notification_does_not_show_in_ui(self):
         from unittest.mock import MagicMock
 
-        from core.base_provider import BaseAgent
+        from johnston_core.base_provider import BaseAgent
 
         app = JohnstonApp()
 
@@ -513,7 +513,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_exception_preserves_queue(self):
         from unittest.mock import MagicMock, patch
 
-        from core.base_provider import BaseAgent
+        from johnston_core.base_provider import BaseAgent
 
         app = JohnstonApp()
 
@@ -521,7 +521,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
             yield ("thinking_start", "Thinking...", "")
             raise ValueError("API call failed")
 
-        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
+        with patch("johnston_core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint"):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
@@ -545,7 +545,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_queued_user_message_checkpoint(self):
         from unittest.mock import MagicMock, patch
 
-        from core.base_provider import BaseAgent
+        from johnston_core.base_provider import BaseAgent
 
         app = JohnstonApp()
         checkpoint_calls = []
@@ -559,7 +559,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         async def queued_event_stream(prompt, attachments=None):
             yield ("queued_user_message", "Mid-turn queued message", None, True)
 
-        with patch("core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint", side_effect=mock_checkpoint):
+        with patch("johnston_core.infrastructure.storage.git_checkpoint.GitCheckpointManager.create_checkpoint", side_effect=mock_checkpoint):
             async with app.run_test() as pilot:
                 await pilot.pause(0.1)
                 app.pm.is_provider_connected = MagicMock(return_value=True)
@@ -595,7 +595,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         app.trigger_ai_response = MagicMock()
 
-        with patch("widgets.mixins.message_flow.handle_slash_command", new_callable=AsyncMock) as mock_handle:
+        with patch("johnston_tui.mixins.message_flow.handle_slash_command", new_callable=AsyncMock) as mock_handle:
             mock_handle.return_value = True
 
             async with app.run_test() as pilot:

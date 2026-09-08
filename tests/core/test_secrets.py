@@ -1,7 +1,7 @@
 import os
 from unittest.mock import patch
 
-from core.infrastructure.secrets import (
+from johnston_core.infrastructure.secrets import (
     get_secret,
     interpolate_secrets,
     interpolate_secrets_in_obj,
@@ -12,8 +12,8 @@ from core.infrastructure.secrets import (
 
 def test_load_and_save_secrets(tmp_path):
     secrets_file = str(tmp_path / "secrets.json")
-    with patch("core.infrastructure.secrets.SECRETS_FILE", secrets_file), patch(
-        "core.infrastructure.secrets.CONFIG_DIR", str(tmp_path)
+    with patch("johnston_core.infrastructure.secrets.SECRETS_FILE", secrets_file), patch(
+        "johnston_core.infrastructure.secrets.CONFIG_DIR", str(tmp_path)
     ):
         assert load_secrets() == {}
         save_secret("TEST_KEY", "secret_val_123")
@@ -24,8 +24,8 @@ def test_load_and_save_secrets(tmp_path):
 def test_get_secret_fallbacks(tmp_path):
     secrets_file = str(tmp_path / "secrets.json")
     with (
-        patch("core.infrastructure.secrets.SECRETS_FILE", secrets_file),
-        patch("core.infrastructure.secrets.CONFIG_DIR", str(tmp_path)),
+        patch("johnston_core.infrastructure.secrets.SECRETS_FILE", secrets_file),
+        patch("johnston_core.infrastructure.secrets.CONFIG_DIR", str(tmp_path)),
         patch.dict(os.environ, {"ENV_ONLY_KEY": "env_val", "MY_PROVIDER_API_KEY": "prov_val"}),
     ):
         save_secret("FILE_KEY", "file_val")
@@ -45,8 +45,8 @@ def test_get_secret_fallbacks(tmp_path):
 
 def test_interpolate_secrets(tmp_path):
     secrets_file = str(tmp_path / "secrets.json")
-    with patch("core.infrastructure.secrets.SECRETS_FILE", secrets_file), patch(
-        "core.infrastructure.secrets.CONFIG_DIR", str(tmp_path)
+    with patch("johnston_core.infrastructure.secrets.SECRETS_FILE", secrets_file), patch(
+        "johnston_core.infrastructure.secrets.CONFIG_DIR", str(tmp_path)
     ):
         save_secret("DB_PASS", "pass123")
         save_secret("TOKEN", "tok456")

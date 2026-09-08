@@ -8,8 +8,8 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import MagicMock, patch
 
-from core.infrastructure.platform import paths
-from core.interfaces.cli.commands.provider_cmd import (
+from johnston_core.infrastructure.platform import paths
+from johnston_core.interfaces.cli.commands.provider_cmd import (
     add_provider_cmd,
     disable_provider,
     enable_provider,
@@ -20,8 +20,8 @@ from core.interfaces.cli.commands.provider_cmd import (
     set_key,
     set_model,
 )
-from core.interfaces.cli.entrypoint import build_parser, main
-from core.provider_manager import ProviderManager
+from johnston_core.interfaces.cli.entrypoint import build_parser, main
+from johnston_core.provider_manager import ProviderManager
 
 
 class TestCLIProvider(unittest.TestCase):
@@ -278,7 +278,7 @@ class TestCLIProvider(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_main_subcommand_provider(self):
-        with patch("core.interfaces.cli.commands.provider_cmd.run_provider", return_value=0) as mock_run:
+        with patch("johnston_core.interfaces.cli.commands.provider_cmd.run_provider", return_value=0) as mock_run:
             with self.assertRaises(SystemExit) as cm:
                 main(["provider", "list"])
             self.assertEqual(cm.exception.code, 0)
@@ -351,26 +351,26 @@ class TestCLIProvider(unittest.TestCase):
         pm.set_provider_api_key.assert_called_once_with("openai", "dash_key_val")
 
     def test_subcommands_roles_skills_rules_dispatch(self):
-        with patch("core.interfaces.cli.commands.roles_cmd.run_roles", return_value=0) as m_roles:
+        with patch("johnston_core.interfaces.cli.commands.roles_cmd.run_roles", return_value=0) as m_roles:
             with self.assertRaises(SystemExit) as cm:
                 main(["roles"])
             self.assertEqual(cm.exception.code, 0)
             m_roles.assert_called_once()
 
-        with patch("core.interfaces.cli.commands.skills_cmd.run_skills", return_value=0) as m_skills:
+        with patch("johnston_core.interfaces.cli.commands.skills_cmd.run_skills", return_value=0) as m_skills:
             with self.assertRaises(SystemExit) as cm:
                 main(["skills"])
             self.assertEqual(cm.exception.code, 0)
             m_skills.assert_called_once()
 
-        with patch("core.interfaces.cli.commands.rules_cmd.run_rules", return_value=0) as m_rules:
+        with patch("johnston_core.interfaces.cli.commands.rules_cmd.run_rules", return_value=0) as m_rules:
             with self.assertRaises(SystemExit) as cm:
                 main(["rules"])
             self.assertEqual(cm.exception.code, 0)
             m_rules.assert_called_once()
 
     def test_provider_def_from_dict_direct(self):
-        from core.domain.entities.provider import ProviderDef
+        from johnston_core.domain.entities.provider import ProviderDef
 
         pdef = ProviderDef.from_dict("custom_key", {"name": "Custom", "model": "m-1", "api_key": "raw_k"})
         self.assertEqual(pdef.key, "custom_key")

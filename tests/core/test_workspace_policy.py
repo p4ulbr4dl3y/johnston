@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from core.domain.policies.permission_policy import (
+from johnston_core.domain.policies.permission_policy import (
     LOGS_DIR,
     SECRETS_FILE,
     PermissionAction,

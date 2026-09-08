@@ -3,8 +3,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app import JohnstonApp
-from core.base_provider import BaseAgent
-from widgets.mixins.message_flow import MessageFlowMixin
+from johnston_core.base_provider import BaseAgent
+from johnston_tui.mixins.message_flow import MessageFlowMixin
 
 
 class TestMessageFlowPaste(unittest.IsolatedAsyncioTestCase):
@@ -50,7 +50,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.notify = MagicMock()
             with patch(
-                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "johnston_tui.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = False
@@ -63,7 +63,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.notify = MagicMock()
             with patch(
-                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "johnston_tui.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = False
@@ -76,7 +76,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.notify = MagicMock()
             with patch(
-                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "johnston_tui.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 mock_h.return_value = False
                 app.is_generating = True
@@ -89,7 +89,7 @@ class TestExecSlashCommand(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             app.notify = MagicMock()
             with patch(
-                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "johnston_tui.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 mock_h.side_effect = Exception("boom")
                 await app._exec_slash_command("/help")
@@ -183,7 +183,7 @@ class TestChatInputSubmitted(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             with patch(
-                "widgets.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
+                "johnston_tui.mixins.message_flow.handle_slash_command", new_callable=unittest.mock.AsyncMock
             ) as mock_h:
                 event = MagicMock()
                 event.value = "/help"
@@ -252,11 +252,11 @@ class TestShellModeFlow(unittest.IsolatedAsyncioTestCase):
             app._exec_shell_command.assert_awaited_once_with("ls -la", user_text="!ls -la")
 
     async def test_exec_shell_command_success(self):
-        from core.domain.defaults.errors import ToolResult
+        from johnston_core.domain.defaults.errors import ToolResult
         app = JohnstonApp()
         async with app.run_test():
             mock_res = ToolResult.done(content="file1\nfile2", display="file1\nfile2", returncode=0)
-            with patch("tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
+            with patch("johnston_core.tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
                 mock_exec.return_value = mock_res
                 await app._exec_shell_command("ls", user_text="!ls")
                 mock_exec.assert_awaited_once()
@@ -264,7 +264,7 @@ class TestShellModeFlow(unittest.IsolatedAsyncioTestCase):
     async def test_exec_shell_command_error_handled(self):
         app = JohnstonApp()
         async with app.run_test():
-            with patch("tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
+            with patch("johnston_core.tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
                 mock_exec.side_effect = RuntimeError("command failure")
                 await app._exec_shell_command("badcmd", user_text="!badcmd")
                 mock_exec.assert_awaited_once()

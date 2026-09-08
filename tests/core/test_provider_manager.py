@@ -9,17 +9,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.domain.entities.provider import ProviderDef
-from core.models_catalog import catalog
-from core.provider_manager import ProviderManager
+from johnston_core.domain.entities.provider import ProviderDef
+from johnston_core.models_catalog import catalog
+from johnston_core.provider_manager import ProviderManager
 
 
 @pytest.fixture
 def pm(tmp_path, monkeypatch):
-    monkeypatch.setattr("core.provider_manager.CONFIG_DIR", str(tmp_path))
-    monkeypatch.setattr("core.provider_manager.CONFIG_FILE", str(tmp_path / "config.json"))
-    monkeypatch.setattr("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "providers.json"))
-    monkeypatch.setattr("core.provider_manager.CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr("johnston_core.provider_manager.CONFIG_DIR", str(tmp_path))
+    monkeypatch.setattr("johnston_core.provider_manager.CONFIG_FILE", str(tmp_path / "config.json"))
+    monkeypatch.setattr("johnston_core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "providers.json"))
+    monkeypatch.setattr("johnston_core.provider_manager.CACHE_DIR", str(tmp_path / "cache"))
     return ProviderManager()
 
 
@@ -49,14 +49,14 @@ class TestProviderManager(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
 
         # Patch config values inside provider_manager
-        self.config_dir_patcher = patch("core.provider_manager.CONFIG_DIR", self.test_dir)
+        self.config_dir_patcher = patch("johnston_core.provider_manager.CONFIG_DIR", self.test_dir)
         self.config_file_patcher = patch(
-            "core.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json")
+            "johnston_core.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json")
         )
         self.providers_json_patcher = patch(
-            "core.provider_manager.PROVIDERS_JSON_FILE", os.path.join(self.test_dir, "providers.json")
+            "johnston_core.provider_manager.PROVIDERS_JSON_FILE", os.path.join(self.test_dir, "providers.json")
         )
-        self.cache_dir_patcher = patch("core.provider_manager.CACHE_DIR", os.path.join(self.test_dir, "cache"))
+        self.cache_dir_patcher = patch("johnston_core.provider_manager.CACHE_DIR", os.path.join(self.test_dir, "cache"))
 
         self.config_dir_patcher.start()
         self.config_file_patcher.start()
@@ -245,9 +245,9 @@ class TestProviderManagerJson(unittest.TestCase):
                 json.dump(sample_data, f)
 
             with (
-                patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
-                patch("core.provider_manager.CONFIG_FILE", config_file),
-                patch("core.provider_manager.CONFIG_DIR", tmpdir),
+                patch("johnston_core.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                patch("johnston_core.provider_manager.CONFIG_FILE", config_file),
+                patch("johnston_core.provider_manager.CONFIG_DIR", tmpdir),
             ):
                 pm = ProviderManager()
                 providers = pm.load_providers()
@@ -281,9 +281,9 @@ class TestProviderManagerJson(unittest.TestCase):
                     json.dump(sample_data, f)
 
                 with (
-                    patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
-                    patch("core.provider_manager.CONFIG_FILE", config_file),
-                    patch("core.provider_manager.CONFIG_DIR", tmpdir),
+                    patch("johnston_core.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                    patch("johnston_core.provider_manager.CONFIG_FILE", config_file),
+                    patch("johnston_core.provider_manager.CONFIG_DIR", tmpdir),
                 ):
                     pm = ProviderManager()
                     models = await pm.fetch_models_for_provider("no_models_endpoint", force_refresh=True)
@@ -301,9 +301,9 @@ class TestProviderManagerJsonRegression(unittest.TestCase):
                 f.write("{not json")
 
             with (
-                patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
-                patch("core.provider_manager.CONFIG_FILE", config_file),
-                patch("core.provider_manager.CONFIG_DIR", tmpdir),
+                patch("johnston_core.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                patch("johnston_core.provider_manager.CONFIG_FILE", config_file),
+                patch("johnston_core.provider_manager.CONFIG_DIR", tmpdir),
             ):
                 pm = ProviderManager()
                 providers = pm.load_providers()
@@ -330,9 +330,9 @@ class TestProviderManagerJsonRegression(unittest.TestCase):
                 )
 
             with (
-                patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
-                patch("core.provider_manager.CONFIG_FILE", config_file),
-                patch("core.provider_manager.CONFIG_DIR", tmpdir),
+                patch("johnston_core.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                patch("johnston_core.provider_manager.CONFIG_FILE", config_file),
+                patch("johnston_core.provider_manager.CONFIG_DIR", tmpdir),
             ):
                 pm = ProviderManager()
                 pm.set_provider_model("custom_json", "saved-model")
@@ -385,7 +385,7 @@ def test_unicode_and_quoted_key_values(pm):
     key = 'sk-привет"quote\\back\\slash'
     pm.set_provider_api_key("openai", key)
     assert pm.get_api_key("openai") == key
-    from core.infrastructure.secrets import load_secrets
+    from johnston_core.infrastructure.secrets import load_secrets
 
     saved = load_secrets()
     assert saved.get("openai") == key or saved.get("OPENAI_API_KEY") == key
@@ -411,7 +411,7 @@ def test_connected_no_key(pm):
 
 def test_connected_env_key(pm, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "env-secret-key")
-    from core.infrastructure.secrets import save_secret
+    from johnston_core.infrastructure.secrets import save_secret
 
     save_secret("openai", "file-secret-key")
     # file should take precedence over env
@@ -419,21 +419,21 @@ def test_connected_env_key(pm, monkeypatch):
 
 
 def test_connected_with_file_key(pm):
-    from core.infrastructure.secrets import save_secret
+    from johnston_core.infrastructure.secrets import save_secret
 
     save_secret("openai", "sk-abc")
     assert pm.is_provider_connected("openai") is True
 
 
 def test_connected_whitespace_key(pm):
-    from core.infrastructure.secrets import save_secret
+    from johnston_core.infrastructure.secrets import save_secret
 
     save_secret("openai", "   ")
     assert pm.is_provider_connected("openai") is False
 
 
 def test_connected_case_sensitive_name(pm, tmp_path):
-    from core.infrastructure.secrets import save_secret
+    from johnston_core.infrastructure.secrets import save_secret
 
     save_secret("openai", "sk-abc")
     # actual provider key is lowercase; uppercase name must not match
@@ -441,7 +441,7 @@ def test_connected_case_sensitive_name(pm, tmp_path):
 
 
 def test_connected_disabled_provider(pm, tmp_path):
-    from core.infrastructure.secrets import save_secret
+    from johnston_core.infrastructure.secrets import save_secret
 
     save_secret("openai", "sk-abc")
     _write(tmp_path / "providers.json", {"openai": {"enabled": False}})
@@ -449,7 +449,7 @@ def test_connected_disabled_provider(pm, tmp_path):
 
 
 def test_connected_multiple_providers(pm, tmp_path):
-    from core.infrastructure.secrets import save_secret
+    from johnston_core.infrastructure.secrets import save_secret
 
     save_secret("openai", "sk-abc")
     save_secret("groq", "sk-xyz")
@@ -533,7 +533,7 @@ def test_create_agent_provider_without_base_url(pm, tmp_path):
 
 
 def test_fetch_models_network_error_swallowed(pm, tmp_path):
-    from core.infrastructure.secrets import save_secret
+    from johnston_core.infrastructure.secrets import save_secret
 
     _write(
         tmp_path / "providers.json",
@@ -551,7 +551,7 @@ def test_fetch_models_network_error_swallowed(pm, tmp_path):
 
 
 def test_fetch_models_no_base_url(pm, tmp_path):
-    from core.infrastructure.secrets import save_secret
+    from johnston_core.infrastructure.secrets import save_secret
 
     _write(
         tmp_path / "providers.json",
@@ -756,7 +756,7 @@ def test_env_api_key_fallback_and_stored_precedence(pm, tmp_path, monkeypatch):
 
 def test_env_api_key_togetherai(pm, monkeypatch):
     monkeypatch.setenv("TOGETHERAI_API_KEY", "tog-key")
-    from core.infrastructure.secrets import get_secret
+    from johnston_core.infrastructure.secrets import get_secret
 
     assert get_secret("togetherai") == "tog-key"
     assert get_secret("unknown-provider") == ""
@@ -791,7 +791,7 @@ def test_base_url_placeholder_unresolved_stays_verbatim(pm, tmp_path, caplog, mo
     import logging as _logging
 
     # Fresh dedup state: earlier tests may have already warned for this token.
-    monkeypatch.setattr("core.provider_manager._WARNED_BASE_URL_TOKENS", set())
+    monkeypatch.setattr("johnston_core.provider_manager._WARNED_BASE_URL_TOKENS", set())
     _write(
         tmp_path / "providers.json",
         {"azure": {"key": "azure", "name": "Azure"}},
@@ -827,7 +827,7 @@ def test_select_model_switching_provider_sets_live_agent_model(pm, tmp_path):
     """Regression: switching provider via select_model must apply the chosen model
     to the *recreated* agent (not a stale pre-recreation reference), and persist
     it via the ``model`` field alone (no dedicated ``active_provider`` field)."""
-    from core.application.provider.actions import select_model
+    from johnston_core.application.provider.actions import select_model
 
     _write(
         tmp_path / "providers.json",
@@ -867,7 +867,7 @@ def test_select_model_switching_provider_sets_live_agent_model(pm, tmp_path):
 
 
 def test_is_local_provider():
-    from core.provider_manager import is_local_provider
+    from johnston_core.provider_manager import is_local_provider
 
     assert is_local_provider("ollama") is True
     assert is_local_provider("lmstudio") is True

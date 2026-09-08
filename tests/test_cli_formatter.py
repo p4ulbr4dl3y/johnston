@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from core.interfaces.cli.formatter import (
+from johnston_core.interfaces.cli.formatter import (
     format_key_status,
     format_kv,
     format_status,

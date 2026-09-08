@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.adapters import (
+from johnston_core.adapters import (
     AnthropicAdapter,
     GeminiAdapter,
     OpenAIAdapter,
@@ -116,7 +116,7 @@ async def test_gemini_close_with_running_loop_swallowed():
 async def test_gemini_close_with_running_loop_closes_pending_coroutine():
     """Regression: the _close_all coroutine created before asyncio.run() raises
     (running loop) must be closed, not leaked as 'never awaited' RuntimeWarning."""
-    import core.infrastructure.adapters.base as base_module
+    import johnston_core.infrastructure.adapters.base as base_module
 
     adapter = GeminiAdapter()
     adapter._clients = {("u", "k"): MagicMock()}
@@ -171,7 +171,7 @@ async def test_gemini_stream_system_tools_skip_lines():
         {"type": "function", "function": {}},  # empty function -> skipped declaration
     ]
     messages = [{"role": "system", "content": "You are helpful."}, {"role": "user", "content": "hi"}]
-    with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+    with patch("johnston_core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
         events = [
             e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", messages, tools=tools)
         ]
@@ -182,8 +182,8 @@ async def test_gemini_stream_system_tools_skip_lines():
 @pytest.mark.asyncio
 async def test_gemini_stream_thinking_config_truthy():
     lines = ['data: {"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}']
-    with patch("core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
-        with patch("core.adapters.gemini.build_gemini_thinking_config", return_value={"thinkingBudget": 2}):
+    with patch("johnston_core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston_core.adapters.gemini.build_gemini_thinking_config", return_value={"thinkingBudget": 2}):
             events = [e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [], thinking_effort="high")]
     assert any(e[0] == "adapter_text" for e in events)
 
@@ -247,7 +247,7 @@ async def test_openai_stream_data_choices_and_empty_delta():
         'data: {"choices":[],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}',
         "data: [DONE]",
     ]
-    with patch("core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+    with patch("johnston_core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
         events = [e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
     texts = "".join(e[1] for e in events if e[0] == "adapter_text")
     assert texts == "hello"

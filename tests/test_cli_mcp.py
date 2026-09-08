@@ -9,14 +9,14 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import MagicMock, patch
 
-from core.infrastructure.mcp import config as mcp_config
-from core.infrastructure.mcp.config import (
+from johnston_core.infrastructure.mcp import config as mcp_config
+from johnston_core.infrastructure.mcp.config import (
     add_server_config,
     remove_server_config,
     set_server_enabled,
 )
-from core.infrastructure.mcp.manager import MCPManager
-from core.interfaces.cli.commands.mcp_cmd import (
+from johnston_core.infrastructure.mcp.manager import MCPManager
+from johnston_core.interfaces.cli.commands.mcp_cmd import (
     add_mcp,
     disable_mcp,
     enable_mcp,
@@ -25,7 +25,7 @@ from core.interfaces.cli.commands.mcp_cmd import (
     rm_mcp,
     run_mcp,
 )
-from core.interfaces.cli.entrypoint import build_parser, main
+from johnston_core.interfaces.cli.entrypoint import build_parser, main
 
 
 class TestCLIMCP(unittest.TestCase):
@@ -277,7 +277,7 @@ class TestCLIMCP(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_main_subcommand_mcp(self):
-        with patch("core.interfaces.cli.commands.mcp_cmd.run_mcp", return_value=0) as mock_run:
+        with patch("johnston_core.interfaces.cli.commands.mcp_cmd.run_mcp", return_value=0) as mock_run:
             with self.assertRaises(SystemExit) as cm:
                 main(["mcp", "list"])
             self.assertEqual(cm.exception.code, 0)

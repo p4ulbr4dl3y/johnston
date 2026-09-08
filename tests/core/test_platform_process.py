@@ -2,16 +2,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.domain.policies.policy_shell import check_read_only_command_mutations
-from core.infrastructure.platform.process import spawn_shell_process, spawn_windows_process
-from tools.context import ToolContext
+from johnston_core.domain.policies.policy_shell import check_read_only_command_mutations
+from johnston_core.infrastructure.platform.process import spawn_shell_process, spawn_windows_process
+from johnston_core.tools.context import ToolContext
 
 
 @pytest.mark.asyncio
 async def test_spawn_shell_process_sandboxed():
     with (
         patch(
-            "core.infrastructure.platform.sandbox.build_sandboxed_command",
+            "johnston_core.infrastructure.platform.sandbox.build_sandboxed_command",
             return_value=("/bin/sandbox", ["arg1", "arg2"], True),
         ),
         patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec,
@@ -47,7 +47,7 @@ async def test_spawn_shell_process_windows_spawner():
 async def test_spawn_shell_process_windows_default():
     with (
         patch(
-            "core.infrastructure.platform.process.spawn_windows_process",
+            "johnston_core.infrastructure.platform.process.spawn_windows_process",
             new_callable=AsyncMock,
         ) as mock_win,
     ):
@@ -183,7 +183,7 @@ def test_tool_context_shell_widget_helpers():
 
 @pytest.mark.asyncio
 async def test_terminate_process_tree_windows():
-    from core.infrastructure.platform.process import terminate_process_tree
+    from johnston_core.infrastructure.platform.process import terminate_process_tree
 
     proc = MagicMock()
     proc.pid = 1234
@@ -194,7 +194,7 @@ async def test_terminate_process_tree_windows():
     mock_sub.wait = AsyncMock()
 
     with (
-        patch("core.infrastructure.platform.process.is_windows", return_value=True),
+        patch("johnston_core.infrastructure.platform.process.is_windows", return_value=True),
         patch("asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_sub) as mock_exec,
     ):
         await terminate_process_tree(proc, timeout=0.5)
@@ -207,7 +207,7 @@ async def test_terminate_process_tree_windows():
 
 @pytest.mark.asyncio
 async def test_terminate_process_tree_posix():
-    from core.infrastructure.platform.process import terminate_process_tree
+    from johnston_core.infrastructure.platform.process import terminate_process_tree
 
     proc = MagicMock()
     proc.pid = 4321
@@ -215,7 +215,7 @@ async def test_terminate_process_tree_posix():
     proc.wait = AsyncMock()
 
     with (
-        patch("core.infrastructure.platform.process.is_windows", return_value=False),
+        patch("johnston_core.infrastructure.platform.process.is_windows", return_value=False),
         patch("os.killpg") as mock_killpg,
     ):
         await terminate_process_tree(proc, timeout=0.5)
@@ -225,14 +225,14 @@ async def test_terminate_process_tree_posix():
 
 
 def test_terminate_process_tree_sync_windows():
-    from core.infrastructure.platform.process import terminate_process_tree_sync
+    from johnston_core.infrastructure.platform.process import terminate_process_tree_sync
 
     proc = MagicMock()
     proc.pid = 5678
     proc.returncode = None
 
     with (
-        patch("core.infrastructure.platform.process.is_windows", return_value=True),
+        patch("johnston_core.infrastructure.platform.process.is_windows", return_value=True),
         patch("subprocess.run") as mock_run,
     ):
         terminate_process_tree_sync(proc)

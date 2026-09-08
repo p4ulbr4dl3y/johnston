@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 
 from textual.widgets import OptionList
 
-from core.application.session.actions import RewindEntry
-from widgets.presentation.screens.rewind import RewindScreen, RewindSelection
+from johnston_core.application.session.actions import RewindEntry
+from johnston_tui.presentation.screens.rewind import RewindScreen, RewindSelection
 
 
 class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
@@ -38,7 +38,7 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(screen_disabled.raw_options[1], "second message")
 
     def test_selection_pushes_rewind_action_screen(self):
-        from widgets.presentation.screens.rewind_action import RewindActionScreen
+        from johnston_tui.presentation.screens.rewind_action import RewindActionScreen
 
         user_messages = [
             RewindEntry(0, "first message", "+3 / -1"),
@@ -67,7 +67,7 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(screen._dismissed.restore_code)
 
     def test_rewind_action_screen_options_and_diff(self):
-        from widgets.presentation.screens.rewind_action import RewindActionScreen
+        from johnston_tui.presentation.screens.rewind_action import RewindActionScreen
 
         entry = RewindEntry(0, "first message", "+3 / -1", changed_files=["a.py"])
         screen = RewindActionScreen(entry)
@@ -154,7 +154,7 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(dismissed_val.restore_code)
 
     def test_format_rewind_files(self):
-        from widgets.presentation.screens.rewind import format_rewind_files
+        from johnston_tui.presentation.screens.rewind import format_rewind_files
 
         # Empty files
         self.assertEqual(format_rewind_files([]).plain, "")

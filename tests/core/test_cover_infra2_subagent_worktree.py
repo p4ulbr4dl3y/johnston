@@ -6,8 +6,8 @@ import tempfile
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core.infrastructure.platform import paths
-from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+from johnston_core.infrastructure.platform import paths
+from johnston_core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
 
 def _cp(rc, out=""):
@@ -39,7 +39,7 @@ class TestCoverWorktree:
 
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
-            patch("core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake),
+            patch("johnston_core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake),
         ):
             path, branch = SubagentWorktreeManager.create_worktree(self.tmp, "cov-session", "feature-x")
         assert path == wt_path
@@ -58,7 +58,7 @@ class TestCoverWorktree:
 
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
-            patch("core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake),
+            patch("johnston_core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake),
         ):
             assert SubagentWorktreeManager.attach_worktree(self.tmp, "cov-session", "feature-x") == wt_path
         import shutil

@@ -17,17 +17,17 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.events import Key
 
-from core.application.generation.ai_generator import (
+from johnston_core.application.generation.ai_generator import (
     GenCanvas,
     _handle_interruption,
     generate_ai_response,
 )
-from core.base_provider import BaseAgent
-from core.base_provider.compaction import collect_user_messages
-from core.domain.entities.session import AgentSession
-from core.domain.policies.messages import is_system_note, is_ui_visible_user_message
-from widgets.chat_input import KEY_QUIT, ChatInput
-from widgets.chat_toolcall import ToolCallWidget
+from johnston_core.base_provider import BaseAgent
+from johnston_core.base_provider.compaction import collect_user_messages
+from johnston_core.domain.entities.session import AgentSession
+from johnston_core.domain.policies.messages import is_system_note, is_ui_visible_user_message
+from johnston_tui.chat_input import KEY_QUIT, ChatInput
+from johnston_tui.chat_toolcall import ToolCallWidget
 
 
 def _make_canvas(**overrides) -> GenCanvas:
@@ -622,14 +622,14 @@ class TestGeneratorStreamInterruptionFlow:
         assert any('<system_note kind="interrupted"' in m["content"] for m in agent.history)
 
     def test_ask_user_wizard_screen_has_quit_bindings(self):
-        from widgets.presentation.screens.ask_user import AskUserWizardScreen
+        from johnston_tui.presentation.screens.ask_user import AskUserWizardScreen
 
         keys = [b[0] for b in AskUserWizardScreen.BINDINGS]
         assert "ctrl+c" in keys
         assert "ctrl+q" in keys
 
     def test_mark_cancelled_preserves_accumulated_shell_output(self):
-        from widgets.chat_toolcall import ToolCallWidget
+        from johnston_tui.chat_toolcall import ToolCallWidget
 
         w = ToolCallWidget("shell", "pytest")
         w.status = "running"
@@ -643,7 +643,7 @@ class TestGeneratorStreamInterruptionFlow:
         assert w.is_clickable_header() is True
 
     def test_mark_cancelled_without_prior_output_sets_default_message(self):
-        from widgets.chat_toolcall import ToolCallWidget
+        from johnston_tui.chat_toolcall import ToolCallWidget
 
         w = ToolCallWidget("shell", "pytest")
         w.status = "running"
@@ -653,7 +653,7 @@ class TestGeneratorStreamInterruptionFlow:
         assert w.result_text == "[interrupted | tool cancelled]"
 
     def test_shell_expand_loads_background_log_file(self, tmp_path):
-        from widgets.chat_toolcall import ToolCallWidget
+        from johnston_tui.chat_toolcall import ToolCallWidget
 
         log_f = tmp_path / "test.log"
         log_f.write_text("collected 50 items\n50 passed in 2.0s\n")

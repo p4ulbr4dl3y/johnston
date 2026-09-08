@@ -4,20 +4,20 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.domain.policies.permission_policy import (
+from johnston_core.domain.policies.permission_policy import (
     ExecutionMode,
     PermissionAction,
     get_config_dir,
     normalize_action,
 )
-from core.permission_manager import LOGS_DIR, SECRETS_FILE, PermissionManager
+from johnston_core.permission_manager import LOGS_DIR, SECRETS_FILE, PermissionManager
 
 
 class TestPermissionManager(unittest.TestCase):
     def setUp(self):
         self.pm = PermissionManager.get_instance()
         self.pm.clear_session_overrides()
-        self.config_patcher = patch("core.permission_manager.CONFIG_FILE", "/nonexistent_test_config.json")
+        self.config_patcher = patch("johnston_core.permission_manager.CONFIG_FILE", "/nonexistent_test_config.json")
         self.config_patcher.start()
 
     def tearDown(self):
@@ -98,7 +98,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"gh__search": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 action = self.pm.check_permission("gh__search").action
                 self.assertEqual(action, "deny")
 
@@ -125,7 +125,7 @@ class TestPermissionManager(unittest.TestCase):
                     f,
                 )
 
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 # Explicit tool permission -> allow for safe command
                 action_exec = self.pm.check_permission("shell", {"command": "echo hi"}).action
                 self.assertEqual(action_exec, "allow")
@@ -140,7 +140,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"shell": "BOGUS"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 action = self.pm.check_permission("shell", {"command": "echo hi"}).action
                 self.assertEqual(action, "ask", "invalid action value must fail closed to 'ask', not 'allow'")
 
@@ -149,7 +149,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": " allow "}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 action = self.pm.check_permission("web_fetch").action
                 self.assertEqual(action, "allow")
 
@@ -158,7 +158,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"default": "WHATEVER"}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 action = self.pm.check_permission("read").action
                 self.assertEqual(action, "ask")
 
@@ -167,7 +167,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"default": "WHATEVER"}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 action = self.pm.check_permission("gh__search").action
                 self.assertEqual(action, "ask")
 
@@ -195,7 +195,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 first = self.pm.get_effective_permissions()
                 second = self.pm.get_effective_permissions()
                 # Merge result is memoized (same object), no re-merge per call.
@@ -207,7 +207,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 self.assertEqual(self.pm.check_permission("web_fetch").action, "deny")
                 with open(cfg_file, "w", encoding="utf-8") as f:
                     json.dump({"permissions": {"tools": {"web_fetch": "allow"}}}, f)
@@ -226,7 +226,7 @@ class TestPermissionManager(unittest.TestCase):
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": "allow"}}}, f)
             st = os.stat(cfg_file)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 self.assertEqual(self.pm.check_permission("web_fetch").action, "allow")
                 with open(cfg_file, "w", encoding="utf-8") as f:
                     json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
@@ -248,7 +248,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"web_fetch": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 self.assertEqual(self.pm.check_permission("web_fetch").action, "deny")
                 os.remove(cfg_file)
                 # Missing file -> no cached snapshot -> review-mode baseline.
@@ -260,7 +260,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"WEB_FETCH": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 self.assertEqual(self.pm.check_permission("Web_Fetch").action, "deny")
 
     def test_configure_instance_replaces_singleton(self):
@@ -279,7 +279,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"mode": "review"}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 self.pm.get_effective_permissions()
                 self.assertIsNotNone(self.pm._effective_cache)
                 self.assertEqual(len(self.pm._effective_cache), 4)
@@ -401,7 +401,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"danger__*": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 self.assertEqual(self.pm.check_permission("danger__run").action, "deny")
 
     def test_unsafe_shell_cannot_be_bypassed_by_session_override(self):
@@ -436,7 +436,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"danger__*": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 self.pm.set_session_override("danger__*", "allow")
                 dec = self.pm.check_permission("danger__delete")
                 self.assertEqual(dec.action, PermissionAction.DENY, "wildcard session allow must not bypass config wildcard deny")
@@ -450,7 +450,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"danger__run": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 self.pm.set_session_override("danger__run", "allow")
                 self.assertEqual(self.pm.check_permission("danger__run").action, PermissionAction.ALLOW)
 
@@ -462,7 +462,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"danger__*": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 self.pm.set_session_override("danger__run", "allow")
                 dec = self.pm.check_permission("danger__run")
                 self.assertEqual(dec.action, PermissionAction.DENY, "exact same-tool session override must not lift a config wildcard deny")
@@ -479,7 +479,7 @@ class TestPermissionManager(unittest.TestCase):
                     cfg_file = os.path.join(tmpdir, "config.json")
                     with open(cfg_file, "w", encoding="utf-8") as f:
                         json.dump({"permissions": {"tools": {"read": junk}}}, f)
-                    with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+                    with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                         dec = self.pm.check_permission("read", {"path": os.path.join(tmpdir, "x.py")})
                         self.assertEqual(
                             dec.action,
@@ -491,7 +491,7 @@ class TestPermissionManager(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"read": 999}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 dec = self.pm.check_permission("read", {"path": os.path.join(tmpdir, "x.py")})
                 self.assertEqual(dec.action, PermissionAction.ASK)
                 self.assertIn("Explicit tool permission", dec.reason)

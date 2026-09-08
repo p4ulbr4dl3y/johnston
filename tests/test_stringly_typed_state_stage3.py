@@ -2,14 +2,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.application.session.stream_runner import execute_session_turn
-from core.base_provider.compaction import CompactionMixin
-from core.domain.defaults.errors import ToolResult, ToolResultStatus, normalize_tool_result
-from core.domain.entities.session import AgentSession
-from widgets.mixins.message_flow_background import update_background_shell_widget
-from widgets.presentation.tool_renderers import compute_tool_call_content
-from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
-from widgets.presentation.widgets.chat_view_restore import restore_message_item
+from johnston_core.application.session.stream_runner import execute_session_turn
+from johnston_core.base_provider.compaction import CompactionMixin
+from johnston_core.domain.defaults.errors import ToolResult, ToolResultStatus, normalize_tool_result
+from johnston_core.domain.entities.session import AgentSession
+from johnston_tui.mixins.message_flow_background import update_background_shell_widget
+from johnston_tui.presentation.tool_renderers import compute_tool_call_content
+from johnston_tui.presentation.widgets.chat_stream_driver import ChatStreamDriver
+from johnston_tui.presentation.widgets.chat_view_restore import restore_message_item
 
 
 # ==============================================================================
@@ -37,7 +37,7 @@ def test_update_background_shell_widget_strict_task_id_matching():
     session.messages = [msg_coincidental, msg_matching]
     app.sm.get.return_value = session
 
-    with patch("widgets.mixins.message_flow_background.schedule_session_save") as mock_save:
+    with patch("johnston_tui.mixins.message_flow_background.schedule_session_save") as mock_save:
         update_background_shell_widget(app, "bg_task_123", "command finished")
         mock_save.assert_called_once_with(app, session)
 
@@ -65,7 +65,7 @@ def test_update_background_shell_widget_background_task_id_alias():
     session.messages = [msg_matching]
     app.sm.get.return_value = session
 
-    with patch("widgets.mixins.message_flow_background.schedule_session_save"):
+    with patch("johnston_tui.mixins.message_flow_background.schedule_session_save"):
         update_background_shell_widget(app, "bg_456", "done output")
 
     assert "done output" in msg_matching["result_text"]

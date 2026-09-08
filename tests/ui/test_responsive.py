@@ -10,14 +10,14 @@ from textual.app import App
 from textual.timer import Timer
 from textual.widgets.option_list import Option
 
-from widgets.command_suggestions import CommandSuggestions
-from widgets.mixins.resize_debounce import ResizeDebounceMixin
-from widgets.presentation.screens.diff import DiffFooter, DiffHeader
-from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
-from widgets.presentation.screens.session_conflict import SessionConflictScreen
-from widgets.presentation.screens.thinking_effort import ThinkingEffortScreen
-from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
-from widgets.utils.responsive import (
+from johnston_tui.command_suggestions import CommandSuggestions
+from johnston_tui.mixins.resize_debounce import ResizeDebounceMixin
+from johnston_tui.presentation.screens.diff import DiffFooter, DiffHeader
+from johnston_tui.presentation.screens.permission_confirm import PermissionConfirmScreen
+from johnston_tui.presentation.screens.session_conflict import SessionConflictScreen
+from johnston_tui.presentation.screens.thinking_effort import ThinkingEffortScreen
+from johnston_tui.presentation.widgets.subagent_footer import SubagentStatusFooter
+from johnston_tui.utils.responsive import (
     BREAKPOINT_BANNER,
     BREAKPOINT_COMPACT,
     BREAKPOINT_HINT,
@@ -341,7 +341,7 @@ class TestCommandSuggestionsViewportAwareness:
             async def fake_provider():
                 return [("/cmd", desc)]
 
-            with patch("widgets.command_suggestions.get_all_command_suggestions", fake_provider):
+            with patch("johnston_tui.command_suggestions.get_all_command_suggestions", fake_provider):
                 await cs.update_query("/cm", "/cm", 3)
             return cs.added
 
@@ -481,7 +481,7 @@ class TestFitModalDialog:
 
 
 _repo_root = Path(__file__).resolve().parents[2]
-_tui_css = _repo_root / "packages" / "tui" / "app.tcss"
+_tui_css = _repo_root / "packages" / "tui" / "johnston_tui" / "app.tcss"
 _APP_CSS_PATH = str(_tui_css if _tui_css.exists() else _repo_root / "app.tcss")
 
 
@@ -495,7 +495,7 @@ class _ModalHostApp(App[None]):
         self.screen_to_test = screen_to_test
 
     def get_theme_variable_defaults(self) -> dict[str, str]:
-        from core.domain.defaults.themes import ZINC_DARK
+        from johnston_core.domain.defaults.themes import ZINC_DARK
         return dict(ZINC_DARK.tcss_vars)
 
     def on_mount(self) -> None:
@@ -530,7 +530,7 @@ class TestModalFitPilot:
         assert 0 < width <= int(46 * MODAL_WIDTH_RATIO)
 
     async def test_confirm_screen_compact_width(self):
-        from widgets.presentation.screens.confirm import ConfirmScreen
+        from johnston_tui.presentation.screens.confirm import ConfirmScreen
 
         width = await self._dialog_width(ConfirmScreen(title="Delete", message="Sure?"), (120, 40))
         assert width == MODAL_COMPACT_MAX_WIDTH == 56

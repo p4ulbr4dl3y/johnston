@@ -14,9 +14,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import core.infrastructure.platform.platform_utils as pu
-import core.infrastructure.runtime.fs_signature as fs
-from core.infrastructure.runtime.prompt_markdown import format_skills_markdown
+import johnston_core.infrastructure.platform.platform_utils as pu
+import johnston_core.infrastructure.runtime.fs_signature as fs
+from johnston_core.infrastructure.runtime.prompt_markdown import format_skills_markdown
 
 # ---------------------------------------------------------------------------
 # platform_utils.py
@@ -155,9 +155,9 @@ def test_copy_to_os_clipboard_empty_text():
 
 def test_copy_to_os_clipboard_windows_clip():
     with (
-        patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
-        patch("core.infrastructure.platform.platform_utils.shutil.which"),
-        patch("core.infrastructure.platform.platform_utils.subprocess.Popen") as popen,
+        patch("johnston_core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+        patch("johnston_core.infrastructure.platform.platform_utils.shutil.which"),
+        patch("johnston_core.infrastructure.platform.platform_utils.subprocess.Popen") as popen,
     ):
         p = MagicMock()
         popen.return_value = p
@@ -167,9 +167,9 @@ def test_copy_to_os_clipboard_windows_clip():
 
 def test_copy_to_os_clipboard_pbcopy():
     with (
-        patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-        patch("core.infrastructure.platform.platform_utils.shutil.which", side_effect=lambda n: n == "pbcopy"),
-        patch("core.infrastructure.platform.platform_utils.subprocess.Popen") as popen,
+        patch("johnston_core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+        patch("johnston_core.infrastructure.platform.platform_utils.shutil.which", side_effect=lambda n: n == "pbcopy"),
+        patch("johnston_core.infrastructure.platform.platform_utils.subprocess.Popen") as popen,
     ):
         p = MagicMock()
         popen.return_value = p
@@ -179,9 +179,9 @@ def test_copy_to_os_clipboard_pbcopy():
 
 def test_copy_to_os_clipboard_wl_copy():
     with (
-        patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-        patch("core.infrastructure.platform.platform_utils.shutil.which", side_effect=lambda n: n == "wl-copy"),
-        patch("core.infrastructure.platform.platform_utils.subprocess.Popen") as popen,
+        patch("johnston_core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+        patch("johnston_core.infrastructure.platform.platform_utils.shutil.which", side_effect=lambda n: n == "wl-copy"),
+        patch("johnston_core.infrastructure.platform.platform_utils.subprocess.Popen") as popen,
     ):
         p = MagicMock()
         popen.return_value = p
@@ -191,12 +191,12 @@ def test_copy_to_os_clipboard_wl_copy():
 
 def test_copy_to_os_clipboard_xclip():
     with (
-        patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+        patch("johnston_core.infrastructure.platform.platform_utils.is_windows", return_value=False),
         patch(
-            "core.infrastructure.platform.platform_utils.shutil.which",
+            "johnston_core.infrastructure.platform.platform_utils.shutil.which",
             side_effect=lambda n: n == "xclip",
         ),
-        patch("core.infrastructure.platform.platform_utils.subprocess.Popen") as popen,
+        patch("johnston_core.infrastructure.platform.platform_utils.subprocess.Popen") as popen,
     ):
         p = MagicMock()
         popen.return_value = p
@@ -206,16 +206,16 @@ def test_copy_to_os_clipboard_xclip():
 
 def test_copy_to_os_clipboard_spawn_error_swallowed():
     with (
-        patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-        patch("core.infrastructure.platform.platform_utils.shutil.which", side_effect=lambda n: n == "pbcopy"),
-        patch("core.infrastructure.platform.platform_utils.subprocess.Popen", side_effect=OSError("no pbcopy")),
+        patch("johnston_core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+        patch("johnston_core.infrastructure.platform.platform_utils.shutil.which", side_effect=lambda n: n == "pbcopy"),
+        patch("johnston_core.infrastructure.platform.platform_utils.subprocess.Popen", side_effect=OSError("no pbcopy")),
     ):
         pu.copy_to_os_clipboard("hi")  # no raise
 
 
 @pytest.mark.asyncio
 async def test_copy_to_os_clipboard_async():
-    with patch("core.infrastructure.platform.platform_utils.copy_to_os_clipboard") as m:
+    with patch("johnston_core.infrastructure.platform.platform_utils.copy_to_os_clipboard") as m:
         await pu.copy_to_os_clipboard_async("hello")
     m.assert_called_once_with("hello")
 

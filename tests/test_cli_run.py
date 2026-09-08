@@ -9,9 +9,9 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import Any, AsyncGenerator
 from unittest.mock import MagicMock, patch
 
-from core.domain.entities.provider import ProviderDef
-from core.domain.policies.role_policy import AgentMode
-from core.interfaces.cli.commands.run_cmd import (
+from johnston_core.domain.entities.provider import ProviderDef
+from johnston_core.domain.policies.role_policy import AgentMode
+from johnston_core.interfaces.cli.commands.run_cmd import (
     format_args_summary,
     format_meta_footer,
     format_result_summary,
@@ -19,7 +19,7 @@ from core.interfaces.cli.commands.run_cmd import (
     run_headless,
     run_headless_async,
 )
-from core.interfaces.cli.entrypoint import build_parser, main
+from johnston_core.interfaces.cli.entrypoint import build_parser, main
 
 
 class MockAgent:
@@ -516,7 +516,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
             quiet=False,
             json=False,
         )
-        with patch("core.interfaces.cli.commands.run_cmd.apply_role") as mock_apply:
+        with patch("johnston_core.interfaces.cli.commands.run_cmd.apply_role") as mock_apply:
             out_buf = io.StringIO()
             with redirect_stdout(out_buf):
                 code = await run_headless_async(args, pm=pm)
@@ -553,7 +553,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(code, 0)
         self.assertTrue(closed)
 
-    @patch("core.application.skills.manager.get_skill_manager")
+    @patch("johnston_core.application.skills.manager.get_skill_manager")
     async def test_run_headless_async_slash_skill_injection(self, mock_get_sm):
         skill = MagicMock()
         skill.name = "caveman"
@@ -592,7 +592,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertIn("write poem", agent.received_prompt)
         self.assertIn("[skills] activated: caveman", err_buf.getvalue())
 
-    @patch("core.application.skills.manager.get_skill_manager")
+    @patch("johnston_core.application.skills.manager.get_skill_manager")
     async def test_run_headless_async_explicit_skill_flag_json(self, mock_get_sm):
         skill = MagicMock()
         skill.name = "caveman"
@@ -632,7 +632,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         data = json.loads(out_buf.getvalue())
         self.assertEqual(data["skills"], ["caveman"])
 
-    @patch("core.application.skills.manager.get_skill_manager")
+    @patch("johnston_core.application.skills.manager.get_skill_manager")
     async def test_run_headless_async_skills_stream_json(self, mock_get_sm):
         skill = MagicMock()
         skill.name = "caveman"
@@ -740,7 +740,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lines[0]["title"], "Session Compacted")
         self.assertTrue(lines[-1]["usage"].get("compacted"))
 
-    @patch("core.infrastructure.mcp.get_mcp_manager")
+    @patch("johnston_core.infrastructure.mcp.get_mcp_manager")
     async def test_run_headless_async_mcp_warmup_and_shutdown(self, mock_get_mm):
         mock_mm = MagicMock()
         mock_mm.load_servers.return_value = [{"name": "my-mcp"}]
@@ -786,7 +786,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertIn("[mcp] active: my-mcp (2 tools)", err_buf.getvalue())
         self.assertTrue(mock_mm.stop_all_async.called)
 
-    @patch("core.infrastructure.mcp.get_mcp_manager")
+    @patch("johnston_core.infrastructure.mcp.get_mcp_manager")
     async def test_run_headless_async_mcp_json(self, mock_get_mm):
         mock_mm = MagicMock()
         mock_mm.load_servers.return_value = [{"name": "my-mcp"}]
@@ -831,7 +831,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         data = json.loads(out_buf.getvalue())
         self.assertEqual(data.get("mcp"), {"servers": ["my-mcp"], "tools": 1})
 
-    @patch("core.infrastructure.mcp.get_mcp_manager")
+    @patch("johnston_core.infrastructure.mcp.get_mcp_manager")
     async def test_run_headless_async_mcp_stream_json(self, mock_get_mm):
         mock_mm = MagicMock()
         mock_mm.load_servers.return_value = [{"name": "my-mcp"}]
@@ -879,8 +879,8 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lines[0]["tools"], 1)
 
     async def test_run_headless_async_yolo_mode(self):
-        from core.domain.policies.permission_policy import ExecutionMode
-        from core.permission_manager import PermissionManager
+        from johnston_core.domain.policies.permission_policy import ExecutionMode
+        from johnston_core.permission_manager import PermissionManager
 
         agent = MockAgent(steps=[("content", "hello", "")])
         pm = MagicMock()
@@ -955,7 +955,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         data = json.loads(out_buf.getvalue())
         self.assertEqual(data.get("mode"), "edits")
 
-    @patch("core.infrastructure.storage.session_store.SessionStore.get_instance")
+    @patch("johnston_core.infrastructure.storage.session_store.SessionStore.get_instance")
     async def test_run_headless_async_resume_and_save(self, mock_get_store):
         mock_store = MagicMock()
         mock_session = MagicMock()
@@ -1069,7 +1069,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
 class TestCLIRunSyncWrapper(unittest.TestCase):
     """Unit tests for synchronous run_headless wrapper."""
 
-    @patch("core.interfaces.cli.commands.run_cmd.run_headless_async")
+    @patch("johnston_core.interfaces.cli.commands.run_cmd.run_headless_async")
     def test_run_headless_sync_success(self, mock_async):
         async def fake_run(*args, **kwargs):
             return 0
@@ -1079,7 +1079,7 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
         code = run_headless(args)
         self.assertEqual(code, 0)
 
-    @patch("core.interfaces.cli.commands.run_cmd.run_headless_async")
+    @patch("johnston_core.interfaces.cli.commands.run_cmd.run_headless_async")
     def test_run_headless_sync_keyboard_interrupt(self, mock_async):
         async def fake_interrupt(*args, **kwargs):
             raise KeyboardInterrupt()
@@ -1089,7 +1089,7 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
         code = run_headless(args)
         self.assertEqual(code, 130)
 
-    @patch("core.interfaces.cli.commands.run_cmd.run_headless_async")
+    @patch("johnston_core.interfaces.cli.commands.run_cmd.run_headless_async")
     def test_run_headless_sync_generic_exception(self, mock_async):
         async def fake_crash(*args, **kwargs):
             raise ValueError("Fatal crash")
@@ -1102,7 +1102,7 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("Fatal crash", err_buf.getvalue())
 
-    @patch("core.interfaces.cli.commands.run_cmd.run_headless_async")
+    @patch("johnston_core.interfaces.cli.commands.run_cmd.run_headless_async")
     def test_run_headless_sync_running_loop_fallback(self, mock_async):
         async def fake_run(*args, **kwargs):
             return 0
@@ -1116,7 +1116,7 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
             code = run_headless(args)
             self.assertEqual(code, 0)
 
-    @patch("core.interfaces.cli.commands.run_cmd.run_headless", return_value=0)
+    @patch("johnston_core.interfaces.cli.commands.run_cmd.run_headless", return_value=0)
     def test_entrypoint_main_run_dispatch(self, mock_run_headless):
         with self.assertRaises(SystemExit) as cm:
             main(["run", "hello", "--quiet"])
@@ -1160,9 +1160,9 @@ class TestCLIRunSyncWrapper(unittest.TestCase):
         footer_review = format_meta_footer("openai", "gpt-4o", 1.0, 100, 50, 150, mode="review")
         self.assertNotIn("review", footer_review)
 
-    @patch("core.interfaces.cli.commands.run_cmd.run_headless", return_value=0)
+    @patch("johnston_core.interfaces.cli.commands.run_cmd.run_headless", return_value=0)
     def test_main_run_with_yolo_and_mode_flags(self, mock_run):
-        from core.interfaces.cli.entrypoint import main
+        from johnston_core.interfaces.cli.entrypoint import main
 
         with self.assertRaises(SystemExit) as cm:
             main(["run", "hello", "-y"])

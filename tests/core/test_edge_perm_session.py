@@ -10,9 +10,9 @@ from unittest.mock import patch
 
 import pytest
 
-from core.domain.entities.session import AgentSession
-from core.infrastructure.storage.session_store import SessionStore
-from core.permission_manager import PermissionManager
+from johnston_core.domain.entities.session import AgentSession
+from johnston_core.infrastructure.storage.session_store import SessionStore
+from johnston_core.permission_manager import PermissionManager
 
 # ---------------------------------------------------------------------------
 # fixtures / helpers
@@ -29,7 +29,7 @@ class _PM:
             os.remove(config_path)
 
     def __enter__(self):
-        self.patcher = patch("core.permission_manager.CONFIG_FILE", self.cfg)
+        self.patcher = patch("johnston_core.permission_manager.CONFIG_FILE", self.cfg)
         self.patcher.start()
         return self.pm
 
@@ -51,7 +51,7 @@ def store(tmp_path):
     projects_dir.mkdir(exist_ok=True)
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
-    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
+    with patch("johnston_core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
         s = SessionStore(project_path=str(project))
         yield s
 

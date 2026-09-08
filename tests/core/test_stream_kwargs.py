@@ -7,7 +7,7 @@ auto-titling.
 
 from types import SimpleNamespace
 
-from core.infrastructure.adapters.base import build_stream_kwargs
+from johnston_core.infrastructure.adapters.base import build_stream_kwargs
 
 
 def _agent(**overrides):

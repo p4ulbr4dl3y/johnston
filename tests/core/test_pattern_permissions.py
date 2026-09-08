@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.domain.policies.permission_policy import (
+from johnston_core.domain.policies.permission_policy import (
     PermissionAction,
     evaluate_pattern_rules,
     evaluate_workspace_boundary,
@@ -16,7 +16,7 @@ from core.domain.policies.permission_policy import (
     match_pattern,
     suggest_pattern,
 )
-from core.permission_manager import PermissionManager
+from johnston_core.permission_manager import PermissionManager
 
 
 class TestPatternPolicyHelpers(unittest.TestCase):
@@ -143,7 +143,7 @@ class TestPatternPolicyHelpers(unittest.TestCase):
     def test_strip_command_wrappers(self):
         import shlex
 
-        from core.domain.policies.policy_shell import strip_command_wrappers
+        from johnston_core.domain.policies.policy_shell import strip_command_wrappers
 
         self.assertEqual(strip_command_wrappers("sudo rm -rf /tmp/x"), "rm -rf /tmp/x")
         self.assertEqual(strip_command_wrappers("env FOO=1 sudo git status"), "git status")
@@ -315,7 +315,7 @@ class TestPermissionManagerPatterns(unittest.TestCase):
                     f,
                 )
 
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 # Matching allow pattern
                 dec1 = self.pm.check_permission("shell", {"command": "git status"})
                 self.assertEqual(dec1.action, PermissionAction.ALLOW)
@@ -376,7 +376,7 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
                     {"permissions": {"patterns": {"read": [{"pattern": ".env*", "action": "deny"}]}}},
                     f,
                 )
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 pm.set_session_pattern_override("read", "/app/.env.local", "allow")
                 dec = pm.check_permission("read", {"path": "/app/.env.local"})
                 self.assertEqual(dec.action, PermissionAction.DENY)
@@ -398,7 +398,7 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
                     },
                     f,
                 )
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 for cmd in (
                     "rm -rf /tmp/x",
                     "sudo rm -rf /tmp/x",
@@ -443,7 +443,7 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
                     {"permissions": {"patterns": {"shell": [{"pattern": "pytest *", "action": "ask"}]}}},
                     f,
                 )
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 pm.set_session_pattern_override("shell", "pytest *", "allow")
                 dec = pm.check_permission("shell", {"command": "pytest -v"})
                 self.assertEqual(dec.action, PermissionAction.ALLOW)
@@ -459,7 +459,7 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
                     {"permissions": {"patterns": {"shell": [{"pattern": "rm -rf *", "action": "deny"}]}}},
                     f,
                 )
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 pm.set_session_override("shell", "allow")
                 dec = pm.check_permission("shell", {"command": "rm -rf /tmp/dangerous"})
                 self.assertEqual(dec.action, PermissionAction.DENY)
@@ -476,7 +476,7 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
                     {"permissions": {"tools": {"shell": "deny", "read": "deny"}}},
                     f,
                 )
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 pm.set_session_pattern_override("shell", "ls *", "allow")
                 dec = pm.check_permission("shell", {"command": "ls -la"})
                 self.assertEqual(dec.action, PermissionAction.DENY)
@@ -495,7 +495,7 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"shell": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 pm.set_session_override("shell", "allow")
                 dec = pm.check_permission("shell", {"command": "ls -la"})
                 self.assertEqual(dec.action, PermissionAction.ALLOW)
@@ -513,7 +513,7 @@ class TestConfigDenyBeatsSessionAllow(unittest.TestCase):
             cfg_file = os.path.join(tmpdir, "config.json")
             with open(cfg_file, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"tools": {"shell": "deny"}}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", cfg_file):
+            with patch("johnston_core.permission_manager.CONFIG_FILE", cfg_file):
                 pm.set_session_pattern_override("shell", "bash *", "allow")
                 dec = pm.check_permission("shell", {"command": "BASH_ENV=/tmp/evil.sh bash"})
                 self.assertEqual(dec.action, PermissionAction.DENY)

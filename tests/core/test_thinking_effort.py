@@ -4,7 +4,7 @@ import tempfile
 import unittest
 import unittest.mock
 
-from core.infrastructure.runtime.thinking_effort import (
+from johnston_core.infrastructure.runtime.thinking_effort import (
     build_gemini_thinking_config,
     build_openai_thinking_kwargs,
     normalize_thinking_effort,
@@ -30,7 +30,7 @@ class TestThinkingEffortResolver(unittest.TestCase):
         self.assertIsNone(build_gemini_thinking_config("gemini-1.5-pro", "high"))
 
     def test_thinking_effort_screen_marks_active_but_highlights_auto(self):
-        from widgets.presentation.screens.thinking_effort import ThinkingEffortScreen
+        from johnston_tui.presentation.screens.thinking_effort import ThinkingEffortScreen
 
         screen = ThinkingEffortScreen("medium")
 
@@ -41,7 +41,7 @@ class TestThinkingEffortResolver(unittest.TestCase):
 
 class TestThinkingEffortProviderManager(unittest.TestCase):
     def test_provider_model_effort_override_and_default(self):
-        import core.provider_manager as pm_mod
+        import johnston_core.provider_manager as pm_mod
 
         with tempfile.TemporaryDirectory() as tmp:
             config_path = os.path.join(tmp, "config.json")
@@ -78,7 +78,7 @@ class TestThinkingEffortProviderManager(unittest.TestCase):
 
 class TestThinkingEffortOpenAIRequest(unittest.IsolatedAsyncioTestCase):
     async def test_base_agent_sends_openai_reasoning_effort(self):
-        from core.base_provider import BaseAgent
+        from johnston_core.base_provider import BaseAgent
 
         agent = BaseAgent(
             api_key="test",
@@ -152,7 +152,7 @@ class _FakeHttpClient:
 
 class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
     async def test_anthropic_payload_effort(self):
-        from core.adapters import AnthropicAdapter
+        from johnston_core.adapters import AnthropicAdapter
 
         class Client(_FakeHttpClient):
             lines = [
@@ -160,7 +160,7 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
                 'data: {"type":"message_stop"}',
             ]
 
-        with unittest.mock.patch("core.adapters.anthropic.httpx.AsyncClient", Client):
+        with unittest.mock.patch("johnston_core.adapters.anthropic.httpx.AsyncClient", Client):
             async for _ in AnthropicAdapter().stream_chat(
                 "", "key", "claude-test", [{"role": "user", "content": "hi"}], thinking_effort="medium"
             ):
@@ -168,12 +168,12 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_FakeHttpClient.captured_payload["output_config"], {"effort": "medium"})
 
     async def test_gemini_payload_effort(self):
-        from core.adapters import GeminiAdapter
+        from johnston_core.adapters import GeminiAdapter
 
         class Client(_FakeHttpClient):
             lines = ['data: {"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1,"totalTokenCount":2}}']
 
-        with unittest.mock.patch("core.adapters.gemini.httpx.AsyncClient", Client):
+        with unittest.mock.patch("johnston_core.adapters.gemini.httpx.AsyncClient", Client):
             async for _ in GeminiAdapter().stream_chat(
                 "", "key", "gemini-2.5-flash", [{"role": "user", "content": "hi"}], thinking_effort="high"
             ):
@@ -186,7 +186,7 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
 
 class TestThinkingEffortCommand(unittest.IsolatedAsyncioTestCase):
     async def test_command_saves_effort_and_preserves_role(self):
-        from widgets.presentation.commands import ThinkingEffortCommand
+        from johnston_tui.presentation.commands import ThinkingEffortCommand
 
         class Agent:
             def __init__(self):

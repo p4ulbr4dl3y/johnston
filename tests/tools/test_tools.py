@@ -2,11 +2,11 @@ import os
 import tempfile
 import unittest
 
+from johnston_core.tools.create import CreateTool
+from johnston_core.tools.edit import EditTool
+from johnston_core.tools.read import ReadTool
+from johnston_core.tools.shell import ShellTool
 from tests.conftest import WindowsSafeTemporaryDirectory
-from tools.create import CreateTool
-from tools.edit import EditTool
-from tools.read import ReadTool
-from tools.shell import ShellTool
 
 
 class MockAgent:
@@ -32,7 +32,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.test_dir = self.temp_dir.name
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
-        from core.permission_manager import PermissionManager
+        from johnston_core.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         # Grant the tools that used to be 'allow' via the removed read/write groups.
@@ -131,7 +131,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         from unittest.mock import patch
 
-        with patch("tools.read.tool.convert_doc_to_markdown_sync", return_value="# Converted PDF Header\nPDF body text"):
+        with patch("johnston_core.tools.read.tool.convert_doc_to_markdown_sync", return_value="# Converted PDF Header\nPDF body text"):
             res_pdf = str(await tool.execute({"path": pdf_path}))
             self.assertIn("Converted PDF Header", res_pdf)
 
@@ -228,7 +228,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("error msg", res_err)
 
     async def test_tool_case_and_canonical(self):
-        from tools.registry import execute_tool
+        from johnston_core.tools.registry import execute_tool
 
         file_path = os.path.join(self.test_dir, "case_test.txt")
 
@@ -265,7 +265,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             self.assertIn("exceeds 10MB", res)
 
     async def test_format_line_pagination_string_args(self):
-        from tools.utils import format_line_pagination
+        from johnston_core.tools.utils import format_line_pagination
 
         lines = ["line 1", "line 2", "line 3", "line 4"]
         res = format_line_pagination(lines, start_line="2", end_line="3")
@@ -274,14 +274,14 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("line 1", res.content)
 
     async def test_format_line_pagination_max_800_cap(self):
-        from tools.utils import format_line_pagination
+        from johnston_core.tools.utils import format_line_pagination
 
         lines = [f"line {i}" for i in range(1, 1500)]
         res = format_line_pagination(lines, start_line=1, end_line=1200)
         self.assertIn("lines 1..800 of 1499", res.content)
 
     async def test_format_line_pagination_char_limit_line_boundary(self):
-        from tools.utils import format_line_pagination
+        from johnston_core.tools.utils import format_line_pagination
 
         long_line = "x" * 100
         lines = [long_line for _ in range(500)]
@@ -290,7 +290,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("truncated", res.content)
 
     async def test_ask_user_validation(self):
-        from tools.ask_user import AskUserTool
+        from johnston_core.tools.ask_user import AskUserTool
 
         tool = AskUserTool()
         # Invalid questions structure
@@ -298,7 +298,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ERR: params 'questions': missing or invalid", res)
 
     async def test_edit_context_disambiguation(self):
-        from tools.edit import EditTool
+        from johnston_core.tools.edit import EditTool
 
         file_path = os.path.join(self.test_dir, "range_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
@@ -322,7 +322,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lines, ["header\n", "val = 1\n", "middle\n", "val = 42\n", "footer\n"])
 
     async def test_edit_duplicate_error(self):
-        from tools.edit import EditTool
+        from johnston_core.tools.edit import EditTool
 
         file_path = os.path.join(self.test_dir, "range_err.py")
         with open(file_path, "w", encoding="utf-8") as f:
@@ -341,7 +341,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Include 2-4 lines of surrounding context", res)
 
     async def test_edit_tool_unique_target(self):
-        from tools.edit import EditTool
+        from johnston_core.tools.edit import EditTool
 
         file_path = os.path.join(self.test_dir, "unique_test.py")
         with open(file_path, "w", encoding="utf-8") as f:
@@ -361,7 +361,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
             self.assertIn("unique_target = 100", f.read())
 
     async def test_edit_tool_end_line_auto_expansion(self):
-        from tools.edit import EditTool
+        from johnston_core.tools.edit import EditTool
 
         file_path = os.path.join(self.test_dir, "auto_expand.py")
         with open(file_path, "w", encoding="utf-8") as f:
@@ -416,7 +416,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Line 801", res.content)
 
     async def test_read_tool_doc_caching(self):
-        from tools.read import convert_doc_to_markdown_sync
+        from johnston_core.tools.read import convert_doc_to_markdown_sync
 
         pdf_path = os.path.join(self.test_dir, "cached_doc.pdf")
         with open(pdf_path, "wb") as f:
@@ -424,8 +424,8 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
 
         from unittest.mock import patch
 
-        with patch("tools.read.doc.set_cached_doc_markdown") as mock_set:
-            with patch("core.infrastructure.converter.convert_file", return_value="# Cached Doc Header\nDoc text"):
+        with patch("johnston_core.tools.read.doc.set_cached_doc_markdown") as mock_set:
+            with patch("johnston_core.infrastructure.converter.convert_file", return_value="# Cached Doc Header\nDoc text"):
                 res1 = convert_doc_to_markdown_sync(pdf_path)
                 self.assertIn("Cached Doc Header", res1)
                 self.assertTrue(mock_set.called)

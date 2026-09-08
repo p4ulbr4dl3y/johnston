@@ -9,12 +9,12 @@ from unittest.mock import MagicMock, patch
 
 from textual import events
 
-from core.application.session.actions import RewindEntry
-from widgets.presentation.screens.mcp import MCPScreen
-from widgets.presentation.screens.resume import ResumeScreen
-from widgets.presentation.screens.rewind import RewindScreen
-from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen
-from widgets.utils.row_format import display_width
+from johnston_core.application.session.actions import RewindEntry
+from johnston_tui.presentation.screens.mcp import MCPScreen
+from johnston_tui.presentation.screens.resume import ResumeScreen
+from johnston_tui.presentation.screens.rewind import RewindScreen
+from johnston_tui.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen
+from johnston_tui.utils.row_format import display_width
 
 
 class TestResumeScreenAdaptivity(unittest.TestCase):
@@ -98,7 +98,7 @@ class TestRewindScreenAdaptivity(unittest.TestCase):
         screen._refresh_options.assert_called_once()
 
         # RewindActionScreen formats options with badge row
-        from widgets.presentation.screens.rewind_action import RewindActionScreen
+        from johnston_tui.presentation.screens.rewind_action import RewindActionScreen
 
         action_screen = RewindActionScreen(self.messages[0])
         action_screen._apply_dialog_fit = MagicMock()
@@ -135,7 +135,7 @@ class TestTasksScreenAdaptivity(unittest.TestCase):
 
 
 class TestMCPScreenAdaptivity(unittest.TestCase):
-    @patch("widgets.presentation.screens.mcp.get_mcp_manager")
+    @patch("johnston_tui.presentation.screens.mcp.get_mcp_manager")
     def test_on_resize_renders_from_cache_when_mounted(self, mock_get_mm):
         screen = MCPScreen()
         screen._render_from_cache = MagicMock()

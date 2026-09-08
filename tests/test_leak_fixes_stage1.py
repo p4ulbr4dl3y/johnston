@@ -4,20 +4,20 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from core.application.session.stream_runner import run_subagent_stream_bg
-from core.domain.entities.session import AgentSession, SessionStatus
-from core.domain.entities.theme import Theme
-from core.infrastructure.tasks.manager import TaskManager
-from core.infrastructure.tasks.shell_task import ShellTask
-from core.infrastructure.tasks.task import BaseTask, TaskStatus
-from core.theme_manager import ThemeManager
-from tools.context import ToolContext
-from tools.kill import KillTool
-from widgets.chat_toolcall import ToolCallWidget
-from widgets.mixins.message_flow_background import on_background_shell_completed, update_background_shell_widget
-from widgets.mixins.resize_debounce import ResizeDebounceMixin
-from widgets.presentation.screens.subagent_screen import SessionChatScreen
-from widgets.presentation.screens.tasks import ShellTasksScreen
+from johnston_core.application.session.stream_runner import run_subagent_stream_bg
+from johnston_core.domain.entities.session import AgentSession, SessionStatus
+from johnston_core.domain.entities.theme import Theme
+from johnston_core.infrastructure.tasks.manager import TaskManager
+from johnston_core.infrastructure.tasks.shell_task import ShellTask
+from johnston_core.infrastructure.tasks.task import BaseTask, TaskStatus
+from johnston_core.theme_manager import ThemeManager
+from johnston_core.tools.context import ToolContext
+from johnston_core.tools.kill import KillTool
+from johnston_tui.chat_toolcall import ToolCallWidget
+from johnston_tui.mixins.message_flow_background import on_background_shell_completed, update_background_shell_widget
+from johnston_tui.mixins.resize_debounce import ResizeDebounceMixin
+from johnston_tui.presentation.screens.subagent_screen import SessionChatScreen
+from johnston_tui.presentation.screens.tasks import ShellTasksScreen
 
 
 class DummyTask(BaseTask):

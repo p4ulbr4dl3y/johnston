@@ -1,10 +1,10 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from core.domain.entities.session import AgentSession
-from widgets.app.role_service import toggle_agent_role
-from widgets.app.session_state import collect_session_data
-from widgets.mixins.session_persistence import SessionPersistenceMixin
+from johnston_core.domain.entities.session import AgentSession
+from johnston_tui.app.role_service import toggle_agent_role
+from johnston_tui.app.session_state import collect_session_data
+from johnston_tui.mixins.session_persistence import SessionPersistenceMixin
 
 
 class DummyApp(SessionPersistenceMixin):
@@ -64,7 +64,7 @@ class TestSessionRolePersistence(unittest.TestCase):
         app.sm.get.return_value = session
         app.save_current_session = MagicMock()
 
-        with patch("widgets.app.role_service.RoleRegistry.get_instance") as mock_reg_inst:
+        with patch("johnston_tui.app.role_service.RoleRegistry.get_instance") as mock_reg_inst:
             reg = MagicMock()
             reg.list_roles.return_value = {"worker": MagicMock(), "explorer": MagicMock()}
             mock_reg_inst.return_value = reg
@@ -79,7 +79,7 @@ class TestSessionRolePersistence(unittest.TestCase):
 
     def test_toggle_agent_role_empty_registry_returns_false(self):
         app = DummyApp()
-        with patch("widgets.app.role_service.RoleRegistry.get_instance") as mock_reg_inst:
+        with patch("johnston_tui.app.role_service.RoleRegistry.get_instance") as mock_reg_inst:
             reg = MagicMock()
             reg.list_roles.return_value = {}
             mock_reg_inst.return_value = reg

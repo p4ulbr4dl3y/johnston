@@ -2,9 +2,9 @@ from unittest.mock import ANY, AsyncMock, MagicMock
 
 import pytest
 
-from core.domain.defaults.errors import ToolResult, ToolResultStatus
-from tools.context import ToolContext
-from tools.message_subagent import MessageSubagentTool
+from johnston_core.domain.defaults.errors import ToolResult, ToolResultStatus
+from johnston_core.tools.context import ToolContext
+from johnston_core.tools.message_subagent import MessageSubagentTool
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ async def test_message_subagent_missing_message(msg_tool):
 async def test_message_subagent_not_found(msg_tool, monkeypatch):
     store = MagicMock()
     store.find_session_by_title_or_id.return_value = None
-    monkeypatch.setattr("core.infrastructure.storage.session_store.get_session_store", lambda host: store)
+    monkeypatch.setattr("johnston_core.infrastructure.storage.session_store.get_session_store", lambda host: store)
 
     ctx = ToolContext(app=MagicMock())
 
@@ -48,10 +48,10 @@ async def test_message_subagent_success(msg_tool, monkeypatch):
 
     store = MagicMock()
     store.find_session_by_title_or_id.return_value = session
-    monkeypatch.setattr("core.infrastructure.storage.session_store.get_session_store", lambda host: store)
+    monkeypatch.setattr("johnston_core.infrastructure.storage.session_store.get_session_store", lambda host: store)
 
     send_mock = AsyncMock(return_value=ToolResult.done(content="[resumed sub-123]"))
-    monkeypatch.setattr("core.application.session.subagent_service.SubagentService.send_message", send_mock)
+    monkeypatch.setattr("johnston_core.application.session.subagent_service.SubagentService.send_message", send_mock)
 
     ctx = ToolContext(app=MagicMock())
 
@@ -71,8 +71,8 @@ async def test_message_subagent_rejects_legacy_session_id_alias(msg_tool, monkey
 
 @pytest.mark.asyncio
 async def test_send_subagent_followup_cancelled_session_rejected():
-    from core.application.session.stream_followup import send_subagent_followup
-    from core.domain.entities.session import AgentSession, SessionStatus
+    from johnston_core.application.session.stream_followup import send_subagent_followup
+    from johnston_core.domain.entities.session import AgentSession, SessionStatus
 
     session = AgentSession(session_id="sub-cancelled", kind="subagent", status=SessionStatus.CANCELLED)
     res = await send_subagent_followup(session, "try again", ctx=MagicMock(), store=MagicMock())
@@ -82,8 +82,8 @@ async def test_send_subagent_followup_cancelled_session_rejected():
 
 @pytest.mark.asyncio
 async def test_send_subagent_followup_returns_running_status():
-    from core.application.session.stream_followup import send_subagent_followup
-    from core.domain.entities.session import AgentSession, SessionStatus
+    from johnston_core.application.session.stream_followup import send_subagent_followup
+    from johnston_core.domain.entities.session import AgentSession, SessionStatus
 
     session = AgentSession(session_id="sub-active", kind="subagent", status=SessionStatus.COMPLETED)
     agent = MagicMock()
@@ -121,10 +121,10 @@ async def test_message_subagent_non_string_args_coerced(msg_tool, monkeypatch):
 
     store = MagicMock()
     store.find_session_by_title_or_id.return_value = session
-    monkeypatch.setattr("core.infrastructure.storage.session_store.get_session_store", lambda host: store)
+    monkeypatch.setattr("johnston_core.infrastructure.storage.session_store.get_session_store", lambda host: store)
 
     send_mock = AsyncMock(return_value=ToolResult.done(content="[resumed 123]"))
-    monkeypatch.setattr("core.application.session.subagent_service.SubagentService.send_message", send_mock)
+    monkeypatch.setattr("johnston_core.application.session.subagent_service.SubagentService.send_message", send_mock)
 
     ctx = ToolContext(app=MagicMock())
     res = await msg_tool.execute({"id": 123, "message": 456}, ctx=ctx)

@@ -2,7 +2,7 @@
 
 import tempfile
 
-from core.infrastructure.platform.command_sanitizer import (
+from johnston_core.infrastructure.platform.command_sanitizer import (
     _ENV_VAR_RE,
     _PREFIX_WRAPPERS,
     _REDUNDANT_CD_PATTERN,
@@ -130,7 +130,7 @@ def test_clean_command_wrappers_quotes_with_operators():
 
 
 def test_strip_wrapper_tokens():
-    from core.infrastructure.platform.command_sanitizer import strip_wrapper_tokens
+    from johnston_core.infrastructure.platform.command_sanitizer import strip_wrapper_tokens
 
     assert strip_wrapper_tokens(["sudo", "git", "commit"]) == ["git", "commit"]
     assert strip_wrapper_tokens(["env", "A=1", "nice", "-n", "5", "ls"]) == ["ls"]

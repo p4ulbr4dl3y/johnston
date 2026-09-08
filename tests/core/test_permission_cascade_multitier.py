@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from core.domain.policies.permission_policy import ExecutionMode, PermissionAction
-from core.permission_manager import PermissionManager
+from johnston_core.domain.policies.permission_policy import ExecutionMode, PermissionAction
+from johnston_core.permission_manager import PermissionManager
 
 
 class TestPermissionCascadeMultitier(unittest.TestCase):
@@ -24,7 +24,7 @@ class TestPermissionCascadeMultitier(unittest.TestCase):
         self.outside_dir = "/opt/outside"
         self.outside_file = os.path.join(self.outside_dir, "outside.py")
 
-        self.patcher = patch("core.permission_manager.CONFIG_FILE", self.global_config_file)
+        self.patcher = patch("johnston_core.permission_manager.CONFIG_FILE", self.global_config_file)
         self.patcher.start()
 
         self.pm = PermissionManager()
@@ -244,7 +244,7 @@ class TestPermissionCascadeMultitier(unittest.TestCase):
         self._write_json(local_config, {"permissions": {"tools": {"shell": "allow"}}})
 
         # Mock is_git_repository to return False
-        with patch("core.permission_manager.is_git_repository", return_value=False):
+        with patch("johnston_core.permission_manager.is_git_repository", return_value=False):
             self.pm.get_effective_permissions(non_git_dir)
             gitignore_path = os.path.join(non_git_dir, ".gitignore")
             self.assertFalse(os.path.exists(gitignore_path))
@@ -309,7 +309,7 @@ class TestPermissionCascadeMultitier(unittest.TestCase):
         """Regression: effective-permissions cache keyed only by (mtime, size)
         would keep a stale ALLOW after an equal-size same-mtime config rewrite
         to DENY."""
-        from core.infrastructure.platform.platform_utils import invalidate_json_read_cache
+        from johnston_core.infrastructure.platform.platform_utils import invalidate_json_read_cache
 
         project_config = os.path.join(self.project_dir, ".johnston", "config.json")
         self._write_json(project_config, {"permissions": {"tools": {"edit": "allow"}}})

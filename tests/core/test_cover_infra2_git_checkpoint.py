@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from unittest.mock import patch
 
-from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+from johnston_core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
 
 def _cp(rc, out="", err=""):
@@ -32,7 +32,7 @@ class TestCoverShadowExclude:
         assert content.index("\n") == len("existingpattern")
 
     def test_ensure_shadow_exclude_swallows_error(self):
-        with patch("core.infrastructure.storage.git_checkpoint.os.makedirs", side_effect=OSError("boom")):
+        with patch("johnston_core.infrastructure.storage.git_checkpoint.os.makedirs", side_effect=OSError("boom")):
             GitCheckpointManager._ensure_shadow_exclude(self.tmp)  # must not raise
 
 
@@ -40,7 +40,7 @@ class TestCoverShadowIndexEnv:
     def test_shadow_index_env_remove_error_swallowed(self):
         tmp = tempfile.mkdtemp()
         try:
-            with patch("core.infrastructure.storage.git_checkpoint.os.remove", side_effect=OSError("boom")):
+            with patch("johnston_core.infrastructure.storage.git_checkpoint.os.remove", side_effect=OSError("boom")):
                 with GitCheckpointManager._shadow_index_env(tmp, tmp) as env:
                     with open(env["GIT_INDEX_FILE"], "w", encoding="utf-8") as f:
                         f.write("x")
@@ -69,7 +69,7 @@ class TestCoverEnsureGitRepo:
                 return _cp(0, "x")
 
             with patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=(tmp, tmp)):
-                with patch("core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake):
+                with patch("johnston_core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake):
                     assert GitCheckpointManager.ensure_git_repo(tmp) is False
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -89,7 +89,7 @@ class TestCoverEnsureGitRepo:
 
             with patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=(tmp, tmp)):
                 with patch.object(GitCheckpointManager, "_ensure_shadow_exclude"):
-                    with patch("core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake):
+                    with patch("johnston_core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake):
                         assert GitCheckpointManager.ensure_git_repo(tmp) is False
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
@@ -117,7 +117,7 @@ class TestCoverCreateCheckpoint:
             patch.object(GitCheckpointManager, "is_valid_checkpoint_target", return_value=True),
             patch.object(GitCheckpointManager, "ensure_git_repo", return_value=True),
             patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")),
-            patch("core.infrastructure.storage.git_checkpoint.run_git", return_value=_cp(1)),
+            patch("johnston_core.infrastructure.storage.git_checkpoint.run_git", return_value=_cp(1)),
         ):
             assert GitCheckpointManager.create_checkpoint("s", 0, project_path="/w") is None
 
@@ -140,7 +140,7 @@ class TestCoverCreateCheckpoint:
             patch.object(GitCheckpointManager, "is_valid_checkpoint_target", return_value=True),
             patch.object(GitCheckpointManager, "ensure_git_repo", return_value=True),
             patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")),
-            patch("core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake),
+            patch("johnston_core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake),
         ):
             return GitCheckpointManager.create_checkpoint("s", 0, project_path="/w")
 
@@ -181,7 +181,7 @@ class TestCoverRestoreCheckpoint:
         with (
             patch.object(GitCheckpointManager, "is_git_repo", return_value=True),
             patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")),
-            patch("core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake),
+            patch("johnston_core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake),
         ):
             return GitCheckpointManager.restore_checkpoint("s", 0, project_path="/w")
 
@@ -210,7 +210,7 @@ class TestCoverPurge:
         with (
             patch.object(GitCheckpointManager, "is_git_repo", return_value=True),
             patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")),
-            patch("core.infrastructure.storage.git_checkpoint.run_git", return_value=_cp(1)),
+            patch("johnston_core.infrastructure.storage.git_checkpoint.run_git", return_value=_cp(1)),
         ):
             GitCheckpointManager.purge_checkpoints_after("s", 0, project_path="/w")
 
@@ -219,7 +219,7 @@ class TestCoverPurge:
             patch.object(GitCheckpointManager, "is_git_repo", return_value=True),
             patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")),
             patch(
-                "core.infrastructure.storage.git_checkpoint.run_git",
+                "johnston_core.infrastructure.storage.git_checkpoint.run_git",
                 return_value=_cp(0, "refs/johnston/checkpoints/s/notanumber\n"),
             ),
         ):
@@ -230,7 +230,7 @@ class TestCoverPurge:
             patch.object(GitCheckpointManager, "is_git_repo", return_value=True),
             patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")),
             patch(
-                "core.infrastructure.storage.git_checkpoint.run_git",
+                "johnston_core.infrastructure.storage.git_checkpoint.run_git",
                 return_value=_cp(0, "refs/johnston/checkpoints/s/1\n\n"),
             ),
         ):
@@ -267,7 +267,7 @@ class TestCoverGetDiffStats:
             patch.object(GitCheckpointManager, "is_git_repo", return_value=True),
             patch.object(GitCheckpointManager, "_ensure_shadow_exclude"),
             patch.object(GitCheckpointManager, "_get_shadow_dir", return_value=("/s", "/w")),
-            patch("core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake),
+            patch("johnston_core.infrastructure.storage.git_checkpoint.run_git", side_effect=fake),
         ):
             return GitCheckpointManager.get_diff_details_batch("s", [0], project_path="/w")
 

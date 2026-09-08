@@ -3,15 +3,15 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.domain.defaults.errors import ToolResult
-from core.domain.entities.session import AgentSession
-from widgets.mixins.message_flow_auto_title import schedule_auto_title
-from widgets.mixins.message_flow_queue import (
+from johnston_core.domain.defaults.errors import ToolResult
+from johnston_core.domain.entities.session import AgentSession
+from johnston_tui.mixins.message_flow_auto_title import schedule_auto_title
+from johnston_tui.mixins.message_flow_queue import (
     pop_queued_for_current_session,
     process_queued_message,
     queue_message_ui,
 )
-from widgets.mixins.message_flow_shell import exec_shell_command
+from johnston_tui.mixins.message_flow_shell import exec_shell_command
 
 
 class TestMessageFlowQueueModule(unittest.IsolatedAsyncioTestCase):
@@ -94,7 +94,7 @@ class TestMessageFlowShellModule(unittest.IsolatedAsyncioTestCase):
         )
 
         res = ToolResult.done(content="hello output", display="hello output", returncode=0)
-        with patch("tools.shell.ShellTool.execute", new_callable=AsyncMock, return_value=res):
+        with patch("johnston_core.tools.shell.ShellTool.execute", new_callable=AsyncMock, return_value=res):
             await exec_shell_command(app, "echo hello", user_text="!echo hello")
 
         chat_input.focus.assert_called_once()
@@ -120,7 +120,7 @@ class TestMessageFlowShellModule(unittest.IsolatedAsyncioTestCase):
             is_app_active=False,
         )
 
-        with patch("tools.shell.ShellTool.execute", new_callable=AsyncMock, side_effect=RuntimeError("exec error")):
+        with patch("johnston_core.tools.shell.ShellTool.execute", new_callable=AsyncMock, side_effect=RuntimeError("exec error")):
             await exec_shell_command(app, "broken")
 
         tool_widget.set_result.assert_called_once()
@@ -131,14 +131,14 @@ class TestMessageFlowAutoTitleModule(unittest.IsolatedAsyncioTestCase):
     async def test_schedule_auto_title_inactivity_guards(self):
         app = SimpleNamespace(is_app_active=False)
         session = MagicMock(auto_titled=False)
-        with patch("core.application.session.auto_title.auto_title_session") as mock_fn:
+        with patch("johnston_core.application.session.auto_title.auto_title_session") as mock_fn:
             schedule_auto_title(app, session)
             await asyncio.sleep(0.01)
             mock_fn.assert_not_called()
 
         app.is_app_active = True
         session.auto_titled = True
-        with patch("core.application.session.auto_title.auto_title_session") as mock_fn:
+        with patch("johnston_core.application.session.auto_title.auto_title_session") as mock_fn:
             schedule_auto_title(app, session)
             await asyncio.sleep(0.01)
             mock_fn.assert_not_called()

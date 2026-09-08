@@ -2,8 +2,8 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from core.domain.defaults.errors import ToolResultStatus
-from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
+from johnston_core.domain.defaults.errors import ToolResultStatus
+from johnston_tui.presentation.widgets.chat_stream_driver import ChatStreamDriver
 
 
 class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
@@ -499,7 +499,7 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         done_last.append_shell_output.assert_not_called()
 
     def test_find_shell_output_target_child_fallback(self):
-        from widgets.chat_toolcall import ToolCallWidget
+        from johnston_tui.chat_toolcall import ToolCallWidget
 
         child = ToolCallWidget("shell", "tail -f log")
         child.status = "running"
@@ -516,7 +516,7 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.driver.tool_handles), 0)
 
     async def test_session_event_tool_result_child_fallback_by_id(self):
-        from widgets.chat_toolcall import ToolCallWidget
+        from johnston_tui.chat_toolcall import ToolCallWidget
 
         child = ToolCallWidget("shell", "run")
         child.status = "running"

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 from textual.app import App
 from textual.widgets import Static
 
-from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+from johnston_tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
 
 class HostApp(App[None]):

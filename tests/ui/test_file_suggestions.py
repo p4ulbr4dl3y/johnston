@@ -1,8 +1,8 @@
 import asyncio
 import unittest
 
-from widgets.chat_input import ChatInput
-from widgets.command_suggestions import CommandSuggestions
+from johnston_tui.chat_input import ChatInput
+from johnston_tui.command_suggestions import CommandSuggestions
 
 
 def _run_async(coro):

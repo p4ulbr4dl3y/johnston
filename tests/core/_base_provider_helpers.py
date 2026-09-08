@@ -6,7 +6,7 @@ not collected as tests (no ``test_``/``_test`` suffix).
 import asyncio
 import unittest.mock
 
-from core.base_provider import BaseAgent
+from johnston_core.base_provider import BaseAgent
 
 
 def make_agent(**kwargs):

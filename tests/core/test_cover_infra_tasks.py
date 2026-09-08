@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-import core.infrastructure.tasks.output as _out
-from core.infrastructure.tasks.output import OutputBuffer, process_carriage_returns
-from core.infrastructure.tasks.shell_task import ShellTask
+import johnston_core.infrastructure.tasks.output as _out
+from johnston_core.infrastructure.tasks.output import OutputBuffer, process_carriage_returns
+from johnston_core.infrastructure.tasks.shell_task import ShellTask
 
 # ---------------------------------------------------------------------------
 # output.py
@@ -109,7 +109,7 @@ def test_shell_task_repr_and_open_log_failure(monkeypatch):
         opened = False
         path = ""
 
-    monkeypatch.setattr("core.infrastructure.tasks.shell_task.OutputLog.create", lambda _tid: Closed())
+    monkeypatch.setattr("johnston_core.infrastructure.tasks.shell_task.OutputLog.create", lambda _tid: Closed())
     assert task.open_log() is None
     assert task._log is None
 
@@ -215,7 +215,7 @@ async def test_kill_sync_killpg_raises(monkeypatch):
     def _boom(pgid, sig):
         raise OSError("killpg fail")
 
-    monkeypatch.setattr("core.infrastructure.tasks.shell_task.os.killpg", _boom)
+    monkeypatch.setattr("johnston_core.infrastructure.tasks.shell_task.os.killpg", _boom)
     task.kill_sync()
     assert task._status.value == "killed"
 

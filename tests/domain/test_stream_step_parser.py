@@ -1,7 +1,7 @@
 """Unit tests for the shared stream-step parser (parse_stream_step)."""
 import unittest
 
-from core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
+from johnston_core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
 
 
 class TestParseStreamStep(unittest.TestCase):

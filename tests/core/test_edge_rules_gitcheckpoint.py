@@ -5,9 +5,9 @@ import tempfile
 import unittest
 from unittest import mock
 
-from core.application.rules.rules import RulesManager
-from core.infrastructure.runtime.git_utils import run_git
-from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+from johnston_core.application.rules.rules import RulesManager
+from johnston_core.infrastructure.runtime.git_utils import run_git
+from johnston_core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
 
 def _write_rule(project_dir, fname, content):
@@ -57,7 +57,7 @@ class TestRulesManagerEdge(unittest.TestCase):
         self.assertEqual(rules[0].content, "# \nActual body text")
 
     def test_load_rules_include_global_false(self):
-        with mock.patch("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", self.tmpdir):
+        with mock.patch("johnston_core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", self.tmpdir):
             # global rule
             global_rules = os.path.join(self.tmpdir, "rules")
             os.makedirs(global_rules, exist_ok=True)

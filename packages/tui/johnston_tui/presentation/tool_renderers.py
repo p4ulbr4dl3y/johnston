@@ -1,0 +1,254 @@
+"""Specialized tool rendering and formatting helpers for tool calls."""
+from __future__ import annotations
+
+import os
+import re
+from typing import Any, Callable
+
+from rich.text import Text
+
+from johnston_tui.presentation.widgets.chat_diff import format_edit_diff
+
+
+def clean_truncation_marker(match: re.Match) -> str:
+    """Format a regex match of a truncation tag into a clean UI string."""
+    prefix = match.group(1) or ""
+    tag_name = match.group(2) or "Truncated"
+    inner = match.group(3)
+    if "|" in inner:
+        parts = [p.strip() for p in inner.split("|") if p.strip()]
+        ui_parts = []
+        for p in parts:
+            if re.match(r"^(?:Next:?|next)\s*", p, re.IGNORECASE):
+                continue
+            if re.match(r"^Use\s+.*to inspect", p, re.IGNORECASE):
+                continue
+            ui_parts.append(p)
+        if ui_parts:
+            if tag_name.lower() == "truncated":
+                return f"{prefix}[truncated | {' | '.join(ui_parts)}]"
+            return f"{prefix}[{tag_name}: {' | '.join(ui_parts)}]"
+    showing_match = re.search(
+        r"showing\s+(?:first|last|recent)\s+[^\s.(),|]+(?:\s+chars|\s+output)?",
+        inner,
+        re.IGNORECASE,
+    )
+    log_match = re.search(r"(?:Full\s+)?log:\s*([^\s\]|]+)", inner, re.IGNORECASE)
+
+    if showing_match or log_match:
+        showing = showing_match.group(0).strip() if showing_match else "showing truncated output"
+        if log_match:
+            log_path = log_match.group(1).rstrip(".]")
+            return f"{prefix}[Output truncated: {showing} | Log: {log_path}]"
+        return f"{prefix}[Output truncated: {showing}]"
+
+    return match.group(0)
+
+
+def format_truncation_for_ui(text: str, *, strip_edges: bool = True) -> str:
+    """Format truncation banners for UI display.
+
+    ``strip_edges=False`` skips the leading/trailing whitespace trim so callers
+    can clean a single flushed chunk without eating whitespace that the full
+    buffer keeps (streaming flush only trims the actual buffer edges).
+    """
+    if not text:
+        return ""
+    cleaned = re.sub(
+        r"(\.\.\.\s*)?\[(Output\s+truncated|Truncated):?\s*([^\]]*)\]",
+        clean_truncation_marker,
+        text,
+        flags=re.IGNORECASE,
+    )
+    return cleaned.strip() if strip_edges else cleaned
+
+
+def build_synthetic_create_diff(file_path: str, content: str) -> str:
+    """Build a synthetic ``--- a/… / +++ b/… / @@ -1,N +1,N @@`` diff for create/write tools."""
+    from johnston_tui.presentation.tool_display import shorten_path
+
+    disp_path = shorten_path(file_path).lstrip("/") if file_path else "file"
+    new_lines = content.splitlines() if content else []
+    cnt = len(new_lines) or 1
+    d_lines = [
+        f"--- a/{disp_path}",
+        f"+++ b/{disp_path}",
+        f"@@ -1,{cnt} +1,{cnt} @@",
+    ] + [f"+{line_str}" for line_str in new_lines]
+    return "\n".join(d_lines)
+
+
+def format_plan_display(plan_items: Any, explanation: str = "") -> Text:
+    """Format an update_plan checklist into a unified rich Text renderable."""
+    t = Text()
+    if explanation:
+        t.append(f"{explanation}\n\n", style="italic dim")
+
+    if isinstance(plan_items, list):
+        plan_lines = []
+        for item in plan_items:
+            if not isinstance(item, dict):
+                continue
+            step = str(item.get("step") or "").strip()
+            status = str(item.get("status") or "pending").lower()
+
+            if status == "completed":
+                line = Text("[✓] ", style="dim") + Text(step, style="strike dim")
+            elif status == "in_progress":
+                line = Text("[▶] ", style="bold") + Text(step, style="bold")
+            else:
+                line = Text("[ ] ") + Text(step)
+            plan_lines.append(line)
+
+        for i, pl in enumerate(plan_lines):
+            t.append(pl)
+            if i < len(plan_lines) - 1:
+                t.append("\n")
+    elif isinstance(plan_items, str) and plan_items.strip():
+        t.append(plan_items.strip())
+
+    return t
+
+
+def format_ask_user_display(questions: list[dict], answers: dict[int, dict] | dict[int, str] | None = None) -> Text:
+    """Format ask_user questions and answers into a unified rich Text renderable."""
+    answers = answers or {}
+    t = Text()
+    num_questions = len(questions)
+    for i, q in enumerate(questions):
+        if i > 0:
+            t.append("\n\n")
+        q_text = str(q.get("question") or "").strip()
+        prefix = f"{i + 1}. " if num_questions > 1 else ""
+        t.append(f"{prefix}{q_text}\n", style="bold")
+        ans_info = answers.get(i, {})
+        ans = ans_info.get("answer", "") if isinstance(ans_info, dict) else str(ans_info or "")
+        if ans:
+            t.append(ans)
+        else:
+            t.append("(No response)", style="italic dim")
+    return t
+
+
+
+
+def format_code_with_line_numbers(code: str) -> str:
+    """Format code with fallback line numbers."""
+    lines = code.splitlines()
+    if not lines:
+        return "[dim]1 │ [/dim]"
+    max_digits = max(len(str(len(lines))), 2)
+    formatted = []
+    for i, line in enumerate(lines, 1):
+        num_str = str(i).rjust(max_digits)
+        escaped_line = line.replace("[", "\\[")
+        formatted.append(f"[dim]{num_str} │ [/dim]{escaped_line}")
+    return "\n".join(formatted)
+
+
+def compute_tool_call_content(
+    *,
+    tool_type: str,
+    canonical_tool: str,
+    args: dict,
+    target: str,
+    result_text: str,
+    is_error: bool,
+    guess_lexer: Callable[[str], str],
+    clean_markup: Callable[[str], str],
+    clean_hints: Callable[[str], str],
+    clean_bash_output: Callable[[str], str],
+    format_json_result_fn: Callable[[str], str | None],
+    log_path: str | None = None,
+) -> tuple[str, Any]:
+    """Compute (kind, value) representation for expanded tool-call content."""
+    try:
+        file_path = args.get("path") or target
+        if tool_type == "create":
+            raw_text = (result_text or "").strip()
+            if is_error:
+                return "markup", clean_markup(raw_text or "(Error)")
+            if raw_text and (
+                "@@" in raw_text
+                or "--- a/" in raw_text
+                or "+++ b/" in raw_text
+            ):
+                diff_text = raw_text
+            else:
+                content = args.get("content")
+                if content is None:
+                    from johnston_tui.utils.file_reader import read_file_content
+
+                    content = read_file_content(file_path)
+                if content is None and raw_text and not raw_text.startswith(("Success:", "OK:", "created", "updated")):
+                    content = raw_text
+                diff_text = build_synthetic_create_diff(file_path, content or "")
+            if diff_text:
+                return "raw", format_edit_diff(clean_hints(diff_text), file_path)
+            return "markup", clean_markup(result_text or "(No content)")
+        elif tool_type == "edit":
+            raw_text = (result_text or "").strip()
+            if is_error:
+                return "markup", clean_markup(raw_text or "(Error)")
+            diff_text = raw_text
+            if not diff_text or "@@" not in diff_text:
+                from johnston_tui.lexer_utils import build_edit_diff_text
+
+                diff_text = build_edit_diff_text(args, file_path or "file")
+
+            if diff_text:
+                return "raw", format_edit_diff(clean_hints(diff_text), file_path)
+            return "markup", clean_markup(result_text or "(No diff)")
+        elif tool_type == "update_plan":
+            raw_text = (result_text or "").strip()
+            if is_error:
+                return "markup", clean_markup(raw_text or "(Error)")
+            plan_items = args.get("plan") or []
+            explanation = args.get("explanation", "")
+            return "raw", format_plan_display(plan_items, explanation)
+        elif canonical_tool == "ask_user":
+            raw_text = clean_hints(result_text or "(No response)")
+            t = Text()
+            blocks = raw_text.split("\n\n")
+            for i, block in enumerate(blocks):
+                if i > 0:
+                    t.append("\n\n")
+                lines = block.split("\n", 1)
+                if len(lines) == 2:
+                    q_line, ans_line = lines
+                    t.append(f"{q_line.strip()}\n", style="bold")
+                    t.append(ans_line.strip(), style="dim" if ans_line.strip() == "(No response)" else "")
+                else:
+                    t.append(block)
+            return "raw", t
+        elif canonical_tool in ("kill", "message_subagent"):
+            clean_res = clean_hints(result_text or "(No result)")
+            return "markup", clean_markup(clean_res)
+        elif canonical_tool == "invoke_subagent":
+            clean_res = clean_hints(result_text or "")
+            if not clean_res.strip():
+                prompt = args.get("prompt", "")
+                clean_res = prompt or "(Subagent task)"
+            return "markup", clean_markup(clean_res)
+        elif tool_type == "shell":
+            output_text = clean_bash_output(result_text)
+            if log_path and os.path.isfile(log_path):
+                try:
+                    from johnston_tui.utils.file_reader import read_file_content
+
+                    log_content = read_file_content(log_path)
+                    if log_content and log_content.strip():
+                        output_text = log_content.rstrip("\r\n")
+                except Exception:
+                    pass
+            if not output_text.strip():
+                output_text = "(No output)"
+            return "markup", clean_markup(output_text)
+        else:
+            clean_res = clean_hints(result_text or "(No result)")
+            json_res = format_json_result_fn(clean_res)
+            if json_res:
+                return "markup", clean_markup(json_res)
+            return "markup", clean_markup(clean_res)
+    except Exception:
+        return "markup", clean_markup(result_text or "")

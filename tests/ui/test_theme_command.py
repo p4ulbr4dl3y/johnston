@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from widgets.presentation.commands import ThemeCommand
-from widgets.presentation.screens.theme import ThemeScreen
+from johnston_tui.presentation.commands import ThemeCommand
+from johnston_tui.presentation.screens.theme import ThemeScreen
 
 
 @pytest.mark.asyncio

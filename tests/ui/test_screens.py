@@ -4,14 +4,14 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 from textual.events import Key
 
-from core.application.session.actions import RewindEntry
-from core.application.skills.manager import Skill, SkillScope
-from widgets.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
-from widgets.presentation.screens.help import HelpScreen
-from widgets.presentation.screens.providers import ProvidersScreen
-from widgets.presentation.screens.resume import ResumeScreen
-from widgets.presentation.screens.rewind import RewindScreen
-from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
+from johnston_core.application.session.actions import RewindEntry
+from johnston_core.application.skills.manager import Skill, SkillScope
+from johnston_tui.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
+from johnston_tui.presentation.screens.help import HelpScreen
+from johnston_tui.presentation.screens.providers import ProvidersScreen
+from johnston_tui.presentation.screens.resume import ResumeScreen
+from johnston_tui.presentation.screens.rewind import RewindScreen
+from johnston_tui.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
 
 
 class TestHelpScreen(unittest.TestCase):
@@ -268,7 +268,7 @@ class TestTaskScreens(unittest.TestCase):
             mock_app.call_from_thread.assert_called_once_with(s.update_tasks_list)
 
     def test_base_modal_screen_dismiss_safety(self):
-        from widgets.presentation.screens.base_modal import BaseModalScreen
+        from johnston_tui.presentation.screens.base_modal import BaseModalScreen
 
         screen = BaseModalScreen()
         mock_app = MagicMock()
@@ -347,7 +347,7 @@ class TestTaskScreens(unittest.TestCase):
         s.update_tasks_list.assert_called_once()
 
         # Test hint count update
-        from widgets.presentation.screens.constants import MODAL_HINT_ID
+        from johnston_tui.presentation.screens.constants import MODAL_HINT_ID
 
         mock_hint = MagicMock()
         mock_opt = MagicMock()
@@ -367,7 +367,7 @@ class TestTaskScreens(unittest.TestCase):
             self.assertEqual(kwargs.get("right_text"), "1/2")
 
     def test_tasks_screen_sort_newest_first(self):
-        from widgets.presentation.screens.tasks import _filter_and_sort_tasks
+        from johnston_tui.presentation.screens.tasks import _filter_and_sort_tasks
 
         items = [
             {"id": "t1", "command": "old done", "is_running": False, "created_at": 100.0},
@@ -447,7 +447,7 @@ class TestProvidersScreen(unittest.TestCase):
         event.stop.assert_called_once()
 
     def test_step_transitions_and_esc_back(self):
-        from widgets.presentation.screens.api_key import ApiKeyScreen
+        from johnston_tui.presentation.screens.api_key import ApiKeyScreen
 
         providers = {"p1": {"key": "p1", "name": "P1"}}
         s = ProvidersScreen(providers=providers, active_key="", configured_keys={"p1": "secret-key"})
@@ -478,7 +478,7 @@ class TestProvidersScreen(unittest.TestCase):
         self.assertEqual(dismissed, [("p1", "new-key"), None])
 
     def test_api_key_screen_input_submission(self):
-        from widgets.presentation.screens.api_key import ApiKeyScreen
+        from johnston_tui.presentation.screens.api_key import ApiKeyScreen
 
         s = ApiKeyScreen(provider_name="P1", current_key="existing-key", provider_key="p1")
         dismissed = []
@@ -521,7 +521,7 @@ class TestProvidersEdge(unittest.TestCase):
 
 
 class TestSkillScreens(unittest.TestCase):
-    @patch("widgets.presentation.screens.skills.get_skill_manager")
+    @patch("johnston_tui.presentation.screens.skills.get_skill_manager")
     def test_list_init_with_skills(self, mock_get_sm):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = [
@@ -529,7 +529,7 @@ class TestSkillScreens(unittest.TestCase):
             Skill("skill-b", "", "", "", SkillScope.PROJECT, False),
         ]
         mock_get_sm.return_value = mock_sm
-        from widgets.presentation.screens.skills import SkillsScreen
+        from johnston_tui.presentation.screens.skills import SkillsScreen
 
         s = SkillsScreen()
         self.assertEqual(len(s.options), 2)
@@ -538,23 +538,23 @@ class TestSkillScreens(unittest.TestCase):
         self.assertIn("skill-b", s.options[1])
         self.assertIn("●", s.options[1])
 
-    @patch("widgets.presentation.screens.skills.get_skill_manager")
+    @patch("johnston_tui.presentation.screens.skills.get_skill_manager")
     def test_list_init_no_skills(self, mock_get_sm):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = []
         mock_get_sm.return_value = mock_sm
-        from widgets.presentation.screens.skills import SkillsScreen
+        from johnston_tui.presentation.screens.skills import SkillsScreen
 
         s = SkillsScreen()
         self.assertEqual(s.options, [])
 
-    @patch("widgets.presentation.screens.skills.get_skill_manager")
+    @patch("johnston_tui.presentation.screens.skills.get_skill_manager")
     def test_skills_screen_toggle_hidden(self, mock_get_sm):
         mock_sm = MagicMock()
         mock_sm.list_skills.return_value = [Skill("skill-a", "", "", "", SkillScope.GLOBAL, True)]
         mock_sm.toggle_hidden.return_value = False
         mock_get_sm.return_value = mock_sm
-        from widgets.presentation.screens.skills import SkillsScreen
+        from johnston_tui.presentation.screens.skills import SkillsScreen
 
         s = SkillsScreen()
         self.assertEqual(len(s.options), 1)

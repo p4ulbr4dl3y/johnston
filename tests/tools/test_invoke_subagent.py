@@ -1,10 +1,10 @@
 import tempfile
 import unittest
 
-from core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
-from core.infrastructure.storage.session_store import SessionStore
-from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS, truncate_subagent_result
-from tools.invoke_subagent import InvokeSubagentTool
+from johnston_core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
+from johnston_core.infrastructure.storage.session_store import SessionStore
+from johnston_core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS, truncate_subagent_result
+from johnston_core.tools.invoke_subagent import InvokeSubagentTool
 
 
 class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
@@ -70,7 +70,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             )
 
         # With limit=2, spawning should fail with "2 concurrent max"
-        with patch("tools.invoke_subagent.get_settings") as mock_st:
+        with patch("johnston_core.tools.invoke_subagent.get_settings") as mock_st:
             mock_st.return_value.subagents.max_concurrent = 2
             res = str(await tool.execute({"task": "another task", "title": "Over limit", "branch": "main"}))
             self.assertIn("ERR: limit: 2 concurrent max", res)
@@ -222,9 +222,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
-            patch("core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("johnston_core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("johnston_core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
+            patch("johnston_core.tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
@@ -259,9 +259,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
-            patch("core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("johnston_core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("johnston_core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
+            patch("johnston_core.tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
@@ -295,9 +295,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
-            patch("core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("johnston_core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("johnston_core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
+            patch("johnston_core.tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
 
@@ -383,8 +383,8 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_invoke_subagent_branch_equals_current_creates_isolated_branch(self):
         from unittest.mock import AsyncMock, MagicMock, patch
 
-        from core.application.session.subagent_service import SubagentService
-        from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+        from johnston_core.application.session.subagent_service import SubagentService
+        from johnston_core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
         tool = InvokeSubagentTool()
         mock_app = MagicMock()
@@ -403,9 +403,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("core.infrastructure.runtime.subagent_worktree.SubagentWorktreeManager.is_git_repo", return_value=True),
-            patch("core.application.session.subagent_service.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("core.infrastructure.runtime.subagent_worktree.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("johnston_core.infrastructure.runtime.subagent_worktree.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("johnston_core.application.session.subagent_service.run_git_async", new_callable=AsyncMock) as mock_git,
+            patch("johnston_core.infrastructure.runtime.subagent_worktree.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
@@ -426,7 +426,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_kill_subagent_cleans_up_worktree_and_branch(self):
         from unittest.mock import patch
 
-        from core.application.session.subagent_service import SubagentService
+        from johnston_core.application.session.subagent_service import SubagentService
 
         session = self.store.create_subagent(
             parent_id="sess-main",
@@ -439,7 +439,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             branch_name="subagent/task-kill-wt",
         )
 
-        with patch("core.application.session.subagent_service.SubagentWorktreeManager.cleanup_worktree") as mock_cleanup:
+        with patch("johnston_core.application.session.subagent_service.SubagentWorktreeManager.cleanup_worktree") as mock_cleanup:
             res = SubagentService.kill_subagent(session, self.store)
             self.assertEqual(res.content, f"[killed {session.id}]")
             mock_cleanup.assert_called_once_with(
@@ -449,12 +449,12 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
     def test_prune_merged_subagent_branches(self):
         from unittest.mock import MagicMock, patch
 
-        from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+        from johnston_core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
         with (
             patch.object(SubagentWorktreeManager, "is_git_repo", return_value=True),
             patch.object(SubagentWorktreeManager, "get_repo_root", return_value="/repo"),
-            patch("core.infrastructure.runtime.subagent_worktree.run_git") as mock_run_git,
+            patch("johnston_core.infrastructure.runtime.subagent_worktree.run_git") as mock_run_git,
         ):
             mock_res = MagicMock()
             mock_res.returncode = 0
@@ -524,7 +524,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=False),
+            patch("johnston_core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=False),
         ):
             res = await tool.execute({"task": "valid task", "title": 12345, "role": 999})
             self.assertFalse(res.is_error)

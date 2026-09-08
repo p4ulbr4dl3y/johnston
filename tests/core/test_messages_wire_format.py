@@ -34,7 +34,7 @@ def _stub_runtime_deps():
 
 _stub_runtime_deps()
 
-from core.domain.policies.messages import (  # noqa: E402
+from johnston_core.domain.policies.messages import (  # noqa: E402
     NOTIFICATION_KIND_SHELL,
     NOTIFICATION_KIND_SUBAGENT,
     SYSTEM_NOTICE_KIND_CONTEXT_TRIMMED,
@@ -215,7 +215,7 @@ class VisionSanitizationInjectionTests(unittest.TestCase):
 
     def _make_mixin(self):
         # Bypass BaseAgent construction; only the sanitizer is exercised.
-        from core.base_provider.errors import ErrorHandlingMixin
+        from johnston_core.base_provider.errors import ErrorHandlingMixin
         return ErrorHandlingMixin()
 
     def test_user_text_is_xml_escaped(self):

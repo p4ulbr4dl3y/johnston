@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from textual.app import App, ComposeResult
 
-from core.infrastructure.tasks.manager import TaskManager
-from widgets.status_footer import StatusFooter
+from johnston_core.infrastructure.tasks.manager import TaskManager
+from johnston_tui.status_footer import StatusFooter
 
 
 class DummyTask:
@@ -139,7 +139,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         app = FooterTestApp()
         async with app.run_test():
             footer = app.query_one(StatusFooter)
-            with patch("widgets.app.status_state.build_status_kwargs", side_effect=Exception("boom")):
+            with patch("johnston_tui.app.status_state.build_status_kwargs", side_effect=Exception("boom")):
                 with patch.object(footer, "update_status") as mock_us:
                     footer.refresh_footer()
                     mock_us.assert_called_once_with(provider_key="default")
@@ -148,7 +148,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         app = FooterTestApp()
         async with app.run_test() as pilot:
             footer = app.query_one(StatusFooter)
-            with patch("core.models_catalog.catalog.get_model_display_name", return_value=""):
+            with patch("johnston_core.models_catalog.catalog.get_model_display_name", return_value=""):
                 footer.refresh_footer()
                 await pilot.pause()
             self.assertEqual(footer._last_status_args["clean_model"], "[Select model: /models]")
@@ -175,9 +175,9 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             "good": MagicMock(last_error=None),
         }
         mgr.active_server_count.return_value = 1
-        from widgets.app.status_state import refresh_footer_cache
+        from johnston_tui.app.status_state import refresh_footer_cache
 
-        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
+        with patch("johnston_core.infrastructure.mcp.get_mcp_manager", return_value=mgr):
             app = FooterTestApp()
             async with app.run_test() as pilot:
                 footer = app.query_one(StatusFooter)
@@ -191,7 +191,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         app = FooterTestApp()
         async with app.run_test():
             footer = app.query_one(StatusFooter)
-            with patch("core.models_catalog.catalog.get_model_display_name", return_value=""):
+            with patch("johnston_core.models_catalog.catalog.get_model_display_name", return_value=""):
                 footer.update_status(provider_key="openai", model_name="gpt-4o", is_connected=True)
             footer.update_status(provider_key="openai", is_connected=True, model_name="")
             footer.update_status(provider_key="openai", is_connected=False, model_name="")
@@ -232,7 +232,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
                 )
 
     async def test_subagent_footer_mount_unmount_and_update(self):
-        from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
+        from johnston_tui.presentation.widgets.subagent_footer import SubagentStatusFooter
 
         class SubagentFooterApp(App[None]):
             def compose(self):
@@ -261,7 +261,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(footer._resize_timer)
 
     async def test_subagent_footer_old_session_fallback_metrics(self):
-        from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
+        from johnston_tui.presentation.widgets.subagent_footer import SubagentStatusFooter
 
         class SubagentFooterApp(App[None]):
             def compose(self):
@@ -290,7 +290,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
     def test_format_display_path(self):
         import os
 
-        from widgets.status_footer import format_display_path
+        from johnston_tui.status_footer import format_display_path
 
         home = os.path.realpath(os.path.expanduser("~"))
         # Home dir itself
@@ -343,23 +343,23 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         footer._branch_time = 0.0
 
         # When get_git_info returns empty during async refresh
-        with patch("core.application.generation.prompt_builder.get_git_info", return_value=""):
+        with patch("johnston_core.application.generation.prompt_builder.get_git_info", return_value=""):
             branch = footer._git_branch(cwd="/some/dir")
             self.assertEqual(branch, "main")
 
     def test_compute_branch_sync_bare_branch(self):
         footer = StatusFooter()
-        with patch("core.application.generation.prompt_builder.get_git_info", return_value="main"):
+        with patch("johnston_core.application.generation.prompt_builder.get_git_info", return_value="main"):
             self.assertEqual(footer._compute_branch_sync(cwd="/some/dir"), "main")
 
     def test_compute_branch_sync_detached_head(self):
         footer = StatusFooter()
-        with patch("core.application.generation.prompt_builder.get_git_info", return_value="detached HEAD (abc1234)"):
+        with patch("johnston_core.application.generation.prompt_builder.get_git_info", return_value="detached HEAD (abc1234)"):
             self.assertEqual(footer._compute_branch_sync(cwd="/some/dir"), "detached (abc1234)")
 
     def test_compute_branch_sync_not_repo(self):
         footer = StatusFooter()
-        with patch("core.application.generation.prompt_builder.get_git_info", return_value=""):
+        with patch("johnston_core.application.generation.prompt_builder.get_git_info", return_value=""):
             self.assertEqual(footer._compute_branch_sync(cwd="/some/dir"), "")
 
     def test_git_diff_stats_with_cwd_and_fallback(self):
@@ -401,7 +401,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(rows[1][1], "")
 
     async def test_attachment_bar_updates(self):
-        from widgets.presentation.widgets.attachment_bar import AttachmentBar, AttachmentChip, AttachmentHint
+        from johnston_tui.presentation.widgets.attachment_bar import AttachmentBar, AttachmentChip, AttachmentHint
 
         bar = AttachmentBar()
         bar.update_attachments([])

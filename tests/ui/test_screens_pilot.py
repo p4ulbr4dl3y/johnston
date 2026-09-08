@@ -8,13 +8,13 @@ from textual.app import App
 from textual.widgets import Input, OptionList, RichLog
 from textual.widgets.option_list import Option
 
-from core.infrastructure.tasks.manager import TaskManager
-from widgets.presentation.screens.help import HelpScreen
-from widgets.presentation.screens.mcp import MCPScreen
-from widgets.presentation.screens.model import ModelScreen
-from widgets.presentation.screens.providers import ProvidersScreen
-from widgets.presentation.screens.subagent_screen import SubagentViewScreen
-from widgets.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
+from johnston_core.infrastructure.tasks.manager import TaskManager
+from johnston_tui.presentation.screens.help import HelpScreen
+from johnston_tui.presentation.screens.mcp import MCPScreen
+from johnston_tui.presentation.screens.model import ModelScreen
+from johnston_tui.presentation.screens.providers import ProvidersScreen
+from johnston_tui.presentation.screens.subagent_screen import SubagentViewScreen
+from johnston_tui.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
 
 
 class DummyHostApp(App[None]):
@@ -47,7 +47,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         shutil.rmtree(self.test_dir)
 
     async def test_mcp_screen_pilot(self):
-        with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get_mgr:
+        with patch("johnston_tui.presentation.screens.mcp.get_mcp_manager") as mock_get_mgr:
             mock_mgr = MagicMock()
             mock_mgr.load_servers.return_value = [
                 {"name": "srv1", "command": "python", "scope": "global"}
@@ -80,7 +80,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_providers_screen_pilot(self):
-        from widgets.presentation.screens.api_key import ApiKeyScreen
+        from johnston_tui.presentation.screens.api_key import ApiKeyScreen
 
         providers = {"opencode": {"key": "opencode", "name": "OpenCode"}, "openai": {"key": "openai", "name": "OpenAI"}}
         screen = ProvidersScreen(providers=providers, active_key="opencode", configured_keys={})
@@ -190,7 +190,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         screen.update_tasks_list()
 
     async def test_task_console_screen_pilot(self):
-        from core.infrastructure.tasks.output import OutputBuffer
+        from johnston_core.infrastructure.tasks.output import OutputBuffer
 
         mock_task = MagicMock()
         mock_task.command = "python long_running_script.py"
@@ -362,7 +362,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(app.screen, ShellTasksScreen)
 
     async def test_subagent_view_screen_kill_pilot(self):
-        from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+        from johnston_tui.presentation.screens.subagent_screen import SubagentViewScreen
 
         sub_session = MagicMock()
         sub_session.id = "sub-k"
@@ -408,7 +408,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
 
     async def test_ask_user_wizard_screen_pilot(self):
-        from widgets.presentation.screens.ask_user import AskUserWizardScreen
+        from johnston_tui.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [
             {"question": "Pick color", "options": ["Red", "Blue"]},
@@ -441,7 +441,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Red", str(app.dismiss_result))
 
     async def test_ask_user_wizard_deselect_preserves_highlight_index(self):
-        from widgets.presentation.screens.ask_user import AskUserWizardScreen
+        from johnston_tui.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [{"question": "Pick item", "options": ["Item 0", "Item 1", "Item 2"]}]
         screen = AskUserWizardScreen(questions)
@@ -470,7 +470,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_write_in_input_down_key_does_not_advance_page(self):
 
-        from widgets.presentation.screens.ask_user import AskUserWizardScreen
+        from johnston_tui.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [
             {"question": "Enter custom text", "options": []},
@@ -497,7 +497,7 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_write_in_input_cleared_between_questions(self):
 
-        from widgets.presentation.screens.ask_user import AskUserWizardScreen
+        from johnston_tui.presentation.screens.ask_user import AskUserWizardScreen
 
         questions = [{"question": "Q1", "options": ["Opt1"]}, {"question": "Q2", "options": ["Opt2"]}]
         screen = AskUserWizardScreen(questions)

@@ -10,13 +10,13 @@ import unittest
 from contextlib import redirect_stderr
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.domain.policies.permission_policy import ExecutionMode
-from core.infrastructure.storage.session_store import SessionStore
-from core.interfaces.cli.commands.run_cmd import run_headless, run_headless_async
-from core.interfaces.cli.entrypoint import build_parser, main
-from core.permission_manager import PermissionManager
-from widgets.app.app import JohnstonApp
-from widgets.chat_input import ChatInput
+from johnston_core.domain.policies.permission_policy import ExecutionMode
+from johnston_core.infrastructure.storage.session_store import SessionStore
+from johnston_core.interfaces.cli.commands.run_cmd import run_headless, run_headless_async
+from johnston_core.interfaces.cli.entrypoint import build_parser, main
+from johnston_core.permission_manager import PermissionManager
+from johnston_tui.app.app import JohnstonApp
+from johnston_tui.chat_input import ChatInput
 
 
 class TestCLIRootParserFlags(unittest.TestCase):
@@ -223,7 +223,7 @@ class TestCLIDirectoryAndDebugExecution(unittest.TestCase):
 
     def test_run_headless_debug_sets_logging(self):
         args = MagicMock(cwd=None, debug=True, prompt="test")
-        with patch("core.interfaces.cli.commands.run_cmd.run_headless_async", new_callable=AsyncMock) as mock_async:
+        with patch("johnston_core.interfaces.cli.commands.run_cmd.run_headless_async", new_callable=AsyncMock) as mock_async:
             mock_async.return_value = 0
             code = run_headless(args)
             self.assertEqual(code, 0)
@@ -287,7 +287,7 @@ class TestJohnstonAppStartupFlags(unittest.TestCase):
             s2.messages = [{"role": "user", "text": "latest msg"}]
             store.save(s2)
 
-            with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
+            with patch("johnston_core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
                 with patch.object(SessionStore, "list_main_sessions", return_value=[{"id": "session-latest"}]):
                     app = JohnstonApp(continue_latest=True)
                     self.assertEqual(app.resume_session_id, "session-latest")
@@ -350,7 +350,7 @@ class TestRunCmdExecutionFlags(unittest.IsolatedAsyncioTestCase):
             json=False,
         )
 
-        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
+        with patch("johnston_core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
             code = await run_headless_async(args, pm=mock_pm)
 
         self.assertEqual(code, 0)
@@ -442,7 +442,7 @@ class TestRunCmdExecutionFlags(unittest.IsolatedAsyncioTestCase):
             json=False,
         )
 
-        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
+        with patch("johnston_core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
             code = await run_headless_async(args, pm=mock_pm)
 
         self.assertEqual(code, 0)
@@ -454,7 +454,7 @@ class TestLifecycleInitialPrompt(unittest.IsolatedAsyncioTestCase):
     """Test initial prompt posting in LifecycleMixin."""
 
     async def test_on_mount_schedules_initial_prompt(self):
-        from widgets.mixins.lifecycle import LifecycleMixin
+        from johnston_tui.mixins.lifecycle import LifecycleMixin
 
         class MockApp(LifecycleMixin):
             def __init__(self):
@@ -481,9 +481,9 @@ class TestLifecycleInitialPrompt(unittest.IsolatedAsyncioTestCase):
         app = MockApp()
         mock_mcp = MagicMock()
         mock_mcp.ensure_tools_ready_async = AsyncMock()
-        with patch("core.models_catalog.catalog.load_cache"):
-            with patch("core.models_catalog.catalog.refresh", new_callable=AsyncMock):
-                with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp):
+        with patch("johnston_core.models_catalog.catalog.load_cache"):
+            with patch("johnston_core.models_catalog.catalog.refresh", new_callable=AsyncMock):
+                with patch("johnston_core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp):
                     app.on_mount()
 
         self.assertTrue(getattr(app, "_initial_prompt_posted", False))
@@ -530,9 +530,9 @@ class TestMainEntrypointFlagDispatch(unittest.TestCase):
     @patch("app.JohnstonApp.run")
     def test_main_branch_flag_switches_worktree(self, mock_run):
         with patch("app.JohnstonApp.__init__", return_value=None), \
-             patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=True), \
-             patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.get_repo_root", return_value="/fake/repo"), \
-             patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.create_worktree", return_value=("/fake/wt", "feat/cool")), \
+             patch("johnston_core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=True), \
+             patch("johnston_core.infrastructure.runtime.git_worktree.GitWorktreeManager.get_repo_root", return_value="/fake/repo"), \
+             patch("johnston_core.infrastructure.runtime.git_worktree.GitWorktreeManager.create_worktree", return_value=("/fake/wt", "feat/cool")), \
              patch("os.path.exists", return_value=True), \
              patch("os.chdir") as mock_chdir, \
              patch("app.JohnstonApp.switch_project_dir") as mock_switch:
@@ -543,7 +543,7 @@ class TestMainEntrypointFlagDispatch(unittest.TestCase):
             mock_switch.assert_called_once_with("/fake/wt", "feat/cool")
 
     def test_main_branch_flag_not_git_repo(self):
-        with patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=False), \
+        with patch("johnston_core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=False), \
              patch("sys.stderr", new_callable=io.StringIO) as mock_err:
             with self.assertRaises(SystemExit) as cm:
                 main(["-b", "feat/fail"])

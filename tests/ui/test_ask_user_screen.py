@@ -8,7 +8,7 @@ from textual.app import App, ComposeResult
 from textual.events import Focus, Key
 from textual.widgets import Markdown, OptionList
 
-from widgets.presentation.screens.ask_user import (
+from johnston_tui.presentation.screens.ask_user import (
     AskUserWizardScreen,
     WriteInInput,
 )
@@ -331,7 +331,7 @@ class TestAskUserScreensPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(screen.q_idx, 3)
 
     async def test_wizard_screen_with_dict_options_pilot(self):
-        from widgets.presentation.screens.ask_user import format_wizard_option
+        from johnston_tui.presentation.screens.ask_user import format_wizard_option
 
         formatted = format_wizard_option(
             r"\[ ]",

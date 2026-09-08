@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from tools.context import ToolContext
+from johnston_core.tools.context import ToolContext
 
 DEFAULT_TOOLS: List[Dict[str, Any]] = [
     {"function": {"name": "read"}},
@@ -52,65 +52,65 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     monkeypatch.setenv("JOHNSTON_CONFIG_DIR", cfg_dir_str)
 
     # 1. Base functions
-    monkeypatch.setattr("core.infrastructure.platform.platform_utils.johnston_config_dir", lambda: test_config_dir)
-    monkeypatch.setattr("core.infrastructure.platform.paths.johnston_config_dir", lambda: test_config_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.platform_utils.johnston_config_dir", lambda: test_config_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.johnston_config_dir", lambda: test_config_dir)
 
     # 2. paths constants
-    monkeypatch.setattr("core.infrastructure.platform.paths.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("core.infrastructure.platform.paths.PROJECTS_DIR", projects_dir)
-    monkeypatch.setattr("core.infrastructure.platform.paths.CONFIG_FILE", config_file)
-    monkeypatch.setattr("core.infrastructure.platform.paths.SECRETS_FILE", secrets_file)
-    monkeypatch.setattr("core.infrastructure.platform.paths.PROVIDERS_JSON_FILE", providers_file)
-    monkeypatch.setattr("core.infrastructure.platform.paths.CACHE_DIR", str(test_config_dir / "cache"))
-    monkeypatch.setattr("core.infrastructure.platform.paths.LOGS_DIR", logs_dir)
-    monkeypatch.setattr("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", temp_images_dir)
-    monkeypatch.setattr("core.infrastructure.platform.paths.WORKTREES_DIR", worktrees_dir)
-    monkeypatch.setattr("core.infrastructure.platform.paths.SHADOW_REPOS_DIR", shadow_repos_dir)
-    monkeypatch.setattr("core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", prompt_history_file)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.CONFIG_FILE", config_file)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.SECRETS_FILE", secrets_file)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.PROVIDERS_JSON_FILE", providers_file)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.CACHE_DIR", str(test_config_dir / "cache"))
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.TEMP_IMAGES_DIR", temp_images_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.WORKTREES_DIR", worktrees_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.SHADOW_REPOS_DIR", shadow_repos_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", prompt_history_file)
 
     # 3. Module-level bound constants
-    monkeypatch.setattr("core.infrastructure.secrets.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("core.infrastructure.secrets.SECRETS_FILE", secrets_file)
-    monkeypatch.setattr("core.infrastructure.storage.session_store.PROJECTS_DIR", projects_dir)
-    monkeypatch.setattr("core.permission_manager.CONFIG_FILE", config_file)
-    monkeypatch.setattr("core.permission_manager.LOGS_DIR", logs_dir)
-    monkeypatch.setattr("core.permission_manager.SECRETS_FILE", secrets_file)
-    monkeypatch.setattr("core.domain.policies.permission_policy.LOGS_DIR", logs_dir)
-    monkeypatch.setattr("core.domain.policies.permission_policy.SECRETS_FILE", secrets_file)
-    monkeypatch.setattr("core.provider_manager.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("core.provider_manager.CONFIG_FILE", config_file)
-    monkeypatch.setattr("core.provider_manager.PROVIDERS_JSON_FILE", providers_file)
-    monkeypatch.setattr("core.provider_manager.CACHE_DIR", str(test_config_dir / "cache"))
-    monkeypatch.setattr("core.models_catalog.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("core.models_catalog.CACHE_FILE", cache_file)
-    monkeypatch.setattr("core.application.skills.manager.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("core.application.skills.manager.GLOBAL_SKILLS_DIR", skills_dir)
-    monkeypatch.setattr("core.infrastructure.mcp.manager.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("core.infrastructure.mcp.manager.GLOBAL_MCP_FILE", mcp_file)
+    monkeypatch.setattr("johnston_core.infrastructure.secrets.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("johnston_core.infrastructure.secrets.SECRETS_FILE", secrets_file)
+    monkeypatch.setattr("johnston_core.infrastructure.storage.session_store.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr("johnston_core.permission_manager.CONFIG_FILE", config_file)
+    monkeypatch.setattr("johnston_core.permission_manager.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("johnston_core.permission_manager.SECRETS_FILE", secrets_file)
+    monkeypatch.setattr("johnston_core.domain.policies.permission_policy.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("johnston_core.domain.policies.permission_policy.SECRETS_FILE", secrets_file)
+    monkeypatch.setattr("johnston_core.provider_manager.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("johnston_core.provider_manager.CONFIG_FILE", config_file)
+    monkeypatch.setattr("johnston_core.provider_manager.PROVIDERS_JSON_FILE", providers_file)
+    monkeypatch.setattr("johnston_core.provider_manager.CACHE_DIR", str(test_config_dir / "cache"))
+    monkeypatch.setattr("johnston_core.models_catalog.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("johnston_core.models_catalog.CACHE_FILE", cache_file)
+    monkeypatch.setattr("johnston_core.application.skills.manager.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("johnston_core.application.skills.manager.GLOBAL_SKILLS_DIR", skills_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.mcp.manager.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("johnston_core.infrastructure.mcp.manager.GLOBAL_MCP_FILE", mcp_file)
 
-    from core.infrastructure.mcp.manager import MCPManager
+    from johnston_core.infrastructure.mcp.manager import MCPManager
 
     orig_mcp_init = MCPManager.__init__
     def fake_mcp_init(self, project_dir=None, *args, **kwargs):
         if not project_dir:
             project_dir = cfg_dir_str
         orig_mcp_init(self, project_dir, *args, **kwargs)
-    monkeypatch.setattr("core.infrastructure.mcp.manager.MCPManager.__init__", fake_mcp_init)
-    monkeypatch.setattr("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("core.infrastructure.runtime.subagent_worktree.WORKTREES_DIR", worktrees_dir)
-    monkeypatch.setattr("core.infrastructure.storage.git_checkpoint.SHADOW_REPOS_DIR", shadow_repos_dir)
-    monkeypatch.setattr("core.infrastructure.platform.logging_setup.LOGS_DIR", logs_dir)
-    monkeypatch.setattr("core.infrastructure.platform.logging_setup.LOG_FILE", log_file)
-    monkeypatch.setattr("core.infrastructure.tasks.output.LOGS_DIR", logs_dir)
-    monkeypatch.setattr("tools.base.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.mcp.manager.MCPManager.__init__", fake_mcp_init)
+    monkeypatch.setattr("johnston_core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("johnston_core.infrastructure.runtime.subagent_worktree.WORKTREES_DIR", worktrees_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.storage.git_checkpoint.SHADOW_REPOS_DIR", shadow_repos_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.logging_setup.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("johnston_core.infrastructure.platform.logging_setup.LOG_FILE", log_file)
+    monkeypatch.setattr("johnston_core.infrastructure.tasks.output.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("johnston_core.tools.base.LOGS_DIR", logs_dir)
 
     # 4. Reset singletons before test
-    from core.application.rules.rules import RulesManager
-    from core.application.skills.manager import SkillManager
-    from core.infrastructure.mcp.manager import MCPManager
-    from core.infrastructure.storage.session_store import SessionStore
-    from core.permission_manager import PermissionManager
-    from core.role_registry import RoleRegistry
+    from johnston_core.application.rules.rules import RulesManager
+    from johnston_core.application.skills.manager import SkillManager
+    from johnston_core.infrastructure.mcp.manager import MCPManager
+    from johnston_core.infrastructure.storage.session_store import SessionStore
+    from johnston_core.permission_manager import PermissionManager
+    from johnston_core.role_registry import RoleRegistry
 
     SessionStore._instance = None
     PermissionManager._instance = None
@@ -118,7 +118,7 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     RoleRegistry._instance = None
     SkillManager._dirs_ensured = False
     MCPManager._mcp_manager_instance = None
-    from core.infrastructure.platform.platform_utils import _json_read_cache as _jrc
+    from johnston_core.infrastructure.platform.platform_utils import _json_read_cache as _jrc
     _jrc.clear()
 
     yield
@@ -130,7 +130,7 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     RoleRegistry._instance = None
     SkillManager._dirs_ensured = False
     MCPManager._mcp_manager_instance = None
-    from core.infrastructure.platform.platform_utils import _json_read_cache as _jrc
+    from johnston_core.infrastructure.platform.platform_utils import _json_read_cache as _jrc
     _jrc.clear()
 
 

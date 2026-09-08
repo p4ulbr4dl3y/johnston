@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from core.application.rules.rules import RuleDefinition, RulesManager
+from johnston_core.application.rules.rules import RuleDefinition, RulesManager
 
 
 class TestRulesManager(unittest.TestCase):
@@ -58,7 +58,7 @@ Always run uv instead of pip.""")
                 f.write("Rule text")
 
             rm = RulesManager()
-            with patch("core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", tmpdir):
+            with patch("johnston_core.infrastructure.runtime.markdown_scanner.CONFIG_DIR", tmpdir):
                 proj_rules_dir = os.path.join(tmpdir, ".johnston", "rules")
                 os.makedirs(os.path.dirname(proj_rules_dir), exist_ok=True)
                 os.symlink(rules_dir, proj_rules_dir)
@@ -70,12 +70,12 @@ Always run uv instead of pip.""")
     def test_markdown_scanner_cache_ttl_skips_signature(self):
         from unittest.mock import patch
 
-        from core.infrastructure.runtime.markdown_scanner import MarkdownScannerCache
+        from johnston_core.infrastructure.runtime.markdown_scanner import MarkdownScannerCache
 
         cache = MarkdownScannerCache(subpath="rules")
         with tempfile.TemporaryDirectory() as tmpdir:
             res1 = cache.get(project_dir=tmpdir, include_global=False)
-            with patch("core.infrastructure.runtime.markdown_scanner.compute_dir_signature", side_effect=AssertionError("Should not compute signature within TTL")):
+            with patch("johnston_core.infrastructure.runtime.markdown_scanner.compute_dir_signature", side_effect=AssertionError("Should not compute signature within TTL")):
                 res2 = cache.get(project_dir=tmpdir, include_global=False)
                 self.assertEqual(res1, res2)
 

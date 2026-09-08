@@ -7,24 +7,24 @@ import os
 import sys
 from typing import Any, Sequence
 
-from core.infrastructure.platform.logging_setup import setup_logging
-from core.interfaces.cli.commands.config_cmd import run_config
-from core.interfaces.cli.commands.doctor_cmd import run_doctor
-from core.interfaces.cli.commands.mcp_cmd import print_mcp, run_mcp
-from core.interfaces.cli.commands.provider_cmd import print_models, run_provider
-from core.interfaces.cli.commands.roles_cmd import print_roles, run_roles
-from core.interfaces.cli.commands.rules_cmd import print_rules, run_rules
-from core.interfaces.cli.commands.run_cmd import run_headless
-from core.interfaces.cli.commands.session_cmd import run_session
-from core.interfaces.cli.commands.skills_cmd import print_skills, run_skills
-from core.interfaces.cli.entrypoint import (
+from johnston_cli.repl import start_repl
+from johnston_core.infrastructure.platform.logging_setup import setup_logging
+from johnston_core.interfaces.cli.commands.config_cmd import run_config
+from johnston_core.interfaces.cli.commands.doctor_cmd import run_doctor
+from johnston_core.interfaces.cli.commands.mcp_cmd import print_mcp, run_mcp
+from johnston_core.interfaces.cli.commands.provider_cmd import print_models, run_provider
+from johnston_core.interfaces.cli.commands.roles_cmd import print_roles, run_roles
+from johnston_core.interfaces.cli.commands.rules_cmd import print_rules, run_rules
+from johnston_core.interfaces.cli.commands.run_cmd import run_headless
+from johnston_core.interfaces.cli.commands.session_cmd import run_session
+from johnston_core.interfaces.cli.commands.skills_cmd import print_skills, run_skills
+from johnston_core.interfaces.cli.entrypoint import (
     _print_resume_hint,
     get_version,
 )
-from core.interfaces.cli.entrypoint import (
+from johnston_core.interfaces.cli.entrypoint import (
     build_parser as _core_build_parser,
 )
-from johnston_cli.repl import start_repl
 
 __all__ = [
     "build_parser",
@@ -152,7 +152,7 @@ def _dispatch_common_flags(args: Any) -> None:
 
     for ws in getattr(args, "workspace", []) or []:
         if ws:
-            from core.permission_manager import PermissionManager
+            from johnston_core.permission_manager import PermissionManager
 
             PermissionManager.get_instance().add_workspace_root(ws)
 
@@ -166,8 +166,8 @@ def _handle_worktree_branch(branch_arg: str | None) -> tuple[str | None, str | N
     if not branch_arg or not branch_arg.strip():
         return None, None
     raw_b = branch_arg.strip()
-    from core.infrastructure.runtime.git_worktree import GitWorktreeManager
-    from core.permission_manager import PermissionManager
+    from johnston_core.infrastructure.runtime.git_worktree import GitWorktreeManager
+    from johnston_core.permission_manager import PermissionManager
 
     cur_dir = os.getcwd()
     if not GitWorktreeManager.is_git_repo(cur_dir):
@@ -229,10 +229,10 @@ def main_johnston(argv: Sequence[str] | None = None) -> int:
         return sub_code
 
     try:
-        from app import JohnstonApp
+        from johnston_tui.app import JohnstonApp
     except ImportError:
         try:
-            from widgets.app.app import JohnstonApp
+            from app import JohnstonApp
         except ImportError:
             sys.stderr.write("Error: Johnston TUI is not installed.\n")
             return 1

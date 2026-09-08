@@ -1,7 +1,7 @@
 import unittest
 
-from core.base_provider import BaseAgent
-from core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
+from johnston_core.base_provider import BaseAgent
+from johnston_core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 
 
 class DummyUsage:
@@ -45,7 +45,7 @@ class TestTokenUtil(unittest.TestCase):
         self.assertEqual(agent.get_metrics()["total_tokens"], 0)
 
     def test_models_catalog_context_window(self):
-        from core.models_catalog import format_context_tokens, get_context_window
+        from johnston_core.models_catalog import format_context_tokens, get_context_window
 
         self.assertEqual(format_context_tokens(128000), "128k")
         self.assertEqual(format_context_tokens(200000), "200k")

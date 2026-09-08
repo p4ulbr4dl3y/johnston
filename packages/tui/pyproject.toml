@@ -18,14 +18,12 @@ dependencies = [
 ]
 
 [project.scripts]
-johnston-tui = "app:main"
+johnston-tui = "johnston_tui.app:main"
 
 [tool.uv.sources]
 johnston-core = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 only-include = [
-    "app.py",
-    "app.tcss",
-    "widgets",
+    "johnston_tui",
 ]

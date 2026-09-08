@@ -12,14 +12,14 @@ import json
 
 import pytest
 
-from core.domain.entities.session import AgentSession, MessageType
-from core.infrastructure.storage.session_serialization import (
+from johnston_core.domain.entities.session import AgentSession, MessageType
+from johnston_core.infrastructure.storage.session_serialization import (
     from_file as _session_from_file,
 )
-from core.infrastructure.storage.session_serialization import (
+from johnston_core.infrastructure.storage.session_serialization import (
     to_dict as _session_to_dict,
 )
-from core.infrastructure.storage.session_serialization import (
+from johnston_core.infrastructure.storage.session_serialization import (
     to_jsonl_lines as _session_to_jsonl_lines,
 )
 
@@ -199,7 +199,7 @@ def test_tracker_not_persisted(sess):
 
 
 def test_record_interruption_finalizes_tool_and_thinking(sess):
-    from core.infrastructure.runtime.session_interruption import record_session_interruption
+    from johnston_core.infrastructure.runtime.session_interruption import record_session_interruption
 
     _add_tool(sess, "edit.py")
     sess.add_event({"type": "thinking", "text": "pondering"})

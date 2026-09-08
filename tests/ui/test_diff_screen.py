@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.widgets import OptionList
 
-from widgets.presentation.commands import DiffCommand
-from widgets.presentation.screens.diff import DiffFooter, DiffHeader, DiffScreen, disambiguate_file_paths
+from johnston_tui.presentation.commands import DiffCommand
+from johnston_tui.presentation.screens.diff import DiffFooter, DiffHeader, DiffScreen, disambiguate_file_paths
 
 
 class TestDisambiguateFilePaths(unittest.TestCase):
@@ -144,7 +144,7 @@ class TestDiffScreen(unittest.TestCase):
         screen = DiffScreen(items)
         screen._update_layout = MagicMock()
 
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=100):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=100):
             screen.action_toggle_sidebar()
             self.assertFalse(screen.sidebar_visible)
             screen.action_toggle_sidebar()
@@ -156,7 +156,7 @@ class TestDiffScreen(unittest.TestCase):
         screen.dismiss = MagicMock()
         screen.query_one = MagicMock()
 
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=50):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=50):
             # In compact mode, default is files view
             self.assertEqual(screen.compact_view, "files")
 
@@ -182,7 +182,7 @@ class TestDiffScreen(unittest.TestCase):
         screen = DiffScreen(items)
         screen._update_layout = MagicMock()
 
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=50):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=50):
             mock_event = MagicMock(spec=Input.Submitted)
             screen.on_input_submitted(mock_event)
             self.assertEqual(screen.compact_view, "diff")
@@ -191,7 +191,7 @@ class TestDiffScreen(unittest.TestCase):
         items = [("test_modal_badge_adaptivity.py", "diff1", 1, 0)]
         screen = DiffScreen(items)
 
-        with patch("widgets.presentation.screens.diff.resolve_width", return_value=60):
+        with patch("johnston_tui.presentation.screens.diff.resolve_width", return_value=60):
             # Row width must use screen width (60 - 2 = 58), not fallback 31
             self.assertEqual(screen._sidebar_row_width(), 58)
             options = screen._format_sidebar_options(screen._sidebar_row_width())
@@ -343,7 +343,7 @@ class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
         app.sm.get.return_value = None
         cmd = DiffCommand()
 
-        with patch("core.application.session.actions.get_session_diff", new_callable=AsyncMock) as mock_get_diff:
+        with patch("johnston_core.application.session.actions.get_session_diff", new_callable=AsyncMock) as mock_get_diff:
             mock_get_diff.return_value = []
             await cmd.execute(app)
             app.notify.assert_called_once_with("No workspace changes found for session files", severity="information")
@@ -355,7 +355,7 @@ class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
         app.sm.project_path = "/path"
         cmd = DiffCommand()
 
-        with patch("core.application.session.actions.get_session_diff", new_callable=AsyncMock) as mock_get_diff:
+        with patch("johnston_core.application.session.actions.get_session_diff", new_callable=AsyncMock) as mock_get_diff:
             mock_get_diff.return_value = [("file.py", "diff content", 1, 0)]
             await cmd.execute(app)
             app.push_screen.assert_called_once()

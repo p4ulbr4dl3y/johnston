@@ -1,13 +1,13 @@
 import os
 import tempfile
 
-from core.domain.entities.session import SessionKind
-from core.infrastructure.config.settings import JohnstonSettings, StorageSettings
-from core.infrastructure.storage.session_index_db import SessionIndexDb
-from core.infrastructure.storage.session_store import SessionStore
-from core.infrastructure.storage.session_store_cache import SessionStoreCacheMixin
-from core.infrastructure.storage.session_store_locks import SessionStoreLocksMixin
-from core.infrastructure.storage.session_store_paths import SessionStorePathsMixin
+from johnston_core.domain.entities.session import SessionKind
+from johnston_core.infrastructure.config.settings import JohnstonSettings, StorageSettings
+from johnston_core.infrastructure.storage.session_index_db import SessionIndexDb
+from johnston_core.infrastructure.storage.session_store import SessionStore
+from johnston_core.infrastructure.storage.session_store_cache import SessionStoreCacheMixin
+from johnston_core.infrastructure.storage.session_store_locks import SessionStoreLocksMixin
+from johnston_core.infrastructure.storage.session_store_paths import SessionStorePathsMixin
 
 
 def test_paths_mixin_standalone():
@@ -88,7 +88,7 @@ def test_cache_mixin_standalone(monkeypatch):
 
         # Default TTL from settings
         custom_settings = JohnstonSettings(storage=StorageSettings(disk_cache_ttl=12.5))
-        monkeypatch.setattr("core.infrastructure.storage.session_store.get_settings", lambda: custom_settings)
+        monkeypatch.setattr("johnston_core.infrastructure.storage.session_store.get_settings", lambda: custom_settings)
         assert cache.DISK_CACHE_TTL == 12.5
 
         # Explicit TTL setter

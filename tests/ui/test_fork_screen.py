@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from textual.widgets import OptionList
 
-from widgets.presentation.screens.fork import FORK_CURRENT_STATE, ForkScreen
+from johnston_tui.presentation.screens.fork import FORK_CURRENT_STATE, ForkScreen
 
 
 class TestForkScreen(unittest.IsolatedAsyncioTestCase):

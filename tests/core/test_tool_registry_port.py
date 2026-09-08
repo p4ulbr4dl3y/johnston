@@ -4,13 +4,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-import core.domain.ports.tool_registry as tr_port
-from core.domain.ports.tool_registry import (
+import johnston_core.domain.ports.tool_registry as tr_port
+from johnston_core.domain.ports.tool_registry import (
     ToolRegistryPort,
     get_default_tool_registry,
     set_default_tool_registry,
 )
-from core.provider_manager import ProviderManager
+from johnston_core.provider_manager import ProviderManager
 
 
 @pytest.fixture(autouse=True)

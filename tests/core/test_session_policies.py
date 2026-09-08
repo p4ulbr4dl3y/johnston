@@ -11,9 +11,9 @@ import shutil
 import tempfile
 import unittest
 
-from core.application.session.actions import _truncate_transcript
-from core.domain.entities.session import AgentSession
-from core.domain.policies.messages import (
+from johnston_core.application.session.actions import _truncate_transcript
+from johnston_core.domain.entities.session import AgentSession
+from johnston_core.domain.policies.messages import (
     count_history_user_turns,
     drop_stale_system_notes,
     find_history_user_cutoff,
@@ -25,7 +25,7 @@ from core.domain.policies.messages import (
     is_ui_visible_user_message,
     transcript_before_turn,
 )
-from core.infrastructure.storage.session_store import SessionStore
+from johnston_core.infrastructure.storage.session_store import SessionStore
 
 
 def _make_store(test_dir: str) -> SessionStore:

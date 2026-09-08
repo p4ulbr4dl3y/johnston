@@ -11,13 +11,13 @@ from unittest.mock import patch
 
 import pytest
 
-from core.application.skills.manager import (
+from johnston_core.application.skills.manager import (
     Skill,
     SkillManager,
     SkillScope,
 )
-from core.domain.defaults.skills.loader import load_bundled_skills
-from core.infrastructure.config.settings import get_settings
+from johnston_core.domain.defaults.skills.loader import load_bundled_skills
+from johnston_core.infrastructure.config.settings import get_settings
 
 
 def _write_skill(dir_path, rel_dir, name_hint, frontmatter_lines, body="Body text."):
@@ -169,7 +169,7 @@ def test_toggle_hidden_updates_settings_without_modifying_file(harness):
 def test_toggle_hidden_error_in_settings_raises(harness):
     sm = harness.sm
     _write_skill(sm.global_dir, "errorskill", None, ["name: errorskill", "description: d"])
-    with patch("core.application.skills.manager.patch_settings", side_effect=RuntimeError("settings save error")):
+    with patch("johnston_core.application.skills.manager.patch_settings", side_effect=RuntimeError("settings save error")):
         with pytest.raises(RuntimeError):
             sm.toggle_hidden("errorskill")
 

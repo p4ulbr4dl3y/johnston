@@ -6,15 +6,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from core.application.generation.ai_generator import GenCanvas
-from core.application.session.stream import (
+from johnston_core.application.generation.ai_generator import GenCanvas
+from johnston_core.application.session.stream import (
     cancel_running_subagents,
     configure_subagent_agent,
     merge_subagent_metrics,
     record_subagent_step,
     run_subagent_stream_bg,
 )
-from core.domain.entities.session import AgentSession, SessionStatus
+from johnston_core.domain.entities.session import AgentSession, SessionStatus
 
 STATUS_CANCELLED = SessionStatus.CANCELLED
 STATUS_COMPLETED = SessionStatus.COMPLETED
@@ -123,7 +123,7 @@ class TestUnknownAndSemantics:
         assert acc[0] == "final"
 
     def test_stream_step_to_session_event_phases(self):
-        from core.application.session.stream import stream_step_to_session_event
+        from johnston_core.application.session.stream import stream_step_to_session_event
 
         # thinking_start
         evt_start = stream_step_to_session_event(("thinking_start", "Starting thought", ""))
@@ -151,8 +151,8 @@ class TestUnknownAndSemantics:
         assert evt_up == {"type": "tool_generating_update", "tool_type": "read", "target": "foo.py", "meta": {"id": "c1"}}
 
     def test_stream_step_to_session_event_tool_result_carries_tool_id(self):
-        from core.application.session.stream import stream_step_to_session_event
-        from core.domain.defaults.errors import ToolResultStatus
+        from johnston_core.application.session.stream import stream_step_to_session_event
+        from johnston_core.domain.defaults.errors import ToolResultStatus
 
         # Full 7-tuple form: the tool_call_id must survive canonicalization so
         # consumers can pair a result with its exact start event.
@@ -171,7 +171,7 @@ class TestUnknownAndSemantics:
         assert short == {"type": "tool", "result_text": "out"}
 
     def test_record_subagent_step_tool_generating_ephemeral(self):
-        from core.application.session.stream import record_subagent_step
+        from johnston_core.application.session.stream import record_subagent_step
 
         sess = make_session()
         received_events = []
@@ -198,7 +198,7 @@ class TestUnknownAndSemantics:
         assert len(sess.messages) == 1  # now persisted to messages
 
     def test_record_subagent_step_tool_call_id_persisted_and_result_merged(self):
-        from core.application.session.stream import record_subagent_step
+        from johnston_core.application.session.stream import record_subagent_step
 
         sess = make_session()
         acc = [""]
@@ -213,7 +213,7 @@ class TestUnknownAndSemantics:
 
         # Tool result (tool_result carries the same id at position 6): it must
         # merge into the existing start message and re-affirm the pairing.
-        from core.domain.defaults.errors import ToolResultStatus
+        from johnston_core.domain.defaults.errors import ToolResultStatus
 
         record_subagent_step(
             ("tool_result", "file contents", "", False, ToolResultStatus.DONE, 0, "c1"),
@@ -230,7 +230,7 @@ class TestUnknownAndSemantics:
         assert tool_msg["tool_type"] == "read"
 
     def test_record_subagent_step_tool_call_id_rename_restricted_to_tool(self):
-        from core.application.session.stream import record_subagent_step
+        from johnston_core.application.session.stream import record_subagent_step
 
         # A non-tool event must NOT get the tool_id -> tool_call_id rename.
         sess = make_session()
@@ -258,7 +258,7 @@ class TestUnknownAndSemantics:
     def test_thinking_delta_accumulation(self):
         sess = make_session()
         acc = [""]
-        from core.application.session.stream import record_subagent_step
+        from johnston_core.application.session.stream import record_subagent_step
 
         record_subagent_step(("thinking_start", "Starting thought", ""), sess, acc)
         assert sess.messages[-1]["text"] == "Starting thought"
@@ -675,7 +675,7 @@ class TestSafeSaves:
     async def test_error_logged_not_swallowed(self, caplog):
         import logging as _logging
 
-        from core.application.session.stream import _safe_save
+        from johnston_core.application.session.stream import _safe_save
 
         s = make_session()
         with caplog.at_level(_logging.ERROR):
@@ -685,7 +685,7 @@ class TestSafeSaves:
 
     @pytest.mark.asyncio
     async def test_error_propagates_to_caller(self):
-        from core.application.session.stream import _safe_save
+        from johnston_core.application.session.stream import _safe_save
 
         s = make_session()
         with pytest.raises(OSError):
@@ -753,7 +753,7 @@ class TestSafeSaves:
         """A7 (execute_session_turn level): FailureStore.save raises OSError
         and the task is cancelled mid-stream -> asyncio.CancelledError
         propagates, never the OSError."""
-        from core.application.session.stream import execute_session_turn
+        from johnston_core.application.session.stream import execute_session_turn
 
         async def stream_with_suspend(*a, **k):
             yield ("thinking_start", "Thinking...", "")
@@ -845,7 +845,7 @@ def _tool(name):
 
 class TestApplyRole:
     def _fake_registry(self, monkeypatch, roles):
-        from core import role_registry
+        from johnston_core import role_registry
 
         class FakeReg:
             def load_roles(self, project_dir=None, include_global=True):
@@ -857,7 +857,7 @@ class TestApplyRole:
         monkeypatch.setattr(role_registry.RoleRegistry, "get_instance", lambda: FakeReg())
 
     def test_scope_main_falls_back_to_worker(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from johnston_core.role_registry import AgentRole
 
         main_role = AgentRole(key="orchestrator", scope="main", prompt="main prompt")
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
@@ -868,7 +868,7 @@ class TestApplyRole:
         assert returned.scope != "main"
 
     def test_role_not_found_falls_back_to_worker(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from johnston_core.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -877,7 +877,7 @@ class TestApplyRole:
         assert hasattr(returned, "key")  # not None
 
     def test_tools_none_becomes_empty(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from johnston_core.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -886,7 +886,7 @@ class TestApplyRole:
         assert sub.tools == []
 
     def test_shell_description_overridden_others_preserved(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from johnston_core.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -900,7 +900,7 @@ class TestApplyRole:
         assert read["function"]["description"] == "desc read"
 
     def test_excluded_tools_removed(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from johnston_core.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -1001,7 +1001,7 @@ class TestCancelRunning:
 
 class TestSubagentStepAndErrorHandling:
     def test_record_subagent_step_queued_user_message(self):
-        from core.application.session.stream import record_subagent_step
+        from johnston_core.application.session.stream import record_subagent_step
 
         sess = make_session()
         acc = ["previous text"]
@@ -1090,7 +1090,7 @@ class TestSubagentStepAndErrorHandling:
 
     @pytest.mark.asyncio
     async def test_execute_session_turn_main_and_callback(self):
-        from core.application.session.stream import execute_session_turn
+        from johnston_core.application.session.stream import execute_session_turn
 
         agent = FakeSubagent(steps=[("bot_delta", "Hello from runner")])
         agent.is_subagent = False
@@ -1173,7 +1173,7 @@ class TestParentInterruptLeavesSubagentsRunning:
             cancel_subagents=cancel_cb,
         )
 
-        from widgets.app.ai_controller import run_ai_generation
+        from johnston_tui.app.ai_controller import run_ai_generation
 
         with pytest.raises(asyncio.CancelledError):
             await run_ai_generation(

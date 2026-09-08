@@ -2,8 +2,8 @@
 import unittest
 from unittest.mock import patch
 
-from widgets.lexer_utils import generate_chunk_unified_diff
-from widgets.utils.lexer import guess_lexer_name, lex_block_to_line_texts
+from johnston_tui.lexer_utils import generate_chunk_unified_diff
+from johnston_tui.utils.lexer import guess_lexer_name, lex_block_to_line_texts
 
 
 class TestGuessLexerName(unittest.TestCase):
@@ -68,7 +68,7 @@ class TestLexBlockToLineTexts(unittest.TestCase):
 
     def test_lexer_exception_falls_back_to_plain(self):
         with patch(
-            "widgets.utils.lexer.pygments.lex", side_effect=RuntimeError("boom")
+            "johnston_tui.utils.lexer.pygments.lex", side_effect=RuntimeError("boom")
         ):
             out = self._texts(["a", "b"], lexer=object())
         self.assertEqual(len(out), 2)
