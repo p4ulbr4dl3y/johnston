@@ -7,6 +7,86 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.31.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.30.0...johnston-v0.31.0) (2026-09-08)
+
+
+### Features
+
+* **branch:** add git worktree command, screen, and cli flag ([57d3896](https://github.com/p4ulbr4dl3y/johnston/commit/57d3896a9e1108f43fe05f9dc4c3efa474ef24a1))
+* **core:** non-interactive shell and atomic kill/message_subagent ([1956c90](https://github.com/p4ulbr4dl3y/johnston/commit/1956c90c8e9d60d65c4ba809847121fd529c83ee))
+* **permission:** allow LOGS_DIR reading and protect secrets.json ([5ec6f21](https://github.com/p4ulbr4dl3y/johnston/commit/5ec6f21b078e4373df45a4712e5a7004c4b48830))
+* **perms:** support mcp server-level permission allow patterns ([bd813cd](https://github.com/p4ulbr4dl3y/johnston/commit/bd813cd556500521f089b504de3c3851f396ec9c))
+* **prompts:** add subagent role preference and report format rules ([614f8ab](https://github.com/p4ulbr4dl3y/johnston/commit/614f8ab9f9045e723d84ebe50a9eae82dfdaff85))
+* **prompts:** allow single final git commit in subagents ([2747d19](https://github.com/p4ulbr4dl3y/johnston/commit/2747d19ece682a76b5bcc4213f853a1c8f1b267d))
+* **prompts:** clarify relative path translation in worktree prompt ([d9dc128](https://github.com/p4ulbr4dl3y/johnston/commit/d9dc128b6359ba518a1ecafdeb5593a09dcd72bd))
+* **prompts:** clarify relative vs absolute path policy in schemas ([1e61fac](https://github.com/p4ulbr4dl3y/johnston/commit/1e61fac93b810fc494880f935c8b75344a7ee5ab))
+* **prompts:** disallow piping and cd, clarify synthetic messages ([9fb5417](https://github.com/p4ulbr4dl3y/johnston/commit/9fb5417a06bb6d179e9c60f7870ff0b13c197630))
+* **prompts:** optimize tool_io rules and schema argument ordering ([81738a8](https://github.com/p4ulbr4dl3y/johnston/commit/81738a82886baad17c27a60f57af6826214599e5))
+* **reviewer:** add adversarial verification protocol to reviewer role ([a4a49ba](https://github.com/p4ulbr4dl3y/johnston/commit/a4a49ba23fef627ba5820797e6ca198cd32682e5))
+* **roles:** add reviewer builtin role and review-loop skill ([c3c9b43](https://github.com/p4ulbr4dl3y/johnston/commit/c3c9b43e5aeff0130956cacf19874349315ba5e9))
+* **roles:** allow throwaway probe scripts via shell in reviewer prompt ([1fc3614](https://github.com/p4ulbr4dl3y/johnston/commit/1fc3614bf35354bb6d5c59fabd43704547a7cd9d))
+* **roles:** enhance explorer prompt with outline, reuse, and shell safety ([46f53c2](https://github.com/p4ulbr4dl3y/johnston/commit/46f53c2e769da071ba9f678a0fc7788ea48a88ca))
+* **roles:** enhance worker prompt with verification and test integrity ([589bf78](https://github.com/p4ulbr4dl3y/johnston/commit/589bf78ca919d0288452b27d6d977aeee3d30740))
+* **session:** persist branch state and compact worktree footer ([b234d9e](https://github.com/p4ulbr4dl3y/johnston/commit/b234d9e6616460cc3f4f568438d0515344a87da1))
+* **shell:** prevent task polling and strip log path from text ([7c29d1d](https://github.com/p4ulbr4dl3y/johnston/commit/7c29d1d9ac808f46f850d319ce0a926cb5fb9d42))
+* **skills:** add creator skills and sync guide documentation ([03ef863](https://github.com/p4ulbr4dl3y/johnston/commit/03ef86321ef8b61632d31029f8c48c2c2f402270))
+* **skills:** add hidden bundled goal skill for autonomous execution ([b8c2f67](https://github.com/p4ulbr4dl3y/johnston/commit/b8c2f67ce39a955399f34cd7cc94a8679b21fcbe))
+* **skills:** add hidden bundled init and handoff skills ([60a42e6](https://github.com/p4ulbr4dl3y/johnston/commit/60a42e62ffec1eb23802256fc577ff00ff33d000))
+* **skills:** align handoff skill schema with compaction template ([e85cf04](https://github.com/p4ulbr4dl3y/johnston/commit/e85cf049bcdc86aff01c2e45c6d6fd7559ca9173))
+* **skills:** enhance review-loop with scope resolution and delegation ([b84bc8f](https://github.com/p4ulbr4dl3y/johnston/commit/b84bc8fafcebad4406c60f75bb1ab6a0489e4ab4))
+* **subagents:** require relative paths in subagents prompt directive ([0621409](https://github.com/p4ulbr4dl3y/johnston/commit/0621409ae0a2bd0e90abe625e8119e2a4e113925))
+* **tools:** centralize interactive mode and subagent restrictions ([b3689b6](https://github.com/p4ulbr4dl3y/johnston/commit/b3689b651229111b0116f5072143fa0618499142))
+* **ui:** add diagram scrollbar and prevent trackpad hijacking ([4a0b06d](https://github.com/p4ulbr4dl3y/johnston/commit/4a0b06dc4f772db53304a668a9ff6d7200f7432f))
+* **ui:** add workspace roots management modal screen ([38279aa](https://github.com/p4ulbr4dl3y/johnston/commit/38279aad06f1ed630d68088af5464de4531a06bb))
+* **ui:** shorten and normalize tool paths with cwd and tilde ([0c06c0d](https://github.com/p4ulbr4dl3y/johnston/commit/0c06c0d620c91893b2cf3d04b614a55ce55ad349))
+* **ui:** support drag-and-drop folder addition in workspace modal ([99a994e](https://github.com/p4ulbr4dl3y/johnston/commit/99a994e54f7f475308449d7c50fbf4d0d51728e6))
+* **ui:** use thin half-block scrollbar for diagram fences ([e9b2492](https://github.com/p4ulbr4dl3y/johnston/commit/e9b24922d8afa6c64483b06207a2fc599d06dedb))
+* **workspace:** add cyclic navigation and selection clearing ([c0c77cd](https://github.com/p4ulbr4dl3y/johnston/commit/c0c77cdedbab41c320b0fcceb52340772a9963a8))
+* **workspace:** add master-detail file tree preview to modal ([40cd0e2](https://github.com/p4ulbr4dl3y/johnston/commit/40cd0e21f9a8d20106780947911d2dab73dba3fb))
+* **workspace:** add tilde shortening and middle truncation for paths ([16b66a5](https://github.com/p4ulbr4dl3y/johnston/commit/16b66a56d7c128d1056235947c11a357535540e5))
+* **workspace:** make modal session-only with inline input ([867f31f](https://github.com/p4ulbr4dl3y/johnston/commit/867f31f707d6fde04a25d81be70fd297c0db3cb8))
+* **workspace:** recognize and manage global config roots ([f0585c9](https://github.com/p4ulbr4dl3y/johnston/commit/f0585c936ce7f399c54acd7d9abfe3f83c86f406))
+
+
+### Bug Fixes
+
+* **branch:** address reviewer safety and edge-case feedback ([88663db](https://github.com/p4ulbr4dl3y/johnston/commit/88663db5207b6ef014630663729aa7e4c5382deb))
+* **core,widgets:** eliminate task, listener and widget memory leaks ([74d4bd0](https://github.com/p4ulbr4dl3y/johnston/commit/74d4bd001cf2d552efba13cae5101e90055f95ad))
+* **core:** sync prompt contracts, tool batching and role safety ([0eeffe6](https://github.com/p4ulbr4dl3y/johnston/commit/0eeffe68919a11e1312d6a41565bac0577c8ba68))
+* **permission:** harden cascade, workspace check, and deny rules ([d8b1387](https://github.com/p4ulbr4dl3y/johnston/commit/d8b1387e62e0275e5f52a9cc219e8b505a9faed2))
+* **permission:** prevent secrets bypass via shell, globs, and search ([2abf00f](https://github.com/p4ulbr4dl3y/johnston/commit/2abf00feb35f0ac189a0693a362e69551d0c56eb))
+* **perms:** detect squeezed flags and eval in unsafe shell regex ([5b2bea7](https://github.com/p4ulbr4dl3y/johnston/commit/5b2bea7fe32ef63811c278b65b1afa81a9904c18))
+* **perms:** harden shell parsing, multi-target paths and CLI prompts ([ce893f9](https://github.com/p4ulbr4dl3y/johnston/commit/ce893f9b9acbfab7f0d9dcb0371099546b5c744f))
+* **perms:** harden shell safety, wildcard priority and roots option ([43b28c3](https://github.com/p4ulbr4dl3y/johnston/commit/43b28c31c836638a26c474c0cc4954d8fcad02f3))
+* **perms:** pass server_name to permission confirm modal and preview ([b0c234a](https://github.com/p4ulbr4dl3y/johnston/commit/b0c234a32d7d26324f4849134b1ec174b0ef2013))
+* **prompts:** backtick tag refs in prose and add integrity tests ([8171b34](https://github.com/p4ulbr4dl3y/johnston/commit/8171b34ae3a0d9d3044fc84b341b876da05bcceb))
+* **prompts:** harmonize tool schemas, role rules, and offset guidance ([c3e85cc](https://github.com/p4ulbr4dl3y/johnston/commit/c3e85cc7cd05f72d8d33a15b120280f854eaa339))
+* **prompts:** refine plan completion, skill trigger, and error kinds ([7727ad6](https://github.com/p4ulbr4dl3y/johnston/commit/7727ad64957a2ca35d9b82c0b2698aa1a7f1b1b7))
+* **security:** harden shell policy against interpreter bypass ([578bd49](https://github.com/p4ulbr4dl3y/johnston/commit/578bd490571721c1b304cf8b0dd089ee17e52d04))
+* **shell:** harden read-only command mutation parser against bypasses ([58cf788](https://github.com/p4ulbr4dl3y/johnston/commit/58cf788e1e7e45a2a3165b857ccac177467d9aaa))
+* **shell:** harden read-only shell parser against token and wrapper bypasses ([10144fc](https://github.com/p4ulbr4dl3y/johnston/commit/10144fc0a12c2c2251271de1b664a1c98aed89ce))
+* **shell:** show log path only for wait_seconds=0 background tasks ([6691d66](https://github.com/p4ulbr4dl3y/johnston/commit/6691d666d699b90aa81e3db04ff9c0ac79f7329f))
+* **skills:** default handoff file storage to .johnston/HANDOFF.md ([73f9bb1](https://github.com/p4ulbr4dl3y/johnston/commit/73f9bb1ad8bdcee3de8ae184096abf2b07927862))
+* **skills:** use task and role in invoke_subagent examples ([1a8ac49](https://github.com/p4ulbr4dl3y/johnston/commit/1a8ac494ebdd3acf84d937524b105e7f09041dbc))
+* **tasks:** enforce strict task lifecycle and transactional subagents ([4fdcd21](https://github.com/p4ulbr4dl3y/johnston/commit/4fdcd218c5ed62d59ca2ccd48ab55fc641a9920c))
+* **tasks:** harden shell, task trees, and subagent worktree cleanup ([2d82bb4](https://github.com/p4ulbr4dl3y/johnston/commit/2d82bb40fc314d48d482b974aa978d0dc67c1c35))
+* **tools:** enforce strict type validation for non-string args ([5743386](https://github.com/p4ulbr4dl3y/johnston/commit/574338696c95902d56cf22fa4a9fb96b48ca1249))
+* **tools:** harden argument normalization, schemas and error handling ([7800379](https://github.com/p4ulbr4dl3y/johnston/commit/780037938fb3f391f76dd306ecf5b2b2df2b23cd))
+* **tools:** surface non-zero shell exit code and honor allow_task ([48cff17](https://github.com/p4ulbr4dl3y/johnston/commit/48cff1778c6b595bff51fe49517acda149a38b7d))
+* **ui:** accept subagent_role in PermissionConfirmScreen ([961fdf9](https://github.com/p4ulbr4dl3y/johnston/commit/961fdf9627bf2e6b614be00ec8d06f04bd5de777))
+* **ui:** ensure ConfirmScreen handles focus, click and d/c keys ([5af65bb](https://github.com/p4ulbr4dl3y/johnston/commit/5af65bba5eb5cb32d08811cd83bf8816a6a7f5d5))
+* **ui:** kill subagents and bg shell only via ctrl+k ([76770af](https://github.com/p4ulbr4dl3y/johnston/commit/76770afa37e236dddfdb9e13e2c52dc0f7452645))
+* **ui:** prevent paste leakage to chat input during modal screens ([e784ca6](https://github.com/p4ulbr4dl3y/johnston/commit/e784ca6435366fa9463594686b36ca4c81d5b756))
+* **ui:** restore hint count badges in skills and mcp modals ([3f24b4c](https://github.com/p4ulbr4dl3y/johnston/commit/3f24b4c876ff99b1d566b41865a8da527a8788f7))
+* **widgets:** allow legacy session fallback for background shell task ([dd03364](https://github.com/p4ulbr4dl3y/johnston/commit/dd03364af90d53ef01ebb418a1d906c412895cac))
+* **workspace:** clear list highlight when input has focus ([51041f5](https://github.com/p4ulbr4dl3y/johnston/commit/51041f5ae733ce6979ec8fa7e0b13f0ff548c6da))
+* **workspace:** remove redundant toast notifications ([b2253b4](https://github.com/p4ulbr4dl3y/johnston/commit/b2253b4731019a58dce5a9a13762f7656e2d8d7b))
+
+
+### Reverts
+
+* **workspace:** revert master-detail file tree modal ([b3cdd12](https://github.com/p4ulbr4dl3y/johnston/commit/b3cdd12a9bc2a1d315c7067749b20daa70021306))
+
 ## [0.30.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.29.0...johnston-v0.30.0) (2026-09-06)
 
 
