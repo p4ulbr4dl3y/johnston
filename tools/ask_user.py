@@ -70,28 +70,20 @@ class AskUserTool(BaseTool):
                                 },
                                 "options": {
                                     "type": "array",
-                                    "description": "2-4 options. Either list of strings (e.g. ['Option A', 'Option B']) or objects with label and description. Add '(Recommended)' to suggested choice.",
+                                    "description": "2-4 options. Add '(Recommended)' to suggested choice.",
                                     "items": {
-                                        "anyOf": [
-                                            {
+                                        "type": "object",
+                                        "properties": {
+                                            "label": {
                                                 "type": "string",
-                                                "description": "Option label.",
+                                                "description": "Choice text (1-5 words).",
                                             },
-                                            {
-                                                "type": "object",
-                                                "properties": {
-                                                    "label": {
-                                                        "type": "string",
-                                                        "description": "Short choice text (1-5 words).",
-                                                    },
-                                                    "description": {
-                                                        "type": "string",
-                                                        "description": "Trade-offs or implications.",
-                                                    },
-                                                },
-                                                "required": ["label"],
+                                            "description": {
+                                                "type": "string",
+                                                "description": "Trade-offs or implications (optional).",
                                             },
-                                        ]
+                                        },
+                                        "required": ["label"],
                                     },
                                 },
                             },

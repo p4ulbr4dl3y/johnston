@@ -17,7 +17,7 @@ class ReadTool(BaseTool):
     description = (
         f"Read file contents, inspect directory listings, or view/extract archive contents (ZIP/TAR/WHL/JAR). "
         f"Supports inner paths (e.g. 'pkg.whl/mod.py'). Converts docs (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) and images. "
-        f"Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers."
+        f"Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers; paginate using start_line/end_line."
     )
     schema = {
         "type": "function",

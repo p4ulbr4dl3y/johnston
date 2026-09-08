@@ -235,7 +235,8 @@ class ShellTool(BaseTool):
     name = "shell"
     description = (
         "Execute a non-interactive shell command synchronously or with background execution. "
-        "Outputs [exit N] followed by command stdout/stderr."
+        "Runs in project root by default (use 'cwd' for subdirectories, never 'cd'). "
+        "Always use non-interactive flags (e.g. -y, --batch). Outputs [exit N] followed by stdout/stderr."
     )
 
     schema = {
@@ -243,8 +244,9 @@ class ShellTool(BaseTool):
         "function": {
             "name": "shell",
             "description": (
-                "Execute a non-interactive shell command. Runs in project root by default. "
-                "Always use non-interactive flags (e.g. -y, --batch) and avoid interactive REPLs/paginators."
+                "Execute a non-interactive shell command synchronously or with background execution. "
+                "Runs in project root by default (use 'cwd' for subdirectories, never 'cd'). "
+                "Always use non-interactive flags (e.g. -y, --batch). Outputs [exit N] followed by stdout/stderr."
             ),
             "parameters": {
                 "type": "object",

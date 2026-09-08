@@ -40,7 +40,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "6. **Stay in your lane**: if you spot a bug or improvement outside scope, note it as 'Out-of-scope observation' — DO NOT fix without instruction.\n"
             "</rules>\n\n"
             "<anti_patterns>\n"
-            "Do NOT: overwrite existing files with `create`, rewrite working code 'for clarity', weaken test assertions, run formatters across the repo, run `git commit --amend`.\n"
+            "Do NOT: overwrite existing files with `create` when `edit` is feasible (use `create` only for wholesale rewrites >40%), rewrite working code 'for clarity', weaken test assertions, run formatters across the repo, run `git commit --amend`.\n"
             "</anti_patterns>"
         ),
         scope="any",
@@ -92,7 +92,7 @@ BUILTIN_ROLES: Dict[str, AgentRole] = {
             "7. **Strict verdict**: conclude with `VERDICT: APPROVE` only if verified via shell and zero P0/P1/P2 issues exist; otherwise `VERDICT: REJECT`.\n"
             "</rules>\n\n"
             "<anti_patterns>\n"
-            "Do NOT: approve without running verification via `shell`, trust passing mocks without checking behavior, comment on formatting/whitespace/naming, flag theoretical DOS or performance concerns without proof, report pre-existing debt, invent findings when diff is clean, attempt code edits.\n"
+            "Do NOT: approve without running verification via `shell`, trust passing mocks without checking behavior, comment on formatting/whitespace/naming, flag theoretical DOS or performance concerns without proof, report pre-existing debt, invent findings when diff is clean, generate scratch files in workspace (use system temp only), attempt code edits.\n"
             "</anti_patterns>"
         ),
         read_only=True,

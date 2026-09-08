@@ -314,7 +314,7 @@ Errors: prefix `ERR: <kind> ['<target>']: <detail>` (target is omitted if genera
 
 Truncation marker: `[truncated | log <p> | next read(path=<log>, start_line=N)]` — for tracebacks, read ~50 lines around N; for mass output/JSON/lists, filter with `rg`/`jq` on log or re-run with flags (e.g. `pytest -k` / `cargo test`, `git log -n 5`). Do NOT paginate large logs via read.
 
-Pagination: `[<p> | lines N..M of T]` then `N|line content`. Use `read(path, start_line=N, end_line=M)` (window up to max lines per call) or `read(path, content_offset=N)` for binary.
+Pagination: `[<p> | lines N..M of T]` then `N|line content`. Use `read(path, start_line=N, end_line=M)` (window up to max lines per call) or `read(path, content_offset=N)` for minified/single-line files.
 
 Plan progress: `[plan updated | N/M done | <explanation>]`. Plan persists; do not re-emit.
 
