@@ -247,3 +247,39 @@ class ToolContext:
         if isinstance(fg, dict):
             fg.pop(task_id, None)
 
+    def find_task(self, task_id: str) -> Any | None:
+        """Find task in background tasks registry or active foreground tasks."""
+        if not task_id:
+            return None
+        from core.infrastructure.tasks.manage import filter_to_session
+
+        tasks = filter_to_session(self.background_tasks or [], self.session_id or "")
+        for t in tasks:
+            if getattr(t, "task_id", None) == task_id or getattr(t, "id", None) == task_id:
+                return t
+
+        if self.host:
+            fg = getattr(self.host, "_foreground_shell_tasks", None)
+            if isinstance(fg, dict) and task_id in fg:
+                return fg[task_id]
+        return None
+
+    def terminate_task_widget(
+        self,
+        task_id: str,
+        output: str = "[killed]",
+        status: str = "done",
+    ) -> None:
+        """Safely terminate and detach linked UI widget for a killed task."""
+        if not self.host:
+            return
+        reg = getattr(self.host, "_background_shell_widgets", None)
+        if isinstance(reg, dict):
+            widget = reg.pop(task_id, None)
+            if widget is not None and hasattr(widget, "set_result"):
+                try:
+                    widget.set_result(output, status=status)
+                except Exception:
+                    pass
+
+

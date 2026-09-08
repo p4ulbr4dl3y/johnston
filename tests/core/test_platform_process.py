@@ -170,3 +170,75 @@ def test_tool_context_shell_widget_helpers():
     ctx.cleanup_foreground_shell_task("t_fg")
     assert "t_fg" not in host._foreground_shell_tasks
 
+    # Test find_task & terminate_task_widget
+    host._foreground_shell_tasks["fg1"] = task
+    assert ctx.find_task("fg1") == task
+    assert ctx.find_task("missing") is None
+
+    host._background_shell_widgets["w1"] = widget
+    ctx.terminate_task_widget("w1", output="killed!", status="done")
+    assert "w1" not in host._background_shell_widgets
+    widget.set_result.assert_called_with("killed!", status="done")
+
+
+@pytest.mark.asyncio
+async def test_terminate_process_tree_windows():
+    from core.infrastructure.platform.process import terminate_process_tree
+
+    proc = MagicMock()
+    proc.pid = 1234
+    proc.returncode = None
+    proc.wait = AsyncMock()
+
+    mock_sub = MagicMock()
+    mock_sub.wait = AsyncMock()
+
+    with (
+        patch("core.infrastructure.platform.process.is_windows", return_value=True),
+        patch("asyncio.create_subprocess_exec", new_callable=AsyncMock, return_value=mock_sub) as mock_exec,
+    ):
+        await terminate_process_tree(proc, timeout=0.5)
+        mock_exec.assert_called_once()
+        args = mock_exec.call_args[0]
+        assert "taskkill" in args
+        assert "/T" in args
+        assert "1234" in args
+
+
+@pytest.mark.asyncio
+async def test_terminate_process_tree_posix():
+    from core.infrastructure.platform.process import terminate_process_tree
+
+    proc = MagicMock()
+    proc.pid = 4321
+    proc.returncode = None
+    proc.wait = AsyncMock()
+
+    with (
+        patch("core.infrastructure.platform.process.is_windows", return_value=False),
+        patch("os.killpg") as mock_killpg,
+    ):
+        await terminate_process_tree(proc, timeout=0.5)
+        mock_killpg.assert_called_once()
+        args = mock_killpg.call_args[0]
+        assert args[0] == 4321
+
+
+def test_terminate_process_tree_sync_windows():
+    from core.infrastructure.platform.process import terminate_process_tree_sync
+
+    proc = MagicMock()
+    proc.pid = 5678
+    proc.returncode = None
+
+    with (
+        patch("core.infrastructure.platform.process.is_windows", return_value=True),
+        patch("subprocess.run") as mock_run,
+    ):
+        terminate_process_tree_sync(proc)
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        assert "taskkill" in args
+        assert "/PID" in args
+
+

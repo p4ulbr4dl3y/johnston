@@ -136,3 +136,49 @@ async def test_kill_accepts_task_id_or_session_id_alias(kill_tool):
     res = await kill_tool.execute({"task_id": "shell-999"}, ctx=ctx)
     assert res.status == ToolResultStatus.DONE
     assert "[killed shell-999]" in res.content
+
+
+@pytest.mark.asyncio
+async def test_kill_foreground_shell_task(kill_tool):
+    fg_task = MagicMock()
+    fg_task.task_id = "shell-fg1"
+    fg_task.is_active = True
+    fg_task.kill = AsyncMock()
+    fg_task.get_formatted_output = MagicMock(return_value="fg output")
+
+    app = MagicMock()
+    app.task_manager = []
+    app.current_session_id = "sess-1"
+    app._foreground_shell_tasks = {"shell-fg1": fg_task}
+    app._background_shell_widgets = {}
+    ctx = ToolContext(app=app)
+
+    res = await kill_tool.execute({"id": "shell-fg1"}, ctx=ctx)
+    assert res.status == ToolResultStatus.DONE
+    assert "[killed shell-fg1]" in res.content
+    fg_task.kill.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_kill_process_fallback(kill_tool, monkeypatch):
+    proc = MagicMock()
+    proc.returncode = None
+    task = MagicMock(spec=["task_id", "is_active", "process", "session_id"])
+    task.task_id = "shell-p1"
+    task.session_id = "sess-1"
+    task.is_active = True
+    task.process = proc
+
+    term_mock = AsyncMock()
+    monkeypatch.setattr("core.infrastructure.platform.process.terminate_process_tree", term_mock)
+
+    app = MagicMock()
+    app.task_manager = [task]
+    app.current_session_id = "sess-1"
+    app._background_shell_widgets = {}
+    ctx = ToolContext(app=app)
+
+    res = await kill_tool.execute({"id": "shell-p1"}, ctx=ctx)
+    assert res.status == ToolResultStatus.DONE
+    term_mock.assert_awaited_once_with(proc)
+

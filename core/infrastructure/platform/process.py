@@ -1,7 +1,8 @@
-"""Low-level OS process spawning utilities."""
-
 import asyncio
-from typing import Callable, Optional
+import os
+import signal
+import subprocess
+from typing import Any, Callable, Optional
 
 from core.infrastructure.platform.platform_utils import (
     is_windows,
@@ -114,3 +115,112 @@ async def spawn_shell_process(
         executable=shell,
         **shell_subprocess_kwargs(),
     )
+
+
+async def terminate_process_tree(process: Any, timeout: float = 1.0) -> None:
+    """Terminate a process and all its child descendants across Windows and POSIX."""
+    if not process or getattr(process, "returncode", None) is not None:
+        return
+
+    pid = getattr(process, "pid", None)
+    if not isinstance(pid, int) or pid <= 0:
+        try:
+            if hasattr(process, "terminate"):
+                process.terminate()
+            if hasattr(process, "wait"):
+                res = process.wait()
+                if asyncio.iscoroutine(res):
+                    await asyncio.wait_for(res, timeout=timeout)
+        except Exception:
+            try:
+                if hasattr(process, "kill"):
+                    process.kill()
+            except Exception:
+                pass
+        return
+
+    if is_windows():
+        try:
+            cmd = ["taskkill", "/F", "/T", "/PID", str(pid)]
+            p = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(p.wait(), timeout=timeout)
+        except Exception:
+            try:
+                if hasattr(process, "kill"):
+                    process.kill()
+                elif hasattr(process, "terminate"):
+                    process.terminate()
+            except Exception:
+                pass
+        return
+
+    # POSIX: process group kill
+    try:
+        os.killpg(pid, signal.SIGTERM)
+        if hasattr(process, "wait"):
+            res = process.wait()
+            if asyncio.iscoroutine(res):
+                await asyncio.wait_for(res, timeout=timeout)
+    except (asyncio.TimeoutError, Exception):
+        try:
+            os.killpg(pid, signal.SIGKILL)
+            if hasattr(process, "wait"):
+                res = process.wait()
+                if asyncio.iscoroutine(res):
+                    await asyncio.wait_for(res, timeout=0.5)
+        except Exception:
+            try:
+                if hasattr(process, "kill"):
+                    process.kill()
+            except Exception:
+                pass
+
+
+def terminate_process_tree_sync(process: Any) -> None:
+    """Synchronously terminate a process and its child descendants."""
+    if not process or getattr(process, "returncode", None) is not None:
+        return
+
+    pid = getattr(process, "pid", None)
+    if not isinstance(pid, int) or pid <= 0:
+        try:
+            if hasattr(process, "kill"):
+                process.kill()
+            elif hasattr(process, "terminate"):
+                process.terminate()
+        except Exception:
+            pass
+        return
+
+    if is_windows():
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=2.0,
+                check=False,
+            )
+        except Exception:
+            try:
+                if hasattr(process, "kill"):
+                    process.kill()
+            except Exception:
+                pass
+        return
+
+    # POSIX: SIGKILL to process group
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except Exception:
+        pass
+    try:
+        if hasattr(process, "kill"):
+            process.kill()
+    except Exception:
+        pass
+

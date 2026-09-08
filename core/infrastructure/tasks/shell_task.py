@@ -304,25 +304,36 @@ class ShellTask(BaseTask):
 
     async def kill(self) -> None:
         self.was_killed = True
-        self._listeners.clear()
         if self.watcher_task is not None and not self.watcher_task.done():
             self.watcher_task.cancel()
         await self.close_log_async()
         if self.process is not None:
-            await terminate_process(self.process)
+            try:
+                from core.infrastructure.platform.process import terminate_process_tree
+
+                await terminate_process_tree(self.process)
+            except Exception:
+                await terminate_process(self.process)
         if self.read_task is not None and not self.read_task.done():
             self.read_task.cancel()
         self.output.append(_TASK_TERMINATED_BY_USER)
+        self._notify_listeners("")
+        self._listeners.clear()
         self._mark_terminated(TaskStatus.KILLED)
 
     def kill_sync(self) -> None:
         """Synchronous kill used by exit paths that run outside the event loop."""
         self.was_killed = True
-        self._listeners.clear()
         if self.watcher_task is not None and not self.watcher_task.done():
             self.watcher_task.cancel()
         self.close_log()
         if self.process is not None:
+            try:
+                from core.infrastructure.platform.process import terminate_process_tree_sync
+
+                terminate_process_tree_sync(self.process)
+            except Exception:
+                pass
             try:
                 pid = getattr(self.process, "pid", None)
                 if isinstance(pid, int) and pid > 0:
@@ -336,4 +347,7 @@ class ShellTask(BaseTask):
         if self.read_task is not None and not self.read_task.done():
             self.read_task.cancel()
         self.output.append(_TASK_TERMINATED_BY_USER)
+        self._notify_listeners("")
+        self._listeners.clear()
         self._mark_terminated(TaskStatus.KILLED)
+
