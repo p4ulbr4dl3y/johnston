@@ -483,10 +483,6 @@ def _format_active_tool_progress(
         return f"searching codebase ({n_searches})" if n_searches > 1 else "searching codebase"
 
     if name == "update_plan":
-        plan = args.get("plan")
-        if isinstance(plan, list) and plan:
-            done = sum(1 for item in plan if isinstance(item, dict) and item.get("status") == "completed")
-            return f"plan [{done}/{len(plan)}]"
         return "updating plan"
 
     if name in ("web_fetch", "read_url_content", "search_web"):
@@ -561,10 +557,14 @@ def extract_subagent_plan_status(session: Any) -> Optional[Tuple[int, int]]:
     if session is None:
         return None
     plan = getattr(session, "current_plan", None) if not isinstance(session, dict) else session.get("current_plan")
+    if not isinstance(plan, list):
+        plan = None
     if not plan:
         agent = getattr(session, "agent", None)
         if agent:
             plan = getattr(agent, "current_plan", None)
+            if not isinstance(plan, list):
+                plan = None
     if not plan:
         messages = session.get("messages") if isinstance(session, dict) else getattr(session, "messages", None)
         if messages and isinstance(messages, (list, tuple)):
@@ -661,8 +661,6 @@ def extract_subagent_progress(session: Any) -> str:
             if tool_type:
                 raw_badge = _format_active_tool_progress(tool_type, args, target, turn_events=batch_events)
                 if plan_prefix:
-                    if raw_badge.startswith("plan ["):
-                        return raw_badge
                     return f"{plan_prefix}{raw_badge}"
                 return raw_badge
             continue

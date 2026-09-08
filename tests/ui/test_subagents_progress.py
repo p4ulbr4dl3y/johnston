@@ -180,7 +180,15 @@ class TestSubagentProgressDisplay(unittest.TestCase):
                 "args": {"plan": [{"status": "completed"}, {"status": "in_progress"}]},
             }
         ]
-        self.assertEqual(extract_subagent_progress(sess), "plan [1/2]")
+        self.assertEqual(extract_subagent_progress(sess), "[1/2] updating plan")
+        sess.messages = [
+            {
+                "type": "tool",
+                "tool_type": "update_plan",
+                "args": {"plan": []},
+            }
+        ]
+        self.assertEqual(extract_subagent_progress(sess), "updating plan")
 
         # web_fetch single & search multi
         sess.messages = [
@@ -253,6 +261,7 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         ]
         self.assertEqual(_format_active_tool_progress("search", {"query": "b"}, turn_events=turn_evts), "searching codebase (2)")
         self.assertEqual(_format_active_tool_progress("custom_mcp_query", {}), "tool: custom_mcp_query")
+        self.assertEqual(_format_active_tool_progress("update_plan", {}), "updating plan")
         self.assertEqual(_format_active_tool_progress("", {}), "running...")
 
     def test_format_subagent_task_row(self):
