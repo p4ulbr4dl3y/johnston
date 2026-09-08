@@ -1452,6 +1452,51 @@ async def test_sync_shell_cleans_up_background_registry_on_exit(tool, make_app_m
         widget.mark_background.assert_not_called()
 
 
+def test_shell_is_concurrency_safe():
+    assert not ShellTool().is_concurrency_safe()
+
+
+async def test_shell_command_type_handling(tool):
+    res_none = await tool.execute({"command": None})
+    assert res_none.is_error
+    assert "missing or empty" in res_none.content
+
+    res_empty = await tool.execute({"command": "   "})
+    assert res_empty.is_error
+    assert "missing or empty" in res_empty.content
+
+
+async def test_promote_task_to_background_helper(make_app_mock, make_tool_context):
+    from tools.shell import _promote_task_to_background
+
+    app = _app(make_app_mock, task_manager=TaskManager())
+    app._background_shell_widgets = {}
+    widget = MagicMock(spec=["mark_background"])
+    ctx = make_tool_context(app=app)
+    ctx.session = MagicMock()
+    ctx.session.messages = [{"type": "tool", "tool_type": "shell"}]
+
+    task = ShellTask("test-bg-1", "echo bg", _process())
+    _promote_task_to_background(task, ctx, widget)
+
+    assert task.is_background
+    assert ctx.session.messages[0]["task_id"] == "test-bg-1"
+    assert app._background_shell_widgets["test-bg-1"] is widget
+
+
+async def test_cancel_read_task_helper():
+    from tools.shell import _cancel_read_task
+
+    await _cancel_read_task(None)
+
+    async def _dummy():
+        await asyncio.sleep(10)
+
+    t = asyncio.create_task(_dummy())
+    await _cancel_read_task(t)
+    assert t.cancelled() or t.done()
+
+
 
 
 
