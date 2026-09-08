@@ -1013,7 +1013,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_extract_streaming_target('{"title": "Auth refactor"}'), "Auth refactor")
         self.assertEqual(_extract_streaming_target('{"question": "Continue?"}'), "Continue?")
         self.assertEqual(_extract_streaming_target('{"step": "Refactor auth"}'), "Refactor auth")
-        self.assertEqual(_extract_streaming_target('{"id": "t1"}', tool_name="kill"), "kill t1")
+        self.assertEqual(_extract_streaming_target('{"id": "t1"}', tool_name="kill"), "t1")
         self.assertEqual(_extract_streaming_target('{"id": "s1"}', tool_name="message_subagent"), "send message to s1")
         self.assertEqual(_extract_streaming_target('{"query": "", "path": "src/main.py"}'), "src/main.py")
         self.assertEqual(_extract_streaming_target('{"file": "data.csv"}'), "data.csv")

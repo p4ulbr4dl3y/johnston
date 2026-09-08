@@ -52,7 +52,7 @@ class TestToolDisplay(unittest.TestCase):
 
     def test_kill_display(self):
         res = extract_tool_display("kill", {"id": "task_123"})
-        self.assertEqual(res, "kill task_123")
+        self.assertEqual(res, "task_123")
 
     def test_message_subagent_display(self):
         res = extract_tool_display("message_subagent", {"id": "sub_123", "message": "hello"})

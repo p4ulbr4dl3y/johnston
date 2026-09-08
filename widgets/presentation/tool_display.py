@@ -286,7 +286,7 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: i
     if name == "kill":
         tid = str(args.get("id") or args.get("task_id") or args.get("session_id") or "").strip()
         if tid:
-            return truncate(f"kill {tid}", max_len=max_len, mode=mode)
+            return truncate(tid, max_len=max_len, mode=mode)
         return ""
 
     if name == "message_subagent":

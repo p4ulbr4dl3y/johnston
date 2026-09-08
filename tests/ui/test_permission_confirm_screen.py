@@ -161,13 +161,18 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     async def test_compose_kill_and_message_subagent(self):
         cases = [
-            ("kill", {"id": "t1"}),
-            ("message_subagent", {"id": "s1", "message": "hello"}),
+            ("kill", {"id": "t1"}, "wants to terminate `t1`"),
+            ("kill", {}, "wants to terminate task or subagent"),
+            ("message_subagent", {"id": "s1", "message": "hello"}, "wants to message `s1`:"),
+            ("message_subagent", {"message": "hello"}, "wants to message subagent:"),
         ]
-        for t_name, args in cases:
+        for t_name, args, expected in cases:
             screen = PermissionConfirmScreen(t_name, args)
             async with HostApp(screen).run_test() as pilot:
                 await pilot.pause()
+                mds = screen.query("Markdown")
+                all_md = "\n".join(str(getattr(m, "_markdown", "")) for m in mds)
+                self.assertIn(expected, all_md)
 
     async def test_compose_tool_without_args(self):
         screen = PermissionConfirmScreen("other_tool")

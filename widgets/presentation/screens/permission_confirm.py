@@ -238,16 +238,16 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 action_desc = f"{actor} wants to launch subagent {target_desc}"
         elif self.tool_name == "kill":
             target_id = nargs.get("id") or nargs.get("task_id") or nargs.get("session_id") or ""
-            target_str = f" `{target_id}`" if target_id else ""
-            action_desc = f"{actor} wants to terminate task or subagent{target_str}"
+            if target_id:
+                action_desc = f"{actor} wants to terminate `{target_id}`"
+            else:
+                action_desc = f"{actor} wants to terminate task or subagent"
         elif self.tool_name == "message_subagent":
             s_id = nargs.get("id") or nargs.get("session_id") or ""
-            target_str = f" to subagent `{s_id}`" if s_id else " to subagent"
+            target_str = f" `{s_id}`" if s_id else " subagent"
             message = (nargs.get("message") or "").strip()
-            if message:
-                action_desc = f"{actor} wants to send follow-up message{target_str}:"
-            else:
-                action_desc = f"{actor} wants to send follow-up message{target_str}"
+            colon = ":" if message else ""
+            action_desc = f"{actor} wants to message{target_str}{colon}"
         elif self.tool_name == "update_plan":
             explanation = (nargs.get("explanation") or "").strip()
             if explanation:

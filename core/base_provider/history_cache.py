@@ -28,7 +28,7 @@ def _extract_streaming_target(buffer: str, scan_from: int = 0, tool_name: str = 
     if canonical == "kill":
         tid_m = re.search(r'"(?:id|task_id|session_id)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
         if tid_m:
-            return f"kill {tid_m.group(1).strip()}"
+            return tid_m.group(1).strip()
 
     if canonical == "message_subagent":
         sid_m = re.search(r'"(?:id|session_id)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
