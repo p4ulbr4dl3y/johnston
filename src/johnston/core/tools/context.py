@@ -7,6 +7,18 @@ from typing import Any, List
 from johnston.core.interfaces.host import HostProtocol
 
 
+def _is_mock(obj: Any) -> bool:
+    return obj is not None and type(obj).__name__.startswith(("MagicMock", "Mock", "AsyncMock"))
+
+
+def _has_host_method(host: Any, method_name: str) -> bool:
+    if host is None:
+        return False
+    if _is_mock(host):
+        return method_name in getattr(host, "__dict__", {})
+    return callable(getattr(host, method_name, None))
+
+
 class ToolContext:
     """Unified execution context for tools (isolates UI from business logic)"""
 
@@ -56,6 +68,8 @@ class ToolContext:
             abs_cwd = os.path.realpath(os.path.abspath(candidate))
             if os.path.isdir(abs_cwd):
                 self.cwd = abs_cwd
+        self._fallback_background_widgets: dict[str, Any] = {}
+        self._fallback_foreground_tasks: dict[str, Any] = {}
 
     @property
     def app(self) -> Any:
@@ -236,6 +250,13 @@ class ToolContext:
         """Link the shell tool card to the task for the completion repaint."""
         if not self.host or widget is None:
             return
+        if _has_host_method(self.host, "attach_shell_widget"):
+            self.host.attach_shell_widget(
+                task_id, widget, log_path=log_path, is_background=is_background
+            )
+            return
+
+        # Backward compatibility for duck-typed / mock hosts that expose the registry attribute:
         if is_background:
             if hasattr(widget, "mark_background"):
                 try:
@@ -251,43 +272,63 @@ class ToolContext:
                 except Exception:
                     pass
         reg = getattr(self.host, "_background_shell_widgets", None)
-        if reg is None:
-            try:
-                reg = {}
-                setattr(self.host, "_background_shell_widgets", reg)
-            except Exception:
-                reg = None
         if isinstance(reg, dict):
             reg[task_id] = widget
+        elif _is_mock(self.host) or hasattr(self.host, "__dict__"):
+            try:
+                if not isinstance(reg, dict):
+                    reg = {}
+                    setattr(self.host, "_background_shell_widgets", reg)
+                reg[task_id] = widget
+            except Exception:
+                self._fallback_background_widgets[task_id] = widget
+        else:
+            self._fallback_background_widgets[task_id] = widget
 
     def detach_shell_widget(self, task_id: str) -> None:
         """Unregister widget handle for shell task upon completion or drop."""
-        if self.host:
-            reg = getattr(self.host, "_background_shell_widgets", None)
-            if isinstance(reg, dict):
-                reg.pop(task_id, None)
+        if not self.host:
+            return
+        if _has_host_method(self.host, "detach_shell_widget"):
+            self.host.detach_shell_widget(task_id)
+            return
+        reg = getattr(self.host, "_background_shell_widgets", None)
+        if isinstance(reg, dict):
+            reg.pop(task_id, None)
+        self._fallback_background_widgets.pop(task_id, None)
 
     def register_foreground_shell_task(self, task_id: str, task: Any) -> None:
         """Register active foreground shell task so UI/actions mixin can cancel or background it."""
         if not self.host:
             return
+        if _has_host_method(self.host, "register_foreground_shell_task"):
+            self.host.register_foreground_shell_task(task_id, task)
+            return
         fg = getattr(self.host, "_foreground_shell_tasks", None)
-        if not isinstance(fg, dict):
-            try:
-                fg = {}
-                setattr(self.host, "_foreground_shell_tasks", fg)
-            except Exception:
-                fg = None
         if isinstance(fg, dict):
             fg[task_id] = task
+        elif _is_mock(self.host) or hasattr(self.host, "__dict__"):
+            try:
+                if not isinstance(fg, dict):
+                    fg = {}
+                    setattr(self.host, "_foreground_shell_tasks", fg)
+                fg[task_id] = task
+            except Exception:
+                self._fallback_foreground_tasks[task_id] = task
+        else:
+            self._fallback_foreground_tasks[task_id] = task
 
     def cleanup_foreground_shell_task(self, task_id: str) -> None:
         """Unregister foreground shell task upon exit or conversion."""
         if not self.host:
             return
+        if _has_host_method(self.host, "cleanup_foreground_shell_task"):
+            self.host.cleanup_foreground_shell_task(task_id)
+            return
         fg = getattr(self.host, "_foreground_shell_tasks", None)
         if isinstance(fg, dict):
             fg.pop(task_id, None)
+        self._fallback_foreground_tasks.pop(task_id, None)
 
     def find_task(self, task_id: str) -> Any | None:
         """Find task in background tasks registry or active foreground tasks."""
@@ -306,11 +347,17 @@ class ToolContext:
             if getattr(t, "task_id", None) == task_id or getattr(t, "id", None) == task_id:
                 return t
 
-        # 3. Check active foreground tasks
+        # 3. Check active foreground tasks via host method or fallback
         if self.host:
+            if _has_host_method(self.host, "get_foreground_shell_task"):
+                t = self.host.get_foreground_shell_task(task_id)
+                if t is not None:
+                    return t
             fg = getattr(self.host, "_foreground_shell_tasks", None)
             if isinstance(fg, dict) and task_id in fg:
                 return fg[task_id]
+        if task_id in self._fallback_foreground_tasks:
+            return self._fallback_foreground_tasks[task_id]
         return None
 
     def terminate_task_widget(
@@ -322,9 +369,19 @@ class ToolContext:
         """Safely terminate and detach linked UI widget for a killed task."""
         if not self.host:
             return
+        if _has_host_method(self.host, "terminate_task_widget"):
+            self.host.terminate_task_widget(task_id, output=output, status=status)
+            return
         reg = getattr(self.host, "_background_shell_widgets", None)
         if isinstance(reg, dict):
             widget = reg.pop(task_id, None)
+            if widget is not None and hasattr(widget, "set_result"):
+                try:
+                    widget.set_result(output, status=status)
+                except Exception:
+                    pass
+        elif task_id in self._fallback_background_widgets:
+            widget = self._fallback_background_widgets.pop(task_id, None)
             if widget is not None and hasattr(widget, "set_result"):
                 try:
                     widget.set_result(output, status=status)

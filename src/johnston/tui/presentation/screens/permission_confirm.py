@@ -211,7 +211,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
         # Generate diff for Edit tools
         if self.tool_name == "edit":
-            from johnston.tui.lexer_utils import build_edit_diff_text
+            from johnston.tui.utils.lexer_utils import build_edit_diff_text
 
             return build_edit_diff_text(self.args, target_path or "file")
 

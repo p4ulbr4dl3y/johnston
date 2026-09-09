@@ -1,4 +1,4 @@
-from johnston.tui.patch import apply_textual_patches
+from johnston.tui.utils.patch import apply_textual_patches
 
 apply_textual_patches()
 
@@ -12,12 +12,13 @@ from johnston.tui.mixins.actions import ActionsMixin
 from johnston.tui.mixins.lifecycle import LifecycleMixin
 from johnston.tui.mixins.message_flow import MessageFlowMixin
 from johnston.tui.mixins.session_persistence import SessionPersistenceMixin
+from johnston.tui.mixins.task_widget_registry import TaskWidgetRegistryMixin
 from johnston.tui.utils.key_aliases import expand_bindings
 
 _CSS_PATH = Path(__file__).resolve().parents[1] / "app.tcss"
 
 
-class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, ActionsMixin, App):
+class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, ActionsMixin, TaskWidgetRegistryMixin, App):
     """Minimalist Johnston TUI agent with provider/model configuration and isolated project sessions"""
 
     ENABLE_COMMAND_PALETTE = False

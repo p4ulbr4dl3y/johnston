@@ -19,7 +19,7 @@ class _FakeScreen(Widget):
 
 class TestPatchAllowSelect(unittest.TestCase):
     def test_apply_patches_sets_allow_select_property(self):
-        from johnston.tui.patch import apply_textual_patches
+        from johnston.tui.utils.patch import apply_textual_patches
 
         apply_textual_patches()
 
@@ -27,7 +27,7 @@ class TestPatchAllowSelect(unittest.TestCase):
         self.assertTrue(isinstance(desc, property))
 
     def test_apply_patches_idempotent(self):
-        from johnston.tui.patch import apply_textual_patches
+        from johnston.tui.utils.patch import apply_textual_patches
 
         apply_textual_patches()
         apply_textual_patches()

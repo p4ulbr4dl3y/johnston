@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import patch
 
-from johnston.tui.lexer_utils import build_edit_diff_text, generate_chunk_unified_diff
+from johnston.tui.utils.lexer_utils import build_edit_diff_text, generate_chunk_unified_diff
 
 
 class TestGenerateChunkUnifiedDiff(unittest.TestCase):

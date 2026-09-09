@@ -2,7 +2,7 @@ import unittest
 
 from textual.widget import Widget
 
-from johnston.tui.patch import apply_textual_patches
+from johnston.tui.utils.patch import apply_textual_patches
 
 
 class TestPatch(unittest.TestCase):

@@ -6,7 +6,7 @@ from textual.widgets import Static
 
 from johnston.core.domain.policies.models_catalog import catalog, format_context_tokens
 from johnston.core.infrastructure.runtime.thinking_effort import display_thinking_effort
-from johnston.tui.git_metrics_mixin import GitMetricsMixin
+from johnston.tui.mixins.git_metrics_mixin import GitMetricsMixin
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 from johnston.tui.presentation.widgets.footer_layout import (

@@ -1,4 +1,4 @@
-from johnston.tui.patch import apply_textual_patches
+from johnston.tui.utils.patch import apply_textual_patches
 
 apply_textual_patches()
 

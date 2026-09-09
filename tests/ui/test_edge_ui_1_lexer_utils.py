@@ -2,8 +2,8 @@
 import unittest
 from unittest.mock import patch
 
-from johnston.tui.lexer_utils import generate_chunk_unified_diff
 from johnston.tui.utils.lexer import guess_lexer_name, lex_block_to_line_texts
+from johnston.tui.utils.lexer_utils import generate_chunk_unified_diff
 
 
 class TestGuessLexerName(unittest.TestCase):

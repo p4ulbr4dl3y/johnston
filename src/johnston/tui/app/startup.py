@@ -43,6 +43,7 @@ def build_agent(app) -> None:
     # repaint once a background shell task exits (chunks stream via the
     # task's output listeners; this registry is only for the final status).
     app._background_shell_widgets: dict[str, Any] = {}
+    app._foreground_shell_tasks: dict[str, Any] = {}
     app.agent = app.pm.create_active_agent()
     app.role = getattr(app.agent, "role", "worker") if app.agent else "worker"
     if app.agent:
