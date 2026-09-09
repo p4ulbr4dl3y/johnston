@@ -511,11 +511,19 @@ def rewind_session(
             except Exception as e:
                 logger.warning("Git checkpoint restore failed: %s", e)
 
-        git_restore_task = asyncio.create_task(_restore_git_bg())
-        # Kept on the agent so a follow-up rewind can chain onto it and app
-        # shutdown can cancel/await it.
-        if agent is not None:
-            agent.rewind_git_restore_task = git_restore_task
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is not None and not loop.is_closed():
+            git_restore_task = loop.create_task(_restore_git_bg())
+            # Kept on the agent so a follow-up rewind can chain onto it and app
+            # shutdown can cancel/await it.
+            if agent is not None:
+                agent.rewind_git_restore_task = git_restore_task
+        elif agent is not None:
+            agent.rewind_git_restore_task = None
 
     refresh_footer_cb()
     save_session_cb()

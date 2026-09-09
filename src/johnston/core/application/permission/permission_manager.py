@@ -2,7 +2,17 @@ import fnmatch
 import os
 from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
-from johnston.core.application.permission.permission_config import PermissionConfigStore
+from johnston.core.application.permission.helpers import (
+    CONFIG_FILE,
+    LOGS_DIR,
+    SECRETS_FILE,
+    is_git_repository,
+    is_strict_ancestor,
+)
+from johnston.core.application.permission.permission_config import (
+    PermissionConfigStore,
+    ensure_gitignore,
+)
 from johnston.core.domain.policies.permission_policy import (
     BUILTIN_TOOLS,
     VALID_ACTIONS,
@@ -15,23 +25,11 @@ from johnston.core.domain.policies.permission_policy import (
     has_unsafe_shell_syntax,
     normalize_execution_mode,
 )
-from johnston.core.infrastructure.platform.paths import CONFIG_FILE, LOGS_DIR, SECRETS_FILE
-from johnston.core.infrastructure.runtime.git_utils import is_git_repository  # noqa: F401  (re-exported for patching)
 from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
 
-__all__ = ["PermissionManager", "CONFIG_FILE", "LOGS_DIR", "SECRETS_FILE"]
+__all__ = ["PermissionManager", "CONFIG_FILE", "LOGS_DIR", "SECRETS_FILE", "is_git_repository"]
 
-
-def _is_strict_ancestor(ancestor: str, target: str) -> bool:
-    """True when ``target`` is a strict parent directory of ``ancestor``
-    (e.g. '/' or a configured ``..`` entry). Such roots unboundedly widen the
-    workspace, so they are ignored when resolving configured writable_roots."""
-    if ancestor == target:
-        return False
-    try:
-        return os.path.commonpath([ancestor, target]) == target
-    except ValueError:
-        return False
+_is_strict_ancestor = is_strict_ancestor
 
 
 class PermissionManager:
@@ -213,10 +211,8 @@ class PermissionManager:
 
     def ensure_gitignore(self, project_dir: Optional[str] = None) -> bool:
         """Ensures .johnston/config.local.json is listed in <project_dir>/.gitignore if git exists."""
-        from johnston.core.application.permission.permission_config import ensure_gitignore as _ensure
-
         pdir = os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
-        return _ensure(pdir)
+        return ensure_gitignore(pdir)
 
     def save_workspace_root(
         self,

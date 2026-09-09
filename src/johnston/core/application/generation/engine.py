@@ -127,6 +127,7 @@ class GenCanvas:
     # tasks spawned by the parent session get cancelled too. None = no-op.
     cancel_subagents: Optional[Callable[[str], None]] = field(default=None)
     driver: Optional[Any] = field(default=None)
+    session_id: Optional[str] = field(default=None)
 
 
 def ensure_provider_ready(pm: Any, agent: Any) -> Optional[ProviderReadyState]:

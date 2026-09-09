@@ -1,44 +1,62 @@
 import os
+import threading
 from typing import List, Optional
 
 from johnston.core.domain.entities.rules import RuleDefinition
 from johnston.core.infrastructure.runtime.markdown_scanner import MarkdownScannerCache
+
+_rules_singleton_lock = threading.Lock()
 
 
 class RulesManager:
     _instance: Optional["RulesManager"] = None
 
     def __init__(self):
-        self.rules: List[RuleDefinition] = []
+        self._rules: List[RuleDefinition] = []
         self._cache = MarkdownScannerCache(subpath="rules")
+        self._lock = threading.Lock()
+
+    @property
+    def rules(self) -> List[RuleDefinition]:
+        with self._lock:
+            return list(self._rules)
+
+    @rules.setter
+    def rules(self, val: List[RuleDefinition]) -> None:
+        with self._lock:
+            self._rules = list(val)
 
     @classmethod
     def get_instance(cls) -> "RulesManager":
         if cls._instance is None:
-            cls._instance = RulesManager()
+            with _rules_singleton_lock:
+                if cls._instance is None:
+                    cls._instance = RulesManager()
         return cls._instance
 
     def load_rules(self, project_dir: Optional[str] = None, include_global: bool = True) -> List[RuleDefinition]:
-        p_dir = project_dir or os.getcwd()
+        with self._lock:
+            p_dir = project_dir or os.getcwd()
 
-        def _build(_dirs, files):
-            rules: List[RuleDefinition] = []
-            for fpath, source in files:
-                rule = self._parse_rule_file(fpath, source)
-                if rule:
-                    rules.append(rule)
-            return rules
+            def _build(_dirs, files):
+                rules: List[RuleDefinition] = []
+                for fpath, source in files:
+                    rule = self._parse_rule_file(fpath, source)
+                    if rule:
+                        rules.append(rule)
+                return rules
 
-        self.rules = self._cache.get(
-            project_dir=p_dir,
-            include_global=include_global,
-            build=_build,
-        )
-        return list(self.rules)
+            self._rules = self._cache.get(
+                project_dir=p_dir,
+                include_global=include_global,
+                build=_build,
+            )
+            return list(self._rules)
 
     def invalidate_cache(self) -> None:
         """Force the next load_rules to re-scan from disk."""
-        self._cache.invalidate()
+        with self._lock:
+            self._cache.invalidate()
 
     def _parse_rule_file(self, fpath: str, source: str) -> Optional[RuleDefinition]:
         try:

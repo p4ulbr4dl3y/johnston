@@ -4,6 +4,12 @@ import json
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from johnston.core.application.permission.helpers import (
+    CONFIG_FILE,  # noqa: F401
+    check_is_git_repository,
+    get_global_config_file,
+    is_git_repository,
+)
 from johnston.core.domain.defaults.config import DEFAULT_PERMISSIONS
 from johnston.core.domain.policies.permission_policy import (
     VALID_ACTIONS,
@@ -13,7 +19,7 @@ from johnston.core.domain.policies.permission_policy import (
 from johnston.core.infrastructure.platform.platform_utils import read_json
 from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
 
-__all__ = ["PermissionConfigStore", "ensure_gitignore"]
+__all__ = ["PermissionConfigStore", "ensure_gitignore", "is_git_repository"]
 
 # Effective-permissions cache entry: (paths, stamps, digests, merged perms).
 # Stamps are (st_mtime_ns, st_size) so same-mtime/same-second rewrites still
@@ -29,11 +35,8 @@ _EffectiveCache = Tuple[
 
 
 def _git_repo(pdir: str) -> bool:
-    """Resolves is_git_repository via johnston.core.application.permission.permission_manager so patches/tests
-    targeting that module's attribute take effect."""
-    from johnston.core.application.permission.permission_manager import is_git_repository
-
-    return is_git_repository(pdir)
+    """Resolves is_git_repository without circular dependencies."""
+    return check_is_git_repository(pdir)
 
 
 def _file_mtime(path: str) -> Optional[_FileStamp]:
@@ -222,7 +225,7 @@ class PermissionConfigStore:
         abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(path)))
 
         pdir = self._resolve_pdir(project_dir)
-        from johnston.core.application.permission.permission_manager import CONFIG_FILE as global_path
+        global_path = get_global_config_file()
 
         candidates = [
             os.path.join(pdir, ".johnston", "config.local.json"),
@@ -432,9 +435,9 @@ class PermissionConfigStore:
         """
         pdir = self._resolve_pdir(project_dir)
 
-        # Resolve CONFIG_FILE dynamically via the orchestrator module so that
-        # patches/tests targeting johnston.core.application.permission.permission_manager.CONFIG_FILE take effect.
-        from johnston.core.application.permission.permission_manager import CONFIG_FILE as global_path
+        # Resolve CONFIG_FILE dynamically via helper so that
+        # patches/tests targeting CONFIG_FILE take effect.
+        global_path = get_global_config_file()
         shared_path = os.path.join(pdir, ".johnston", "config.json")
         local_path = os.path.join(pdir, ".johnston", "config.local.json")
 

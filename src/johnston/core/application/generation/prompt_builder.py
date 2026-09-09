@@ -13,6 +13,8 @@ unchanged.
 
 import asyncio
 import datetime
+import hashlib
+import json
 import os
 import platform
 from typing import Any, Dict, List, Optional
@@ -506,13 +508,20 @@ class PromptBuilder:
             return t
 
         # Identity key lets us reuse the last pre-sorted build when the tool
-        # objects (and role flags) are unchanged this turn, skipping the
-        # per-schema deepcopy + re-sort. Pair object id with tool name to prevent
-        # collisions when CPython reallocates a freed dictionary at the same address.
+        # schemas (and role flags) are unchanged this turn, skipping the
+        # per-schema deepcopy + re-sort. Deterministic hash of name and content
+        # avoids unstable id(t) object references across turns.
         def _tool_ident(t: Dict[str, Any]) -> tuple:
-            fn = t.get("function") if isinstance(t, dict) else None
-            name = fn.get("name", "") if isinstance(fn, dict) else ""
-            return (name, id(t))
+            if not isinstance(t, dict):
+                return ("", str(t))
+            fn = t.get("function") if isinstance(t.get("function"), dict) else {}
+            name = fn.get("name", "") or t.get("name", "")
+            try:
+                content_str = json.dumps(t, sort_keys=True, default=repr)
+            except Exception:
+                content_str = repr(t)
+            content_hash = hashlib.sha256(content_str.encode("utf-8")).hexdigest()
+            return (name, content_hash)
 
         key = (
             tuple(_tool_ident(t) for t in filtered_base),
