@@ -442,13 +442,13 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
             self.assertTrue(os.path.exists(wt_path))
             wt_env = os.path.join(wt_path, ".env")
             wt_venv = os.path.join(wt_path, ".venv")
-            self.assertTrue(os.path.islink(wt_env))
+            self.assertFalse(os.path.lexists(wt_env))
             self.assertTrue(os.path.islink(wt_venv))
 
-            # Test attach_worktree also ensures symlinks
+            # Test attach_worktree also ensures safe symlinks (refuses .env)
             attached_path = SubagentWorktreeManager.attach_worktree(self.repo_dir, session_id, branch_name)
             self.assertEqual(attached_path, wt_path)
-            self.assertTrue(os.path.islink(wt_env))
+            self.assertFalse(os.path.lexists(wt_env))
             self.assertTrue(os.path.islink(wt_venv))
         finally:
             SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=False)

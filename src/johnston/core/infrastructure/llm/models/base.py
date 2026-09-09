@@ -53,34 +53,46 @@ class BaseApiAdapter:
             self._clients[key] = client
         return client
 
+    async def aclose(self) -> None:
+        """Asynchronously closes all cached clients to release HTTP connection pools."""
+        clients, self._clients = self._clients, {}
+        if not clients:
+            return
+        await self._close_all(clients)
+
     def close(self) -> None:
         """Closes all cached clients to release HTTP connection pools.
 
-        Sync best-effort hook (e.g. registered via ``atexit``). Real cleanup
-        happens through :meth:`_close_all`; this runs the async close in a fresh
-        event loop when no loop is currently running.
+        Sync best-effort hook (e.g. registered via ``atexit``).
+        If an event loop is currently running, schedules ``_close_all`` via ``create_task``.
+        Otherwise, runs ``_close_all`` in a fresh event loop via ``asyncio.run()``.
         """
         clients, self._clients = self._clients, {}
         if not clients:
             return
-        close_coro = self._close_all(clients)
         try:
-            asyncio.run(close_coro)
-        except Exception:
-            # asyncio.run raises immediately when a loop is already running,
-            # without ever touching the coroutine — close it so it does not
-            # leak as a "coroutine never awaited" RuntimeWarning. The close
-            # failure itself stays swallowed (best-effort atexit-style hook).
-            close_coro.close()
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is not None and loop.is_running():
+            loop.create_task(self._close_all(clients))
+        else:
+            try:
+                asyncio.run(self._close_all(clients))
+            except Exception:
+                pass
 
     @staticmethod
-    async def _close_all(clients: Dict[Tuple[str, str], Any]) -> None:
+    async def _close_all(clients: Dict[Tuple[Any, ...], Any]) -> None:
         for client in clients.values():
             closer = getattr(client, "aclose", None) or getattr(client, "close", None)
             if closer is None:
                 continue
             try:
-                await closer()
+                res = closer()
+                if asyncio.iscoroutine(res) or hasattr(res, "__await__"):
+                    await res
             except Exception:
                 pass
 

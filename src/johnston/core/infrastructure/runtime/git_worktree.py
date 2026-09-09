@@ -55,11 +55,31 @@ class GitWorktreeManager:
         return os.path.join(WORKTREES_DIR, repo_name, sanitized)
 
     @staticmethod
-    def _symlink_env_files(repo_root: str, wt_path: str) -> None:
-        """Symlinks .env and .venv from repo_root to wt_path if they exist."""
+    def is_secret_file(filename: str) -> bool:
+        """Returns True if filename or path matches known secret/credential patterns."""
+        base = os.path.basename(filename).lower()
+        if base == ".env" or base.startswith(".env.") or base.endswith(".env"):
+            return True
+        secret_exts = (".pem", ".key", ".pfx", ".p12", ".pkcs12")
+        if any(base.endswith(ext) for ext in secret_exts):
+            return True
+        secret_tokens = ("credentials", "id_rsa", "id_ed25519", "secret", "token")
+        if any(tok in base for tok in secret_tokens):
+            return True
+        return False
+
+    @staticmethod
+    def _symlink_env_files(repo_root: str, wt_path: str, candidates: Optional[List[str]] = None) -> None:
+        """Symlinks safe environment tooling (.venv) from repo_root to wt_path if they exist.
+
+        Refuses to symlink .env or any secret/credential files into isolated worktrees.
+        """
         if not repo_root or not wt_path or os.path.realpath(repo_root) == os.path.realpath(wt_path):
             return
-        for item in [".env", ".venv"]:
+        items = candidates if candidates is not None else [".venv"]
+        for item in items:
+            if GitWorktreeManager.is_secret_file(item):
+                continue
             src = os.path.join(repo_root, item)
             dst = os.path.join(wt_path, item)
             if os.path.exists(src) and not os.path.lexists(dst):
@@ -169,7 +189,7 @@ class GitWorktreeManager:
     def create_worktree(
         project_dir: str, branch_name: str, base_branch: str = "HEAD"
     ) -> Tuple[Optional[str], Optional[str]]:
-        """Creates a git worktree at ~/.johnston/worktrees/<repo>/<branch>, symlinks .env/.venv.
+        """Creates a git worktree at ~/.johnston/worktrees/<repo>/<branch>, symlinks safe environment (.venv).
 
         Returns (wt_path, branch_name) on success, (None, None) on failure.
         """

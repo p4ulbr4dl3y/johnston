@@ -5,6 +5,7 @@ and streaming error/skip lines that tests/adapters/test_adapters.py misses.
 All HTTP is mocked; no real network calls.
 """
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -104,36 +105,25 @@ def test_gemini_close_no_clients():
 
 
 @pytest.mark.asyncio
-async def test_gemini_close_with_running_loop_swallowed():
+async def test_gemini_close_with_running_loop_schedules_aclose():
     adapter = GeminiAdapter()
     adapter._clients = {("u", "k"): MagicMock()}
-    # asyncio.run() inside a running loop raises RuntimeError -> swallowed.
     adapter.close()
+    await asyncio.sleep(0.01)
     assert adapter._clients == {}
 
 
 @pytest.mark.asyncio
-async def test_gemini_close_with_running_loop_closes_pending_coroutine():
-    """Regression: the _close_all coroutine created before asyncio.run() raises
-    (running loop) must be closed, not leaked as 'never awaited' RuntimeWarning."""
-    import johnston.core.infrastructure.llm.models.base as base_module
-
+async def test_gemini_close_with_running_loop_executes_aclose_task():
     adapter = GeminiAdapter()
-    adapter._clients = {("u", "k"): MagicMock()}
-    orig_close_all = base_module.BaseApiAdapter._close_all
-    recorded = []
+    mock_client = MagicMock()
+    mock_client.aclose = AsyncMock()
+    adapter._clients = {("u", "k"): mock_client}
 
-    def spy_close_all(clients):
-        coro = orig_close_all(clients)
-        recorded.append(coro)
-        return coro
-
-    with patch.object(base_module.BaseApiAdapter, "_close_all", staticmethod(spy_close_all)):
-        adapter.close()  # RuntimeError from asyncio.run stays swallowed
+    adapter.close()
+    await asyncio.sleep(0.01)
     assert adapter._clients == {}
-    # A live, never-awaited coroutine still has a frame; close() clears it.
-    assert len(recorded) == 1
-    assert recorded[0].cr_frame is None
+    mock_client.aclose.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -225,10 +215,11 @@ async def test_openai_close_no_clients():
 
 
 @pytest.mark.asyncio
-async def test_openai_close_with_running_loop_swallowed():
+async def test_openai_close_with_running_loop_schedules_aclose():
     adapter = OpenAIAdapter()
     adapter._clients = {("u", "k"): MagicMock()}
     adapter.close()
+    await asyncio.sleep(0.01)
     assert adapter._clients == {}
 
 

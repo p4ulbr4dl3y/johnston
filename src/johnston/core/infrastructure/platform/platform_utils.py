@@ -6,8 +6,9 @@ import signal
 import subprocess
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Sequence, Set, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Set, Union
 
 _FSYNC_EXECUTOR = None
 _FSYNC_EXECUTOR_LOCK = threading.Lock()
@@ -143,24 +144,86 @@ def invalidate_json_read_cache(path: Optional[str] = None) -> None:
         _json_read_cache.pop(path, None)
 
 
+@contextmanager
+def interprocess_file_lock(lock_path: str, timeout: float = 10.0) -> Iterator[None]:
+    """Context manager for advisory interprocess file locking.
+
+    Uses ``fcntl.flock`` on POSIX systems with a non-blocking retry loop,
+    and falls back to ``msvcrt.locking`` on Windows, or graceful fallback.
+    """
+    os.makedirs(os.path.dirname(os.path.abspath(lock_path)) or ".", exist_ok=True)
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_CLOEXEC", 0)
+    try:
+        fd = os.open(lock_path, flags, 0o600)
+    except OSError:
+        yield
+        return
+
+    start_time = time.time()
+    acquired = False
+    try:
+        while True:
+            try:
+                if is_windows():
+                    import msvcrt
+
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except (BlockingIOError, OSError, PermissionError):
+                if time.time() - start_time >= timeout:
+                    break
+                time.sleep(0.01)
+        yield
+    finally:
+        if acquired:
+            try:
+                if is_windows():
+                    import msvcrt
+
+                    try:
+                        os.lseek(fd, 0, os.SEEK_SET)
+                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass
+                else:
+                    import fcntl
+
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            except OSError:
+                pass
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+
 def update_json_config(
     path: str,
     mutator: Callable[[Dict[str, Any]], None],
     indent: int = 2,
+    lock_timeout: float = 10.0,
 ) -> Dict[str, Any]:
     """Read a JSON dict, apply ``mutator``, and atomically write it back.
 
+    Uses an advisory interprocess file lock during read-modify-write to prevent races.
     Missing, invalid, or non-dict content is treated as an empty dict. Writes via
     ``atomic_write_json`` and invalidates the shared read cache. Returns the
     updated dict so callers can use the result without re-reading.
     """
-    data = read_json(path, {})
-    if not isinstance(data, dict):
-        data = {}
-    mutator(data)
-    atomic_write_json(path, data, indent=indent)
-    invalidate_json_read_cache(path)
-    return data
+    lock_path = path + ".lock"
+    with interprocess_file_lock(lock_path, timeout=lock_timeout):
+        data = read_json(path, {})
+        if not isinstance(data, dict):
+            data = {}
+        mutator(data)
+        atomic_write_json(path, data, indent=indent)
+        invalidate_json_read_cache(path)
+        return data
 
 
 def cached_json_read(path: str, default: Any = None) -> Any:

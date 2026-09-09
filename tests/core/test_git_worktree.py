@@ -85,10 +85,10 @@ class TestGitWorktreeManager(unittest.TestCase):
             self.assertEqual(created_branch, branch_name)
             self.assertTrue(os.path.isdir(wt_path))
 
-            # Verify symlinks
+            # Verify symlinks: .venv is linked, but secret .env is refused
             wt_env = os.path.join(wt_path, ".env")
             wt_venv = os.path.join(wt_path, ".venv")
-            self.assertTrue(os.path.islink(wt_env))
+            self.assertFalse(os.path.lexists(wt_env))
             self.assertTrue(os.path.islink(wt_venv))
 
             # Modify file in worktree
