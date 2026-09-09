@@ -8,7 +8,6 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList, Static
 
-from johnston.tui.chat_toolcall import ToolScrollBox
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
@@ -23,6 +22,7 @@ from johnston.tui.presentation.screens.constants import (
     WRITE_IN_INPUT,
     WRITE_IN_INPUT_ID,
 )
+from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox
 from johnston.tui.presentation.widgets.modal_hint import ModalHint
 from johnston.tui.utils.key_aliases import expand_bindings, normalize_key_to_latin
 

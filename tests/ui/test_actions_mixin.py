@@ -9,8 +9,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from johnston.tui.app import JohnstonApp
-from johnston.tui.chat_input import ChatInput
 from johnston.tui.mixins.actions import ActionsMixin
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 
 
 def _bare_mixin() -> ActionsMixin:

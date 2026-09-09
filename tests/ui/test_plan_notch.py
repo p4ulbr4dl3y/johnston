@@ -200,7 +200,7 @@ async def test_action_toggle_plan_hidden_pilot():
 
 @pytest.mark.asyncio
 async def test_app_on_plan_update_and_auto_clear_pilot():
-    from johnston.tui.chat_input import ChatInput
+    from johnston.tui.presentation.widgets.chat_input import ChatInput
 
     app = JohnstonApp()
     async with app.run_test():
@@ -336,7 +336,7 @@ async def test_session_persistence_restores_completed_plan_if_no_subsequent_user
 
 @pytest.mark.asyncio
 async def test_app_on_chat_input_submitted_malformed_plan_does_not_crash():
-    from johnston.tui.chat_input import ChatInput
+    from johnston.tui.presentation.widgets.chat_input import ChatInput
 
     app = JohnstonApp()
     async with app.run_test():

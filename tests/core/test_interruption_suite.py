@@ -26,8 +26,8 @@ from johnston.core.base_provider import BaseAgent
 from johnston.core.base_provider.compaction import collect_user_messages
 from johnston.core.domain.entities.session import AgentSession
 from johnston.core.domain.policies.messages import is_system_note, is_ui_visible_user_message
-from johnston.tui.chat_input import KEY_QUIT, ChatInput
-from johnston.tui.chat_toolcall import ToolCallWidget
+from johnston.tui.presentation.widgets.chat_input import KEY_QUIT, ChatInput
+from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
 
 def _make_canvas(**overrides) -> GenCanvas:
@@ -632,7 +632,7 @@ class TestGeneratorStreamInterruptionFlow:
         assert "ctrl+q" in keys
 
     def test_mark_cancelled_preserves_accumulated_shell_output(self):
-        from johnston.tui.chat_toolcall import ToolCallWidget
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
         w = ToolCallWidget("shell", "pytest")
         w.status = "running"
@@ -646,7 +646,7 @@ class TestGeneratorStreamInterruptionFlow:
         assert w.is_clickable_header() is True
 
     def test_mark_cancelled_without_prior_output_sets_default_message(self):
-        from johnston.tui.chat_toolcall import ToolCallWidget
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
         w = ToolCallWidget("shell", "pytest")
         w.status = "running"
@@ -656,7 +656,7 @@ class TestGeneratorStreamInterruptionFlow:
         assert w.result_text == "[interrupted | tool cancelled]"
 
     def test_shell_expand_loads_background_log_file(self, tmp_path):
-        from johnston.tui.chat_toolcall import ToolCallWidget
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
         log_f = tmp_path / "test.log"
         log_f.write_text("collected 50 items\n50 passed in 2.0s\n")

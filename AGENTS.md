@@ -28,9 +28,9 @@ Layered core (`src/johnston/core/`): DDD-style. High-level vs low-level — keep
 TUI layering (`src/johnston/tui/`):
 
 - `src/johnston/tui/app/` — app controllers/state (app, ai_controller, dispatch, role_service, session/status_state).
-- `src/johnston/tui/presentation/screens/` — user-facing screens. Reusable sub-widgets live in `src/johnston/tui/presentation/widgets/`.
+- `src/johnston/tui/presentation/screens/` — user-facing screens. Widgets and sub-widgets live in `src/johnston/tui/presentation/widgets/` (chat_input, chat_toolcall, status_footer, command_suggestions, etc.).
 - `src/johnston/tui/mixins/` — shared view behavior (actions, lifecycle, message_flow, session_persistence).
-- `src/johnston/tui/` root — core chat widgets (chat_input, chat_toolcall, status_footer, command_suggestions).
+- `src/johnston/tui/` root — app entry (`app.py`) and styling (`app.tcss`).
 - Utils in `src/johnston/tui/utils/` (file_reader, lexer).
 
 ## Testing

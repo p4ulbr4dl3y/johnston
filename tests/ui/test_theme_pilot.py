@@ -5,8 +5,8 @@ from textual.widgets import Input
 
 from johnston.tui.app.app import JohnstonApp
 from johnston.tui.app.theme_manager import theme_manager
-from johnston.tui.chat_input import ChatInput
 from johnston.tui.presentation.screens.theme import ThemeScreen
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 
 
 @pytest.mark.asyncio

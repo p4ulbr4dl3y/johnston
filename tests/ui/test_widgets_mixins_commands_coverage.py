@@ -9,7 +9,6 @@ import pytest
 from textual.app import App
 
 from johnston.core.infrastructure.tasks.manager import TaskManager
-from johnston.tui.chat_input import DEFAULT_PLACEHOLDER
 from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.lifecycle import LifecycleMixin
 from johnston.tui.mixins.session_persistence import SessionPersistenceMixin
@@ -22,6 +21,7 @@ from johnston.tui.presentation.commands.ui_commands import (
 )
 from johnston.tui.presentation.screens.help import HelpScreen
 from johnston.tui.presentation.screens.theme import ThemeScreen
+from johnston.tui.presentation.widgets.chat_input import DEFAULT_PLACEHOLDER
 
 # ============================================================================
 # 1. UI Commands Tests

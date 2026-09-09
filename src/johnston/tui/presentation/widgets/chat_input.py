@@ -131,8 +131,8 @@ class ChatInput(ChatInputHistoryMixin, ChatInputSuggestionsMixin, ChatInputPaste
 
         try:
             if self.is_mounted and self.app:
-                from johnston.tui.command_suggestions import CommandSuggestions
                 from johnston.tui.presentation.screens.constants import COMMAND_SUGGESTIONS
+                from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 
                 att_offset = 2 if has_attachments else 0
                 footer_offset = 3
@@ -234,8 +234,8 @@ class ChatInput(ChatInputHistoryMixin, ChatInputSuggestionsMixin, ChatInputPaste
         # Cancel active suggestions popup or agent generation via Escape
         if event.key == "escape":
             try:
-                from johnston.tui.command_suggestions import CommandSuggestions
                 from johnston.tui.presentation.screens.constants import COMMAND_SUGGESTIONS
+                from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 
                 suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 if suggestions.display:
@@ -286,8 +286,8 @@ class ChatInput(ChatInputHistoryMixin, ChatInputSuggestionsMixin, ChatInputPaste
 
         # Handle arrow navigation in suggestions menu
         try:
-            from johnston.tui.command_suggestions import CommandSuggestions
             from johnston.tui.presentation.screens.constants import COMMAND_SUGGESTIONS
+            from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 
             suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
             if suggestions.display:
@@ -349,8 +349,8 @@ class ChatInput(ChatInputHistoryMixin, ChatInputSuggestionsMixin, ChatInputPaste
 
             # Hide suggestions
             try:
-                from johnston.tui.command_suggestions import CommandSuggestions
                 from johnston.tui.presentation.screens.constants import COMMAND_SUGGESTIONS
+                from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 
                 suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 suggestions.display = False

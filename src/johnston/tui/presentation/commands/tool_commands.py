@@ -5,12 +5,12 @@ import asyncio
 
 from johnston.core.application.skills.manager import get_skill_manager
 from johnston.core.infrastructure.mcp import get_mcp_manager
-from johnston.tui.chat_input import ChatInput
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.screens.constants import MESSAGE_INPUT
 from johnston.tui.presentation.screens.mcp import MCPScreen
 from johnston.tui.presentation.screens.skills import SkillsScreen
 from johnston.tui.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 
 
 class SkillsCommand(BaseCommand):

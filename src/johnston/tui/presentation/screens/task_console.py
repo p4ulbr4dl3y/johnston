@@ -8,9 +8,9 @@ from textual.widgets import Input, Label, Markdown, RichLog
 
 from johnston.core.infrastructure.platform.platform_utils import is_windows
 from johnston.core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
-from johnston.tui.chat_toolcall import ToolScrollBox
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID
+from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox
 from johnston.tui.presentation.widgets.modal_header import ModalHeader
 from johnston.tui.presentation.widgets.modal_hint import ModalHint
 from johnston.tui.utils.key_aliases import expand_bindings

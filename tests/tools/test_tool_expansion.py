@@ -7,8 +7,8 @@ from rich.console import Console
 from rich.text import Text
 from textual._context import active_app
 
-from johnston.tui.chat_toolcall import ToolCallWidget
 from johnston.tui.presentation.widgets.chat_diff import DiffRenderable
+from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
 
 class TestToolExpansion(unittest.TestCase):

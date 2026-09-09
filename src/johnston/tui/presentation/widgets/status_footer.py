@@ -5,16 +5,16 @@ from rich.table import Table
 from textual.widgets import Static
 
 from johnston.core.domain.policies.models_catalog import catalog
-from johnston.tui.footer_render import (
-    render_compact_rows,
-    render_wide_rows,
-    resolve_status_defaults,
-)
 from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
 from johnston.tui.presentation.widgets.footer_layout import (
     format_display_path,  # noqa: F401  (re-exported; tests import it from this module)
+)
+from johnston.tui.presentation.widgets.footer_render import (
+    render_compact_rows,
+    render_wide_rows,
+    resolve_status_defaults,
 )
 from johnston.tui.utils.responsive import is_compact_width, resolve_width
 

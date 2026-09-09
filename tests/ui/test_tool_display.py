@@ -146,7 +146,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(res, "/path/to/index.html")
 
     def test_image_read_not_expandable(self):
-        from johnston.tui.chat_toolcall import ToolCallWidget
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
         # Image file target
         w1 = ToolCallWidget("read", "/path/to/123.png", args={"path": "/path/to/123.png"})
@@ -157,7 +157,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertFalse(w2.is_expandable())
 
     def test_create_tool_widget_render_diff_vs_clean_code(self):
-        from johnston.tui.chat_toolcall import ToolCallWidget
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
         # Create with diff (file update)
         w_diff = ToolCallWidget(
@@ -180,7 +180,7 @@ class TestToolDisplay(unittest.TestCase):
         w_new.render_content()
 
     def test_edit_tool_cleaning_system_noise(self):
-        from johnston.tui.chat_toolcall import ToolCallWidget
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
         widget = ToolCallWidget(
             "edit",
@@ -213,7 +213,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(num_strs, ["10", "11", "11", "12", "13"])
 
     def test_shell_cleaning_system_noise(self):
-        from johnston.tui.chat_toolcall import ToolCallWidget
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
         widget = ToolCallWidget("shell", "echo test", args={"command": "echo test"})
         cleaned = widget._clean_bash_output(

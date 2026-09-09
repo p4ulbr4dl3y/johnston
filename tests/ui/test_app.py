@@ -10,8 +10,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from johnston.tui.app import JohnstonApp
-from johnston.tui.chat_input import ChatInput
-from johnston.tui.command_suggestions import CommandSuggestions
 from johnston.tui.presentation.screens.help import HelpScreen
 from johnston.tui.presentation.screens.model import ModelScreen
 from johnston.tui.presentation.screens.providers import ProvidersScreen
@@ -19,7 +17,9 @@ from johnston.tui.presentation.screens.resume import ResumeScreen
 from johnston.tui.presentation.screens.rewind import RewindScreen
 from johnston.tui.presentation.screens.tasks import SubagentsScreen
 from johnston.tui.presentation.widgets.chat_container import ChatView
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 from johnston.tui.presentation.widgets.chat_messages import UserMessage
+from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 
 
 class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):

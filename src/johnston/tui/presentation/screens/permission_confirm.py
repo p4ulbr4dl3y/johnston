@@ -8,11 +8,11 @@ from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList, Static
 
 from johnston.core.domain.policies.permission_policy import suggest_pattern
-from johnston.tui.chat_toolcall import ToolScrollBox
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
 from johnston.tui.presentation.tool_renderers import build_synthetic_create_diff
 from johnston.tui.presentation.widgets.chat_diff import format_edit_diff
+from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox
 from johnston.tui.presentation.widgets.modal_header import ModalHeader
 from johnston.tui.presentation.widgets.modal_hint import ModalHint
 from johnston.tui.utils.key_aliases import expand_bindings

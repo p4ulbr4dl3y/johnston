@@ -18,7 +18,7 @@ _TRUNC_BANNER_START = re.compile(r"(?:\.\.\.\s*)?\[(?:Output\s+truncated|Truncat
 def _format_trunc(text: str, *, strip_edges: bool = True) -> str:
     import sys
 
-    mod = sys.modules.get("johnston.tui.chat_toolcall")
+    mod = sys.modules.get("johnston.tui.presentation.widgets.chat_toolcall")
     fn = getattr(mod, "format_truncation_for_ui", format_truncation_for_ui)
     return fn(text, strip_edges=strip_edges)
 
@@ -70,7 +70,7 @@ class ToolCallShellMixin:
     def _RAW_BASH_LIMIT(self) -> int:
         import sys
 
-        mod = sys.modules.get("johnston.tui.chat_toolcall")
+        mod = sys.modules.get("johnston.tui.presentation.widgets.chat_toolcall")
         fn = getattr(mod, "get_settings", None) if mod else None
         if fn is not None:
             return fn().tools.shell_stream_buffer_bytes
@@ -93,7 +93,7 @@ class ToolCallShellMixin:
         self._shell_update_scheduled = True
         import sys
 
-        mod = sys.modules.get("johnston.tui.chat_toolcall")
+        mod = sys.modules.get("johnston.tui.presentation.widgets.chat_toolcall")
         fn = getattr(mod, "get_settings", None) if mod else None
         interval = (fn() if fn else get_settings()).ui.stream_flush_interval
         try:

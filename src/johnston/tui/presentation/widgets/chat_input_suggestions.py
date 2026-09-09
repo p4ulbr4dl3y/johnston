@@ -13,8 +13,8 @@ class ChatInputSuggestionsMixin:
         """Update slash command and file suggestions list"""
         try:
             if self.is_mounted and self.app:
-                from johnston.tui.command_suggestions import CommandSuggestions
                 from johnston.tui.presentation.screens.constants import COMMAND_SUGGESTIONS
+                from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 
                 suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
                 row, col = self.cursor_location
@@ -71,7 +71,7 @@ class ChatInputSuggestionsMixin:
         try:
             import sys
 
-            chat_mod = sys.modules.get("johnston.tui.chat_input")
+            chat_mod = sys.modules.get("johnston.tui.presentation.widgets.chat_input")
             _asyncio = getattr(chat_mod, "asyncio", asyncio) if chat_mod else asyncio
             loop = _asyncio.get_running_loop()
             loop.create_task(self.update_suggestions())
@@ -82,8 +82,8 @@ class ChatInputSuggestionsMixin:
     def _accept_active_suggestion(self) -> bool:
         """Apply active suggestion if suggestion menu is visible."""
         try:
-            from johnston.tui.command_suggestions import CommandSuggestions
             from johnston.tui.presentation.screens.constants import COMMAND_SUGGESTIONS
+            from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 
             suggestions = self.app.query_one(COMMAND_SUGGESTIONS, CommandSuggestions)
             if suggestions.display and suggestions.highlighted is not None:

@@ -15,7 +15,11 @@ import unittest
 from unittest.mock import patch
 
 from johnston.core.infrastructure.tasks.output import process_carriage_returns
-from johnston.tui.chat_toolcall import ToolCallWidget, _bash_safe_boundary, format_truncation_for_ui
+from johnston.tui.presentation.widgets.chat_toolcall import (
+    ToolCallWidget,
+    _bash_safe_boundary,
+    format_truncation_for_ui,
+)
 
 
 def legacy_result(widget) -> str:
@@ -144,7 +148,7 @@ class TestIncrementalFlushMatchesLegacy(unittest.TestCase):
             calls.append(len(text))
             return format_truncation_for_ui(text, **kwargs)
 
-        with patch("johnston.tui.chat_toolcall.format_truncation_for_ui", side_effect=spy):
+        with patch("johnston.tui.presentation.widgets.chat_toolcall.format_truncation_for_ui", side_effect=spy):
             for chunk in stream:
                 widget.append_shell_output(chunk)
         self.assertTrue(calls)

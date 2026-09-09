@@ -6,7 +6,7 @@ import pytest
 from textual.app import App, ComposeResult
 
 from johnston.core.infrastructure.tasks.manager import TaskManager
-from johnston.tui.status_footer import StatusFooter
+from johnston.tui.presentation.widgets.status_footer import StatusFooter
 
 
 class DummyTask:
@@ -290,7 +290,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
     def test_format_display_path(self):
         import os
 
-        from johnston.tui.status_footer import format_display_path
+        from johnston.tui.presentation.widgets.status_footer import format_display_path
 
         home = os.path.realpath(os.path.expanduser("~"))
         # Home dir itself

@@ -1,11 +1,11 @@
 """UI and system slash commands (help, copy, theme)."""
 from __future__ import annotations
 
-from johnston.tui.chat_input import ChatInput
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.screens.constants import MESSAGE_INPUT
 from johnston.tui.presentation.screens.help import HelpScreen
 from johnston.tui.presentation.widgets.chat_container import ChatView
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 
 
 class HelpCommand(BaseCommand):

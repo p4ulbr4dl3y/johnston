@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from johnston.tui.presentation.widgets.footer_layout import format_display_path
+from johnston.tui.presentation.widgets.status_footer import StatusFooter
 from johnston.tui.presentation.widgets.subagent_footer import SubagentHeader, SubagentStatusFooter
-from johnston.tui.status_footer import StatusFooter
 
 
 class FooterHarness(StatusFooter):
@@ -73,7 +73,7 @@ class TestStatusFooterCoverage(unittest.TestCase):
     def test_status_footer_no_pm_and_bad_app_size(self):
         footer = FooterHarness()
         footer._harness_app = None
-        with patch("johnston.tui.status_footer.catalog.get_model_display_name", return_value=""):
+        with patch("johnston.tui.presentation.widgets.status_footer.catalog.get_model_display_name", return_value=""):
             footer.update_status(provider_key="openai", is_connected=None, model_name="")
         self.assertIsNotNone(footer.last_update)
         self.assertIsNotNone(footer._last_grid_rows)
@@ -284,8 +284,8 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         app.pm = cm
         footer._harness_app = app
         footer.session = session
-        with patch("johnston.tui.status_footer.catalog.get_model_display_name", return_value=""), patch(
-            "johnston.tui.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
+        with patch("johnston.tui.presentation.widgets.status_footer.catalog.get_model_display_name", return_value=""), patch(
+            "johnston.tui.presentation.widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
         ), patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
@@ -319,8 +319,8 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         orig_mode = pm.session_mode
         pm.set_session_mode("yolo")
         try:
-            with patch("johnston.tui.status_footer.catalog.get_model_display_name", return_value=""), patch(
-                "johnston.tui.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
+            with patch("johnston.tui.presentation.widgets.status_footer.catalog.get_model_display_name", return_value=""), patch(
+                "johnston.tui.presentation.widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
             ), patch.object(footer, "_git_diff_stats", return_value=""):
                 footer._render_footer()
             self.assertIn("Task Title", footer._last_grid_rows[0][0])
@@ -351,7 +351,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         app.pm = cm
         footer._harness_app = app
         footer.session = session
-        with patch("johnston.tui.status_footer.catalog.get_model_display_name", return_value="gpt-4o"), patch.object(
+        with patch("johnston.tui.presentation.widgets.status_footer.catalog.get_model_display_name", return_value="gpt-4o"), patch.object(
             footer, "_git_diff_stats", return_value="+2/-1"
         ):
             footer._render_footer()

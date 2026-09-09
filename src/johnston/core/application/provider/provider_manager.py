@@ -2,6 +2,11 @@ import logging
 import os
 from typing import Optional
 
+from johnston.core.application.provider.mixins import (
+    ProviderManagerAgentMixin,
+    ProviderManagerConfigMixin,
+    ProviderManagerModelsMixin,
+)
 from johnston.core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
 from johnston.core.domain.entities.provider import (
     _WARNED_BASE_URL_TOKENS,
@@ -26,11 +31,6 @@ from johnston.core.infrastructure.platform.platform_utils import (
     invalidate_json_read_cache,
     read_json,
     update_json_config,
-)
-from johnston.core.infrastructure.provider_manager import (
-    ProviderManagerAgentMixin,
-    ProviderManagerConfigMixin,
-    ProviderManagerModelsMixin,
 )
 from johnston.core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, normalize_thinking_effort
 from johnston.core.infrastructure.secrets import (

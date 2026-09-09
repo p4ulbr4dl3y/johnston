@@ -71,7 +71,7 @@ class ToolCallHintsMixin:
                 c_str = child.raw_text if hasattr(child, "raw_text") else getattr(child, "content", "")
                 if not (c_str or "").strip():
                     continue
-            from johnston.tui.chat_toolcall import ToolCallWidget
+            from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
             if isinstance(child, ToolCallWidget):
                 child.is_sequential = True
@@ -102,7 +102,7 @@ class ToolCallHintsMixin:
                 c_str = child.raw_text if hasattr(child, "raw_text") else getattr(child, "content", "")
                 if not (c_str or "").strip():
                     continue
-            from johnston.tui.chat_toolcall import ToolCallWidget
+            from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
             if isinstance(child, ToolCallWidget):
                 self.is_sequential = True

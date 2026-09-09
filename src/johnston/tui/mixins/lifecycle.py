@@ -8,12 +8,12 @@ from textual.containers import Vertical
 
 from johnston.core.domain.policies.models_catalog import catalog
 from johnston.core.infrastructure.platform.logging_setup import install_asyncio_exception_handler
-from johnston.tui.chat_input import ChatInput
-from johnston.tui.command_suggestions import CommandSuggestions
 from johnston.tui.presentation.widgets.attachment_bar import AttachmentBar
 from johnston.tui.presentation.widgets.chat_container import ChatView
+from johnston.tui.presentation.widgets.chat_input import ChatInput
+from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 from johnston.tui.presentation.widgets.plan_notch import PlanNotchContainer
-from johnston.tui.status_footer import StatusFooter
+from johnston.tui.presentation.widgets.status_footer import StatusFooter
 
 logger = logging.getLogger("johnston.app")
 

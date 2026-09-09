@@ -3,15 +3,15 @@
 import asyncio
 
 from johnston.core.infrastructure.config.settings import JohnstonSettings, UISettings
-from johnston.tui.chat_input import ChatInput
-from johnston.tui.chat_toolcall import ToolCallWidget
 from johnston.tui.presentation.widgets.chat_container import ChatView
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 from johnston.tui.presentation.widgets.chat_messages import BotMessage, ThinkingWidget
+from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
 
 def test_chat_input_max_prompt_history_respects_settings(monkeypatch):
     settings = JohnstonSettings(ui=UISettings(max_prompt_history=7))
-    monkeypatch.setattr("johnston.tui.chat_input.get_settings", lambda: settings)
+    monkeypatch.setattr("johnston.tui.presentation.widgets.chat_input.get_settings", lambda: settings)
     widget = ChatInput.__new__(ChatInput)
     assert widget.MAX_PROMPT_HISTORY == 7
     # per-instance override (existing tests assign this value) still wins
@@ -67,7 +67,7 @@ def test_thinking_widget_stream_flush_interval_respects_settings(monkeypatch):
 
 def test_tool_call_widget_stream_flush_interval_respects_settings(monkeypatch):
     settings = JohnstonSettings(ui=UISettings(stream_flush_interval=0.077))
-    monkeypatch.setattr("johnston.tui.chat_toolcall.get_settings", lambda: settings)
+    monkeypatch.setattr("johnston.tui.presentation.widgets.chat_toolcall.get_settings", lambda: settings)
     captured = {}
 
     class FakeLoop:

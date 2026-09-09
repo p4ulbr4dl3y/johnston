@@ -144,7 +144,7 @@ class ChatInputPasteMixin:
     def PASTE_LINE_THRESHOLD(self) -> int:
         import sys
 
-        chat_mod = sys.modules.get("johnston.tui.chat_input")
+        chat_mod = sys.modules.get("johnston.tui.presentation.widgets.chat_input")
         _get_settings = getattr(chat_mod, "get_settings", get_settings) if chat_mod else get_settings
         return _get_settings().ui.paste_line_threshold
 

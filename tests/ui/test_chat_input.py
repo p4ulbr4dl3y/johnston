@@ -8,8 +8,8 @@ from PIL import Image
 from textual.app import App, ComposeResult
 from textual.events import Key, MouseUp, Paste
 
-from johnston.tui import chat_input as chat_input_mod
-from johnston.tui.chat_input import ChatInput, ClipboardAttachment
+from johnston.tui.presentation.widgets import chat_input as chat_input_mod
+from johnston.tui.presentation.widgets.chat_input import ChatInput, ClipboardAttachment
 
 
 class DummyChatApp(App[None]):
@@ -82,7 +82,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ci_custom.placeholder, "Custom prompt...")
 
     def test_placeholder_responsiveness(self):
-        from johnston.tui.chat_input import (
+        from johnston.tui.presentation.widgets.chat_input import (
             COMPACT_PLACEHOLDER,
             DEFAULT_PLACEHOLDER,
             FORK_PLACEHOLDER,
@@ -873,13 +873,13 @@ class TestChatInputHistoryFile(unittest.TestCase):
     def test_load_prompt_history_invalid_json_returns_empty(self):
         ci = ChatInput()
         with patch.object(chat_input_mod.config, "PROMPT_HISTORY_FILE", "/nonexistent/history.json"):
-            with patch("johnston.tui.chat_input.read_json", return_value=None):
+            with patch("johnston.tui.presentation.widgets.chat_input.read_json", return_value=None):
                 self.assertEqual(ci.load_prompt_history(), [])
 
     def test_save_prompt_history_swallows_write_error(self):
         ci = ChatInput()
         ci.prompt_history = ["a", "b"]
-        with patch("johnston.tui.chat_input.atomic_write_json", side_effect=OSError("disk full")):
+        with patch("johnston.tui.presentation.widgets.chat_input.atomic_write_json", side_effect=OSError("disk full")):
             ci.save_prompt_history()  # must not raise
 
 
@@ -891,7 +891,7 @@ class TestChatInputScheduleSuggestions(unittest.TestCase):
     def test_schedule_runtime_error_swallowed(self):
         ci = ChatInput()
         with patch.object(type(ci), "is_mounted", new_callable=PropertyMock, return_value=True):
-            with patch("johnston.tui.chat_input.asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
+            with patch("johnston.tui.presentation.widgets.chat_input.asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
                 ci._schedule_suggestions_update()  # must not raise
 
 
@@ -1081,7 +1081,7 @@ class TestChatInputHelpAndShellMode(unittest.IsolatedAsyncioTestCase):
             event.stop.assert_called_once()
 
     async def test_typing_bang_enters_shell_mode(self):
-        from johnston.tui.chat_input import DEFAULT_SHELL_PLACEHOLDER
+        from johnston.tui.presentation.widgets.chat_input import DEFAULT_SHELL_PLACEHOLDER
         ci, ctx = _app_context()
         await ctx.__aenter__()
         self.addAsyncCleanup(ctx.__aexit__, None, None, None)
@@ -1100,7 +1100,7 @@ class TestChatInputHelpAndShellMode(unittest.IsolatedAsyncioTestCase):
         event.stop.assert_called_once()
 
     async def test_backspace_on_empty_exits_shell_mode(self):
-        from johnston.tui.chat_input import DEFAULT_PLACEHOLDER
+        from johnston.tui.presentation.widgets.chat_input import DEFAULT_PLACEHOLDER
         ci, ctx = _app_context()
         await ctx.__aenter__()
         self.addAsyncCleanup(ctx.__aexit__, None, None, None)

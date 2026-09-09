@@ -3,8 +3,8 @@ from typing import Any, Dict
 
 from textual import events
 
-from johnston.tui.chat_input import ChatInput
 from johnston.tui.presentation.widgets.chat_container import ChatView
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 from johnston.tui.presentation.widgets.chat_welcome import WelcomeWidget
 from johnston.tui.presentation.widgets.plan_notch import PlanActionsMixin
 

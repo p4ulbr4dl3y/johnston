@@ -152,8 +152,8 @@ class TestForkCommand(unittest.IsolatedAsyncioTestCase):
         chat_input.focus.assert_called()
 
     async def test_pending_fork_applied_on_message_submit(self):
-        from johnston.tui.chat_input import ChatInput
         from johnston.tui.mixins.message_flow import MessageFlowMixin
+        from johnston.tui.presentation.widgets.chat_input import ChatInput
 
         class TestApp(MessageFlowMixin):
             def __init__(self):

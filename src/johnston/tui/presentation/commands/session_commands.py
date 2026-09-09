@@ -15,7 +15,6 @@ from johnston.core.application.session.actions import (
 )
 from johnston.core.application.session.auto_title import clean_heuristic_title
 from johnston.core.domain.policies.session_naming import FORK_BASE_MAX_LEN
-from johnston.tui.chat_input import ChatInput
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.commands.helpers import (
     WORKER_TEARDOWN_TIMEOUT,
@@ -30,6 +29,7 @@ from johnston.tui.presentation.screens.rename_session import RenameSessionScreen
 from johnston.tui.presentation.screens.resume import ResumeScreen
 from johnston.tui.presentation.screens.rewind import RewindScreen, RewindSelection
 from johnston.tui.presentation.widgets.chat_container import ChatView
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 
 
 class NewCommand(BaseCommand):

@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.app import App, ComposeResult
 
-from johnston.tui.command_suggestions import CommandSuggestions
+from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 
 
 class DummySuggApp(App[None]):
@@ -198,7 +198,7 @@ class TestCommandSuggestionsCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_long_command_desc_truncated(self):
         sugg = CommandSuggestions()
         cmds = [("/test", "x" * 200)]
-        with patch("johnston.tui.command_suggestions.get_all_command_suggestions", new=AsyncMock(return_value=cmds)):
+        with patch("johnston.tui.presentation.widgets.command_suggestions.get_all_command_suggestions", new=AsyncMock(return_value=cmds)):
             res = await sugg.update_query("/test", "/test", 5)
         self.assertEqual(res, ["/test"])
         opt_text = str(sugg.options[0].prompt)
@@ -208,8 +208,8 @@ class TestCommandSuggestionsCoverage(unittest.IsolatedAsyncioTestCase):
         sugg = CommandSuggestions()
         cmds = [("/test", "x" * 120)]
         with (
-            patch("johnston.tui.command_suggestions.get_all_command_suggestions", new=AsyncMock(return_value=cmds)),
-            patch("johnston.tui.command_suggestions.resolve_width", return_value=160),
+            patch("johnston.tui.presentation.widgets.command_suggestions.get_all_command_suggestions", new=AsyncMock(return_value=cmds)),
+            patch("johnston.tui.presentation.widgets.command_suggestions.resolve_width", return_value=160),
         ):
             await sugg.update_query("/test", "/test", 5)
         opt_text = str(sugg.options[0].prompt)
@@ -218,7 +218,7 @@ class TestCommandSuggestionsCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertIn("x" * 120, opt_text)
 
     async def test_option_selected_command_and_file_mount(self):
-        from johnston.tui.chat_input import ChatInput
+        from johnston.tui.presentation.widgets.chat_input import ChatInput
 
         class SuggApp(App[None]):
             def __init__(self, sugg, input_widget):

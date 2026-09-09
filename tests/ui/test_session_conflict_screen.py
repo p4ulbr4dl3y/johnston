@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.app import App, ComposeResult
 
-from johnston.tui.chat_input import ChatInput
 from johnston.tui.presentation.commands import NewCommand, ResumeCommand
 from johnston.tui.presentation.screens.resume import ResumeScreen
 from johnston.tui.presentation.screens.session_conflict import SessionConflictScreen
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 
 
 class ConflictTestApp(App):

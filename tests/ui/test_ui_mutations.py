@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from johnston.core.application.generation.ai_generator import ProviderReadyState
-from johnston.tui.chat_toolcall import ToolCallWidget
 from johnston.tui.mixins.message_flow import MessageFlowMixin
 from johnston.tui.presentation.commands.session_commands import CompactCommand
 from johnston.tui.presentation.widgets.chat_messages import ThinkingWidget
+from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 from johnston.tui.presentation.widgets.chat_view_restore import restore_message_item
 
 # ==============================================================================

@@ -11,11 +11,11 @@ from johnston.core.application.provider.actions import (
     set_provider_credentials,
     set_thinking_effort,
 )
-from johnston.tui.chat_input import ChatInput
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.screens.constants import MESSAGE_INPUT
 from johnston.tui.presentation.screens.model import ModelScreen
 from johnston.tui.presentation.screens.thinking_effort import ThinkingEffortScreen
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 
 
 class ProvidersCommand(BaseCommand):

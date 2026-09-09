@@ -499,7 +499,7 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         done_last.append_shell_output.assert_not_called()
 
     def test_find_shell_output_target_child_fallback(self):
-        from johnston.tui.chat_toolcall import ToolCallWidget
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
         child = ToolCallWidget("shell", "tail -f log")
         child.status = "running"
@@ -516,7 +516,7 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.driver.tool_handles), 0)
 
     async def test_session_event_tool_result_child_fallback_by_id(self):
-        from johnston.tui.chat_toolcall import ToolCallWidget
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
         child = ToolCallWidget("shell", "run")
         child.status = "running"

@@ -30,7 +30,7 @@ class SessionPersistenceMixin:
         self.pending_fork = None
 
         try:
-            from johnston.tui.chat_input import DEFAULT_PLACEHOLDER, FORK_PLACEHOLDER, ChatInput
+            from johnston.tui.presentation.widgets.chat_input import DEFAULT_PLACEHOLDER, FORK_PLACEHOLDER, ChatInput
             chat_input = self.query_one("#message-input", ChatInput)
             if read_only:
                 chat_input.placeholder = FORK_PLACEHOLDER

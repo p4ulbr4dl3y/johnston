@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from johnston.tui.chat_toolcall import ToolCallWidget
+from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
 
 class TestToolCallWidgetHelpers(unittest.TestCase):
@@ -706,7 +706,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
 
     def test_render_content_create_syntax_exception_fallback(self):
         w = self._widget("create", "", args={"content": "print(1)", "path": "f.py"})
-        with patch("johnston.tui.chat_toolcall.TransparentSyntax", side_effect=Exception("boom")):
+        with patch("johnston.tui.presentation.widgets.chat_toolcall.TransparentSyntax", side_effect=Exception("boom")):
             w.render_content()
         self.assertTrue(w.content_widget.display)
 

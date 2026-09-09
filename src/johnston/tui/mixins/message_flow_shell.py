@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 async def exec_shell_command(app: Any, cmd: str, user_text: Optional[str] = None) -> None:
     """Execute a user shell command (!cmd) directly without calling LLM."""
     try:
-        from johnston.tui.chat_input import ChatInput
+        from johnston.tui.presentation.widgets.chat_input import ChatInput
 
         chat_input = app.query_one("#message-input", ChatInput)
         chat_input.focus()

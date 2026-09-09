@@ -37,7 +37,7 @@ class TestChatViewEdge(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test() as pilot:
             chat_view = app.query_one("ChatView")
-            from johnston.tui.chat_toolcall import ToolCallWidget
+            from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
             tool = await chat_view.add_tool_call("read", "f.py", None)
             await pilot.pause()

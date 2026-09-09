@@ -13,11 +13,11 @@ from johnston.core.infrastructure.tasks.task import BaseTask, TaskStatus
 from johnston.core.tools.context import ToolContext
 from johnston.core.tools.kill import KillTool
 from johnston.tui.app.theme_manager import ThemeManager
-from johnston.tui.chat_toolcall import ToolCallWidget
 from johnston.tui.mixins.message_flow_background import on_background_shell_completed, update_background_shell_widget
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.presentation.screens.subagent_screen import SessionChatScreen
 from johnston.tui.presentation.screens.tasks import ShellTasksScreen
+from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
 
 class DummyTask(BaseTask):

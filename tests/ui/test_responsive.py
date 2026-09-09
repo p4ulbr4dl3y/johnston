@@ -10,12 +10,12 @@ from textual.app import App
 from textual.timer import Timer
 from textual.widgets.option_list import Option
 
-from johnston.tui.command_suggestions import CommandSuggestions
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.presentation.screens.diff import DiffFooter, DiffHeader
 from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 from johnston.tui.presentation.screens.session_conflict import SessionConflictScreen
 from johnston.tui.presentation.screens.thinking_effort import ThinkingEffortScreen
+from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 from johnston.tui.presentation.widgets.subagent_footer import SubagentStatusFooter
 from johnston.tui.utils.responsive import (
     BREAKPOINT_BANNER,
@@ -341,7 +341,7 @@ class TestCommandSuggestionsViewportAwareness:
             async def fake_provider():
                 return [("/cmd", desc)]
 
-            with patch("johnston.tui.command_suggestions.get_all_command_suggestions", fake_provider):
+            with patch("johnston.tui.presentation.widgets.command_suggestions.get_all_command_suggestions", fake_provider):
                 await cs.update_query("/cm", "/cm", 3)
             return cs.added
 

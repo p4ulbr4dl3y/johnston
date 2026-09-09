@@ -146,7 +146,7 @@ class HelpScreen(BaseModalScreen[None]):
             pass
 
     def compose(self) -> ComposeResult:
-        from johnston.tui.chat_toolcall import ToolScrollBox
+        from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox
 
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide"):
             yield ModalHeader("Johnston Help", esc_hint="", id="help-header-md")
@@ -210,7 +210,7 @@ class HelpScreen(BaseModalScreen[None]):
             event.stop()
             return
         if event.key in ("up", "down", "pageup", "pagedown"):
-            from johnston.tui.chat_toolcall import ToolScrollBox
+            from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox
 
             try:
                 scroll_box = self.query_one("#help-scroll-box", ToolScrollBox)

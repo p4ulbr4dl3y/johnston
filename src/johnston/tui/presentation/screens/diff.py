@@ -10,10 +10,10 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Input, OptionList, Static
 
-from johnston.tui.chat_toolcall import ToolScrollBox
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.presentation.screens.base_selection import ModalSearchNavMixin
 from johnston.tui.presentation.widgets.chat_diff import format_edit_diff, get_diff_colors
+from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox
 from johnston.tui.presentation.widgets.footer_layout import format_hint, get_theme_colors
 from johnston.tui.utils.key_aliases import expand_bindings
 from johnston.tui.utils.responsive import BREAKPOINT_COMPACT, BREAKPOINT_HINT, is_compact_width, resolve_width

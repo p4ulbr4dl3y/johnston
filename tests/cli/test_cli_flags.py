@@ -16,7 +16,7 @@ from johnston.core.application.permission.permission_manager import PermissionMa
 from johnston.core.domain.policies.permission_policy import ExecutionMode
 from johnston.core.infrastructure.storage.session_store import SessionStore
 from johnston.tui.app.app import JohnstonApp
-from johnston.tui.chat_input import ChatInput
+from johnston.tui.presentation.widgets.chat_input import ChatInput
 
 
 class TestCLIRootParserFlags(unittest.TestCase):

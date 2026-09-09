@@ -4,7 +4,6 @@ from textual.containers import VerticalScroll
 
 from johnston.core.infrastructure.config.settings import get_settings
 from johnston.core.infrastructure.mcp import mcp_tool_is_known
-from johnston.tui.chat_toolcall import ToolCallWidget
 from johnston.tui.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 from johnston.tui.presentation.widgets.chat_messages import (
     BotMessage,
@@ -13,6 +12,7 @@ from johnston.tui.presentation.widgets.chat_messages import (
     ThinkingWidget,
     UserMessage,
 )
+from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 from johnston.tui.presentation.widgets.chat_view_hints import ChatViewHintsMixin
 from johnston.tui.presentation.widgets.chat_view_history import (
     ChatViewHistoryMixin,

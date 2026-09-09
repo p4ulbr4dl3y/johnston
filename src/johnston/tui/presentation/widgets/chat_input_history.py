@@ -10,7 +10,7 @@ def load_prompt_history(max_history: int) -> list[str]:
     """Load global prompt history from disk"""
     import sys
 
-    chat_mod = sys.modules.get("johnston.tui.chat_input")
+    chat_mod = sys.modules.get("johnston.tui.presentation.widgets.chat_input")
     _read_json = getattr(chat_mod, "read_json", read_json) if chat_mod else read_json
     _config = getattr(chat_mod, "config", config) if chat_mod else config
     data = _read_json(_config.PROMPT_HISTORY_FILE, default=[])
@@ -22,7 +22,7 @@ def load_prompt_history(max_history: int) -> list[str]:
 def save_prompt_history_to_disk(history: list[str], max_history: int) -> None:
     import sys
 
-    chat_mod = sys.modules.get("johnston.tui.chat_input")
+    chat_mod = sys.modules.get("johnston.tui.presentation.widgets.chat_input")
     _atomic_write_json = getattr(chat_mod, "atomic_write_json", atomic_write_json) if chat_mod else atomic_write_json
     _config = getattr(chat_mod, "config", config) if chat_mod else config
     try:
@@ -120,7 +120,7 @@ class ChatInputHistoryMixin:
             return self._max_prompt_history
         import sys
 
-        chat_mod = sys.modules.get("johnston.tui.chat_input")
+        chat_mod = sys.modules.get("johnston.tui.presentation.widgets.chat_input")
         _get_settings = getattr(chat_mod, "get_settings", get_settings) if chat_mod else get_settings
         return _get_settings().ui.max_prompt_history
 

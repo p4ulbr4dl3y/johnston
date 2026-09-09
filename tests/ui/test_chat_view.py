@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 import pytest
 
 from johnston.tui.app import JohnstonApp
-from johnston.tui.chat_toolcall import ToolCallWidget
 from johnston.tui.presentation.widgets.chat_container import ChatView
 from johnston.tui.presentation.widgets.chat_markdown import (
     clean_markdown_for_rendering,
@@ -19,6 +18,7 @@ from johnston.tui.presentation.widgets.chat_messages import (
     ThinkingWidget,
     UserMessage,
 )
+from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 from johnston.tui.presentation.widgets.chat_welcome import WelcomeWidget
 
 

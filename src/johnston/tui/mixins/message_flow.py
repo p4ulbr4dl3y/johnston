@@ -5,7 +5,6 @@ from typing import Any, Optional
 from textual import events, work
 
 from johnston.tui.app.dispatch import COMMAND_REGISTRY, handle_slash_command, normalize_homoglyphs
-from johnston.tui.chat_input import DEFAULT_PLACEHOLDER, ChatInput
 from johnston.tui.mixins.message_flow_auto_title import schedule_auto_title
 from johnston.tui.mixins.message_flow_background import (
     on_background_shell_completed,
@@ -21,7 +20,8 @@ from johnston.tui.mixins.message_flow_queue import (
 )
 from johnston.tui.mixins.message_flow_shell import exec_shell_command
 from johnston.tui.presentation.widgets.chat_container import ChatView
-from johnston.tui.status_footer import StatusFooter
+from johnston.tui.presentation.widgets.chat_input import DEFAULT_PLACEHOLDER, ChatInput
+from johnston.tui.presentation.widgets.status_footer import StatusFooter
 
 logger = logging.getLogger(__name__)
 

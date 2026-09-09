@@ -325,8 +325,8 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
-            from johnston.tui.chat_toolcall import ToolCallWidget
             from johnston.tui.presentation.widgets.chat_messages import ThinkingWidget
+            from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
             tw = screen.query_one(ThinkingWidget)
             tc = screen.query_one(ToolCallWidget)
@@ -476,8 +476,8 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app2.run_test() as pilot:
             await pilot.pause(0.2)
-            from johnston.tui.chat_toolcall import ToolCallWidget
             from johnston.tui.presentation.widgets.chat_messages import ThinkingWidget
+            from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
             tw = screen2.query_one(ThinkingWidget)
             self.assertTrue(tw.is_expanded)
@@ -793,7 +793,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             sess.add_event({"type": "status_change", "status": "cancelled"})
             await pilot.pause(0.1)
 
-            from johnston.tui.chat_toolcall import ToolCallWidget
+            from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 
             tc = screen.query_one(ToolCallWidget)
             self.assertEqual(tc.status, "cancelled")

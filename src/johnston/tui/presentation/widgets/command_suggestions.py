@@ -145,7 +145,7 @@ class CommandSuggestions(HeaderWrapOptionList):
         if show:
             try:
                 if self.app:
-                    from johnston.tui.chat_input import ChatInput
+                    from johnston.tui.presentation.widgets.chat_input import ChatInput
 
                     ci = self.app.query_one(MESSAGE_INPUT, ChatInput)
                     ci.update_height()
@@ -160,7 +160,7 @@ class CommandSuggestions(HeaderWrapOptionList):
         is_shell = False
         try:
             if self.app:
-                from johnston.tui.chat_input import ChatInput
+                from johnston.tui.presentation.widgets.chat_input import ChatInput
                 ci = self.app.query_one(MESSAGE_INPUT, ChatInput)
                 is_shell = getattr(ci, "is_shell_mode", False)
         except Exception:
@@ -248,7 +248,7 @@ class CommandSuggestions(HeaderWrapOptionList):
             return
         if self.highlighted < len(self.current_matched):
             try:
-                from johnston.tui.chat_input import ChatInput
+                from johnston.tui.presentation.widgets.chat_input import ChatInput
 
                 chat_input = self.app.query_one(MESSAGE_INPUT, ChatInput)
                 if self.mode == "command":
