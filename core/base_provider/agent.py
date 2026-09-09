@@ -112,8 +112,7 @@ class BaseAgent(
         # through the identity+length guard in _current_history_tokens().
         self._history_tokens = 0
         self._history_ident = id(self.history)
-        self._history_len = 0
-        self.app = None
+        self.host: Optional[Any] = None
         self.tokens_input = 0
         self.tokens_output = 0
         self.tokens_cache_read = 0
@@ -132,12 +131,21 @@ class BaseAgent(
         self._tool_policy_cache: Dict[tuple, Any] = {}
 
     @property
+    def app(self) -> Optional[Any]:
+        """Backward compatibility alias for host."""
+        return self.host
+
+    @app.setter
+    def app(self, val: Optional[Any]) -> None:
+        self.host = val
+
+    @property
     def role_name(self) -> str:
         if getattr(self, "_role_name", None):
             return self._role_name
         from core.role_registry import resolve_role_display_name
 
-        pdir = getattr(getattr(self, "app", None), "project_dir", None)
+        pdir = getattr(getattr(self, "host", None), "project_dir", None)
         return resolve_role_display_name(self.role, project_dir=pdir)
 
     @role_name.setter

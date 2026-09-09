@@ -10,13 +10,13 @@ def has_queued_messages(agent: Any) -> bool:
         return True
     if getattr(agent, "is_subagent", False):
         return False
-    app = getattr(agent, "app", None)
-    if app is None:
+    host = getattr(agent, "host", None) or getattr(agent, "app", None)
+    if host is None:
         return False
-    mq = getattr(app, "message_queue", None)
-    if not mq:
+    mq = getattr(host, "message_queue", None)
+    if not isinstance(mq, (list, tuple)) or not mq:
         return False
-    sid = getattr(app, "current_session_id", None)
+    sid = getattr(host, "current_session_id", None)
     for item in mq:
         item_sid = item[3] if len(item) > 3 else None
         if item_sid is None or sid is None or item_sid == sid:
@@ -50,11 +50,11 @@ def drain_queued_messages(agent: Any) -> List[Tuple[str, Any, bool, Any]]:
     if getattr(agent, "is_subagent", False):
         return drained
 
-    app = getattr(agent, "app", None)
-    if app is not None:
-        mq = getattr(app, "message_queue", None)
-        if mq:
-            sid = getattr(app, "current_session_id", None)
+    host = getattr(agent, "host", None) or getattr(agent, "app", None)
+    if host is not None:
+        mq = getattr(host, "message_queue", None)
+        if isinstance(mq, list) and mq:
+            sid = getattr(host, "current_session_id", None)
             kept = []
             for item in mq:
                 item_sid = item[3] if len(item) > 3 else None

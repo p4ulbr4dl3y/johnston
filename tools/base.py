@@ -321,7 +321,7 @@ def _resolve_app(ctx_or_app: Any) -> Any:
         return ctx_or_app.host
     if callable(getattr(ctx_or_app, "push_screen_wait", None)):
         return ctx_or_app
-    return getattr(ctx_or_app, "app", None) or ctx_or_app
+    return getattr(ctx_or_app, "host", None) or getattr(ctx_or_app, "app", None) or ctx_or_app
 
 
 def check_mcp_role_policy(ctx_or_app: Any, target: str) -> Optional[ToolResult]:

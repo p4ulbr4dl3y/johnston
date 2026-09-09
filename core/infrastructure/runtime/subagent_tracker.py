@@ -9,16 +9,19 @@ def record_subagent_session(app: Any, session_id: str) -> None:
     widget = getattr(app, "current_tool_widget", None)
     if widget is None:
         return
-    if isinstance(getattr(widget, "args", None), dict):
-        widget.args["session_id"] = session_id
     try:
+        if isinstance(getattr(widget, "args", None), dict):
+            widget.args["session_id"] = session_id
         setattr(widget, "subagent_session_id", session_id)
     except Exception:
         pass
     reg = getattr(app, "_subagent_tools", None)
     if not isinstance(reg, dict):
         reg = {}
-        app._subagent_tools = reg
+        try:
+            app._subagent_tools = reg
+        except Exception:
+            return
     reg[session_id] = widget
 
 
@@ -37,7 +40,12 @@ def mark_subagent_running(app: Any, session_id: str, text: str = "") -> None:
         try:
             mark(text=text)
         except TypeError:
-            mark()
+            try:
+                mark()
+            except Exception:
+                pass
+        except Exception:
+            pass
 
 
 _mark_subagent_running = mark_subagent_running
