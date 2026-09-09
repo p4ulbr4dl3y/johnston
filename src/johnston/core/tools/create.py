@@ -19,33 +19,25 @@ class _ProbeResult:
 class CreateTool(BaseTool):
     name = "create"
     description = (
-        "Create a new file or completely overwrite an existing file. Parent directories created automatically."
+        "Create a new file or completely overwrite an existing file (>40% changed). "
+        "For localized/partial modifications, use 'edit' instead. Parent directories created automatically."
     )
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "create",
-            "description": (
-                "Create a new file or completely overwrite an existing file. Parent directories created automatically."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": (
-                            "File path to create or overwrite (relative to cwd by default, "
-                            "or absolute for external files)."
-                        ),
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Full file content (empty string creates an empty file).",
-                    },
-                },
-                "required": ["path", "content"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": (
+                    "File path to create or overwrite. Use relative path for workspace files, "
+                    "or absolute for external files."
+                ),
+            },
+            "content": {
+                "type": "string",
+                "description": "Full file content (empty string creates an empty file).",
             },
         },
+        "required": ["path", "content"],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:

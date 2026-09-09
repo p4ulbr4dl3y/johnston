@@ -14,37 +14,28 @@ class InvokeSubagentTool(BaseTool):
     description = (
         "Launch an autonomous subagent in the background to execute an isolated task. Yield turn immediately after launch."
     )
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "invoke_subagent",
-            "description": (
-                "Launch an autonomous subagent in the background to execute an isolated task. Yield turn immediately after launch."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "role": {
-                        "type": "string",
-                        "enum": ["worker", "explorer", "reviewer"],
-                        "description": "Subagent role name from available roles (default: 'worker')",
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": (
-                            "Short task title in English as a noun phrase (3-5 words, e.g. 'Auth token refactor')."
-                        ),
-                    },
-                    "task": {
-                        "type": "string",
-                        "description": (
-                            "Actionable task instructions, context, acceptance criteria, and expected verification."
-                        ),
-                    },
-                },
-                "required": ["title", "task"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "role": {
+                "type": "string",
+                "enum": ["worker", "explorer", "reviewer"],
+                "description": "Subagent role name from available roles (default: 'worker')",
+            },
+            "title": {
+                "type": "string",
+                "description": (
+                    "Short task title in English as a noun phrase (3-5 words, e.g. 'Auth token refactor')."
+                ),
+            },
+            "task": {
+                "type": "string",
+                "description": (
+                    "Actionable task instructions, context, acceptance criteria, and expected verification."
+                ),
             },
         },
+        "required": ["title", "task"],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:

@@ -54,6 +54,7 @@ Conventional Commits: `type(scope): desc` (`fix(tools): handle empty command out
 ## Refactoring
 
 No backward compatibility for refactors/cleanups — break freely, update callers/tests.
+Mass refactoring: use Python one-liner / shell scripts over repeated tool calls for multi-file mechanical edits.
 
 ## Reuse Before New Code
 

@@ -41,61 +41,52 @@ class AskUserTool(BaseTool):
     description = (
         "Prompt user with an interactive modal to clarify ambiguous requirements or choose implementation options."
     )
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "ask_user",
-            "description": (
-                "Prompt user with an interactive modal to clarify ambiguous requirements or choose implementation options."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "questions": {
-                        "type": "array",
-                        "description": "List of 1-4 questions.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "question": {
-                                    "type": "string",
-                                    "description": "Question text ending with '?'.",
-                                },
-                                "header": {
-                                    "type": "string",
-                                    "description": "Short tag (≤12 chars) shown above the question.",
-                                },
-                                "is_multi_select": {
-                                    "type": "boolean",
-                                    "default": False,
-                                    "description": "Allow multiple option selections.",
-                                },
-                                "options": {
-                                    "type": "array",
-                                    "description": "2-4 options. Add '(Recommended)' to suggested choice.",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "label": {
-                                                "type": "string",
-                                                "description": "Choice text (1-5 words).",
-                                            },
-                                            "description": {
-                                                "type": "string",
-                                                "description": "Trade-offs or implications (optional).",
-                                            },
-                                        },
-                                        "required": ["label"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "questions": {
+                "type": "array",
+                "description": "List of 1-4 questions.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "question": {
+                            "type": "string",
+                            "description": "Question text ending with '?'.",
+                        },
+                        "header": {
+                            "type": "string",
+                            "description": "Short tag (≤12 chars) shown above the question.",
+                        },
+                        "is_multi_select": {
+                            "type": "boolean",
+                            "default": False,
+                            "description": "Allow multiple option selections.",
+                        },
+                        "options": {
+                            "type": "array",
+                            "description": "2-4 options. Add '(Recommended)' to suggested choice.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "label": {
+                                        "type": "string",
+                                        "description": "Choice text (1-5 words).",
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "Trade-offs or implications (optional).",
                                     },
                                 },
+                                "required": ["label"],
                             },
-                            "required": ["question", "options"],
                         },
-                    }
+                    },
+                    "required": ["question", "options"],
                 },
-                "required": ["questions"],
-            },
+            }
         },
+        "required": ["questions"],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:

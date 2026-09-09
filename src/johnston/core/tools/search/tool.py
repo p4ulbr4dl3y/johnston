@@ -165,64 +165,54 @@ class SearchTool(BaseTool):
         "Fast codebase search across files by content (regex/text grep), "
         "filename (glob), or symbol outline (AST classes/functions)."
     )
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "search",
-            "description": (
-                "Fast codebase search across files by content (regex/text grep), "
-                "filename (glob), or symbol outline (AST classes/functions)."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": (
-                            "Search query: required for 'content' (regex or text); "
-                            "optional for 'filename' (filepath pattern) and 'outline' (symbol name, empty matches all)."
-                        ),
-                    },
-                    "path": {
-                        "type": "string",
-                        "description": "Path to directory or file to search within (default: current workspace root).",
-                    },
-                    "mode": {
-                        "type": "string",
-                        "enum": ["content", "filename", "outline"],
-                        "description": "Search mode: 'content' (default), 'filename', or 'outline'.",
-                    },
-                    "glob": {
-                        "type": "string",
-                        "description": (
-                            "Glob pattern to filter files. Supports comma-separated patterns, "
-                            "! negation, and ** for recursive matching (e.g. '*.py', '!*test*', '**/*.ts')."
-                        ),
-                    },
-                    "case_sensitive": {
-                        "type": "boolean",
-                        "description": "Whether search is case-sensitive across all modes (default: false).",
-                    },
-                    "max_results": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 500,
-                        "description": "Maximum number of results to return (default: 50).",
-                    },
-                    "context_lines": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 20,
-                        "description": "Number of context lines before and after matches (mode='content' only, default: 0).",
-                    },
-                    "include_hidden": {
-                        "type": "boolean",
-                        "description": "Include hidden files/directories (starting with '.') in search (default: false).",
-                    },
-                },
-                "required": [],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": (
+                    "Search query: required for 'content' (regex or text); "
+                    "optional for 'filename' (filepath pattern) and 'outline' (symbol name, empty matches all)."
+                ),
+            },
+            "path": {
+                "type": "string",
+                "description": "Path to directory or file to search within (default: current workspace root).",
+            },
+            "mode": {
+                "type": "string",
+                "enum": ["content", "filename", "outline"],
+                "description": "Search mode: 'content' (default), 'filename', or 'outline'.",
+            },
+            "glob": {
+                "type": "string",
+                "description": (
+                    "Glob pattern to filter files. Supports comma-separated patterns, "
+                    "! negation, and ** for recursive matching (e.g. '*.py', '!*test*', '**/*.ts')."
+                ),
+            },
+            "case_sensitive": {
+                "type": "boolean",
+                "description": "Whether search is case-sensitive across all modes (default: false).",
+            },
+            "max_results": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 500,
+                "description": "Maximum number of results to return (default: 50).",
+            },
+            "context_lines": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20,
+                "description": "Number of context lines before and after matches (mode='content' only, default: 0).",
+            },
+            "include_hidden": {
+                "type": "boolean",
+                "description": "Include hidden files/directories (starting with '.') in search (default: false).",
             },
         },
+        "required": [],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:

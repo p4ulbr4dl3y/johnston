@@ -11,43 +11,34 @@ class UpdatePlanTool(BaseTool):
     description = (
         "Update multi-step task checklist and progress. Exactly one step must be 'in_progress'."
     )
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "update_plan",
-            "description": (
-                "Update multi-step task checklist and progress. Exactly one step must be 'in_progress'."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "plan": {
-                        "type": "array",
-                        "description": "Full ordered list of all steps. Send the WHOLE plan each call.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "step": {
-                                    "type": "string",
-                                    "description": "Short step title (≤7 words).",
-                                },
-                                "status": {
-                                    "type": "string",
-                                    "enum": ["pending", "in_progress", "completed"],
-                                    "description": "Step status. Exactly one `in_progress` at a time.",
-                                },
-                            },
-                            "required": ["step", "status"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "plan": {
+                "type": "array",
+                "description": "Full ordered list of all steps. Send the WHOLE plan each call.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "step": {
+                            "type": "string",
+                            "description": "Short step title (≤7 words).",
+                        },
+                        "status": {
+                            "type": "string",
+                            "enum": ["pending", "in_progress", "completed"],
+                            "description": "Step status. Exactly one `in_progress` at a time.",
                         },
                     },
-                    "explanation": {
-                        "type": "string",
-                        "description": "Optional reason for plan update (why this step is in_progress, etc.).",
-                    },
+                    "required": ["step", "status"],
                 },
-                "required": ["plan"],
+            },
+            "explanation": {
+                "type": "string",
+                "description": "Optional reason for plan update (why this step is in_progress, etc.).",
             },
         },
+        "required": ["plan"],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:

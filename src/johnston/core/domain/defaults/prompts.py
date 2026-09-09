@@ -37,19 +37,16 @@ _SHARED_PLANNING = (
 
 _SHARED_FILE_EDITS = (
     "- **File Edits**:\n"
-    "  - `edit`: localized changes via unique `old_str`/`new_str` context (or `replace_all=true`). "
-    "Batch non-overlapping edits in one turn (ensure disjoint context lines).\n"
-    "  - `create`: new files or wholesale file rewrites (>40% changed)."
+    "  - Prefer `edit` for localized changes; batch non-overlapping edits in one turn.\n"
+    "  - Use `create` strictly for new files or wholesale rewrites (>40% changed).\n"
+    "  - **Mass edits**: For repetitive changes across multiple files (renames, imports, regex refactors), "
+    "run a script (Python, `sd`, `sed`) via `shell` instead of dozens of `edit` calls. Cheaper, atomic, zero hallucinations."
 )
 
 _SHARED_SHELL_EXECUTION = (
-    "- **Shell Execution**:\n"
-    "  - Strictly non-interactive (`stdin=DEVNULL`). Always use non-interactive flags (`-y`, `--batch`, `CI=1`, heredoc). "
-    "Interactive prompts, pagers, or editors (`less`, `nano`, `python -i`, prompts without `-y`) fail immediately with EOF.\n"
-    "  - Chain dependent commands with `&&` in a single call (e.g. `build && test`) to short-circuit on failure. "
-    "NEVER pipe (`|`) commands in any shell (e.g. no `| grep`, `| tail`): piping masks exit codes, breaks log files, and blocks live streaming. "
-    "Runtime auto-truncates large output to tail and saves full log to file (`[truncated | log <path>]`). Run raw; inspect log files via `read`.\n"
-    "  - Run commands directly. NEVER use 'cd' (state does not persist); use 'cwd' parameter for subdirectories."
+    "- **Shell Execution**: Strictly non-interactive (`stdin=DEVNULL`). "
+    "Runtime auto-truncates large output to tail and saves full log to file (`[truncated | log <path>]`). "
+    "Inspect raw logs via `read`. NEVER use 'cd'; pass 'cwd' parameter instead."
 )
 
 _SHARED_COMPACTION = (

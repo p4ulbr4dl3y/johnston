@@ -156,28 +156,20 @@ async def _guard_request(req: "httpx.Request") -> None:
 class WebFetchTool(BaseTool):
     name = "web_fetch"
     description = "Fetch content from an HTTP/HTTPS URL and convert HTML or rich documents to Markdown."
-
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "web_fetch",
-            "description": "Fetch content from an HTTP/HTTPS URL and convert HTML or rich documents to Markdown.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "Full HTTP or HTTPS URL to fetch.",
-                    },
-                    "raw": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "If true, return raw text/HTML without Markdown conversion.",
-                    },
-                },
-                "required": ["url"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "Full HTTP or HTTPS URL to fetch.",
+            },
+            "raw": {
+                "type": "boolean",
+                "default": False,
+                "description": "If true, return raw text/HTML without Markdown conversion.",
             },
         },
+        "required": ["url"],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:

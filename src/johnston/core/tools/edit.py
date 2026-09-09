@@ -338,42 +338,35 @@ class EditTool(BaseTool):
         "Replace text in an existing file via exact-match. "
         "Provide 2-4 lines of surrounding context to ensure uniqueness."
     )
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "edit",
-            "description": (
-                "Replace text in an existing file via exact-match. "
-                "Provide 2-4 lines of surrounding context to ensure uniqueness."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": (
-                            "Path of an existing regular file (relative to cwd by default, "
-                            "or absolute for external files)."
-                        ),
-                    },
-                    "old_str": {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "Exact text block to replace.",
-                    },
-                    "new_str": {
-                        "type": "string",
-                        "description": "Replacement text. Omit or set to empty string to delete old_str.",
-                    },
-                    "replace_all": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "If true, replace every occurrence of old_str instead of requiring a unique match.",
-                    },
-                },
-                "required": ["path", "old_str"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": (
+                    "Path of an existing regular file (relative to cwd by default, "
+                    "or absolute for external files)."
+                ),
+            },
+            "old_str": {
+                "type": "string",
+                "minLength": 1,
+                "description": (
+                    "Exact contiguous text block to replace. "
+                    "Include 2-4 lines of unique surrounding context to prevent ambiguous matches."
+                ),
+            },
+            "new_str": {
+                "type": "string",
+                "description": "Replacement text. Omit or set to empty string to delete old_str.",
+            },
+            "replace_all": {
+                "type": "boolean",
+                "default": False,
+                "description": "If true, replace every occurrence of old_str instead of requiring a unique match.",
             },
         },
+        "required": ["path", "old_str"],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:

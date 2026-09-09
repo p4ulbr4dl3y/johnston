@@ -13,30 +13,19 @@ class MessageSubagentTool(BaseTool):
         "Use when: previous task needs refinement, fixes on partial/failed output, or next steps in the same scope. "
         "Do NOT use for new independent tasks (call invoke_subagent instead)."
     )
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "message_subagent",
-            "description": (
-                "Send follow-up instructions to an existing subagent session (resumes subagent with its worktree branch and history). "
-                "Use when: previous task needs refinement, fixes on partial/failed output, or next steps in the same scope. "
-                "Do NOT use for new independent tasks (call invoke_subagent instead)."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "description": "Target subagent session ID or title (matches 'id' in <notification>).",
-                    },
-                    "message": {
-                        "type": "string",
-                        "description": "Follow-up instruction, clarification, or feedback for the subagent.",
-                    },
-                },
-                "required": ["id", "message"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string",
+                "description": "Target subagent session ID or title (matches 'id' in <notification>).",
+            },
+            "message": {
+                "type": "string",
+                "description": "Follow-up instruction, clarification, or feedback for the subagent.",
             },
         },
+        "required": ["id", "message"],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:

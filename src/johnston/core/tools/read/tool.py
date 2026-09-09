@@ -36,48 +36,36 @@ class ReadTool(BaseTool):
         f"Supports inner paths (e.g. 'pkg.whl/mod.py'). Converts docs (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) and images. "
         f"Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers; paginate using start_line/end_line."
     )
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "read",
-            "description": (
-                "Read file contents, inspect directory listings, or view/extract archive contents (ZIP/TAR/WHL/JAR). "
-                "Supports reading files inside archives (e.g. 'archive.zip/sub/file.py'). "
-                "Converts rich documents (PDF/DOCX/XLSX/PPTX/EPUB/IPYNB) and images (base64 JSON). "
-                f"Outputs up to {DEFAULT_LINE_WINDOW} lines with line numbers; paginate using start_line/end_line."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": (
-                            "File, directory, archive (ZIP/TAR/WHL/JAR), path inside archive ('pkg.whl/mod.py'), "
-                            "or `scheme://...` MCP resource path. Relative to cwd by default; absolute for external files."
-                        ),
-                    },
-                    "start_line": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "description": "1-indexed start line. Use with `end_line` to paginate.",
-                    },
-                    "end_line": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "description": f"1-indexed end line (inclusive). Max range: {DEFAULT_LINE_WINDOW} lines per call.",
-                    },
-                    "content_offset": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "description": (
-                            "Byte offset for minified single-line files or large pastes. "
-                            "When set, line numbers are NOT shown."
-                        ),
-                    },
-                },
-                "required": ["path"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": (
+                    "File, directory, archive (ZIP/TAR/WHL/JAR), path inside archive ('pkg.whl/mod.py'), "
+                    "or `scheme://...` MCP resource path. Relative to cwd by default; absolute for external files."
+                ),
+            },
+            "start_line": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "1-indexed start line. Use with `end_line` to paginate.",
+            },
+            "end_line": {
+                "type": "integer",
+                "minimum": 1,
+                "description": f"1-indexed end line (inclusive). Max range: {DEFAULT_LINE_WINDOW} lines per call.",
+            },
+            "content_offset": {
+                "type": "integer",
+                "minimum": 0,
+                "description": (
+                    "Byte offset for minified single-line files or large pastes. "
+                    "When set, line numbers are NOT shown."
+                ),
             },
         },
+        "required": ["path"],
     }
 
     def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:

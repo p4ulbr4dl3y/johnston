@@ -9,25 +9,18 @@ class KillTool(BaseTool):
     interactive_only = True
     subagent_restriction_detail = "subagents cannot terminate tasks or subagents"
     description = "Terminate a running background shell task or subagent session by ID."
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "kill",
-            "description": "Terminate a running background shell task or subagent session by ID.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "description": (
-                            "ID of the background shell task or subagent session to terminate "
-                            "(matches the 'id' attribute from <notification>)."
-                        ),
-                    },
-                },
-                "required": ["id"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "id": {
+                "type": "string",
+                "description": (
+                    "ID of the background shell task or subagent session to terminate "
+                    "(matches the 'id' attribute from <notification>)."
+                ),
             },
         },
+        "required": ["id"],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:

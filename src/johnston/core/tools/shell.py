@@ -124,58 +124,49 @@ class ShellTool(BaseTool):
         "Always use non-interactive flags (e.g. -y, --batch). Outputs [exit N] followed by stdout/stderr."
     )
 
-    schema = {
-        "type": "function",
-        "function": {
-            "name": "shell",
-            "description": (
-                "Execute a non-interactive shell command synchronously or with background execution. "
-                "Runs in project root by default (use 'cwd' for subdirectories, never 'cd'). "
-                "Always use non-interactive flags (e.g. -y, --batch). Outputs [exit N] followed by stdout/stderr."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": (
-                            "Non-interactive shell command to execute. Do not launch interactive pagers or REPLs."
-                        ),
-                    },
-                    "cwd": {
-                        "type": "string",
-                        "description": (
-                            "Directory to run command in (default: current workspace root). "
-                            "Always use this parameter instead of 'cd'. "
-                            "Omit if working in project root."
-                        ),
-                    },
-                    "timeout": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": int(DEFAULT_SHELL_MAX_CAP),
-                        "default": int(DEFAULT_SHELL_TIMEOUT),
-                        "description": (
-                            f"Seconds before SIGTERM. For sync commands: defaults to {int(DEFAULT_SHELL_TIMEOUT)}s. "
-                            "For background commands (wait_seconds specified): hard kill limit (omit or 0 for unlimited runtime)."
-                        ),
-                    },
-                    "wait_seconds": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "description": (
-                            "Synchronous wait threshold in seconds before moving to background. "
-                            "Omit (or null) to run synchronously up to timeout (never backgrounded). "
-                            "0 = run in background immediately without idle alerts (persistent servers, daemons, watchers). "
-                            "N > 0 = wait up to N seconds (builds, tests, migrations): returns output immediately if finished; "
-                            "otherwise moves to background task with hang detection. "
-                            "Main agent only. When backgrounded, do not poll or sleep; runtime sends <notification> on exit or inactivity."
-                        ),
-                    },
-                },
-                "required": ["command"],
+    parameters = {
+        "type": "object",
+        "properties": {
+            "command": {
+                "type": "string",
+                "description": (
+                    "Non-interactive shell command. Chain dependent steps with '&&'. "
+                    "NEVER pipe ('|') commands — piping breaks log streaming and exit codes. "
+                    "Do not launch interactive pagers, prompts, or REPLs (always pass -y, CI=1)."
+                ),
+            },
+            "cwd": {
+                "type": "string",
+                "description": (
+                    "Directory to run command in (default: current workspace root). "
+                    "Always use this parameter instead of 'cd'. "
+                    "Omit if working in project root."
+                ),
+            },
+            "timeout": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": int(DEFAULT_SHELL_MAX_CAP),
+                "default": int(DEFAULT_SHELL_TIMEOUT),
+                "description": (
+                    f"Seconds before SIGTERM. For sync commands: defaults to {int(DEFAULT_SHELL_TIMEOUT)}s. "
+                    "For background commands (wait_seconds specified): hard kill limit (omit or 0 for unlimited runtime)."
+                ),
+            },
+            "wait_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "description": (
+                    "Synchronous wait threshold in seconds before moving to background. "
+                    "Omit (or null) to run synchronously up to timeout (never backgrounded). "
+                    "0 = run in background immediately without idle alerts (persistent servers, daemons, watchers). "
+                    "N > 0 = wait up to N seconds (builds, tests, migrations): returns output immediately if finished; "
+                    "otherwise moves to background task with hang detection. "
+                    "Main agent only. When backgrounded, do not poll or sleep; runtime sends <notification> on exit or inactivity."
+                ),
             },
         },
+        "required": ["command"],
     }
 
     def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:

@@ -558,6 +558,7 @@ def async_start(task_kind: str, task_id: str, log_path: Optional[str] = None, **
 class BaseTool:
     name: str = ""
     description: str = ""
+    parameters: Optional[Dict[str, Any]] = None
     schema: Optional[Dict[str, Any]] = None
     interactive_only: bool = False
     subagent_restriction_detail: str = ""
@@ -575,28 +576,26 @@ class BaseTool:
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        # Single source of truth for tool descriptions: the class-level
-        # `description` attribute is canonical and is propagated into the JSON
-        # schema sent to the model. This prevents the class `description` and
-        # `schema["function"]["description"]` from drifting out of sync.
-        #
-        # BUGFIX: previously we mutated the class's schema dict in-place.
-        # When a subclass did not redeclare `schema`, the parent class's dict
-        # was shared, so subclass description accidentally rewrote the
-        # parent's wire schema. Now we shallow-copy at subclass time so the
-        # propagation is local to the subclass.
+        # 1. Clean declaration: if subclass provides `parameters`, build `schema` automatically.
+        if getattr(cls, "parameters", None) is not None and "schema" not in vars(cls):
+            cls.schema = {
+                "type": "function",
+                "function": {
+                    "name": cls.name,
+                    "description": cls.description,
+                    "parameters": cls.parameters,
+                },
+            }
+            return
+
+        # 2. Legacy schema support: propagate description to schema dict if needed.
         desc = getattr(cls, "description", "")
         schema = getattr(cls, "schema", None)
         if not desc or not isinstance(schema, dict):
             return
-        # Only copy if `schema` is inherited verbatim from a parent (i.e.
-        # `cls` did not assign its own `schema` attribute). This preserves
-        # existing copy-on-write semantics for subclasses that DO override
-        # the schema, while preventing cross-class mutation when they do not.
         cls_attrs = vars(cls)
         if "schema" not in cls_attrs:
             return
-        # Subclass defined its own schema dict — safe to write description in.
         fn = schema.get("function")
         if isinstance(fn, dict):
             fn["description"] = desc
