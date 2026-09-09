@@ -12,12 +12,12 @@ from johnston.core.infrastructure.tasks.shell_task import ShellTask
 from johnston.core.infrastructure.tasks.task import BaseTask, TaskStatus
 from johnston.core.tools.context import ToolContext
 from johnston.core.tools.kill import KillTool
+from johnston.tui.app.theme_manager import ThemeManager
 from johnston.tui.chat_toolcall import ToolCallWidget
 from johnston.tui.mixins.message_flow_background import on_background_shell_completed, update_background_shell_widget
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.presentation.screens.subagent_screen import SessionChatScreen
 from johnston.tui.presentation.screens.tasks import ShellTasksScreen
-from johnston.tui.theme_manager import ThemeManager
 
 
 class DummyTask(BaseTask):
@@ -123,9 +123,16 @@ async def test_task_manager_auto_prunes_on_task_wait():
 @pytest.mark.asyncio
 async def test_kill_tool_teardown_widget():
     """kill tool ensures _background_shell_widgets is popped."""
+    from johnston.tui.mixins.task_widget_registry import TaskWidgetRegistryMixin
+
+    class Host(TaskWidgetRegistryMixin):
+        def __init__(self):
+            self._background_shell_widgets = {}
+            self._subagent_tools = {}
+            self.refresh_status_footer = MagicMock()
+
     tool = KillTool()
-    app = MagicMock()
-    app._background_shell_widgets = {}
+    app = Host()
 
     widget = MagicMock()
     app._background_shell_widgets["t_bg"] = widget

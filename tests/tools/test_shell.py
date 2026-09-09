@@ -1415,9 +1415,13 @@ async def test_shell_cwd_sandbox_write_blocked(tool, make_app_mock, make_tool_co
 
 def test_attach_shell_widget_sync_vs_background():
     from johnston.core.tools.shell import _attach_shell_widget
+    from johnston.tui.mixins.task_widget_registry import TaskWidgetRegistryMixin
 
-    host = MagicMock()
-    host._background_shell_widgets = {}
+    class Host(TaskWidgetRegistryMixin):
+        def __init__(self):
+            self._background_shell_widgets = {}
+
+    host = Host()
     widget = MagicMock(spec=["mark_background"])
 
     # Sync attach does not mark background on widget

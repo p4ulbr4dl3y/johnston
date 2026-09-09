@@ -256,7 +256,6 @@ class ToolContext:
             )
             return
 
-        # Backward compatibility for duck-typed / mock hosts that expose the registry attribute:
         if is_background:
             if hasattr(widget, "mark_background"):
                 try:
@@ -271,19 +270,7 @@ class ToolContext:
                         setattr(widget, "log_path", log_path)
                 except Exception:
                     pass
-        reg = getattr(self.host, "_background_shell_widgets", None)
-        if isinstance(reg, dict):
-            reg[task_id] = widget
-        elif _is_mock(self.host) or hasattr(self.host, "__dict__"):
-            try:
-                if not isinstance(reg, dict):
-                    reg = {}
-                    setattr(self.host, "_background_shell_widgets", reg)
-                reg[task_id] = widget
-            except Exception:
-                self._fallback_background_widgets[task_id] = widget
-        else:
-            self._fallback_background_widgets[task_id] = widget
+        self._fallback_background_widgets[task_id] = widget
 
     def detach_shell_widget(self, task_id: str) -> None:
         """Unregister widget handle for shell task upon completion or drop."""
@@ -292,9 +279,6 @@ class ToolContext:
         if _has_host_method(self.host, "detach_shell_widget"):
             self.host.detach_shell_widget(task_id)
             return
-        reg = getattr(self.host, "_background_shell_widgets", None)
-        if isinstance(reg, dict):
-            reg.pop(task_id, None)
         self._fallback_background_widgets.pop(task_id, None)
 
     def register_foreground_shell_task(self, task_id: str, task: Any) -> None:
@@ -372,23 +356,11 @@ class ToolContext:
         if _has_host_method(self.host, "terminate_task_widget"):
             self.host.terminate_task_widget(task_id, output=output, status=status)
             return
-        reg = getattr(self.host, "_background_shell_widgets", None)
-        if isinstance(reg, dict):
-            widget = reg.pop(task_id, None)
-            if widget is not None and hasattr(widget, "set_result"):
-                try:
-                    widget.set_result(output, status=status)
-                except Exception:
-                    pass
-        elif task_id in self._fallback_background_widgets:
-            widget = self._fallback_background_widgets.pop(task_id, None)
-            if widget is not None and hasattr(widget, "set_result"):
-                try:
-                    widget.set_result(output, status=status)
-                except Exception:
-                    pass
-        sub_tools = getattr(self.host, "_subagent_tools", None)
-        if isinstance(sub_tools, dict):
-            sub_tools.pop(task_id, None)
+        widget = self._fallback_background_widgets.pop(task_id, None)
+        if widget is not None and hasattr(widget, "set_result"):
+            try:
+                widget.set_result(output, status=status)
+            except Exception:
+                pass
 
 

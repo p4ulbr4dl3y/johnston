@@ -192,7 +192,7 @@ def compute_tool_call_content(
                 return "markup", clean_markup(raw_text or "(Error)")
             diff_text = raw_text
             if not diff_text or "@@" not in diff_text:
-                from johnston.tui.utils.lexer_utils import build_edit_diff_text
+                from johnston.tui.utils.diff_builder import build_edit_diff_text
 
                 diff_text = build_edit_diff_text(args, file_path or "file")
 

@@ -198,6 +198,33 @@ def _make_app_mock(
     resolved_agent = agent if agent is not None else _make_agent_mock(role=role)
     app.agent = resolved_agent
     app.pm = _make_pm_mock(agent=resolved_agent)
+
+    app._background_shell_widgets = {}
+    app._foreground_shell_tasks = {}
+
+    def _attach_shell(tid: str, widget: Any, log_path: str | None = None, is_background: bool = False) -> None:
+        if is_background:
+            if hasattr(widget, "mark_background"):
+                widget.mark_background(tid, log_path)
+            else:
+                setattr(widget, "background_task_id", tid)
+                setattr(widget, "task_id", tid)
+                if log_path:
+                    setattr(widget, "log_path", log_path)
+        app._background_shell_widgets[tid] = widget
+
+    def _detach_shell(tid: str) -> None:
+        app._background_shell_widgets.pop(tid, None)
+
+    def _term_widget(tid: str, output: str = "[killed]", status: str = "done") -> None:
+        w = app._background_shell_widgets.pop(tid, None)
+        if w is not None and hasattr(w, "set_result"):
+            w.set_result(output, status=status)
+
+    app.attach_shell_widget = MagicMock(side_effect=_attach_shell)
+    app.detach_shell_widget = MagicMock(side_effect=_detach_shell)
+    app.terminate_task_widget = MagicMock(side_effect=_term_widget)
+
     app.tool_context = ToolContext(app)
 
     for key, value in overrides.items():

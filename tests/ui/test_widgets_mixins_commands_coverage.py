@@ -10,7 +10,7 @@ from textual.app import App
 
 from johnston.core.infrastructure.tasks.manager import TaskManager
 from johnston.tui.chat_input import DEFAULT_PLACEHOLDER
-from johnston.tui.mixins.git_metrics_mixin import GitMetricsMixin
+from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.lifecycle import LifecycleMixin
 from johnston.tui.mixins.session_persistence import SessionPersistenceMixin
 from johnston.tui.presentation.commands.ui_commands import (

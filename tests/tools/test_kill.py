@@ -38,10 +38,17 @@ async def test_kill_shell_task_success(kill_tool):
 
     widget = MagicMock()
 
-    app = MagicMock()
-    app.task_manager = [task]
-    app.current_session_id = "sess-1"
-    app._background_shell_widgets = {"shell-123": widget}
+    from johnston.tui.mixins.task_widget_registry import TaskWidgetRegistryMixin
+
+    class Host(TaskWidgetRegistryMixin):
+        def __init__(self):
+            self.task_manager = [task]
+            self.current_session_id = "sess-1"
+            self._background_shell_widgets = {"shell-123": widget}
+            self._subagent_tools = {}
+            self.refresh_status_footer = MagicMock()
+
+    app = Host()
     ctx = ToolContext(app=app)
 
     res = await kill_tool.execute({"id": "shell-123"}, ctx=ctx)

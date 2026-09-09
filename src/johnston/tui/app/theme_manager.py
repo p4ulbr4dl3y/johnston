@@ -8,10 +8,10 @@ from textual.theme import Theme as TextualTheme
 
 from johnston.core.domain.defaults.themes import ZINC_DARK
 from johnston.core.domain.entities.theme import Theme, is_ansi_theme
-from johnston.tui.theme_manager import ThemeManager as CoreThemeManager
+from johnston.tui.app.base_theme import BaseThemeManager
 
 
-class ThemeManager(CoreThemeManager):
+class ThemeManager(BaseThemeManager):
     """UI theme manager extending core registry with Textual Theme conversions."""
 
     _instance: Optional[ThemeManager] = None

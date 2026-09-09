@@ -139,11 +139,14 @@ def test_check_read_only_command_mutations_policies():
 
 
 def test_tool_context_shell_widget_helpers():
-    class DummyHost:
+    from johnston.tui.mixins.task_widget_registry import TaskWidgetRegistryMixin
+
+    class DummyHost(TaskWidgetRegistryMixin):
         def __init__(self):
             self.current_tool_widget = "dummy_widget"
             self._background_shell_widgets = {}
             self._foreground_shell_tasks = {}
+            self._subagent_tools = {}
 
     host = DummyHost()
     ctx = ToolContext(app=host, is_subagent=False)
@@ -179,6 +182,19 @@ def test_tool_context_shell_widget_helpers():
     ctx.terminate_task_widget("w1", output="killed!", status="done")
     assert "w1" not in host._background_shell_widgets
     widget.set_result.assert_called_with("killed!", status="done")
+
+    # Test fallback dictionary when host does not implement shell widget methods
+    bare_ctx = ToolContext(app=object())
+    bare_ctx.attach_shell_widget("fb1", widget)
+    assert bare_ctx._fallback_background_widgets["fb1"] is widget
+    bare_ctx.detach_shell_widget("fb1")
+    assert "fb1" not in bare_ctx._fallback_background_widgets
+
+    fb_widget = MagicMock()
+    bare_ctx.attach_shell_widget("fb2", fb_widget)
+    bare_ctx.terminate_task_widget("fb2", output="killed!", status="done")
+    assert "fb2" not in bare_ctx._fallback_background_widgets
+    fb_widget.set_result.assert_called_with("killed!", status="done")
 
 
 @pytest.mark.asyncio

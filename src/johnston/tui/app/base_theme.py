@@ -17,10 +17,10 @@ from johnston.core.infrastructure.platform.platform_utils import read_json
 logger = logging.getLogger(__name__)
 
 
-class ThemeManager:
+class BaseThemeManager:
     """Registry and state manager for UI themes and syntax palettes."""
 
-    _instance: Optional[ThemeManager] = None
+    _instance: Optional[BaseThemeManager] = None
 
     def __init__(
         self,
@@ -50,8 +50,8 @@ class ThemeManager:
         self._current_theme: Theme = self._themes.get(chosen, ZINC_DARK)
 
     @classmethod
-    def get_instance(cls) -> ThemeManager:
-        """Get or initialize singleton ThemeManager instance."""
+    def get_instance(cls) -> BaseThemeManager:
+        """Get or initialize singleton BaseThemeManager instance."""
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
@@ -162,4 +162,4 @@ class ThemeManager:
         self._listeners = alive_listeners
 
 
-theme_manager = ThemeManager.get_instance()
+ThemeManager = BaseThemeManager
