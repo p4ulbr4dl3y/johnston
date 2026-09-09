@@ -6,7 +6,7 @@ from typing import Any, Dict
 from johnston.core.domain.defaults.errors import ToolResult
 from johnston.core.infrastructure.converter import DOC_EXTENSIONS
 from johnston.core.infrastructure.platform.platform_utils import IMAGE_EXTENSIONS
-from johnston.core.tools.base import BaseTool, _write_output_log, get_fuzzy_matches, resolve_path, try_int
+from johnston.core.tools.base import BaseTool, _write_output_log, get_fuzzy_matches, try_int
 from johnston.core.tools.cancel import run_cancellable
 from johnston.core.tools.read.archive import (
     _inspect_archive,
@@ -24,6 +24,7 @@ from johnston.core.tools.utils import (
     DEFAULT_READ_MAX_CHARS,
     format_line_pagination,
     get_max_tool_payload_bytes,
+    resolve_readable_path,
 )
 
 logger = logging.getLogger(__name__)
@@ -123,12 +124,9 @@ class ReadTool(BaseTool):
             except Exception as e:
                 logger.debug("Failed to read MCP resource %s: %s", raw_path, e)
 
-        path = resolve_path(raw_path, cwd=ctx.cwd)
-        if getattr(ctx, "sandbox_enabled", False):
-            from johnston.core.infrastructure.platform.sandbox import is_path_readable_in_sandbox
-
-            if not is_path_readable_in_sandbox(path, cwd=ctx.cwd):
-                return ToolResult.error("permission", f"sandbox restriction: read not permitted for sensitive path '{path}'")
+        path, err = resolve_readable_path(ctx, raw_path)
+        if err is not None:
+            return err
 
         # Resolve requested line window up front so it applies to files, directories, and archives.
         start_line = args.get("start_line")

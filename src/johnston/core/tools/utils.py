@@ -44,6 +44,23 @@ def resolve_writable_path(ctx: Any, path_arg: Any) -> tuple[str, ToolResult | No
     return path, None
 
 
+def resolve_readable_path(ctx: Any, path_arg: Any) -> tuple[str, ToolResult | None]:
+    """Resolves a path argument and checks sandbox read permissions."""
+    if not path_arg or not str(path_arg).strip():
+        raw = "."
+    else:
+        raw = str(path_arg).strip()
+    from johnston.core.tools.base import resolve_path
+
+    path = resolve_path(raw, cwd=ctx.cwd)
+    if getattr(ctx, "sandbox_enabled", False):
+        from johnston.core.infrastructure.platform.sandbox import is_path_readable_in_sandbox
+
+        if not is_path_readable_in_sandbox(path, cwd=ctx.cwd):
+            return "", ToolResult.error("permission", f"sandbox restriction: read not permitted for sensitive path '{path}'")
+    return path, None
+
+
 def validate_file_for_edit(path: str) -> ToolResult | None:
     """Validate that a file exists, is not a directory, and does not exceed payload cap."""
     if not path or not os.path.exists(path):

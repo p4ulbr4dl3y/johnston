@@ -7,11 +7,9 @@ from johnston.core.domain.defaults.errors import ToolResult
 from johnston.core.tools.base import (
     ERROR_KIND_NOT_FOUND,
     ERROR_KIND_PARAMS,
-    ERROR_KIND_PERMISSION,
     BaseTool,
     done,
     fail,
-    resolve_path,
     truncate_output,
     try_int,
 )
@@ -26,6 +24,7 @@ from johnston.core.tools.search.content import (
 )
 from johnston.core.tools.search.files import _search_filename
 from johnston.core.tools.search.outline import _search_outline
+from johnston.core.tools.utils import resolve_readable_path
 
 
 def search_sync(
@@ -224,17 +223,9 @@ class SearchTool(BaseTool):
 
         query = str(args.get("query") or "")
         raw_path = str(args.get("path") or ".").strip() or "."
-        resolved_path = resolve_path(raw_path, cwd=ctx.cwd)
-
-        if getattr(ctx, "sandbox_enabled", False):
-            from johnston.core.infrastructure.platform.sandbox import is_path_readable_in_sandbox
-
-            if not is_path_readable_in_sandbox(resolved_path, cwd=ctx.cwd):
-                return fail(
-                    ERROR_KIND_PERMISSION,
-                    f"sandbox restriction: read not permitted for sensitive path '{resolved_path}'",
-                    name=resolved_path,
-                )
+        resolved_path, err = resolve_readable_path(ctx, raw_path)
+        if err is not None:
+            return err
 
         raw_mode = args.get("mode")
         glob_pattern = str(args.get("glob") or "").strip() or None

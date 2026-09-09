@@ -639,9 +639,12 @@ class BaseTool:
         elif not isinstance(raw_args, dict):
             return {}, ToolResult.error("params", detail="arguments must be a dictionary")
 
-        schema = self.get_schema() or self.schema or {}
-        fn_meta = schema.get("function") if isinstance(schema, dict) else {}
-        params_meta = fn_meta.get("parameters") if isinstance(fn_meta, dict) else {}
+        if self.parameters is not None:
+            params_meta = self.parameters
+        else:
+            schema = self.get_schema() or self.schema or {}
+            fn_meta = schema.get("function") if isinstance(schema, dict) else {}
+            params_meta = fn_meta.get("parameters") if isinstance(fn_meta, dict) else {}
         properties = params_meta.get("properties") if isinstance(params_meta, dict) else {}
         required_fields = set(params_meta.get("required", [])) if isinstance(params_meta, dict) else set()
 
