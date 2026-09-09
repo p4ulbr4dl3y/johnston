@@ -8,9 +8,9 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 from johnston.core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
 from johnston.core.infrastructure.config.settings import get_settings
 from johnston.core.infrastructure.llm.base.compaction import (
-    format_compaction_title,
-    resolve_auto_compact_limit,
-    should_compact,
+    format_compaction_title,  # noqa: F401  (re-exported)
+    resolve_auto_compact_limit,  # noqa: F401  (re-exported)
+    should_compact,  # noqa: F401  (re-exported)
 )
 from johnston.core.infrastructure.llm.base.history_cache import (
     _get_tools_digest,
