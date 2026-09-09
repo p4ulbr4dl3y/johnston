@@ -112,6 +112,7 @@ class SubagentsMarkdownInjectionTests(unittest.TestCase):
         role = _Role(key="worker", description="worker agent")
         out = format_subagents_markdown([role], max_concurrent=5)
         self.assertIn("self-contained:", out)
+        self.assertIn("inherits them automatically", out)
         self.assertIn("parallel vs serial:", out)
         self.assertIn("permissions:", out)
         self.assertIn("git branch -d", out)
