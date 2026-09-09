@@ -6,13 +6,22 @@ from unittest.mock import MagicMock
 from johnston.core.infrastructure.llm.base.agent import BaseAgent
 from johnston.core.infrastructure.llm.base.message_queue import drain_queued_messages, has_queued_messages
 from johnston.core.infrastructure.runtime.subagent_tracker import mark_subagent_running, record_subagent_session
-from johnston.core.interfaces.host import HostProtocol, NullHost
+from johnston.core.interfaces.host import (
+    ExecutionObserverHost,
+    HostProtocol,
+    NullHost,
+    ShellTaskHost,
+    UserInteractionHost,
+)
 from johnston.core.tools.context import ToolContext
 
 
 class TestHostProtocol(unittest.IsolatedAsyncioTestCase):
-    def test_null_host_implements_host_protocol(self):
+    def test_null_host_implements_all_protocols(self):
         host = NullHost()
+        self.assertTrue(isinstance(host, UserInteractionHost))
+        self.assertTrue(isinstance(host, ExecutionObserverHost))
+        self.assertTrue(isinstance(host, ShellTaskHost))
         self.assertTrue(isinstance(host, HostProtocol))
 
     def test_null_host_properties_and_defaults(self):
@@ -20,7 +29,39 @@ class TestHostProtocol(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(host.project_dir, "/test/pdir")
         self.assertEqual(host.current_session_id, "sess-1")
         self.assertIsNone(host.task_manager)
+        self.assertIsNone(host.pm)
+        self.assertFalse(host.sandbox_enabled)
+        self.assertFalse(host.is_read_only)
+        self.assertIsNone(host.session)
         self.assertEqual(host.message_queue, [])
+
+    def test_null_host_explicit_attributes(self):
+        pm_mock = MagicMock()
+        session_mock = MagicMock()
+        host = NullHost(
+            project_dir="/custom",
+            current_session_id="s42",
+            task_manager="tm",
+            pm=pm_mock,
+            sandbox_enabled=True,
+            is_read_only=True,
+            session=session_mock,
+            message_queue=["m1"],
+        )
+        self.assertEqual(host.project_dir, "/custom")
+        self.assertEqual(host.current_session_id, "s42")
+        self.assertEqual(host.task_manager, "tm")
+        self.assertIs(host.pm, pm_mock)
+        self.assertTrue(host.sandbox_enabled)
+        self.assertTrue(host.is_read_only)
+        self.assertIs(host.session, session_mock)
+        self.assertEqual(host.message_queue, ["m1"])
+
+    def test_async_method_signatures(self):
+        import inspect
+
+        self.assertTrue(inspect.iscoroutinefunction(NullHost.ask_user))
+        self.assertTrue(inspect.iscoroutinefunction(NullHost.confirm_permission))
 
     async def test_null_host_methods(self):
         host = NullHost()
@@ -31,6 +72,29 @@ class TestHostProtocol(unittest.IsolatedAsyncioTestCase):
         host.refresh_status_footer()
         host.on_subagent_tool_completed("sess-1", "done", "result")
         host.on_plan_update([{"step": "step 1", "status": "pending"}], "in_progress")
+
+    def test_null_host_shell_tasks(self):
+        host = NullHost()
+        task = MagicMock()
+        host.register_foreground_shell_task("task-1", task)
+        self.assertIs(host.get_foreground_shell_task("task-1"), task)
+        host.cleanup_foreground_shell_task("task-1")
+        self.assertIsNone(host.get_foreground_shell_task("task-1"))
+
+    def test_null_host_noop_widget_methods(self):
+        host = NullHost()
+        widget = MagicMock(spec=["mark_background", "set_result"])
+        # attach, detach, terminate must be pure no-ops and never mutate/monkeypatch widget
+        host.attach_shell_widget("t1", widget, log_path="/tmp/log", is_background=True)
+        self.assertFalse(hasattr(widget, "background_task_id"))
+        self.assertFalse(hasattr(widget, "task_id"))
+        self.assertFalse(hasattr(widget, "log_path"))
+        widget.mark_background.assert_not_called()
+
+        host.detach_shell_widget("t1")
+
+        host.terminate_task_widget("t1", output="killed", status="done")
+        widget.set_result.assert_not_called()
 
 
 class TestToolContextWithHost(unittest.IsolatedAsyncioTestCase):
@@ -50,27 +114,54 @@ class TestToolContextWithHost(unittest.IsolatedAsyncioTestCase):
         self.assertIs(ctx.host, host)
         self.assertIs(ctx.app, host)
 
+    def test_tool_context_attributes_forwarding_from_host(self):
+        pm_mock = MagicMock()
+        session_mock = MagicMock(id="sess-custom")
+        host = NullHost(
+            project_dir="/custom/dir",
+            current_session_id="sess-custom",
+            pm=pm_mock,
+            sandbox_enabled=True,
+            is_read_only=True,
+            session=session_mock,
+        )
+        ctx = ToolContext(host=host)
+        self.assertIs(ctx.provider_manager, pm_mock)
+        self.assertTrue(ctx.sandbox_enabled)
+        self.assertTrue(ctx.is_read_only)
+        self.assertEqual(ctx.session_id, "sess-custom")
+
     def test_tool_context_shell_widget_operations_with_null_host(self):
         host = NullHost()
         ctx = ToolContext(host=host)
-        widget = MagicMock()
+        widget = MagicMock(spec=["mark_background", "set_result"])
 
-        # attach / detach
+        # attach / detach with NullHost: clean no-op, no monkeypatching
         ctx.attach_shell_widget("t1", widget, is_background=True)
-        self.assertEqual(host._background_shell_widgets.get("t1"), widget)
+        self.assertFalse(hasattr(widget, "background_task_id"))
         ctx.detach_shell_widget("t1")
-        self.assertNotIn("t1", host._background_shell_widgets)
 
-        # foreground tasks
+        # foreground tasks via NullHost (ShellTaskHost protocol)
         task_mock = MagicMock()
         ctx.register_foreground_shell_task("t2", task_mock)
         self.assertEqual(ctx.find_task("t2"), task_mock)
         ctx.cleanup_foreground_shell_task("t2")
         self.assertIsNone(ctx.find_task("t2"))
 
-        # terminate widget
+        # terminate widget with NullHost: clean no-op, no set_result called
         ctx.attach_shell_widget("t3", widget)
         ctx.terminate_task_widget("t3", output="done", status="done")
+        widget.set_result.assert_not_called()
+
+    def test_tool_context_widget_operations_with_fallback_host(self):
+        # Host without attach_shell_widget or terminate_task_widget uses ToolContext fallbacks
+        class BareHost:
+            pass
+
+        ctx = ToolContext(BareHost())
+        widget = MagicMock()
+        ctx.attach_shell_widget("t1", widget, is_background=True)
+        ctx.terminate_task_widget("t1", output="done", status="done")
         widget.set_result.assert_called_once_with("done", status="done")
 
     def test_tool_context_widget_operations_with_none_host(self):
