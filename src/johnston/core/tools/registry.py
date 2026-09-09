@@ -6,7 +6,7 @@ import time
 from typing import Any, Dict, Type
 
 from johnston.core.domain.defaults.errors import ToolResult, ToolResultStatus, normalize_tool_result
-from johnston.core.domain.ports.tool_registry import set_default_tool_registry
+from johnston.core.domain.ports.tool_registry import register_tool_registry_factory, set_default_tool_registry
 from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
 from johnston.core.tools.ask_user import AskUserTool
 from johnston.core.tools.base import BaseTool, _resolve_app
@@ -405,6 +405,7 @@ class DefaultToolRegistry:
 
 
 
+register_tool_registry_factory(DefaultToolRegistry)
 set_default_tool_registry(DefaultToolRegistry())
 
 

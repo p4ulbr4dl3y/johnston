@@ -1,11 +1,20 @@
 """Pure role policy: AgentRole model and tool-permission checks. No IO."""
 import fnmatch
 from enum import Enum
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
 
 from johnston.core.domain.defaults.errors import ToolResult, ToolResultStatus, format_tool_error
 from johnston.core.domain.defaults.tools import SUBAGENT_EXCLUDED_TOOLS
-from johnston.core.domain.policies.provider import split_provider_model
+from johnston.core.domain.entities.role import AgentRole, RoleScope, normalize_role_scope
+
+__all__ = [
+    "AgentMode",
+    "AgentRole",
+    "RoleScope",
+    "is_role_scope_compatible",
+    "normalize_role_scope",
+    "role_tool_error",
+]
 
 
 def _canonical_tool_name(name: str) -> str:
@@ -14,14 +23,6 @@ def _canonical_tool_name(name: str) -> str:
     Local copy keeps this domain module free of infrastructure imports.
     """
     return (name or "").strip().lower()
-
-
-class RoleScope(str, Enum):
-    """The agent contexts a role applies to."""
-
-    BOTH = "any"
-    MAIN = "main"
-    SUBAGENT = "subagent"
 
 
 class AgentMode(str, Enum):
@@ -47,16 +48,6 @@ class AgentMode(str, Enum):
         return RoleScope.SUBAGENT if self == AgentMode.SUBAGENT else RoleScope.MAIN
 
 
-def normalize_role_scope(scope: Any) -> str:
-    """Normalize a role scope value to its canonical short name."""
-    if hasattr(scope, "value"):
-        scope = scope.value
-    clean = (scope or "").strip().lower()
-    if clean in ("both", "all"):
-        return "any"
-    return clean or "any"
-
-
 def is_role_scope_compatible(scope: Any, mode: AgentMode) -> bool:
     """Check if a role scope is compatible with the given execution mode."""
     clean = normalize_role_scope(scope)
@@ -69,51 +60,6 @@ def is_role_scope_compatible(scope: Any, mode: AgentMode) -> bool:
     if mode == AgentMode.INTERACTIVE:
         return clean in (RoleScope.MAIN, "interactive")
     return False
-
-
-class AgentRole:
-    """Unified definition for agent execution roles and modes."""
-
-    def __init__(
-        self,
-        key: str,
-        name: str = "",
-        description: str = "",
-        prompt: str = "",
-        disallowed_tools: Optional[List[str]] = None,
-        allowed_tools: Optional[List[str]] = None,
-        model: str = "",
-        scope: str = "any",
-        source: str = "builtin",
-        tool_name_normalizer: Optional[Callable[[str], str]] = None,
-        read_only: bool = False,
-    ):
-        self.key = key.lower().strip()
-        self.name = name or self.key.capitalize()
-        self.description = description
-        self.prompt = prompt or ""
-        self.disallowed_tools = [t.strip() for t in (disallowed_tools or [])]
-        self.allowed_tools = [t.strip() for t in (allowed_tools or [])]
-        raw_model = (model or "").strip()
-        if raw_model:
-            if "/" not in raw_model:
-                raise ValueError(
-                    f"Invalid model format '{raw_model}' for role '{self.key}': must be 'provider/model'"
-                )
-            p, m = split_provider_model(raw_model)
-            if not p or not m:
-                raise ValueError(
-                    f"Invalid model format '{raw_model}' for role '{self.key}': must be 'provider/model'"
-                )
-            self.provider = p
-            self.model = m
-        else:
-            self.provider = ""
-            self.model = ""
-        self.scope = normalize_role_scope(scope)
-        self.source = source
-        self.tool_name_normalizer = tool_name_normalizer
-        self.read_only = bool(read_only)
 
 
 def _matches_tool_pattern(name: str, resolved: str, pattern: str) -> bool:

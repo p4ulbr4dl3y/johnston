@@ -122,7 +122,17 @@ _BASE_URL_PLACEHOLDER_RE = re.compile(r"\{([a-zA-Z0-9_-]+)\}")
 _WARNED_BASE_URL_TOKENS: set[tuple[str, str]] = set()
 
 
-def resolve_base_url_placeholders(raw: str, provider_key: str, data: Dict[str, Any]) -> str:
+def reset_warned_base_url_tokens() -> None:
+    """Reset the set of warned base URL placeholders."""
+    _WARNED_BASE_URL_TOKENS.clear()
+
+
+def resolve_base_url_placeholders(
+    raw: str,
+    provider_key: str,
+    data: Dict[str, Any],
+    warned_tokens: Optional[set[tuple[str, str]]] = None,
+) -> str:
     """Expand ``{token}`` placeholders in a base_url template (azure
     ``{resource}``, cloudflare ``{account_id}``, ...).
 
@@ -131,6 +141,7 @@ def resolve_base_url_placeholders(raw: str, provider_key: str, data: Dict[str, A
     Unresolved tokens stay verbatim (visible failure, no silently wrong host)
     with a one-time warning pointing at the env var to set.
     """
+    target_set = warned_tokens if warned_tokens is not None else _WARNED_BASE_URL_TOKENS
 
     def _sub(match: "re.Match[str]") -> str:
         token = match.group(1)
@@ -144,14 +155,10 @@ def resolve_base_url_placeholders(raw: str, provider_key: str, data: Dict[str, A
         )
         if val:
             return str(val)
-        import sys
 
-        pm_mod = sys.modules.get("johnston.core.application.provider.provider_manager")
-        warned_set = getattr(pm_mod, "_WARNED_BASE_URL_TOKENS", _WARNED_BASE_URL_TOKENS)
         warn_key = (provider_key, token)
-        if warn_key not in warned_set:
-            warned_set.add(warn_key)
-            _WARNED_BASE_URL_TOKENS.add(warn_key)
+        if warn_key not in target_set:
+            target_set.add(warn_key)
             logger.warning(
                 "Base URL placeholder {%s} for provider '%s' was not resolved. Set %s in environment or secrets.json.",
                 token,

@@ -9,6 +9,7 @@ from johnston.core.application.provider.provider_manager import ProviderManager
 from johnston.core.domain.ports.tool_registry import (
     ToolRegistryPort,
     get_default_tool_registry,
+    register_tool_registry_factory,
     set_default_tool_registry,
 )
 
@@ -16,20 +17,26 @@ from johnston.core.domain.ports.tool_registry import (
 @pytest.fixture(autouse=True)
 def restore_tool_registry():
     """Ensure tool registry global state is restored after tests."""
-    original = tr_port._default_tool_registry
+    original_reg = tr_port._default_tool_registry
+    original_factory = tr_port._tool_registry_factory
     yield
-    tr_port.set_default_tool_registry(original)
+    tr_port.set_default_tool_registry(original_reg)
+    tr_port.register_tool_registry_factory(original_factory)
 
 
-def test_get_default_tool_registry_fallback_when_none():
-    """Test get_default_tool_registry returns non-None port even when _default_tool_registry is None."""
+def test_get_default_tool_registry_none_when_unset():
+    """Test get_default_tool_registry returns None when unset without port-level imports."""
     tr_port._default_tool_registry = None
-    registry = get_default_tool_registry()
-    assert registry is not None
-    assert isinstance(registry, ToolRegistryPort)
-    tools = registry.get_default_tools()
-    assert isinstance(tools, list)
-    assert len(tools) > 0
+    tr_port._tool_registry_factory = None
+    assert get_default_tool_registry() is None
+
+
+def test_get_default_tool_registry_factory_resolution():
+    """Test get_default_tool_registry resolves from factory if registry is None."""
+    tr_port._default_tool_registry = None
+    mock_registry = MagicMock(spec=ToolRegistryPort)
+    register_tool_registry_factory(lambda: mock_registry)
+    assert get_default_tool_registry() is mock_registry
 
 
 def test_provider_manager_create_agent_tools_initialization():

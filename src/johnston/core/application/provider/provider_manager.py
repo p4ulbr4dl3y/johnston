@@ -11,6 +11,7 @@ from johnston.core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
 from johnston.core.domain.entities.provider import (
     _WARNED_BASE_URL_TOKENS,
     ProviderDef,
+    reset_warned_base_url_tokens,
     resolve_base_url_placeholders,
 )
 from johnston.core.domain.policies.models_catalog import catalog
@@ -146,6 +147,7 @@ __all__ = [
     "normalize_thinking_effort",
     "provider_models_cache_path",
     "read_json",
+    "reset_warned_base_url_tokens",
     "resolve_base_url_placeholders",
     "save_secret",
     "split_provider_model",

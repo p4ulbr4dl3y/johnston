@@ -1,6 +1,15 @@
 """Tool registry port defining the boundary between core/provider_manager and tools subsystem."""
 
-from typing import Any, Awaitable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol, runtime_checkable
+
+__all__ = [
+    "ToolRegistryFactory",
+    "ToolRegistryPort",
+    "get_default_tool_registry",
+    "register_tool_registry_factory",
+    "reset_tool_circuit_breakers",
+    "set_default_tool_registry",
+]
 
 
 @runtime_checkable
@@ -34,7 +43,15 @@ class ToolRegistryPort(Protocol):
         ...
 
 
+ToolRegistryFactory = Callable[[], ToolRegistryPort]
+_tool_registry_factory: Optional[ToolRegistryFactory] = None
 _default_tool_registry: Optional[ToolRegistryPort] = None
+
+
+def register_tool_registry_factory(factory: Optional[ToolRegistryFactory]) -> None:
+    """Register a factory for resolving default tool registry."""
+    global _tool_registry_factory
+    _tool_registry_factory = factory
 
 
 def set_default_tool_registry(registry: Optional[ToolRegistryPort]) -> None:
@@ -46,13 +63,9 @@ def set_default_tool_registry(registry: Optional[ToolRegistryPort]) -> None:
 def get_default_tool_registry() -> Optional[ToolRegistryPort]:
     """Resolves the active tool registry port implementation."""
     global _default_tool_registry
-    if _default_tool_registry is None:
+    if _default_tool_registry is None and _tool_registry_factory is not None:
         try:
-            import importlib
-
-            mod = importlib.import_module("johnston.core.tools.registry")
-            if _default_tool_registry is None and hasattr(mod, "DefaultToolRegistry"):
-                _default_tool_registry = mod.DefaultToolRegistry()
+            _default_tool_registry = _tool_registry_factory()
         except Exception:
             pass
     return _default_tool_registry

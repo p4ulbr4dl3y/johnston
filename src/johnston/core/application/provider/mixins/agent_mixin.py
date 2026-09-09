@@ -28,6 +28,12 @@ class ProviderManagerAgentMixin:
         from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
 
         reg = tool_registry or getattr(self, "_tool_registry", None) or get_default_tool_registry()
+        if reg is None:
+            from johnston.core.domain.ports.tool_registry import set_default_tool_registry
+            from johnston.core.tools.registry import DefaultToolRegistry
+
+            reg = DefaultToolRegistry()
+            set_default_tool_registry(reg)
         tool_executor = reg.execute_tool if reg is not None else None
         default_tools_provider = reg.get_default_tools if reg is not None else None
         image_processor = reg.process_image_file if reg is not None else None

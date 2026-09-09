@@ -791,7 +791,9 @@ def test_base_url_placeholder_unresolved_stays_verbatim(pm, tmp_path, caplog, mo
     import logging as _logging
 
     # Fresh dedup state: earlier tests may have already warned for this token.
-    monkeypatch.setattr("johnston.core.application.provider.provider_manager._WARNED_BASE_URL_TOKENS", set())
+    from johnston.core.domain.entities.provider import reset_warned_base_url_tokens
+
+    reset_warned_base_url_tokens()
     _write(
         tmp_path / "providers.json",
         {"azure": {"key": "azure", "name": "Azure"}},
