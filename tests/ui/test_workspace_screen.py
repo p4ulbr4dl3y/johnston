@@ -8,7 +8,7 @@ from textual.app import App
 from textual.events import Paste
 from textual.widgets import Input, OptionList
 
-from core.permission_manager import PermissionManager
+from core.application.permission.permission_manager import PermissionManager
 from widgets.presentation.commands.workspace_command import WorkspaceCommand
 from widgets.presentation.screens.confirm import ConfirmScreen
 from widgets.presentation.screens.workspace import (
@@ -89,7 +89,7 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         try:
             with open(global_cfg, "w", encoding="utf-8") as f:
                 json.dump({"permissions": {"writable_roots": [global_dir]}}, f)
-            with patch("core.permission_manager.CONFIG_FILE", global_cfg):
+            with patch("core.application.permission.permission_manager.CONFIG_FILE", global_cfg):
                 self.assertEqual(get_root_scope(self.pm, global_dir), "global")
                 # Also test remove_persisted_workspace_root on global config
                 self.pm.remove_persisted_workspace_root(global_dir)

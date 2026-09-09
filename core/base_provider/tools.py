@@ -1,9 +1,9 @@
 from typing import Any, Dict, List, Tuple
 
 from core.application.generation.prompt_builder import PromptBuilder
+from core.domain.policies.models_catalog import catalog
 from core.infrastructure.runtime.token_util import estimate_tokens
 from core.infrastructure.runtime.tool_name import normalize_tool_name
-from core.models_catalog import catalog
 
 # Sentinel for the _tool_policy_error memo so a cached "allowed" (None) result
 # is indistinguishable from "not yet cached".

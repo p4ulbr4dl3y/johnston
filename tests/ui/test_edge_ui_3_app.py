@@ -11,7 +11,7 @@ class TestAppBootEdge(unittest.TestCase):
         self.assertTrue(app.current_session_id)
 
     def test_init_no_agent_tolerated(self):
-        with patch("core.provider_manager.ProviderManager.create_active_agent", return_value=None):
+        with patch("core.application.provider.provider_manager.ProviderManager.create_active_agent", return_value=None):
             app = JohnstonApp()
             self.assertIsNone(app.agent)
             self.assertEqual(app.role, "worker")

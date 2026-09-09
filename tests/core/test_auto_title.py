@@ -272,7 +272,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
 
-        with patch("core.provider_manager.ProviderManager.create_agent_for_provider", return_value=provider_agent), \
+        with patch("core.application.provider.provider_manager.ProviderManager.create_agent_for_provider", return_value=provider_agent), \
              patch("core.adapters.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(active_agent, sess)
 

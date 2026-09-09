@@ -168,8 +168,8 @@ async def test_role_falls_back_or_accepts(role, monkeypatch):
         base = {"worker": _FakeRole(key="worker", scope="any")}
         return base.get(low, base["worker"])
 
-    monkeypatch.setattr("core.role_registry.RoleRegistry.get_role", fake_get_role)
-    monkeypatch.setattr("core.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
+    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.get_role", fake_get_role)
+    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
 
     store, app, tool, tmp = _make_env(agent)
     try:
@@ -199,8 +199,8 @@ async def test_main_scope_role_falls_back_to_worker(monkeypatch):
             return registry.get_role("orchestrator")
         return _FakeRole(key="worker", scope="any")
 
-    monkeypatch.setattr("core.role_registry.RoleRegistry.get_role", fake_get)
-    monkeypatch.setattr("core.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
+    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.get_role", fake_get)
+    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
 
     store, app, tool, tmp = _make_env(agent)
     try:
@@ -227,8 +227,8 @@ async def test_role_pinned_provider_not_connected_raises(monkeypatch):
             return _FakeRole(key="heavymetal", scope="any", provider="zzz-not-connected")
         return _FakeRole(key="worker", scope="any")
 
-    monkeypatch.setattr("core.role_registry.RoleRegistry.get_role", fake_get)
-    monkeypatch.setattr("core.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
+    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.get_role", fake_get)
+    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
 
     class _Pm:
         def load_providers(self):
@@ -240,7 +240,7 @@ async def test_role_pinned_provider_not_connected_raises(monkeypatch):
         def create_agent_for_provider(self, key):
             return _FakeRole(key="whatever", scope="any")
 
-    monkeypatch.setattr("core.provider_manager.ProviderManager", _Pm)
+    monkeypatch.setattr("core.application.provider.provider_manager.ProviderManager", _Pm)
 
     store, app, tool, tmp = _make_env(agent)
     try:

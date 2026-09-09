@@ -879,8 +879,8 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(lines[0]["tools"], 1)
 
     async def test_run_headless_async_yolo_mode(self):
+        from core.application.permission.permission_manager import PermissionManager
         from core.domain.policies.permission_policy import ExecutionMode
-        from core.permission_manager import PermissionManager
 
         agent = MockAgent(steps=[("content", "hello", "")])
         pm = MagicMock()

@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
-from core.models_catalog import catalog
-from core.provider_manager import is_local_provider
+from core.application.provider.provider_manager import is_local_provider
+from core.domain.policies.models_catalog import catalog
 
 
 def accumulate_usage(

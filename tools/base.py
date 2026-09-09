@@ -330,7 +330,7 @@ def check_mcp_role_policy(ctx_or_app: Any, target: str) -> Optional[ToolResult]:
     Returns an error ToolResult if the tool is disallowed by role policy, else None.
     """
     from core.domain.policies.role_policy import role_tool_error
-    from core.role_registry import RoleRegistry
+    from core.roles.role_registry import RoleRegistry
 
     role_source = _resolve_app(ctx_or_app)
     role = getattr(role_source, "role", "worker") if role_source is not None else "worker"

@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
+from core.domain.policies.models_catalog import ModelsCatalog, format_context_tokens, get_context_window
 from core.infrastructure.adapters.models_fetcher import fetch_catalog_endpoints
 from core.infrastructure.config.settings import JohnstonSettings, LLMSettings
-from core.models_catalog import ModelsCatalog, format_context_tokens, get_context_window
 
 
 class TestModelsCatalog(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestModelsCatalog(unittest.TestCase):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmpdir.cleanup)
         cache_file = os.path.join(self._tmpdir.name, "cache", "models_catalog_cache.json")
-        cache_patch = patch("core.models_catalog.CACHE_FILE", cache_file)
+        cache_patch = patch("core.domain.policies.models_catalog.CACHE_FILE", cache_file)
         cache_patch.start()
         self.addCleanup(cache_patch.stop)
 
@@ -56,7 +56,7 @@ class TestModelsCatalog(unittest.TestCase):
             catalog = ModelsCatalog()
             catalog._limits = {}
             catalog._names = {}
-            with patch("core.models_catalog.CONFIG_DIR", tmpdir):
+            with patch("core.domain.policies.models_catalog.CONFIG_DIR", tmpdir):
                 with patch.object(ModelsCatalog, "load_cache", return_value=True) as mock_load:
                     limit = catalog.get_context_limit("prov", "m1")
         self.assertEqual(limit, 128000)
@@ -79,7 +79,7 @@ class TestModelsCatalog(unittest.TestCase):
             os.makedirs(cache_dir)
             with open(os.path.join(cache_dir, "models_acme.json"), "w", encoding="utf-8") as f:
                 f.write("{broken json")
-            with patch("core.models_catalog.CONFIG_DIR", tmpdir):
+            with patch("core.domain.policies.models_catalog.CONFIG_DIR", tmpdir):
                 catalog = ModelsCatalog()
                 self.assertEqual(catalog.get_context_limit("acme", "warp-1"), 128000)
 
@@ -156,7 +156,7 @@ class TestModelsCatalog(unittest.TestCase):
             tmp_path = tmp.name
 
         try:
-            with patch("core.models_catalog.CACHE_FILE", tmp_path):
+            with patch("core.domain.policies.models_catalog.CACHE_FILE", tmp_path):
                 cat.save_cache()
                 cat2 = ModelsCatalog()
                 self.assertTrue(cat2.load_cache())
@@ -172,7 +172,7 @@ class TestModelsCatalog(unittest.TestCase):
             tmp_path = tmp.name
         try:
             cat = ModelsCatalog()
-            with patch("core.models_catalog.CACHE_FILE", tmp_path):
+            with patch("core.domain.policies.models_catalog.CACHE_FILE", tmp_path):
                 self.assertFalse(cat.load_cache())
         finally:
             if os.path.exists(tmp_path):
@@ -183,8 +183,8 @@ class TestModelsCatalog(unittest.TestCase):
             tmp_path = tmp.name
         try:
             cat = ModelsCatalog()
-            with patch("core.models_catalog.CACHE_FILE", tmp_path):
-                with patch("core.models_catalog.os.replace", side_effect=OSError("replace failed")):
+            with patch("core.domain.policies.models_catalog.CACHE_FILE", tmp_path):
+                with patch("core.domain.policies.models_catalog.os.replace", side_effect=OSError("replace failed")):
                     cat.save_cache()
             self.assertFalse(os.path.exists(tmp_path + ".tmp"))
         finally:
@@ -197,9 +197,9 @@ class TestModelsCatalog(unittest.TestCase):
             tmp_path = tmp.name
         try:
             cat = ModelsCatalog()
-            with patch("core.models_catalog.CACHE_FILE", tmp_path):
-                with patch("core.models_catalog.os.replace", side_effect=OSError("replace failed")):
-                    with patch("core.models_catalog.os.remove", side_effect=OSError("remove failed")):
+            with patch("core.domain.policies.models_catalog.CACHE_FILE", tmp_path):
+                with patch("core.domain.policies.models_catalog.os.replace", side_effect=OSError("replace failed")):
+                    with patch("core.domain.policies.models_catalog.os.remove", side_effect=OSError("remove failed")):
                         cat.save_cache()
         finally:
             for path in (tmp_path, tmp_path + ".tmp"):
@@ -259,7 +259,7 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmpdir.cleanup)
         cache_file = os.path.join(self._tmpdir.name, "cache", "models_catalog_cache.json")
-        cache_patch = patch("core.models_catalog.CACHE_FILE", cache_file)
+        cache_patch = patch("core.domain.policies.models_catalog.CACHE_FILE", cache_file)
         cache_patch.start()
         self.addCleanup(cache_patch.stop)
 
@@ -482,7 +482,7 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
     async def test_refresh_outer_exception(self):
         cat = ModelsCatalog()
         cat._limits = {}
-        with patch("core.models_catalog.asyncio.gather", side_effect=RuntimeError("boom")):
+        with patch("core.domain.policies.models_catalog.asyncio.gather", side_effect=RuntimeError("boom")):
             limits = await cat.refresh()
         self.assertEqual(limits, {})
 
@@ -501,7 +501,7 @@ class TestModelsCatalogAsync(unittest.IsolatedAsyncioTestCase):
 
         async with httpx.AsyncClient() as client:
             with patch.object(httpx.AsyncClient, "get", spy_get):
-                with patch("core.models_catalog.asyncio.gather", side_effect=RuntimeError("boom")):
+                with patch("core.domain.policies.models_catalog.asyncio.gather", side_effect=RuntimeError("boom")):
                     with self.assertRaises(RuntimeError):
                         await fetch_catalog_endpoints(client)
         # A live, never-awaited coroutine still has a frame; close() clears it.
@@ -542,13 +542,13 @@ def test_format_context_floaty():
 
 
 def test_get_context_window_unknown_returns_default(tmp_path):
-    with patch("core.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
+    with patch("core.domain.policies.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
         assert get_context_window("no_provider", "no_model") == "128k"
 
 
 def test_get_context_window_none_and_empty(tmp_path):
     # Must not crash and must fall back to default
-    with patch("core.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
+    with patch("core.domain.policies.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
         assert get_context_window(None, None) == "128k"
         assert get_context_window("", "") == "128k"
         assert get_context_window(None, "") == "128k"
@@ -576,7 +576,7 @@ def test_get_context_window_suffix_model_resolves_ambiguously():
 
 def test_get_context_window_cyrillic_and_spaces(tmp_path):
     # Weird names must not crash -> default fallback
-    with patch("core.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
+    with patch("core.domain.policies.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
         assert get_context_window("", "модель с пробелами") == "128k"
         cat = ModelsCatalog()
         cat._limits = {"prov/модель-с-пробелами": 32000}
@@ -645,7 +645,7 @@ def test_resolve_no_match_returns_empty():
 # ---------------------------------------------------------------------------
 
 def test_display_name_empty_provider_and_suffix(tmp_path):
-    with patch("core.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
+    with patch("core.domain.policies.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
         cat = ModelsCatalog()
         assert cat.get_model_display_name("", "") == ""
         assert cat.get_model_display_name("", "gpt-4o") == "GPT 4o"
@@ -676,7 +676,7 @@ def test_get_context_limit_does_not_mutate_inputs():
 
 @pytest.fixture
 def iso_cat(tmp_path):
-    with patch("core.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
+    with patch("core.domain.policies.models_catalog.CACHE_FILE", str(tmp_path / "cache" / "c.json")):
         cat = ModelsCatalog()
         cat._limits = {}
         cat._names = {}
@@ -955,8 +955,8 @@ def test_models_catalog_internal_caches_and_invalidation():
 
 
 def test_models_catalog_set_match_lru_bounding():
+    from core.domain.policies.models_catalog import _MATCH_CACHE_MAX, _set_match
     from core.infrastructure.runtime.lru import LruCache
-    from core.models_catalog import _MATCH_CACHE_MAX, _set_match
 
     cache = LruCache(_MATCH_CACHE_MAX)
     for i in range(_MATCH_CACHE_MAX + 50):

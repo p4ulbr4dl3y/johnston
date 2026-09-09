@@ -61,7 +61,7 @@ def format_subagent_task_row(
         else:
             role = getattr(agent, "role", None) if agent else getattr(session, "role", None)
             if isinstance(role, str) and role.strip():
-                from core.role_registry import get_role_display_name
+                from core.roles.role_registry import get_role_display_name
 
                 role_str = get_role_display_name(role)
     if not clean.lower().startswith(f"{role_str.lower()}:"):

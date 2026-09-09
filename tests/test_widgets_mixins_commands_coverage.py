@@ -639,7 +639,7 @@ def test_lifecycle_on_mount_normal_flow():
     app.current_session_id = "curr_1"
 
     with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler") as mock_install:
-        with patch("core.models_catalog.catalog.load_cache") as mock_cache:
+        with patch("core.domain.policies.models_catalog.catalog.load_cache") as mock_cache:
             with patch("core.infrastructure.mcp.get_mcp_manager") as mock_mcp:
                 mcp_mock = MagicMock()
                 mcp_mock.ensure_tools_ready_async.return_value = AsyncMock()()
@@ -667,7 +667,7 @@ def test_lifecycle_on_mount_resume_session_locked_steal_and_readonly():
 
     with patch.object(app, "load_session_ui") as mock_load_ui:
         with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
-            with patch("core.models_catalog.catalog.load_cache"):
+            with patch("core.domain.policies.models_catalog.catalog.load_cache"):
                 with patch("core.infrastructure.mcp.get_mcp_manager"):
                     # Custom push_screen to capture callback
                     callbacks = []
@@ -705,7 +705,7 @@ def test_lifecycle_on_mount_resume_session_empty_picker():
 
     with patch("widgets.presentation.commands.ResumeCommand.execute") as mock_resume_exec:
         with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
-            with patch("core.models_catalog.catalog.load_cache"):
+            with patch("core.domain.policies.models_catalog.catalog.load_cache"):
                 with patch("core.infrastructure.mcp.get_mcp_manager"):
                     app.on_mount()
                     app.sm.acquire_session_lock.assert_called_with("curr_1")
@@ -720,7 +720,7 @@ def test_lifecycle_on_mount_resume_session_unlocked():
 
     with patch.object(app, "load_session_ui") as mock_load_ui:
         with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
-            with patch("core.models_catalog.catalog.load_cache"):
+            with patch("core.domain.policies.models_catalog.catalog.load_cache"):
                 with patch("core.infrastructure.mcp.get_mcp_manager"):
                     app.on_mount()
                     mock_load_ui.assert_called_once_with("res_2")
@@ -786,7 +786,7 @@ def test_lifecycle_on_unmount_full_flow():
         with patch("core.application.session.stream.cancel_running_subagents") as mock_subagents:
             with patch.object(app, "save_current_session") as mock_save:
                 with patch("core.infrastructure.mcp.get_mcp_manager") as mock_mcp:
-                    with patch("core.models_catalog.catalog.close", new_callable=AsyncMock):
+                    with patch("core.domain.policies.models_catalog.catalog.close", new_callable=AsyncMock):
                         with patch("tools.registry.aclose_tools", return_value=AsyncMock()()):
                             app.on_unmount()
 
@@ -1069,7 +1069,7 @@ def test_lifecycle_on_unmount_sync_and_error_handling():
                 with patch("core.application.session.stream.cancel_running_subagents", side_effect=RuntimeError("subagent err")):
                     with patch.object(app, "save_current_session", side_effect=RuntimeError("save err")):
                         with patch("core.infrastructure.mcp.get_mcp_manager", side_effect=RuntimeError("mcp err")):
-                            with patch("core.models_catalog.catalog.close", new_callable=AsyncMock):
+                            with patch("core.domain.policies.models_catalog.catalog.close", new_callable=AsyncMock):
                                 with patch("tools.registry.aclose_tools") as mock_aclose:
                                     mock_aclose.return_value = AsyncMock()()
                                     app.sm.release_all_locks.side_effect = RuntimeError("locks err")

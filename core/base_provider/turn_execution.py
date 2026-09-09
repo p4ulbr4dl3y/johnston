@@ -9,7 +9,7 @@ from core.infrastructure.adapters.base import (
     normalize_tool_arguments_str,
     parse_tool_call_args,
 )
-from core.role_registry import RoleRegistry
+from core.roles.role_registry import RoleRegistry
 
 logger = logging.getLogger("core.base_provider.agent")
 

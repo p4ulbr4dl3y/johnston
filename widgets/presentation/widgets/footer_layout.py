@@ -8,7 +8,7 @@ from rich.markup import escape
 from rich.table import Table
 
 from core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
-from core.models_catalog import format_context_tokens
+from core.domain.policies.models_catalog import format_context_tokens
 from widgets.mixins.stream_frame import SPINNER_FRAMES
 from widgets.utils.row_format import build_status_right_text, ellipsize, format_cost
 
@@ -196,7 +196,7 @@ def _build_subagent_grid(
     title_part = ellipsize(clean_title, max_title_len)
     row1_left = f"[bold {t_primary}]{escape(title_part)}[/]"
 
-    from core.role_registry import get_role_display_name
+    from core.roles.role_registry import get_role_display_name
 
     role_str = get_role_display_name(agent_role)
     if is_generating:

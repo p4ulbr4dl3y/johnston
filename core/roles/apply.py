@@ -23,7 +23,7 @@ def apply_role(
     if pinned, filters/hardens tools, and sets the system prompt and model.
     Returns the resolved role definition.
     """
-    from core.role_registry import RoleRegistry
+    from core.roles.role_registry import RoleRegistry
 
     if mode is not None:
         effective_mode = AgentMode(mode.lower().strip()) if isinstance(mode, str) else mode

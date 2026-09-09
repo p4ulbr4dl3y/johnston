@@ -51,7 +51,7 @@ class InvokeSubagentTool(BaseTool):
         return False
 
     def get_schema(self, is_subagent: bool = False) -> Dict[str, Any]:
-        from core.role_registry import RoleRegistry
+        from core.roles.role_registry import RoleRegistry
 
         schema = copy.deepcopy(self.schema)
         try:

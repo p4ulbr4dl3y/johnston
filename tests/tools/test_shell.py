@@ -21,11 +21,11 @@ from tools.shell import ShellTool, _new_task_id
 @pytest.fixture(autouse=True)
 def _reset_permissions():
     """Clear session overrides and avoid touching the real config file."""
-    from core.permission_manager import PermissionManager
+    from core.application.permission.permission_manager import PermissionManager
 
     pm = PermissionManager.get_instance()
     pm.clear_session_overrides()
-    with patch("core.permission_manager.CONFIG_FILE", "/nonexistent_test_config.json"):
+    with patch("core.application.permission.permission_manager.CONFIG_FILE", "/nonexistent_test_config.json"):
         yield
     pm.clear_session_overrides()
 
@@ -601,7 +601,7 @@ async def test_background_task_kill_lifecycle(tool, make_app_mock):
 
 
 async def test_session_override_allow_shell(tool, make_app_mock):
-    from core.permission_manager import PermissionManager
+    from core.application.permission.permission_manager import PermissionManager
 
     pm = PermissionManager.get_instance()
     pm.clear_session_overrides()

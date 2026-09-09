@@ -297,7 +297,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         self.assertIn("[Select model: /models]", footer._last_grid_rows[2][0])
 
     def test_render_footer_reflects_execution_mode_and_sandbox_off(self):
-        from core.permission_manager import PermissionManager
+        from core.application.permission.permission_manager import PermissionManager
 
         footer = SubagentStatusFooter()
         footer._harness_app = MagicMock()

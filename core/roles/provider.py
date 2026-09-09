@@ -37,7 +37,7 @@ def rebind_provider(subagent: Any, provider_key: str) -> None:
 
     Raises ``ValueError`` when the provider cannot produce an agent.
     """
-    from core.provider_manager import ProviderManager
+    from core.application.provider.provider_manager import ProviderManager
 
     pm = ProviderManager()
     rebuilt = pm.create_agent_for_provider(provider_key)
@@ -59,7 +59,7 @@ def apply_provider(agent: Any, definition: AgentRole) -> None:
     provider = getattr(definition, "provider", None)
     if not isinstance(provider, str) or not provider.strip():
         return
-    from core.provider_manager import ProviderManager
+    from core.application.provider.provider_manager import ProviderManager
 
     pm = ProviderManager()
     pm.load_providers()

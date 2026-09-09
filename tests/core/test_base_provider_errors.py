@@ -269,7 +269,7 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertIn("tprov", events[-1][1])
 
     async def test_cancelled_with_usage_records_tokens_and_cost(self):
-        from core.models_catalog import catalog
+        from core.domain.policies.models_catalog import catalog
 
         agent = self._make_agent()
         pricing = {"prompt": 0.01, "completion": 0.03}

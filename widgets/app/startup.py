@@ -22,8 +22,8 @@ def register_textual_themes(app) -> None:
 
 def configure_global_managers(tool_name_normalizer) -> None:
     """Configure the global PermissionManager and RoleRegistry singletons."""
-    from core.permission_manager import PermissionManager
-    from core.role_registry import RoleRegistry
+    from core.application.permission.permission_manager import PermissionManager
+    from core.roles.role_registry import RoleRegistry
 
     PermissionManager.configure_instance(tool_name_normalizer=tool_name_normalizer)
     RoleRegistry._instance = RoleRegistry(tool_name_normalizer=tool_name_normalizer)
@@ -31,9 +31,9 @@ def configure_global_managers(tool_name_normalizer) -> None:
 
 def build_agent(app) -> None:
     """Create provider manager, session store, task manager and the active agent."""
+    from core.application.provider.provider_manager import ProviderManager
     from core.infrastructure.storage.session_store import SessionStore
     from core.infrastructure.tasks.manager import TaskManager
-    from core.provider_manager import ProviderManager
 
     app.pm = ProviderManager()
     app.sm = SessionStore()
@@ -115,8 +115,8 @@ def apply_sandbox(app, sandbox) -> None:
 def apply_mode(app, mode) -> None:
     """Set the permission execution mode from the ``--mode`` flag."""
     if mode:
+        from core.application.permission.permission_manager import PermissionManager
         from core.domain.policies.permission_policy import ExecutionMode
-        from core.permission_manager import PermissionManager
 
         try:
             PermissionManager.get_instance().set_session_mode(ExecutionMode(mode.lower()))

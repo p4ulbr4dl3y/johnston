@@ -10,7 +10,7 @@ import pytest
 
 import core.application.generation.prompt_builder as pb
 from core.application.generation.prompt_builder import PromptBuilder
-from core.role_registry import RoleRegistry
+from core.roles.role_registry import RoleRegistry
 
 _CUSTOM_ROLE_MD = """---
 key: custom

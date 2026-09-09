@@ -153,7 +153,7 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
 
         app = TestLifecycleApp()
         with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
-            with patch("core.models_catalog.catalog.load_cache"):
+            with patch("core.domain.policies.models_catalog.catalog.load_cache"):
                 with patch("core.infrastructure.mcp.get_mcp_manager"):
                     app.on_mount()
 

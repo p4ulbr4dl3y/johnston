@@ -143,7 +143,7 @@ class BaseAgent(
     def role_name(self) -> str:
         if getattr(self, "_role_name", None):
             return self._role_name
-        from core.role_registry import resolve_role_display_name
+        from core.roles.role_registry import resolve_role_display_name
 
         pdir = getattr(getattr(self, "host", None), "project_dir", None)
         return resolve_role_display_name(self.role, project_dir=pdir)

@@ -8,7 +8,7 @@ from textual.theme import Theme as TextualTheme
 
 from core.domain.defaults.themes import ZINC_DARK
 from core.domain.entities.theme import Theme, is_ansi_theme
-from core.theme_manager import ThemeManager as CoreThemeManager
+from widgets.theme_manager import ThemeManager as CoreThemeManager
 
 
 class ThemeManager(CoreThemeManager):

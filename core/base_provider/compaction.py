@@ -16,9 +16,9 @@ from core.domain.defaults.prompts import (
     COMPACTION_UPDATE_HEADER,
 )
 from core.domain.policies.messages import is_checkpoint_message, is_system_note
+from core.domain.policies.models_catalog import catalog, get_context_window
 from core.infrastructure.adapters.base import build_stream_kwargs, normalize_tool_arguments_str
 from core.infrastructure.runtime.token_util import estimate_message_tokens, estimate_tokens
-from core.models_catalog import catalog, get_context_window
 
 # Checkpoint wire-format constants. There is exactly one canonical form.
 CHECKPOINT_OPEN_TAG = "<compaction_checkpoint>"
@@ -763,7 +763,7 @@ class CompactionMixin:
             )
             reset_tool_circuit_breakers(sid)
 
-            from core.models_catalog import format_context_tokens
+            from core.domain.policies.models_catalog import format_context_tokens
 
             def _fmt(t: int) -> str:
                 return f"{t:,}" if t < 10000 else format_context_tokens(t)

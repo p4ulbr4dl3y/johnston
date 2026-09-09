@@ -4,9 +4,9 @@ from typing import Any
 from textual import events
 from textual.widgets import Input, OptionList
 
+from core.domain.policies.models_catalog import catalog
 from core.infrastructure.platform.paths import CONFIG_DIR
 from core.infrastructure.platform.platform_utils import cached_json_read
-from core.models_catalog import catalog
 from widgets.presentation.screens.api_key import ApiKeyScreen
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen

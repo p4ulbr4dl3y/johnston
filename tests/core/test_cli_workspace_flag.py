@@ -2,9 +2,9 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
+from core.application.permission.permission_manager import PermissionManager
 from core.interfaces.cli.commands.run_cmd import run_headless
 from core.interfaces.cli.entrypoint import build_parser, main
-from core.permission_manager import PermissionManager
 
 
 class TestCliWorkspaceFlag(unittest.TestCase):

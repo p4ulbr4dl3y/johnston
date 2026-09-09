@@ -146,7 +146,7 @@ def resolve_base_url_placeholders(raw: str, provider_key: str, data: Dict[str, A
             return str(val)
         import sys
 
-        pm_mod = sys.modules.get("core.provider_manager")
+        pm_mod = sys.modules.get("core.application.provider.provider_manager")
         warned_set = getattr(pm_mod, "_WARNED_BASE_URL_TOKENS", _WARNED_BASE_URL_TOKENS)
         warn_key = (provider_key, token)
         if warn_key not in warned_set:

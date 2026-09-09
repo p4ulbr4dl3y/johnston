@@ -177,7 +177,7 @@ class TestRoleServiceCoverage:
             refresh_status_footer=MagicMock(),
         )
 
-        with patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             res = toggle_agent_role(app)
 
         assert res is True
@@ -198,13 +198,13 @@ class TestRoleServiceCoverage:
             role="unknown_role",
             refresh_status_footer=MagicMock(),
         )
-        with patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app)
         assert app.role == "worker"
 
         # Wrap around: architect -> worker
         app.agent.role = "architect"
-        with patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app)
         assert app.role == "worker"
 
@@ -218,7 +218,7 @@ class TestRoleServiceCoverage:
             role="worker",
             refresh_status_footer=MagicMock(),
         )
-        with patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app)
         assert app.role == "architect"
 
@@ -230,7 +230,7 @@ class TestRoleServiceCoverage:
             current_session_id="sess-1",
             refresh_status_footer=MagicMock(),
         )
-        with patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app2)
         assert app2.role == "architect"
 
@@ -243,7 +243,7 @@ class TestRoleServiceCoverage:
             current_session_id="sess-1",
             refresh_status_footer=MagicMock(),
         )
-        with patch("core.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app3)
         assert app3.role == "architect"
         assert session.role == "architect"

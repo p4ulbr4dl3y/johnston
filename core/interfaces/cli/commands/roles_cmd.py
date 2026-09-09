@@ -8,7 +8,7 @@ def run_roles(args: Any = None) -> int:
     """Print available unified agent roles to stdout or JSON."""
     import json
 
-    from core.role_registry import RoleRegistry
+    from core.roles.role_registry import RoleRegistry
 
     registry = RoleRegistry.get_instance()
     roles = registry.load_roles()

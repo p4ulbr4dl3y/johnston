@@ -602,7 +602,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
     def test_role_policies_allow_search(self):
         from core.domain.policies.role_policy import role_tool_error
-        from core.role_registry import BUILTIN_ROLES
+        from core.roles.role_registry import BUILTIN_ROLES
 
         explorer = BUILTIN_ROLES["explorer"]
         worker = BUILTIN_ROLES["worker"]

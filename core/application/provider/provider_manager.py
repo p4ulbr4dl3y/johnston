@@ -8,6 +8,7 @@ from core.domain.entities.provider import (
     ProviderDef,
     resolve_base_url_placeholders,
 )
+from core.domain.policies.models_catalog import catalog
 from core.domain.policies.provider import split_provider_model
 from core.domain.ports.tool_registry import ToolRegistryPort, get_default_tool_registry
 from core.infrastructure.adapters.models_source import extract_context_length
@@ -38,7 +39,6 @@ from core.infrastructure.secrets import (
     interpolate_secrets_in_obj,
     save_secret,
 )
-from core.models_catalog import catalog
 
 logger = logging.getLogger(__name__)
 

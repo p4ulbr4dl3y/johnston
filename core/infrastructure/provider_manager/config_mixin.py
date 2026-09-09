@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _pm():
-    import core.provider_manager as pm
+    import core.application.provider.provider_manager as pm
 
     return pm
 

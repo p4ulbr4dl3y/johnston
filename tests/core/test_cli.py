@@ -202,7 +202,7 @@ class TestCLIAdvanced(unittest.TestCase):
         pm.load_providers.return_value = {"empty": {"name": "Empty"}}
         pm.get_active_provider_key.return_value = "empty"
         pm.get_api_key.return_value = ""
-        with patch("core.provider_manager.ProviderManager", return_value=pm):
+        with patch("core.application.provider.provider_manager.ProviderManager", return_value=pm):
             with redirect_stdout(f):
                 from cli import print_models
 
@@ -222,7 +222,7 @@ class TestCLIAdvanced(unittest.TestCase):
         }
         pm.get_active_provider_key.return_value = "openai"
         pm.get_api_key.return_value = "sk-123"
-        with patch("core.provider_manager.ProviderManager", return_value=pm):
+        with patch("core.application.provider.provider_manager.ProviderManager", return_value=pm):
             with redirect_stdout(f):
                 from cli import print_models
 
@@ -341,7 +341,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_roles_with_disallowed_tools(self):
         f = io.StringIO()
-        with patch("core.role_registry.RoleRegistry") as mock_cls:
+        with patch("core.roles.role_registry.RoleRegistry") as mock_cls:
             role_mgr = MagicMock()
             role = MagicMock(
                 source="builtin",

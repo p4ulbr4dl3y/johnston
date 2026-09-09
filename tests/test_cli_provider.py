@@ -8,6 +8,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import MagicMock, patch
 
+from core.application.provider.provider_manager import ProviderManager
 from core.infrastructure.platform import paths
 from core.interfaces.cli.commands.provider_cmd import (
     add_provider_cmd,
@@ -21,7 +22,6 @@ from core.interfaces.cli.commands.provider_cmd import (
     set_model,
 )
 from core.interfaces.cli.entrypoint import build_parser, main
-from core.provider_manager import ProviderManager
 
 
 class TestCLIProvider(unittest.TestCase):

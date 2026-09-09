@@ -845,7 +845,7 @@ def _tool(name):
 
 class TestApplyRole:
     def _fake_registry(self, monkeypatch, roles):
-        from core import role_registry
+        from core.roles import role_registry
 
         class FakeReg:
             def load_roles(self, project_dir=None, include_global=True):
@@ -857,7 +857,7 @@ class TestApplyRole:
         monkeypatch.setattr(role_registry.RoleRegistry, "get_instance", lambda: FakeReg())
 
     def test_scope_main_falls_back_to_worker(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from core.roles.role_registry import AgentRole
 
         main_role = AgentRole(key="orchestrator", scope="main", prompt="main prompt")
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
@@ -868,7 +868,7 @@ class TestApplyRole:
         assert returned.scope != "main"
 
     def test_role_not_found_falls_back_to_worker(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from core.roles.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -877,7 +877,7 @@ class TestApplyRole:
         assert hasattr(returned, "key")  # not None
 
     def test_tools_none_becomes_empty(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from core.roles.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -886,7 +886,7 @@ class TestApplyRole:
         assert sub.tools == []
 
     def test_shell_description_overridden_others_preserved(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from core.roles.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -900,7 +900,7 @@ class TestApplyRole:
         assert read["function"]["description"] == "desc read"
 
     def test_excluded_tools_removed(self, monkeypatch):
-        from core.role_registry import AgentRole
+        from core.roles.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})

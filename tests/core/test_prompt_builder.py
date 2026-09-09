@@ -230,7 +230,7 @@ class TestPromptBuilder(unittest.TestCase):
         from unittest.mock import patch
 
         from core.domain.policies.role_policy import AgentRole
-        from core.role_registry import RoleRegistry
+        from core.roles.role_registry import RoleRegistry
 
         reg = RoleRegistry.get_instance()
         role = AgentRole(

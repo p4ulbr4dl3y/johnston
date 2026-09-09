@@ -11,7 +11,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from core.permission_manager import PermissionManager
+from core.application.permission.permission_manager import PermissionManager
 from widgets.presentation.screens.base_modal import BaseModalScreen
 from widgets.presentation.screens.base_selection import HeaderWrapOptionList
 from widgets.presentation.screens.confirm import ConfirmScreen
@@ -117,7 +117,7 @@ def get_root_scope(pm: PermissionManager, path: str) -> str:
                 pass
 
     try:
-        from core.permission_manager import CONFIG_FILE as global_path
+        from core.application.permission.permission_manager import CONFIG_FILE as global_path
 
         if os.path.isfile(global_path):
             with open(global_path, "r", encoding="utf-8") as f:

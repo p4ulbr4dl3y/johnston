@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from textual.app import App
 
-from core.permission_manager import PermissionManager
+from core.application.permission.permission_manager import PermissionManager
 from widgets.app.dispatch import handle_slash_command
 from widgets.presentation.commands.workspace_command import WorkspaceCommand
 from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen

@@ -8,7 +8,7 @@ These pin the security fixes:
 - Round-trip of summaries through wrap/strip
 
 The module is imported in isolation (without pulling agent.py, which has heavy
-runtime deps) by stubbing the `core.models_catalog` namespace.
+runtime deps) by stubbing the `core.domain.policies.models_catalog` namespace.
 """
 import unittest
 

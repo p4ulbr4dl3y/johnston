@@ -10,11 +10,11 @@ import unittest
 from contextlib import redirect_stderr
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from core.application.permission.permission_manager import PermissionManager
 from core.domain.policies.permission_policy import ExecutionMode
 from core.infrastructure.storage.session_store import SessionStore
 from core.interfaces.cli.commands.run_cmd import run_headless, run_headless_async
 from core.interfaces.cli.entrypoint import build_parser, main
-from core.permission_manager import PermissionManager
 from widgets.app.app import JohnstonApp
 from widgets.chat_input import ChatInput
 
@@ -481,8 +481,8 @@ class TestLifecycleInitialPrompt(unittest.IsolatedAsyncioTestCase):
         app = MockApp()
         mock_mcp = MagicMock()
         mock_mcp.ensure_tools_ready_async = AsyncMock()
-        with patch("core.models_catalog.catalog.load_cache"):
-            with patch("core.models_catalog.catalog.refresh", new_callable=AsyncMock):
+        with patch("core.domain.policies.models_catalog.catalog.load_cache"):
+            with patch("core.domain.policies.models_catalog.catalog.refresh", new_callable=AsyncMock):
                 with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp):
                     app.on_mount()
 

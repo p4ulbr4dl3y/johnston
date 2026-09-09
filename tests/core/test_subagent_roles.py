@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock
 
 from core.infrastructure.storage.session_store import SessionStore
-from core.role_registry import RoleRegistry
+from core.roles.role_registry import RoleRegistry
 
 
 class TestSubagentRoles(unittest.TestCase):
@@ -103,7 +103,7 @@ class TestSubagentApplyRole(unittest.TestCase):
         import tempfile
 
         from core.application.session.stream import configure_subagent_agent
-        from core.role_registry import RoleRegistry
+        from core.roles.role_registry import RoleRegistry
 
         class _FakeAgent:
             pass
@@ -141,7 +141,7 @@ class TestSubagentApplyRole(unittest.TestCase):
         import tempfile
 
         from core.application.session.stream import configure_agent
-        from core.role_registry import RoleRegistry
+        from core.roles.role_registry import RoleRegistry
 
         class _FakeAgent:
             def __init__(self):
@@ -216,7 +216,7 @@ class TestSubagentApplyProvider(unittest.TestCase):
 
         import unittest.mock as mock
 
-        with mock.patch("core.provider_manager.ProviderManager", return_value=fake_pm):
+        with mock.patch("core.application.provider.provider_manager.ProviderManager", return_value=fake_pm):
             rebind_provider(agent, "clinepass")
 
         self.assertEqual(agent.provider_key, "clinepass")
@@ -237,7 +237,7 @@ class TestSubagentApplyProvider(unittest.TestCase):
         fake_pm = types.SimpleNamespace(create_agent_for_provider=lambda pk: real_rebuilt)
 
         subagent = BaseAgent(api_key="sk-old", model="gpt-3.5", base_url="http://old")
-        with mock.patch("core.provider_manager.ProviderManager", return_value=fake_pm):
+        with mock.patch("core.application.provider.provider_manager.ProviderManager", return_value=fake_pm):
             rebind_provider(subagent, "openai")
 
         self.assertIsNone(subagent._client)

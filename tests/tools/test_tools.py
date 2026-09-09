@@ -32,7 +32,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.test_dir = self.temp_dir.name
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
-        from core.permission_manager import PermissionManager
+        from core.application.permission.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         # Grant the tools that used to be 'allow' via the removed read/write groups.

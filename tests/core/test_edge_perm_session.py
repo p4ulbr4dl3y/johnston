@@ -10,9 +10,9 @@ from unittest.mock import patch
 
 import pytest
 
+from core.application.permission.permission_manager import PermissionManager
 from core.domain.entities.session import AgentSession
 from core.infrastructure.storage.session_store import SessionStore
-from core.permission_manager import PermissionManager
 
 # ---------------------------------------------------------------------------
 # fixtures / helpers
@@ -29,7 +29,7 @@ class _PM:
             os.remove(config_path)
 
     def __enter__(self):
-        self.patcher = patch("core.permission_manager.CONFIG_FILE", self.cfg)
+        self.patcher = patch("core.application.permission.permission_manager.CONFIG_FILE", self.cfg)
         self.patcher.start()
         return self.pm
 

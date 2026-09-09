@@ -160,7 +160,7 @@ class AgentSession:
     def role_name(self) -> str:
         if getattr(self, "_role_name", None):
             return self._role_name
-        from core.role_registry import resolve_role_display_name
+        from core.roles.role_registry import resolve_role_display_name
 
         return resolve_role_display_name(self.role, project_dir=self.project_dir or None)
 

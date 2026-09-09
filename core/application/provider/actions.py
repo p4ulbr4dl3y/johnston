@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Tuple
 
+from core.application.provider.provider_manager import ProviderManager
 from core.infrastructure.runtime.background import spawn_background_task
-from core.provider_manager import ProviderManager
 
 logger = logging.getLogger(__name__)
 

@@ -354,7 +354,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     for ws in getattr(args, "workspace", []) or []:
         if ws:
-            from core.permission_manager import PermissionManager
+            from core.application.permission.permission_manager import PermissionManager
 
             PermissionManager.get_instance().add_workspace_root(ws)
 
@@ -367,8 +367,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if getattr(args, "branch", None):
         raw_b = args.branch.strip()
         if raw_b:
+            from core.application.permission.permission_manager import PermissionManager
             from core.infrastructure.runtime.git_worktree import GitWorktreeManager
-            from core.permission_manager import PermissionManager
 
             cur_dir = os.getcwd()
             if not GitWorktreeManager.is_git_repo(cur_dir):

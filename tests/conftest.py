@@ -72,17 +72,17 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     monkeypatch.setattr("core.infrastructure.secrets.CONFIG_DIR", cfg_dir_str)
     monkeypatch.setattr("core.infrastructure.secrets.SECRETS_FILE", secrets_file)
     monkeypatch.setattr("core.infrastructure.storage.session_store.PROJECTS_DIR", projects_dir)
-    monkeypatch.setattr("core.permission_manager.CONFIG_FILE", config_file)
-    monkeypatch.setattr("core.permission_manager.LOGS_DIR", logs_dir)
-    monkeypatch.setattr("core.permission_manager.SECRETS_FILE", secrets_file)
+    monkeypatch.setattr("core.application.permission.permission_manager.CONFIG_FILE", config_file)
+    monkeypatch.setattr("core.application.permission.permission_manager.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("core.application.permission.permission_manager.SECRETS_FILE", secrets_file)
     monkeypatch.setattr("core.domain.policies.permission_policy.LOGS_DIR", logs_dir)
     monkeypatch.setattr("core.domain.policies.permission_policy.SECRETS_FILE", secrets_file)
-    monkeypatch.setattr("core.provider_manager.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("core.provider_manager.CONFIG_FILE", config_file)
-    monkeypatch.setattr("core.provider_manager.PROVIDERS_JSON_FILE", providers_file)
-    monkeypatch.setattr("core.provider_manager.CACHE_DIR", str(test_config_dir / "cache"))
-    monkeypatch.setattr("core.models_catalog.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("core.models_catalog.CACHE_FILE", cache_file)
+    monkeypatch.setattr("core.application.provider.provider_manager.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("core.application.provider.provider_manager.CONFIG_FILE", config_file)
+    monkeypatch.setattr("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", providers_file)
+    monkeypatch.setattr("core.application.provider.provider_manager.CACHE_DIR", str(test_config_dir / "cache"))
+    monkeypatch.setattr("core.domain.policies.models_catalog.CONFIG_DIR", cfg_dir_str)
+    monkeypatch.setattr("core.domain.policies.models_catalog.CACHE_FILE", cache_file)
     monkeypatch.setattr("core.application.skills.manager.CONFIG_DIR", cfg_dir_str)
     monkeypatch.setattr("core.application.skills.manager.GLOBAL_SKILLS_DIR", skills_dir)
     monkeypatch.setattr("core.infrastructure.mcp.manager.CONFIG_DIR", cfg_dir_str)
@@ -105,12 +105,12 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     monkeypatch.setattr("tools.base.LOGS_DIR", logs_dir)
 
     # 4. Reset singletons before test
+    from core.application.permission.permission_manager import PermissionManager
     from core.application.rules.rules import RulesManager
     from core.application.skills.manager import SkillManager
     from core.infrastructure.mcp.manager import MCPManager
     from core.infrastructure.storage.session_store import SessionStore
-    from core.permission_manager import PermissionManager
-    from core.role_registry import RoleRegistry
+    from core.roles.role_registry import RoleRegistry
 
     SessionStore._instance = None
     PermissionManager._instance = None

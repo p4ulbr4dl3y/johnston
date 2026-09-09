@@ -307,7 +307,7 @@ def test_tools_new_fields_env_overrides(monkeypatch):
 
 def test_catalog_cache_ttl_wired_in_refresh(monkeypatch):
     """models_catalog.refresh() resolves catalog_cache_ttl from settings."""
-    from core.models_catalog import ModelsCatalog
+    from core.domain.policies.models_catalog import ModelsCatalog
 
     catalog = ModelsCatalog.__new__(ModelsCatalog)
     # _updated_at ~ now so the freshness window (catalog_cache_ttl=999) is fresh

@@ -13,8 +13,8 @@ import pytest
 
 from core.base_provider import BaseAgent
 from core.base_provider.compaction import CompactionMixin
+from core.domain.policies.models_catalog import format_context_tokens
 from core.infrastructure.runtime.token_util import estimate_tokens
-from core.models_catalog import format_context_tokens
 
 
 def _agent(history):

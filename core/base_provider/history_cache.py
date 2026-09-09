@@ -41,7 +41,7 @@ def _extract_streaming_target(buffer: str, scan_from: int = 0, tool_name: str = 
         role = type_m.group(1).strip() if type_m else ""
         title = title_m.group(1).strip() if title_m else ""
         if role or title:
-            from core.role_registry import get_role_display_name
+            from core.roles.role_registry import get_role_display_name
 
             role_cap = get_role_display_name(role) if role else "Worker"
             if title:

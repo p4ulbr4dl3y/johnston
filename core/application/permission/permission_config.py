@@ -29,9 +29,9 @@ _EffectiveCache = Tuple[
 
 
 def _git_repo(pdir: str) -> bool:
-    """Resolves is_git_repository via core.permission_manager so patches/tests
+    """Resolves is_git_repository via core.application.permission.permission_manager so patches/tests
     targeting that module's attribute take effect."""
-    from core.permission_manager import is_git_repository
+    from core.application.permission.permission_manager import is_git_repository
 
     return is_git_repository(pdir)
 
@@ -222,7 +222,7 @@ class PermissionConfigStore:
         abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(path)))
 
         pdir = self._resolve_pdir(project_dir)
-        from core.permission_manager import CONFIG_FILE as global_path
+        from core.application.permission.permission_manager import CONFIG_FILE as global_path
 
         candidates = [
             os.path.join(pdir, ".johnston", "config.local.json"),
@@ -433,8 +433,8 @@ class PermissionConfigStore:
         pdir = self._resolve_pdir(project_dir)
 
         # Resolve CONFIG_FILE dynamically via the orchestrator module so that
-        # patches/tests targeting core.permission_manager.CONFIG_FILE take effect.
-        from core.permission_manager import CONFIG_FILE as global_path
+        # patches/tests targeting core.application.permission.permission_manager.CONFIG_FILE take effect.
+        from core.application.permission.permission_manager import CONFIG_FILE as global_path
         shared_path = os.path.join(pdir, ".johnston", "config.json")
         local_path = os.path.join(pdir, ".johnston", "config.local.json")
 

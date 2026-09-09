@@ -4,7 +4,7 @@ from __future__ import annotations
 from rich.table import Table
 from textual.widgets import Static
 
-from core.models_catalog import catalog
+from core.domain.policies.models_catalog import catalog
 from widgets.footer_render import (
     render_compact_rows,
     render_wide_rows,

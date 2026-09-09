@@ -6,8 +6,8 @@ import threading
 from textual.app import ComposeResult
 from textual.containers import Vertical
 
+from core.domain.policies.models_catalog import catalog
 from core.infrastructure.platform.logging_setup import install_asyncio_exception_handler
-from core.models_catalog import catalog
 from widgets.chat_input import ChatInput
 from widgets.command_suggestions import CommandSuggestions
 from widgets.presentation.widgets.attachment_bar import AttachmentBar
@@ -224,7 +224,7 @@ class LifecycleMixin:
             logger.debug(f"MCP cleanup error: {err}")
 
         try:
-            from core.models_catalog import catalog
+            from core.domain.policies.models_catalog import catalog
 
             if loop is not None and loop.is_running():
                 # A fire-and-forget create_task() here races app shutdown: the
@@ -304,7 +304,7 @@ class LifecycleMixin:
             os.chdir(new_dir)
         except Exception:
             pass
-        from core.permission_manager import PermissionManager
+        from core.application.permission.permission_manager import PermissionManager
 
         PermissionManager.get_instance().set_project_dir(new_dir)
         if getattr(self, "agent", None):

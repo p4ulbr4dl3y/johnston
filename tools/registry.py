@@ -132,8 +132,8 @@ async def check_and_confirm_permission(
     Checks tool permissions via PermissionManager and prompts user if confirmation is required.
     Returns None if allowed, or an error ToolResult if denied/cancelled.
     """
+    from core.application.permission.permission_manager import PermissionManager
     from core.domain.policies.permission_policy import PermissionAction
-    from core.permission_manager import PermissionManager
     from tools.base import confirm_permission, resolve_subagent_identity
 
     pm = PermissionManager.get_instance()

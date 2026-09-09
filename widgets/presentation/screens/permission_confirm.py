@@ -161,8 +161,8 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             raw_options.append((f'Always allow ALL tools from "{server_name}" [dim](project)[/]', f"server_allow:{server_name}__*:project"))
 
         nargs = self.args if isinstance(self.args, dict) else {}
+        from core.application.permission.permission_manager import PermissionManager
         from core.domain.policies.permission_policy import extract_tool_target_value, is_path_within_workspace
-        from core.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         target_path = (

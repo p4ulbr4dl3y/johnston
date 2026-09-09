@@ -41,7 +41,7 @@ class TestThinkingEffortResolver(unittest.TestCase):
 
 class TestThinkingEffortProviderManager(unittest.TestCase):
     def test_provider_model_effort_override_and_default(self):
-        import core.provider_manager as pm_mod
+        import core.application.provider.provider_manager as pm_mod
 
         with tempfile.TemporaryDirectory() as tmp:
             config_path = os.path.join(tmp, "config.json")

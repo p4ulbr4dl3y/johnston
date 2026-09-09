@@ -79,7 +79,7 @@ class TestToolSchemas(unittest.TestCase):
 
 class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):
     async def test_execute_tool_read_by_canonical_name(self):
-        from core.permission_manager import PermissionManager
+        from core.application.permission.permission_manager import PermissionManager
 
         PermissionManager.get_instance().set_session_override("read", "allow")
         fd, path = tempfile.mkstemp(dir=os.getcwd())

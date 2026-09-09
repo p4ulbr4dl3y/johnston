@@ -2,6 +2,7 @@ import fnmatch
 import os
 from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
+from core.application.permission.permission_config import PermissionConfigStore
 from core.domain.policies.permission_policy import (
     BUILTIN_TOOLS,
     VALID_ACTIONS,
@@ -17,7 +18,6 @@ from core.domain.policies.permission_policy import (
 from core.infrastructure.platform.paths import CONFIG_FILE, LOGS_DIR, SECRETS_FILE
 from core.infrastructure.runtime.git_utils import is_git_repository  # noqa: F401  (re-exported for patching)
 from core.infrastructure.runtime.tool_name import normalize_tool_name
-from core.permission_config import PermissionConfigStore
 
 __all__ = ["PermissionManager", "CONFIG_FILE", "LOGS_DIR", "SECRETS_FILE"]
 
@@ -213,7 +213,7 @@ class PermissionManager:
 
     def ensure_gitignore(self, project_dir: Optional[str] = None) -> bool:
         """Ensures .johnston/config.local.json is listed in <project_dir>/.gitignore if git exists."""
-        from core.permission_config import ensure_gitignore as _ensure
+        from core.application.permission.permission_config import ensure_gitignore as _ensure
 
         pdir = os.path.realpath(os.path.abspath(project_dir or self.current_project_dir or os.getcwd()))
         return _ensure(pdir)

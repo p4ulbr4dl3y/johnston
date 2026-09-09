@@ -4,11 +4,11 @@ Provides role resolution + fallback, provider switching, tool filtering with
 hardened descriptions, and system-prompt/model wiring.
 """
 
-from core.role_registry import get_role_display_name
 from core.roles.apply import apply_role
 from core.roles.prompt import apply_prompt, format_role_prompt
 from core.roles.provider import apply_provider, rebind_provider
 from core.roles.resolve import resolve_role
+from core.roles.role_registry import get_role_display_name
 from core.roles.tools import apply_role_tools
 
 __all__ = [

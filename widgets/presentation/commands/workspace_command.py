@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from core.permission_manager import PermissionManager
+from core.application.permission.permission_manager import PermissionManager
 from widgets.presentation.commands.base import BaseCommand
 from widgets.presentation.widgets.chat_container import ChatView
 

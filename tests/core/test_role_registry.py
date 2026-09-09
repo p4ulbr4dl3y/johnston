@@ -6,7 +6,7 @@ import unittest
 import pytest
 
 from core.domain.policies.role_policy import AgentRole, normalize_role_scope, role_tool_error
-from core.role_registry import BUILTIN_ROLES, RoleRegistry
+from core.roles.role_registry import BUILTIN_ROLES, RoleRegistry
 
 
 class TestRoleRegistry(unittest.TestCase):
@@ -642,7 +642,7 @@ class TestRoleToolWildcards:
 
 class TestRoleDisplayAndInjection:
     def test_get_role_display_name_builtin(self):
-        from core.role_registry import get_role_display_name
+        from core.roles.role_registry import get_role_display_name
 
         assert get_role_display_name("worker") == "Worker"
         assert get_role_display_name("explorer") == "Explorer"
@@ -650,14 +650,14 @@ class TestRoleDisplayAndInjection:
         assert get_role_display_name(None) == "Worker"
 
     def test_get_role_display_name_fallback_title_case(self):
-        from core.role_registry import get_role_display_name
+        from core.roles.role_registry import get_role_display_name
 
         assert get_role_display_name("code_reviewer") == "Code Reviewer"
         assert get_role_display_name("qa-tester") == "Qa Tester"
         assert get_role_display_name("custom_dev_ops_role") == "Custom Dev Ops Role"
 
     def test_get_role_display_name_from_object_attributes(self):
-        from core.role_registry import get_role_display_name
+        from core.roles.role_registry import get_role_display_name
 
         class DummyEntityWithName:
             name = "Custom Name"
@@ -688,13 +688,13 @@ class TestRoleDisplayAndInjection:
         assert agent.role_name == "Lead QA"
 
     def test_resolve_role_display_name_with_display(self):
-        from core.role_registry import resolve_role_display_name
+        from core.roles.role_registry import resolve_role_display_name
 
         assert resolve_role_display_name("code_reviewer") == "Code Reviewer"
         assert resolve_role_display_name("qa_tester") == "Qa Tester"
 
     def test_resolve_role_display_name_empty_defaults_to_worker(self):
-        from core.role_registry import resolve_role_display_name
+        from core.roles.role_registry import resolve_role_display_name
 
         assert resolve_role_display_name("") == "Worker"
         assert resolve_role_display_name(None) == "Worker"

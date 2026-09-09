@@ -128,7 +128,7 @@ class PromptBuilder:
     def build_system_prompt(self) -> str:
         cwd = self.cwd or os.getcwd()
         from core.infrastructure.mcp import get_mcp_manager
-        from core.role_registry import RoleRegistry
+        from core.roles.role_registry import RoleRegistry
 
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
@@ -168,7 +168,7 @@ class PromptBuilder:
         """
         cwd = self.cwd or os.getcwd()
         from core.infrastructure.mcp import get_mcp_manager
-        from core.role_registry import RoleRegistry
+        from core.roles.role_registry import RoleRegistry
 
         mcp_mgr = get_mcp_manager()
         mcp_snippet = await asyncio.to_thread(mcp_mgr.get_system_prompt_snippet)
@@ -313,7 +313,7 @@ class PromptBuilder:
         ``build_tools`` -> ``get_role``, so the in-memory identity changes
         exactly when the on-disk role set changes.
         """
-        from core.role_registry import BUILTIN_ROLES, RoleRegistry
+        from core.roles.role_registry import BUILTIN_ROLES, RoleRegistry
 
         registry = RoleRegistry.get_instance()
         role_key = (self.role or "").strip().lower()
@@ -352,7 +352,7 @@ class PromptBuilder:
         - mcp (only when mcp tools are present)
         - worktree guidelines (if worktree_branch is active; placed at tail of stable core)
         """
-        from core.role_registry import RoleRegistry
+        from core.roles.role_registry import RoleRegistry
 
         base = self._base_sys_prompt()
 
@@ -420,7 +420,7 @@ class PromptBuilder:
     async def _build_stable_core_async(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
         """Async variant: same stable-prefix assembly, but file reads (rules,
         and the role definition on cache miss) happen on a worker thread."""
-        from core.role_registry import RoleRegistry
+        from core.roles.role_registry import RoleRegistry
 
         rules_snippet = await get_rules_snippet_async(role=self.role, cwd=self.cwd)
         role_def = None
@@ -435,7 +435,7 @@ class PromptBuilder:
     def build_tools(self) -> List[Dict[str, Any]]:
         from core.domain.policies.role_policy import role_tool_error
         from core.infrastructure.mcp import get_mcp_manager
-        from core.role_registry import RoleRegistry
+        from core.roles.role_registry import RoleRegistry
 
         mcp_mgr = get_mcp_manager()
         mcp_tools = mcp_mgr.get_cached_tools()

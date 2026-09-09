@@ -7,13 +7,13 @@ from typing import Any, Optional
 from core.interfaces.cli.formatter import format_table
 
 if False:  # type checking only
-    from core.provider_manager import ProviderManager
+    from core.application.provider.provider_manager import ProviderManager
 
 
 def _get_pm(pm: Optional[ProviderManager] = None) -> ProviderManager:
     if pm is not None:
         return pm
-    from core.provider_manager import ProviderManager
+    from core.application.provider.provider_manager import ProviderManager
 
     return ProviderManager()
 

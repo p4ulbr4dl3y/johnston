@@ -148,7 +148,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         app = FooterTestApp()
         async with app.run_test() as pilot:
             footer = app.query_one(StatusFooter)
-            with patch("core.models_catalog.catalog.get_model_display_name", return_value=""):
+            with patch("core.domain.policies.models_catalog.catalog.get_model_display_name", return_value=""):
                 footer.refresh_footer()
                 await pilot.pause()
             self.assertEqual(footer._last_status_args["clean_model"], "[Select model: /models]")
@@ -191,7 +191,7 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
         app = FooterTestApp()
         async with app.run_test():
             footer = app.query_one(StatusFooter)
-            with patch("core.models_catalog.catalog.get_model_display_name", return_value=""):
+            with patch("core.domain.policies.models_catalog.catalog.get_model_display_name", return_value=""):
                 footer.update_status(provider_key="openai", model_name="gpt-4o", is_connected=True)
             footer.update_status(provider_key="openai", is_connected=True, model_name="")
             footer.update_status(provider_key="openai", is_connected=False, model_name="")

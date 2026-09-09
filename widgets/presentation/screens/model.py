@@ -4,7 +4,7 @@ from textual import events
 from textual.widgets import Input
 from textual.widgets.option_list import Option
 
-from core.models_catalog import catalog
+from core.domain.policies.models_catalog import catalog
 from widgets.presentation.screens.base_modal import status_tag
 from widgets.presentation.screens.base_selection import BaseSelectionScreen
 from widgets.presentation.screens.constants import MODAL_SEARCH_INPUT_ID

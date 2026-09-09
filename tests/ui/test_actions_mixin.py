@@ -464,7 +464,7 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
 
 class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
     async def test_confirm_permission_always_allow_sets_overrides(self):
-        from core.permission_manager import PermissionManager
+        from core.application.permission.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         pm.clear_session_overrides()
@@ -476,7 +476,7 @@ class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
 
             with (
                 patch.object(app, "push_screen", side_effect=on_push),
-                patch("core.permission_manager.PermissionManager.get_instance", return_value=pm),
+                patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=pm),
             ):
                 result = await app.confirm_permission("shell", {"command": "ls"}, "Destructive", "shell")
             self.assertTrue(result)
@@ -485,7 +485,7 @@ class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
             pm.clear_session_overrides()
 
     async def test_confirm_permission_denied(self):
-        from core.permission_manager import PermissionManager
+        from core.application.permission.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         pm.clear_session_overrides()

@@ -8,11 +8,11 @@ import sys
 import urllib.request
 from typing import Any, List, Optional, Tuple
 
+from core.application.provider.provider_manager import ProviderManager, is_local_provider
 from core.domain.defaults.providers import DEFAULT_JSON_PROVIDERS
 from core.infrastructure.mcp import MCPManager, get_mcp_manager
 from core.infrastructure.platform import paths
 from core.interfaces.cli.formatter import GREEN, RED, RESET, YELLOW, supports_color
-from core.provider_manager import ProviderManager, is_local_provider
 
 __all__ = [
     "diagnose_config_dirs",

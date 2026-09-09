@@ -15,8 +15,8 @@ import asyncio
 import os
 import time
 
+from core.domain.policies.models_catalog import catalog
 from core.infrastructure.runtime.thinking_effort import display_thinking_effort
-from core.models_catalog import catalog
 
 
 def get_mcp_manager():
@@ -180,7 +180,7 @@ def build_status_kwargs(app, widget=None) -> dict:
     except Exception:
         attachments_count = 0
 
-    from core.permission_manager import PermissionManager
+    from core.application.permission.permission_manager import PermissionManager
 
     execution_mode = PermissionManager.get_instance().execution_mode.value
 

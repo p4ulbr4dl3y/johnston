@@ -22,8 +22,8 @@ class ActionsMixin(PlanActionsMixin):
 
     def action_toggle_mode(self) -> None:
         """Cycle execution mode: review -> edits -> yolo -> review"""
+        from core.application.permission.permission_manager import PermissionManager
         from core.domain.policies.permission_policy import ExecutionMode
-        from core.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         cur = pm.execution_mode
@@ -182,7 +182,7 @@ class ActionsMixin(PlanActionsMixin):
         This is the UI-side implementation of tool permission prompting, owned by the app
         layer so that the tools layer stays independent of Textual widgets.
         """
-        from core.permission_manager import PermissionManager
+        from core.application.permission.permission_manager import PermissionManager
         from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         pm = PermissionManager.get_instance()

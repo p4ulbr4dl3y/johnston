@@ -345,7 +345,7 @@ async def auto_title_session(
         if "/" in raw_atm:
             p_key, m_name = split_provider_model(raw_atm)
             try:
-                from core.provider_manager import ProviderManager
+                from core.application.provider.provider_manager import ProviderManager
 
                 pm = ProviderManager()
                 built_agent = pm.create_agent_for_provider(p_key)

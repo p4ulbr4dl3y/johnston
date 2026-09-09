@@ -345,7 +345,7 @@ class TestBranchScreen(unittest.IsolatedAsyncioTestCase):
 
 class TestLifecycleAndStatusState(unittest.TestCase):
     def test_switch_project_dir(self) -> None:
-        from core.permission_manager import PermissionManager
+        from core.application.permission.permission_manager import PermissionManager
         from widgets.mixins.lifecycle import LifecycleMixin
 
         class DummyApp(LifecycleMixin):

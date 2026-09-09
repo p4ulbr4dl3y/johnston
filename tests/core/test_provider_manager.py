@@ -9,17 +9,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from core.application.provider.provider_manager import ProviderManager
 from core.domain.entities.provider import ProviderDef
-from core.models_catalog import catalog
-from core.provider_manager import ProviderManager
+from core.domain.policies.models_catalog import catalog
 
 
 @pytest.fixture
 def pm(tmp_path, monkeypatch):
-    monkeypatch.setattr("core.provider_manager.CONFIG_DIR", str(tmp_path))
-    monkeypatch.setattr("core.provider_manager.CONFIG_FILE", str(tmp_path / "config.json"))
-    monkeypatch.setattr("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "providers.json"))
-    monkeypatch.setattr("core.provider_manager.CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr("core.application.provider.provider_manager.CONFIG_DIR", str(tmp_path))
+    monkeypatch.setattr("core.application.provider.provider_manager.CONFIG_FILE", str(tmp_path / "config.json"))
+    monkeypatch.setattr("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "providers.json"))
+    monkeypatch.setattr("core.application.provider.provider_manager.CACHE_DIR", str(tmp_path / "cache"))
     return ProviderManager()
 
 
@@ -49,14 +49,14 @@ class TestProviderManager(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
 
         # Patch config values inside provider_manager
-        self.config_dir_patcher = patch("core.provider_manager.CONFIG_DIR", self.test_dir)
+        self.config_dir_patcher = patch("core.application.provider.provider_manager.CONFIG_DIR", self.test_dir)
         self.config_file_patcher = patch(
-            "core.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json")
+            "core.application.provider.provider_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json")
         )
         self.providers_json_patcher = patch(
-            "core.provider_manager.PROVIDERS_JSON_FILE", os.path.join(self.test_dir, "providers.json")
+            "core.application.provider.provider_manager.PROVIDERS_JSON_FILE", os.path.join(self.test_dir, "providers.json")
         )
-        self.cache_dir_patcher = patch("core.provider_manager.CACHE_DIR", os.path.join(self.test_dir, "cache"))
+        self.cache_dir_patcher = patch("core.application.provider.provider_manager.CACHE_DIR", os.path.join(self.test_dir, "cache"))
 
         self.config_dir_patcher.start()
         self.config_file_patcher.start()
@@ -245,9 +245,9 @@ class TestProviderManagerJson(unittest.TestCase):
                 json.dump(sample_data, f)
 
             with (
-                patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
-                patch("core.provider_manager.CONFIG_FILE", config_file),
-                patch("core.provider_manager.CONFIG_DIR", tmpdir),
+                patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                patch("core.application.provider.provider_manager.CONFIG_FILE", config_file),
+                patch("core.application.provider.provider_manager.CONFIG_DIR", tmpdir),
             ):
                 pm = ProviderManager()
                 providers = pm.load_providers()
@@ -281,9 +281,9 @@ class TestProviderManagerJson(unittest.TestCase):
                     json.dump(sample_data, f)
 
                 with (
-                    patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
-                    patch("core.provider_manager.CONFIG_FILE", config_file),
-                    patch("core.provider_manager.CONFIG_DIR", tmpdir),
+                    patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                    patch("core.application.provider.provider_manager.CONFIG_FILE", config_file),
+                    patch("core.application.provider.provider_manager.CONFIG_DIR", tmpdir),
                 ):
                     pm = ProviderManager()
                     models = await pm.fetch_models_for_provider("no_models_endpoint", force_refresh=True)
@@ -301,9 +301,9 @@ class TestProviderManagerJsonRegression(unittest.TestCase):
                 f.write("{not json")
 
             with (
-                patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
-                patch("core.provider_manager.CONFIG_FILE", config_file),
-                patch("core.provider_manager.CONFIG_DIR", tmpdir),
+                patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                patch("core.application.provider.provider_manager.CONFIG_FILE", config_file),
+                patch("core.application.provider.provider_manager.CONFIG_DIR", tmpdir),
             ):
                 pm = ProviderManager()
                 providers = pm.load_providers()
@@ -330,9 +330,9 @@ class TestProviderManagerJsonRegression(unittest.TestCase):
                 )
 
             with (
-                patch("core.provider_manager.PROVIDERS_JSON_FILE", json_file),
-                patch("core.provider_manager.CONFIG_FILE", config_file),
-                patch("core.provider_manager.CONFIG_DIR", tmpdir),
+                patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", json_file),
+                patch("core.application.provider.provider_manager.CONFIG_FILE", config_file),
+                patch("core.application.provider.provider_manager.CONFIG_DIR", tmpdir),
             ):
                 pm = ProviderManager()
                 pm.set_provider_model("custom_json", "saved-model")
@@ -791,7 +791,7 @@ def test_base_url_placeholder_unresolved_stays_verbatim(pm, tmp_path, caplog, mo
     import logging as _logging
 
     # Fresh dedup state: earlier tests may have already warned for this token.
-    monkeypatch.setattr("core.provider_manager._WARNED_BASE_URL_TOKENS", set())
+    monkeypatch.setattr("core.application.provider.provider_manager._WARNED_BASE_URL_TOKENS", set())
     _write(
         tmp_path / "providers.json",
         {"azure": {"key": "azure", "name": "Azure"}},
@@ -867,7 +867,7 @@ def test_select_model_switching_provider_sets_live_agent_model(pm, tmp_path):
 
 
 def test_is_local_provider():
-    from core.provider_manager import is_local_provider
+    from core.application.provider.provider_manager import is_local_provider
 
     assert is_local_provider("ollama") is True
     assert is_local_provider("lmstudio") is True

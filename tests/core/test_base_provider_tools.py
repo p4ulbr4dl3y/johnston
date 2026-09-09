@@ -12,14 +12,14 @@ import unittest.mock
 
 from core.base_provider import BaseAgent
 from core.domain.defaults.errors import ToolResult
-from core.role_registry import AgentRole
+from core.roles.role_registry import AgentRole
 from tests.core._base_provider_helpers import _MockStream, _text_chunk, _tool_call_chunk, make_agent
 from tools.registry import execute_tool
 
 
 class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        from core.permission_manager import PermissionManager
+        from core.application.permission.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         pm.set_session_override("shell", "allow")

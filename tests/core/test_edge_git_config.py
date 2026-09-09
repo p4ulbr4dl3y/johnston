@@ -13,10 +13,10 @@ from unittest.mock import patch
 
 import pytest
 
+from core.application.provider.provider_manager import ProviderManager
 from core.infrastructure.config.config_helpers import ensure_json_config
 from core.infrastructure.platform.platform_utils import atomic_write_json, read_json
 from core.infrastructure.runtime.git_utils import make_git_diff, run_git
-from core.provider_manager import ProviderManager
 
 
 def test_atomic_write_text_with_background_fsync(tmp_path):
@@ -304,8 +304,8 @@ def test_read_json_binary_garbage_returns_default(tmp_path):
 
 def test_provider_manager_read_config_non_dict_returns_empty(tmp_path):
     """A config file holding a non-dict (e.g. a list) must not poison the manager."""
-    with patch("core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
-        with patch("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
+    with patch("core.application.provider.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
+        with patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
             cfg = tmp_path / "cfg.json"
             cfg.write_text("[1,2,3]", encoding="utf-8")
             pm = ProviderManager()
@@ -314,8 +314,8 @@ def test_provider_manager_read_config_non_dict_returns_empty(tmp_path):
 
 
 def test_provider_manager_broken_config_file_returns_empty(tmp_path):
-    with patch("core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
-        with patch("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
+    with patch("core.application.provider.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
+        with patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
             cfg = tmp_path / "cfg.json"
             cfg.write_text("{broken", encoding="utf-8")
             pm = ProviderManager()
@@ -323,8 +323,8 @@ def test_provider_manager_broken_config_file_returns_empty(tmp_path):
 
 
 def test_provider_manager_missing_config_returns_empty(tmp_path):
-    with patch("core.provider_manager.CONFIG_FILE", str(tmp_path / "absent.json")):
-        with patch("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
+    with patch("core.application.provider.provider_manager.CONFIG_FILE", str(tmp_path / "absent.json")):
+        with patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
             pm = ProviderManager()
             assert pm._read_config() == {}
             assert pm._get_config_data() == {}
@@ -332,8 +332,8 @@ def test_provider_manager_missing_config_returns_empty(tmp_path):
 
 def test_provider_manager_nested_missing_key_no_keyerror(tmp_path):
     """Absent nested key via .get() chains must not raise KeyError."""
-    with patch("core.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
-        with patch("core.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
+    with patch("core.application.provider.provider_manager.CONFIG_FILE", str(tmp_path / "cfg.json")):
+        with patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", str(tmp_path / "prov.json")):
             cfg = tmp_path / "cfg.json"
             cfg.write_text('{"model": ""}', encoding="utf-8")
             pm = ProviderManager()

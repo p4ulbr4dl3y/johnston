@@ -232,7 +232,7 @@ class TestBaseAgent(unittest.IsolatedAsyncioTestCase):
         # produce a lower cost for an Anthropic-type agent than an OpenAI-type one.
         from unittest.mock import patch
 
-        from core.models_catalog import catalog
+        from core.domain.policies.models_catalog import catalog
 
         cached_usage = {
             "prompt_tokens": 100,
@@ -341,7 +341,7 @@ class TestBaseAgent(unittest.IsolatedAsyncioTestCase):
     def test_cost_usd_explicit_cache_pricing(self):
         from unittest.mock import patch
 
-        from core.models_catalog import catalog
+        from core.domain.policies.models_catalog import catalog
 
         agent = BaseAgent(api_key="t", model="test-cached-model", base_url="http://t", provider_key="custom")
         self.addCleanup(agent.close)

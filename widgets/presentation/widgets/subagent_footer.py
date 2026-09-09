@@ -4,8 +4,8 @@ from __future__ import annotations
 from rich.table import Table
 from textual.widgets import Static
 
+from core.domain.policies.models_catalog import catalog, format_context_tokens
 from core.infrastructure.runtime.thinking_effort import display_thinking_effort
-from core.models_catalog import catalog, format_context_tokens
 from widgets.git_metrics_mixin import GitMetricsMixin
 from widgets.mixins.resize_debounce import ResizeDebounceMixin
 from widgets.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin

@@ -13,11 +13,11 @@ from typing import Any, Optional
 
 from core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
 from core.domain.policies.role_policy import AgentMode
-from core.role_registry import RoleRegistry
 from core.roles.apply import apply_role
+from core.roles.role_registry import RoleRegistry
 
 if False:  # type checking only
-    from core.provider_manager import ProviderManager
+    from core.application.provider.provider_manager import ProviderManager
 
 __all__ = [
     "format_args_summary",
@@ -298,8 +298,8 @@ def _resolve_or_create_session(args: Any, agent: Any, role: str) -> tuple[Any, A
 
 def _configure_permission_manager(args: Any) -> tuple[Any, str]:
     """Add workspace roots and apply yolo/mode session mode; return (perm_mgr, mode_val)."""
+    from core.application.permission.permission_manager import PermissionManager
     from core.domain.policies.permission_policy import ExecutionMode
-    from core.permission_manager import PermissionManager
 
     perm_mgr = PermissionManager.get_instance()
     for ws in getattr(args, "workspace", []) or []:
@@ -698,7 +698,7 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
 
     close_pm = False
     if pm is None:
-        from core.provider_manager import ProviderManager
+        from core.application.provider.provider_manager import ProviderManager
 
         pm = ProviderManager()
         close_pm = True
@@ -793,7 +793,7 @@ def run_headless(args: Any, pm: Optional[ProviderManager] = None) -> int:
 
     for ws in getattr(args, "workspace", []) or []:
         if ws:
-            from core.permission_manager import PermissionManager
+            from core.application.permission.permission_manager import PermissionManager
 
             PermissionManager.get_instance().add_workspace_root(ws)
 

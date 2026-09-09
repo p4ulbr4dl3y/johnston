@@ -51,7 +51,7 @@ class TestMCPListToolsFailure(unittest.IsolatedAsyncioTestCase):
         mock_role.disallowed_tools = []
         reg = MagicMock()
         reg.get_role.return_value = mock_role
-        return patch("core.role_registry.RoleRegistry.get_instance", return_value=reg)
+        return patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=reg)
 
     async def test_get_active_tools_exception_wrapped(self):
         mock_mgr = MagicMock()
@@ -128,7 +128,7 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
         mock_role.disallowed_tools = []
         reg = MagicMock()
         reg.get_role.return_value = mock_role
-        return patch("core.role_registry.RoleRegistry.get_instance", return_value=reg)
+        return patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=reg)
 
     async def test_first_miss_lists_second_hits_negative_cache(self):
         mock_mgr = self._mock_mgr()

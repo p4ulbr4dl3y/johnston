@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from core.models_catalog import format_context_tokens
+from core.domain.policies.models_catalog import format_context_tokens
 from widgets.mixins.stream_frame import SPINNER_FRAMES
 from widgets.presentation.widgets.footer_layout import (
     format_display_path,
@@ -66,7 +66,7 @@ def resolve_status_defaults(
         clean_model = catalog_mod.get_model_display_name(provider_key, model_name)
         if not clean_model:
             clean_model = "[Select model: /models]"
-    from core.role_registry import get_role_display_name
+    from core.roles.role_registry import get_role_display_name
 
     role_str = get_role_display_name(agent_role)
     if is_generating:
