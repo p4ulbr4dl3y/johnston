@@ -1,3 +1,10 @@
+"""Public interface of the compaction package.
+
+`from johnston.core.infrastructure.llm.base.compaction import X` resolves to
+this module (a package directory wins over a same-named module file when both
+exist), so all names are re-exported here to keep existing consumers working
+unchanged. The stateful ``CompactionMixin`` lives in :mod:`compaction.mixin`.
+"""
 from johnston.core.infrastructure.llm.base.compaction.helpers import (
     _INSTRUCTION_PATTERNS,
     CHECKPOINT_CLOSE_TAG,

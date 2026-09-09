@@ -445,13 +445,14 @@ async def test_compact_history_budget_trim_oldest():
         async def stream_chat(self, *a, **k):
             yield ("adapter_text", _SUMMARY)
 
-    with patch("johnston.core.infrastructure.llm.base.compaction.estimate_tokens", return_value=100_000):
-        with patch(
-            "johnston.core.infrastructure.llm.base.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
-        ) as mock_limit:
-            mock_limit.return_value = 1000  # budget = 900 <= 100k -> while loop trims oldest
-            with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter()):
-                success, _ = await agent.compact_history()
+    with patch("johnston.core.infrastructure.llm.base.compaction.mixin.estimate_tokens", return_value=100_000):
+        with patch("johnston.core.infrastructure.llm.base.compaction.helpers.estimate_tokens", return_value=100_000):
+            with patch(
+                "johnston.core.infrastructure.llm.base.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+            ) as mock_limit:
+                mock_limit.return_value = 1000  # budget = 900 <= 100k -> while loop trims oldest
+                with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter()):
+                    success, _ = await agent.compact_history()
     assert success
 
 
