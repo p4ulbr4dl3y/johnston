@@ -328,6 +328,27 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget7 = self._widget("mcp_search", "", args={"query": "x"})
         widget7.render_header()
 
+    def test_render_header_edit_and_create_diff_stats(self):
+        diff = "--- a/f.py\n+++ b/f.py\n@@ -1,2 +1,3 @@\n-a\n+b\n+c\n"
+        widget = self._widget("edit", "f.py", args={"path": "f.py"}, result_text=diff, status="done")
+        widget.render_header()
+        text = str(widget.header_label.render())
+        self.assertIn("Edit", text)
+        self.assertIn("f.py", text)
+        self.assertIn("+2 -1", text)
+
+        # Set result updates header with badge
+        widget_live = self._widget("edit", "f.py", args={"path": "f.py"}, status="running")
+        widget_live.render_header()
+        self.assertNotIn("+2 -1", str(widget_live.header_label.render()))
+        widget_live.set_result(diff)
+        self.assertIn("+2 -1", str(widget_live.header_label.render()))
+
+        # Create tool with line count
+        widget_create = self._widget("create", "new.py", args={"path": "new.py"}, result_text="[created new.py | 10 lines]", status="done")
+        widget_create.render_header()
+        self.assertIn("+10", str(widget_create.header_label.render()))
+
     def test_set_result_shell_background(self):
         widget = self._widget("shell", "cmd")
         # Status comes from the event: background text alone doesn't set running.

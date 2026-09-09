@@ -123,6 +123,7 @@ class ToolCallContentMixin:
             show_hints=getattr(self, "_show_hints", False),
             max_len=target_max_len,
             compact_hints=compact_hints,
+            result_text=getattr(self, "result_text", None),
         )
         self.header_label.update(header_text)
 

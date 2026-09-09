@@ -228,28 +228,128 @@ def _canonical_args(args: Dict[str, Any]) -> tuple:
         return (type(args).__name__, repr(args))
 
 
-def _display_cache_key(tool_name: str, args: Dict[str, Any], max_len: int = 60, mode: str = "middle") -> tuple:
+def _count_diff_lines(diff_text: str) -> Tuple[int, int]:
+    added = 0
+    removed = 0
+    for line in diff_text.splitlines():
+        if line.startswith("+"):
+            if not (line.startswith("+++ ") or line.startswith("+++\t") or line == "+++"):
+                added += 1
+        elif line.startswith("-"):
+            if not (line.startswith("--- ") or line.startswith("---\t") or line == "---"):
+                removed += 1
+    return (added, removed)
+
+
+def compute_diff_stats(
+    canonical_tool: str,
+    args: Dict[str, Any],
+    result_text: Optional[str] = None,
+    status: Optional[str] = None,
+) -> Tuple[int, int]:
+    """Compute (added, removed) line counts for edit/create tools.
+
+    Only computes stats if status == 'done'.
+    Returns (0, 0) if not 'done', error, unchanged, or empty.
+    """
+    if status != "done":
+        return (0, 0)
+
+    if not isinstance(result_text, str) or not result_text.strip():
+        if canonical_tool in ("create", "write_to_file"):
+            content = args.get("content") if isinstance(args, dict) else None
+            if isinstance(content, str) and content:
+                return (len(content.splitlines()), 0)
+        return (0, 0)
+
+    text = result_text.strip()
+    if text.startswith(("[unchanged", "[error", "Error:", "error:", "[interrupted")):
+        return (0, 0)
+
+    if canonical_tool in ("edit", "replace_file_content", "multi_edit"):
+        return _count_diff_lines(text)
+
+    if canonical_tool in ("create", "write_to_file"):
+        if "@@" in text or text.startswith(("---", "+++")):
+            return _count_diff_lines(text)
+
+        m = re.search(r"\[created\b[^|]*\|\s*(\d+)\s+lines\]", text)
+        if m:
+            return (int(m.group(1)), 0)
+
+        m_ow = re.search(r"\[overwritten\b[^|]*\|\s*(\d+)\s+lines", text)
+        if m_ow:
+            return (int(m_ow.group(1)), 0)
+
+        content = args.get("content") if isinstance(args, dict) else None
+        if isinstance(content, str) and content:
+            return (len(content.splitlines()), 0)
+
+    return (0, 0)
+
+
+def format_diff_badge(added: int, removed: int) -> str:
+    """Format diff stat badge for tool header chip, e.g. ' [+12 -3]' or ' [+45]'."""
+    if added > 0 and removed > 0:
+        return f" [+{added} -{removed}]"
+    if added > 0:
+        return f" [+{added}]"
+    if removed > 0:
+        return f" [-{removed}]"
+    return ""
+
+
+def _display_cache_key(
+    tool_name: str,
+    args: Dict[str, Any],
+    max_len: int = 60,
+    mode: str = "middle",
+    result_text: Optional[str] = None,
+    status: Optional[str] = None,
+) -> tuple:
     try:
         cwd = os.getcwd()
     except Exception:
         cwd = ""
-    return (str(tool_name), _canonical_args(args), max_len, mode, cwd)
+    res_key = (status, len(result_text), hash(result_text)) if (status == "done" and result_text) else (status,)
+    return (str(tool_name), _canonical_args(args), max_len, mode, cwd, res_key)
 
 
-def extract_tool_display(tool_name: str, args: Dict[str, Any], max_len: int = 60, mode: str = "middle") -> str:
+def extract_tool_display(
+    tool_name: str,
+    args: Dict[str, Any],
+    max_len: int = 60,
+    mode: str = "middle",
+    result_text: Optional[str] = None,
+    status: Optional[str] = None,
+) -> str:
     """Build a short, human-readable label describing what a tool call targets."""
-    key = _display_cache_key(tool_name, args, max_len, mode)
+    key = _display_cache_key(tool_name, args, max_len, mode, result_text=result_text, status=status)
     hit = _DISPLAY_CACHE.get(key)
     if hit is not None:
         return hit
 
-    result = _extract_tool_display_inner(tool_name, args, max_len=max_len, mode=mode)
+    result = _extract_tool_display_inner(
+        tool_name,
+        args,
+        max_len=max_len,
+        mode=mode,
+        result_text=result_text,
+        status=status,
+    )
 
     _DISPLAY_CACHE.put(key, result)
     return result
 
 
-def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: int = 60, mode: str = "middle") -> str:
+def _extract_tool_display_inner(
+    tool_name: str,
+    args: Dict[str, Any],
+    max_len: int = 60,
+    mode: str = "middle",
+    result_text: Optional[str] = None,
+    status: Optional[str] = None,
+) -> str:
     from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name as _normalize
     from johnston.core.tools.registry import REGISTRY
 
@@ -368,10 +468,19 @@ def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: i
             return truncate(f"{path_str}{suffix}", max_len=max_len, mode=file_mode)
         return ""
 
-    if name in ("create", "edit"):
-        val = args.get("path")
+    if name in ("create", "edit", "write_to_file", "replace_file_content", "multi_edit"):
+        val = args.get("path") or args.get("file_path") or args.get("TargetFile")
         if isinstance(val, str) and val:
-            return truncate(shorten_path(val.strip()), max_len=max_len, mode=file_mode)
+            short_p = shorten_path(val.strip())
+            badge = ""
+            if status == "done":
+                added, removed = compute_diff_stats(name, args, result_text=result_text, status=status)
+                badge = format_diff_badge(added, removed)
+            if badge:
+                avail_len = max(10, max_len - len(badge))
+                trunc_p = truncate(short_p, max_len=avail_len, mode=file_mode)
+                return f"{trunc_p}{escape_markup(badge)}"
+            return truncate(short_p, max_len=max_len, mode=file_mode)
         return ""
 
     if name == "shell":

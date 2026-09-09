@@ -47,6 +47,7 @@ def build_toolcall_header(
     show_hints: bool = True,
     max_len: int = 60,
     compact_hints: bool = False,
+    result_text: Optional[str] = None,
 ) -> str:
     """Builds rich markup string for toolcall header label."""
     is_generating = status == "generating"
@@ -60,11 +61,33 @@ def build_toolcall_header(
     ):
         display_name = display_names.get(canonical_tool, tool_type or "Tool")
         if canonical_tool == "update_plan":
-            target_str = extract_tool_display(canonical_tool, args, max_len=max_len, mode=trunc_mode) if args else ""
+            target_str = (
+                extract_tool_display(
+                    canonical_tool,
+                    args,
+                    max_len=max_len,
+                    mode=trunc_mode,
+                    result_text=result_text,
+                    status=status,
+                )
+                if args
+                else ""
+            )
             if not target_str and is_generating and target and target != "plan":
                 target_str = truncate(str(target), max_len=max_len, mode=trunc_mode)
         else:
-            extracted = extract_tool_display(canonical_tool, args, max_len=max_len, mode=trunc_mode) if args else ""
+            extracted = (
+                extract_tool_display(
+                    canonical_tool,
+                    args,
+                    max_len=max_len,
+                    mode=trunc_mode,
+                    result_text=result_text,
+                    status=status,
+                )
+                if args
+                else ""
+            )
             target_str = extracted or (truncate(str(target), max_len=max_len, mode=trunc_mode) if target else "")
         if is_generating and not target_str:
             arg_suffix = "(...)"
