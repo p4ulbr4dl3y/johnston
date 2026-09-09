@@ -342,7 +342,9 @@ class TestToolDisplay(unittest.TestCase):
         diff = "--- a/x.py\n+++ b/x.py\n@@ -1,3 +1,4 @@\n a\n-b\n+c\n+d\n"
         res = extract_tool_display("edit", {"path": "x.py"}, result_text=diff, status="done")
         self.assertIn("x.py", res)
-        self.assertIn("+2 -1", res)
+        self.assertIn("+2", res)
+        self.assertIn("-1", res)
+        self.assertIn("/", res)
 
         diff_add = "--- a/x.py\n+++ b/x.py\n@@ -1 +1,3 @@\n a\n+b\n+c\n"
         res_add = extract_tool_display("edit", {"path": "x.py"}, result_text=diff_add, status="done")
@@ -380,7 +382,9 @@ class TestToolDisplay(unittest.TestCase):
         diff_ow = "--- a/foo.py\n+++ b/foo.py\n@@ -1 +1,2 @@\n-old\n+new1\n+new2\n"
         res_ow = extract_tool_display("create", {"path": "foo.py"}, result_text=diff_ow, status="done")
         self.assertIn("foo.py", res_ow)
-        self.assertIn("+2 -1", res_ow)
+        self.assertIn("+2", res_ow)
+        self.assertIn("-1", res_ow)
+        self.assertIn("/", res_ow)
 
         # Fallback to args content
         res_content = extract_tool_display("create", {"path": "foo.py", "content": "a\nb\nc"}, status="done")
@@ -414,7 +418,8 @@ class TestToolDisplay(unittest.TestCase):
         )
         self.assertIn("Edit", hdr)
         self.assertIn("x.py", hdr)
-        self.assertIn("+2 -1", hdr)
+        self.assertIn("+2", hdr)
+        self.assertIn("-1", hdr)
 
 
 if __name__ == "__main__":

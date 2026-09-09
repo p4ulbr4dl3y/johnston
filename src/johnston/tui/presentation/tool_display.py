@@ -13,9 +13,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from johnston.core.infrastructure.runtime.lru import LruCache
 from johnston.tui.utils.row_format import format_duration
 
-# Textual markup-aware escaping: literal [ and ] would otherwise be swallowed as
-# style tags, so escape them (and backslashes) for the chat tool chip.
-_ESCAPE_RE = re.compile(r"([\[\]\\])")
+# Textual markup-aware escaping: literal [ and \ would otherwise be swallowed as
+# style tags, so escape them for the chat tool chip (] does not open tags in Rich).
+_ESCAPE_RE = re.compile(r"([\[\\])")
 
 # LRU memo for extract_tool_display keyed by (tool_name, canonical args). The
 # agent loop calls this once per tool call for the chip label; multi-tool turns
@@ -289,9 +289,9 @@ def compute_diff_stats(
 
 
 def format_diff_badge(added: int, removed: int) -> str:
-    """Format diff stat badge for tool header chip, e.g. ' [+12 -3]' or ' [+45]'."""
+    """Format diff stat badge for tool header chip, e.g. ' [+12 / -3]' or ' [+45]'."""
     if added > 0 and removed > 0:
-        return f" [+{added} -{removed}]"
+        return f" [+{added} / -{removed}]"
     if added > 0:
         return f" [+{added}]"
     if removed > 0:
@@ -472,14 +472,13 @@ def _extract_tool_display_inner(
         val = args.get("path") or args.get("file_path") or args.get("TargetFile")
         if isinstance(val, str) and val:
             short_p = shorten_path(val.strip())
-            badge = ""
             if status == "done":
                 added, removed = compute_diff_stats(name, args, result_text=result_text, status=status)
                 badge = format_diff_badge(added, removed)
-            if badge:
-                avail_len = max(10, max_len - len(badge))
-                trunc_p = truncate(short_p, max_len=avail_len, mode=file_mode)
-                return f"{trunc_p}{escape_markup(badge)}"
+                if badge:
+                    avail_len = max(10, max_len - len(badge))
+                    trunc_p = truncate(short_p, max_len=avail_len, mode=file_mode)
+                    return f"{trunc_p}{escape_markup(badge)}"
             return truncate(short_p, max_len=max_len, mode=file_mode)
         return ""
 

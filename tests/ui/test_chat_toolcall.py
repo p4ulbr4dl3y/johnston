@@ -335,14 +335,19 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         text = str(widget.header_label.render())
         self.assertIn("Edit", text)
         self.assertIn("f.py", text)
-        self.assertIn("+2 -1", text)
+        self.assertIn("+2", text)
+        self.assertIn("-1", text)
+        self.assertIn("/", text)
 
         # Set result updates header with badge
         widget_live = self._widget("edit", "f.py", args={"path": "f.py"}, status="running")
         widget_live.render_header()
-        self.assertNotIn("+2 -1", str(widget_live.header_label.render()))
+        self.assertNotIn("+2", str(widget_live.header_label.render()))
         widget_live.set_result(diff)
-        self.assertIn("+2 -1", str(widget_live.header_label.render()))
+        live_text = str(widget_live.header_label.render())
+        self.assertIn("+2", live_text)
+        self.assertIn("-1", live_text)
+        self.assertIn("/", live_text)
 
         # Create tool with line count
         widget_create = self._widget("create", "new.py", args={"path": "new.py"}, result_text="[created new.py | 10 lines]", status="done")
