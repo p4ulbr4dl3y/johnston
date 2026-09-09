@@ -36,7 +36,7 @@ def configure_agent(
             agent.worktree_branch = worktree_branch
     if app and hasattr(app, "sandbox_enabled"):
         agent.sandbox_enabled = app.sandbox_enabled
-    from johnston.core.roles import apply_role
+    from johnston.core.application.roles import apply_role
 
     return apply_role(
         agent,

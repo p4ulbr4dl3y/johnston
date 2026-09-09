@@ -2,11 +2,11 @@
 
 from typing import Any, Optional
 
+from johnston.core.application.roles.prompt import apply_prompt
+from johnston.core.application.roles.provider import apply_provider
+from johnston.core.application.roles.resolve import resolve_role
+from johnston.core.application.roles.tools import apply_role_tools
 from johnston.core.domain.policies.role_policy import AgentMode, AgentRole
-from johnston.core.roles.prompt import apply_prompt
-from johnston.core.roles.provider import apply_provider
-from johnston.core.roles.resolve import resolve_role
-from johnston.core.roles.tools import apply_role_tools
 
 
 def apply_role(
@@ -23,7 +23,7 @@ def apply_role(
     if pinned, filters/hardens tools, and sets the system prompt and model.
     Returns the resolved role definition.
     """
-    from johnston.core.roles.role_registry import RoleRegistry
+    from johnston.core.application.roles.role_registry import RoleRegistry
 
     if mode is not None:
         effective_mode = AgentMode(mode.lower().strip()) if isinstance(mode, str) else mode

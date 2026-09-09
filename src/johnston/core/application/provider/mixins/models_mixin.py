@@ -4,7 +4,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-from johnston.core.infrastructure.adapters.models_source import extract_context_length
+from johnston.core.infrastructure.llm.models.models_source import extract_context_length
 
 logger = logging.getLogger(__name__)
 

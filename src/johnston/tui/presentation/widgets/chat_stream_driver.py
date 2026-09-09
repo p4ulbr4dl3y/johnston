@@ -3,7 +3,7 @@
 Single authoritative controller that renders stream steps, session events and
 history playback through one state machine (``consume_session_event``).
 
-``consume_stream_step`` (generator-driven, e.g. main agent in ai_generator)
+``consume_stream_step`` (generator-driven, e.g. main agent in engine)
 canonicalizes raw step tuples via ``stream_step_to_session_event`` and
 delegates to the same ``consume_session_event`` path used by session listeners
 (subagent screen) and history replay — live streaming and replay can never

@@ -1,6 +1,6 @@
 from typing import Any
 
-from johnston.core.infrastructure.adapters.base import (
+from johnston.core.infrastructure.llm.models.base import (
     BaseApiAdapter,
     ImageDetails,
     _safe_int,

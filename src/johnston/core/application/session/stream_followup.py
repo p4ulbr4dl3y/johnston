@@ -57,7 +57,7 @@ async def send_subagent_followup(
                 )
         elif getattr(ctx, "host", None):
             # Keep existing subagent provider credentials current with any host changes
-            from johnston.core.roles.provider import rebind_provider
+            from johnston.core.application.roles.provider import rebind_provider
 
             pkey = getattr(subagent, "provider_key", "")
             if not pkey and hasattr(ctx.host, "pm") and hasattr(ctx.host.pm, "get_active_provider_key"):

@@ -3,8 +3,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
-from johnston.core.adapters.base import check_httpx_response_status
-from johnston.core.infrastructure.adapters.base import (
+from johnston.core.infrastructure.llm.models.base import (
     BaseApiAdapter,
     build_adapter_usage_event,
     extract_image_details,
@@ -14,6 +13,7 @@ from johnston.core.infrastructure.adapters.base import (
     parse_tool_call_args,
     resolve_stream_timeout,
 )
+from johnston.core.infrastructure.llm.providers.base import check_httpx_response_status
 from johnston.core.infrastructure.runtime.thinking_effort import build_gemini_thinking_config
 
 

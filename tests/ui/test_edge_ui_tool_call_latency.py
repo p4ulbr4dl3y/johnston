@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from johnston.core.application.generation.ai_generator import GenCanvas, generate_ai_response
-from johnston.core.base_provider import BaseAgent
+from johnston.core.application.generation.engine import GenCanvas, generate_ai_response
+from johnston.core.infrastructure.llm.base import BaseAgent
 from johnston.core.tools.registry import execute_tool
 from johnston.tui.app import JohnstonApp
 from johnston.tui.presentation.widgets.chat_container import ChatView
@@ -75,7 +75,7 @@ class TestToolCallLatency(unittest.IsolatedAsyncioTestCase):
             chat_view = app.query_one(ChatView)
 
             test_cases = [
-                ("read", "core/application/generation/ai_generator.py", {"path": "ai_generator.py"}),
+                ("read", "core/application/generation/engine.py", {"path": "engine.py"}),
                 ("shell", "pytest -q", {"command": "pytest -q"}),
                 ("create", "new_file.py", {"path": "new_file.py", "content": "print('hello')\n" * 50}),
                 ("edit", "old_file.py", {"path": "old_file.py", "old_str": "a", "new_str": "b"}),

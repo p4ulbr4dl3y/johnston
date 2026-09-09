@@ -2,9 +2,11 @@ import asyncio
 import logging
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
-from johnston.core.base_provider.compaction import CompactionMixin
-from johnston.core.base_provider.errors import ErrorHandlingMixin, format_api_error
-from johnston.core.base_provider.history_cache import (
+from johnston.core.domain.defaults.config import DEFAULT_MAX_TOKENS
+from johnston.core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT
+from johnston.core.infrastructure.llm.base.compaction import CompactionMixin
+from johnston.core.infrastructure.llm.base.errors import ErrorHandlingMixin, format_api_error
+from johnston.core.infrastructure.llm.base.history_cache import (
     _SANITIZE_CACHE,
     _SANITIZE_CACHE_MAX,
     _STREAMING_TARGET_RE,
@@ -16,17 +18,15 @@ from johnston.core.base_provider.history_cache import (
     sanitize_history_cached,
     serialize_messages_key,
 )
-from johnston.core.base_provider.message_queue import drain_queued_messages, has_queued_messages
-from johnston.core.base_provider.stream_loop import StreamLoopMixin
-from johnston.core.base_provider.tools import ToolMixin
-from johnston.core.base_provider.turn_context import (
+from johnston.core.infrastructure.llm.base.message_queue import drain_queued_messages, has_queued_messages
+from johnston.core.infrastructure.llm.base.stream_loop import StreamLoopMixin
+from johnston.core.infrastructure.llm.base.tools import ToolMixin
+from johnston.core.infrastructure.llm.base.turn_context import (
     TurnContextMixin,
     _warmup_mcp_tools,  # noqa: F401
 )
-from johnston.core.base_provider.turn_execution import TurnExecutionMixin
-from johnston.core.base_provider.usage import accumulate_usage
-from johnston.core.domain.defaults.config import DEFAULT_MAX_TOKENS
-from johnston.core.domain.defaults.prompts import DEFAULT_SYSTEM_PROMPT
+from johnston.core.infrastructure.llm.base.turn_execution import TurnExecutionMixin
+from johnston.core.infrastructure.llm.base.usage import accumulate_usage
 from johnston.core.infrastructure.runtime.thinking_effort import normalize_thinking_effort
 from johnston.core.infrastructure.runtime.token_util import estimate_message_tokens, estimate_tokens
 
@@ -143,7 +143,7 @@ class BaseAgent(
     def role_name(self) -> str:
         if getattr(self, "_role_name", None):
             return self._role_name
-        from johnston.core.roles.role_registry import resolve_role_display_name
+        from johnston.core.application.roles.role_registry import resolve_role_display_name
 
         pdir = getattr(getattr(self, "host", None), "project_dir", None)
         return resolve_role_display_name(self.role, project_dir=pdir)

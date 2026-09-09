@@ -10,7 +10,7 @@ import pytest
 
 import johnston.core.application.generation.prompt_builder as pb
 from johnston.core.application.generation.prompt_builder import PromptBuilder
-from johnston.core.roles.role_registry import RoleRegistry
+from johnston.core.application.roles.role_registry import RoleRegistry
 
 _CUSTOM_ROLE_MD = """---
 key: custom

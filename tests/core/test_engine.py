@@ -1,4 +1,4 @@
-"""Focused unit tests for the Textual-free AI generation engine core/application/generation/ai_generator.py."""
+"""Focused unit tests for the Textual-free generation engine core/application/generation/engine.py."""
 
 import asyncio
 import logging
@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from johnston.core.application.generation import ai_generator as ai_generator_module
-from johnston.core.application.generation.ai_generator import GenCanvas, generate_ai_response
+from johnston.core.application.generation import engine as engine_module
+from johnston.core.application.generation.engine import GenCanvas, generate_ai_response
 
 
 class _FakeAgent:
@@ -106,7 +106,7 @@ async def test_generation_failure_logged_with_exception(caplog):
         raise ValueError("boom")
 
     canvas = _canvas()
-    with caplog.at_level(logging.ERROR, logger="johnston.core.application.generation.ai_generator"):
+    with caplog.at_level(logging.ERROR, logger="johnston.core.application.generation.engine"):
         await generate_ai_response(_FakeAgent(stream), _fake_session(), canvas, session_id="s1", user_text="hi")
 
     canvas.notify.assert_called_once()
@@ -334,7 +334,7 @@ async def test_user_message_with_display_text():
 async def test_await_pending_git_restore_barrier():
     from types import SimpleNamespace
 
-    from johnston.core.application.generation.ai_generator import _await_pending_git_restore
+    from johnston.core.application.generation.engine import _await_pending_git_restore
 
     # Agent without the attribute: no-op.
     await _await_pending_git_restore(object())
@@ -374,13 +374,13 @@ async def test_generate_waits_for_pending_restore_before_checkpoint():
     agent = _FakeAgent(stream)
     agent.rewind_git_restore_task = pending
 
-    real_checkpoint = ai_generator_module._create_git_checkpoint_async
+    real_checkpoint = engine_module._create_git_checkpoint_async
 
     async def spy_checkpoint(canvas, session_id, project_path):
         order.append("checkpoint")
         return await real_checkpoint(canvas, session_id, project_path)
 
-    with mock.patch.object(ai_generator_module, "_create_git_checkpoint_async", side_effect=spy_checkpoint):
+    with mock.patch.object(engine_module, "_create_git_checkpoint_async", side_effect=spy_checkpoint):
         await generate_ai_response(
             agent, _fake_session(), _canvas(get_user_messages=mock.MagicMock(return_value=[])), session_id="s1", user_text="hi"
         )
@@ -388,9 +388,9 @@ async def test_generate_waits_for_pending_restore_before_checkpoint():
     assert order == ["restore", "checkpoint"]
 
 
-def test_ai_generator_has_no_widget_or_textual_imports():
-    """ai_generator must have zero imports from johnston.tui.* or textual.*."""
-    with open(ai_generator_module.__file__, "r") as f:
+def test_engine_has_no_widget_or_textual_imports():
+    """engine must have zero imports from johnston.tui.* or textual.*."""
+    with open(engine_module.__file__, "r") as f:
         content = f.read()
     assert "from widgets" not in content
     assert "import widgets" not in content

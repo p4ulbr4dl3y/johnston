@@ -1,6 +1,6 @@
 import unittest
 
-from johnston.core.base_provider import BaseAgent
+from johnston.core.infrastructure.llm.base import BaseAgent
 from johnston.core.infrastructure.runtime.token_util import estimate_tokens, parse_usage
 
 

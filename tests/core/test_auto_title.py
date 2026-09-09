@@ -185,7 +185,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
 
-        with patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
+        with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Optimize SQL Query Indexes")
@@ -211,7 +211,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
 
-        with patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
+        with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Redis cache in FastAPI")
@@ -240,7 +240,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
 
-        with patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
+        with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Pytest Configuration Setup")
@@ -273,7 +273,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
         mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
 
         with patch("johnston.core.application.provider.provider_manager.ProviderManager.create_agent_for_provider", return_value=provider_agent), \
-             patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
+             patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(active_agent, sess)
 
         self.assertEqual(res, "Anthropic Prompt Caching")
@@ -287,7 +287,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
         mock_agent.api_type = "openai"
         mock_agent.model = "gpt-4o"
 
-        with patch("johnston.core.adapters.get_adapter", side_effect=RuntimeError("API error")):
+        with patch("johnston.core.infrastructure.llm.providers.get_adapter", side_effect=RuntimeError("API error")):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Deploy to production Kubernetes cluster")
@@ -322,7 +322,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = dummy_stream
 
-        with patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
+        with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(mock_agent, sess)
 
         # The fork marker survives auto-titling so lineage stays visible.

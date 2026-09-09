@@ -3,13 +3,13 @@ import logging
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
-from johnston.core.base_provider.errors import format_api_error
-from johnston.core.base_provider.history_cache import (
+from johnston.core.domain.defaults.config import DEFAULT_MAX_TOKENS, ESCALATED_MAX_TOKENS
+from johnston.core.infrastructure.llm.base.errors import format_api_error
+from johnston.core.infrastructure.llm.base.history_cache import (
     _extract_streaming_target,
     sanitize_history_cached,
 )
-from johnston.core.domain.defaults.config import DEFAULT_MAX_TOKENS, ESCALATED_MAX_TOKENS
-from johnston.core.infrastructure.adapters.base import (
+from johnston.core.infrastructure.llm.models.base import (
     build_stream_kwargs,
     new_tool_call_id,
 )
@@ -20,7 +20,7 @@ from johnston.core.infrastructure.runtime.token_util import (
     estimate_tokens as _default_estimate_tokens,
 )
 
-logger = logging.getLogger("johnston.core.base_provider.agent")
+logger = logging.getLogger("johnston.core.infrastructure.llm.base.agent")
 
 __all__ = [
     "StreamLoopMixin",
@@ -28,14 +28,14 @@ __all__ = [
 
 
 def _resolve_estimate_tokens(val: Any) -> int:
-    import johnston.core.base_provider.agent as agent_mod
+    import johnston.core.infrastructure.llm.base.agent as agent_mod
 
     fn = getattr(agent_mod, "estimate_tokens", _default_estimate_tokens)
     return fn(val)
 
 
 def _resolve_estimate_message_tokens(val: Any) -> int:
-    import johnston.core.base_provider.agent as agent_mod
+    import johnston.core.infrastructure.llm.base.agent as agent_mod
 
     fn = getattr(agent_mod, "estimate_message_tokens", _default_estimate_message_tokens)
     return fn(val)
@@ -83,7 +83,7 @@ class StreamLoopMixin:
             last_finish_reason = None
 
             try:
-                from johnston.core.adapters import get_adapter
+                from johnston.core.infrastructure.llm.providers import get_adapter
 
                 adapter = get_adapter(self.api_type)
                 stream_kwargs = build_stream_kwargs(
@@ -430,7 +430,7 @@ class StreamLoopMixin:
                     yield evt
                 messages = tool_result["messages"]
         except Exception as err:
-            import johnston.core.base_provider.agent as agent_mod
+            import johnston.core.infrastructure.llm.base.agent as agent_mod
 
             agent_mod.logger.exception("API request failed: %s", err)
             error_msg = format_api_error(err)

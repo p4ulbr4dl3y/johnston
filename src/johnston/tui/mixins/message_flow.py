@@ -237,7 +237,7 @@ class MessageFlowMixin:
 
         Thin wrapper that builds a GenCanvas and delegates to the engine.
         """
-        from johnston.core.application.generation.ai_generator import ProviderReadyState, ensure_provider_ready
+        from johnston.core.application.generation.engine import ProviderReadyState, ensure_provider_ready
 
         # ---- connectivity check (mixin-level) ----
         state = ensure_provider_ready(self.pm, self.agent)
@@ -262,7 +262,7 @@ class MessageFlowMixin:
 
         # ---- build canvas ----
         project_path = getattr(self.sm, "project_path", None) if hasattr(self, "sm") else None
-        from johnston.tui.app.ai_controller import build_gen_canvas, run_ai_generation
+        from johnston.tui.app.generation_controller import build_gen_canvas, run_ai_generation
 
         canvas = build_gen_canvas(
             chat_view,

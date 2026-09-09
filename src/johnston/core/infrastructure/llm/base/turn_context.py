@@ -5,21 +5,21 @@ import logging
 import os
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
-from johnston.core.base_provider.compaction import (
+from johnston.core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
+from johnston.core.infrastructure.config.settings import get_settings
+from johnston.core.infrastructure.llm.base.compaction import (
     format_compaction_title,
     resolve_auto_compact_limit,
     should_compact,
 )
-from johnston.core.base_provider.history_cache import (
+from johnston.core.infrastructure.llm.base.history_cache import (
     _get_tools_digest,
     sanitize_history_cached,
 )
-from johnston.core.base_provider.tools import build_prompt_context_async
-from johnston.core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
-from johnston.core.infrastructure.adapters.base import image_url_block
-from johnston.core.infrastructure.config.settings import get_settings
+from johnston.core.infrastructure.llm.base.tools import build_prompt_context_async
+from johnston.core.infrastructure.llm.models.base import image_url_block
 
-logger = logging.getLogger("johnston.core.base_provider.agent")
+logger = logging.getLogger("johnston.core.infrastructure.llm.base.agent")
 
 __all__ = [
     "_warmup_mcp_tools",
@@ -63,7 +63,7 @@ class TurnContextMixin:
                 detail_val = img_dict.get("detail", "high")
                 return image_url_block(media_type, b64_data, detail_val)
         except Exception as e:
-            import johnston.core.base_provider.agent as agent_mod
+            import johnston.core.infrastructure.llm.base.agent as agent_mod
 
             agent_mod.logger.warning("%s: %s", error_prefix, e)
         return None

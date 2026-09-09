@@ -23,7 +23,7 @@ def register_textual_themes(app) -> None:
 def configure_global_managers(tool_name_normalizer) -> None:
     """Configure the global PermissionManager and RoleRegistry singletons."""
     from johnston.core.application.permission.permission_manager import PermissionManager
-    from johnston.core.roles.role_registry import RoleRegistry
+    from johnston.core.application.roles.role_registry import RoleRegistry
 
     PermissionManager.configure_instance(tool_name_normalizer=tool_name_normalizer)
     RoleRegistry._instance = RoleRegistry(tool_name_normalizer=tool_name_normalizer)
@@ -128,7 +128,7 @@ def apply_mode(app, mode) -> None:
 def apply_role(app, role) -> None:
     """Apply the role to the agent and track it on the app from the ``--role`` flag."""
     if role and getattr(app, "agent", None):
-        from johnston.core.roles.apply import apply_role as apply_role_to_agent
+        from johnston.core.application.roles.apply import apply_role as apply_role_to_agent
 
         try:
             apply_role_to_agent(app.agent, role, is_subagent=False)

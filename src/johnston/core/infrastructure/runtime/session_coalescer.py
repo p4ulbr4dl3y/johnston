@@ -112,7 +112,7 @@ def add_event(session: Any, event: Dict[str, Any]) -> None:
                 p_items = msg_to_store["args"].get("plan")
                 if p_items:
                     try:
-                        from johnston.core.base_provider.compaction import _clean_plan_items
+                        from johnston.core.infrastructure.llm.base.compaction import _clean_plan_items
 
                         cleaned = _clean_plan_items(p_items)
                         if cleaned:

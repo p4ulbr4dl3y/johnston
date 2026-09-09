@@ -10,7 +10,7 @@ from johnston.core.domain.policies.messages import (
     _xml_escape,
     format_system_note,
 )
-from johnston.core.infrastructure.adapters.base import extract_image_payload
+from johnston.core.infrastructure.llm.models.base import extract_image_payload
 
 
 def _extract_error_fields(data: dict) -> tuple[str, str]:

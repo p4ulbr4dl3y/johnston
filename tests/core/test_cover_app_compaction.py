@@ -11,9 +11,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from johnston.core.base_provider import BaseAgent
-from johnston.core.base_provider.compaction import CompactionMixin
 from johnston.core.domain.policies.models_catalog import format_context_tokens
+from johnston.core.infrastructure.llm.base import BaseAgent
+from johnston.core.infrastructure.llm.base.compaction import CompactionMixin
 from johnston.core.infrastructure.runtime.token_util import estimate_tokens
 
 
@@ -186,7 +186,7 @@ async def test_compact_history_adapter_streaming_success():
         async def stream_chat(self, *a, **k):
             yield ("adapter_text", _SUMMARY)
 
-    with patch("johnston.core.adapters.get_adapter", return_value=_FakeAdapter()):
+    with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter()):
         success, msg = await agent.compact_history()
     assert any('<compaction_checkpoint>' in m.get("content", "") for m in agent.history)
 
@@ -216,8 +216,8 @@ async def test_compact_history_report_before_after_same_method():
         return f"{t:,}" if t < 10000 else format_context_tokens(t)
 
     with (
-        patch("johnston.core.adapters.get_adapter", return_value=_FakeAdapter()),
-        patch("johnston.core.base_provider.tools.build_prompt_context_async", new_callable=AsyncMock) as mock_bpc,
+        patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter()),
+        patch("johnston.core.infrastructure.llm.base.tools.build_prompt_context_async", new_callable=AsyncMock) as mock_bpc,
     ):
         mock_bpc.return_value = ("sys", [], sys_tokens)
         success, msg = await agent.compact_history()
@@ -250,7 +250,7 @@ async def test_compact_history_previous_summary_from_tags():
         async def stream_chat(self, *a, **k):
             yield ("adapter_text", _SUMMARY)
 
-    with patch("johnston.core.adapters.get_adapter", return_value=_FakeAdapter()):
+    with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter()):
         success, _ = await agent.compact_history()
     assert success
 
@@ -279,7 +279,7 @@ async def test_compact_history_previous_summary_from_context_note():
         async def stream_chat(self, *a, **k):
             yield ("adapter_text", _SUMMARY)
 
-    with patch("johnston.core.adapters.get_adapter", return_value=_FakeAdapter()):
+    with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter()):
         success, _ = await agent.compact_history()
     assert success
 
@@ -302,7 +302,7 @@ async def test_compact_history_client_fallback_dict_choice():
         async def stream_chat(self, *a, **k):
             yield ("adapter_text", _SUMMARY)
 
-    with patch("johnston.core.adapters.get_adapter", return_value=_StreamingAdapter()):
+    with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_StreamingAdapter()):
         success, _ = await agent.compact_history()
     assert success
 
@@ -326,7 +326,7 @@ async def test_compact_history_adapter_empty_returns_failure():
             if False:
                 yield  # pragma: no cover
 
-    with patch("johnston.core.adapters.get_adapter", return_value=_EmptyAdapter()):
+    with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_EmptyAdapter()):
         success, msg = await agent.compact_history()
     assert success is False
     assert "Failed to generate summary" in msg
@@ -351,7 +351,7 @@ async def test_compact_history_adapter_error_returns_failure():
             raise RuntimeError("boom")
             yield  # pragma: no cover
 
-    with patch("johnston.core.adapters.get_adapter", return_value=_ErrorAdapter()):
+    with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_ErrorAdapter()):
         success, msg = await agent.compact_history()
     assert success is False
     assert "Failed to generate summary" in msg
@@ -385,7 +385,7 @@ async def test_compact_history_adapter_transient_503_retries_and_succeeds():
                 raise Exception("503 Service Unavailable")
             yield ("adapter_text", _SUMMARY)
 
-    with patch("johnston.core.adapters.get_adapter", return_value=_FlakyAdapter()):
+    with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FlakyAdapter()):
         success, msg = await agent.compact_history()
     assert success is True
     assert attempts == 2
@@ -420,7 +420,7 @@ async def test_compact_history_with_none_content_messages_succeeds():
         async def stream_chat(self, *a, **k):
             yield ("adapter_text", _SUMMARY)
 
-    with patch("johnston.core.adapters.get_adapter", return_value=_FakeAdapter()):
+    with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter()):
         success, msg = await agent.compact_history()
     assert success is True
     assert any("<compaction_checkpoint>" in (m.get("content") or "") for m in agent.history)
@@ -445,12 +445,12 @@ async def test_compact_history_budget_trim_oldest():
         async def stream_chat(self, *a, **k):
             yield ("adapter_text", _SUMMARY)
 
-    with patch("johnston.core.base_provider.compaction.estimate_tokens", return_value=100_000):
+    with patch("johnston.core.infrastructure.llm.base.compaction.estimate_tokens", return_value=100_000):
         with patch(
-            "johnston.core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+            "johnston.core.infrastructure.llm.base.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
         ) as mock_limit:
             mock_limit.return_value = 1000  # budget = 900 <= 100k -> while loop trims oldest
-            with patch("johnston.core.adapters.get_adapter", return_value=_FakeAdapter()):
+            with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter()):
                 success, _ = await agent.compact_history()
     assert success
 
@@ -483,7 +483,7 @@ async def test_compact_history_outer_error_returns_compaction_error():
             yield ("adapter_text", _SUMMARY)
 
     with patch.object(agent, "sanitize_history_for_model", side_effect=flaky):
-        with patch("johnston.core.adapters.get_adapter", return_value=_FakeAdapter()):
+        with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter()):
             success, msg = await agent.compact_history()
     assert success is False
     assert "Compaction error" in msg

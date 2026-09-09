@@ -160,7 +160,7 @@ class AgentSession:
     def role_name(self) -> str:
         if getattr(self, "_role_name", None):
             return self._role_name
-        from johnston.core.roles.role_registry import resolve_role_display_name
+        from johnston.core.application.roles.role_registry import resolve_role_display_name
 
         return resolve_role_display_name(self.role, project_dir=self.project_dir or None)
 

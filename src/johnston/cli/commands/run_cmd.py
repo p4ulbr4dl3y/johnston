@@ -11,10 +11,10 @@ import sys
 import time
 from typing import Any, Optional
 
+from johnston.core.application.roles.apply import apply_role
+from johnston.core.application.roles.role_registry import RoleRegistry
 from johnston.core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
 from johnston.core.domain.policies.role_policy import AgentMode
-from johnston.core.roles.apply import apply_role
-from johnston.core.roles.role_registry import RoleRegistry
 
 if False:  # type checking only
     from johnston.core.application.provider.provider_manager import ProviderManager

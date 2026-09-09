@@ -1,4 +1,4 @@
-"""Agent tests for johnston.core.base_provider (agent area).
+"""Agent tests for johnston.core.infrastructure.llm.base (agent area).
 
 Split out of the former test_base_provider monolith: agent cost/token/max-token
 properties, history sanitization, stream_steps behavior (tool loops, thinking,
@@ -9,7 +9,7 @@ import os
 import unittest
 import unittest.mock
 
-from johnston.core.base_provider import BaseAgent
+from johnston.core.infrastructure.llm.base import BaseAgent
 from tests.conftest import _make_app_mock
 from tests.core._base_provider_helpers import (
     _Attachment,
@@ -301,7 +301,7 @@ class TestBaseAgent(unittest.IsolatedAsyncioTestCase):
                 mock_create.return_value = mock_response
                 async for _ in agent_openai.stream_steps("hi"):
                     pass
-            with patch("johnston.core.adapters.get_adapter", return_value=_FakeAnthropicAdapter()):
+            with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAnthropicAdapter()):
                 async for _ in agent_anthropic.stream_steps("hi"):
                     pass
 
@@ -560,7 +560,7 @@ class TestAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         agent.image_processor = fake_process
         logged = []
         with unittest.mock.patch(
-            "johnston.core.base_provider.agent.logger.warning", side_effect=lambda *a, **k: logged.append(a)
+            "johnston.core.infrastructure.llm.base.agent.logger.warning", side_effect=lambda *a, **k: logged.append(a)
         ):
             with unittest.mock.patch.object(
                 agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock
@@ -634,7 +634,7 @@ class TestAgentStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             ],
             [("adapter_text", "final answer")],
         ]
-        with unittest.mock.patch("johnston.core.adapters.get_adapter", return_value=_FakeAdapter(streams)):
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=_FakeAdapter(streams)):
             agent.tool_executor = unittest.mock.AsyncMock(return_value="tool ok")
             events = []
             async for evt in agent.stream_steps("run tools"):
@@ -915,7 +915,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
                 yield ("adapter_thought", "quick think")
                 yield ("adapter_text", "Here is the final answer")
 
-        with unittest.mock.patch("johnston.core.adapters.get_adapter") as mock_get_adapter:
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter") as mock_get_adapter:
             mock_adapter = unittest.mock.MagicMock()
             mock_adapter.stream_chat = mock_stream_chat
             mock_get_adapter.return_value = mock_adapter
@@ -939,7 +939,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
             yield ("adapter_thought", "thinking forever")
             yield ("adapter_finish_reason", "MAX_TOKENS")
 
-        with unittest.mock.patch("johnston.core.adapters.get_adapter") as mock_get_adapter:
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter") as mock_get_adapter:
             mock_adapter = unittest.mock.MagicMock()
             mock_adapter.stream_chat = mock_stream_chat
             mock_get_adapter.return_value = mock_adapter
@@ -967,7 +967,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
             passed_kwargs.update(kwargs)
             yield ("adapter_text", "Hello")
 
-        with unittest.mock.patch("johnston.core.adapters.get_adapter") as mock_get_adapter:
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter") as mock_get_adapter:
             mock_adapter = unittest.mock.MagicMock()
             mock_adapter.stream_chat = mock_stream_chat
             mock_get_adapter.return_value = mock_adapter
@@ -991,7 +991,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         async def mock_stream_chat(**kwargs):
             yield ("adapter_text", "Done")
 
-        with unittest.mock.patch("johnston.core.adapters.get_adapter") as mock_get_adapter:
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter") as mock_get_adapter:
             mock_adapter = unittest.mock.MagicMock()
             mock_adapter.stream_chat = mock_stream_chat
             mock_get_adapter.return_value = mock_adapter
@@ -1004,7 +1004,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(q_steps[0], ("queued_user_message", "Follow-up message", None, True, None))
 
     def test_extract_streaming_target(self):
-        from johnston.core.base_provider.agent import _extract_streaming_target
+        from johnston.core.infrastructure.llm.base.agent import _extract_streaming_target
 
         self.assertEqual(_extract_streaming_target(""), "")
         self.assertEqual(_extract_streaming_target('{"path": "foo/bar.py", "content": "..."}'), "foo/bar.py")
@@ -1042,7 +1042,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
     def test_extract_streaming_target_incremental_matches_full_scan(self):
         """Windowed extraction (one scan per delta chunk) must agree with a
         full-buffer scan for every split point of realistic argument payloads."""
-        from johnston.core.base_provider.agent import _extract_streaming_target
+        from johnston.core.infrastructure.llm.base.agent import _extract_streaming_target
 
         cases = [
             ('{"path": "foo/bar.py", "content": "..."}', "foo/bar.py"),
@@ -1065,7 +1065,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         """A target key buried more than the overlap window before the chunk
         boundary is intentionally not re-scanned (O(n) streaming extraction);
         the final parsed arguments always carry the target regardless."""
-        from johnston.core.base_provider.agent import _TARGET_SCAN_BACKOFF, _extract_streaming_target
+        from johnston.core.infrastructure.llm.base.agent import _TARGET_SCAN_BACKOFF, _extract_streaming_target
 
         big_value = "x" * (_TARGET_SCAN_BACKOFF + 64)
         chunk1 = '{"command": "' + big_value
@@ -1093,7 +1093,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
             else:
                 yield ("adapter_text", "All done")
 
-        with unittest.mock.patch("johnston.core.adapters.get_adapter") as mock_get_adapter, \
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter") as mock_get_adapter, \
              unittest.mock.patch.object(agent, "_execute_single_tool") as mock_exec:
             from johnston.core.domain.defaults.errors import ToolResult
             mock_exec.return_value = ("call_1", "Done diff", ToolResult.done(content="Done diff"))
@@ -1145,7 +1145,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.message_queue[0][0], "msg foreign")
 
     def test_resolve_auto_compact_limit(self):
-        from johnston.core.base_provider.compaction import resolve_auto_compact_limit
+        from johnston.core.infrastructure.llm.base.compaction import resolve_auto_compact_limit
 
         agent = BaseAgent(api_key="k", model="m", base_url="http://t", provider_key="p")
         agent.auto_compact_token_limit = 12345
@@ -1157,7 +1157,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(limit_sub, int)
 
     def test_collect_user_messages_preserve_root_prompt(self):
-        from johnston.core.base_provider.compaction import collect_user_messages
+        from johnston.core.infrastructure.llm.base.compaction import collect_user_messages
 
         history = [
             {"role": "user", "content": "Root prompt"},

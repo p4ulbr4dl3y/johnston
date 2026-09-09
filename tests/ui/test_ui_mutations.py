@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from johnston.core.application.generation.ai_generator import ProviderReadyState
+from johnston.core.application.generation.engine import ProviderReadyState
 from johnston.tui.mixins.message_flow import MessageFlowMixin
 from johnston.tui.presentation.commands.session_commands import CompactCommand
 from johnston.tui.presentation.widgets.chat_messages import ThinkingWidget
@@ -141,7 +141,7 @@ async def test_generate_ai_response_leaves_is_generating_false_when_provider_not
     app = DummyFlowApp()
 
     with patch(
-        "johnston.core.application.generation.ai_generator.ensure_provider_ready",
+        "johnston.core.application.generation.engine.ensure_provider_ready",
         return_value=ProviderReadyState.NEEDS_PROVIDER,
     ), patch(
         "johnston.tui.presentation.commands.ProvidersCommand.execute",

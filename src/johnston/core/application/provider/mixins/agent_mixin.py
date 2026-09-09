@@ -24,7 +24,7 @@ class ProviderManagerAgentMixin:
         model_val = self.get_provider_model(provider_key)
         thinking_effort = self.get_provider_thinking_effort(provider_key, model_val)
 
-        from johnston.core.base_provider import BaseAgent
+        from johnston.core.infrastructure.llm.base import BaseAgent
         from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
 
         reg = tool_registry or getattr(self, "_tool_registry", None) or get_default_tool_registry()

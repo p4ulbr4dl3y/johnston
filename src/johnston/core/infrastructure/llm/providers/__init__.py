@@ -1,9 +1,9 @@
 from typing import Dict
 
-from johnston.core.adapters.anthropic import AnthropicAdapter, apply_anthropic_rolling_cache
-from johnston.core.adapters.base import BaseApiAdapter, sort_keys_recursive
-from johnston.core.adapters.gemini import GeminiAdapter
-from johnston.core.adapters.openai import OpenAIAdapter, format_messages_for_openai
+from johnston.core.infrastructure.llm.providers.anthropic import AnthropicAdapter, apply_anthropic_rolling_cache
+from johnston.core.infrastructure.llm.providers.base import BaseApiAdapter, sort_keys_recursive
+from johnston.core.infrastructure.llm.providers.gemini import GeminiAdapter
+from johnston.core.infrastructure.llm.providers.openai import OpenAIAdapter, format_messages_for_openai
 
 __all__ = [
     "ADAPTERS",

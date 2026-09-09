@@ -179,7 +179,7 @@ class ToolContext:
         if getattr(self.host, "is_read_only", False) is True:
             return True
         try:
-            from johnston.core.roles.role_registry import RoleRegistry
+            from johnston.core.application.roles.role_registry import RoleRegistry
 
             role_name = self.subagent_role or getattr(self.host, "role", "")
             if isinstance(role_name, str) and role_name:

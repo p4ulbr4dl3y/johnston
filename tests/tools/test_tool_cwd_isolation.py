@@ -33,7 +33,7 @@ class MockTextualApp:
 
 def make_agent(app, cwd=None, is_subagent=False):
     """Build a real BaseAgent wired like a (sub)agent with an optional worktree cwd."""
-    from johnston.core.base_provider import BaseAgent
+    from johnston.core.infrastructure.llm.base import BaseAgent
 
     agent = BaseAgent(api_key="", base_url="", model="")
     agent.app = app

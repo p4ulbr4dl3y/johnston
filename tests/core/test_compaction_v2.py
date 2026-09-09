@@ -12,8 +12,8 @@ runtime deps) by stubbing the `johnston.core.domain.policies.models_catalog` nam
 """
 import unittest
 
-from johnston.core.base_provider import compaction as mod
-from johnston.core.base_provider.compaction import (
+from johnston.core.infrastructure.llm.base import compaction as mod
+from johnston.core.infrastructure.llm.base.compaction import (
     CHECKPOINT_CLOSE_TAG,
     CHECKPOINT_OPEN_TAG,
 )

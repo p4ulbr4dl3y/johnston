@@ -9,8 +9,8 @@ import httpx
 import pytest
 
 from johnston.core.domain.policies.models_catalog import ModelsCatalog, format_context_tokens, get_context_window
-from johnston.core.infrastructure.adapters.models_fetcher import fetch_catalog_endpoints
 from johnston.core.infrastructure.config.settings import JohnstonSettings, LLMSettings
+from johnston.core.infrastructure.llm.models.models_fetcher import fetch_catalog_endpoints
 
 
 class TestModelsCatalog(unittest.TestCase):

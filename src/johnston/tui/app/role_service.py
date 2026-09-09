@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from johnston.core.roles.role_registry import RoleRegistry
+from johnston.core.application.roles.role_registry import RoleRegistry
 
 
 def toggle_agent_role(app: Any) -> bool:

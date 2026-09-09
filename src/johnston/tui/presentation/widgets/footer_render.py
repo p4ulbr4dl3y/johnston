@@ -66,7 +66,7 @@ def resolve_status_defaults(
         clean_model = catalog_mod.get_model_display_name(provider_key, model_name)
         if not clean_model:
             clean_model = "[Select model: /models]"
-    from johnston.core.roles.role_registry import get_role_display_name
+    from johnston.core.application.roles.role_registry import get_role_display_name
 
     role_str = get_role_display_name(agent_role)
     if is_generating:

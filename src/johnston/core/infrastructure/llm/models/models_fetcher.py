@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Tuple
 
 import httpx
 
-from johnston.core.infrastructure.adapters.models_source import (
+from johnston.core.infrastructure.llm.models.models_source import (
     MODELS_DEV_URL,
     OPENROUTER_MODELS_URL,
     extract_context_length,

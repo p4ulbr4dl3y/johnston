@@ -601,8 +601,8 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("0 matches found", res.content)
 
     def test_role_policies_allow_search(self):
+        from johnston.core.application.roles.role_registry import BUILTIN_ROLES
         from johnston.core.domain.policies.role_policy import role_tool_error
-        from johnston.core.roles.role_registry import BUILTIN_ROLES
 
         explorer = BUILTIN_ROLES["explorer"]
         worker = BUILTIN_ROLES["worker"]

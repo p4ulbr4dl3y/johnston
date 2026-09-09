@@ -20,14 +20,14 @@ Prefix shell commands with `rtk` where practical (`rtk git status`). Prefer `rg`
 Layered core (`src/johnston/core/`): DDD-style. High-level vs low-level — keep deps pointing inward.
 
 - `src/johnston/core/domain/` — business rules: `entities/` (session), `policies/` (catalog, models_catalog, permission, role), `defaults/` (config, prompts, providers, linters, skills).
-- `src/johnston/core/application/` — use-cases: `generation/`, `permission/`, `provider/`, `session/`, `rules/`, `skills/`, `linters/`.
-- `src/johnston/core/infrastructure/` — implementation: `adapters/`, `mcp/`, `platform/`, `runtime/` (circuit_breaker, frontmatter, token_util, thinking_effort), `storage/`, `tasks/`.
-- `src/johnston/core/adapters/` — external LLM providers (anthropic, gemini, openai). `src/johnston/core/base_provider/` holds provider internals (agent, compaction, errors, tools).
-- `src/johnston/core/roles/` — assistant role registry/apply/resolve/prompt/provider/tools.
+- `src/johnston/core/application/` — use-cases: `generation/` (engine, git_info, prompt_builder), `permission/`, `provider/`, `roles/` (assistant role registry/apply/resolve/prompt/provider/tools), `session/`, `rules/`, `skills/`, `linters/`.
+- `src/johnston/core/infrastructure/` — implementation: `llm/` (`base/` provider internals, `models/` neutral model helpers, `providers/` external LLM adapters: anthropic, gemini, openai), `mcp/`, `platform/`, `runtime/` (circuit_breaker, frontmatter, token_util, thinking_effort), `storage/`, `tasks/`.
+- `src/johnston/core/interfaces/` — ports and external interfaces.
+- `src/johnston/core/tools/` — tool registry and execution implementations.
 
 TUI layering (`src/johnston/tui/`):
 
-- `src/johnston/tui/app/` — app controllers/state (app, ai_controller, dispatch, role_service, session/status_state).
+- `src/johnston/tui/app/` — app controllers/state (app, generation_controller, dispatch, role_service, session/status_state).
 - `src/johnston/tui/presentation/screens/` — user-facing screens. Widgets and sub-widgets live in `src/johnston/tui/presentation/widgets/` (chat_input, chat_toolcall, status_footer, command_suggestions, etc.).
 - `src/johnston/tui/mixins/` — shared view behavior (actions, lifecycle, message_flow, session_persistence).
 - `src/johnston/tui/` root — app entry (`app.py`) and styling (`app.tcss`).

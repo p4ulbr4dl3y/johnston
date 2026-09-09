@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Optional
 
-from johnston.core.base_provider.compaction import format_compaction_title
 from johnston.core.domain.ports.storage import SessionStorePort
+from johnston.core.infrastructure.llm.base.compaction import format_compaction_title
 
 logger = logging.getLogger("johnston.core.application.session.actions")
 

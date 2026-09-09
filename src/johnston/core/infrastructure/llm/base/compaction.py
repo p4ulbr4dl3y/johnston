@@ -17,7 +17,7 @@ from johnston.core.domain.defaults.prompts import (
 )
 from johnston.core.domain.policies.messages import is_checkpoint_message, is_system_note
 from johnston.core.domain.policies.models_catalog import catalog, get_context_window
-from johnston.core.infrastructure.adapters.base import build_stream_kwargs, normalize_tool_arguments_str
+from johnston.core.infrastructure.llm.models.base import build_stream_kwargs, normalize_tool_arguments_str
 from johnston.core.infrastructure.runtime.token_util import estimate_message_tokens, estimate_tokens
 
 # Checkpoint wire-format constants. There is exactly one canonical form.
@@ -559,7 +559,7 @@ class CompactionMixin:
             return False, "History is too short to compact (<= 4 messages)"
 
         try:
-            from johnston.core.base_provider.tools import build_prompt_context_async
+            from johnston.core.infrastructure.llm.base.tools import build_prompt_context_async
 
             sys_prompt, all_tools, sys_tokens = await build_prompt_context_async(self)
 
@@ -662,7 +662,7 @@ class CompactionMixin:
             last_err = None
             tools_payload = all_tools if all_tools else None
             try:
-                from johnston.core.adapters import get_adapter
+                from johnston.core.infrastructure.llm.providers import get_adapter
 
                 adapter = get_adapter(getattr(self, "api_type", "openai"))
                 stream_kwargs = build_stream_kwargs(

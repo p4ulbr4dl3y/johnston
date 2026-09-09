@@ -2,16 +2,16 @@ import asyncio
 import logging
 from typing import Any, AsyncGenerator, Dict, List, Tuple
 
-from johnston.core.base_provider.compaction import format_compaction_title
+from johnston.core.application.roles.role_registry import RoleRegistry
 from johnston.core.domain.defaults.errors import ToolResult
-from johnston.core.infrastructure.adapters.base import (
+from johnston.core.infrastructure.llm.base.compaction import format_compaction_title
+from johnston.core.infrastructure.llm.models.base import (
     extract_image_payload,
     normalize_tool_arguments_str,
     parse_tool_call_args,
 )
-from johnston.core.roles.role_registry import RoleRegistry
 
-logger = logging.getLogger("johnston.core.base_provider.agent")
+logger = logging.getLogger("johnston.core.infrastructure.llm.base.agent")
 
 __all__ = [
     "TurnExecutionMixin",

@@ -1,4 +1,4 @@
-"""Tool-execution tests for johnston.core.base_provider (tools area).
+"""Tool-execution tests for johnston.core.infrastructure.llm.base (tools area).
 
 Split out of the former test_base_provider monolith: real tool execution via
 ``execute_tool``, runtime tool-policy enforcement, and tool stream/results
@@ -10,9 +10,9 @@ import tempfile
 import unittest
 import unittest.mock
 
-from johnston.core.base_provider import BaseAgent
+from johnston.core.application.roles.role_registry import AgentRole
 from johnston.core.domain.defaults.errors import ToolResult
-from johnston.core.roles.role_registry import AgentRole
+from johnston.core.infrastructure.llm.base import BaseAgent
 from johnston.core.tools.registry import execute_tool
 from tests.core._base_provider_helpers import _MockStream, _text_chunk, _tool_call_chunk, make_agent
 

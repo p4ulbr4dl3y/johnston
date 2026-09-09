@@ -16,8 +16,8 @@ from johnston.core.domain.entities.provider import (
 from johnston.core.domain.policies.models_catalog import catalog
 from johnston.core.domain.policies.provider import split_provider_model
 from johnston.core.domain.ports.tool_registry import ToolRegistryPort, get_default_tool_registry
-from johnston.core.infrastructure.adapters.models_source import extract_context_length
 from johnston.core.infrastructure.config.settings import get_settings
+from johnston.core.infrastructure.llm.models.models_source import extract_context_length
 from johnston.core.infrastructure.platform.paths import (
     CACHE_DIR,
     CONFIG_DIR,

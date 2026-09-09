@@ -15,8 +15,8 @@ from johnston.core.domain.defaults.config import (
 from johnston.core.domain.entities.session import AgentSession
 from johnston.core.domain.policies.provider import split_provider_model
 from johnston.core.domain.policies.session_naming import FORK_BASE_MAX_LEN, cap_at_word, fork_marker
-from johnston.core.infrastructure.adapters.base import build_stream_kwargs
 from johnston.core.infrastructure.config.settings import get_settings
+from johnston.core.infrastructure.llm.models.base import build_stream_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -360,7 +360,7 @@ async def auto_title_session(
     # Try LLM generation if target agent is configured
     if target_agent and getattr(target_agent, "api_type", None) and target_model:
         try:
-            from johnston.core.adapters import get_adapter
+            from johnston.core.infrastructure.llm.providers import get_adapter
 
             adapter = get_adapter(target_agent.api_type)
             messages = [
@@ -376,7 +376,7 @@ async def auto_title_session(
                 thinking_effort="none",
             )
 
-            from johnston.core.base_provider.errors import stream_response_with_retry
+            from johnston.core.infrastructure.llm.base.errors import stream_response_with_retry
 
             raw_text, raw_thought = await asyncio.wait_for(
                 stream_response_with_retry(adapter, stream_kwargs, max_retries=1),

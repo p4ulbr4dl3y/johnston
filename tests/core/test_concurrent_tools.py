@@ -4,8 +4,8 @@ import unittest
 import unittest.mock
 from typing import Any
 
-from johnston.core.base_provider import BaseAgent
 from johnston.core.domain.defaults.errors import ToolResult
+from johnston.core.infrastructure.llm.base import BaseAgent
 from johnston.core.tools.ask_user import AskUserTool
 from johnston.core.tools.base import BaseTool
 from johnston.core.tools.create import CreateTool
@@ -86,7 +86,7 @@ class TestConcurrentToolExecutionInAgent(unittest.IsolatedAsyncioTestCase):
                     yield ("adapter_text", "All files read")
 
         events = []
-        with unittest.mock.patch("johnston.core.adapters.get_adapter", return_value=MockAdapter()):
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=MockAdapter()):
             async for ev in agent.stream_steps("Read 3 files"):
                 events.append(ev)
 
@@ -142,7 +142,7 @@ class TestConcurrentToolExecutionInAgent(unittest.IsolatedAsyncioTestCase):
                     yield ("adapter_text", "Done")
 
         events = []
-        with unittest.mock.patch("johnston.core.adapters.get_adapter", return_value=MockAdapter()):
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=MockAdapter()):
             async for ev in agent.stream_steps("Mixed tools"):
                 events.append(ev)
 
@@ -193,7 +193,7 @@ class TestConcurrentToolExecutionInAgent(unittest.IsolatedAsyncioTestCase):
                     yield ("adapter_text", "Done")
 
         events = []
-        with unittest.mock.patch("johnston.core.adapters.get_adapter", return_value=MockAdapter()):
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=MockAdapter()):
             async for ev in agent.stream_steps("Read files"):
                 events.append(ev)
 
@@ -248,7 +248,7 @@ class TestConcurrentToolsGeneratorAndSession(unittest.IsolatedAsyncioTestCase):
                     yield ("adapter_text", "done")
 
         events = []
-        with unittest.mock.patch("johnston.core.adapters.get_adapter", return_value=MockAdapter()):
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=MockAdapter()):
             async for ev in agent.stream_steps("Read files"):
                 events.append(ev)
 
@@ -287,7 +287,7 @@ class TestConcurrentToolsGeneratorAndSession(unittest.IsolatedAsyncioTestCase):
                     yield ("adapter_text", "done")
 
         events = []
-        with unittest.mock.patch("johnston.core.adapters.get_adapter") as mock_get_adapter, \
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.get_adapter") as mock_get_adapter, \
              unittest.mock.patch.object(agent, "_execute_single_tool") as mock_exec:
             mock_exec.return_value = ("stable_id", "ls ok", ToolResult.done(content="ls ok"))
             mock_adapter = unittest.mock.MagicMock()
@@ -300,8 +300,8 @@ class TestConcurrentToolsGeneratorAndSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(tool_steps), 1)
         self.assertEqual(tool_steps[0][4], "stable_id")
 
-    async def test_ai_generator_concurrent_tool_ui_handles(self):
-        from johnston.core.application.generation.ai_generator import GenCanvas, generate_ai_response
+    async def test_engine_concurrent_tool_ui_handles(self):
+        from johnston.core.application.generation.engine import GenCanvas, generate_ai_response
         from johnston.core.domain.entities.session import AgentSession
 
         w1, w2, w3 = unittest.mock.MagicMock(), unittest.mock.MagicMock(), unittest.mock.MagicMock()
@@ -358,8 +358,8 @@ class TestConcurrentToolsGeneratorAndSession(unittest.IsolatedAsyncioTestCase):
         w3.set_result.assert_called_once()
         self.assertEqual(w3.set_result.call_args[0][0], "res3")
 
-    async def test_ai_generator_concurrent_tool_interruption(self):
-        from johnston.core.application.generation.ai_generator import GenCanvas, generate_ai_response
+    async def test_engine_concurrent_tool_interruption(self):
+        from johnston.core.application.generation.engine import GenCanvas, generate_ai_response
         from johnston.core.domain.entities.session import AgentSession
 
         w1, w2 = unittest.mock.MagicMock(), unittest.mock.MagicMock()

@@ -417,7 +417,7 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(self.driver.thinking_handle)
 
     async def test_stream_queued_user_message_ignored(self):
-        """queued_user_message steps are rendered by the caller (ai_generator),
+        """queued_user_message steps are rendered by the caller (engine),
         never by the driver — the driver must not duplicate them."""
         await self.driver.consume_stream_step(("queued_user_message", "Follow-up", None, True, None))
         self.chat_view.add_user_message.assert_not_awaited()

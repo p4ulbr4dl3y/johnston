@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from johnston.core.application.provider.provider_manager import ProviderManager
-from johnston.core.base_provider import BaseAgent
+from johnston.core.infrastructure.llm.base import BaseAgent
 
 
 class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):

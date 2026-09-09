@@ -1,4 +1,4 @@
-"""Error/retry tests for johnston.core.base_provider (errors area).
+"""Error/retry tests for johnston.core.infrastructure.llm.base (errors area).
 
 Split out of the former test_base_provider monolith: retryable-error detection,
 stream retry success/non-retryable failure, vision-error sanitization+retry,
@@ -9,7 +9,7 @@ import json
 import unittest
 import unittest.mock
 
-from johnston.core.base_provider import BaseAgent
+from johnston.core.infrastructure.llm.base import BaseAgent
 from tests.core._base_provider_helpers import (
     _Attachment,
     _BlockingStream,
@@ -372,7 +372,7 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[-1], ("bot_text", "recovered", ""))
 
     def test_calculate_retry_delay_with_retry_after(self):
-        from johnston.core.base_provider.errors import calculate_retry_delay
+        from johnston.core.infrastructure.llm.base.errors import calculate_retry_delay
 
         class _ErrWithHeaders(Exception):
             def __init__(self):
@@ -383,7 +383,7 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(delay, 7.5)
 
     def test_calculate_retry_delay_backoff_and_jitter(self):
-        from johnston.core.base_provider.errors import calculate_retry_delay
+        from johnston.core.infrastructure.llm.base.errors import calculate_retry_delay
 
         err = Exception("503 Service Unavailable")
         # attempt 1: base delay 2.0, jitter between 0 and 1.0 (2.0 to 3.0)
@@ -397,7 +397,7 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(d2, 6.0)
 
     async def test_stream_response_with_retry_success_after_transient_error(self):
-        from johnston.core.base_provider.errors import stream_response_with_retry
+        from johnston.core.infrastructure.llm.base.errors import stream_response_with_retry
 
         attempts = 0
 
@@ -429,7 +429,7 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(retried), 1)
 
     async def test_stream_response_with_retry_non_retryable_raises_immediately(self):
-        from johnston.core.base_provider.errors import stream_response_with_retry
+        from johnston.core.infrastructure.llm.base.errors import stream_response_with_retry
 
         attempts = 0
 
@@ -446,7 +446,7 @@ class TestErrorStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(attempts, 1)
 
     async def test_stream_response_with_retry_exhausted_raises(self):
-        from johnston.core.base_provider.errors import stream_response_with_retry
+        from johnston.core.infrastructure.llm.base.errors import stream_response_with_retry
 
         attempts = 0
 

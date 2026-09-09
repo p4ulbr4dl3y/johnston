@@ -168,8 +168,8 @@ async def test_role_falls_back_or_accepts(role, monkeypatch):
         base = {"worker": _FakeRole(key="worker", scope="any")}
         return base.get(low, base["worker"])
 
-    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.get_role", fake_get_role)
-    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
+    monkeypatch.setattr("johnston.core.application.roles.role_registry.RoleRegistry.get_role", fake_get_role)
+    monkeypatch.setattr("johnston.core.application.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
 
     store, app, tool, tmp = _make_env(agent)
     try:
@@ -199,8 +199,8 @@ async def test_main_scope_role_falls_back_to_worker(monkeypatch):
             return registry.get_role("orchestrator")
         return _FakeRole(key="worker", scope="any")
 
-    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.get_role", fake_get)
-    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
+    monkeypatch.setattr("johnston.core.application.roles.role_registry.RoleRegistry.get_role", fake_get)
+    monkeypatch.setattr("johnston.core.application.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
 
     store, app, tool, tmp = _make_env(agent)
     try:
@@ -227,8 +227,8 @@ async def test_role_pinned_provider_not_connected_raises(monkeypatch):
             return _FakeRole(key="heavymetal", scope="any", provider="zzz-not-connected")
         return _FakeRole(key="worker", scope="any")
 
-    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.get_role", fake_get)
-    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
+    monkeypatch.setattr("johnston.core.application.roles.role_registry.RoleRegistry.get_role", fake_get)
+    monkeypatch.setattr("johnston.core.application.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
 
     class _Pm:
         def load_providers(self):

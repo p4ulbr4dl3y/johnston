@@ -1,7 +1,7 @@
 import time
 import unittest
 
-from johnston.core.base_provider import BaseAgent
+from johnston.core.infrastructure.llm.base import BaseAgent
 from johnston.core.infrastructure.runtime.circuit_breaker import CircuitBreaker, circuit_breaker
 
 

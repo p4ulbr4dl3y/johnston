@@ -7,7 +7,7 @@ Concern split (see the sibling modules):
   rules-snippet assembly with mtime-based cache invalidation.
 
 This module keeps the ``PromptBuilder`` class and re-exports the moved public
-API so every import site (``johnston.core.base_provider.tools``, widgets, tests) works
+API so every import site (``johnston.core.infrastructure.llm.base.tools``, widgets, tests) works
 unchanged.
 """
 
@@ -127,8 +127,8 @@ class PromptBuilder:
 
     def build_system_prompt(self) -> str:
         cwd = self.cwd or os.getcwd()
+        from johnston.core.application.roles.role_registry import RoleRegistry
         from johnston.core.infrastructure.mcp import get_mcp_manager
-        from johnston.core.roles.role_registry import RoleRegistry
 
         mcp_mgr = get_mcp_manager()
         mcp_snippet = mcp_mgr.get_system_prompt_snippet()
@@ -167,8 +167,8 @@ class PromptBuilder:
         thread instead of blocking the event loop.
         """
         cwd = self.cwd or os.getcwd()
+        from johnston.core.application.roles.role_registry import RoleRegistry
         from johnston.core.infrastructure.mcp import get_mcp_manager
-        from johnston.core.roles.role_registry import RoleRegistry
 
         mcp_mgr = get_mcp_manager()
         mcp_snippet = await asyncio.to_thread(mcp_mgr.get_system_prompt_snippet)
@@ -313,7 +313,7 @@ class PromptBuilder:
         ``build_tools`` -> ``get_role``, so the in-memory identity changes
         exactly when the on-disk role set changes.
         """
-        from johnston.core.roles.role_registry import BUILTIN_ROLES, RoleRegistry
+        from johnston.core.application.roles.role_registry import BUILTIN_ROLES, RoleRegistry
 
         registry = RoleRegistry.get_instance()
         role_key = (self.role or "").strip().lower()
@@ -352,7 +352,7 @@ class PromptBuilder:
         - mcp (only when mcp tools are present)
         - worktree guidelines (if worktree_branch is active; placed at tail of stable core)
         """
-        from johnston.core.roles.role_registry import RoleRegistry
+        from johnston.core.application.roles.role_registry import RoleRegistry
 
         base = self._base_sys_prompt()
 
@@ -371,7 +371,7 @@ class PromptBuilder:
 
         role_block = ""
         if getattr(role_def, "prompt", None) and not self.is_subagent and "<role" not in base:
-            from johnston.core.roles.prompt import format_role_prompt
+            from johnston.core.application.roles.prompt import format_role_prompt
 
             formatted_role = format_role_prompt(self.role, role_def.prompt)
             if formatted_role:
@@ -420,7 +420,7 @@ class PromptBuilder:
     async def _build_stable_core_async(self, mcp_snippet, skills_snippet, subagents_snippet) -> str:
         """Async variant: same stable-prefix assembly, but file reads (rules,
         and the role definition on cache miss) happen on a worker thread."""
-        from johnston.core.roles.role_registry import RoleRegistry
+        from johnston.core.application.roles.role_registry import RoleRegistry
 
         rules_snippet = await get_rules_snippet_async(role=self.role, cwd=self.cwd)
         role_def = None
@@ -433,9 +433,9 @@ class PromptBuilder:
         )
 
     def build_tools(self) -> List[Dict[str, Any]]:
+        from johnston.core.application.roles.role_registry import RoleRegistry
         from johnston.core.domain.policies.role_policy import role_tool_error
         from johnston.core.infrastructure.mcp import get_mcp_manager
-        from johnston.core.roles.role_registry import RoleRegistry
 
         mcp_mgr = get_mcp_manager()
         mcp_tools = mcp_mgr.get_cached_tools()
@@ -477,7 +477,7 @@ class PromptBuilder:
             filtered_base.append(self.subagent_schema)
 
         if not self.mode.is_interactive:
-            from johnston.core.roles.tools import _rebuild_tool
+            from johnston.core.application.roles.tools import _rebuild_tool
 
             filtered_base = [_rebuild_tool(t) for t in filtered_base]
             filtered_mcp = [_rebuild_tool(t) for t in filtered_mcp]

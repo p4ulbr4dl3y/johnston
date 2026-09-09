@@ -78,7 +78,7 @@ class TestThinkingEffortProviderManager(unittest.TestCase):
 
 class TestThinkingEffortOpenAIRequest(unittest.IsolatedAsyncioTestCase):
     async def test_base_agent_sends_openai_reasoning_effort(self):
-        from johnston.core.base_provider import BaseAgent
+        from johnston.core.infrastructure.llm.base import BaseAgent
 
         agent = BaseAgent(
             api_key="test",
@@ -152,7 +152,7 @@ class _FakeHttpClient:
 
 class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
     async def test_anthropic_payload_effort(self):
-        from johnston.core.adapters import AnthropicAdapter
+        from johnston.core.infrastructure.llm.providers import AnthropicAdapter
 
         class Client(_FakeHttpClient):
             lines = [
@@ -160,7 +160,7 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
                 'data: {"type":"message_stop"}',
             ]
 
-        with unittest.mock.patch("johnston.core.adapters.anthropic.httpx.AsyncClient", Client):
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.anthropic.httpx.AsyncClient", Client):
             async for _ in AnthropicAdapter().stream_chat(
                 "", "key", "claude-test", [{"role": "user", "content": "hi"}], thinking_effort="medium"
             ):
@@ -168,12 +168,12 @@ class TestThinkingEffortAdapters(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_FakeHttpClient.captured_payload["output_config"], {"effort": "medium"})
 
     async def test_gemini_payload_effort(self):
-        from johnston.core.adapters import GeminiAdapter
+        from johnston.core.infrastructure.llm.providers import GeminiAdapter
 
         class Client(_FakeHttpClient):
             lines = ['data: {"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1,"totalTokenCount":2}}']
 
-        with unittest.mock.patch("johnston.core.adapters.gemini.httpx.AsyncClient", Client):
+        with unittest.mock.patch("johnston.core.infrastructure.llm.providers.gemini.httpx.AsyncClient", Client):
             async for _ in GeminiAdapter().stream_chat(
                 "", "key", "gemini-2.5-flash", [{"role": "user", "content": "hi"}], thinking_effort="high"
             ):

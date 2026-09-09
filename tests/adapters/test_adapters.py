@@ -2,7 +2,7 @@ import json
 import unittest
 from unittest.mock import MagicMock, patch
 
-from johnston.core.adapters import (
+from johnston.core.infrastructure.llm.providers import (
     AnthropicAdapter,
     GeminiAdapter,
     OpenAIAdapter,
@@ -224,7 +224,7 @@ class TestAdapterMessageNormalization(unittest.TestCase):
     def test_openai_format_messages_for_image(self):
         import json
 
-        from johnston.core.adapters import format_messages_for_openai
+        from johnston.core.infrastructure.llm.providers import format_messages_for_openai
 
         img_json = json.dumps(
             {
@@ -258,7 +258,7 @@ class TestAdapterMessageNormalization(unittest.TestCase):
     def test_openai_parallel_tool_calls_image_sequence(self):
         import json
 
-        from johnston.core.adapters import format_messages_for_openai
+        from johnston.core.infrastructure.llm.providers import format_messages_for_openai
 
         img_json = json.dumps(
             {
@@ -294,7 +294,7 @@ class TestAdapterMessageNormalization(unittest.TestCase):
         self.assertIn("data:image/png;base64,SU1H", formatted[4]["content"][1]["image_url"]["url"])
 
     def test_openai_reasoning_content_cleared_to_empty_string(self):
-        from johnston.core.adapters import format_messages_for_openai
+        from johnston.core.infrastructure.llm.providers import format_messages_for_openai
 
         messages = [
             {"role": "user", "content": "hello"},
@@ -406,7 +406,7 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"choices":[],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}',
             "data: [DONE]",
         ]
-        with patch("johnston.core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             adapter = OpenAIAdapter()
             events = [e async for e in adapter.stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])]
         texts = [e[1] for e in events if e[0] == "adapter_text"]
@@ -420,7 +420,7 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"mand\\":\\"ls\\"}"}}]}}]}',
             "data: [DONE]",
         ]
-        with patch("johnston.core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             adapter = OpenAIAdapter()
             events = [
                 e
@@ -444,7 +444,7 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"path\\": \\"a.txt\\"}"}}]}}]}',
             "data: [DONE]",
         ]
-        with patch("johnston.core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             adapter = OpenAIAdapter()
             events = [
                 e
@@ -461,7 +461,7 @@ class TestOpenAIAdapterStreaming(unittest.IsolatedAsyncioTestCase):
     async def test_stream_max_tokens(self):
         lines = ['data: {"choices":[{"delta":{"content":"x"}}]}']
         client = _MockHttpClient(lines)
-        with patch("johnston.core.adapters.openai.httpx.AsyncClient", return_value=client):
+        with patch("johnston.core.infrastructure.llm.providers.openai.httpx.AsyncClient", return_value=client):
             _ = [e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [], max_tokens=100)]
         self.assertIsNotNone(client)
 
@@ -476,7 +476,7 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"type":"message_delta","usage":{"output_tokens":5}}',
             'data: {"type":"message_stop"}',
         ]
-        with patch("johnston.core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e
                 async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
@@ -495,7 +495,7 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"type":"content_block_stop","index":0}',
             'data: {"type":"message_stop"}',
         ]
-        with patch("johnston.core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e
                 async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
@@ -520,7 +520,7 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"type":"content_block_stop","index":0}',
             'data: {"type":"message_stop"}',
         ]
-        with patch("johnston.core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e
                 async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
@@ -540,7 +540,7 @@ class TestAnthropicAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}',
             'data: {"type":"message_stop"}',
         ]
-        with patch("johnston.core.adapters.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.anthropic.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e
                 async for e in AnthropicAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
@@ -557,7 +557,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
             'data: {"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}',
         ]
-        with patch("johnston.core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
             ]
@@ -572,7 +572,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":5,'
             '"totalTokenCount":105,"cachedContentTokenCount":80}}',
         ]
-        with patch("johnston.core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
             ]
@@ -586,7 +586,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}]}',
             'data: {"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}',
         ]
-        with patch("johnston.core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
             ]
@@ -597,7 +597,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
         lines = [
             'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"shell","args":{"command":"ls"}}}]}}]}'
         ]
-        with patch("johnston.core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
             ]
@@ -611,7 +611,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
             'data: {"candidates":[{"content":{"parts":[{"thought":"hmm"},{"text":"Hello"}]}}]}',
             'data: {"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}',
         ]
-        with patch("johnston.core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
             ]
@@ -622,7 +622,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
 
     async def test_stream_thinking_non_str_serialized(self):
         lines = ['data: {"candidates":[{"content":{"parts":[{"thought":{"inner":"deep"}}]}}]}']
-        with patch("johnston.core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
             ]
@@ -632,7 +632,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
 
     async def test_stream_finish_reason(self):
         lines = ['data: {"candidates":[{"content":{"parts":[{"thought":"deep"}]},"finishReason":"MAX_TOKENS"}]}']
-        with patch("johnston.core.adapters.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.gemini.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e async for e in GeminiAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
             ]
@@ -641,7 +641,7 @@ class TestGeminiAdapterStreaming(unittest.IsolatedAsyncioTestCase):
 
     async def test_max_output_tokens_thinking_budget_expansion(self):
         mock_client = _MockHttpClient(['data: {"candidates":[{"content":{"parts":[{"text":"hi"}]}}]}'])
-        with patch("johnston.core.adapters.gemini.httpx.AsyncClient", return_value=mock_client):
+        with patch("johnston.core.infrastructure.llm.providers.gemini.httpx.AsyncClient", return_value=mock_client):
             events = [
                 e
                 async for e in GeminiAdapter().stream_chat(
@@ -715,7 +715,7 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
 
                 return _CM()
 
-        with patch("johnston.core.adapters.anthropic.httpx.AsyncClient", return_value=_CaptureClient()):
+        with patch("johnston.core.infrastructure.llm.providers.anthropic.httpx.AsyncClient", return_value=_CaptureClient()):
             async for _ in AnthropicAdapter().stream_chat(
                 "http://x",
                 "k",
@@ -759,7 +759,7 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
 
                 return _CM()
 
-        with patch("johnston.core.adapters.anthropic.httpx.AsyncClient", return_value=_CaptureClient()):
+        with patch("johnston.core.infrastructure.llm.providers.anthropic.httpx.AsyncClient", return_value=_CaptureClient()):
             async for _ in AnthropicAdapter().stream_chat(
                 "http://x",
                 "k",
@@ -776,7 +776,7 @@ class TestAdapterPromptCaching(unittest.IsolatedAsyncioTestCase):
             'data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":10,"total_tokens":110,"prompt_tokens_details":{"cached_tokens":40}}}',
             "data: [DONE]",
         ]
-        with patch("johnston.core.adapters.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
+        with patch("johnston.core.infrastructure.llm.providers.openai.httpx.AsyncClient", return_value=_MockHttpClient(lines)):
             events = [
                 e async for e in OpenAIAdapter().stream_chat("http://x", "k", "m", [{"role": "user", "content": "hi"}])
             ]
@@ -885,7 +885,7 @@ class TestGeminiThoughtStreaming(unittest.IsolatedAsyncioTestCase):
                 return FakeStreamResponse(sse_data)
 
         with patch.object(adapter, "_get_client", return_value=FakeClient()):
-            with patch("johnston.core.adapters.gemini.check_httpx_response_status", return_value=None):
+            with patch("johnston.core.infrastructure.llm.providers.gemini.check_httpx_response_status", return_value=None):
                 events = [e async for e in adapter.stream_chat(base_url="http://test", api_key="k", model="gemini-2.5-flash", messages=[{"role": "user", "content": "hi"}])]
 
         tags = [e[0] for e in events]
@@ -929,7 +929,7 @@ class TestGeminiThoughtStreaming(unittest.IsolatedAsyncioTestCase):
                 return FakeStreamResponse(sse_data)
 
         with patch.object(adapter, "_get_client", return_value=FakeClient()):
-            with patch("johnston.core.adapters.gemini.check_httpx_response_status", return_value=None):
+            with patch("johnston.core.infrastructure.llm.providers.gemini.check_httpx_response_status", return_value=None):
                 events = [e async for e in adapter.stream_chat(
                     base_url="http://test", api_key="k", model="gemini-2.5-flash", messages=[]
                 )]
@@ -982,7 +982,7 @@ class TestGeminiThoughtStreaming(unittest.IsolatedAsyncioTestCase):
                 return FakeStreamResponse(sse_data)
 
         with patch.object(adapter, "_get_client", return_value=FakeClient()):
-            with patch("johnston.core.adapters.gemini.check_httpx_response_status", return_value=None):
+            with patch("johnston.core.infrastructure.llm.providers.gemini.check_httpx_response_status", return_value=None):
                 events = [e async for e in adapter.stream_chat(
                     base_url="http://test", api_key="k", model="gemini-2.5-flash", messages=[]
                 )]

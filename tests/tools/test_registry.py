@@ -115,7 +115,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+            patch("johnston.core.application.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             mock_app = MagicMock()
             mock_app.role = "plan"
@@ -138,7 +138,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+            patch("johnston.core.application.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             res = await execute_tool("exposed_mcp_tool", {"foo": "bar"})
             self.assertEqual(res.content, "MCP Executed Output")
@@ -159,7 +159,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+            patch("johnston.core.application.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
             self.assertLogs("johnston.core.tools.registry", level="WARNING") as cm,
         ):
             res = await execute_tool("faulty_mcp", {})
@@ -181,7 +181,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+            patch("johnston.core.application.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             res = await execute_tool("none_mcp", {})
             self.assertEqual(res.content, "ERR: unknown_tool 'none_mcp'")
@@ -192,7 +192,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mode_def.disallowed_tools = []
         mock_role_registry = MagicMock()
         mock_role_registry.get_role.return_value = mock_mode_def
-        return patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry)
+        return patch("johnston.core.application.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry)
 
     async def test_execute_tool_permission_denied(self):
         mock_pm = MagicMock()

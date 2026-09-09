@@ -196,7 +196,7 @@ def _build_subagent_grid(
     title_part = ellipsize(clean_title, max_title_len)
     row1_left = f"[bold {t_primary}]{escape(title_part)}[/]"
 
-    from johnston.core.roles.role_registry import get_role_display_name
+    from johnston.core.application.roles.role_registry import get_role_display_name
 
     role_str = get_role_display_name(agent_role)
     if is_generating:

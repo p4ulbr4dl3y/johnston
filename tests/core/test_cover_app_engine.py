@@ -1,7 +1,7 @@
-"""Coverage-focused unit tests for core/application/generation/ai_generator.py.
+"""Coverage-focused unit tests for core/application/generation/engine.py.
 
 Covers the debounce-save error/edge paths and the interruption handler branches
-that existing test_ai_generator.py does not exercise. No network calls.
+that existing test_engine.py does not exercise. No network calls.
 """
 
 import asyncio
@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from johnston.core.application.generation.ai_generator import (
+from johnston.core.application.generation.engine import (
     GenCanvas,
     _SessionSaveDebounce,
     generate_ai_response,
@@ -196,8 +196,8 @@ async def test_schedule_exceptions_swallowed_on_save_points():
         yield ("bot_text", "done", "")
         yield ("event_divider", "Compacted", "")
 
-    with patch("johnston.core.application.generation.ai_generator._SessionSaveDebounce.schedule", side_effect=RuntimeError("x")), patch(
-        "johnston.core.application.generation.ai_generator._SessionSaveDebounce.flush", side_effect=RuntimeError("f")
+    with patch("johnston.core.application.generation.engine._SessionSaveDebounce.schedule", side_effect=RuntimeError("x")), patch(
+        "johnston.core.application.generation.engine._SessionSaveDebounce.flush", side_effect=RuntimeError("f")
     ):
         await generate_ai_response(_FakeAgent(stream), _fake_session(), canvas, session_id="s1", user_text="hi")
     canvas.add_event_divider.assert_awaited_once_with("Compacted")

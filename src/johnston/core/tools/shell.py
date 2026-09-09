@@ -182,7 +182,7 @@ class ShellTool(BaseTool):
         import copy
 
         if is_subagent:
-            from johnston.core.roles.tools import _rebuild_tool
+            from johnston.core.application.roles.tools import _rebuild_tool
 
             base_s = _rebuild_tool(self.schema)
         else:

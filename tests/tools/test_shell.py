@@ -1196,8 +1196,8 @@ async def test_shell_sync_wires_hard_timeout_to_task(tool, make_app_mock, make_t
 
 
 def test_apply_role_tools_cleans_timeout_description(tool):
+    from johnston.core.application.roles.tools import apply_role_tools
     from johnston.core.domain.policies.role_policy import AgentRole
-    from johnston.core.roles.tools import apply_role_tools
 
     sub = MagicMock()
     sub.tools = [tool.get_schema()]

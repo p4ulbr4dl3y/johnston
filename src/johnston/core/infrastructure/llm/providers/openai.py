@@ -4,8 +4,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
-from johnston.core.adapters.base import check_httpx_response_status
-from johnston.core.infrastructure.adapters.base import (
+from johnston.core.infrastructure.llm.models.base import (
     BaseApiAdapter,
     build_adapter_usage_event,
     extract_image_details,
@@ -15,6 +14,7 @@ from johnston.core.infrastructure.adapters.base import (
     parse_sse_line,
     resolve_stream_timeout,
 )
+from johnston.core.infrastructure.llm.providers.base import check_httpx_response_status
 from johnston.core.infrastructure.runtime.thinking_effort import build_openai_thinking_kwargs
 from johnston.core.infrastructure.runtime.token_util import parse_usage
 

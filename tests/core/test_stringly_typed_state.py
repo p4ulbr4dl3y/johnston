@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from johnston.core.application.session.stream_runner import execute_session_turn
-from johnston.core.base_provider.compaction import CompactionMixin
 from johnston.core.domain.defaults.errors import ToolResult, ToolResultStatus, normalize_tool_result
 from johnston.core.domain.entities.session import AgentSession
+from johnston.core.infrastructure.llm.base.compaction import CompactionMixin
 from johnston.tui.mixins.message_flow_background import update_background_shell_widget
 from johnston.tui.presentation.tool_renderers import compute_tool_call_content
 from johnston.tui.presentation.widgets.chat_stream_driver import ChatStreamDriver

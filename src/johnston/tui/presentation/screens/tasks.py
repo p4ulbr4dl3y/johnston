@@ -491,7 +491,7 @@ class SubagentsScreen(BaseTasksListScreen):
             if not role_display:
                 role = getattr(agent, "role", None) if agent else getattr(s, "role", None)
                 if role and isinstance(role, str) and role.strip() and role.strip().lower() not in ("worker", "subagent", "default"):
-                    from johnston.core.roles.role_registry import get_role_display_name
+                    from johnston.core.application.roles.role_registry import get_role_display_name
 
                     role_display = get_role_display_name(role)
             if role_display and isinstance(role_display, str) and role_display.lower() not in ("worker", "subagent", "default"):

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from johnston.core.application.generation.ai_generator import GenCanvas
+from johnston.core.application.generation.engine import GenCanvas
 from johnston.core.application.session.stream import (
     cancel_running_subagents,
     configure_subagent_agent,
@@ -286,7 +286,7 @@ class FakeAgent:
         self.cost_usd = 0.0
 
     def get_metrics(self):
-        """Mirrors johnston.core.base_provider.agent.get_metrics contract used by the footer."""
+        """Mirrors johnston.core.infrastructure.llm.base.agent.get_metrics contract used by the footer."""
         return {
             "total_tokens": self.total_tokens,
             "tokens_input": self.tokens_input,
@@ -845,7 +845,7 @@ def _tool(name):
 
 class TestApplyRole:
     def _fake_registry(self, monkeypatch, roles):
-        from johnston.core.roles import role_registry
+        from johnston.core.application.roles import role_registry
 
         class FakeReg:
             def load_roles(self, project_dir=None, include_global=True):
@@ -857,7 +857,7 @@ class TestApplyRole:
         monkeypatch.setattr(role_registry.RoleRegistry, "get_instance", lambda: FakeReg())
 
     def test_scope_main_falls_back_to_worker(self, monkeypatch):
-        from johnston.core.roles.role_registry import AgentRole
+        from johnston.core.application.roles.role_registry import AgentRole
 
         main_role = AgentRole(key="orchestrator", scope="main", prompt="main prompt")
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
@@ -868,7 +868,7 @@ class TestApplyRole:
         assert returned.scope != "main"
 
     def test_role_not_found_falls_back_to_worker(self, monkeypatch):
-        from johnston.core.roles.role_registry import AgentRole
+        from johnston.core.application.roles.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -877,7 +877,7 @@ class TestApplyRole:
         assert hasattr(returned, "key")  # not None
 
     def test_tools_none_becomes_empty(self, monkeypatch):
-        from johnston.core.roles.role_registry import AgentRole
+        from johnston.core.application.roles.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -886,7 +886,7 @@ class TestApplyRole:
         assert sub.tools == []
 
     def test_shell_description_overridden_others_preserved(self, monkeypatch):
-        from johnston.core.roles.role_registry import AgentRole
+        from johnston.core.application.roles.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -900,7 +900,7 @@ class TestApplyRole:
         assert read["function"]["description"] == "desc read"
 
     def test_excluded_tools_removed(self, monkeypatch):
-        from johnston.core.roles.role_registry import AgentRole
+        from johnston.core.application.roles.role_registry import AgentRole
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
@@ -1173,7 +1173,7 @@ class TestParentInterruptLeavesSubagentsRunning:
             cancel_subagents=cancel_cb,
         )
 
-        from johnston.tui.app.ai_controller import run_ai_generation
+        from johnston.tui.app.generation_controller import run_ai_generation
 
         with pytest.raises(asyncio.CancelledError):
             await run_ai_generation(

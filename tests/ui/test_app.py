@@ -26,7 +26,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.slow
     async def test_chat_app_flow(self):
         app = JohnstonApp()
-        from johnston.core.base_provider import BaseAgent
+        from johnston.core.infrastructure.llm.base import BaseAgent
 
         app.agent = BaseAgent(api_key="test", model="gpt-4o", provider_key="openai")
         async with app.run_test() as pilot:
@@ -260,7 +260,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_generate_ai_response_queue_draining_and_attachments(self):
         from unittest.mock import MagicMock, patch
 
-        from johnston.core.base_provider import BaseAgent
+        from johnston.core.infrastructure.llm.base import BaseAgent
 
         app = JohnstonApp()
 
@@ -309,7 +309,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
         import asyncio
         from unittest.mock import MagicMock, patch
 
-        from johnston.core.base_provider import BaseAgent
+        from johnston.core.infrastructure.llm.base import BaseAgent
 
         app = JohnstonApp()
 
@@ -430,7 +430,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_session_drift_prevention(self):
         from unittest.mock import MagicMock, patch
 
-        from johnston.core.base_provider import BaseAgent
+        from johnston.core.infrastructure.llm.base import BaseAgent
 
         app = JohnstonApp()
         ran_prompts = []
@@ -487,7 +487,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_queued_system_notification_does_not_show_in_ui(self):
         from unittest.mock import MagicMock
 
-        from johnston.core.base_provider import BaseAgent
+        from johnston.core.infrastructure.llm.base import BaseAgent
 
         app = JohnstonApp()
 
@@ -516,7 +516,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_exception_preserves_queue(self):
         from unittest.mock import MagicMock, patch
 
-        from johnston.core.base_provider import BaseAgent
+        from johnston.core.infrastructure.llm.base import BaseAgent
 
         app = JohnstonApp()
 
@@ -548,7 +548,7 @@ class TestJohnstonAppUI(unittest.IsolatedAsyncioTestCase):
     async def test_queued_user_message_checkpoint(self):
         from unittest.mock import MagicMock, patch
 
-        from johnston.core.base_provider import BaseAgent
+        from johnston.core.infrastructure.llm.base import BaseAgent
 
         app = JohnstonApp()
         checkpoint_calls = []

@@ -3,8 +3,8 @@ import os
 import unittest
 from unittest.mock import MagicMock
 
-from johnston.core.base_provider.agent import BaseAgent
-from johnston.core.base_provider.message_queue import drain_queued_messages, has_queued_messages
+from johnston.core.infrastructure.llm.base.agent import BaseAgent
+from johnston.core.infrastructure.llm.base.message_queue import drain_queued_messages, has_queued_messages
 from johnston.core.infrastructure.runtime.subagent_tracker import mark_subagent_running, record_subagent_session
 from johnston.core.interfaces.host import HostProtocol, NullHost
 from johnston.core.tools.context import ToolContext

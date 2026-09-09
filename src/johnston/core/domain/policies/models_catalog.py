@@ -18,7 +18,7 @@ from johnston.core.domain.policies.model_catalog_policy import (
     _RE_TOKEN_SPLIT,
     format_context_tokens,
 )
-from johnston.core.infrastructure.adapters.models_fetcher import fetch_catalog_endpoints
+from johnston.core.infrastructure.llm.models.models_fetcher import fetch_catalog_endpoints
 from johnston.core.infrastructure.platform.paths import CONFIG_DIR, provider_models_cache_path
 from johnston.core.infrastructure.platform.platform_utils import (
     atomic_write_json,

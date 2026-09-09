@@ -11,8 +11,8 @@ from johnston.core.application.session.actions import (
     get_rewind_git_stats,
     rewind_session,
 )
-from johnston.core.base_provider import BaseAgent
-from johnston.core.base_provider import agent as agent_mod
+from johnston.core.infrastructure.llm.base import BaseAgent
+from johnston.core.infrastructure.llm.base import agent as agent_mod
 
 
 def _reset_circuit():
@@ -177,8 +177,8 @@ class TestAgentCompactionCoverage(unittest.IsolatedAsyncioTestCase):
         agent = self._make_agent()
         agent.history = self._big_history()
         agent.tool_executor = AsyncMock(return_value="ok")
-        with patch("johnston.core.base_provider.agent.estimate_tokens", side_effect=_compaction_estimator):
-            with patch("johnston.core.base_provider.BaseAgent.context_limit", new_callable=PropertyMock) as lim:
+        with patch("johnston.core.infrastructure.llm.base.agent.estimate_tokens", side_effect=_compaction_estimator):
+            with patch("johnston.core.infrastructure.llm.base.BaseAgent.context_limit", new_callable=PropertyMock) as lim:
                 lim.return_value = 100
                 with patch.object(agent, "compact_history", new=AsyncMock(return_value=(True, "Hist (7 → 3 tok)"))):
                     with patch.object(
@@ -270,7 +270,7 @@ class TestAgentAdapterStreams(unittest.IsolatedAsyncioTestCase):
                         yield item
 
         fake = F([iter([("adapter_thought", "deep"), ("adapter_text", "answer")])])
-        with patch("johnston.core.adapters.get_adapter", return_value=fake):
+        with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=fake):
             events = []
             async for evt in agent.stream_steps("hi"):
                 events.append(evt)
@@ -298,7 +298,7 @@ class TestAgentAdapterStreams(unittest.IsolatedAsyncioTestCase):
                 iter([("adapter_text", "done")]),
             ]
         )
-        with patch("johnston.core.adapters.get_adapter", return_value=fake):
+        with patch("johnston.core.infrastructure.llm.providers.get_adapter", return_value=fake):
             events = []
             async for evt in agent.stream_steps("run"):
                 events.append(evt)

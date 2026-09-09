@@ -5,8 +5,8 @@ import unittest
 
 import pytest
 
+from johnston.core.application.roles.role_registry import BUILTIN_ROLES, RoleRegistry
 from johnston.core.domain.policies.role_policy import AgentRole, normalize_role_scope, role_tool_error
-from johnston.core.roles.role_registry import BUILTIN_ROLES, RoleRegistry
 
 
 class TestRoleRegistry(unittest.TestCase):
@@ -642,7 +642,7 @@ class TestRoleToolWildcards:
 
 class TestRoleDisplayAndInjection:
     def test_get_role_display_name_builtin(self):
-        from johnston.core.roles.role_registry import get_role_display_name
+        from johnston.core.application.roles.role_registry import get_role_display_name
 
         assert get_role_display_name("worker") == "Worker"
         assert get_role_display_name("explorer") == "Explorer"
@@ -650,14 +650,14 @@ class TestRoleDisplayAndInjection:
         assert get_role_display_name(None) == "Worker"
 
     def test_get_role_display_name_fallback_title_case(self):
-        from johnston.core.roles.role_registry import get_role_display_name
+        from johnston.core.application.roles.role_registry import get_role_display_name
 
         assert get_role_display_name("code_reviewer") == "Code Reviewer"
         assert get_role_display_name("qa-tester") == "Qa Tester"
         assert get_role_display_name("custom_dev_ops_role") == "Custom Dev Ops Role"
 
     def test_get_role_display_name_from_object_attributes(self):
-        from johnston.core.roles.role_registry import get_role_display_name
+        from johnston.core.application.roles.role_registry import get_role_display_name
 
         class DummyEntityWithName:
             name = "Custom Name"
@@ -678,7 +678,7 @@ class TestRoleDisplayAndInjection:
         assert sess.role_name == "Custom QA Lead"
 
     def test_agent_role_name_property(self):
-        from johnston.core.base_provider.agent import BaseAgent
+        from johnston.core.infrastructure.llm.base.agent import BaseAgent
 
         agent = BaseAgent()
         agent.role = "qa_tester"
@@ -688,21 +688,21 @@ class TestRoleDisplayAndInjection:
         assert agent.role_name == "Lead QA"
 
     def test_resolve_role_display_name_with_display(self):
-        from johnston.core.roles.role_registry import resolve_role_display_name
+        from johnston.core.application.roles.role_registry import resolve_role_display_name
 
         assert resolve_role_display_name("code_reviewer") == "Code Reviewer"
         assert resolve_role_display_name("qa_tester") == "Qa Tester"
 
     def test_resolve_role_display_name_empty_defaults_to_worker(self):
-        from johnston.core.roles.role_registry import resolve_role_display_name
+        from johnston.core.application.roles.role_registry import resolve_role_display_name
 
         assert resolve_role_display_name("") == "Worker"
         assert resolve_role_display_name(None) == "Worker"
         assert resolve_role_display_name("unknown_role") == "Unknown Role"
 
     def test_resolve_role_display_name_caching_via_properties(self):
-        from johnston.core.base_provider.agent import BaseAgent
         from johnston.core.domain.entities.session import AgentSession
+        from johnston.core.infrastructure.llm.base.agent import BaseAgent
 
         # Cached value (set via the setter) is returned without re-resolving.
         sess = AgentSession("s1", role="code_reviewer")
@@ -745,7 +745,7 @@ class TestRoleDisplayAndInjection:
             os.remove(f_name)
 
     def test_apply_role_sets_read_only_and_default_not_subagent(self):
-        from johnston.core.roles.apply import apply_role
+        from johnston.core.application.roles.apply import apply_role
 
         class MockAgent:
             def __init__(self):

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from johnston.core.base_provider import BaseAgent
+from johnston.core.infrastructure.llm.base import BaseAgent
 from johnston.tui.app import JohnstonApp
 from johnston.tui.presentation.widgets.chat_container import ChatView
 

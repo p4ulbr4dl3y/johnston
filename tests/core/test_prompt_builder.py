@@ -229,8 +229,8 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_tools_disallowed_subagent_schema_not_appended(self):
         from unittest.mock import patch
 
+        from johnston.core.application.roles.role_registry import RoleRegistry
         from johnston.core.domain.policies.role_policy import AgentRole
-        from johnston.core.roles.role_registry import RoleRegistry
 
         reg = RoleRegistry.get_instance()
         role = AgentRole(

@@ -106,11 +106,11 @@ def isolate_johnston_env(tmp_path, monkeypatch):
 
     # 4. Reset singletons before test
     from johnston.core.application.permission.permission_manager import PermissionManager
+    from johnston.core.application.roles.role_registry import RoleRegistry
     from johnston.core.application.rules.rules import RulesManager
     from johnston.core.application.skills.manager import SkillManager
     from johnston.core.infrastructure.mcp.manager import MCPManager
     from johnston.core.infrastructure.storage.session_store import SessionStore
-    from johnston.core.roles.role_registry import RoleRegistry
 
     SessionStore._instance = None
     PermissionManager._instance = None

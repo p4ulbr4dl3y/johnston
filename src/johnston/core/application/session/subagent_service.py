@@ -120,8 +120,8 @@ class SubagentService:
             res = await run_git_async(["branch", "--show-current"], cwd=project_dir, timeout=5)
             current_branch = res.stdout.strip()
 
-        from johnston.core.roles.resolve import resolve_role
-        from johnston.core.roles.role_registry import RoleRegistry
+        from johnston.core.application.roles.resolve import resolve_role
+        from johnston.core.application.roles.role_registry import RoleRegistry
 
         registry = RoleRegistry.get_instance()
         role_def = resolve_role(registry, subagent_type, project_dir=project_dir)

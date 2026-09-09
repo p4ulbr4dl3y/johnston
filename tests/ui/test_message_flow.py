@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from unittest.mock import MagicMock, patch
 
-from johnston.core.base_provider import BaseAgent
+from johnston.core.infrastructure.llm.base import BaseAgent
 from johnston.tui.app import JohnstonApp
 from johnston.tui.mixins.message_flow import MessageFlowMixin
 

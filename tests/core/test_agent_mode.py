@@ -2,6 +2,10 @@
 import unittest
 from unittest.mock import MagicMock
 
+from johnston.core.application.roles.apply import apply_role
+from johnston.core.application.roles.prompt import apply_prompt
+from johnston.core.application.roles.resolve import resolve_role
+from johnston.core.application.roles.tools import HARDENED_SHELL_DESCRIPTION, apply_role_tools
 from johnston.core.domain.defaults.tools import NON_INTERACTIVE_EXCLUDED_TOOLS
 from johnston.core.domain.policies.role_policy import (
     AgentMode,
@@ -10,10 +14,6 @@ from johnston.core.domain.policies.role_policy import (
     is_role_scope_compatible,
     role_tool_error,
 )
-from johnston.core.roles.apply import apply_role
-from johnston.core.roles.prompt import apply_prompt
-from johnston.core.roles.resolve import resolve_role
-from johnston.core.roles.tools import HARDENED_SHELL_DESCRIPTION, apply_role_tools
 
 
 class TestAgentMode(unittest.TestCase):
@@ -187,7 +187,7 @@ class TestAgentMode(unittest.TestCase):
         self.assertIn("wait_seconds", str(result))
 
     def test_agent_tool_policy_error_honors_mode(self):
-        from johnston.core.base_provider.agent import BaseAgent
+        from johnston.core.infrastructure.llm.base.agent import BaseAgent
 
         class DummyAgent(BaseAgent):
             def _create_client(self, *args, **kwargs):

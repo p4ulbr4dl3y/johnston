@@ -15,7 +15,7 @@ import unittest
 
 
 # Sandbox may not have httpx/pygments installed; stub the heavy modules
-# before the johnston.core.base_provider package init runs.
+# before the johnston.core.infrastructure.llm.base package init runs.
 def _stub_runtime_deps():
     for name in ("httpx", "pygments", "pygments.token", "litellm"):
         if name not in sys.modules:
@@ -215,7 +215,7 @@ class VisionSanitizationInjectionTests(unittest.TestCase):
 
     def _make_mixin(self):
         # Bypass BaseAgent construction; only the sanitizer is exercised.
-        from johnston.core.base_provider.errors import ErrorHandlingMixin
+        from johnston.core.infrastructure.llm.base.errors import ErrorHandlingMixin
         return ErrorHandlingMixin()
 
     def test_user_text_is_xml_escaped(self):

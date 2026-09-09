@@ -1,7 +1,7 @@
 """Comprehensive test suite for interruption and cancellation handling across Johnston.
 
 Covers:
-1. `_handle_interruption` in core/application/generation/ai_generator.py (thinking, bot, tool, tokens, session, canvas)
+1. `_handle_interruption` in core/application/generation/engine.py (thinking, bot, tool, tokens, session, canvas)
 2. History sanitization and compaction of interrupted states (synthetic tool results, system notes)
 3. UI Escape key routing in ChatInput (suggestions vs worker cancellation)
 4. ToolCallWidget widget cancellation states and UI rendering
@@ -17,15 +17,15 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.events import Key
 
-from johnston.core.application.generation.ai_generator import (
+from johnston.core.application.generation.engine import (
     GenCanvas,
     _handle_interruption,
     generate_ai_response,
 )
-from johnston.core.base_provider import BaseAgent
-from johnston.core.base_provider.compaction import collect_user_messages
 from johnston.core.domain.entities.session import AgentSession
 from johnston.core.domain.policies.messages import is_system_note, is_ui_visible_user_message
+from johnston.core.infrastructure.llm.base import BaseAgent
+from johnston.core.infrastructure.llm.base.compaction import collect_user_messages
 from johnston.tui.presentation.widgets.chat_input import KEY_QUIT, ChatInput
 from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Optional
 
-from johnston.core.application.generation.ai_generator import GenCanvas
-from johnston.core.application.generation.ai_generator import generate_ai_response as _engine
+from johnston.core.application.generation.engine import GenCanvas
+from johnston.core.application.generation.engine import generate_ai_response as _engine
 from johnston.tui.presentation.widgets.chat_stream_driver import ChatStreamDriver
 
 logger = logging.getLogger(__name__)

@@ -341,7 +341,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_roles_with_disallowed_tools(self):
         f = io.StringIO()
-        with patch("johnston.core.roles.role_registry.RoleRegistry") as mock_cls:
+        with patch("johnston.core.application.roles.role_registry.RoleRegistry") as mock_cls:
             role_mgr = MagicMock()
             role = MagicMock(
                 source="builtin",
