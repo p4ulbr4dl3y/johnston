@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import core.infrastructure.mcp.process_client as core_infra_process_client
-from core.infrastructure.mcp.process_client import MCPProcessClient
+import johnston.core.infrastructure.mcp.process_client as core_infra_process_client
+from johnston.core.infrastructure.mcp.process_client import MCPProcessClient
 
 
 async def _make_client():
@@ -79,7 +79,7 @@ class TestCoverReaderMisc:
         thread = MagicMock()
         thread.is_alive.return_value = True
         client._stderr_thread = thread
-        with patch("core.infrastructure.mcp.process_client.logger") as mock_logger:
+        with patch("johnston.core.infrastructure.mcp.process_client.logger") as mock_logger:
             client._join_stderr_thread()
         mock_logger.debug.assert_called()
         assert client._stderr_thread is None
@@ -109,7 +109,7 @@ class TestCoverPopenKwargs:
     def test_build_popen_kwargs_win32_creationflags(self):
         client = MCPProcessClient("t", ["node", "srv.js"], cwd="/tmp", env={"A": "1"})
         with (
-            patch("core.infrastructure.mcp.process_client.sys.platform", "win32"),
+            patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "win32"),
             patch.object(
                 core_infra_process_client.subprocess, "CREATE_NEW_PROCESS_GROUP", 0x08000000, create=True
             ),
@@ -161,9 +161,9 @@ class TestCoverTerminate:
         client, proc = self._base()
         proc.wait.side_effect = [OSError("w1"), OSError("w2")]
         with (
-            patch("core.infrastructure.mcp.process_client.sys.platform", "linux"),
+            patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "linux"),
             patch(
-                "core.infrastructure.mcp.process_client.os.killpg", side_effect=[None, OSError("kill fail")]
+                "johnston.core.infrastructure.mcp.process_client.os.killpg", side_effect=[None, OSError("kill fail")]
             ) as killpg,
         ):
             client._terminate_process_group()
@@ -173,7 +173,7 @@ class TestCoverTerminate:
         client, proc = self._base()
         proc.wait.side_effect = [OSError("w1"), OSError("w2")]
         proc.kill.side_effect = OSError("kill fail")
-        with patch("core.infrastructure.mcp.process_client.sys.platform", "win32"):
+        with patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "win32"):
             client._terminate_process_group()
         proc.kill.assert_called_once()
 
@@ -182,8 +182,8 @@ class TestCoverTerminate:
         client, proc = self._base()
         proc.stdout = None
         with (
-            patch("core.infrastructure.mcp.process_client.sys.platform", "linux"),
-            patch("core.infrastructure.mcp.process_client.os.killpg"),
+            patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "linux"),
+            patch("johnston.core.infrastructure.mcp.process_client.os.killpg"),
         ):
             client._terminate_process_group()
         assert client.process is None
@@ -193,7 +193,7 @@ class TestCoverTerminate:
         thread = MagicMock()
         thread.is_alive.return_value = True
         client._reader_thread = thread
-        with patch("core.infrastructure.mcp.process_client.logger") as mock_logger:
+        with patch("johnston.core.infrastructure.mcp.process_client.logger") as mock_logger:
             client._join_reader_thread()
         mock_logger.debug.assert_called()
         assert client._reader_thread is None
@@ -224,7 +224,7 @@ class TestCoverFetchAndStale:
     def test_is_tools_stale(self):
         client = MCPProcessClient("t", "echo")
         client._tools_fetch_time = 90.0
-        with patch("core.infrastructure.mcp.process_client.time.monotonic", return_value=100.0):
+        with patch("johnston.core.infrastructure.mcp.process_client.time.monotonic", return_value=100.0):
             assert client.is_tools_stale(ttl=5.0)
 
 

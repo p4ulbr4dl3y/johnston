@@ -3,11 +3,11 @@ import os
 import unittest
 from unittest.mock import MagicMock
 
-from core.base_provider.agent import BaseAgent
-from core.base_provider.message_queue import drain_queued_messages, has_queued_messages
-from core.infrastructure.runtime.subagent_tracker import mark_subagent_running, record_subagent_session
-from core.interfaces.host import HostProtocol, NullHost
-from core.tools.context import ToolContext
+from johnston.core.base_provider.agent import BaseAgent
+from johnston.core.base_provider.message_queue import drain_queued_messages, has_queued_messages
+from johnston.core.infrastructure.runtime.subagent_tracker import mark_subagent_running, record_subagent_session
+from johnston.core.interfaces.host import HostProtocol, NullHost
+from johnston.core.tools.context import ToolContext
 
 
 class TestHostProtocol(unittest.IsolatedAsyncioTestCase):

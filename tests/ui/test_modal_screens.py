@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 from textual.app import App
 
-from widgets.presentation.screens.ask_user import WRITE_IN_LABEL, AskUserWizardScreen
+from johnston.tui.presentation.screens.ask_user import WRITE_IN_LABEL, AskUserWizardScreen
 
 
 class _PermHostApp(App[None]):
@@ -44,7 +44,7 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
         screen._force_modal_focus()  # is_mounted False -> early return
 
     async def test_force_modal_focus_query_exceptions(self):
-        from widgets.presentation.screens.ask_user import WRITE_IN_INPUT
+        from johnston.tui.presentation.screens.ask_user import WRITE_IN_INPUT
 
         screen = _ask_screen(questions=[{"question": "Q"}])
         screen._is_mounted = True
@@ -197,13 +197,13 @@ class TestAskUserExtra(unittest.IsolatedAsyncioTestCase):
 
 class TestPermissionConfirmExtra(unittest.IsolatedAsyncioTestCase):
     def test_build_diff_text_unknown_tool(self):
-        from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+        from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         screen = PermissionConfirmScreen("read", {"path": "x"})
         self.assertEqual(screen._build_diff_text("x"), "")
 
     async def test_compose_kill_and_message_subagent(self):
-        from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+        from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         cases = [
             ("kill", {"id": "s1"}),
@@ -218,14 +218,14 @@ class TestPermissionConfirmExtra(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
 
     async def test_compose_update_plan(self):
-        from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+        from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         screen = PermissionConfirmScreen("update_plan", {})
         async with _PermHostApp(screen).run_test() as pilot:
             await pilot.pause()
 
     async def test_compose_ask_user(self):
-        from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+        from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         cases = [
             {"questions": [{"q": "1"}, {"q": "2"}]},
@@ -240,7 +240,7 @@ class TestPermissionConfirmExtra(unittest.IsolatedAsyncioTestCase):
 
 class TestModalScreenBindings(unittest.TestCase):
     def test_mcp_bindings_include_quit(self):
-        from widgets.presentation.screens.mcp import MCPScreen
+        from johnston.tui.presentation.screens.mcp import MCPScreen
 
         actions = {b[1] for b in MCPScreen.BINDINGS}
         self.assertIn("cancel", actions)
@@ -254,7 +254,7 @@ if __name__ == "__main__":
 
     async def test_action_allow_pattern_no_pattern_no_escalation(self):
         """'p' with no suggested pattern must NOT silently always-allow."""
-        from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+        from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         screen = PermissionConfirmScreen("kill", {"id": "t1"})
         self.assertIsNone(screen.suggested_pattern)
@@ -264,7 +264,7 @@ if __name__ == "__main__":
         self.assertEqual(dismissed, [])
 
     async def test_action_allow_pattern_with_pattern_dismisses_pattern(self):
-        from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
+        from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         screen = PermissionConfirmScreen("shell", {"command": "cat a.txt"})
         self.assertEqual(screen.suggested_pattern, "cat *")

@@ -2,7 +2,7 @@
 
 import pytest
 
-from core.infrastructure.runtime.lru import LruCache
+from johnston.core.infrastructure.runtime.lru import LruCache
 
 
 def test_put_get_roundtrip():

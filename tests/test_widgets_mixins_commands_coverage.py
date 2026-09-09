@@ -8,20 +8,20 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from textual.app import App
 
-from core.infrastructure.tasks.manager import TaskManager
-from widgets.chat_input import DEFAULT_PLACEHOLDER
-from widgets.git_metrics_mixin import GitMetricsMixin
-from widgets.mixins.lifecycle import LifecycleMixin
-from widgets.mixins.session_persistence import SessionPersistenceMixin
-from widgets.presentation.commands.ui_commands import (
+from johnston.core.infrastructure.tasks.manager import TaskManager
+from johnston.tui.chat_input import DEFAULT_PLACEHOLDER
+from johnston.tui.git_metrics_mixin import GitMetricsMixin
+from johnston.tui.mixins.lifecycle import LifecycleMixin
+from johnston.tui.mixins.session_persistence import SessionPersistenceMixin
+from johnston.tui.presentation.commands.ui_commands import (
     CommandsCommand,
     CopyCommand,
     HelpCommand,
     KeybindsCommand,
     ThemeCommand,
 )
-from widgets.presentation.screens.help import HelpScreen
-from widgets.presentation.screens.theme import ThemeScreen
+from johnston.tui.presentation.screens.help import HelpScreen
+from johnston.tui.presentation.screens.theme import ThemeScreen
 
 # ============================================================================
 # 1. UI Commands Tests
@@ -163,7 +163,7 @@ async def test_theme_command_execution_and_callbacks():
     app.query_one.return_value = input_mock
 
     # 3. Selected valid theme with set_app_theme on app
-    from widgets.app.theme_manager import theme_manager
+    from johnston.tui.app.theme_manager import theme_manager
 
     valid_theme_name = theme_manager.current_theme.name
     callback(valid_theme_name)
@@ -259,7 +259,7 @@ async def test_session_persistence_load_ui_full_flow():
     app.query_one = mock_query
 
     with patch(
-        "widgets.presentation.widgets.chat_container.restore_message_item",
+        "johnston.tui.presentation.widgets.chat_container.restore_message_item",
         new_callable=AsyncMock,
     ) as mock_restore:
         # Load session UI (read_only=False)
@@ -320,7 +320,7 @@ async def test_session_persistence_load_ui_read_only_and_pagination():
     app.pm.create_active_agent.side_effect = RuntimeError("agent creation failed")
 
     with patch(
-        "widgets.presentation.widgets.chat_container.restore_message_item",
+        "johnston.tui.presentation.widgets.chat_container.restore_message_item",
         new_callable=AsyncMock,
     ) as mock_restore:
         app.load_session_ui("ro_session", read_only=True)
@@ -364,8 +364,8 @@ async def test_session_persistence_load_ui_recompute_context_tokens_and_call_aft
 
     app.query_one = mock_query
 
-    with patch("widgets.app.session_state.recompute_context_tokens", return_value=42) as mock_recompute:
-        with patch("widgets.presentation.widgets.chat_container.restore_message_item", new_callable=AsyncMock):
+    with patch("johnston.tui.app.session_state.recompute_context_tokens", return_value=42) as mock_recompute:
+        with patch("johnston.tui.presentation.widgets.chat_container.restore_message_item", new_callable=AsyncMock):
             app.load_session_ui("ctx_session")
             assert mock_recompute.called
             assert app.agent.last_context_tokens == 42
@@ -393,7 +393,7 @@ async def test_session_persistence_load_ui_item_restore_error_and_outer_error():
 
     # Item restore raises exception
     with patch(
-        "widgets.presentation.widgets.chat_container.restore_message_item",
+        "johnston.tui.presentation.widgets.chat_container.restore_message_item",
         side_effect=RuntimeError("item error"),
     ):
         app.load_session_ui("err_session")
@@ -638,9 +638,9 @@ def test_lifecycle_on_mount_normal_flow():
     app = DummyLifecycleApp()
     app.current_session_id = "curr_1"
 
-    with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler") as mock_install:
-        with patch("core.domain.policies.models_catalog.catalog.load_cache") as mock_cache:
-            with patch("core.infrastructure.mcp.get_mcp_manager") as mock_mcp:
+    with patch("johnston.tui.mixins.lifecycle.install_asyncio_exception_handler") as mock_install:
+        with patch("johnston.core.domain.policies.models_catalog.catalog.load_cache") as mock_cache:
+            with patch("johnston.core.infrastructure.mcp.get_mcp_manager") as mock_mcp:
                 mcp_mock = MagicMock()
                 mcp_mock.ensure_tools_ready_async.return_value = AsyncMock()()
                 mock_mcp.return_value = mcp_mock
@@ -659,16 +659,16 @@ def test_lifecycle_on_mount_normal_flow():
 
 
 def test_lifecycle_on_mount_resume_session_locked_steal_and_readonly():
-    from widgets.presentation.screens.session_conflict import SessionConflictScreen
+    from johnston.tui.presentation.screens.session_conflict import SessionConflictScreen
 
     app = DummyLifecycleApp()
     app.resume_session_id = "res_1"
     app.sm.is_session_locked.return_value = True
 
     with patch.object(app, "load_session_ui") as mock_load_ui:
-        with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
-            with patch("core.domain.policies.models_catalog.catalog.load_cache"):
-                with patch("core.infrastructure.mcp.get_mcp_manager"):
+        with patch("johnston.tui.mixins.lifecycle.install_asyncio_exception_handler"):
+            with patch("johnston.core.domain.policies.models_catalog.catalog.load_cache"):
+                with patch("johnston.core.infrastructure.mcp.get_mcp_manager"):
                     # Custom push_screen to capture callback
                     callbacks = []
                     app.push_screen = lambda s, callback=None: callbacks.append((s, callback))
@@ -703,10 +703,10 @@ def test_lifecycle_on_mount_resume_session_empty_picker():
     app.resume_session_id = ""
     app.current_session_id = "curr_1"
 
-    with patch("widgets.presentation.commands.ResumeCommand.execute") as mock_resume_exec:
-        with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
-            with patch("core.domain.policies.models_catalog.catalog.load_cache"):
-                with patch("core.infrastructure.mcp.get_mcp_manager"):
+    with patch("johnston.tui.presentation.commands.ResumeCommand.execute") as mock_resume_exec:
+        with patch("johnston.tui.mixins.lifecycle.install_asyncio_exception_handler"):
+            with patch("johnston.core.domain.policies.models_catalog.catalog.load_cache"):
+                with patch("johnston.core.infrastructure.mcp.get_mcp_manager"):
                     app.on_mount()
                     app.sm.acquire_session_lock.assert_called_with("curr_1")
                     assert len(app._tracked_tasks) >= 1
@@ -719,9 +719,9 @@ def test_lifecycle_on_mount_resume_session_unlocked():
     app.sm.is_session_locked.return_value = False
 
     with patch.object(app, "load_session_ui") as mock_load_ui:
-        with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
-            with patch("core.domain.policies.models_catalog.catalog.load_cache"):
-                with patch("core.infrastructure.mcp.get_mcp_manager"):
+        with patch("johnston.tui.mixins.lifecycle.install_asyncio_exception_handler"):
+            with patch("johnston.core.domain.policies.models_catalog.catalog.load_cache"):
+                with patch("johnston.core.infrastructure.mcp.get_mcp_manager"):
                     app.on_mount()
                     mock_load_ui.assert_called_once_with("res_2")
 
@@ -746,13 +746,13 @@ async def test_lifecycle_check_initial_setup_variations():
         app.pm.get_active_provider_key.return_value = "anthropic"
         app.pm.is_provider_connected.return_value = False
 
-        with patch("widgets.presentation.commands.ProvidersCommand.execute", new_callable=AsyncMock) as mock_prov_cmd:
+        with patch("johnston.tui.presentation.commands.ProvidersCommand.execute", new_callable=AsyncMock) as mock_prov_cmd:
             await app._check_initial_setup()
             mock_prov_cmd.assert_called_once_with(app)
 
         # App became inactive during check
         app.is_app_active = False
-        with patch("widgets.presentation.commands.ProvidersCommand.execute", new_callable=AsyncMock) as mock_prov_cmd:
+        with patch("johnston.tui.presentation.commands.ProvidersCommand.execute", new_callable=AsyncMock) as mock_prov_cmd:
             await app._check_initial_setup()
             mock_prov_cmd.assert_not_called()
 
@@ -761,13 +761,13 @@ async def test_lifecycle_check_initial_setup_variations():
 
         # 4. Connected but no agent model -> triggers ModelsCommand
         app.agent.model = ""
-        with patch("widgets.presentation.commands.ModelsCommand.execute", new_callable=AsyncMock) as mock_models_cmd:
+        with patch("johnston.tui.presentation.commands.ModelsCommand.execute", new_callable=AsyncMock) as mock_models_cmd:
             await app._check_initial_setup()
             mock_models_cmd.assert_called_once_with(app)
 
         # 5. Connected and has agent model -> does nothing
         app.agent.model = "claude-3-opus"
-        with patch("widgets.presentation.commands.ModelsCommand.execute", new_callable=AsyncMock) as mock_models_cmd:
+        with patch("johnston.tui.presentation.commands.ModelsCommand.execute", new_callable=AsyncMock) as mock_models_cmd:
             await app._check_initial_setup()
             mock_models_cmd.assert_not_called()
 
@@ -782,12 +782,12 @@ def test_lifecycle_on_unmount_full_flow():
     git_task.done.return_value = False
     app.agent.rewind_git_restore_task = git_task
 
-    with patch("widgets.app.theme_manager.theme_manager.remove_listener") as mock_rm_listener:
-        with patch("core.application.session.stream.cancel_running_subagents") as mock_subagents:
+    with patch("johnston.tui.app.theme_manager.theme_manager.remove_listener") as mock_rm_listener:
+        with patch("johnston.core.application.session.stream.cancel_running_subagents") as mock_subagents:
             with patch.object(app, "save_current_session") as mock_save:
-                with patch("core.infrastructure.mcp.get_mcp_manager") as mock_mcp:
-                    with patch("core.domain.policies.models_catalog.catalog.close", new_callable=AsyncMock):
-                        with patch("core.tools.registry.aclose_tools", return_value=AsyncMock()()):
+                with patch("johnston.core.infrastructure.mcp.get_mcp_manager") as mock_mcp:
+                    with patch("johnston.core.domain.policies.models_catalog.catalog.close", new_callable=AsyncMock):
+                        with patch("johnston.core.tools.registry.aclose_tools", return_value=AsyncMock()()):
                             app.on_unmount()
 
                             assert app.is_app_active is False
@@ -913,13 +913,13 @@ async def test_git_metrics_branch_async_flow():
 def test_git_metrics_compute_branch_sync_variants():
     widget = DummyGitWidget()
 
-    with patch("core.application.generation.prompt_builder.get_git_info", return_value="detached HEAD (1234567)"):
+    with patch("johnston.core.application.generation.prompt_builder.get_git_info", return_value="detached HEAD (1234567)"):
         assert widget._compute_branch_sync() == "detached (1234567)"
 
-    with patch("core.application.generation.prompt_builder.get_git_info", return_value="main\n"):
+    with patch("johnston.core.application.generation.prompt_builder.get_git_info", return_value="main\n"):
         assert widget._compute_branch_sync() == "main"
 
-    with patch("core.application.generation.prompt_builder.get_git_info", side_effect=Exception("git error")):
+    with patch("johnston.core.application.generation.prompt_builder.get_git_info", side_effect=Exception("git error")):
         assert widget._compute_branch_sync() == ""
 
 
@@ -1016,7 +1016,7 @@ async def test_session_persistence_edge_cases():
 
     app.query_one = mock_query
 
-    with patch("widgets.presentation.widgets.chat_container.restore_message_item", new_callable=AsyncMock):
+    with patch("johnston.tui.presentation.widgets.chat_container.restore_message_item", new_callable=AsyncMock):
         # agent is None and session has role
         app.agent = None
         app.pm = None
@@ -1051,7 +1051,7 @@ async def test_session_persistence_edge_cases():
     await worker_coro3  # Should not raise
 
     # 5. _get_current_session_data
-    with patch("widgets.app.session_state.collect_session_data", return_value={"test": 123}) as mock_collect:
+    with patch("johnston.tui.app.session_state.collect_session_data", return_value={"test": 123}) as mock_collect:
         data = app._get_current_session_data()
         assert data == {"test": 123}
         mock_collect.assert_called_once_with(app)
@@ -1065,12 +1065,12 @@ def test_lifecycle_on_unmount_sync_and_error_handling():
     # 1. No running event loop fallback
     with patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
         with patch.object(app, "_kill_all_tasks_sync") as mock_kill_sync:
-            with patch("widgets.app.theme_manager.theme_manager.remove_listener", side_effect=RuntimeError("theme err")):
-                with patch("core.application.session.stream.cancel_running_subagents", side_effect=RuntimeError("subagent err")):
+            with patch("johnston.tui.app.theme_manager.theme_manager.remove_listener", side_effect=RuntimeError("theme err")):
+                with patch("johnston.core.application.session.stream.cancel_running_subagents", side_effect=RuntimeError("subagent err")):
                     with patch.object(app, "save_current_session", side_effect=RuntimeError("save err")):
-                        with patch("core.infrastructure.mcp.get_mcp_manager", side_effect=RuntimeError("mcp err")):
-                            with patch("core.domain.policies.models_catalog.catalog.close", new_callable=AsyncMock):
-                                with patch("core.tools.registry.aclose_tools") as mock_aclose:
+                        with patch("johnston.core.infrastructure.mcp.get_mcp_manager", side_effect=RuntimeError("mcp err")):
+                            with patch("johnston.core.domain.policies.models_catalog.catalog.close", new_callable=AsyncMock):
+                                with patch("johnston.core.tools.registry.aclose_tools") as mock_aclose:
                                     mock_aclose.return_value = AsyncMock()()
                                     app.sm.release_all_locks.side_effect = RuntimeError("locks err")
 
@@ -1083,7 +1083,7 @@ def test_lifecycle_on_unmount_tools_close_scheduling_failure():
     app.is_app_active = True
 
     with patch("asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
-        with patch("widgets.mixins.lifecycle._close_tools_sync", side_effect=RuntimeError("close error")) as mock_close:
+        with patch("johnston.tui.mixins.lifecycle._close_tools_sync", side_effect=RuntimeError("close error")) as mock_close:
             app.on_unmount()
             mock_close.assert_called_once()
 

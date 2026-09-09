@@ -13,11 +13,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app import JohnstonApp
-from core.application.generation.ai_generator import GenCanvas, generate_ai_response
-from core.base_provider import BaseAgent
-from core.tools.registry import execute_tool
-from widgets.presentation.widgets.chat_container import ChatView
+from johnston.core.application.generation.ai_generator import GenCanvas, generate_ai_response
+from johnston.core.base_provider import BaseAgent
+from johnston.core.tools.registry import execute_tool
+from johnston.tui.app import JohnstonApp
+from johnston.tui.presentation.widgets.chat_container import ChatView
 
 # Timing-sensitive (event-loop latency) — run serially via ``-m slow``.
 pytestmark = pytest.mark.slow
@@ -132,7 +132,7 @@ class TestToolCallLatency(unittest.IsolatedAsyncioTestCase):
                 notify=MagicMock(),
                 save_session=AsyncMock(),
             )
-            from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
+            from johnston.tui.presentation.widgets.chat_stream_driver import ChatStreamDriver
             canvas.driver = ChatStreamDriver(canvas, on_tool_widget=canvas.register_tool_widget, notify=canvas.notify)
 
             async def _fake_stream(*args, **kwargs):

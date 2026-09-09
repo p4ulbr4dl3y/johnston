@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from textual.app import App, ComposeResult
 
-from widgets.chat_input import ChatInput
-from widgets.presentation.commands import NewCommand, ResumeCommand
-from widgets.presentation.screens.resume import ResumeScreen
-from widgets.presentation.screens.session_conflict import SessionConflictScreen
+from johnston.tui.chat_input import ChatInput
+from johnston.tui.presentation.commands import NewCommand, ResumeCommand
+from johnston.tui.presentation.screens.resume import ResumeScreen
+from johnston.tui.presentation.screens.session_conflict import SessionConflictScreen
 
 
 class ConflictTestApp(App):
@@ -81,7 +81,7 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         chat_view.remove_children = AsyncMock()
         app.query_one.return_value = chat_view
 
-        with patch("widgets.presentation.commands.session_commands.new_session", return_value="new_sess"):
+        with patch("johnston.tui.presentation.commands.session_commands.new_session", return_value="new_sess"):
             cmd = NewCommand()
             await cmd.execute(app)
 
@@ -91,7 +91,7 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(app.current_session_id, "new_sess")
 
     async def test_message_flow_auto_forks_when_read_only(self):
-        from widgets.mixins.message_flow import MessageFlowMixin
+        from johnston.tui.mixins.message_flow import MessageFlowMixin
 
         class TestApp(MessageFlowMixin):
             def __init__(self):
@@ -123,7 +123,7 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
         test_app.trigger_ai_response.assert_called_with("hello from readonly", show_in_ui=True)
 
     async def test_lifecycle_resume_conflict_cancel_starts_new_session(self):
-        from widgets.mixins.lifecycle import LifecycleMixin
+        from johnston.tui.mixins.lifecycle import LifecycleMixin
 
         class TestLifecycleApp(LifecycleMixin):
             def __init__(self):
@@ -152,9 +152,9 @@ class TestSessionConflictScreen(unittest.IsolatedAsyncioTestCase):
                 return coro
 
         app = TestLifecycleApp()
-        with patch("widgets.mixins.lifecycle.install_asyncio_exception_handler"):
-            with patch("core.domain.policies.models_catalog.catalog.load_cache"):
-                with patch("core.infrastructure.mcp.get_mcp_manager"):
+        with patch("johnston.tui.mixins.lifecycle.install_asyncio_exception_handler"):
+            with patch("johnston.core.domain.policies.models_catalog.catalog.load_cache"):
+                with patch("johnston.core.infrastructure.mcp.get_mcp_manager"):
                     app.on_mount()
 
         self.assertIsInstance(app._pushed_screen, SessionConflictScreen)

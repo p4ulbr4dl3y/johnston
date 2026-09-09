@@ -22,10 +22,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 
-from core.tools.ask_user import AskUserTool
-from core.tools.cancel import run_cancellable
-from core.tools.utils import MAX_TOOL_PAYLOAD_BYTES
-from core.tools.web_fetch import WebFetchTool
+from johnston.core.tools.ask_user import AskUserTool
+from johnston.core.tools.cancel import run_cancellable
+from johnston.core.tools.utils import MAX_TOOL_PAYLOAD_BYTES
+from johnston.core.tools.web_fetch import WebFetchTool
 
 
 # --------------------------------------------------------------------------- #

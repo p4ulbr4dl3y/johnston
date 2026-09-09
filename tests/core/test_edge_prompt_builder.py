@@ -1,4 +1,4 @@
-"""Edge-case tests for core.application.generation.prompt_builder.
+"""Edge-case tests for johnston.core.application.generation.prompt_builder.
 
 Goal: find bugs in PromptBuilder / get_git_info / get_project_instructions_snippet /
 get_rules_snippet under empty/None/long/unicode/duplicate/unsorted input, plus
@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from core.application.generation.prompt_builder import (
+from johnston.core.application.generation.prompt_builder import (
     PromptBuilder,
     get_git_info,
     get_git_info_async,
@@ -20,9 +20,9 @@ from core.application.generation.prompt_builder import (
 @pytest.fixture(autouse=True)
 def _no_git_subprocess(monkeypatch):
     # Keep git formatting deterministic/fast in edge tests.
-    monkeypatch.setattr("core.application.generation.prompt_builder._compute_git_info", lambda cwd=None: "")
+    monkeypatch.setattr("johnston.core.application.generation.prompt_builder._compute_git_info", lambda cwd=None: "")
     monkeypatch.setattr(
-        "core.infrastructure.runtime.git_utils.format_git_branch_info", lambda cwd=None: ""
+        "johnston.core.infrastructure.runtime.git_utils.format_git_branch_info", lambda cwd=None: ""
     )
 
 
@@ -244,7 +244,7 @@ def test_build_tools_partitioned_mcp_after_builtins(monkeypatch):
                 {"type": "function", "function": {"name": "alpha_mcp"}},
             ]
 
-    monkeypatch.setattr("core.infrastructure.mcp.get_mcp_manager", lambda: FakeMcpManager())
+    monkeypatch.setattr("johnston.core.infrastructure.mcp.get_mcp_manager", lambda: FakeMcpManager())
     base = [{"function": {"name": "write"}}, {"function": {"name": "bash"}}]
     b = PromptBuilder("p", base, role="worker", allow_task=False)
     names = [t["function"]["name"] for t in b.build_tools()]
@@ -261,7 +261,7 @@ def test_build_tools_mcp_name_conflict_builtin_wins(monkeypatch):
                 {"type": "function", "function": {"name": "mcp_extra"}},
             ]
 
-    monkeypatch.setattr("core.infrastructure.mcp.get_mcp_manager", lambda: FakeMcpManager())
+    monkeypatch.setattr("johnston.core.infrastructure.mcp.get_mcp_manager", lambda: FakeMcpManager())
     base = [{"function": {"name": "bash", "description": "builtin"}}]
     b = PromptBuilder("p", base, role="worker", allow_task=False)
     tools = b.build_tools()
@@ -361,7 +361,7 @@ def test_project_snippet_no_side_effect_on_cwd(tmp_path):
 
 def test_project_snippet_cached_until_mtime_change(tmp_path):
     """Re-reading unchanged files must hit the cache; editing invalidates it."""
-    import core.application.generation.prompt_builder as pb
+    import johnston.core.application.generation.prompt_builder as pb
 
     (tmp_path / "AGENTS.md").write_text("v1")
     key = os.path.realpath(str(tmp_path))
@@ -382,7 +382,7 @@ def test_project_snippet_cached_until_mtime_change(tmp_path):
 
 def test_project_instruction_cache_eviction(tmp_path, monkeypatch):
     """Exceeding cache max size must evict oldest entries without raising error."""
-    import core.application.generation.prompt_builder as pb
+    import johnston.core.application.generation.prompt_builder as pb
 
     monkeypatch.setattr(pb, "_PROJECT_INSTR_CACHE_MAX", 2)
     pb._PROJECT_INSTRUCTION_CACHE.maxsize = 2
@@ -416,8 +416,8 @@ def test_git_info_cached_short_circuits(monkeypatch):
         calls.append(cwd)
         return "branch 'main'"
 
-    monkeypatch.setattr("core.application.generation.prompt_builder._compute_git_info", fake_compute)
-    monkeypatch.setattr("core.application.generation.prompt_builder._GIT_INFO_CACHE", {})
+    monkeypatch.setattr("johnston.core.application.generation.prompt_builder._compute_git_info", fake_compute)
+    monkeypatch.setattr("johnston.core.application.generation.prompt_builder._GIT_INFO_CACHE", {})
     a = get_git_info()
     b = get_git_info()
     assert a == b == "branch 'main'"
@@ -434,8 +434,8 @@ async def test_git_info_async_cached(monkeypatch):
 
     # Patch the sync compute fn used inside get_git_info_async via to_thread;
     # count calls to prove the cache short-circuits the second call.
-    monkeypatch.setattr("core.application.generation.prompt_builder._compute_git_info", fake_compute)
-    monkeypatch.setattr("core.application.generation.prompt_builder._GIT_INFO_CACHE", {})
+    monkeypatch.setattr("johnston.core.application.generation.prompt_builder._compute_git_info", fake_compute)
+    monkeypatch.setattr("johnston.core.application.generation.prompt_builder._GIT_INFO_CACHE", {})
     a = await get_git_info_async()
     b = await get_git_info_async()
     assert a == b == "branch 'dev'"

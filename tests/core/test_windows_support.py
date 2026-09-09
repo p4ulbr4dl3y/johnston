@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from PIL import Image
 
-from core.infrastructure.platform.platform_utils import (
+from johnston.core.infrastructure.platform.platform_utils import (
     get_clipboard_image_or_file,
     is_image_file,
     is_windows,
@@ -23,11 +23,11 @@ from core.infrastructure.platform.platform_utils import (
 
 class TestPlatformUtils(unittest.TestCase):
     def test_is_windows_real_posix(self):
-        with patch("core.infrastructure.platform.platform_utils.os.name", "posix"):
+        with patch("johnston.core.infrastructure.platform.platform_utils.os.name", "posix"):
             self.assertFalse(is_windows())
 
     def test_is_windows_real_nt(self):
-        with patch("core.infrastructure.platform.platform_utils.os.name", "nt"):
+        with patch("johnston.core.infrastructure.platform.platform_utils.os.name", "nt"):
             self.assertTrue(is_windows())
 
     def test_config_dir_env_override(self):
@@ -36,23 +36,23 @@ class TestPlatformUtils(unittest.TestCase):
 
     def test_windows_config_dir_defaults_to_home_dot_johnston(self):
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True),
             patch.dict(os.environ, {"JOHNSTON_CONFIG_DIR": ""}),
         ):
             self.assertEqual(johnston_config_dir(), Path.home() / ".johnston")
 
     def test_non_windows_config_dir(self):
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch.dict(os.environ, {"JOHNSTON_CONFIG_DIR": ""}),
         ):
             self.assertEqual(johnston_config_dir(), Path.home() / ".johnston")
 
     def test_shell_executable_windows_finds_first_candidate(self):
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True),
             patch(
-                "core.infrastructure.platform.platform_utils.shutil.which",
+                "johnston.core.infrastructure.platform.platform_utils.shutil.which",
                 side_effect=lambda name: rf"C:\tools\{name}.exe",
             ),
         ):
@@ -63,57 +63,57 @@ class TestPlatformUtils(unittest.TestCase):
             return "/usr/bin/powershell" if name == "powershell" else None
 
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
-            patch("core.infrastructure.platform.platform_utils.shutil.which", side_effect=fake_which),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.shutil.which", side_effect=fake_which),
         ):
             self.assertEqual(shell_executable(), "/usr/bin/powershell")
 
     def test_shell_executable_windows_none_found(self):
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
-            patch("core.infrastructure.platform.platform_utils.shutil.which", return_value=None),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.shutil.which", return_value=None),
         ):
             self.assertIsNone(shell_executable())
 
     def test_shell_executable_unix_uses_shell_env(self):
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch.dict(os.environ, {"SHELL": "/bin/zsh"}),
         ):
             self.assertEqual(shell_executable(), "/bin/zsh")
 
     def test_shell_executable_unix_falls_back_to_which(self):
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch.dict(os.environ, {"SHELL": ""}),
-            patch("core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/sh"),
+            patch("johnston.core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/sh"),
         ):
             self.assertEqual(shell_executable(), "/usr/bin/sh")
 
     def test_shell_executable_unix_hardcoded_sh(self):
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch.dict(os.environ, {"SHELL": ""}),
-            patch("core.infrastructure.platform.platform_utils.shutil.which", return_value=None),
+            patch("johnston.core.infrastructure.platform.platform_utils.shutil.which", return_value=None),
         ):
             self.assertEqual(shell_executable(), "/bin/sh")
 
     def test_shell_subprocess_kwargs_windows_creationflags(self):
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
-            patch("core.infrastructure.platform.platform_utils.subprocess.CREATE_NEW_PROCESS_GROUP", 0x100, create=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.CREATE_NEW_PROCESS_GROUP", 0x100, create=True),
         ):
             self.assertEqual(shell_subprocess_kwargs(), {"creationflags": 0x100})
 
     def test_shell_subprocess_kwargs_windows_no_flag(self):
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
-            patch("core.infrastructure.platform.platform_utils.subprocess.CREATE_NEW_PROCESS_GROUP", 0, create=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.CREATE_NEW_PROCESS_GROUP", 0, create=True),
         ):
             self.assertEqual(shell_subprocess_kwargs(), {})
 
     def test_shell_subprocess_kwargs_unix(self):
-        with patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False):
+        with patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False):
             self.assertEqual(shell_subprocess_kwargs(), {"start_new_session": True})
 
     def test_shell_env_contains_noninteractive_variables(self):
@@ -156,7 +156,7 @@ class TestClipboardRetrieval(unittest.TestCase):
         with (
             patch("PIL.ImageGrab.grabclipboard", return_value="/tmp/shot.png"),
             patch("os.path.exists", return_value=True),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertEqual(file_path, "/tmp/shot.png")
@@ -165,7 +165,7 @@ class TestClipboardRetrieval(unittest.TestCase):
     def test_get_clipboard_pil_raises(self):
         with (
             patch("PIL.ImageGrab.grabclipboard", side_effect=RuntimeError("no clipboard")),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertIsNone(file_path)
@@ -174,7 +174,7 @@ class TestClipboardRetrieval(unittest.TestCase):
     def test_get_clipboard_empty_returns_none(self):
         with (
             patch("PIL.ImageGrab.grabclipboard", return_value=None),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertIsNone(file_path)
@@ -184,10 +184,10 @@ class TestClipboardRetrieval(unittest.TestCase):
         tmp_dir = tempfile.mkdtemp()
         res = subprocess.CompletedProcess([], 0, stdout="FILE:/tmp/clip.png\n")
         with (
-            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-            patch("core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
-            patch("core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
+            patch("johnston.core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertEqual(file_path, "/tmp/clip.png")
@@ -199,11 +199,11 @@ class TestClipboardRetrieval(unittest.TestCase):
         Image.new("RGB", (4, 4), "red").save(clip_file, format="PNG")
         res = subprocess.CompletedProcess([], 0, stdout="DATA\n")
         with (
-            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
+            patch("johnston.core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
             patch("os.getpid", return_value=12345),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-            patch("core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
-            patch("core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertIsNone(file_path)
@@ -216,11 +216,11 @@ class TestClipboardRetrieval(unittest.TestCase):
         Image.new("RGB", (2, 2)).save(clip_file, format="PNG")
         res = subprocess.CompletedProcess([], 0, stdout="DATA\n")
         with (
-            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
+            patch("johnston.core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
             patch("os.getpid", return_value=999),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-            patch("core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
-            patch("core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
             patch("os.remove", side_effect=OSError("locked")),
         ):
             file_path, img = get_clipboard_image_or_file()
@@ -230,10 +230,10 @@ class TestClipboardRetrieval(unittest.TestCase):
     def test_get_clipboard_macos_jxa_raises(self):
         tmp_dir = tempfile.mkdtemp()
         with (
-            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-            patch("core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
-            patch("core.infrastructure.platform.platform_utils.subprocess.run", side_effect=OSError("osascript failed")),
+            patch("johnston.core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.shutil.which", return_value="/usr/bin/osascript"),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.run", side_effect=OSError("osascript failed")),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertIsNone(file_path)
@@ -243,13 +243,13 @@ class TestClipboardRetrieval(unittest.TestCase):
         tmp_dir = tempfile.mkdtemp()
         res = subprocess.CompletedProcess([], 0, stdout="")
         with (
-            patch("core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.paths.TEMP_IMAGES_DIR", tmp_dir),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch(
-                "core.infrastructure.platform.platform_utils.shutil.which",
+                "johnston.core.infrastructure.platform.platform_utils.shutil.which",
                 side_effect=lambda name: "/usr/bin/osascript" if name == "osascript" else None,
             ),
-            patch("core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertIsNone(file_path)
@@ -260,12 +260,12 @@ class TestClipboardRetrieval(unittest.TestCase):
         res = subprocess.CompletedProcess([], 0, stdout=b"png-bytes")
         with (
             patch("PIL.Image.open", return_value=mock_img),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch(
-                "core.infrastructure.platform.platform_utils.shutil.which",
+                "johnston.core.infrastructure.platform.platform_utils.shutil.which",
                 side_effect=lambda name: "/usr/bin/wl-paste" if name == "wl-paste" else None,
             ),
-            patch("core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertIsNone(file_path)
@@ -274,12 +274,12 @@ class TestClipboardRetrieval(unittest.TestCase):
     def test_get_clipboard_linux_wl_paste_no_output(self):
         res = subprocess.CompletedProcess([], 1, stdout=b"")
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch(
-                "core.infrastructure.platform.platform_utils.shutil.which",
+                "johnston.core.infrastructure.platform.platform_utils.shutil.which",
                 side_effect=lambda name: "/usr/bin/wl-paste" if name == "wl-paste" else None,
             ),
-            patch("core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertIsNone(file_path)
@@ -290,12 +290,12 @@ class TestClipboardRetrieval(unittest.TestCase):
         res = subprocess.CompletedProcess([], 0, stdout=b"png-bytes")
         with (
             patch("PIL.Image.open", return_value=mock_img),
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
             patch(
-                "core.infrastructure.platform.platform_utils.shutil.which",
+                "johnston.core.infrastructure.platform.platform_utils.shutil.which",
                 side_effect=lambda name: "/usr/bin/xclip" if name == "xclip" else None,
             ),
-            patch("core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
+            patch("johnston.core.infrastructure.platform.platform_utils.subprocess.run", return_value=res),
         ):
             file_path, img = get_clipboard_image_or_file()
             self.assertIsNone(file_path)
@@ -311,8 +311,8 @@ class TestTerminateProcess(unittest.TestCase):
         process.pid = 4242
         process.wait = AsyncMock()
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-            patch("core.infrastructure.platform.platform_utils.os.killpg", create=True) as killpg,
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.os.killpg", create=True) as killpg,
         ):
             asyncio.run(terminate_process(process, timeout=0.5))
         killpg.assert_called_once_with(4242, signal.SIGTERM)
@@ -322,7 +322,7 @@ class TestTerminateProcess(unittest.TestCase):
         process = MagicMock()
         process.pid = None
         process.wait = AsyncMock()
-        with patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False):
+        with patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False):
             asyncio.run(terminate_process(process, timeout=0.5))
         process.terminate.assert_called_once()
 
@@ -331,8 +331,8 @@ class TestTerminateProcess(unittest.TestCase):
         process.pid = 7
         process.wait = AsyncMock()
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-            patch("core.infrastructure.platform.platform_utils.os.killpg", create=True, side_effect=OSError("no such process")),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.os.killpg", create=True, side_effect=OSError("no such process")),
         ):
             asyncio.run(terminate_process(process, timeout=0.5))
         process.terminate.assert_called_once()
@@ -340,7 +340,7 @@ class TestTerminateProcess(unittest.TestCase):
     def test_terminate_process_windows(self):
         process = MagicMock()
         process.wait = AsyncMock()
-        with patch("core.infrastructure.platform.platform_utils.is_windows", return_value=True):
+        with patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=True):
             asyncio.run(terminate_process(process, timeout=0.5))
         process.terminate.assert_called_once()
 
@@ -349,8 +349,8 @@ class TestTerminateProcess(unittest.TestCase):
         process.pid = 1
         process.wait = AsyncMock(side_effect=asyncio.TimeoutError)
         with (
-            patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False),
-            patch("core.infrastructure.platform.platform_utils.os.killpg", create=True),
+            patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False),
+            patch("johnston.core.infrastructure.platform.platform_utils.os.killpg", create=True),
         ):
             asyncio.run(terminate_process(process, timeout=0.5))
         process.kill.assert_called_once()
@@ -359,6 +359,6 @@ class TestTerminateProcess(unittest.TestCase):
         process = MagicMock()
         process.wait = AsyncMock(side_effect=RuntimeError("wait failed"))
         process.kill.side_effect = OSError("kill failed")
-        with patch("core.infrastructure.platform.platform_utils.is_windows", return_value=False):
+        with patch("johnston.core.infrastructure.platform.platform_utils.is_windows", return_value=False):
             asyncio.run(terminate_process(process, timeout=0.5))
         process.kill.assert_called_once()

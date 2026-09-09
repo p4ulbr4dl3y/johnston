@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from textual.app import App
 
-from widgets.presentation.screens.subagent_screen import SubagentViewScreen
+from johnston.tui.presentation.screens.subagent_screen import SubagentViewScreen
 
 
 class _SubHostApp(App[None]):
@@ -206,14 +206,14 @@ class TestSubagentOnMount(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
-        from core.infrastructure.storage.session_store import SessionStore
+        from johnston.core.infrastructure.storage.session_store import SessionStore
 
         self.store = SessionStore(project_path=self.temp_dir.name)
         self._old_instance = SessionStore._instance
         SessionStore._instance = self.store
 
     def tearDown(self):
-        from core.infrastructure.storage.session_store import SessionStore
+        from johnston.core.infrastructure.storage.session_store import SessionStore
 
         SessionStore._instance = self._old_instance
 

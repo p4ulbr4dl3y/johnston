@@ -8,10 +8,7 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
-from core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
-from core.infrastructure.config.settings import JohnstonSettings, load_settings, save_settings
-from core.infrastructure.platform import paths
-from core.interfaces.cli.commands.config_cmd import (
+from johnston.cli.commands.config_cmd import (
     get_config,
     list_config,
     resolve_key,
@@ -19,14 +16,17 @@ from core.interfaces.cli.commands.config_cmd import (
     set_config,
     unset_config,
 )
-from core.interfaces.cli.entrypoint import main
-from core.interfaces.cli.formatter import (
+from johnston.cli.entrypoint import main
+from johnston.cli.formatter import (
     format_key_status,
     format_kv,
     format_status,
     format_table,
     supports_color,
 )
+from johnston.core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
+from johnston.core.infrastructure.config.settings import JohnstonSettings, load_settings, save_settings
+from johnston.core.infrastructure.platform import paths
 
 
 class TestCLIFormatter(unittest.TestCase):

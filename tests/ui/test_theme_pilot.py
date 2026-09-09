@@ -3,10 +3,10 @@
 import pytest
 from textual.widgets import Input
 
-from widgets.app.app import JohnstonApp
-from widgets.app.theme_manager import theme_manager
-from widgets.chat_input import ChatInput
-from widgets.presentation.screens.theme import ThemeScreen
+from johnston.tui.app.app import JohnstonApp
+from johnston.tui.app.theme_manager import theme_manager
+from johnston.tui.chat_input import ChatInput
+from johnston.tui.presentation.screens.theme import ThemeScreen
 
 
 @pytest.mark.asyncio

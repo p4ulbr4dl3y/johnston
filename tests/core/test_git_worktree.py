@@ -7,8 +7,8 @@ import unittest
 
 import pytest
 
-from core.application.generation.prompt_builder import PromptBuilder
-from core.infrastructure.runtime.git_worktree import GitWorktreeManager
+from johnston.core.application.generation.prompt_builder import PromptBuilder
+from johnston.core.infrastructure.runtime.git_worktree import GitWorktreeManager
 
 
 class TestGitWorktreeManager(unittest.TestCase):

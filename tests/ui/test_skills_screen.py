@@ -6,8 +6,8 @@ from textual.events import Key
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from core.application.skills.manager import Skill, SkillManager, SkillScope
-from widgets.presentation.screens.skills import SkillsScreen
+from johnston.core.application.skills.manager import Skill, SkillManager, SkillScope
+from johnston.tui.presentation.screens.skills import SkillsScreen
 
 
 class DummyHostApp(App[None]):

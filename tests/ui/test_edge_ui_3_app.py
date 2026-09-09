@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from app import JohnstonApp
+from johnston.tui.app import JohnstonApp
 
 
 class TestAppBootEdge(unittest.TestCase):
@@ -11,7 +11,7 @@ class TestAppBootEdge(unittest.TestCase):
         self.assertTrue(app.current_session_id)
 
     def test_init_no_agent_tolerated(self):
-        with patch("core.application.provider.provider_manager.ProviderManager.create_active_agent", return_value=None):
+        with patch("johnston.core.application.provider.provider_manager.ProviderManager.create_active_agent", return_value=None):
             app = JohnstonApp()
             self.assertIsNone(app.agent)
             self.assertEqual(app.role, "worker")
@@ -21,9 +21,9 @@ class TestAppBootEdge(unittest.TestCase):
         app = JohnstonApp()
         with (
             patch.object(app.task_manager, "kill_all", side_effect=RuntimeError("bg")),
-            patch("core.application.session.stream.cancel_running_subagents", side_effect=RuntimeError("sub")),
-            patch("app.JohnstonApp.save_current_session", side_effect=RuntimeError("save")),
-            patch("core.infrastructure.mcp.get_mcp_manager", side_effect=RuntimeError("mcp")),
+            patch("johnston.core.application.session.stream.cancel_running_subagents", side_effect=RuntimeError("sub")),
+            patch("johnston.tui.app.JohnstonApp.save_current_session", side_effect=RuntimeError("save")),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", side_effect=RuntimeError("mcp")),
         ):
             # Must not raise
             app.on_unmount()
@@ -39,7 +39,7 @@ class TestAppInitResume(unittest.IsolatedAsyncioTestCase):
 
         resumed = JohnstonApp(resume_session_id="sess_edge_r")
         async with resumed.run_test():
-            from widgets.presentation.widgets.chat_container import ChatView
+            from johnston.tui.presentation.widgets.chat_container import ChatView
 
             chat_view = resumed.query_one(ChatView)
             user_msgs = chat_view.get_user_messages()

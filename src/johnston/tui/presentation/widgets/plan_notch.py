@@ -1,0 +1,277 @@
+"""Top Dynamic Island / Plan Notch widget."""
+from __future__ import annotations
+
+from typing import TypedDict
+
+from rich.markup import escape
+from rich.text import Text
+from textual.app import ComposeResult
+from textual.containers import Container
+from textual.widgets import Static
+
+from johnston.core.application.session.actions import restore_plan_from_messages
+from johnston.tui.presentation.widgets.footer_layout import format_hint, get_theme_colors
+from johnston.tui.utils.row_format import display_width, ellipsize
+
+
+class PlanItem(TypedDict, total=False):
+    step: str
+    status: str
+
+
+extract_active_plan_from_messages = restore_plan_from_messages
+
+
+class PlanActionsMixin:
+    """Shared plan notch actions and update handlers for screens and JohnstonApp."""
+
+    def action_toggle_plan(self) -> None:
+        """Toggle expansion of the top plan notch widget."""
+        try:
+            notches = list(self.query(PlanNotch))
+            if not notches and hasattr(self, "screen") and self.screen:
+                notches = list(self.screen.query(PlanNotch))
+            if not notches:
+                return
+            notch = notches[0]
+            if not notch.plan_items:
+                if hasattr(self, "notify"):
+                    self.notify("No active plan", severity="information")
+                return
+            notch.toggle_expanded()
+        except Exception:
+            pass
+
+    def action_toggle_plan_hidden(self) -> None:
+        """Toggle visibility/hidden state of the top plan notch widget."""
+        try:
+            notches = list(self.query(PlanNotch))
+            if not notches and hasattr(self, "screen") and self.screen:
+                notches = list(self.screen.query(PlanNotch))
+            if notches:
+                notches[0].toggle_hidden()
+        except Exception:
+            pass
+
+    def on_plan_update(self, plan: list[dict], explanation: str = "") -> None:
+        """Handle plan update event from update_plan tool."""
+        validated_plan = [p for p in plan if isinstance(p, dict)] if isinstance(plan, list) else []
+        self.current_plan = validated_plan
+        self.current_plan_explanation = str(explanation or "").strip()
+        try:
+            notches = list(self.query(PlanNotch))
+            if not notches and hasattr(self, "screen") and self.screen:
+                notches = list(self.screen.query(PlanNotch))
+            for notch in notches:
+                notch.set_plan(validated_plan, str(explanation or "").strip())
+        except Exception:
+            pass
+
+
+class PlanNotch(Static):
+    """Dynamic island / plan notch pinned at the top center."""
+
+    can_focus = False
+    ALLOW_SELECT = False
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.is_expanded: bool = False
+        self.plan_explanation: str = ""
+        self.plan_items: list[PlanItem] = []
+        self.display = False
+
+    def on_mount(self) -> None:
+        self.display = bool(self.plan_items)
+        self.refresh_notch()
+
+    def set_plan(self, plan_items: list[PlanItem] | list[dict], explanation: str = "") -> None:
+        """Update active plan checklist and refresh notch display."""
+        if not isinstance(plan_items, list):
+            plan_items = []
+        self.plan_items = [item for item in plan_items if isinstance(item, dict)]
+        self.plan_explanation = str(explanation or "").strip()
+        self.display = bool(self.plan_items)
+        self.refresh_notch()
+
+    def clear_plan(self) -> None:
+        """Clear active plan and hide notch."""
+        self.plan_items = []
+        self.plan_explanation = ""
+        self.is_expanded = False
+        self.remove_class("expanded")
+        self.display = False
+        self.refresh_notch()
+
+    def on_click(self) -> None:
+        self.toggle_expanded()
+
+    def toggle_hidden(self) -> None:
+        """Toggle complete visibility of the plan notch."""
+        if not self.plan_items:
+            self.display = False
+            return
+        self.display = not self.display
+        self.refresh_notch()
+
+    def toggle_expanded(self) -> None:
+        if not self.plan_items:
+            self.display = False
+            self.is_expanded = False
+            self.remove_class("expanded")
+            self.refresh_notch()
+            return
+        if not self.display:
+            self.display = True
+            self.is_expanded = True
+            self.add_class("expanded")
+            self.refresh_notch()
+            return
+        self.is_expanded = not self.is_expanded
+        if self.is_expanded:
+            self.add_class("expanded")
+        else:
+            self.remove_class("expanded")
+        self.refresh_notch()
+
+    def _render_collapsed(self) -> Text:
+        t_primary, t_secondary, _, _ = get_theme_colors()
+
+        total = len(self.plan_items)
+        target_width = 64
+        badge = format_hint("ctrl+p Plan • ctrl+h Hide")
+        badge_plain = "ctrl+p Plan • ctrl+h Hide"
+
+        if total == 0:
+            no_plan = "No active plan"
+            pad = max(2, target_width - display_width(no_plan) - display_width(badge_plain))
+            txt = Text.from_markup(f"[{t_secondary}]{no_plan}[/]{' ' * pad}{badge}")
+            txt.no_wrap = True
+            return txt
+
+        done = sum(1 for item in self.plan_items if item.get("status") == "completed")
+        active_item = next((item for item in self.plan_items if item.get("status") == "in_progress"), None)
+        if not active_item:
+            active_item = next((item for item in self.plan_items if item.get("status") == "pending"), None)
+
+        if active_item:
+            active_step = active_item.get("step", "")
+        elif done == total:
+            active_step = "All tasks completed"
+        else:
+            active_step = ""
+
+        prefix = f"{done}/{total} "
+        prefix_len = display_width(prefix)
+        max_step = max(8, target_width - prefix_len - display_width(badge_plain) - 2)
+        raw_step = ellipsize(active_step, max_step)
+        step_display = escape(raw_step)
+        left_len = prefix_len + display_width(raw_step)
+        pad = max(2, target_width - left_len - display_width(badge_plain))
+
+        txt = Text.from_markup(
+            f"[bold {t_primary}]{done}/{total}[/] [{t_secondary}]{step_display}[/]{' ' * pad}{badge}"
+        )
+        txt.no_wrap = True
+        return txt
+
+    def _render_expanded(self) -> Text:
+        t_primary, t_secondary, t_muted, _ = get_theme_colors()
+
+        total = len(self.plan_items)
+        done = sum(1 for item in self.plan_items if item.get("status") == "completed")
+
+        target_width = 64
+        header_title = f"Plan ({done}/{total})" if total > 0 else "Plan"
+        badge = format_hint("ctrl+p Close • ctrl+h Hide")
+        badge_plain = "ctrl+p Close • ctrl+h Hide"
+        pad = max(2, target_width - display_width(header_title) - display_width(badge_plain))
+
+        t = Text()
+        t.no_wrap = True
+        # 1. Header row
+        t.append_text(Text.from_markup(f"[bold {t_primary}]{header_title}[/]{' ' * pad}{badge}\n"))
+
+        # 2. Optional explanation
+        if self.plan_explanation:
+            expl = escape(ellipsize(self.plan_explanation, target_width))
+            t.append_text(Text.from_markup(f"[{t_muted}][italic]{expl}[/italic][/]\n"))
+
+        t.append("\n")
+
+        # 3. Checklist items (sliding window if total > 6)
+        if total == 0:
+            t.append_text(Text.from_markup(f"[{t_muted}]No tasks in plan[/]"))
+            return t
+
+        max_visible = 6
+        if total <= max_visible:
+            start_idx, end_idx = 0, total
+            hidden_before, hidden_after = 0, 0
+        else:
+            active_idx = -1
+            for i, it in enumerate(self.plan_items):
+                if it.get("status") == "in_progress":
+                    active_idx = i
+                    break
+            if active_idx == -1:
+                for i, it in enumerate(self.plan_items):
+                    if it.get("status") == "pending":
+                        active_idx = i
+                        break
+            if active_idx == -1:
+                active_idx = total - 1
+
+            half = max_visible // 2
+            start_idx = max(0, active_idx - half)
+            end_idx = start_idx + max_visible
+            if end_idx > total:
+                end_idx = total
+                start_idx = max(0, end_idx - max_visible)
+            hidden_before = start_idx
+            hidden_after = total - end_idx
+
+        item_lines: list[str] = []
+        if hidden_before > 0:
+            item_lines.append(f"[{t_muted}]... ({hidden_before} earlier steps)[/]")
+
+        for item in self.plan_items[start_idx:end_idx]:
+            step = item.get("step", "")
+            status = item.get("status", "pending")
+            step_clean = escape(ellipsize(step, target_width - 4))
+
+            if status == "completed":
+                item_lines.append(f"[{t_muted}][✓][/] [{t_muted}][strike]{step_clean}[/strike][/]")
+            elif status == "in_progress":
+                item_lines.append(f"[bold {t_primary}][▶][/] [bold {t_primary}]{step_clean}[/]")
+            else:
+                item_lines.append(f"[{t_muted}][ ][/] [{t_secondary}]{step_clean}[/]")
+
+        if hidden_after > 0:
+            item_lines.append(f"[{t_muted}]... ({hidden_after} remaining steps)[/]")
+
+        if item_lines:
+            t.append_text(Text.from_markup("\n".join(item_lines)))
+
+        return t
+
+    def refresh_notch(self) -> None:
+        try:
+            if self.is_expanded:
+                content = self._render_expanded()
+            else:
+                content = self._render_collapsed()
+            self.update(content)
+        except Exception:
+            pass
+
+
+class PlanNotchContainer(Container):
+    """Overlay container that anchors the floating plan notch at the top center."""
+
+    can_focus = False
+    ALLOW_SELECT = False
+
+    def compose(self) -> ComposeResult:
+        yield PlanNotch(id="plan-notch")
+

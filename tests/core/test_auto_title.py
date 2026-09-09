@@ -5,13 +5,13 @@ import asyncio
 import unittest
 from unittest.mock import MagicMock, patch
 
-from core.application.session.auto_title import (
+from johnston.core.application.session.auto_title import (
     auto_title_session,
     clean_heuristic_title,
     extract_first_user_text,
     sanitize_title_candidate,
 )
-from core.domain.entities.session import AgentSession
+from johnston.core.domain.entities.session import AgentSession
 
 
 class TestAutoTitleHelpers(unittest.TestCase):
@@ -51,7 +51,7 @@ class TestAutoTitleHelpers(unittest.TestCase):
         )
 
     def test_parse_session_title_multi_tier(self):
-        from core.application.session.auto_title import parse_session_title
+        from johnston.core.application.session.auto_title import parse_session_title
 
         # Tier 1: Strict JSON
         self.assertEqual(
@@ -82,7 +82,7 @@ class TestAutoTitleHelpers(unittest.TestCase):
         self.assertEqual(parse_session_title("   "), "")
 
     def test_extract_first_json_object(self):
-        from core.application.session.auto_title import extract_first_json_object
+        from johnston.core.application.session.auto_title import extract_first_json_object
 
         self.assertEqual(extract_first_json_object('{"title": "test"}'), '{"title": "test"}')
         self.assertEqual(
@@ -92,7 +92,7 @@ class TestAutoTitleHelpers(unittest.TestCase):
         self.assertIsNone(extract_first_json_object("No json object here"))
 
     def test_extract_title_from_thought(self):
-        from core.application.session.auto_title import extract_title_from_thought
+        from johnston.core.application.session.auto_title import extract_title_from_thought
 
         thought = 'User wants title for "docker container crash". Title should be: "Docker container crash investigation".'
         self.assertEqual(extract_title_from_thought(thought), "Docker container crash investigation")
@@ -136,7 +136,7 @@ class TestAutoTitleHelpers(unittest.TestCase):
 
 class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.settings_patcher = patch("core.application.session.auto_title.get_settings")
+        self.settings_patcher = patch("johnston.core.application.session.auto_title.get_settings")
         self.mock_settings = self.settings_patcher.start()
         self.mock_settings.return_value.llm.auto_title = True
         self.mock_settings.return_value.llm.auto_title_timeout = 8.0
@@ -185,7 +185,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
 
-        with patch("core.adapters.get_adapter", return_value=mock_adapter):
+        with patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Optimize SQL Query Indexes")
@@ -211,7 +211,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
 
-        with patch("core.adapters.get_adapter", return_value=mock_adapter):
+        with patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Redis cache in FastAPI")
@@ -240,7 +240,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
 
-        with patch("core.adapters.get_adapter", return_value=mock_adapter):
+        with patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Pytest Configuration Setup")
@@ -272,8 +272,8 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = MagicMock(side_effect=fake_stream)
 
-        with patch("core.application.provider.provider_manager.ProviderManager.create_agent_for_provider", return_value=provider_agent), \
-             patch("core.adapters.get_adapter", return_value=mock_adapter):
+        with patch("johnston.core.application.provider.provider_manager.ProviderManager.create_agent_for_provider", return_value=provider_agent), \
+             patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(active_agent, sess)
 
         self.assertEqual(res, "Anthropic Prompt Caching")
@@ -287,7 +287,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
         mock_agent.api_type = "openai"
         mock_agent.model = "gpt-4o"
 
-        with patch("core.adapters.get_adapter", side_effect=RuntimeError("API error")):
+        with patch("johnston.core.adapters.get_adapter", side_effect=RuntimeError("API error")):
             res = await auto_title_session(mock_agent, sess)
 
         self.assertEqual(res, "Deploy to production Kubernetes cluster")
@@ -322,7 +322,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
         mock_adapter.stream_chat = dummy_stream
 
-        with patch("core.adapters.get_adapter", return_value=mock_adapter):
+        with patch("johnston.core.adapters.get_adapter", return_value=mock_adapter):
             res = await auto_title_session(mock_agent, sess)
 
         # The fork marker survives auto-titling so lineage stays visible.
@@ -344,7 +344,7 @@ class TestAutoTitleSessionAsync(unittest.IsolatedAsyncioTestCase):
 
 class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
     async def test_schedule_auto_title_invokes_and_saves(self):
-        from widgets.mixins.message_flow import MessageFlowMixin
+        from johnston.tui.mixins.message_flow import MessageFlowMixin
 
         class DummyApp(MessageFlowMixin):
             def __init__(self):
@@ -361,7 +361,7 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
         sess = AgentSession("s-test")
         sess.messages = [{"type": "user", "text": "Test auto titling integration"}]
 
-        with patch("core.application.session.auto_title.get_settings") as mock_settings:
+        with patch("johnston.core.application.session.auto_title.get_settings") as mock_settings:
             mock_settings.return_value.llm.auto_title = True
             mock_settings.return_value.llm.auto_title_timeout = 8.0
             mock_settings.return_value.llm.auto_title_max_len = 45
@@ -375,7 +375,7 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(app.footer_refreshed)
 
     async def test_schedule_auto_title_with_forked_session(self):
-        from widgets.mixins.message_flow import MessageFlowMixin
+        from johnston.tui.mixins.message_flow import MessageFlowMixin
 
         class DummyApp(MessageFlowMixin):
             def __init__(self):
@@ -395,7 +395,7 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
             {"type": "user", "text": "New prompt in fork"},
         ]
 
-        with patch("core.application.session.auto_title.get_settings") as mock_settings:
+        with patch("johnston.core.application.session.auto_title.get_settings") as mock_settings:
             mock_settings.return_value.llm.auto_title = True
             mock_settings.return_value.llm.auto_title_timeout = 8.0
             mock_settings.return_value.llm.auto_title_max_len = 45
@@ -409,7 +409,7 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(app.footer_refreshed)
 
     async def test_schedule_auto_title_skipped_when_exiting(self):
-        from widgets.mixins.message_flow import MessageFlowMixin
+        from johnston.tui.mixins.message_flow import MessageFlowMixin
 
         class DummyApp(MessageFlowMixin):
             def __init__(self):
@@ -423,13 +423,13 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
         sess = AgentSession("s-exit")
         sess.messages = [{"type": "user", "text": "Prompt during exit"}]
 
-        with patch("core.application.session.auto_title.auto_title_session") as mock_title:
+        with patch("johnston.core.application.session.auto_title.auto_title_session") as mock_title:
             app._schedule_auto_title(sess)
             await asyncio.sleep(0.05)
             mock_title.assert_not_called()
 
     def test_collect_session_data_preserves_empty_title(self):
-        from widgets.app.session_state import collect_session_data
+        from johnston.tui.app.session_state import collect_session_data
 
         app = MagicMock()
         app.current_session_id = "s-new"
@@ -445,7 +445,7 @@ class TestMessageFlowAutoTitle(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sess._title, "")
 
     def test_write_session_data_preserves_existing_title(self):
-        from widgets.mixins.session_persistence import SessionPersistenceMixin
+        from johnston.tui.mixins.session_persistence import SessionPersistenceMixin
 
         class PersistenceApp(SessionPersistenceMixin):
             def __init__(self):

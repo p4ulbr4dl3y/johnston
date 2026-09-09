@@ -4,13 +4,13 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.application.skills.manager import SkillManager, get_skill_manager
-from core.infrastructure.runtime.frontmatter import parse_frontmatter
+from johnston.core.application.skills.manager import SkillManager, get_skill_manager
+from johnston.core.infrastructure.runtime.frontmatter import parse_frontmatter
 
 
 def _reset_skill_managers() -> None:
     """Clear cached skill managers between tests (replaces removed prod helper)."""
-    import core.application.skills.manager as _skm
+    import johnston.core.application.skills.manager as _skm
     with _skm._registry_lock:
         _skm._SKILL_MANAGERS.clear()
         _skm._bundled_provisioned = False
@@ -111,12 +111,12 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(re_hidden_state)
 
     def test_skills_command_registered(self):
-        from widgets.app.dispatch import COMMAND_REGISTRY
+        from johnston.tui.app.dispatch import COMMAND_REGISTRY
 
         self.assertIn("/skills", COMMAND_REGISTRY)
 
     def test_skill_command_suggestions(self):
-        from widgets.app.command_provider import get_all_command_suggestions
+        from johnston.tui.app.command_provider import get_all_command_suggestions
 
         async def run():
             return await get_all_command_suggestions()
@@ -154,8 +154,8 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("helper", skill_names)
 
     async def test_skill_slash_command_execution(self):
+        from johnston.tui.app.dispatch import handle_slash_command
         from tests.ui.test_commands import MockApp
-        from widgets.app.dispatch import handle_slash_command
 
         os.chdir(self.old_cwd)
         _reset_skill_managers()
@@ -167,8 +167,8 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
         self.assertIn("configure MCP", app.ai_prompts[0][0])
 
     async def test_multi_skill_slash_command_execution(self):
+        from johnston.tui.app.dispatch import handle_slash_command
         from tests.ui.test_commands import MockApp
-        from widgets.app.dispatch import handle_slash_command
 
         os.chdir(self.old_cwd)
         _reset_skill_managers()
@@ -204,14 +204,14 @@ class TestSkillManager(unittest.IsolatedAsyncioTestCase):
             shutil.rmtree(other_dir)
 
     def test_skill_manager_construction_has_no_side_effects(self):
-        with patch("core.application.skills.manager.os.makedirs") as mock_makedirs:
+        with patch("johnston.core.application.skills.manager.os.makedirs") as mock_makedirs:
             SkillManager(project_dir=self.test_dir)
         mock_makedirs.assert_not_called()
 
     def test_get_skill_manager_bundled_skills_no_disk_copy(self):
         _reset_skill_managers()
         with patch(
-            "core.application.skills.manager.GLOBAL_SKILLS_DIR",
+            "johnston.core.application.skills.manager.GLOBAL_SKILLS_DIR",
             os.path.join(self.test_dir, "global-skills"),
         ):
             sm = get_skill_manager()

@@ -4,9 +4,9 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.infrastructure.tasks.manager import TaskManager
-from widgets.app.dispatch import COMMAND_REGISTRY, handle_slash_command
-from widgets.presentation.commands import (
+from johnston.core.infrastructure.tasks.manager import TaskManager
+from johnston.tui.app.dispatch import COMMAND_REGISTRY, handle_slash_command
+from johnston.tui.presentation.commands import (
     BaseCommand,
     CompactCommand,
     ModelsCommand,
@@ -18,9 +18,9 @@ from widgets.presentation.commands import (
     SubagentsCommand,
     ThinkingEffortCommand,
 )
-from widgets.presentation.screens.constants import MESSAGE_INPUT
-from widgets.presentation.screens.rewind import RewindSelection
-from widgets.presentation.widgets.chat_container import ChatView
+from johnston.tui.presentation.screens.constants import MESSAGE_INPUT
+from johnston.tui.presentation.screens.rewind import RewindSelection
+from johnston.tui.presentation.widgets.chat_container import ChatView
 
 
 class MockAgent:
@@ -147,7 +147,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(app.agent.compact_called)
 
     async def test_rewind_command_selected_idx_zero(self):
-        from widgets.presentation.commands import RewindCommand
+        from johnston.tui.presentation.commands import RewindCommand
 
         app = MockApp()
         app.agent.history = [{"role": "user", "content": "First message"}]
@@ -195,7 +195,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(getattr(app, "is_generating", False))
 
     async def test_rewind_command_clears_queue_and_resets_generating(self):
-        from widgets.presentation.commands import RewindCommand
+        from johnston.tui.presentation.commands import RewindCommand
 
         app = MockApp()
         app.is_generating = True
@@ -228,7 +228,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.message_queue, [])
 
     async def test_rewind_command_partial_history_preserved(self):
-        from widgets.presentation.commands import RewindCommand
+        from johnston.tui.presentation.commands import RewindCommand
 
         app = MockApp()
         app.agent.history = [
@@ -274,7 +274,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_rewind_command_truncates_store_transcript(self):
         from unittest.mock import MagicMock
 
-        from widgets.presentation.commands import RewindCommand
+        from johnston.tui.presentation.commands import RewindCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -334,8 +334,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_rewind_command_kills_tasks_and_cancels_subagents(self):
         from unittest.mock import MagicMock
 
-        from core.infrastructure.tasks.shell_task import ShellTask
-        from widgets.presentation.commands import RewindCommand
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.tui.presentation.commands import RewindCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -391,7 +391,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.sm.delete.assert_called()
 
     async def test_rewind_awaits_generation_worker_before_rollback(self):
-        from widgets.presentation.commands import RewindCommand
+        from johnston.tui.presentation.commands import RewindCommand
 
         class FakeWorker:
             """Minimal Textual-Worker stand-in: cleanup runs inside wait()."""
@@ -446,7 +446,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_rewind_compacted_region_clears_history(self):
         from unittest.mock import MagicMock
 
-        from widgets.presentation.commands import RewindCommand
+        from johnston.tui.presentation.commands import RewindCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -589,7 +589,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         """Esc during /compact cancels the registered compact task: the session
         records a "Compaction Cancelled" divider, is_generating resets, and
         _compact_task is cleared so a stale reference never cancels a later run."""
-        from core.domain.entities.session import AgentSession
+        from johnston.core.domain.entities.session import AgentSession
 
         entered = asyncio.Event()
         block = asyncio.Event()
@@ -632,7 +632,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         running compact task the same way Esc does."""
         from unittest.mock import AsyncMock, MagicMock, patch
 
-        from widgets.presentation.commands.session_commands import NewCommand
+        from johnston.tui.presentation.commands.session_commands import NewCommand
 
         entered = asyncio.Event()
         block = asyncio.Event()
@@ -657,8 +657,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(app._compact_task.done())
 
         with patch(
-            "widgets.presentation.commands.session_commands.new_session", new=_fake_new_session_compact_wait
-        ), patch("core.application.session.stream.cancel_running_subagents"):
+            "johnston.tui.presentation.commands.session_commands.new_session", new=_fake_new_session_compact_wait
+        ), patch("johnston.core.application.session.stream.cancel_running_subagents"):
             await NewCommand().execute(app)
 
         try:
@@ -682,7 +682,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
 
         # cancel_active_workers (the Esc / command-level hook) after completion
         # finds no live compact task and no workers: nothing to cancel.
-        from widgets.presentation.commands.helpers import cancel_active_workers
+        from johnston.tui.presentation.commands.helpers import cancel_active_workers
 
         before = list(app.ai_prompts)
         cancel_active_workers(app)
@@ -703,13 +703,13 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_multiple_skills_command(self):
         from unittest.mock import patch
 
-        from core.application.skills.manager import Skill, SkillManager, SkillScope
+        from johnston.core.application.skills.manager import Skill, SkillManager, SkillScope
 
         app = MockApp()
         skill_a = Skill(name="foo", description="Foo", location="/tmp/foo/SKILL.md", content="Foo body", scope=SkillScope.GLOBAL, hidden=False)
         skill_b = Skill(name="bar", description="Bar", location="/tmp/bar/SKILL.md", content="Bar body", scope=SkillScope.GLOBAL, hidden=False)
         orig_get_skill = SkillManager.get_skill
-        with patch("core.application.skills.manager.SkillManager.get_skill", autospec=True, side_effect=lambda s, n, *a, **kw: {"foo": skill_a, "bar": skill_b}.get(n) or orig_get_skill(s, n, *a, **kw)):
+        with patch("johnston.core.application.skills.manager.SkillManager.get_skill", autospec=True, side_effect=lambda s, n, *a, **kw: {"foo": skill_a, "bar": skill_b}.get(n) or orig_get_skill(s, n, *a, **kw)):
             handled = await handle_slash_command(app, "/foo /bar analyze project")
         self.assertTrue(handled)
         self.assertEqual(len(app.ai_prompts), 1)
@@ -721,7 +721,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("analyze project", prompt)
 
     async def test_models_command_non_vision_warning(self):
-        from widgets.presentation.commands import ModelsCommand
+        from johnston.tui.presentation.commands import ModelsCommand
 
         test_model_name = f"test-text-only-{int(time.time() * 1000)}"
 
@@ -759,7 +759,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(pushed_screens), 1)
 
     async def test_models_command_preserves_mode_when_switching_provider(self):
-        from widgets.presentation.commands import ModelsCommand
+        from johnston.tui.presentation.commands import ModelsCommand
 
         class MockPM:
             def __init__(self):
@@ -804,7 +804,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.pm.saved, [("new", "new-model")])
 
     async def test_providers_command_preserves_role_when_connecting_provider(self):
-        from widgets.presentation.commands import ProvidersCommand
+        from johnston.tui.presentation.commands import ProvidersCommand
 
         class MockPM:
             def __init__(self):
@@ -872,7 +872,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/connect", COMMAND_REGISTRY)
 
     async def test_alias_suggestions_formatting(self):
-        from widgets.app.command_provider import get_all_command_suggestions
+        from johnston.tui.app.command_provider import get_all_command_suggestions
 
         commands_dict = dict(await get_all_command_suggestions())
         self.assertIn("/providers", commands_dict)
@@ -900,8 +900,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_new_command_clears_background_tasks(self):
         from unittest.mock import AsyncMock, MagicMock
 
-        from core.infrastructure.tasks.shell_task import ShellTask
-        from widgets.presentation.commands import NewCommand
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.tui.presentation.commands import NewCommand
 
         app = MockApp()
         app.message_queue = MagicMock()
@@ -919,7 +919,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_new_command_clears_unloaded_messages(self):
         from unittest.mock import AsyncMock, MagicMock
 
-        from widgets.presentation.commands import NewCommand
+        from johnston.tui.presentation.commands import NewCommand
 
         app = MockApp()
         app.message_queue = MagicMock()
@@ -940,7 +940,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_new_command_resets_role(self):
         from unittest.mock import AsyncMock, MagicMock
 
-        from widgets.presentation.commands import NewCommand
+        from johnston.tui.presentation.commands import NewCommand
 
         app = MockApp()
         app.message_queue = MagicMock()
@@ -961,7 +961,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_subagents_command_no_subagents(self):
         from unittest.mock import MagicMock
 
-        from widgets.presentation.commands import SubagentsCommand
+        from johnston.tui.presentation.commands import SubagentsCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -980,7 +980,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_subagents_command_with_subagents(self):
         from unittest.mock import MagicMock
 
-        from widgets.presentation.commands import SubagentsCommand
+        from johnston.tui.presentation.commands import SubagentsCommand
 
         app = MockApp()
         app.notify = MagicMock()
@@ -996,7 +996,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_shell_command_no_tasks(self):
         from unittest.mock import MagicMock
 
-        from widgets.presentation.commands import ShellTasksCommand
+        from johnston.tui.presentation.commands import ShellTasksCommand
 
         app = MockApp()
         app.current_session_id = "sess-a"
@@ -1011,8 +1011,8 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_shell_command_with_tasks(self):
         from unittest.mock import MagicMock
 
-        from core.infrastructure.tasks.shell_task import ShellTask
-        from widgets.presentation.commands import ShellTasksCommand
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.tui.presentation.commands import ShellTasksCommand
 
         app = MockApp()
         app.notify = MagicMock()
@@ -1029,7 +1029,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_resume_command_clears_queue_and_resets_generating(self):
         from unittest.mock import MagicMock
 
-        from widgets.presentation.commands import ResumeCommand
+        from johnston.tui.presentation.commands import ResumeCommand
 
         app = MockApp()
         app.is_generating = True
@@ -1051,13 +1051,13 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_mcp_command_pushes_screen(self):
         from unittest.mock import MagicMock, patch
 
-        from widgets.presentation.commands import MCPCommand
+        from johnston.tui.presentation.commands import MCPCommand
 
         app = MockApp()
         app.push_screen = MagicMock()
 
         cmd = MCPCommand()
-        with patch("core.infrastructure.mcp.MCPManager.load_servers", return_value=[{"name": "srv"}]):
+        with patch("johnston.core.infrastructure.mcp.MCPManager.load_servers", return_value=[{"name": "srv"}]):
             await cmd.execute(app)
 
         app.push_screen.assert_called_once()
@@ -1065,13 +1065,13 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
     async def test_mcp_command_no_servers(self):
         from unittest.mock import MagicMock, patch
 
-        from widgets.presentation.commands import MCPCommand
+        from johnston.tui.presentation.commands import MCPCommand
 
         app = MockApp()
         app.push_screen = MagicMock()
 
         cmd = MCPCommand()
-        with patch("core.infrastructure.mcp.MCPManager.load_servers", return_value=[]):
+        with patch("johnston.core.infrastructure.mcp.MCPManager.load_servers", return_value=[]):
             await cmd.execute(app)
 
         app.push_screen.assert_not_called()
@@ -1085,7 +1085,7 @@ if __name__ == "__main__":
 class TestHandleSlashCommand(unittest.IsolatedAsyncioTestCase):
     async def _call(self, text, app=None):
         app = app or MagicMock()
-        from widgets.app.dispatch import handle_slash_command
+        from johnston.tui.app.dispatch import handle_slash_command
 
         return await handle_slash_command(app, text), app
 
@@ -1098,7 +1098,7 @@ class TestHandleSlashCommand(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(handled)
 
     async def test_none_command_returns_false(self):
-        from widgets.app.dispatch import handle_slash_command
+        from johnston.tui.app.dispatch import handle_slash_command
 
         self.assertFalse(await handle_slash_command(MagicMock(), None))
 
@@ -1108,7 +1108,7 @@ class TestHandleSlashCommand(unittest.IsolatedAsyncioTestCase):
 
     async def test_registered_command_executes_with_args(self):
         app = MagicMock()
-        with patch("widgets.app.dispatch.COMMAND_REGISTRY", {"/known": MagicMock()}) as registry:
+        with patch("johnston.tui.app.dispatch.COMMAND_REGISTRY", {"/known": MagicMock()}) as registry:
             inst = AsyncMock()
             registry["/known"].return_value = inst
             handled, _ = await self._call("/known arg1 arg2", app)
@@ -1122,7 +1122,7 @@ class TestHandleSlashCommand(unittest.IsolatedAsyncioTestCase):
 
     async def test_multiple_whitespace_between_args(self):
         # "cmd  arg" with double space must split to earliest command word.
-        with patch("widgets.app.dispatch.COMMAND_REGISTRY", {}):
+        with patch("johnston.tui.app.dispatch.COMMAND_REGISTRY", {}):
             handled, _ = await self._call("/xyz  arg")
         self.assertFalse(handled)
 
@@ -1180,7 +1180,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             await BaseCommand().execute(None)
 
     async def test_new_command_cancels_running_worker(self):
-        from widgets.presentation.commands import NewCommand
+        from johnston.tui.presentation.commands import NewCommand
 
         cancel_called = []
 
@@ -1207,8 +1207,8 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         chat.check_welcome = MagicMock()
         app.query_one = lambda target, default=None: chat
         with patch(
-            "widgets.presentation.commands.session_commands.new_session", new=fake_new_session
-        ), patch("core.application.session.stream.cancel_running_subagents"):
+            "johnston.tui.presentation.commands.session_commands.new_session", new=fake_new_session
+        ), patch("johnston.core.application.session.stream.cancel_running_subagents"):
             await NewCommand().execute(app)
         self.assertEqual(len(cancel_called), 1)
         app.task_manager.kill_all.assert_awaited_once()
@@ -1217,7 +1217,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_new_command_waits_for_worker_teardown_before_clearing_chat(self):
         """/new must not let an interrupted generation worker's teardown
         (e.g. the "Response Interrupted" divider) land in the fresh chat."""
-        from widgets.presentation.commands import NewCommand
+        from johnston.tui.presentation.commands import NewCommand
 
         teardown_done = asyncio.Event()
         divider_mounted = []
@@ -1273,8 +1273,8 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         asyncio.create_task(chat.add_event_divider("Response Interrupted"))
 
         with patch(
-            "widgets.presentation.commands.session_commands.new_session", new=fake_new_session
-        ), patch("core.application.session.stream.cancel_running_subagents"):
+            "johnston.tui.presentation.commands.session_commands.new_session", new=fake_new_session
+        ), patch("johnston.core.application.session.stream.cancel_running_subagents"):
             await NewCommand().execute(app)
 
         # The divider mounts (teardown finished) *before* the view is cleared,
@@ -1327,7 +1327,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
                 callback(("p", "secret"))
 
         app.push_screen = push_screen
-        with patch("widgets.presentation.commands.provider_commands.set_provider_credentials", return_value=""):
+        with patch("johnston.tui.presentation.commands.provider_commands.set_provider_credentials", return_value=""):
             await ProvidersCommand().execute(app)
 
         # Flush the asyncio.create_task(_open_with_key) scheduled on failure path.
@@ -1376,7 +1376,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_models_command_disconnected_opens_providers(self):
         app = SimpleApp()
         app.pm = MagicMock()
-        with patch("widgets.presentation.commands.provider_commands.fetch_grouped_models", return_value=({}, True)), patch.object(
+        with patch("johnston.tui.presentation.commands.provider_commands.fetch_grouped_models", return_value=({}, True)), patch.object(
             ProvidersCommand, "execute", new=AsyncMock()
         ) as m_exec, patch.object(app, "push_screen") as ps:
             await ModelsCommand().execute(app)
@@ -1386,7 +1386,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_models_command_no_models_notify(self):
         app = SimpleApp()
         app.pm = MagicMock()
-        with patch("widgets.presentation.commands.provider_commands.fetch_grouped_models", return_value=({}, False)), patch.object(
+        with patch("johnston.tui.presentation.commands.provider_commands.fetch_grouped_models", return_value=({}, False)), patch.object(
             app, "push_screen"
         ) as ps:
             await ModelsCommand().execute(app)
@@ -1411,8 +1411,8 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
         app.push_screen = push_screen
         with patch(
-            "widgets.presentation.commands.provider_commands.fetch_grouped_models", return_value=({"p": {"name": "P"}}, False)
-        ), patch("widgets.presentation.commands.provider_commands.select_model", side_effect=lambda *a, **k: selected.append(a)):
+            "johnston.tui.presentation.commands.provider_commands.fetch_grouped_models", return_value=({"p": {"name": "P"}}, False)
+        ), patch("johnston.tui.presentation.commands.provider_commands.select_model", side_effect=lambda *a, **k: selected.append(a)):
             await ModelsCommand().execute(app)
         self.assertTrue(selected)
 
@@ -1432,7 +1432,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
                 callback(None)  # empty effort
 
         app.push_screen = push_screen
-        with patch("widgets.presentation.commands.provider_commands.get_current_thinking_effort", return_value=("p", "m", "auto")):
+        with patch("johnston.tui.presentation.commands.provider_commands.get_current_thinking_effort", return_value=("p", "m", "auto")):
             await ThinkingEffortCommand().execute(app)
         self.assertIsNotNone(getattr(app.input, "focused", None))
 
@@ -1447,7 +1447,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_rewind_exception_paths(self):
-        from core.application.session import stream
+        from johnston.core.application.session import stream
 
         app = SimpleApp()
         app.current_session_id = "sess-a"
@@ -1538,7 +1538,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_resume_waits_for_worker_teardown_before_switching_view(self):
         """/resume during active generation must not let the cancelled
         worker's "Response Interrupted" divider land in the resumed view."""
-        from widgets.presentation.commands import ResumeCommand
+        from johnston.tui.presentation.commands import ResumeCommand
 
         teardown_done = asyncio.Event()
         divider_mounted = []
@@ -1613,7 +1613,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_resume_teardown_scoped_to_old_session_subagents(self):
         """/resume must cancel subagents scoped to the OLD session being left."""
-        from widgets.presentation.commands import ResumeCommand
+        from johnston.tui.presentation.commands import ResumeCommand
 
         app = SimpleApp()
         app.workers = []
@@ -1628,7 +1628,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.refresh_status_footer = MagicMock()
         app.push_screen = lambda screen, callback=None: callback("new-id")
 
-        with patch("widgets.presentation.commands.session_commands.cancel_active_workers_and_tasks") as m_cancel:
+        with patch("johnston.tui.presentation.commands.session_commands.cancel_active_workers_and_tasks") as m_cancel:
             await ResumeCommand().execute(app)
         m_cancel.assert_awaited_once()
         self.assertEqual(m_cancel.call_args.kwargs["session_id"], "old-id")
@@ -1638,7 +1638,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
     async def test_fork_waits_for_worker_teardown_before_resetting_view(self):
         """/fork during active generation must not let the cancelled worker's
         "Response Interrupted" divider land in the forked view."""
-        from widgets.presentation.commands import ForkCommand
+        from johnston.tui.presentation.commands import ForkCommand
 
         teardown_done = asyncio.Event()
         divider_mounted = []
@@ -1708,7 +1708,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_fork_teardown_scoped_to_old_session_subagents(self):
         """/fork must cancel subagents scoped to the OLD session being forked."""
-        from widgets.presentation.commands import ForkCommand
+        from johnston.tui.presentation.commands import ForkCommand
 
         chat = MagicMock()
         chat.get_user_messages.return_value = [(0, "Prompt one")]
@@ -1726,7 +1726,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.agent = SimpleNamespace()
         app.push_screen = lambda screen, callback=None: callback(0)
 
-        with patch("widgets.presentation.commands.session_commands.cancel_active_workers_and_tasks") as m_cancel:
+        with patch("johnston.tui.presentation.commands.session_commands.cancel_active_workers_and_tasks") as m_cancel:
             await ForkCommand().execute(app)
         m_cancel.assert_awaited_once()
         self.assertEqual(m_cancel.call_args.kwargs["session_id"], "old-id")
@@ -1741,7 +1741,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_skills_no_skills(self):
         app = SimpleApp()
-        with patch("core.application.skills.manager.SkillManager.list_skills", return_value=[]), patch.object(
+        with patch("johnston.core.application.skills.manager.SkillManager.list_skills", return_value=[]), patch.object(
             app, "push_screen"
         ) as ps:
             await SkillsCommand().execute(app)
@@ -1770,7 +1770,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         def fake_list_skills(self, *a, **k):
             return [FakeSkill("handoff")]
 
-        with patch("core.application.skills.manager.SkillManager.list_skills", new=fake_list_skills):
+        with patch("johnston.core.application.skills.manager.SkillManager.list_skills", new=fake_list_skills):
             await SkillsCommand().execute(app)
         self.assertTrue(selected)
         selected[0]({"name": "handoff"})
@@ -1804,7 +1804,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             cb["on_begin"]()
             return outcome
 
-        with patch("widgets.presentation.commands.session_commands.compact_session", new=fake_compact), patch.object(
+        with patch("johnston.tui.presentation.commands.session_commands.compact_session", new=fake_compact), patch.object(
             app, "push_screen", MagicMock()
         ):
             await CompactCommand().execute(app)
@@ -1828,7 +1828,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.query_one = lambda target, default=None: SimpleApp.query_one.__get__(app)(target, default)
 
         outcome = SimpleNamespace(success=True, message="ok")
-        with patch("widgets.presentation.commands.session_commands.compact_session", return_value=outcome):
+        with patch("johnston.tui.presentation.commands.session_commands.compact_session", return_value=outcome):
             await CompactCommand().execute(app)
         for _ in range(5):
             await asyncio.sleep(0)
@@ -1846,7 +1846,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.save_current_session = MagicMock()
 
         outcome = SimpleNamespace(success=True, message="ok", title="Session Compacted (500 → 100)")
-        with patch("widgets.presentation.commands.session_commands.compact_session", return_value=outcome) as mock_compact:
+        with patch("johnston.tui.presentation.commands.session_commands.compact_session", return_value=outcome) as mock_compact:
             await CompactCommand().execute(app)
 
         mock_compact.assert_awaited_once()
@@ -1854,7 +1854,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_questions_wizard_active(self):
         app = SimpleApp()
-        from widgets.presentation.screens.ask_user import AskUserWizardScreen
+        from johnston.tui.presentation.screens.ask_user import AskUserWizardScreen
 
         app.screen = MagicMock(spec=AskUserWizardScreen)
         app.notify = MagicMock()
@@ -1875,14 +1875,14 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(app.notified, [("No pending questions", "warning")])
 
     async def test_sandbox_command_toggles_state(self):
-        from widgets.presentation.commands import SandboxCommand
+        from johnston.tui.presentation.commands import SandboxCommand
 
         app = SimpleApp()
         app.sandbox_enabled = False
         app.refresh_status_footer = MagicMock()
 
         cmd = SandboxCommand()
-        with patch("core.infrastructure.config.config_helpers.save_sandbox_config") as mock_save:
+        with patch("johnston.core.infrastructure.config.config_helpers.save_sandbox_config") as mock_save:
             await cmd.execute(app)
             self.assertTrue(app.sandbox_enabled)
             app.refresh_status_footer.assert_called_once()
@@ -1894,7 +1894,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
             mock_save.assert_called_once_with(False)
 
     async def test_copy_command_success(self):
-        from widgets.presentation.commands import CopyCommand
+        from johnston.tui.presentation.commands import CopyCommand
 
         app = SimpleApp()
         app.copy_to_clipboard = MagicMock()
@@ -1910,7 +1910,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_called_once_with("Copied to clipboard", severity="information", timeout=1.5)
 
     async def test_copy_command_no_response(self):
-        from widgets.presentation.commands import CopyCommand
+        from johnston.tui.presentation.commands import CopyCommand
 
         app = SimpleApp()
         app.notify = MagicMock()
@@ -1923,7 +1923,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_called_once_with("No assistant response to copy", severity="warning")
 
     async def test_copy_command_error_handled(self):
-        from widgets.presentation.commands import CopyCommand
+        from johnston.tui.presentation.commands import CopyCommand
 
         app = SimpleApp()
         app.notify = MagicMock()
@@ -1936,7 +1936,7 @@ class TestCommandsCoverage(unittest.IsolatedAsyncioTestCase):
 
 class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
     async def test_diff_command_no_session(self):
-        from widgets.presentation.commands.session_commands import DiffCommand
+        from johnston.tui.presentation.commands.session_commands import DiffCommand
 
         app = SimpleApp()
         app.current_session_id = None
@@ -1947,7 +1947,7 @@ class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_called_once_with("No active session found", severity="warning")
 
     async def test_diff_command_no_touched_files(self):
-        from widgets.presentation.commands.session_commands import DiffCommand
+        from johnston.tui.presentation.commands.session_commands import DiffCommand
 
         app = SimpleApp()
         app.current_session_id = "sess-1"
@@ -1965,7 +1965,7 @@ class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
         app.notify.assert_called_once_with("No files were modified during this session", severity="information")
 
     async def test_diff_command_scoped_files_pushed(self):
-        from widgets.presentation.commands.session_commands import DiffCommand
+        from johnston.tui.presentation.commands.session_commands import DiffCommand
 
         app = SimpleApp()
         app.current_session_id = "sess-1"
@@ -1979,7 +1979,7 @@ class TestDiffCommand(unittest.IsolatedAsyncioTestCase):
         ]
         app.sm.get.return_value = mock_sess
 
-        with patch("core.application.session.actions.get_session_diff", new_callable=AsyncMock) as mock_diff:
+        with patch("johnston.core.application.session.actions.get_session_diff", new_callable=AsyncMock) as mock_diff:
             mock_diff.return_value = [("foo.py", "+1 line", 1, 0)]
             cmd = DiffCommand()
             await cmd.execute(app)

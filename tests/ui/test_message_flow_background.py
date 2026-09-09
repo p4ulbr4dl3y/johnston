@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app import JohnstonApp
+from johnston.tui.app import JohnstonApp
 
 
 @pytest.mark.slow
@@ -43,8 +43,8 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("x" * 5000, sent[0].strip(" \n[].<>"))
 
     async def test_completed_updates_widget_done(self):
-        from core.infrastructure.tasks.shell_task import ShellTask
-        from core.infrastructure.tasks.task import TaskStatus
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.core.infrastructure.tasks.task import TaskStatus
 
         app = JohnstonApp()
         async with app.run_test():
@@ -59,8 +59,8 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             widget.set_result.assert_called_once_with("some output", status="done")
 
     async def test_completed_updates_widget_error(self):
-        from core.infrastructure.tasks.shell_task import ShellTask
-        from core.infrastructure.tasks.task import TaskStatus
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.core.infrastructure.tasks.task import TaskStatus
 
         app = JohnstonApp()
         async with app.run_test():
@@ -120,8 +120,8 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(app.message_queue), 0)
 
     async def test_completed_updates_session_messages(self):
-        from core.infrastructure.tasks.shell_task import ShellTask
-        from core.infrastructure.tasks.task import TaskStatus
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.core.infrastructure.tasks.task import TaskStatus
 
         app = JohnstonApp()
         async with app.run_test():
@@ -195,7 +195,7 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertIn('idle_seconds="60"', sent[0])
 
     async def test_completed_timed_out_adds_state_hint(self):
-        from core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
 
         app = JohnstonApp()
         async with app.run_test():
@@ -211,8 +211,8 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertIn('status="error"', sent[0])
 
     async def test_completed_killed_normalizes_to_cancelled(self):
-        from core.infrastructure.tasks.shell_task import ShellTask
-        from core.infrastructure.tasks.task import TaskStatus
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.core.infrastructure.tasks.task import TaskStatus
 
         app = JohnstonApp()
         async with app.run_test():
@@ -229,8 +229,8 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn('status="killed"', sent[0])
 
     async def test_completed_suppressed_notification_skips_ai(self):
-        from core.infrastructure.tasks.shell_task import ShellTask
-        from core.infrastructure.tasks.task import TaskStatus
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.core.infrastructure.tasks.task import TaskStatus
 
         app = JohnstonApp()
         async with app.run_test():
@@ -246,8 +246,8 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(app.message_queue), 0)
 
     async def test_completed_cross_session_queues_to_task_session(self):
-        from core.infrastructure.tasks.shell_task import ShellTask
-        from core.infrastructure.tasks.task import TaskStatus
+        from johnston.core.infrastructure.tasks.shell_task import ShellTask
+        from johnston.core.infrastructure.tasks.task import TaskStatus
 
         app = JohnstonApp()
         async with app.run_test():

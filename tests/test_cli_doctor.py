@@ -9,7 +9,7 @@ import urllib.error
 from contextlib import redirect_stdout
 from unittest.mock import MagicMock, patch
 
-from core.interfaces.cli.commands.doctor_cmd import (
+from johnston.cli.commands.doctor_cmd import (
     _ping_local_endpoint,
     diagnose_config_dirs,
     diagnose_git,
@@ -20,7 +20,7 @@ from core.interfaces.cli.commands.doctor_cmd import (
     format_checklist_item,
     run_doctor,
 )
-from core.interfaces.cli.entrypoint import main
+from johnston.cli.entrypoint import main
 
 
 class TestCLIDoctor(unittest.TestCase):
@@ -30,7 +30,7 @@ class TestCLIDoctor(unittest.TestCase):
         self.assertEqual(format_checklist_item("!", "warn", colorize=False), "  [!] warn")
 
     def test_format_checklist_item_colored(self):
-        with patch("core.interfaces.cli.commands.doctor_cmd.supports_color", return_value=True):
+        with patch("johnston.cli.commands.doctor_cmd.supports_color", return_value=True):
             ok_item = format_checklist_item("✓", "ok", colorize=True)
             self.assertIn("\033[32m[✓]\033[0m", ok_item)
             err_item = format_checklist_item("✗", "err", colorize=True)
@@ -187,7 +187,7 @@ class TestCLIDoctor(unittest.TestCase):
         pm.get_api_key.side_effect = lambda k: "sk-12345" if k == "openai" else ""
         pm.get_provider_model.side_effect = lambda k: {"openai": "gpt-4o", "anthropic": "claude-3-5", "ollama": "llama3", "custom-disabled": "m1"}.get(k, "")
 
-        with patch("core.interfaces.cli.commands.doctor_cmd._ping_local_endpoint", return_value=True):
+        with patch("johnston.cli.commands.doctor_cmd._ping_local_endpoint", return_value=True):
             results = diagnose_providers(pm)
 
         self.assertEqual(results[0][0], "✓")
@@ -219,7 +219,7 @@ class TestCLIDoctor(unittest.TestCase):
         pm.get_api_key.side_effect = lambda k: "sk-test" if k == "openai" else ""
         pm.get_provider_model.side_effect = lambda k: "gpt-4o" if k == "openai" else ""
 
-        with patch("core.interfaces.cli.commands.doctor_cmd.DEFAULT_JSON_PROVIDERS", {f"def-{i}": {} for i in range(10)}):
+        with patch("johnston.cli.commands.doctor_cmd.DEFAULT_JSON_PROVIDERS", {f"def-{i}": {} for i in range(10)}):
             results = diagnose_providers(pm)
 
         self.assertEqual(results[0][0], "✓")
@@ -288,12 +288,12 @@ class TestCLIDoctor(unittest.TestCase):
         mgr.load_servers.return_value = []
 
         with (
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_python", return_value=("✓", "Python OK")),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_uv", return_value=("✓", "uv OK")),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_config_dirs", return_value=[("✓", "Config OK")]),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_git", return_value=("✓", "Git OK")),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_providers", return_value=[("✓", "Provider OK")]),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_mcp", return_value=[("✓", "MCP OK")]),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_python", return_value=("✓", "Python OK")),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_uv", return_value=("✓", "uv OK")),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_config_dirs", return_value=[("✓", "Config OK")]),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_git", return_value=("✓", "Git OK")),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_providers", return_value=[("✓", "Provider OK")]),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_mcp", return_value=[("✓", "MCP OK")]),
         ):
             out = io.StringIO()
             with redirect_stdout(out):
@@ -307,12 +307,12 @@ class TestCLIDoctor(unittest.TestCase):
         mgr = MagicMock()
 
         with (
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_python", return_value=("✓", "Python OK")),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_uv", return_value=("✓", "uv OK")),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_config_dirs", return_value=[("✓", "Config OK")]),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_git", return_value=("!", "Git warning")),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_providers", return_value=[("✓", "Provider OK")]),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_mcp", return_value=[("✓", "MCP OK")]),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_python", return_value=("✓", "Python OK")),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_uv", return_value=("✓", "uv OK")),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_config_dirs", return_value=[("✓", "Config OK")]),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_git", return_value=("!", "Git warning")),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_providers", return_value=[("✓", "Provider OK")]),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_mcp", return_value=[("✓", "MCP OK")]),
         ):
             out = io.StringIO()
             with redirect_stdout(out):
@@ -326,12 +326,12 @@ class TestCLIDoctor(unittest.TestCase):
         mgr = MagicMock()
 
         with (
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_python", return_value=("✓", "Python OK")),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_uv", return_value=("✓", "uv OK")),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_config_dirs", return_value=[("✗", "Config Not Writable")]),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_git", return_value=("✓", "Git OK")),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_providers", return_value=[("✓", "Provider OK")]),
-            patch("core.interfaces.cli.commands.doctor_cmd.diagnose_mcp", return_value=[("✓", "MCP OK")]),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_python", return_value=("✓", "Python OK")),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_uv", return_value=("✓", "uv OK")),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_config_dirs", return_value=[("✗", "Config Not Writable")]),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_git", return_value=("✓", "Git OK")),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_providers", return_value=[("✓", "Provider OK")]),
+            patch("johnston.cli.commands.doctor_cmd.diagnose_mcp", return_value=[("✓", "MCP OK")]),
         ):
             out = io.StringIO()
             with redirect_stdout(out):
@@ -341,7 +341,7 @@ class TestCLIDoctor(unittest.TestCase):
             self.assertIn("Doctor found configuration issues that need attention.", out.getvalue())
 
     def test_cli_doctor_via_main(self):
-        with patch("core.interfaces.cli.commands.doctor_cmd.run_doctor", return_value=0) as m_doc:
+        with patch("johnston.cli.commands.doctor_cmd.run_doctor", return_value=0) as m_doc:
             with self.assertRaises(SystemExit) as cm:
                 main(["doctor"])
             self.assertEqual(cm.exception.code, 0)
@@ -378,12 +378,12 @@ class TestCLIDoctor(unittest.TestCase):
         import json
         out = io.StringIO()
         args = MagicMock(json=True)
-        with patch("core.interfaces.cli.commands.doctor_cmd.diagnose_python", return_value=("✓", "Python v3.11")), \
-             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_uv", return_value=("✓", "uv installed")), \
-             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_config_dirs", return_value=[("✓", "config ok")]), \
-             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_git", return_value=("✓", "git clean")), \
-             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_providers", return_value=[("✓", "openai ready")]), \
-             patch("core.interfaces.cli.commands.doctor_cmd.diagnose_mcp", return_value=[("✓", "mcp ok")]):
+        with patch("johnston.cli.commands.doctor_cmd.diagnose_python", return_value=("✓", "Python v3.11")), \
+             patch("johnston.cli.commands.doctor_cmd.diagnose_uv", return_value=("✓", "uv installed")), \
+             patch("johnston.cli.commands.doctor_cmd.diagnose_config_dirs", return_value=[("✓", "config ok")]), \
+             patch("johnston.cli.commands.doctor_cmd.diagnose_git", return_value=("✓", "git clean")), \
+             patch("johnston.cli.commands.doctor_cmd.diagnose_providers", return_value=[("✓", "openai ready")]), \
+             patch("johnston.cli.commands.doctor_cmd.diagnose_mcp", return_value=[("✓", "mcp ok")]):
             with redirect_stdout(out):
                 code = run_doctor(args=args)
 

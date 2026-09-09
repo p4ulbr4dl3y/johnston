@@ -2,7 +2,7 @@ import asyncio
 import os
 import tempfile
 
-from core.infrastructure.runtime.project_file_index import ProjectFileIndex
+from johnston.core.infrastructure.runtime.project_file_index import ProjectFileIndex
 
 
 def test_project_file_index_scan_and_cache():

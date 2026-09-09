@@ -2,7 +2,7 @@
 
 import unittest
 
-from core.domain.policies.session_naming import (
+from johnston.core.domain.policies.session_naming import (
     FORK_BASE_MAX_LEN,
     build_fork_title,
     fork_marker,

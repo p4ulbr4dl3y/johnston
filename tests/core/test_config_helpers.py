@@ -4,7 +4,7 @@ import os
 import tempfile
 import time
 
-from core.domain.defaults.config import (
+from johnston.core.domain.defaults.config import (
     DEFAULT_CHAT_INPUT_MAX_LINES,
     DEFAULT_COMPACTION_THRESHOLD_RATIO,
     DEFAULT_DNS_CACHE_MAX,
@@ -27,14 +27,14 @@ from core.domain.defaults.config import (
     DEFAULT_STREAM_TIMEOUT,
     DEFAULT_SUBAGENT_RESULT_MAX_CHARS,
 )
-from core.infrastructure.config.config_helpers import (
+from johnston.core.infrastructure.config.config_helpers import (
     ensure_json_config,
     load_sandbox_config,
     load_theme_config,
     save_sandbox_config,
     save_theme_config,
 )
-from core.infrastructure.config.settings import (
+from johnston.core.infrastructure.config.settings import (
     JohnstonSettings,
     LLMSettings,
     SandboxSettings,
@@ -307,7 +307,7 @@ def test_tools_new_fields_env_overrides(monkeypatch):
 
 def test_catalog_cache_ttl_wired_in_refresh(monkeypatch):
     """models_catalog.refresh() resolves catalog_cache_ttl from settings."""
-    from core.domain.policies.models_catalog import ModelsCatalog
+    from johnston.core.domain.policies.models_catalog import ModelsCatalog
 
     catalog = ModelsCatalog.__new__(ModelsCatalog)
     # _updated_at ~ now so the freshness window (catalog_cache_ttl=999) is fresh
@@ -316,7 +316,7 @@ def test_catalog_cache_ttl_wired_in_refresh(monkeypatch):
     catalog._updated_at = time.time()
     # make the freshness window large so the epoch delta is still < max_age
     mock_settings = JohnstonSettings(llm=LLMSettings(catalog_cache_ttl=1_000_000_000_000.0))
-    monkeypatch.setattr("core.infrastructure.config.settings.get_settings", lambda: mock_settings)
+    monkeypatch.setattr("johnston.core.infrastructure.config.settings.get_settings", lambda: mock_settings)
     import asyncio
 
     result = asyncio.run(catalog.refresh(force=False))
@@ -357,7 +357,7 @@ def test_load_settings_invalid_json_warns_and_defaults(caplog):
         path = os.path.join(tmpdir, "config.json")
         with open(path, "w", encoding="utf-8") as f:
             f.write("{not valid json")
-        with caplog.at_level(logging.WARNING, logger="core.infrastructure.config.settings"):
+        with caplog.at_level(logging.WARNING, logger="johnston.core.infrastructure.config.settings"):
             settings = load_settings(path)
         assert settings.model is None
         assert any("unreadable" in r.message for r in caplog.records)
@@ -471,10 +471,10 @@ def test_config_helpers_custom_path_cache_reload():
 
 
 def test_session_store_disk_cache_ttl_respects_settings(monkeypatch):
-    from core.infrastructure.storage.session_store import SessionStore
+    from johnston.core.infrastructure.storage.session_store import SessionStore
 
     settings = JohnstonSettings(storage=StorageSettings(disk_cache_ttl=9.0))
-    monkeypatch.setattr("core.infrastructure.storage.session_store.get_settings", lambda: settings)
+    monkeypatch.setattr("johnston.core.infrastructure.storage.session_store.get_settings", lambda: settings)
     store = SessionStore.__new__(SessionStore)
     assert store.DISK_CACHE_TTL == 9.0
     # per-instance override (existing tests assign this value) still wins
@@ -508,7 +508,7 @@ def test_permissions_settings_roundtrip():
 
 
 def test_auto_compact_token_limit_settings(monkeypatch):
-    from core.infrastructure.config.settings import LLMSettings, SubagentsSettings
+    from johnston.core.infrastructure.config.settings import LLMSettings, SubagentsSettings
 
     # 1. Defaults
     llm = LLMSettings()

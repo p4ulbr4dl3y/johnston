@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.application.generation.ai_generator import (
+from johnston.core.application.generation.ai_generator import (
     GenCanvas,
     _SessionSaveDebounce,
     generate_ai_response,
@@ -48,7 +48,7 @@ def _canvas(**overrides):
         notify=MagicMock(),
         save_session=AsyncMock(),
     )
-    from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
+    from johnston.tui.presentation.widgets.chat_stream_driver import ChatStreamDriver
 
     c.driver = ChatStreamDriver(c, on_tool_widget=c.register_tool_widget, notify=c.notify)
     for k, v in overrides.items():
@@ -196,8 +196,8 @@ async def test_schedule_exceptions_swallowed_on_save_points():
         yield ("bot_text", "done", "")
         yield ("event_divider", "Compacted", "")
 
-    with patch("core.application.generation.ai_generator._SessionSaveDebounce.schedule", side_effect=RuntimeError("x")), patch(
-        "core.application.generation.ai_generator._SessionSaveDebounce.flush", side_effect=RuntimeError("f")
+    with patch("johnston.core.application.generation.ai_generator._SessionSaveDebounce.schedule", side_effect=RuntimeError("x")), patch(
+        "johnston.core.application.generation.ai_generator._SessionSaveDebounce.flush", side_effect=RuntimeError("f")
     ):
         await generate_ai_response(_FakeAgent(stream), _fake_session(), canvas, session_id="s1", user_text="hi")
     canvas.add_event_divider.assert_awaited_once_with("Compacted")

@@ -15,9 +15,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import core.application.provider.provider_manager as pm_mod
-from core.application.provider.provider_manager import ProviderManager
-from core.infrastructure.secrets import save_secret
+import johnston.core.application.provider.provider_manager as pm_mod
+from johnston.core.application.provider.provider_manager import ProviderManager
+from johnston.core.infrastructure.secrets import save_secret
 
 
 @pytest.fixture
@@ -27,8 +27,8 @@ def pm(tmp_path, monkeypatch):
     monkeypatch.setattr(pm_mod, "CONFIG_FILE", os.path.join(str(tmp_path), "config.json"))
     monkeypatch.setattr(pm_mod, "PROVIDERS_JSON_FILE", os.path.join(str(tmp_path), "providers.json"))
     monkeypatch.setattr(pm_mod, "CACHE_DIR", cache_dir)
-    monkeypatch.setattr("core.infrastructure.platform.paths.CACHE_DIR", cache_dir)
-    from core.domain.policies.models_catalog import catalog
+    monkeypatch.setattr("johnston.core.infrastructure.platform.paths.CACHE_DIR", cache_dir)
+    from johnston.core.domain.policies.models_catalog import catalog
 
     catalog._client = None
     manager = ProviderManager()
@@ -87,7 +87,7 @@ def test_set_provider_model_save_failure_logged(pm):
 
 
 def test_recreate_active_agent_preserves_state(pm):
-    from widgets.app.role_service import reconcile_active_agent
+    from johnston.tui.app.role_service import reconcile_active_agent
 
     manager, tmp_path = pm
     manager.set_active_provider_key("openai")
@@ -213,7 +213,7 @@ async def test_fetch_models_forced_refresh_http_flow(pm):
     }
     mock_client.get = AsyncMock(return_value=mock_resp)
     mock_client.__aenter__.return_value = mock_client
-    with patch("core.application.provider.provider_manager.catalog.save_cache", unittest.mock.MagicMock(side_effect=OSError("save fail"))):
+    with patch("johnston.core.application.provider.provider_manager.catalog.save_cache", unittest.mock.MagicMock(side_effect=OSError("save fail"))):
         with patch("httpx.AsyncClient", return_value=mock_client):
             result = await manager.fetch_models_for_provider("apik", force_refresh=True)
     assert result == ["model-a", "model-b"]
@@ -285,7 +285,7 @@ async def test_fetch_models_cache_write_error_swallowed(pm):
     mock_resp.json.return_value = {"data": [{"id": "m1"}]}
     mock_client.get = AsyncMock(return_value=mock_resp)
     mock_client.__aenter__.return_value = mock_client
-    with patch("core.application.provider.provider_manager.atomic_write_json", side_effect=OSError("write io")):
+    with patch("johnston.core.application.provider.provider_manager.atomic_write_json", side_effect=OSError("write io")):
         with patch("httpx.AsyncClient", return_value=mock_client):
             result = await manager.fetch_models_for_provider("apik5", force_refresh=True)
     assert result == ["m1"]

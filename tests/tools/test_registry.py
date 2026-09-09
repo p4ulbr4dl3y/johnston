@@ -1,9 +1,9 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.domain.policies.permission_policy import PermissionAction, PermissionDecision
-from core.infrastructure.runtime.tool_name import normalize_tool_name
-from core.tools.registry import REGISTRY, execute_tool, get_default_tools
+from johnston.core.domain.policies.permission_policy import PermissionAction, PermissionDecision
+from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
+from johnston.core.tools.registry import REGISTRY, execute_tool, get_default_tools
 
 
 class TestRegistry(unittest.IsolatedAsyncioTestCase):
@@ -11,7 +11,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         # MCP tools now go through the permission check (default 'ask'). Existing
         # MCP-path tests exercise dispatch/role logic, not permissions, so allow
         # their tools for the session.
-        from core.application.permission.permission_manager import PermissionManager
+        from johnston.core.application.permission.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         pm.clear_session_overrides()
@@ -49,25 +49,25 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ERR: unknown_tool 'cat'", res_alias.content)
 
     async def test_execute_tool_edit_routes_to_edit_tool(self):
-        from core.tools.edit import EditTool
-        from core.tools.registry import REGISTRY
+        from johnston.core.tools.edit import EditTool
+        from johnston.core.tools.registry import REGISTRY
 
         self.assertIs(REGISTRY["edit"], EditTool)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ALLOW, "")
         with (
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             patch.object(EditTool, "execute", new=AsyncMock(return_value="EDIT_OK")),
         ):
             res = await execute_tool("edit", {"path": "x.py", "old_str": "a", "new_str": "b"})
         self.assertEqual(res.content, "EDIT_OK")
 
     async def test_execute_tool_execution_exception(self):
-        from core.application.permission.permission_manager import PermissionManager
+        from johnston.core.application.permission.permission_manager import PermissionManager
 
         PermissionManager.get_instance().set_session_override("read", "allow")
         with patch.object(REGISTRY["read"], "execute", side_effect=RuntimeError("Execute failed")):
-            with self.assertLogs("core.tools.registry", level="WARNING") as cm:
+            with self.assertLogs("johnston.core.tools.registry", level="WARNING") as cm:
                 res = await execute_tool("read", {"path": "foo.txt"})
         self.assertIn("ERR: execute 'read': Execute failed", res.content)
         self.assertTrue(any("Tool 'read' execution failed" in line for line in cm.output))
@@ -114,8 +114,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry.get_role.return_value = mock_mode_def
 
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             mock_app = MagicMock()
             mock_app.role = "plan"
@@ -137,8 +137,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry.get_role.return_value = mock_mode_def
 
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             res = await execute_tool("exposed_mcp_tool", {"foo": "bar"})
             self.assertEqual(res.content, "MCP Executed Output")
@@ -158,9 +158,9 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry.get_role.return_value = mock_mode_def
 
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
-            self.assertLogs("core.tools.registry", level="WARNING") as cm,
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+            self.assertLogs("johnston.core.tools.registry", level="WARNING") as cm,
         ):
             res = await execute_tool("faulty_mcp", {})
         self.assertIn("ERR: unavailable 'faulty_mcp': [mcp] MCP connection failed", res.content)
@@ -180,8 +180,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_role_registry.get_role.return_value = mock_mode_def
 
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
         ):
             res = await execute_tool("none_mcp", {})
             self.assertEqual(res.content, "ERR: unknown_tool 'none_mcp'")
@@ -192,12 +192,12 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mode_def.disallowed_tools = []
         mock_role_registry = MagicMock()
         mock_role_registry.get_role.return_value = mock_mode_def
-        return patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry)
+        return patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry)
 
     async def test_execute_tool_permission_denied(self):
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Policy blocks it")
-        with patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"})
             self.assertEqual(res.content, "ERR: denied 'read': by permission policy")
 
@@ -206,7 +206,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_app.confirm_permission = AsyncMock(return_value=True)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Confirm please")
-        with patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "nonexistent_abc_123.txt"}, app=mock_app)
         self.assertIn("ERR:", res.content)
         mock_app.confirm_permission.assert_awaited_once()
@@ -216,7 +216,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_app.confirm_permission = AsyncMock(return_value=True)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Confirm please")
-        with patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "nonexistent_abc_123.txt"}, app=mock_app)
         self.assertIn("ERR:", res.content)
         mock_app.confirm_permission.assert_awaited_once()
@@ -226,7 +226,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_app.confirm_permission = AsyncMock(return_value=False)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Confirm please")
-        with patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"}, app=mock_app)
         self.assertEqual(res.content, "ERR: denied 'read': by user")
 
@@ -234,7 +234,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         # No interactive app available and non-tty -> fall back to a textual denial.
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "No interactive app")
-        with patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("read", {"path": "foo.txt"})
         self.assertEqual(res.content, "ERR: denied 'read': requires user confirmation (No interactive app)")
 
@@ -242,12 +242,12 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "CLI test")
         with (
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdin.readline", return_value="y\n"),
             patch("sys.stderr.write"),
             patch("sys.stderr.flush"),
-            patch("core.tools.read.ReadTool.execute", return_value="file content"),
+            patch("johnston.core.tools.read.ReadTool.execute", return_value="file content"),
         ):
             res = await execute_tool("read", {"path": "foo.txt"})
         self.assertEqual(res.content, "file content")
@@ -256,7 +256,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "CLI test")
         with (
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             patch("sys.stdin.isatty", return_value=True),
             patch("sys.stdin.readline", return_value="n\n"),
             patch("sys.stderr.write"),
@@ -278,7 +278,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             async def call_tool_async(self, tool_name, arguments, target_server=None, timeout=None):
                 return "async mcp output"
 
-        with patch("core.infrastructure.mcp.get_mcp_manager", return_value=_FakeMCPManager()), self._mock_mode():
+        with patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=_FakeMCPManager()), self._mock_mode():
             res = await execute_tool("async_mcp", {"q": 1})
         self.assertEqual(res.content, "async mcp output")
 
@@ -289,8 +289,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Policy blocks it")
 
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             self._mock_mode(),
         ):
             res = await execute_tool("mcp_deny_tool", {"arg": "val"})
@@ -308,8 +308,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ALLOW, "")
 
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             self._mock_mode(),
         ):
             res = await execute_tool("mcp_allow_tool", {"arg": "val"})
@@ -325,8 +325,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Policy blocks it")
 
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             self._mock_mode(),
         ):
             res = await execute_tool("gh__search", {"q": "x"})
@@ -343,7 +343,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         )
 
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             self._mock_mode(),
         ):
             res = await execute_tool("err_mcp", {})
@@ -362,8 +362,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ALLOW, "")
 
         with (
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             self._mock_mode(),
         ):
             res = await execute_tool("mcp_huge_tool", {"arg": "val"})
@@ -373,15 +373,15 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertIn("log ", res.content)
 
     async def test_subagent_denies_ask_in_headless_mode(self):
-        from core.tools.context import ToolContext
-        from core.tools.read import ReadTool
+        from johnston.core.tools.context import ToolContext
+        from johnston.core.tools.read import ReadTool
 
         ctx = ToolContext(is_subagent=True)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Ask confirmation")
 
         with (
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             patch.object(ReadTool, "execute", new=AsyncMock(return_value="CONTENT_OK")),
         ):
             res = await execute_tool("read", {"path": "dummy.txt"}, context=ctx)
@@ -389,8 +389,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertIn("requires user confirmation", res.content)
 
     async def test_subagent_confirms_ask_in_ui_mode(self):
-        from core.tools.context import ToolContext
-        from core.tools.read import ReadTool
+        from johnston.core.tools.context import ToolContext
+        from johnston.core.tools.read import ReadTool
 
         mock_app = MagicMock()
         mock_app.push_screen_wait = MagicMock()
@@ -402,7 +402,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Ask confirmation")
 
         with (
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
             patch.object(ReadTool, "execute", new=AsyncMock(return_value="CONTENT_OK")),
         ):
             res = await execute_tool("read", {"path": "dummy.txt"}, context=ctx)
@@ -418,19 +418,19 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_subagent_respects_explicit_deny(self):
-        from core.tools.context import ToolContext
+        from johnston.core.tools.context import ToolContext
 
         ctx = ToolContext(is_subagent=True)
         mock_pm = MagicMock()
         mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.DENY, "Strictly forbidden")
 
-        with patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
+        with patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm):
             res = await execute_tool("shell", {"command": "rm -rf /"}, context=ctx)
         self.assertTrue(res.is_error)
         self.assertIn("ERR: denied 'shell'", res.content)
 
     async def test_mcp_tool_confirms_with_server_name(self):
-        from core.tools.context import ToolContext
+        from johnston.core.tools.context import ToolContext
 
         mock_app = MagicMock()
         mock_app.confirm_permission = AsyncMock(return_value=True)
@@ -446,8 +446,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         mock_mcp.call_tool_async = AsyncMock(return_value="QUERY_OK")
 
         with (
-            patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
-            patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp),
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp),
         ):
             res = await execute_tool("query_db", {"sql": "SELECT 1"}, context=ctx)
 

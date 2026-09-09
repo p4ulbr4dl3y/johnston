@@ -10,13 +10,13 @@ import unittest
 from contextlib import redirect_stderr
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.application.permission.permission_manager import PermissionManager
-from core.domain.policies.permission_policy import ExecutionMode
-from core.infrastructure.storage.session_store import SessionStore
-from core.interfaces.cli.commands.run_cmd import run_headless, run_headless_async
-from core.interfaces.cli.entrypoint import build_parser, main
-from widgets.app.app import JohnstonApp
-from widgets.chat_input import ChatInput
+from johnston.cli.commands.run_cmd import run_headless, run_headless_async
+from johnston.cli.entrypoint import build_parser, main
+from johnston.core.application.permission.permission_manager import PermissionManager
+from johnston.core.domain.policies.permission_policy import ExecutionMode
+from johnston.core.infrastructure.storage.session_store import SessionStore
+from johnston.tui.app.app import JohnstonApp
+from johnston.tui.chat_input import ChatInput
 
 
 class TestCLIRootParserFlags(unittest.TestCase):
@@ -187,16 +187,16 @@ class TestCLIDirectoryAndDebugExecution(unittest.TestCase):
     def test_entrypoint_valid_cwd_changes_dir(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             real_tmp = os.path.realpath(tmp_dir)
-            with patch("app.JohnstonApp.run"):
-                with patch("app.JohnstonApp.__init__", return_value=None):
+            with patch("johnston.tui.app.JohnstonApp.run"):
+                with patch("johnston.tui.app.JohnstonApp.__init__", return_value=None):
                     with self.assertRaises(SystemExit) as cm:
                         main(["-C", tmp_dir])
                     self.assertEqual(cm.exception.code, 0)
                     self.assertEqual(os.path.realpath(os.getcwd()), real_tmp)
 
     def test_entrypoint_debug_sets_logging_level(self):
-        with patch("app.JohnstonApp.run"):
-            with patch("app.JohnstonApp.__init__", return_value=None):
+        with patch("johnston.tui.app.JohnstonApp.run"):
+            with patch("johnston.tui.app.JohnstonApp.__init__", return_value=None):
                 with self.assertRaises(SystemExit) as cm:
                     main(["--debug"])
                 self.assertEqual(cm.exception.code, 0)
@@ -223,7 +223,7 @@ class TestCLIDirectoryAndDebugExecution(unittest.TestCase):
 
     def test_run_headless_debug_sets_logging(self):
         args = MagicMock(cwd=None, debug=True, prompt="test")
-        with patch("core.interfaces.cli.commands.run_cmd.run_headless_async", new_callable=AsyncMock) as mock_async:
+        with patch("johnston.cli.commands.run_cmd.run_headless_async", new_callable=AsyncMock) as mock_async:
             mock_async.return_value = 0
             code = run_headless(args)
             self.assertEqual(code, 0)
@@ -287,7 +287,7 @@ class TestJohnstonAppStartupFlags(unittest.TestCase):
             s2.messages = [{"role": "user", "text": "latest msg"}]
             store.save(s2)
 
-            with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
+            with patch("johnston.core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
                 with patch.object(SessionStore, "list_main_sessions", return_value=[{"id": "session-latest"}]):
                     app = JohnstonApp(continue_latest=True)
                     self.assertEqual(app.resume_session_id, "session-latest")
@@ -350,7 +350,7 @@ class TestRunCmdExecutionFlags(unittest.IsolatedAsyncioTestCase):
             json=False,
         )
 
-        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
+        with patch("johnston.core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
             code = await run_headless_async(args, pm=mock_pm)
 
         self.assertEqual(code, 0)
@@ -442,7 +442,7 @@ class TestRunCmdExecutionFlags(unittest.IsolatedAsyncioTestCase):
             json=False,
         )
 
-        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
+        with patch("johnston.core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
             code = await run_headless_async(args, pm=mock_pm)
 
         self.assertEqual(code, 0)
@@ -454,7 +454,7 @@ class TestLifecycleInitialPrompt(unittest.IsolatedAsyncioTestCase):
     """Test initial prompt posting in LifecycleMixin."""
 
     async def test_on_mount_schedules_initial_prompt(self):
-        from widgets.mixins.lifecycle import LifecycleMixin
+        from johnston.tui.mixins.lifecycle import LifecycleMixin
 
         class MockApp(LifecycleMixin):
             def __init__(self):
@@ -481,9 +481,9 @@ class TestLifecycleInitialPrompt(unittest.IsolatedAsyncioTestCase):
         app = MockApp()
         mock_mcp = MagicMock()
         mock_mcp.ensure_tools_ready_async = AsyncMock()
-        with patch("core.domain.policies.models_catalog.catalog.load_cache"):
-            with patch("core.domain.policies.models_catalog.catalog.refresh", new_callable=AsyncMock):
-                with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp):
+        with patch("johnston.core.domain.policies.models_catalog.catalog.load_cache"):
+            with patch("johnston.core.domain.policies.models_catalog.catalog.refresh", new_callable=AsyncMock):
+                with patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp):
                     app.on_mount()
 
         self.assertTrue(getattr(app, "_initial_prompt_posted", False))
@@ -499,9 +499,9 @@ class TestLifecycleInitialPrompt(unittest.IsolatedAsyncioTestCase):
 class TestMainEntrypointFlagDispatch(unittest.TestCase):
     """Test entrypoint.main() passes all new flags to JohnstonApp."""
 
-    @patch("app.JohnstonApp.run")
+    @patch("johnston.tui.app.JohnstonApp.run")
     def test_main_passes_all_flags(self, mock_run):
-        with patch("app.JohnstonApp.__init__", return_value=None) as mock_app_init:
+        with patch("johnston.tui.app.JohnstonApp.__init__", return_value=None) as mock_app_init:
             with self.assertRaises(SystemExit) as cm:
                 main([
                     "-c",
@@ -527,15 +527,15 @@ class TestMainEntrypointFlagDispatch(unittest.TestCase):
                 theme="zinc-dark",
             )
 
-    @patch("app.JohnstonApp.run")
+    @patch("johnston.tui.app.JohnstonApp.run")
     def test_main_branch_flag_switches_worktree(self, mock_run):
-        with patch("app.JohnstonApp.__init__", return_value=None), \
-             patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=True), \
-             patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.get_repo_root", return_value="/fake/repo"), \
-             patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.create_worktree", return_value=("/fake/wt", "feat/cool")), \
+        with patch("johnston.tui.app.JohnstonApp.__init__", return_value=None), \
+             patch("johnston.core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=True), \
+             patch("johnston.core.infrastructure.runtime.git_worktree.GitWorktreeManager.get_repo_root", return_value="/fake/repo"), \
+             patch("johnston.core.infrastructure.runtime.git_worktree.GitWorktreeManager.create_worktree", return_value=("/fake/wt", "feat/cool")), \
              patch("os.path.exists", return_value=True), \
              patch("os.chdir") as mock_chdir, \
-             patch("app.JohnstonApp.switch_project_dir") as mock_switch:
+             patch("johnston.tui.app.JohnstonApp.switch_project_dir") as mock_switch:
             with self.assertRaises(SystemExit) as cm:
                 main(["-b", "feat/cool"])
             self.assertEqual(cm.exception.code, 0)
@@ -543,7 +543,7 @@ class TestMainEntrypointFlagDispatch(unittest.TestCase):
             mock_switch.assert_called_once_with("/fake/wt", "feat/cool")
 
     def test_main_branch_flag_not_git_repo(self):
-        with patch("core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=False), \
+        with patch("johnston.core.infrastructure.runtime.git_worktree.GitWorktreeManager.is_git_repo", return_value=False), \
              patch("sys.stderr", new_callable=io.StringIO) as mock_err:
             with self.assertRaises(SystemExit) as cm:
                 main(["-b", "feat/fail"])

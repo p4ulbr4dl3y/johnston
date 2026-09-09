@@ -6,8 +6,8 @@ import time
 import unittest
 from unittest import mock
 
-from core.infrastructure.storage import git_checkpoint as gcp
-from core.infrastructure.storage.git_checkpoint import GitCheckpointManager
+from johnston.core.infrastructure.storage import git_checkpoint as gcp
+from johnston.core.infrastructure.storage.git_checkpoint import GitCheckpointManager
 
 
 class TestGitCheckpointManager(unittest.TestCase):
@@ -291,7 +291,7 @@ class TestGitCheckpointManager(unittest.TestCase):
         self.assertTrue(any("file_2.txt" in f for f in results[0][1]))
 
     def test_checkpoint_port_resolution(self):
-        from core.domain.ports.checkpoint import (
+        from johnston.core.domain.ports.checkpoint import (
             CheckpointPort,
             get_checkpoint_manager,
             set_default_checkpoint_manager,

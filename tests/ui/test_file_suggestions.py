@@ -1,8 +1,8 @@
 import asyncio
 import unittest
 
-from widgets.chat_input import ChatInput
-from widgets.command_suggestions import CommandSuggestions
+from johnston.tui.chat_input import ChatInput
+from johnston.tui.command_suggestions import CommandSuggestions
 
 
 def _run_async(coro):
@@ -19,13 +19,13 @@ class TestFileSuggestions(unittest.TestCase):
             self.assertEqual(suggestions.mode, "file")
             self.assertTrue(len(res) > 0)
             self.assertTrue(suggestions.display)
-            self.assertIn("app.py", res)
+            self.assertIn("pyproject.toml", res)
             self.assertTrue(any(f.endswith("/") for f in res), "Directories should be included with trailing slash")
 
-            # 2. Filtering by file name (e.g. '@app')
-            res_app = await suggestions.update_query("Check @app", "Check @app", 10)
+            # 2. Filtering by file name (e.g. '@pyproject')
+            res_py = await suggestions.update_query("Check @pyproject", "Check @pyproject", 16)
             self.assertEqual(suggestions.mode, "file")
-            self.assertIn("app.py", res_app)
+            self.assertIn("pyproject.toml", res_py)
 
             # 3. Ignoring email addresses (char before @ is not space nor start of line)
             await suggestions.update_query("test@domain.com", "test@domain.com", 15)

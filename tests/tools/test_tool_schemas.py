@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from core.tools.registry import TOOL_CLASSES, execute_tool, get_default_tools
+from johnston.core.tools.registry import TOOL_CLASSES, execute_tool, get_default_tools
 
 
 class TestToolSchemas(unittest.TestCase):
@@ -25,21 +25,21 @@ class TestToolSchemas(unittest.TestCase):
             )
 
     def test_shell_schema_documents_background_and_params(self):
-        from core.tools.shell import ShellTool
+        from johnston.core.tools.shell import ShellTool
 
         props = ShellTool.schema["function"]["parameters"]["properties"]
         self.assertNotIn("skip_confirm", props)
         self.assertNotIn("no_background", props)
 
     def test_kill_schema(self):
-        from core.tools.kill import KillTool
+        from johnston.core.tools.kill import KillTool
 
         props = KillTool.schema["function"]["parameters"]["properties"]
         self.assertIn("id", props)
         self.assertEqual(KillTool.schema["function"]["parameters"]["required"], ["id"])
 
     def test_invoke_subagent_dynamic_role_enum(self):
-        from core.tools.invoke_subagent import InvokeSubagentTool
+        from johnston.core.tools.invoke_subagent import InvokeSubagentTool
 
         tool = InvokeSubagentTool()
         schema = tool.get_schema()
@@ -49,7 +49,7 @@ class TestToolSchemas(unittest.TestCase):
         self.assertIn("explorer", role_prop["enum"])
 
     def test_read_content_offset_schema(self):
-        from core.tools.read import ReadTool
+        from johnston.core.tools.read import ReadTool
 
         props = ReadTool.schema["function"]["parameters"]["properties"]
         self.assertIn("content_offset", props)
@@ -57,7 +57,7 @@ class TestToolSchemas(unittest.TestCase):
         self.assertNotIn("detail", props)
 
     def test_message_subagent_schema(self):
-        from core.tools.message_subagent import MessageSubagentTool
+        from johnston.core.tools.message_subagent import MessageSubagentTool
 
         params = MessageSubagentTool.schema["function"]["parameters"]
         props = params["properties"]
@@ -66,7 +66,7 @@ class TestToolSchemas(unittest.TestCase):
         self.assertEqual(params["required"], ["id", "message"])
 
     def test_subagent_schema_has_title_and_no_branch_or_session_id(self):
-        from core.tools.invoke_subagent import InvokeSubagentTool
+        from johnston.core.tools.invoke_subagent import InvokeSubagentTool
 
         props = InvokeSubagentTool.schema["function"]["parameters"]["properties"]
         self.assertIn("title", props)
@@ -79,7 +79,7 @@ class TestToolSchemas(unittest.TestCase):
 
 class TestToolRegistryRegression(unittest.IsolatedAsyncioTestCase):
     async def test_execute_tool_read_by_canonical_name(self):
-        from core.application.permission.permission_manager import PermissionManager
+        from johnston.core.application.permission.permission_manager import PermissionManager
 
         PermissionManager.get_instance().set_session_override("read", "allow")
         fd, path = tempfile.mkstemp(dir=os.getcwd())

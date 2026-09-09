@@ -1,4 +1,4 @@
-"""Tests for the shared user-turn policy (core.domain.policies.messages).
+"""Tests for the shared user-turn policy (johnston.core.domain.policies.messages).
 
 The policy defines what counts as a "real user turn" in both message spaces
 (transcript events and agent history). Fork, rewind, git-checkpoint indexing
@@ -11,9 +11,9 @@ import shutil
 import tempfile
 import unittest
 
-from core.application.session.actions import _truncate_transcript
-from core.domain.entities.session import AgentSession
-from core.domain.policies.messages import (
+from johnston.core.application.session.actions import _truncate_transcript
+from johnston.core.domain.entities.session import AgentSession
+from johnston.core.domain.policies.messages import (
     count_history_user_turns,
     drop_stale_system_notes,
     find_history_user_cutoff,
@@ -25,7 +25,7 @@ from core.domain.policies.messages import (
     is_ui_visible_user_message,
     transcript_before_turn,
 )
-from core.infrastructure.storage.session_store import SessionStore
+from johnston.core.infrastructure.storage.session_store import SessionStore
 
 
 def _make_store(test_dir: str) -> SessionStore:

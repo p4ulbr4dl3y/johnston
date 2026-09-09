@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from core.infrastructure.storage.session_store import SessionStore
+from johnston.core.infrastructure.storage.session_store import SessionStore
 
 # ---------------------------------------------------------------------------
 # fixtures / helpers
@@ -27,7 +27,7 @@ def store(tmp_path):
     projects_dir.mkdir(exist_ok=True)
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
-    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
+    with patch("johnston.core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
         s = SessionStore(project_path=str(project))
         yield s
 
@@ -77,7 +77,7 @@ def test_roundtrip_persistence_between_separate_instances(tmp_path):
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
 
-    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
+    with patch("johnston.core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
         s1 = SessionStore(project_path=str(project))
         sess = s1.create_main("persistent")
         sess.messages = [{"type": "bot", "text": "across-instance"}]
@@ -188,7 +188,7 @@ def test_mid_write_crash_leaves_original_intact(store, monkeypatch):
     fpath = os.path.join(store.sessions_dir, "crash.jsonl")
     original_content = open(fpath, encoding="utf-8").read()
 
-    from core.infrastructure.platform import platform_utils
+    from johnston.core.infrastructure.platform import platform_utils
 
     def boom(src, dst):
         raise OSError("simulated crash after tmp write")
@@ -453,7 +453,7 @@ def test_delete_reload_from_fresh_store(store):
     store.create_main("gone")
     store.delete("gone")
     projects_dir = os.path.dirname(store.project_dir)
-    with patch("core.infrastructure.storage.session_store.PROJECTS_DIR", projects_dir):
+    with patch("johnston.core.infrastructure.storage.session_store.PROJECTS_DIR", projects_dir):
         s2 = SessionStore(project_path=store.project_path)
     assert s2.get("gone") is None, "deleted session must not reappear on fresh load"
 
@@ -579,7 +579,7 @@ def test_reconcile_compaction_divider_on_load(store):
 
 def test_save_session_with_non_serializable_objects(store):
     """Session save must not raise TypeError when messages or retry events contain Exception objects."""
-    from core.application.session.stream import stream_step_to_session_event
+    from johnston.core.application.session.stream import stream_step_to_session_event
 
     sess = store.create_main("non_serializable_sess")
     # Simulate stream_step_to_session_event with Exception object
@@ -603,7 +603,7 @@ def test_save_session_with_non_serializable_objects(store):
 
 
 def test_sanitize_session_event():
-    from core.domain.entities.session import sanitize_session_event
+    from johnston.core.domain.entities.session import sanitize_session_event
 
     data = {
         "str": "ok",
@@ -620,7 +620,7 @@ def test_sanitize_session_event():
 
 
 def test_serialize_session_jsonl_corrupted_fallback(store):
-    from core.infrastructure.storage.session_store import _serialize_session_jsonl
+    from johnston.core.infrastructure.storage.session_store import _serialize_session_jsonl
 
     sess = store.create_main("fallback_sess")
     sess.messages = [{"type": "good", "text": "hello"}]

@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from core.infrastructure.runtime.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
+from johnston.core.infrastructure.runtime.frontmatter import iter_md_files, parse_csv_list, parse_frontmatter
 
 # ---------------------------------------------------------------------------
 # parse_frontmatter

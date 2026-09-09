@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.infrastructure.mcp import MCPManager, MCPProcessClient
-from core.infrastructure.mcp.manager import DEFAULT_MCP_CALL_TIMEOUT
-from widgets.app.dispatch import COMMAND_REGISTRY
+from johnston.core.infrastructure.mcp import MCPManager, MCPProcessClient
+from johnston.core.infrastructure.mcp.manager import DEFAULT_MCP_CALL_TIMEOUT
+from johnston.tui.app.dispatch import COMMAND_REGISTRY
 
 
 def make_manager(project_dir=None) -> MCPManager:
@@ -285,7 +285,7 @@ class TestMCPManagerRegression(unittest.TestCase):
                 f,
             )
 
-        with self.assertLogs("core.infrastructure.mcp.manager", level="WARNING") as captured:
+        with self.assertLogs("johnston.core.infrastructure.mcp.manager", level="WARNING") as captured:
             servers = mm.load_servers()
 
         server_names = [s["name"] for s in servers]
@@ -319,7 +319,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         shutil.rmtree(self.test_dir)
 
     def test_get_mcp_manager_singleton(self):
-        from core.infrastructure.mcp import get_mcp_manager
+        from johnston.core.infrastructure.mcp import get_mcp_manager
 
         inst1 = get_mcp_manager(self.test_dir)
         self.assertEqual(inst1.project_dir, os.path.realpath(self.test_dir))
@@ -333,7 +333,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
     def test_list_changed_notification(self):
         from unittest.mock import MagicMock, patch
 
-        from core.infrastructure.mcp import MCPProcessClient
+        from johnston.core.infrastructure.mcp import MCPProcessClient
 
         client = MCPProcessClient("test", "echo")
         client.process = MagicMock()
@@ -354,7 +354,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
     def test_client_start_initialize_and_call_tool(self):
         from unittest.mock import MagicMock
 
-        from core.infrastructure.mcp import MCPProcessClient
+        from johnston.core.infrastructure.mcp import MCPProcessClient
 
         client = MCPProcessClient("mock_server", "echo hello", cwd=self.test_dir, env={"TEST_ENV": "1"})
 
@@ -416,7 +416,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
                 self.assertTrue(client._stopped)
 
     def test_out_of_order_responses_buffering(self):
-        from core.infrastructure.mcp import MCPProcessClient
+        from johnston.core.infrastructure.mcp import MCPProcessClient
 
         client = MCPProcessClient("buffer_test", "echo 1")
         client.process = unittest.mock.MagicMock()
@@ -443,7 +443,7 @@ class TestMCPProcessClientAndExtra(unittest.TestCase):
         self.assertEqual(res2["id"], 2)
 
     def test_client_call_tool_not_running(self):
-        from core.infrastructure.mcp import MCPProcessClient
+        from johnston.core.infrastructure.mcp import MCPProcessClient
 
         client = MCPProcessClient("dead_server", ["invalid_command_xyz_12345"])
         client.start = lambda: False
@@ -457,7 +457,7 @@ class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
         import asyncio
         from unittest.mock import MagicMock
 
-        from core.infrastructure.mcp import MCPProcessClient
+        from johnston.core.infrastructure.mcp import MCPProcessClient
 
         test_dir = tempfile.mkdtemp()
         try:
@@ -488,7 +488,7 @@ class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
     async def test_call_tool_async_after_sync_start(self):
         import sys
 
-        from core.infrastructure.mcp import MCPProcessClient
+        from johnston.core.infrastructure.mcp import MCPProcessClient
 
         # Python script that reads JSON-RPC requests from stdin and responds
         script = (
@@ -737,7 +737,7 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
         failed.stop_async = AsyncMock()
         failed.last_error = "boom"
 
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed) as mk:
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed) as mk:
             tools = await m.get_active_tools_async()
 
         self.assertEqual(tools, [])
@@ -762,7 +762,7 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
         hanging.start_async = AsyncMock(side_effect=raise_timeout)
         hanging.stop_async = AsyncMock()
 
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=hanging):
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=hanging):
             tools = await m.get_active_tools_async()
 
         self.assertEqual(tools, [])
@@ -816,7 +816,7 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
         client.last_error = None
         client.tools = [{"name": "t1"}]
 
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=client) as mk:
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=client) as mk:
             await m.warm_server_async("x")
 
         mk.assert_called_once()
@@ -829,7 +829,7 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
             {"name": "off", "command": "python", "enabled": False},
             {"name": "other", "command": "python"},
         ]
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient") as mk:
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient") as mk:
             await m.warm_server_async("off")
             await m.warm_server_async("missing")
         mk.assert_not_called()
@@ -848,7 +848,7 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
         failed.stop_async = AsyncMock()
         failed.last_error = "Process start failed: boom"
 
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed):
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed):
             await m.get_active_tools_async()
 
         self.assertEqual(m._server_errors.get("bad"), "Process start failed: boom")
@@ -861,7 +861,7 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
         ok_client.last_error = None
         ok_client.tools = [{"name": "t1"}]
 
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=ok_client):
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=ok_client):
             await m.warm_server_async("bad")
 
         self.assertNotIn("bad", m._server_errors)
@@ -911,7 +911,7 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
         failed.start.return_value = False
         failed.last_error = "start failed"
         failed.tools = []
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed):
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=failed):
             self.assertEqual(m.get_active_tools(), [])
         self.assertEqual(m._server_errors.get("s"), "start failed")
         self.assertNotIn("s", m.clients)
@@ -920,7 +920,7 @@ class BugTests(unittest.IsolatedAsyncioTestCase):
         ok.start.return_value = True
         ok.last_error = None
         ok.tools = [{"name": "t1"}]
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=ok):
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=ok):
             tools = m.get_active_tools()
         self.assertEqual([t["function"]["name"] for t in tools], ["t1"])
         self.assertNotIn("s", m._server_errors)
@@ -1177,7 +1177,7 @@ class DefaultTimeoutEdge(unittest.TestCase):
         shutil.rmtree(self.tmp)
 
     def test_call_tool_applies_default_timeout(self):
-        from core.infrastructure.mcp.manager import DEFAULT_MCP_CALL_TIMEOUT
+        from johnston.core.infrastructure.mcp.manager import DEFAULT_MCP_CALL_TIMEOUT
 
         m = make_manager(self.tmp)
         seen = {}
@@ -1303,7 +1303,7 @@ class UiInteractionRegression(unittest.IsolatedAsyncioTestCase):
         ok_client.tools = [{"name": "t1"}]
         ok_client.last_error = None
 
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=ok_client) as mk:
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=ok_client) as mk:
             results = await asyncio.gather(
                 m._load_server_tools_async(self._server()),
                 m._load_server_tools_async(self._server()),
@@ -1335,7 +1335,7 @@ class UiInteractionRegression(unittest.IsolatedAsyncioTestCase):
         client.last_error = None
         client.process = None
 
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
             warmup = asyncio.create_task(m.ensure_tools_ready_async())
             await started.wait()
             # Half-started client is already reachable before its start returns.
@@ -1360,7 +1360,7 @@ class UiInteractionRegression(unittest.IsolatedAsyncioTestCase):
         await lock.acquire()
         m._start_locks = {"srv": lock}
 
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient") as mk:
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient") as mk:
             task = asyncio.create_task(m._load_server_tools_async(self._server()))
             await asyncio.sleep(0)
             m.stop_all()
@@ -1390,7 +1390,7 @@ class UiInteractionRegression(unittest.IsolatedAsyncioTestCase):
         client.last_error = None
         client.process = None
 
-        with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
+        with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
             task = asyncio.create_task(m._load_server_tools_async(self._server()))
             await started.wait()
             task.cancel()

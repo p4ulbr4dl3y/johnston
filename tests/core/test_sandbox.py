@@ -2,7 +2,7 @@ import os
 import subprocess
 from unittest.mock import patch
 
-from core.infrastructure.platform.sandbox import (
+from johnston.core.infrastructure.platform.sandbox import (
     _build_bwrap_args,
     _escape_sbpl_path,
     build_sandboxed_command,
@@ -36,14 +36,14 @@ def test_is_sandbox_supported():
     with (
         patch("platform.system", return_value="Darwin"),
         patch("os.path.exists", return_value=True),
-        patch("core.infrastructure.platform.sandbox._check_seatbelt", return_value=True),
+        patch("johnston.core.infrastructure.platform.sandbox._check_seatbelt", return_value=True),
     ):
         assert is_sandbox_supported() is True
 
     with (
         patch("platform.system", return_value="Linux"),
         patch("shutil.which", return_value="/usr/bin/bwrap"),
-        patch("core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
+        patch("johnston.core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
     ):
         assert is_sandbox_supported() is True
 
@@ -58,7 +58,7 @@ def test_build_sandboxed_command_darwin():
     with (
         patch("platform.system", return_value="Darwin"),
         patch("os.path.exists", return_value=True),
-        patch("core.infrastructure.platform.sandbox._check_seatbelt", return_value=True),
+        patch("johnston.core.infrastructure.platform.sandbox._check_seatbelt", return_value=True),
     ):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
         assert exe == "/usr/bin/sandbox-exec"
@@ -71,7 +71,7 @@ def test_build_sandboxed_command_linux():
     with (
         patch("platform.system", return_value="Linux"),
         patch("shutil.which", return_value="/usr/bin/bwrap"),
-        patch("core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
+        patch("johnston.core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
     ):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
         assert exe == "/usr/bin/bwrap"
@@ -85,14 +85,14 @@ def test_build_sandboxed_command_linux_bwrap_unusable_falls_back():
     with (
         patch("platform.system", return_value="Linux"),
         patch("shutil.which", return_value="/usr/bin/bwrap"),
-        patch("core.infrastructure.platform.sandbox._check_bwrap", return_value=False),
+        patch("johnston.core.infrastructure.platform.sandbox._check_bwrap", return_value=False),
     ):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir")
         assert sandboxed is False
 
 
 def test_check_bwrap_probes_once_and_caches(tmp_path):
-    import core.infrastructure.platform.sandbox as sbx
+    import johnston.core.infrastructure.platform.sandbox as sbx
 
     sbx._bwrap_probe_cache.clear()
     fake = str(tmp_path / "bwrap")
@@ -210,7 +210,7 @@ def test_build_sandboxed_command_read_only_darwin():
     with (
         patch("platform.system", return_value="Darwin"),
         patch("os.path.exists", return_value=True),
-        patch("core.infrastructure.platform.sandbox._check_seatbelt", return_value=True),
+        patch("johnston.core.infrastructure.platform.sandbox._check_seatbelt", return_value=True),
     ):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir", allow_workspace_writes=False)
         assert sandboxed is True
@@ -222,7 +222,7 @@ def test_build_sandboxed_command_read_only_linux():
     with (
         patch("platform.system", return_value="Linux"),
         patch("shutil.which", return_value="/usr/bin/bwrap"),
-        patch("core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
+        patch("johnston.core.infrastructure.platform.sandbox._check_bwrap", return_value=True),
     ):
         exe, args, sandboxed = build_sandboxed_command("echo 1", cwd="/tmp/test_dir", allow_workspace_writes=False)
         assert sandboxed is True
@@ -238,7 +238,7 @@ def test_is_path_readable_in_sandbox():
 
 
 def test_load_and_save_sandbox_config(tmp_path):
-    from core.infrastructure.config.config_helpers import load_sandbox_config, save_sandbox_config
+    from johnston.core.infrastructure.config.config_helpers import load_sandbox_config, save_sandbox_config
 
     cfg_file = str(tmp_path / "config.json")
     assert load_sandbox_config(cfg_file) is False
@@ -251,7 +251,7 @@ def test_load_and_save_sandbox_config(tmp_path):
 
 
 def test_get_git_worktree_writable_roots(tmp_path):
-    import core.infrastructure.platform.sandbox as sbx
+    import johnston.core.infrastructure.platform.sandbox as sbx
 
     # Non-worktree: returns empty
     non_wt = tmp_path / "plain_dir"
@@ -283,7 +283,7 @@ def test_get_git_worktree_writable_roots(tmp_path):
 
 
 def test_get_default_writable_cache_roots(monkeypatch):
-    import core.infrastructure.platform.sandbox as sbx
+    import johnston.core.infrastructure.platform.sandbox as sbx
 
     monkeypatch.setenv("UV_CACHE_DIR", "/custom/uv/cache")
     monkeypatch.setenv("XDG_CACHE_HOME", "/custom/xdg/cache")
@@ -307,7 +307,7 @@ def test_get_default_writable_cache_roots(monkeypatch):
 
 
 def test_check_seatbelt_probes_and_caches(tmp_path):
-    import core.infrastructure.platform.sandbox as sbx
+    import johnston.core.infrastructure.platform.sandbox as sbx
 
     sbx._seatbelt_probe_cache.clear()
     fake_exe = str(tmp_path / "sandbox-exec")

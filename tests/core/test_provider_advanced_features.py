@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.application.provider.provider_manager import ProviderManager
-from core.base_provider import BaseAgent
+from johnston.core.application.provider.provider_manager import ProviderManager
+from johnston.core.base_provider import BaseAgent
 
 
 class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
@@ -38,8 +38,8 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
     "chunk_timeout": 20.0
   }
 }""")
-            with patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", json_file):
-                with patch("core.application.provider.provider_manager.CONFIG_DIR", tmpdir):
+            with patch("johnston.core.application.provider.provider_manager.PROVIDERS_JSON_FILE", json_file):
+                with patch("johnston.core.application.provider.provider_manager.CONFIG_DIR", tmpdir):
                     pm = ProviderManager()
                     agent = pm.create_agent_for_provider("test_custom")
                     self.assertIsNotNone(agent)
@@ -51,8 +51,8 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
     def test_provider_disabling(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             prov_file = os.path.join(tmpdir, "providers.json")
-            with patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", prov_file):
-                with patch("core.application.provider.provider_manager.CONFIG_DIR", tmpdir):
+            with patch("johnston.core.application.provider.provider_manager.PROVIDERS_JSON_FILE", prov_file):
+                with patch("johnston.core.application.provider.provider_manager.CONFIG_DIR", tmpdir):
                     pm = ProviderManager()
                     self.assertEqual(pm.get_disabled_providers(), [])
                     pm.set_provider_disabled("xai", True)
@@ -70,8 +70,8 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_models_grouped_excludes_disabled(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             prov_file = os.path.join(tmpdir, "providers.json")
-            with patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", prov_file):
-                with patch("core.application.provider.provider_manager.CONFIG_DIR", tmpdir):
+            with patch("johnston.core.application.provider.provider_manager.PROVIDERS_JSON_FILE", prov_file):
+                with patch("johnston.core.application.provider.provider_manager.CONFIG_DIR", tmpdir):
                     pm = ProviderManager()
                     pm.set_provider_disabled("openai", True)
                     with patch.object(pm, "fetch_models_for_provider", new_callable=AsyncMock) as mock_fetch:
@@ -94,8 +94,8 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
     "api_type": "openai"
   }
 }""")
-            with patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", json_file):
-                with patch("core.application.provider.provider_manager.CONFIG_DIR", tmpdir):
+            with patch("johnston.core.application.provider.provider_manager.PROVIDERS_JSON_FILE", json_file):
+                with patch("johnston.core.application.provider.provider_manager.CONFIG_DIR", tmpdir):
                     pm = ProviderManager()
                     agent = pm.create_agent_for_provider("test_no_max")
                     self.assertIsNotNone(agent)
@@ -107,9 +107,9 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
         config_file = os.path.join(tmpdir.name, "config.json")
         providers_file = os.path.join(tmpdir.name, "providers.json")
         self._tmpdir = tmpdir
-        self._patch1 = patch("core.application.provider.provider_manager.CONFIG_FILE", config_file)
-        self._patch2 = patch("core.application.provider.provider_manager.CONFIG_DIR", tmpdir.name)
-        self._patch3 = patch("core.application.provider.provider_manager.PROVIDERS_JSON_FILE", providers_file)
+        self._patch1 = patch("johnston.core.application.provider.provider_manager.CONFIG_FILE", config_file)
+        self._patch2 = patch("johnston.core.application.provider.provider_manager.CONFIG_DIR", tmpdir.name)
+        self._patch3 = patch("johnston.core.application.provider.provider_manager.PROVIDERS_JSON_FILE", providers_file)
         self._patch1.start()
         self._patch2.start()
         self._patch3.start()
@@ -159,7 +159,7 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
             self._teardown_pm()
 
     def test_set_provider_credentials_empty_key_does_not_activate_key_required(self):
-        from core.application.provider.actions import set_provider_credentials
+        from johnston.core.application.provider.actions import set_provider_credentials
 
         pm = self._make_pm()
         try:
@@ -174,7 +174,7 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
             self._teardown_pm()
 
     def test_set_provider_credentials_empty_key_activates_no_key_provider(self):
-        from core.application.provider.actions import set_provider_credentials
+        from johnston.core.application.provider.actions import set_provider_credentials
 
         pm = self._make_pm()
         try:
@@ -190,14 +190,14 @@ class TestProviderAdvancedFeatures(unittest.IsolatedAsyncioTestCase):
             self._teardown_pm()
 
     def test_set_provider_credentials_nonempty_key_enables_and_activates(self):
-        from core.application.provider.actions import set_provider_credentials
+        from johnston.core.application.provider.actions import set_provider_credentials
 
         pm = self._make_pm()
         try:
             pm.set_active_provider_key("openai")
             pm.set_provider_disabled("anthropic", True)
             app = MagicMock()
-            with patch("core.application.provider.actions._refresh_models_background"):
+            with patch("johnston.core.application.provider.actions._refresh_models_background"):
                 result = set_provider_credentials(pm, "anthropic", "sk-test", app)
             self.assertTrue(result)
             self.assertEqual(pm.get_active_provider_key(), "anthropic")

@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from core.infrastructure.platform.terminal_theme import (
+from johnston.core.infrastructure.platform.terminal_theme import (
     _cbrt,
     compute_adaptive_border,
     compute_adaptive_surface,
@@ -17,7 +17,7 @@ from core.infrastructure.platform.terminal_theme import (
 
 
 def test_cbrt_fallback(monkeypatch):
-    import core.infrastructure.platform.terminal_theme as tt
+    import johnston.core.infrastructure.platform.terminal_theme as tt
 
     # Direct test
     assert round(_cbrt(8.0), 4) == 2.0
@@ -107,7 +107,7 @@ def test_parse_osc_palette():
 def test_query_terminal_palette_fallback(monkeypatch):
     monkeypatch.setenv("COLORFGBG", "15;0")
     # Reset cached value
-    import core.infrastructure.platform.terminal_theme as tt
+    import johnston.core.infrastructure.platform.terminal_theme as tt
 
     tt._CACHED_TERMINAL_COLORS = None
     bg, fg = query_terminal_palette()
@@ -116,14 +116,14 @@ def test_query_terminal_palette_fallback(monkeypatch):
 
 
 def test_query_terminal_palette_windows_mock(monkeypatch):
-    import core.infrastructure.platform.terminal_theme as tt
+    import johnston.core.infrastructure.platform.terminal_theme as tt
 
     monkeypatch.delenv("COLORFGBG", raising=False)
     monkeypatch.setattr(tt.sys, "platform", "win32")
     monkeypatch.setattr(tt.sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr(tt.sys.stdout, "isatty", lambda: True)
     monkeypatch.setattr(
-        "core.infrastructure.platform.terminal_theme._query_windows_palette",
+        "johnston.core.infrastructure.platform.terminal_theme._query_windows_palette",
         lambda timeout: ("#181818", "#f0f0f0"),
     )
 
@@ -134,7 +134,7 @@ def test_query_terminal_palette_windows_mock(monkeypatch):
 
 
 def test_clear_palette_cache():
-    import core.infrastructure.platform.terminal_theme as tt
+    import johnston.core.infrastructure.platform.terminal_theme as tt
 
     tt._CACHED_TERMINAL_COLORS = ("#111111", "#eeeeee")
     tt.clear_palette_cache()
@@ -142,7 +142,7 @@ def test_clear_palette_cache():
 
 
 def test_lerp_oklab():
-    from core.infrastructure.platform.terminal_theme import lerp_oklab
+    from johnston.core.infrastructure.platform.terminal_theme import lerp_oklab
 
     # t=0.0 should return c1
     assert lerp_oklab("#000000", "#ffffff", 0.0) == "#000000"
@@ -155,7 +155,7 @@ def test_lerp_oklab():
 
 
 def test_detect_os_theme_dark(monkeypatch):
-    from core.infrastructure.platform.terminal_theme import detect_os_theme_dark
+    from johnston.core.infrastructure.platform.terminal_theme import detect_os_theme_dark
 
     # Fallback / generic test
     is_dark = detect_os_theme_dark()
@@ -163,7 +163,7 @@ def test_detect_os_theme_dark(monkeypatch):
 
 
 def test_compute_adaptive_palette_dark_and_light():
-    from core.infrastructure.platform.terminal_theme import compute_adaptive_palette
+    from johnston.core.infrastructure.platform.terminal_theme import compute_adaptive_palette
 
     # Dark background
     dark_pal = compute_adaptive_palette(terminal_bg="#111111", terminal_fg="#eeeeee")
@@ -184,7 +184,7 @@ def test_compute_adaptive_palette_dark_and_light():
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX termios palette query")
 def test_query_posix_palette_tmux_wrapper(monkeypatch):
-    import core.infrastructure.platform.terminal_theme as tt
+    import johnston.core.infrastructure.platform.terminal_theme as tt
 
     written = []
 
@@ -213,7 +213,7 @@ def test_query_posix_palette_tmux_wrapper(monkeypatch):
 
 
 def test_query_terminal_palette_second_call_hits_cache(monkeypatch):
-    import core.infrastructure.platform.terminal_theme as tt
+    import johnston.core.infrastructure.platform.terminal_theme as tt
 
     monkeypatch.delenv("COLORFGBG", raising=False)
     monkeypatch.setattr(tt.sys, "platform", "linux")

@@ -1,4 +1,4 @@
-"""Edge-case tests for core.adapters.base helpers.
+"""Edge-case tests for johnston.core.adapters.base helpers.
 
 Focus on robustness of shared helpers rather than provider wire parsing.
 All pure functions; network-level helpers use mocks.
@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from core.adapters.base import (
+from johnston.core.adapters.base import (
     ImageDetails,
     build_adapter_usage_event,
     check_httpx_response_status,

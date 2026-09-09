@@ -1,4 +1,4 @@
-"""Tool-execution tests for core.base_provider (tools area).
+"""Tool-execution tests for johnston.core.base_provider (tools area).
 
 Split out of the former test_base_provider monolith: real tool execution via
 ``execute_tool``, runtime tool-policy enforcement, and tool stream/results
@@ -10,16 +10,16 @@ import tempfile
 import unittest
 import unittest.mock
 
-from core.base_provider import BaseAgent
-from core.domain.defaults.errors import ToolResult
-from core.roles.role_registry import AgentRole
-from core.tools.registry import execute_tool
+from johnston.core.base_provider import BaseAgent
+from johnston.core.domain.defaults.errors import ToolResult
+from johnston.core.roles.role_registry import AgentRole
+from johnston.core.tools.registry import execute_tool
 from tests.core._base_provider_helpers import _MockStream, _text_chunk, _tool_call_chunk, make_agent
 
 
 class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        from core.application.permission.permission_manager import PermissionManager
+        from johnston.core.application.permission.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         pm.set_session_override("shell", "allow")
@@ -107,7 +107,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_kill_tool(self):
         class DummyApp:
             def __init__(self):
-                from core.infrastructure.tasks.manager import TaskManager
+                from johnston.core.infrastructure.tasks.manager import TaskManager
 
                 self.task_manager = TaskManager()
 
@@ -118,7 +118,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_task_tool_foreground(self):
         import tempfile
 
-        from core.infrastructure.storage.session_store import SessionStore
+        from johnston.core.infrastructure.storage.session_store import SessionStore
 
         _tmp = tempfile.TemporaryDirectory()
         self.addCleanup(_tmp.cleanup)
@@ -151,7 +151,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
     async def test_task_tool_background(self):
         import tempfile
 
-        from core.infrastructure.storage.session_store import SessionStore
+        from johnston.core.infrastructure.storage.session_store import SessionStore
 
         _tmp = tempfile.TemporaryDirectory()
         self.addCleanup(_tmp.cleanup)
@@ -198,7 +198,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sessions[0].status, "running")
 
     def test_truncate_output_helper(self):
-        from core.tools.base import truncate_output
+        from johnston.core.tools.base import truncate_output
 
         short_text = "hello"
         self.assertEqual(truncate_output(short_text, max_chars=10), "hello")

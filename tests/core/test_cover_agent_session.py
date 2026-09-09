@@ -4,15 +4,15 @@ import logging
 import unittest
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
-import core.infrastructure.runtime.circuit_breaker as cb_mod
-from core.application.session.actions import (
+import johnston.core.infrastructure.runtime.circuit_breaker as cb_mod
+from johnston.core.application.session.actions import (
     CompactionOutcome,
     compact_session,
     get_rewind_git_stats,
     rewind_session,
 )
-from core.base_provider import BaseAgent
-from core.base_provider import agent as agent_mod
+from johnston.core.base_provider import BaseAgent
+from johnston.core.base_provider import agent as agent_mod
 
 
 def _reset_circuit():
@@ -177,8 +177,8 @@ class TestAgentCompactionCoverage(unittest.IsolatedAsyncioTestCase):
         agent = self._make_agent()
         agent.history = self._big_history()
         agent.tool_executor = AsyncMock(return_value="ok")
-        with patch("core.base_provider.agent.estimate_tokens", side_effect=_compaction_estimator):
-            with patch("core.base_provider.BaseAgent.context_limit", new_callable=PropertyMock) as lim:
+        with patch("johnston.core.base_provider.agent.estimate_tokens", side_effect=_compaction_estimator):
+            with patch("johnston.core.base_provider.BaseAgent.context_limit", new_callable=PropertyMock) as lim:
                 lim.return_value = 100
                 with patch.object(agent, "compact_history", new=AsyncMock(return_value=(True, "Hist (7 → 3 tok)"))):
                     with patch.object(
@@ -270,7 +270,7 @@ class TestAgentAdapterStreams(unittest.IsolatedAsyncioTestCase):
                         yield item
 
         fake = F([iter([("adapter_thought", "deep"), ("adapter_text", "answer")])])
-        with patch("core.adapters.get_adapter", return_value=fake):
+        with patch("johnston.core.adapters.get_adapter", return_value=fake):
             events = []
             async for evt in agent.stream_steps("hi"):
                 events.append(evt)
@@ -298,7 +298,7 @@ class TestAgentAdapterStreams(unittest.IsolatedAsyncioTestCase):
                 iter([("adapter_text", "done")]),
             ]
         )
-        with patch("core.adapters.get_adapter", return_value=fake):
+        with patch("johnston.core.adapters.get_adapter", return_value=fake):
             events = []
             async for evt in agent.stream_steps("run"):
                 events.append(evt)
@@ -398,7 +398,7 @@ class HistoryAgent:
 
 class _CompactionTokensTests(unittest.TestCase):
     def test_parse_tokens_skip_m_and_single(self):
-        from core.application.session.actions import _parse_compaction_tokens
+        from johnston.core.application.session.actions import _parse_compaction_tokens
 
         # dot-only number -> continue (line 69); single number -> default (line 77)
         t = _parse_compaction_tokens("Some summary (5 → . tokens)")
@@ -426,7 +426,7 @@ class TestCompactSessionMore(unittest.IsolatedAsyncioTestCase):
 
 class TestGetRewindGitStats(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_checkpoint_target_raises(self):
-        from core.infrastructure.storage import git_checkpoint as gcm
+        from johnston.core.infrastructure.storage import git_checkpoint as gcm
 
         with patch.object(
             gcm.GitCheckpointManager,
@@ -437,7 +437,7 @@ class TestGetRewindGitStats(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(entries[0].git_stats, "")
 
     async def test_diff_stats_batch_raises(self):
-        from core.infrastructure.storage import git_checkpoint as gcm
+        from johnston.core.infrastructure.storage import git_checkpoint as gcm
 
         with patch.object(gcm.GitCheckpointManager, "is_valid_checkpoint_target", return_value=True):
             with patch.object(
@@ -469,14 +469,14 @@ class TestRewindExtraPaths(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent.history, [])
 
     async def test_git_restore_failure_logs_warning(self):
-        from core.infrastructure.storage import git_checkpoint as gcm
+        from johnston.core.infrastructure.storage import git_checkpoint as gcm
 
         agent = DummyAgent()
         agent.history = [{"role": "user", "content": "m"}]
         logged = []
         with patch.object(gcm.GitCheckpointManager, "restore_checkpoint", side_effect=RuntimeError("boom")):
             with patch.object(gcm.GitCheckpointManager, "purge_checkpoints_after", new=MagicMock(return_value=None)):
-                with patch.object(logging.getLogger("core.application.session.actions"), "warning", side_effect=lambda *a, **k: logged.append(a)):
+                with patch.object(logging.getLogger("johnston.core.application.session.actions"), "warning", side_effect=lambda *a, **k: logged.append(a)):
                     rewind_session(agent, "sess-1", "/proj", [(0, "m")], 0, **_noop_cbs())
                     task = agent.rewind_git_restore_task
                     await asyncio.wait_for(asyncio.shield(task), timeout=5)
@@ -484,8 +484,8 @@ class TestRewindExtraPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Git checkpoint restore failed", str(logged[0]))
 
     async def test_rewind_chains_after_previous_restore_task(self):
-        from core.application.session import actions as actions_mod
-        from core.infrastructure.storage import git_checkpoint as gcm
+        from johnston.core.application.session import actions as actions_mod
+        from johnston.core.infrastructure.storage import git_checkpoint as gcm
 
         agent = DummyAgent()
         agent.history = [{"role": "user", "content": "m"}]
@@ -519,8 +519,8 @@ class TestRewindExtraPaths(unittest.IsolatedAsyncioTestCase):
 
 class TestRecordSessionCompaction(unittest.TestCase):
     def test_record_compaction_on_agent_session(self):
-        from core.domain.entities.session import AgentSession
-        from core.infrastructure.runtime.session_interruption import record_session_compaction
+        from johnston.core.domain.entities.session import AgentSession
+        from johnston.core.infrastructure.runtime.session_interruption import record_session_compaction
 
         sess = AgentSession("test_id")
         record_session_compaction(sess, "Session Compacted (10k → 2k)")
@@ -529,7 +529,7 @@ class TestRecordSessionCompaction(unittest.TestCase):
         self.assertEqual(sess.messages[0]["text"], "Session Compacted (10k → 2k)")
 
     def test_record_session_compaction_none_or_plain_object(self):
-        from core.infrastructure.runtime.session_interruption import record_session_compaction
+        from johnston.core.infrastructure.runtime.session_interruption import record_session_compaction
 
         record_session_compaction(None)
         mock_obj = MagicMock()

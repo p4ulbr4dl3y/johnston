@@ -3,9 +3,9 @@
 import pytest
 from pygments.token import Token
 
-from core.domain.defaults.themes import list_themes
-from core.domain.entities.theme import Theme, is_ansi_theme
-from widgets.app.theme_manager import ThemeManager
+from johnston.core.domain.defaults.themes import list_themes
+from johnston.core.domain.entities.theme import Theme, is_ansi_theme
+from johnston.tui.app.theme_manager import ThemeManager
 
 
 def test_theme_entity_creation():
@@ -110,9 +110,9 @@ def test_theme_manager_textual_theme_conversion():
 
 def test_theme_persistence(tmp_path, monkeypatch):
     cfg_file = str(tmp_path / "config.json")
-    monkeypatch.setattr("core.infrastructure.platform.paths.CONFIG_FILE", cfg_file)
+    monkeypatch.setattr("johnston.core.infrastructure.platform.paths.CONFIG_FILE", cfg_file)
 
-    from core.infrastructure.config.config_helpers import load_theme_config, save_theme_config
+    from johnston.core.infrastructure.config.config_helpers import load_theme_config, save_theme_config
 
     assert load_theme_config(cfg_file) is None
 
@@ -201,8 +201,8 @@ def test_theme_manager_singleton_and_reset():
 
 
 def test_themes_loader_module():
-    import core.domain.defaults.themes as themes_mod
-    from core.domain.defaults.themes import (
+    import johnston.core.domain.defaults.themes as themes_mod
+    from johnston.core.domain.defaults.themes import (
         DEFAULT_THEME_NAME,
         ZINC_DARK,
         get_theme,
@@ -225,14 +225,14 @@ def test_themes_loader_module():
 
 
 def test_ui_theme_manager_adapted_theme(monkeypatch):
-    from widgets.app.theme_manager import ThemeManager as UIThemeManager
+    from johnston.tui.app.theme_manager import ThemeManager as UIThemeManager
 
     UIThemeManager.reset_instance()
     mgr = UIThemeManager(default_theme="native")
 
     # Mock terminal palette query to light terminal
     monkeypatch.setattr(
-        "core.infrastructure.platform.terminal_theme.query_terminal_palette",
+        "johnston.core.infrastructure.platform.terminal_theme.query_terminal_palette",
         lambda: ("#ffffff", "#000000"),
     )
 
@@ -251,7 +251,7 @@ def test_ui_theme_manager_adapted_theme(monkeypatch):
 
     # Now mock dark terminal
     monkeypatch.setattr(
-        "core.infrastructure.platform.terminal_theme.query_terminal_palette",
+        "johnston.core.infrastructure.platform.terminal_theme.query_terminal_palette",
         lambda: ("#0d1117", "#c9d1d9"),
     )
     adapted_dark = mgr.get_adapted_theme("native")
@@ -295,13 +295,13 @@ def test_theme_variable_resolution():
 
 
 def test_ui_theme_manager_native_listener_receives_adapted(monkeypatch):
-    from widgets.app.theme_manager import ThemeManager as UIThemeManager
+    from johnston.tui.app.theme_manager import ThemeManager as UIThemeManager
 
     UIThemeManager.reset_instance()
     mgr = UIThemeManager()
 
     monkeypatch.setattr(
-        "core.infrastructure.platform.terminal_theme.query_terminal_palette",
+        "johnston.core.infrastructure.platform.terminal_theme.query_terminal_palette",
         lambda: ("#ffffff", "#000000"),
     )
 
@@ -319,7 +319,7 @@ def test_ui_theme_manager_native_listener_receives_adapted(monkeypatch):
 def test_chat_markdown_theme_sync():
     from textual.widgets._markdown import MarkdownTableCellContents
 
-    from widgets.presentation.widgets.chat_markdown import (
+    from johnston.tui.presentation.widgets.chat_markdown import (
         _apply_chat_markdown_patches,
         _new_markdown_block_get_style,
         sync_theme_styles,
@@ -351,13 +351,13 @@ def test_chat_markdown_theme_sync():
     assert cell_style.foreground.hex.lower() == "#ff0000"
     assert cell_style.background.hex.lower() == "#00ff00"
 
-    from core.domain.defaults.themes import ZINC_DARK
+    from johnston.core.domain.defaults.themes import ZINC_DARK
     sync_theme_styles(ZINC_DARK)
 
 
 def test_builtin_themes_wcag_contrast():
     """Ensure all built-in static themes meet WCAG AA contrast guidelines."""
-    from core.domain.defaults.themes import list_themes
+    from johnston.core.domain.defaults.themes import list_themes
 
     def srgb_to_linear(c: float) -> float:
         c_val = c / 255.0
@@ -444,9 +444,9 @@ def test_theme_accent_properties():
 
 
 def test_dynamic_diff_and_tool_colors():
-    from widgets.presentation.tool_mixins import ParsingMixin
-    from widgets.presentation.widgets.chat_diff import get_diff_colors
-    from widgets.presentation.widgets.footer_layout import get_status_separators
+    from johnston.tui.presentation.tool_mixins import ParsingMixin
+    from johnston.tui.presentation.widgets.chat_diff import get_diff_colors
+    from johnston.tui.presentation.widgets.footer_layout import get_status_separators
 
     class DummyTool(ParsingMixin):
         def __init__(self, status="running", returncode=None):
@@ -506,7 +506,7 @@ def test_themes_module_import_is_lazy(monkeypatch):
     import builtins
     import importlib
 
-    import core.domain.defaults.themes as themes_mod
+    import johnston.core.domain.defaults.themes as themes_mod
 
     real_open = builtins.open
     opened = []
@@ -527,7 +527,7 @@ def test_themes_module_import_is_lazy(monkeypatch):
 
 
 def test_zinc_dark_from_import_still_works():
-    from core.domain.defaults.themes import ZINC_DARK
+    from johnston.core.domain.defaults.themes import ZINC_DARK
 
     assert ZINC_DARK.name == "zinc"
     assert ZINC_DARK.label == "Zinc Dark"
@@ -535,7 +535,7 @@ def test_zinc_dark_from_import_still_works():
 
 def test_prewarm_terminal_palette_requires_running_loop():
     """Outside a running event loop the prewarm is a no-op (never blocks)."""
-    from widgets.app.theme_manager import prewarm_terminal_palette
+    from johnston.tui.app.theme_manager import prewarm_terminal_palette
 
     prewarm_terminal_palette()
 
@@ -544,8 +544,8 @@ def test_prewarm_terminal_palette_fire_and_forget(monkeypatch):
     """The palette query is scheduled on a worker thread and failures are swallowed."""
     import asyncio
 
-    from core.infrastructure.platform import terminal_theme
-    from widgets.app.theme_manager import prewarm_terminal_palette
+    from johnston.core.infrastructure.platform import terminal_theme
+    from johnston.tui.app.theme_manager import prewarm_terminal_palette
 
     async def run() -> None:
         to_thread_calls = []

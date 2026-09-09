@@ -13,18 +13,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from widgets.app.command_provider import (
+from johnston.tui.app.command_provider import (
     _build_command_suggestions,
     get_all_command_suggestions,
 )
-from widgets.app.dispatch import (
+from johnston.tui.app.dispatch import (
     _load_skill_blocks,
     _resolve_skills,
     build_command_registry,
     handle_slash_command,
 )
-from widgets.app.role_service import reconcile_active_agent, toggle_agent_role
-from widgets.app.session_state import collect_session_data, recompute_context_tokens
+from johnston.tui.app.role_service import reconcile_active_agent, toggle_agent_role
+from johnston.tui.app.session_state import collect_session_data, recompute_context_tokens
 
 # ============================================================================
 # session_state.py tests
@@ -54,7 +54,7 @@ class TestSessionStateCoverage:
 
         # Hidden user message (e.g. is_ui_visible_user_message returns False)
         session.messages = [{"type": "user", "content": "hidden", "role": "system"}]
-        with patch("widgets.app.session_state.is_ui_visible_user_message", return_value=False):
+        with patch("johnston.tui.app.session_state.is_ui_visible_user_message", return_value=False):
             assert collect_session_data(app) is None
 
     def test_collect_session_data_success_with_agent(self):
@@ -78,7 +78,7 @@ class TestSessionStateCoverage:
             agent=agent,
             role="worker",
         )
-        with patch("widgets.app.session_state.is_ui_visible_user_message", return_value=True):
+        with patch("johnston.tui.app.session_state.is_ui_visible_user_message", return_value=True):
             data = collect_session_data(app)
 
         assert data is not None
@@ -104,7 +104,7 @@ class TestSessionStateCoverage:
             agent=None,
             role="coder",
         )
-        with patch("widgets.app.session_state.is_ui_visible_user_message", return_value=True):
+        with patch("johnston.tui.app.session_state.is_ui_visible_user_message", return_value=True):
             data = collect_session_data(app)
 
         assert data is not None
@@ -139,8 +139,8 @@ class TestSessionStateCoverage:
             is_subagent=True,
             subagent_schema={"name": "test"},
         )
-        with patch("core.application.generation.prompt_builder.PromptBuilder") as mock_builder_cls, patch(
-            "core.infrastructure.runtime.token_util.estimate_tokens", side_effect=lambda x: len(str(x))
+        with patch("johnston.core.application.generation.prompt_builder.PromptBuilder") as mock_builder_cls, patch(
+            "johnston.core.infrastructure.runtime.token_util.estimate_tokens", side_effect=lambda x: len(str(x))
         ):
             mock_builder = MagicMock()
             mock_builder.build_system_prompt.return_value = "prompt"
@@ -177,7 +177,7 @@ class TestRoleServiceCoverage:
             refresh_status_footer=MagicMock(),
         )
 
-        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             res = toggle_agent_role(app)
 
         assert res is True
@@ -198,13 +198,13 @@ class TestRoleServiceCoverage:
             role="unknown_role",
             refresh_status_footer=MagicMock(),
         )
-        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app)
         assert app.role == "worker"
 
         # Wrap around: architect -> worker
         app.agent.role = "architect"
-        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app)
         assert app.role == "worker"
 
@@ -218,7 +218,7 @@ class TestRoleServiceCoverage:
             role="worker",
             refresh_status_footer=MagicMock(),
         )
-        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app)
         assert app.role == "architect"
 
@@ -230,7 +230,7 @@ class TestRoleServiceCoverage:
             current_session_id="sess-1",
             refresh_status_footer=MagicMock(),
         )
-        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app2)
         assert app2.role == "architect"
 
@@ -243,7 +243,7 @@ class TestRoleServiceCoverage:
             current_session_id="sess-1",
             refresh_status_footer=MagicMock(),
         )
-        with patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
+        with patch("johnston.core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_registry):
             toggle_agent_role(app3)
         assert app3.role == "architect"
         assert session.role == "architect"
@@ -371,7 +371,7 @@ class TestDispatchCoverage:
         # File exists but parse frontmatter fails
         bad_file = tmp_path / "corrupt.md"
         bad_file.write_text("plain", encoding="utf-8")
-        with patch("core.infrastructure.runtime.frontmatter.parse_frontmatter", side_effect=Exception("parse error")):
+        with patch("johnston.core.infrastructure.runtime.frontmatter.parse_frontmatter", side_effect=Exception("parse error")):
             blocks2 = _load_skill_blocks([SimpleNamespace(name="corrupt", content="", location=str(bad_file))])
             assert len(blocks2) == 1
             assert '<skill name="corrupt"' in blocks2[0]
@@ -404,7 +404,7 @@ class TestDispatchCoverage:
         mock_cmd_instance.execute = AsyncMock()
         mock_cmd_cls.return_value = mock_cmd_instance
 
-        with patch.dict("widgets.app.dispatch.COMMAND_REGISTRY", {"/mock": mock_cmd_cls}, clear=False):
+        with patch.dict("johnston.tui.app.dispatch.COMMAND_REGISTRY", {"/mock": mock_cmd_cls}, clear=False):
             res = await handle_slash_command(app, "/mock arg1 arg2", attachments=["img.png"])
             assert res is True
             mock_cmd_cls.assert_called_once()
@@ -421,7 +421,7 @@ class TestDispatchCoverage:
         mock_cmd_cls.return_value = mock_cmd_instance
 
         # Test Cyrillic 'с' (U+0441) mapping to Latin 'c' -> "/clear"
-        with patch.dict("widgets.app.dispatch.COMMAND_REGISTRY", {"/clear": mock_cmd_cls}, clear=False):
+        with patch.dict("johnston.tui.app.dispatch.COMMAND_REGISTRY", {"/clear": mock_cmd_cls}, clear=False):
             res = await handle_slash_command(app, "/сlear")
             assert res is True
             mock_cmd_instance.execute.assert_awaited_once_with(app)
@@ -431,7 +431,7 @@ class TestDispatchCoverage:
         app = SimpleNamespace(trigger_ai_response=MagicMock())
         skill = SimpleNamespace(name="my-skill", content="Instruction body", location="")
 
-        with patch("widgets.app.dispatch.get_skill_manager") as mock_sm_get:
+        with patch("johnston.tui.app.dispatch.get_skill_manager") as mock_sm_get:
             sm = MagicMock()
             sm.get_skill.side_effect = lambda name: skill if name == "my-skill" else None
             mock_sm_get.return_value = sm
@@ -451,7 +451,7 @@ class TestDispatchCoverage:
         app = SimpleNamespace(trigger_ai_response=MagicMock())
         skill = SimpleNamespace(name="solo-skill", content="Solo content", location="")
 
-        with patch("widgets.app.dispatch.get_skill_manager") as mock_sm_get:
+        with patch("johnston.tui.app.dispatch.get_skill_manager") as mock_sm_get:
             sm = MagicMock()
             sm.get_skill.return_value = skill
             mock_sm_get.return_value = sm
@@ -483,8 +483,8 @@ class TestDispatchCoverage:
             }
         )
 
-        with patch("widgets.app.dispatch.get_skill_manager") as mock_sm_get, patch(
-            "core.infrastructure.mcp.get_mcp_manager", return_value=mock_mm
+        with patch("johnston.tui.app.dispatch.get_skill_manager") as mock_sm_get, patch(
+            "johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mm
         ):
             mock_sm_get.return_value.get_skill.return_value = None
 
@@ -506,8 +506,8 @@ class TestDispatchCoverage:
         mock_mm = MagicMock()
         mock_mm.get_prompt_async = AsyncMock(return_value={"messages": []})
 
-        with patch("widgets.app.dispatch.get_skill_manager") as mock_sm_get, patch(
-            "core.infrastructure.mcp.get_mcp_manager", return_value=mock_mm
+        with patch("johnston.tui.app.dispatch.get_skill_manager") as mock_sm_get, patch(
+            "johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mm
         ):
             mock_sm_get.return_value.get_skill.return_value = None
 
@@ -519,8 +519,8 @@ class TestDispatchCoverage:
     async def test_handle_slash_command_mcp_exception(self):
         app = SimpleNamespace(trigger_ai_response=MagicMock())
 
-        with patch("widgets.app.dispatch.get_skill_manager") as mock_sm_get, patch(
-            "core.infrastructure.mcp.get_mcp_manager", side_effect=RuntimeError("MCP failed")
+        with patch("johnston.tui.app.dispatch.get_skill_manager") as mock_sm_get, patch(
+            "johnston.core.infrastructure.mcp.get_mcp_manager", side_effect=RuntimeError("MCP failed")
         ):
             mock_sm_get.return_value.get_skill.return_value = None
 
@@ -530,7 +530,7 @@ class TestDispatchCoverage:
     @pytest.mark.asyncio
     async def test_handle_slash_command_non_slash_text(self):
         app = SimpleNamespace(trigger_ai_response=MagicMock())
-        with patch("widgets.app.dispatch.get_skill_manager") as mock_sm_get:
+        with patch("johnston.tui.app.dispatch.get_skill_manager") as mock_sm_get:
             mock_sm_get.return_value.get_skill.return_value = None
             res = await handle_slash_command(app, "regular chat message")
             assert res is False
@@ -569,9 +569,9 @@ class TestCommandProviderCoverage:
         )
         mock_mm = SimpleNamespace(clients={"srv": client})
 
-        with patch.dict("widgets.app.command_provider.COMMAND_REGISTRY", mock_registry, clear=True), patch(
-            "widgets.app.command_provider.get_skill_manager", return_value=mock_sm
-        ), patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mm):
+        with patch.dict("johnston.tui.app.command_provider.COMMAND_REGISTRY", mock_registry, clear=True), patch(
+            "johnston.tui.app.command_provider.get_skill_manager", return_value=mock_sm
+        ), patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mm):
             suggestions = _build_command_suggestions()
 
         cmds = [s[0] for s in suggestions]
@@ -596,9 +596,9 @@ class TestCommandProviderCoverage:
     def test_build_command_suggestions_with_exceptions(self):
         mock_registry = {"/cmd": SimpleNamespace(name="/cmd", description="desc")}
 
-        with patch.dict("widgets.app.command_provider.COMMAND_REGISTRY", mock_registry, clear=True), patch(
-            "widgets.app.command_provider.get_skill_manager", side_effect=Exception("skill manager error")
-        ), patch("core.infrastructure.mcp.get_mcp_manager", side_effect=Exception("mcp error")):
+        with patch.dict("johnston.tui.app.command_provider.COMMAND_REGISTRY", mock_registry, clear=True), patch(
+            "johnston.tui.app.command_provider.get_skill_manager", side_effect=Exception("skill manager error")
+        ), patch("johnston.core.infrastructure.mcp.get_mcp_manager", side_effect=Exception("mcp error")):
             suggestions = _build_command_suggestions()
 
         assert len(suggestions) == 1
@@ -606,14 +606,14 @@ class TestCommandProviderCoverage:
 
     @pytest.mark.asyncio
     async def test_get_all_command_suggestions_caching(self):
-        import widgets.app.command_provider as cp
+        import johnston.tui.app.command_provider as cp
 
         cp._command_suggestions_cache = []
         cp._command_suggestions_cache_time = 0.0
 
         sample_suggestions = [("/test", "Test description")]
         try:
-            with patch("widgets.app.command_provider._build_command_suggestions", return_value=sample_suggestions) as mock_b:
+            with patch("johnston.tui.app.command_provider._build_command_suggestions", return_value=sample_suggestions) as mock_b:
                 res1 = await get_all_command_suggestions()
                 assert res1 == sample_suggestions
                 assert mock_b.call_count == 1
@@ -624,7 +624,7 @@ class TestCommandProviderCoverage:
                 assert mock_b.call_count == 1
 
                 # Advance time by 15s -> cache expired, re-called
-                with patch("widgets.app.command_provider.time.time", return_value=cp._command_suggestions_cache_time + 15.0):
+                with patch("johnston.tui.app.command_provider.time.time", return_value=cp._command_suggestions_cache_time + 15.0):
                     res3 = await get_all_command_suggestions()
                     assert res3 == sample_suggestions
                     assert mock_b.call_count == 2

@@ -1,0 +1,815 @@
+"""CLI headless run command for Johnston."""
+from __future__ import annotations
+
+import asyncio
+import inspect
+import json
+import logging
+import os
+import re
+import sys
+import time
+from typing import Any, Optional
+
+from johnston.core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
+from johnston.core.domain.policies.role_policy import AgentMode
+from johnston.core.roles.apply import apply_role
+from johnston.core.roles.role_registry import RoleRegistry
+
+if False:  # type checking only
+    from johnston.core.application.provider.provider_manager import ProviderManager
+
+__all__ = [
+    "format_args_summary",
+    "format_meta_footer",
+    "format_result_summary",
+    "resolve_prompt",
+    "run_headless",
+    "run_headless_async",
+]
+
+
+def _emit_early_error(error_msg: str, is_json: bool = False, is_stream_json: bool = False) -> int:
+    """Emit startup or validation error according to output mode format."""
+    clean_msg = error_msg if not error_msg.startswith("Error: ") else error_msg[7:]
+    if is_stream_json:
+        sys.stdout.write(json.dumps({"event": "error", "error": clean_msg}) + "\n")
+        sys.stdout.flush()
+    elif is_json:
+        sys.stdout.write(json.dumps({"error": clean_msg, "status": "error"}, indent=2) + "\n")
+        sys.stdout.flush()
+    else:
+        prefix = "" if error_msg.startswith("Error") else "Error: "
+        sys.stderr.write(f"{prefix}{error_msg}\n")
+        sys.stderr.flush()
+    return 1
+
+
+def resolve_prompt(
+    prompt_arg: Optional[str],
+    is_json: bool = False,
+    is_stream_json: bool = False,
+) -> Optional[str]:
+    """Resolve prompt text from positional argument or stdin."""
+    if prompt_arg == "-" or (not prompt_arg and not sys.stdin.isatty()):
+        try:
+            prompt_arg = sys.stdin.read()
+        except Exception as exc:
+            _emit_early_error(f"Error reading from stdin: {exc}", is_json, is_stream_json)
+            return None
+
+    if not prompt_arg or not prompt_arg.strip():
+        _emit_early_error("No prompt provided. Specify prompt or pass via stdin.", is_json, is_stream_json)
+        return None
+
+    return prompt_arg.strip()
+
+
+def format_args_summary(args: Any) -> str:
+    """Produce a concise string summary of tool call arguments."""
+    if not args:
+        return ""
+    if isinstance(args, str):
+        try:
+            parsed = json.loads(args)
+            if isinstance(parsed, dict):
+                args = parsed
+            else:
+                return args
+        except Exception:
+            return args
+
+    if isinstance(args, dict):
+        parts = []
+        for k, v in args.items():
+            rep = repr(v)
+            if len(rep) > 60:
+                rep = rep[:57] + "..."
+            parts.append(f"{k}={rep}")
+        return ", ".join(parts)
+    s = str(args)
+    if len(s) > 60:
+        return s[:57] + "..."
+    return s
+
+
+def format_result_summary(result: Any) -> str:
+    """Format tool execution result for compact CLI output."""
+    if result is None:
+        return ""
+    s = str(result).strip()
+    if not s:
+        return ""
+    lines = s.splitlines()
+    if len(lines) > 1:
+        first = lines[0]
+        if len(first) > 80:
+            first = first[:77] + "..."
+        return f"{first} (+{len(lines) - 1} lines)"
+    if len(s) > 120:
+        return s[:117] + "..."
+    return s
+
+
+def _format_token_count(n: int) -> str:
+    """Format token count with k/M suffixes for compact display."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}k"
+    return str(n)
+
+
+def format_meta_footer(
+    provider: str,
+    model: str,
+    duration_s: float,
+    tokens_in: int,
+    tokens_out: int,
+    total_tokens: int,
+    cost_usd: float = 0.0,
+    role: Optional[str] = None,
+    mode: Optional[str] = None,
+    sandbox: bool = False,
+    effort: Optional[str] = None,
+    compacted: bool = False,
+) -> str:
+    """Format execution summary metadata line."""
+    prov_model = f"{provider}/{model}" if model and model != "-" else provider
+    if effort and str(effort).strip():
+        prov_model = f"{prov_model} ({str(effort).strip().lower()})"
+
+    if role and isinstance(role, str) and role.strip().lower() not in ("", "worker"):
+        identity = f"{role.strip().lower()}: {prov_model}"
+    else:
+        identity = prov_model
+
+    parts = [identity]
+    if mode and isinstance(mode, str) and mode.strip().lower() not in ("", "review"):
+        parts.append(mode.strip().lower())
+    if sandbox:
+        parts.append("sandbox")
+    if compacted:
+        parts.append("compacted")
+
+    parts.append(f"{duration_s:.2f}s")
+
+    if tokens_out > 0 and duration_s > 0:
+        tps = tokens_out / duration_s
+        parts.append(f"{tps:.1f} tok/s")
+
+    if total_tokens > 0 or tokens_in > 0 or tokens_out > 0:
+        parts.append(
+            f"in: {_format_token_count(tokens_in)}, out: {_format_token_count(tokens_out)}, total: {_format_token_count(total_tokens)} tok"
+        )
+    if cost_usd > 0.0:
+        parts.append(f"${cost_usd:.4f}")
+    return f"[{' | '.join(parts)}]"
+
+
+def _resolve_cwd(args: Any, is_json: bool, is_stream_json: bool) -> Optional[int]:
+    """Chdir to --cwd target when provided; return an early-error exit code or None."""
+    candidate = getattr(args, "cwd", None)
+    if isinstance(candidate, str) and candidate.strip():
+        cwd_target = os.path.abspath(candidate)
+        if not os.path.isdir(cwd_target):
+            return _emit_early_error(f"Directory '{candidate}' does not exist.", is_json, is_stream_json)
+        os.chdir(cwd_target)
+    return None
+
+
+def _setup_provider_and_agent(
+    args: Any,
+    pm: Any,
+    is_json: bool,
+    is_stream_json: bool,
+) -> tuple[Any, str, str, Any, Optional[int]]:
+    """Resolve provider, create the agent, and apply role/model/effort/sandbox.
+
+    Returns (agent, provider_key, role, model, None) on success, or
+    (None, "", "", None, exit_code) after emitting an early error.
+    """
+    provider_key = getattr(args, "provider", None) or pm.get_active_provider_key()
+    if not provider_key:
+        return (None, "", "", None, _emit_early_error("No active provider configured or specified.", is_json, is_stream_json))
+
+    pdef = pm.load_provider_def(provider_key)
+    if pdef is None:
+        return (None, "", "", None, _emit_early_error(f"Provider '{provider_key}' not found.", is_json, is_stream_json))
+
+    if not pdef.enabled:
+        return (None, "", "", None, _emit_early_error(f"Provider '{provider_key}' is disabled.", is_json, is_stream_json))
+
+    needs_key = pm.provider_needs_key(provider_key, pdef)
+    api_key = pm.get_api_key(pdef.key) or pdef.api_key
+    if needs_key and not api_key:
+        return (
+            None,
+            "",
+            "",
+            None,
+            _emit_early_error(
+                f"No API key configured for provider '{provider_key}'. "
+                f"Set key with: johnston provider set-key {provider_key} <KEY>",
+                is_json,
+                is_stream_json,
+            ),
+        )
+
+    agent = pm.create_agent_for_provider(provider_key)
+    if agent is None:
+        return (None, "", "", None, _emit_early_error(f"Failed to create agent for provider '{provider_key}'.", is_json, is_stream_json))
+
+    role = getattr(args, "role", None) or "worker"
+    roles = RoleRegistry.get_instance().load_roles()
+    if role not in roles:
+        return (None, "", "", None, _emit_early_error(f"Role '{role}' not found.", is_json, is_stream_json))
+
+    apply_role(agent, role, mode=AgentMode.HEADLESS)
+
+    model = getattr(args, "model", None)
+    if isinstance(model, str) and model.strip():
+        agent.model = model.strip()
+
+    effort = getattr(args, "effort", None)
+    if isinstance(effort, str) and effort.strip():
+        agent.thinking_effort = effort.strip().lower()
+        agent.reasoning_effort = effort.strip().lower()
+
+    if getattr(args, "sandbox", False) is True:
+        agent.sandbox_enabled = True
+    elif getattr(args, "no_sandbox", False) is True:
+        agent.sandbox_enabled = False
+    else:
+        from johnston.core.infrastructure.config.config_helpers import load_sandbox_config
+
+        agent.sandbox_enabled = load_sandbox_config()
+
+    if getattr(args, "branch", None):
+        agent.worktree_branch = str(args.branch).strip()
+
+    return (agent, provider_key, role, model, None)
+
+
+def _resolve_or_create_session(args: Any, agent: Any, role: str) -> tuple[Any, Any]:
+    """Resume/continue a prior session or create a new main session.
+
+    Returns (sess, store); the store handle is forwarded so persistence in
+    the orchestrator reuses the exact same SessionStore instance.
+    """
+    continue_latest = (
+        getattr(args, "continue_latest", False) is True
+        or getattr(args, "continue", False) is True
+    )
+    resume_arg = getattr(args, "resume", None)
+    sess: Any = None
+    from johnston.core.infrastructure.storage.session_store import SessionStore
+
+    store = SessionStore.get_instance()
+    if continue_latest or (isinstance(resume_arg, str) or resume_arg == ""):
+        target_sid = resume_arg if isinstance(resume_arg, str) and resume_arg.strip() else None
+        if not target_sid:
+            main_sessions = store.list_main_sessions()
+            if main_sessions:
+                target_sid = main_sessions[0]["id"]
+        if target_sid:
+            sess = store.get(target_sid)
+            if sess:
+                if hasattr(sess, "agent_history") and sess.agent_history:
+                    agent.history = list(sess.agent_history)
+                if hasattr(agent, "messages"):
+                    agent.messages = list(getattr(sess, "messages", []) or getattr(sess, "agent_history", []))
+                if hasattr(sess, "tokens_input") and hasattr(agent, "tokens_input"):
+                    agent.tokens_input = sess.tokens_input
+                if hasattr(sess, "tokens_output") and hasattr(agent, "tokens_output"):
+                    agent.tokens_output = sess.tokens_output
+                if hasattr(sess, "total_tokens") and hasattr(agent, "total_tokens"):
+                    agent.total_tokens = sess.total_tokens
+                if hasattr(sess, "cost_usd") and hasattr(agent, "cost_usd"):
+                    agent.cost_usd = sess.cost_usd
+
+    if sess is None:
+        try:
+            sess = store.create_main(role=role)
+        except Exception as create_err:
+            logging.debug("Could not create session in headless run: %s", create_err)
+    return sess, store
+
+
+def _configure_permission_manager(args: Any) -> tuple[Any, str]:
+    """Add workspace roots and apply yolo/mode session mode; return (perm_mgr, mode_val)."""
+    from johnston.core.application.permission.permission_manager import PermissionManager
+    from johnston.core.domain.policies.permission_policy import ExecutionMode
+
+    perm_mgr = PermissionManager.get_instance()
+    for ws in getattr(args, "workspace", []) or []:
+        if ws:
+            perm_mgr.add_workspace_root(ws)
+    if getattr(args, "yolo", False) is True:
+        active_mode = perm_mgr.set_session_mode(ExecutionMode.YOLO)
+    elif getattr(args, "mode", None):
+        active_mode = perm_mgr.set_session_mode(getattr(args, "mode"))
+    else:
+        active_mode = perm_mgr.execution_mode
+    mode_val = active_mode.value
+    return perm_mgr, mode_val
+
+
+def _inject_skills(
+    args: Any,
+    prompt: str,
+    is_quiet: bool,
+    is_json: bool,
+    is_stream_json: bool,
+) -> tuple[str, list[str]]:
+    """Extract/inject slash skills into the prompt and emit the activation notice.
+
+    Returns (effective_prompt, activated_skills).
+    """
+    extra_skills = getattr(args, "skills", None) or []
+    from johnston.core.application.skills.inject import extract_and_inject_skills
+
+    effective_prompt, activated_skills = extract_and_inject_skills(prompt, extra_skills=extra_skills)
+    if activated_skills:
+        if is_stream_json:
+            sys.stdout.write(json.dumps({"event": "skills", "skills": activated_skills}) + "\n")
+            sys.stdout.flush()
+        elif not is_quiet and not is_json:
+            sys.stderr.write(f"[skills] activated: {', '.join(activated_skills)}\n")
+            sys.stderr.flush()
+    return effective_prompt, activated_skills
+
+
+async def _warmup_mcp(
+    args: Any,
+    is_quiet: bool,
+    is_json: bool,
+    is_stream_json: bool,
+) -> tuple[list[Any], int]:
+    """Load enabled MCP servers and warm active tools (best-effort, 10s timeout).
+
+    Returns (enabled_mcp_servers, mcp_tools_count).
+    """
+    enabled_mcp_servers: list[Any] = []
+    mcp_tools_count: int = 0
+    from johnston.core.infrastructure.mcp import get_mcp_manager
+
+    try:
+        mcp_mgr = get_mcp_manager()
+        servers = mcp_mgr.load_servers()
+        enabled_mcp_servers = [s for s in servers if mcp_mgr.server_enabled(s)]
+        if enabled_mcp_servers and (
+            not os.environ.get("PYTEST_CURRENT_TEST") or getattr(args, "_test_mcp_warmup", False)
+        ):
+            mcp_tools = await asyncio.wait_for(mcp_mgr.get_active_tools_async(), timeout=10.0)
+            mcp_tools_count = len(mcp_tools) if mcp_tools else 0
+            if mcp_tools_count > 0:
+                names_str = ", ".join(s.get("name", "") for s in enabled_mcp_servers if s.get("name"))
+                if is_stream_json:
+                    sys.stdout.write(
+                        json.dumps(
+                            {
+                                "event": "mcp",
+                                "servers": [s.get("name", "") for s in enabled_mcp_servers],
+                                "tools": mcp_tools_count,
+                            }
+                        )
+                        + "\n"
+                    )
+                    sys.stdout.flush()
+                elif not is_quiet and not is_json:
+                    sys.stderr.write(f"[mcp] active: {names_str} ({mcp_tools_count} tools)\n")
+                    sys.stderr.flush()
+    except Exception as mcp_exc:
+        logging.debug("Headless MCP warmup failed or timed out: %s", mcp_exc)
+    return enabled_mcp_servers, mcp_tools_count
+
+
+class _StreamEmitter:
+    """Per-mode stream event emitters plus shared plain-text write state.
+
+    Owns ``has_written_text`` / ``pending_lead_ws`` so leading-whitespace
+    suppression stays intact across delta and tool-call events, and renders
+    each event according to the output mode (stream_json / json / plain).
+    """
+
+    def __init__(self, is_quiet: bool, is_json: bool, is_stream_json: bool):
+        self.is_quiet = is_quiet
+        self.is_json = is_json
+        self.is_stream_json = is_stream_json
+        self.has_written_text = False
+        self.pending_lead_ws: list[str] = []
+
+    def _write_stdout(self, text: str) -> None:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+    def _write_stderr(self, text: str) -> None:
+        sys.stderr.write(text)
+        sys.stderr.flush()
+
+    def reset_text_state(self) -> None:
+        """Start a fresh plain-text segment (e.g. after a tool call)."""
+        self.pending_lead_ws.clear()
+        self.has_written_text = False
+
+    def emit_delta(self, chunk: str) -> None:
+        """Emit a content/bot_delta chunk, stripping leading blank lines in plain mode."""
+        if self.is_stream_json:
+            self._write_stdout(json.dumps({"event": "delta", "text": chunk}) + "\n")
+        elif not self.is_json:
+            if not self.has_written_text:
+                if chunk.strip():
+                    self.has_written_text = True
+                    self.pending_lead_ws.clear()
+                    self._write_stdout(re.sub(r"^(?:[ \t]*[\r\n]+)+", "", chunk))
+                else:
+                    self.pending_lead_ws.append(chunk)
+            else:
+                self._write_stdout(chunk)
+
+    def emit_bot_text(self, text: str) -> None:
+        """Emit a single bot_text response, stripped of leading blank lines in plain mode."""
+        if self.is_stream_json:
+            self._write_stdout(json.dumps({"event": "delta", "text": text}) + "\n")
+        elif not self.is_json:
+            out = re.sub(r"^(?:[ \t]*[\r\n]+)+", "", text) if not self.has_written_text else text
+            self._write_stdout(out)
+            self.has_written_text = True
+
+    def emit_tool_call(self, t_name: Any, t_args: Any, response_parts: list[str]) -> None:
+        """Emit a tool_call event; in plain mode print a compact summary line to stderr."""
+        self.reset_text_state()
+        if self.is_stream_json:
+            self._write_stdout(json.dumps({"event": "tool_call", "name": t_name, "args": t_args}) + "\n")
+        elif not self.is_quiet and not self.is_json:
+            summary = format_args_summary(t_args)
+            if response_parts and "".join(response_parts).strip() and not response_parts[-1].endswith("\n"):
+                self._write_stdout("\n")
+            self._write_stderr(f"[tool] {t_name}({summary})\n")
+
+    def emit_tool_result(self, res_content: str) -> None:
+        """Emit a tool_result event; empty results are suppressed in plain mode."""
+        if self.is_stream_json:
+            self._write_stdout(json.dumps({"event": "tool_result", "result": res_content}) + "\n")
+        elif not self.is_quiet and not self.is_json:
+            res_summary = format_result_summary(res_content)
+            if res_summary:
+                self._write_stderr(f"[result] {res_summary}\n")
+
+    def emit_compaction(self, comp_title: str) -> None:
+        """Emit a compaction/event_divider notice."""
+        if self.is_stream_json:
+            self._write_stdout(json.dumps({"event": "compaction", "title": comp_title}) + "\n")
+        elif not self.is_quiet and not self.is_json:
+            self._write_stderr(f"[compaction] {comp_title}\n")
+
+    def emit_error(self, err_msg: str) -> None:
+        """Emit a stream error event or stderr message."""
+        if self.is_stream_json:
+            self._write_stdout(json.dumps({"event": "error", "error": err_msg}) + "\n")
+        else:
+            self._write_stderr(f"Error: {err_msg}\n")
+
+
+async def _process_stream(
+    agent: Any,
+    effective_prompt: str,
+    is_quiet: bool,
+    is_json: bool,
+    is_stream_json: bool,
+) -> tuple[list[str], list[dict[str, Any]], bool, bool]:
+    """Consume agent stream steps, collect run data, and emit per-event output.
+
+    Returns (response_parts, tool_calls, has_error, compacted).
+    """
+    response_parts: list[str] = []
+    tool_calls: list[dict[str, Any]] = []
+    has_error = False
+    compacted = False
+    emitter = _StreamEmitter(is_quiet, is_json, is_stream_json)
+
+    try:
+        async for step in agent.stream_steps(effective_prompt):
+            parsed = parse_stream_step(step)
+            if parsed is None:
+                continue
+            etype = parsed.event_type
+
+            if etype in ("content", "bot_delta"):
+                chunk = parsed.val1 or ""
+                response_parts.append(chunk)
+                emitter.emit_delta(chunk)
+
+            elif etype == "bot_text":
+                if not response_parts and parsed.val1:
+                    response_parts.append(parsed.val1)
+                    emitter.emit_bot_text(parsed.val1)
+
+            elif etype in ("tool_call", "tool"):
+                t_name = parsed.val1
+                if isinstance(parsed.val3, (dict, list)):
+                    t_args = parsed.val3
+                elif isinstance(parsed.val2, (dict, list)):
+                    t_args = parsed.val2
+                elif isinstance(parsed.val2, str) and etype == "tool_call":
+                    try:
+                        t_args = json.loads(parsed.val2)
+                    except Exception:
+                        t_args = parsed.val2
+                elif isinstance(parsed.val3, str) and etype == "tool":
+                    try:
+                        t_args = json.loads(parsed.val3)
+                    except Exception:
+                        t_args = parsed.val3
+                else:
+                    t_args = parsed.val2 if etype == "tool_call" else (parsed.val3 or {})
+
+                if isinstance(t_name, dict):
+                    raw_dict = t_name
+                    t_name = raw_dict.get("name", "")
+                    t_args = raw_dict.get("args") or raw_dict.get("arguments") or {}
+
+                tool_calls.append({"name": t_name, "args": t_args})
+                emitter.emit_tool_call(t_name, t_args, response_parts)
+
+            elif etype == "tool_result":
+                parsed_tr = parse_tool_result_step(step)
+                res_content = parsed_tr.content or parsed.val1 or ""
+                if tool_calls and "result" not in tool_calls[-1]:
+                    tool_calls[-1]["result"] = res_content
+                emitter.emit_tool_result(res_content)
+
+            elif etype in ("event_divider", "compaction"):
+                compacted = True
+                emitter.emit_compaction(parsed.val1 or "Session Compacted")
+
+            elif etype == "error":
+                has_error = True
+                emitter.emit_error(parsed.val1 or "Unknown stream error")
+
+    except Exception as exc:
+        has_error = True
+        emitter.emit_error(str(exc))
+
+    return response_parts, tool_calls, has_error, compacted
+
+
+def _build_usage(
+    agent: Any,
+    provider_key: str,
+    duration_s: float,
+    model: Any,
+    compacted: bool,
+) -> tuple[dict[str, Any], str]:
+    """Build the usage dict and the effective model name for output/footer."""
+    model_name = getattr(agent, "model", None) or model or "-"
+    ti = getattr(agent, "tokens_input", 0)
+    to = getattr(agent, "tokens_output", 0)
+    tt = getattr(agent, "total_tokens", 0)
+    cu = getattr(agent, "cost_usd", 0.0)
+    to_val = to if isinstance(to, (int, float)) else 0
+    tps = round(to_val / duration_s, 1) if duration_s > 0 and to_val > 0 else 0.0
+    usage: dict[str, Any] = {
+        "provider": provider_key,
+        "model": model_name,
+        "duration_s": round(duration_s, 3),
+        "tok_per_sec": tps,
+        "tokens_input": ti if isinstance(ti, (int, float)) else 0,
+        "tokens_output": to_val,
+        "total_tokens": tt if isinstance(tt, (int, float)) else 0,
+        "cost_usd": cu if isinstance(cu, (int, float)) else 0.0,
+    }
+    if compacted:
+        usage["compacted"] = True
+    return usage, model_name
+
+
+def _emit_final_output(
+    args: Any,
+    agent: Any,
+    provider_key: str,
+    model_name: str,
+    duration_s: float,
+    role: str,
+    mode_val: str,
+    compacted: bool,
+    response_parts: list[str],
+    tool_calls: list[dict[str, Any]],
+    usage: dict[str, Any],
+    activated_skills: list[str],
+    mcp_tools_count: int,
+    enabled_mcp_servers: list[Any],
+    is_quiet: bool,
+    is_json: bool,
+    is_stream_json: bool,
+) -> None:
+    """Emit the final run output (done event / JSON payload / plain footer)."""
+    if is_stream_json:
+        sys.stdout.write(json.dumps({"event": "done", "usage": usage}) + "\n")
+        sys.stdout.flush()
+    elif is_json:
+        output_payload = {
+            "response": "".join(response_parts),
+            "tool_calls": tool_calls,
+            "usage": usage,
+        }
+        if activated_skills:
+            output_payload["skills"] = activated_skills
+        if mcp_tools_count > 0:
+            output_payload["mcp"] = {
+                "servers": [s.get("name", "") for s in enabled_mcp_servers if s.get("name")],
+                "tools": mcp_tools_count,
+            }
+        if compacted:
+            output_payload["compacted"] = True
+        if role and role.strip().lower() != "worker":
+            output_payload["role"] = role.strip().lower()
+        if mode_val and mode_val != "review":
+            output_payload["mode"] = mode_val
+        if getattr(agent, "sandbox_enabled", False) is True:
+            output_payload["sandbox"] = True
+        print(json.dumps(output_payload, indent=2))
+        sys.stdout.flush()
+    else:
+        full_text = "".join(response_parts)
+        if full_text and not full_text.endswith("\n"):
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+
+        if not is_quiet:
+            effort_val = getattr(args, "effort", None)
+            sandbox_val = getattr(agent, "sandbox_enabled", False) is True
+            footer = format_meta_footer(
+                provider_key,
+                model_name,
+                duration_s,
+                usage["tokens_input"],
+                usage["tokens_output"],
+                usage["total_tokens"],
+                usage["cost_usd"],
+                role=role,
+                mode=mode_val,
+                sandbox=sandbox_val,
+                effort=effort_val,
+                compacted=compacted,
+            )
+            from johnston.cli.formatter import DIM, RESET, supports_color
+
+            styled_footer = f"{DIM}{footer}{RESET}" if supports_color() else footer
+            sys.stderr.write(f"{styled_footer}\n")
+            sys.stderr.flush()
+
+
+def _persist_session(sess: Any, store: Any, agent: Any) -> None:
+    """Copy agent run state back into the session and save it (best-effort)."""
+    if sess is None or store is None:
+        return
+    try:
+        if hasattr(agent, "history") and agent.history:
+            sess.agent_history = list(agent.history)
+        if hasattr(agent, "messages"):
+            sess.messages = list(agent.messages)
+        sess.tokens_input = getattr(agent, "tokens_input", sess.tokens_input)
+        sess.tokens_output = getattr(agent, "tokens_output", sess.tokens_output)
+        sess.total_tokens = getattr(agent, "total_tokens", sess.total_tokens)
+        sess.cost_usd = getattr(agent, "cost_usd", sess.cost_usd)
+        store.save(sess)
+    except Exception as save_err:
+        logging.debug("Failed to persist resumed session: %s", save_err)
+
+
+async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) -> int:
+    """Async execution logic for johnston run."""
+    if getattr(args, "debug", False) is True:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    is_quiet = getattr(args, "quiet", False) is True
+    is_json = getattr(args, "json", False) is True
+    is_stream_json = getattr(args, "stream_json", False) is True
+
+    cwd_err = _resolve_cwd(args, is_json, is_stream_json)
+    if cwd_err is not None:
+        return cwd_err
+
+    prompt = resolve_prompt(getattr(args, "prompt", None), is_json=is_json, is_stream_json=is_stream_json)
+    if prompt is None:
+        return 1
+
+    close_pm = False
+    if pm is None:
+        from johnston.core.application.provider.provider_manager import ProviderManager
+
+        pm = ProviderManager()
+        close_pm = True
+
+    agent: Any = None
+    enabled_mcp_servers: list[Any] = []
+    perm_mgr: Any = None
+    try:
+        agent, provider_key, role, model, setup_err = _setup_provider_and_agent(args, pm, is_json, is_stream_json)
+        if setup_err is not None:
+            return setup_err
+
+        sess, store = _resolve_or_create_session(args, agent, role)
+
+        perm_mgr, mode_val = _configure_permission_manager(args)
+
+        effective_prompt, activated_skills = _inject_skills(args, prompt, is_quiet, is_json, is_stream_json)
+
+        enabled_mcp_servers, mcp_tools_count = await _warmup_mcp(args, is_quiet, is_json, is_stream_json)
+
+        start_time = time.perf_counter()
+        response_parts, tool_calls, has_error, compacted = await _process_stream(
+            agent, effective_prompt, is_quiet, is_json, is_stream_json
+        )
+        duration_s = max(0.0, time.perf_counter() - start_time)
+
+        usage, model_name = _build_usage(agent, provider_key, duration_s, model, compacted)
+        _emit_final_output(
+            args=args,
+            agent=agent,
+            provider_key=provider_key,
+            model_name=model_name,
+            duration_s=duration_s,
+            role=role,
+            mode_val=mode_val,
+            compacted=compacted,
+            response_parts=response_parts,
+            tool_calls=tool_calls,
+            usage=usage,
+            activated_skills=activated_skills,
+            mcp_tools_count=mcp_tools_count,
+            enabled_mcp_servers=enabled_mcp_servers,
+            is_quiet=is_quiet,
+            is_json=is_json,
+            is_stream_json=is_stream_json,
+        )
+        _persist_session(sess, store, agent)
+
+        return 1 if has_error else 0
+
+    finally:
+        if perm_mgr is not None:
+            try:
+                perm_mgr.clear_session_overrides()
+            except BaseException:
+                pass
+        if enabled_mcp_servers:
+            try:
+                from johnston.core.infrastructure.mcp import get_mcp_manager
+
+                await asyncio.shield(asyncio.wait_for(get_mcp_manager().stop_all_async(), timeout=5.0))
+            except BaseException:
+                pass
+        if agent and hasattr(agent, "close") and callable(agent.close):
+            try:
+                res = agent.close()
+                if inspect.isawaitable(res):
+                    await asyncio.shield(res)
+            except BaseException:
+                pass
+        if close_pm:
+            try:
+                await asyncio.shield(pm.close())
+            except BaseException:
+                pass
+
+
+def run_headless(args: Any, pm: Optional[ProviderManager] = None) -> int:
+    """Headless run command synchronous entrypoint."""
+    if getattr(args, "debug", False) is True:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    is_json = getattr(args, "json", False) is True
+    is_stream_json = getattr(args, "stream_json", False) is True
+
+    candidate = getattr(args, "cwd", None)
+    if isinstance(candidate, str) and candidate.strip():
+        cwd_target = os.path.abspath(candidate)
+        if not os.path.isdir(cwd_target):
+            return _emit_early_error(f"Directory '{candidate}' does not exist.", is_json, is_stream_json)
+        os.chdir(cwd_target)
+
+    for ws in getattr(args, "workspace", []) or []:
+        if ws:
+            from johnston.core.application.permission.permission_manager import PermissionManager
+
+            PermissionManager.get_instance().add_workspace_root(ws)
+
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                return executor.submit(lambda: asyncio.run(run_headless_async(args, pm=pm))).result()
+        return asyncio.run(run_headless_async(args, pm=pm))
+    except KeyboardInterrupt:
+        return 130
+    except Exception as exc:
+        return _emit_early_error(str(exc), is_json, is_stream_json)

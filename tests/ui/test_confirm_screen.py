@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from widgets.presentation.screens.confirm import ConfirmScreen
+from johnston.tui.presentation.screens.confirm import ConfirmScreen
 
 
 class TestConfirmScreen(unittest.TestCase):

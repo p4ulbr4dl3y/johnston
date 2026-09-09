@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from widgets.presentation.widgets.footer_layout import format_display_path
-from widgets.presentation.widgets.subagent_footer import SubagentHeader, SubagentStatusFooter
-from widgets.status_footer import StatusFooter
+from johnston.tui.presentation.widgets.footer_layout import format_display_path
+from johnston.tui.presentation.widgets.subagent_footer import SubagentHeader, SubagentStatusFooter
+from johnston.tui.status_footer import StatusFooter
 
 
 class FooterHarness(StatusFooter):
@@ -31,7 +31,7 @@ class FooterHarness(StatusFooter):
         self.last_update = markup
 
 
-_mcp_mgr_patch = "core.infrastructure.mcp.get_mcp_manager"
+_mcp_mgr_patch = "johnston.core.infrastructure.mcp.get_mcp_manager"
 
 
 class TestStatusFooterCoverage(unittest.TestCase):
@@ -53,7 +53,7 @@ class TestStatusFooterCoverage(unittest.TestCase):
         self.assertEqual(format_display_path("/aa/bb", max_length=3), "/.../bb")
 
     def test_format_display_path_worktree_exact_and_long(self):
-        from core.infrastructure.platform.paths import WORKTREES_DIR
+        from johnston.core.infrastructure.platform.paths import WORKTREES_DIR
 
         # Exact worktree dir
         self.assertEqual(format_display_path(WORKTREES_DIR), "worktree")
@@ -73,7 +73,7 @@ class TestStatusFooterCoverage(unittest.TestCase):
     def test_status_footer_no_pm_and_bad_app_size(self):
         footer = FooterHarness()
         footer._harness_app = None
-        with patch("widgets.status_footer.catalog.get_model_display_name", return_value=""):
+        with patch("johnston.tui.status_footer.catalog.get_model_display_name", return_value=""):
             footer.update_status(provider_key="openai", is_connected=None, model_name="")
         self.assertIsNotNone(footer.last_update)
         self.assertIsNotNone(footer._last_grid_rows)
@@ -284,8 +284,8 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         app.pm = cm
         footer._harness_app = app
         footer.session = session
-        with patch("widgets.status_footer.catalog.get_model_display_name", return_value=""), patch(
-            "widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
+        with patch("johnston.tui.status_footer.catalog.get_model_display_name", return_value=""), patch(
+            "johnston.tui.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
         ), patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
@@ -297,7 +297,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         self.assertIn("[Select model: /models]", footer._last_grid_rows[2][0])
 
     def test_render_footer_reflects_execution_mode_and_sandbox_off(self):
-        from core.application.permission.permission_manager import PermissionManager
+        from johnston.core.application.permission.permission_manager import PermissionManager
 
         footer = SubagentStatusFooter()
         footer._harness_app = MagicMock()
@@ -319,8 +319,8 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         orig_mode = pm.session_mode
         pm.set_session_mode("yolo")
         try:
-            with patch("widgets.status_footer.catalog.get_model_display_name", return_value=""), patch(
-                "widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
+            with patch("johnston.tui.status_footer.catalog.get_model_display_name", return_value=""), patch(
+                "johnston.tui.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
             ), patch.object(footer, "_git_diff_stats", return_value=""):
                 footer._render_footer()
             self.assertIn("Task Title", footer._last_grid_rows[0][0])
@@ -351,7 +351,7 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         app.pm = cm
         footer._harness_app = app
         footer.session = session
-        with patch("widgets.status_footer.catalog.get_model_display_name", return_value="gpt-4o"), patch.object(
+        with patch("johnston.tui.status_footer.catalog.get_model_display_name", return_value="gpt-4o"), patch.object(
             footer, "_git_diff_stats", return_value="+2/-1"
         ):
             footer._render_footer()

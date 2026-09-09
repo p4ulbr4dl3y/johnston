@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.infrastructure.mcp.manager import DEFAULT_MCP_CALL_TIMEOUT, MCPManager
+from johnston.core.infrastructure.mcp.manager import DEFAULT_MCP_CALL_TIMEOUT, MCPManager
 
 
 def make_manager(project_dir=None) -> MCPManager:
@@ -39,7 +39,7 @@ def make_manager(project_dir=None) -> MCPManager:
 
 
 def test_atexit_stop_all_swallows_errors(monkeypatch):
-    import core.infrastructure.mcp.manager as mod
+    import johnston.core.infrastructure.mcp.manager as mod
 
     inst = MagicMock()
     inst.stop_all.side_effect = RuntimeError("boom")
@@ -104,7 +104,7 @@ async def test_stop_all_async_cancels_task_and_falls_back_to_stop():
 
 
 def test_ensure_global_config_swallows_errors(monkeypatch):
-    import core.infrastructure.config.config_helpers as ch
+    import johnston.core.infrastructure.config.config_helpers as ch
 
     def _boom(*a, **k):
         raise OSError("no permissions")
@@ -172,7 +172,7 @@ async def test_update_server_config_creates_new_entry_and_adds_key(tmp_path):
 async def test_update_server_config_write_error_is_swallowed(tmp_path):
     m = make_manager(str(tmp_path))
     m.load_servers = lambda: [{"name": "x", "command": "p", "scope": "global"}]
-    with patch("core.infrastructure.platform.platform_utils.atomic_write_json", side_effect=OSError("disk")):
+    with patch("johnston.core.infrastructure.platform.platform_utils.atomic_write_json", side_effect=OSError("disk")):
         res = m._update_server_config("x", {"enabled": False})
     assert res is not None  # target still returned despite write failure
 
@@ -249,7 +249,7 @@ def test_get_active_tools_creates_and_starts_clients(tmp_path):
     c2 = MagicMock()
     c2.start.return_value = False
 
-    with patch("core.infrastructure.mcp.manager.MCPProcessClient", side_effect=[c1, c2]):
+    with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", side_effect=[c1, c2]):
         tools = m.get_active_tools()
 
     assert "s1" in m.clients
@@ -286,7 +286,7 @@ async def test_load_server_tools_async_start_raises():
     client.start_async = AsyncMock(side_effect=RuntimeError("start boom"))
     client.last_error = None
     client.stop_async = AsyncMock()
-    with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
+    with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
         res = await m._load_server_tools_async({"name": "bad", "command": "python"})
     assert res == []
     assert "bad" not in m.clients
@@ -300,7 +300,7 @@ async def test_load_server_tools_async_failed_start_and_teardown_error():
     client.start_async = AsyncMock(return_value=False)
     client.last_error = None
     client.stop_async = AsyncMock(side_effect=RuntimeError("stop fail"))
-    with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
+    with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
         res = await m._load_server_tools_async({"name": "f", "command": "python"})
     assert res == []
     assert client.last_error == "Failed to start"
@@ -319,7 +319,7 @@ async def test_load_server_tools_async_generation_changed_after_start():
     client.start_async = AsyncMock(side_effect=_start_bumps_generation)
     client.stop_async = AsyncMock()
     client.last_error = None
-    with patch("core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
+    with patch("johnston.core.infrastructure.mcp.manager.MCPProcessClient", return_value=client):
         res = await m._load_server_tools_async({"name": "g", "command": "python"})
     assert res == []
     assert "g" not in m.clients

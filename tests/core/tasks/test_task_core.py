@@ -10,10 +10,10 @@ import sys
 
 import pytest
 
-from core.infrastructure.tasks.manager import TaskManager
-from core.infrastructure.tasks.output import OutputBuffer, process_carriage_returns, strip_ansi
-from core.infrastructure.tasks.shell_task import ShellTask
-from core.infrastructure.tasks.task import TASK_KINDS, TaskStatus
+from johnston.core.infrastructure.tasks.manager import TaskManager
+from johnston.core.infrastructure.tasks.output import OutputBuffer, process_carriage_returns, strip_ansi
+from johnston.core.infrastructure.tasks.shell_task import ShellTask
+from johnston.core.infrastructure.tasks.task import TASK_KINDS, TaskStatus
 
 # ---------------------------------------------------------------------------
 # OutputBuffer
@@ -271,7 +271,7 @@ async def test_shell_task_listeners_are_isolated_and_removable():
 async def test_shell_task_file_log_writes_full_output(monkeypatch, tmp_path):
     """Background file log captures full output beyond the memory cap."""
     # Point the log helper into a tmp dir via its own module constant.
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
 
@@ -294,7 +294,7 @@ async def test_shell_task_file_log_writes_full_output(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_shell_task_open_log_twice_is_idempotent(monkeypatch, tmp_path):
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
     task = ShellTask(task_id="tlog2", command="echo", process=None)
@@ -307,7 +307,7 @@ async def test_shell_task_open_log_twice_is_idempotent(monkeypatch, tmp_path):
 @pytest.mark.asyncio
 async def test_shell_task_open_log_backfills_buffered_output(monkeypatch, tmp_path):
     """Late-opened log (e.g. timeout -> background) is not missing leading output."""
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
     task = ShellTask(task_id="tlog3", command="echo", process=None)
@@ -329,7 +329,7 @@ async def test_shell_task_open_log_backfills_buffered_output(monkeypatch, tmp_pa
 
 
 def test_output_log_streams_and_closes(monkeypatch, tmp_path):
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
     log = _out.OutputLog.create("build")
@@ -344,7 +344,7 @@ def test_output_log_streams_and_closes(monkeypatch, tmp_path):
 
 
 def test_output_log_append_after_close_is_noop(monkeypatch, tmp_path):
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
     log = _out.OutputLog.create("x")
@@ -357,7 +357,7 @@ def test_output_log_append_after_close_is_noop(monkeypatch, tmp_path):
 
 
 def test_output_log_create_failure_returns_closed_noop(monkeypatch):
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     def _boom(*_a, **_k):
         raise OSError("no permissions")
@@ -370,7 +370,7 @@ def test_output_log_create_failure_returns_closed_noop(monkeypatch):
 
 
 def test_make_log_path_sanitizes_prefix(monkeypatch, tmp_path):
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
     path = _out.make_log_path("some/project\\name")
@@ -382,7 +382,7 @@ def test_make_log_path_sanitizes_prefix(monkeypatch, tmp_path):
 
 
 def test_make_log_path_non_unique_keeps_bare_prefix(monkeypatch, tmp_path):
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
     path = _out.make_log_path("shell_1", unique=False)
@@ -390,7 +390,7 @@ def test_make_log_path_non_unique_keeps_bare_prefix(monkeypatch, tmp_path):
 
 
 def test_make_log_path_unique_adds_short_suffix(monkeypatch, tmp_path):
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
     path = _out.make_log_path("shell", unique=True)
@@ -402,7 +402,7 @@ def test_make_log_path_unique_adds_short_suffix(monkeypatch, tmp_path):
 
 
 def test_make_log_path_caps_long_prefix(monkeypatch, tmp_path):
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
     path = _out.make_log_path("x" * 200, unique=False)
@@ -411,7 +411,7 @@ def test_make_log_path_caps_long_prefix(monkeypatch, tmp_path):
 
 
 def test_make_log_path_custom_extension(monkeypatch, tmp_path):
-    import core.infrastructure.tasks.output as _out
+    import johnston.core.infrastructure.tasks.output as _out
 
     monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
     path_md = _out.make_log_path("doc", ext=".md")
@@ -493,7 +493,7 @@ async def test_shell_task_inactivity_progress_callback():
 
 
 def test_format_background_notification_with_event_and_idle_seconds():
-    from core.domain.policies.messages import format_background_notification
+    from johnston.core.domain.policies.messages import format_background_notification
 
     xml = format_background_notification(
         "shell",

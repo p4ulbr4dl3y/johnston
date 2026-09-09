@@ -1,4 +1,4 @@
-"""Compaction tests for core.base_provider (compaction area).
+"""Compaction tests for johnston.core.base_provider (compaction area).
 
 Split out of the former test_base_provider monolith: compact_history / truncation
 behavior, the /compact command, auto-compaction triggering (sys overhead, error
@@ -8,7 +8,7 @@ import json
 import unittest
 import unittest.mock
 
-from core.base_provider import BaseAgent
+from johnston.core.base_provider import BaseAgent
 from tests.core._base_provider_helpers import _MockStream, _text_chunk, _tool_call_chunk, make_agent
 
 SAMPLE_VALID_SUMMARY = """\
@@ -44,12 +44,12 @@ auth.py
 
 class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
     def test_compact_command_registered(self):
-        from widgets.app.dispatch import COMMAND_REGISTRY
+        from johnston.tui.app.dispatch import COMMAND_REGISTRY
 
         self.assertIn("/compact", COMMAND_REGISTRY)
 
     def test_format_compaction_title(self):
-        from core.base_provider.compaction import format_compaction_title
+        from johnston.core.base_provider.compaction import format_compaction_title
 
         msg = "History compacted successfully (10,000 → 4,000 tokens)"
         self.assertEqual(format_compaction_title(msg), "Session Compacted (10,000 → 4,000 tokens)")
@@ -104,7 +104,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             self.assertIn("auth.py", agent.history[1]["content"])
 
     async def test_compact_history_resets_tool_circuit_breakers(self):
-        with unittest.mock.patch("core.domain.ports.tool_registry.reset_tool_circuit_breakers") as mock_reset:
+        with unittest.mock.patch("johnston.core.domain.ports.tool_registry.reset_tool_circuit_breakers") as mock_reset:
             agent = BaseAgent(api_key="mock", model="mock", base_url="https://example.com", system_prompt="", tools=[])
             self.addAsyncCleanup(agent.close)
             agent.session_id = "test-sess-compact"
@@ -174,7 +174,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
         mock_response.choices = [mock_choice]
 
         with (
-            unittest.mock.patch("core.base_provider.tools.build_prompt_context_async", new_callable=unittest.mock.AsyncMock) as mock_bpc,
+            unittest.mock.patch("johnston.core.base_provider.tools.build_prompt_context_async", new_callable=unittest.mock.AsyncMock) as mock_bpc,
             unittest.mock.patch.object(agent.client.chat.completions, "create", new_callable=unittest.mock.AsyncMock) as mock_create,
         ):
             mock_bpc.return_value = ("sys prompt", [], 10)
@@ -304,7 +304,7 @@ class TestCompactionHistory(unittest.IsolatedAsyncioTestCase):
             return True, "compacted"
 
         with unittest.mock.patch(
-            "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+            "johnston.core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
         ) as mock_limit:
             mock_limit.return_value = 100
             with unittest.mock.patch.object(
@@ -411,9 +411,9 @@ class TestAutoCompactionSysOverhead(unittest.IsolatedAsyncioTestCase):
                 return 10  # history
             return 0
 
-        with unittest.mock.patch("core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
+        with unittest.mock.patch("johnston.core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
             with unittest.mock.patch(
-                "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+                "johnston.core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
             ) as mock_limit:
                 mock_limit.return_value = 100  # threshold = 75
                 with unittest.mock.patch.object(
@@ -460,9 +460,9 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 return 10
             return 0
 
-        with unittest.mock.patch("core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
+        with unittest.mock.patch("johnston.core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
             with unittest.mock.patch(
-                "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+                "johnston.core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
             ) as mock_limit:
                 mock_limit.return_value = 100  # threshold = 75
                 with unittest.mock.patch.object(
@@ -504,9 +504,9 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                 return 10
             return 0
 
-        with unittest.mock.patch("core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
+        with unittest.mock.patch("johnston.core.base_provider.agent.estimate_tokens", side_effect=fake_estimate):
             with unittest.mock.patch(
-                "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+                "johnston.core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
             ) as mock_limit:
                 mock_limit.return_value = 100
                 with unittest.mock.patch.object(
@@ -563,7 +563,7 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             {"role": "user", "content": "next " * 500},
         ]
         with unittest.mock.patch(
-            "core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
+            "johnston.core.base_provider.BaseAgent.context_limit", new_callable=unittest.mock.PropertyMock
         ) as mock_limit:
             mock_limit.return_value = 1_000  # downshift from 100k to 1k
             with unittest.mock.patch.object(
@@ -640,7 +640,7 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured_threshold, 50_000)
 
     async def test_subagent_inherits_subagents_auto_compact_token_limit(self):
-        from core.application.session.stream import configure_subagent_agent
+        from johnston.core.application.session.stream import configure_subagent_agent
 
         subagent = self._make_agent()
         configure_subagent_agent(subagent, "worker")
@@ -673,7 +673,7 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured_threshold, 200_000)
 
     def test_extract_plan_from_history_tool_call(self):
-        from core.base_provider.compaction import extract_plan_from_history
+        from johnston.core.base_provider.compaction import extract_plan_from_history
 
         history = [
             {"role": "user", "content": "hello"},
@@ -703,7 +703,7 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan[1]["status"], "in_progress")
 
     def test_extract_plan_from_history_previous_checkpoint(self):
-        from core.base_provider.compaction import extract_plan_from_history
+        from johnston.core.base_provider.compaction import extract_plan_from_history
 
         history = [
             {
@@ -760,7 +760,7 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
             self.assertIn('"status": "in_progress"', checkpoint_content)
 
     def test_extract_plan_stringified_json_and_status_clamping(self):
-        from core.base_provider.compaction import extract_plan_from_history
+        from johnston.core.base_provider.compaction import extract_plan_from_history
 
         history = [
             {
@@ -788,7 +788,7 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plan[1]["status"], "in_progress")
 
     def test_extract_plan_completed_plan_suppressed(self):
-        from core.base_provider.compaction import extract_plan_from_history
+        from johnston.core.base_provider.compaction import extract_plan_from_history
 
         history = [
             {

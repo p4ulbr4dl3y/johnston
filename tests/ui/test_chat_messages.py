@@ -4,14 +4,14 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from rich.text import Text
 
-from widgets.presentation.widgets.chat_messages import (
+from johnston.tui.presentation.widgets.chat_messages import (
     BotMessage,
     ErrorMessage,
     EventDivider,
     ThinkingWidget,
     UserMessage,
 )
-from widgets.presentation.widgets.chat_welcome import WelcomeWidget
+from johnston.tui.presentation.widgets.chat_welcome import WelcomeWidget
 
 
 class TestErrorMessage(unittest.TestCase):
@@ -120,7 +120,7 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
     async def test_scroll_parent_if_needed_executes_layout_followup(self):
         from textual.containers import VerticalScroll
 
-        from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
+        from johnston.tui.presentation.widgets.chat_messages import scroll_parent_if_needed
 
         parent = VerticalScroll()
         parent.is_at_bottom = lambda: True
@@ -147,7 +147,7 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
     async def test_scroll_parent_to_widget_executes_layout_followup(self):
         from textual.containers import VerticalScroll
 
-        from widgets.presentation.widgets.chat_messages import scroll_parent_to_widget
+        from johnston.tui.presentation.widgets.chat_messages import scroll_parent_to_widget
 
         parent = VerticalScroll()
         parent._is_loading_session = False
@@ -468,7 +468,7 @@ class TestThinkingWidgetCoverage(unittest.TestCase):
     def test_toggle_expanded_calls_scroll_if_needed_when_expanding(self):
         tw = ThinkingWidget("x")
         tw.is_expanded = False
-        with patch("widgets.presentation.widgets.chat_messages.scroll_parent_to_widget") as scroll_mock:
+        with patch("johnston.tui.presentation.widgets.chat_messages.scroll_parent_to_widget") as scroll_mock:
             tw.toggle_expanded()
             self.assertTrue(tw.is_expanded)
             scroll_mock.assert_called_once_with(tw, top=False)
@@ -481,8 +481,8 @@ class TestThinkingWidgetCoverage(unittest.TestCase):
             scroll_mock.assert_called_once()
 
     def test_scroll_parent_if_needed_with_force(self):
-        from widgets.presentation.widgets.chat_container import ChatView
-        from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
+        from johnston.tui.presentation.widgets.chat_container import ChatView
+        from johnston.tui.presentation.widgets.chat_messages import scroll_parent_if_needed
 
         parent = MagicMock(spec=ChatView)
         parent.is_at_bottom.return_value = False
@@ -501,8 +501,8 @@ class TestThinkingWidgetCoverage(unittest.TestCase):
         parent.call_after_refresh.assert_called_once()
 
     def test_scroll_parent_if_needed_skips_when_auto_follow_off(self):
-        from widgets.presentation.widgets.chat_container import ChatView
-        from widgets.presentation.widgets.chat_messages import scroll_parent_if_needed
+        from johnston.tui.presentation.widgets.chat_container import ChatView
+        from johnston.tui.presentation.widgets.chat_messages import scroll_parent_if_needed
 
         parent = MagicMock(spec=ChatView)
         parent.is_at_bottom.return_value = True

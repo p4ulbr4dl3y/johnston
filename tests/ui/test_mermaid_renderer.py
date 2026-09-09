@@ -5,8 +5,8 @@ from textual._context import active_app
 from textual.content import Content
 from textual.widgets import Button
 
-from widgets.presentation.widgets.chat_markdown import CustomMarkdownFence, prewarm_fences_from_markdown
-from widgets.utils.mermaid_renderer import (
+from johnston.tui.presentation.widgets.chat_markdown import CustomMarkdownFence, prewarm_fences_from_markdown
+from johnston.tui.utils.mermaid_renderer import (
     _store_cache,
     clean_mermaid_code,
     clear_mermaid_cache,
@@ -89,7 +89,7 @@ graph TD
             assert mock_run.call_args.kwargs.get("encoding") == "utf-8"
 
     def test_fix_mojibake(self):
-        from widgets.utils.mermaid_renderer import _fix_mojibake
+        from johnston.tui.utils.mermaid_renderer import _fix_mojibake
 
         mojibake = "──Ð\x9dÐµÑ\x82──"
         fixed = _fix_mojibake(mojibake)
@@ -119,7 +119,7 @@ graph TD
         assert render_mermaid_to_ascii("   ") is None
 
     def test_render_mermaid_missing_binary(self):
-        with patch("widgets.utils.mermaid_renderer._get_mermaid_binary", return_value=None):
+        with patch("johnston.tui.utils.mermaid_renderer._get_mermaid_binary", return_value=None):
             assert render_mermaid_to_ascii("graph TD\n  A-->B") is None
 
     def test_render_mermaid_subprocess_error(self):
@@ -127,7 +127,7 @@ graph TD
             assert render_mermaid_to_ascii("graph TD\n  A-->B") is None
 
     def test_store_cache_eviction(self):
-        with patch("widgets.utils.mermaid_renderer._CACHE_MAX_SIZE", 3):
+        with patch("johnston.tui.utils.mermaid_renderer._CACHE_MAX_SIZE", 3):
             _store_cache("k1", "v1")
             _store_cache("k2", "v2")
             _store_cache("k3", "v3")
@@ -316,7 +316,7 @@ class TestCustomMarkdownFenceMermaid:
         toggle_btn = MagicMock(spec=Button)
         fence.query_one = MagicMock(return_value=toggle_btn)
 
-        with patch("widgets.utils.mermaid_renderer.render_mermaid_to_ascii", return_value="┌───┐\n│ X │\n└───┘"):
+        with patch("johnston.tui.utils.mermaid_renderer.render_mermaid_to_ascii", return_value="┌───┐\n│ X │\n└───┘"):
             await fence._async_render_mermaid()
 
         assert fence._diagram_str is not None
@@ -329,7 +329,7 @@ class TestCustomMarkdownFenceMermaid:
         from textual.app import App
         from textual.widgets import Markdown
 
-        from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
+        from johnston.tui.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 
         _apply_chat_markdown_patches()
 

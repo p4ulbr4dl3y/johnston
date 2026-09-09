@@ -3,12 +3,12 @@
 import unittest
 from unittest.mock import MagicMock
 
-from core.application.session.subagent_service import (
+from johnston.core.application.session.subagent_service import (
     SubagentService,
     is_active_subagent,
     resolve_subagent_display_status,
 )
-from core.domain.entities.session import AgentSession, SessionStatus
+from johnston.core.domain.entities.session import AgentSession, SessionStatus
 
 
 class FakeTask:
@@ -190,8 +190,8 @@ class TestSubagentServiceOperations(unittest.IsolatedAsyncioTestCase):
     async def test_spawn_registers_subagent_task_in_task_manager(self):
         from unittest.mock import AsyncMock, patch
 
-        from core.infrastructure.tasks.manager import TaskManager
-        from core.infrastructure.tasks.subagent_task import SubagentTask
+        from johnston.core.infrastructure.tasks.manager import TaskManager
+        from johnston.core.infrastructure.tasks.subagent_task import SubagentTask
 
         task_mgr = TaskManager()
         ctx = MagicMock()
@@ -212,10 +212,10 @@ class TestSubagentServiceOperations(unittest.IsolatedAsyncioTestCase):
         wt_mgr.is_git_repo.return_value = False
 
         with (
-            patch("core.application.session.subagent_service.get_session_store", return_value=store),
-            patch("core.application.session.subagent_service.record_subagent_session"),
-            patch("core.application.session.stream.configure_subagent_agent"),
-            patch("core.application.session.stream.run_subagent_stream_bg", new_callable=AsyncMock),
+            patch("johnston.core.application.session.subagent_service.get_session_store", return_value=store),
+            patch("johnston.core.application.session.subagent_service.record_subagent_session"),
+            patch("johnston.core.application.session.stream.configure_subagent_agent"),
+            patch("johnston.core.application.session.stream.run_subagent_stream_bg", new_callable=AsyncMock),
         ):
             res = await SubagentService.spawn_subagent(
                 prompt="work on task",
@@ -232,8 +232,8 @@ class TestSubagentServiceOperations(unittest.IsolatedAsyncioTestCase):
 
 class TestSubagentTaskUnit(unittest.IsolatedAsyncioTestCase):
     async def test_subagent_task_lifecycle_and_status(self):
-        from core.infrastructure.tasks.subagent_task import SubagentTask
-        from core.infrastructure.tasks.task import TaskStatus
+        from johnston.core.infrastructure.tasks.subagent_task import SubagentTask
+        from johnston.core.infrastructure.tasks.task import TaskStatus
 
         sess = AgentSession(session_id="sub-task-2", status=SessionStatus.RUNNING, title="My Subagent")
         task_mock = FakeTask(done=False)

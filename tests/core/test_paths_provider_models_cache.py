@@ -1,7 +1,7 @@
 """Unit tests for the shared provider models-cache path helper."""
 import os
 
-from core.infrastructure.platform import paths
+from johnston.core.infrastructure.platform import paths
 
 
 def test_provider_models_cache_path_filename_and_dir():

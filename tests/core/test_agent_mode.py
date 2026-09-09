@@ -2,18 +2,18 @@
 import unittest
 from unittest.mock import MagicMock
 
-from core.domain.defaults.tools import NON_INTERACTIVE_EXCLUDED_TOOLS
-from core.domain.policies.role_policy import (
+from johnston.core.domain.defaults.tools import NON_INTERACTIVE_EXCLUDED_TOOLS
+from johnston.core.domain.policies.role_policy import (
     AgentMode,
     AgentRole,
     RoleScope,
     is_role_scope_compatible,
     role_tool_error,
 )
-from core.roles.apply import apply_role
-from core.roles.prompt import apply_prompt
-from core.roles.resolve import resolve_role
-from core.roles.tools import HARDENED_SHELL_DESCRIPTION, apply_role_tools
+from johnston.core.roles.apply import apply_role
+from johnston.core.roles.prompt import apply_prompt
+from johnston.core.roles.resolve import resolve_role
+from johnston.core.roles.tools import HARDENED_SHELL_DESCRIPTION, apply_role_tools
 
 
 class TestAgentMode(unittest.TestCase):
@@ -168,8 +168,8 @@ class TestAgentMode(unittest.TestCase):
     def test_tool_context_and_shell_wait_seconds_headless(self):
         import asyncio
 
-        from core.tools.context import ToolContext
-        from core.tools.shell import ShellTool
+        from johnston.core.tools.context import ToolContext
+        from johnston.core.tools.shell import ShellTool
 
         # Headless agent target
         agent = MagicMock()
@@ -187,7 +187,7 @@ class TestAgentMode(unittest.TestCase):
         self.assertIn("wait_seconds", str(result))
 
     def test_agent_tool_policy_error_honors_mode(self):
-        from core.base_provider.agent import BaseAgent
+        from johnston.core.base_provider.agent import BaseAgent
 
         class DummyAgent(BaseAgent):
             def _create_client(self, *args, **kwargs):
@@ -225,11 +225,11 @@ class TestAgentMode(unittest.TestCase):
     def test_interactive_only_tools_context_guards(self):
         import asyncio
 
-        from core.tools.ask_user import AskUserTool
-        from core.tools.context import ToolContext
-        from core.tools.invoke_subagent import InvokeSubagentTool
-        from core.tools.kill import KillTool
-        from core.tools.message_subagent import MessageSubagentTool
+        from johnston.core.tools.ask_user import AskUserTool
+        from johnston.core.tools.context import ToolContext
+        from johnston.core.tools.invoke_subagent import InvokeSubagentTool
+        from johnston.core.tools.kill import KillTool
+        from johnston.core.tools.message_subagent import MessageSubagentTool
 
         tools = [
             (InvokeSubagentTool(), {"task": "t", "title": "tit"}),

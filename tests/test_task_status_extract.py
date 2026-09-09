@@ -9,7 +9,7 @@ import time
 import unittest
 from unittest.mock import MagicMock
 
-from core.infrastructure.tasks.manage import extract_task_status_details
+from johnston.core.infrastructure.tasks.manage import extract_task_status_details
 
 
 def _mk_task(**kwargs):

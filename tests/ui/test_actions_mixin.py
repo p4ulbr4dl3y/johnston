@@ -8,9 +8,9 @@ real JohnstonApp where possible, matching the style in tests/ui/test_app.py.
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app import JohnstonApp
-from widgets.chat_input import ChatInput
-from widgets.mixins.actions import ActionsMixin
+from johnston.tui.app import JohnstonApp
+from johnston.tui.chat_input import ChatInput
+from johnston.tui.mixins.actions import ActionsMixin
 
 
 def _bare_mixin() -> ActionsMixin:
@@ -191,7 +191,7 @@ class TestActionsPointer(unittest.IsolatedAsyncioTestCase):
     async def test_on_click_chatview_target_clears_selection(self):
         from textual import events
 
-        from widgets.presentation.widgets.chat_container import ChatView
+        from johnston.tui.presentation.widgets.chat_container import ChatView
 
         app = JohnstonApp()
         async with app.run_test():
@@ -385,7 +385,7 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
             app.copy_to_clipboard.assert_not_called()
 
     async def test_on_mouse_up_target_is_chatview(self):
-        from widgets.presentation.widgets.chat_container import ChatView
+        from johnston.tui.presentation.widgets.chat_container import ChatView
 
         app = JohnstonApp()
         async with app.run_test():
@@ -422,7 +422,7 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
             app.screen.clear_selection.assert_called()
 
     async def test_on_mouse_up_welcome_widget_parent(self):
-        from widgets.presentation.widgets.chat_welcome import WelcomeWidget
+        from johnston.tui.presentation.widgets.chat_welcome import WelcomeWidget
 
         app = JohnstonApp()
         async with app.run_test():
@@ -464,7 +464,7 @@ class TestActionsMouseUp(unittest.IsolatedAsyncioTestCase):
 
 class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
     async def test_confirm_permission_always_allow_sets_overrides(self):
-        from core.application.permission.permission_manager import PermissionManager
+        from johnston.core.application.permission.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         pm.clear_session_overrides()
@@ -476,7 +476,7 @@ class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
 
             with (
                 patch.object(app, "push_screen", side_effect=on_push),
-                patch("core.application.permission.permission_manager.PermissionManager.get_instance", return_value=pm),
+                patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=pm),
             ):
                 result = await app.confirm_permission("shell", {"command": "ls"}, "Destructive", "shell")
             self.assertTrue(result)
@@ -485,7 +485,7 @@ class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
             pm.clear_session_overrides()
 
     async def test_confirm_permission_denied(self):
-        from core.application.permission.permission_manager import PermissionManager
+        from johnston.core.application.permission.permission_manager import PermissionManager
 
         pm = PermissionManager.get_instance()
         pm.clear_session_overrides()

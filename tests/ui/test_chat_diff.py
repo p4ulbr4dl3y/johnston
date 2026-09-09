@@ -1,6 +1,6 @@
 import unittest
 
-from widgets.presentation.widgets.chat_diff import DiffRenderable, format_edit_diff
+from johnston.tui.presentation.widgets.chat_diff import DiffRenderable, format_edit_diff
 
 
 class TestDiffRenderable(unittest.TestCase):
@@ -165,7 +165,7 @@ class TestFormatEditDiff(unittest.TestCase):
         from rich.console import Console
         from rich.text import Text
 
-        from widgets.presentation.widgets.chat_diff import DiffLine
+        from johnston.tui.presentation.widgets.chat_diff import DiffLine
 
         pfx = Text(" 10 + ")
         code = Text("a very long code line that should wrap to next line")
@@ -218,7 +218,7 @@ class TestFormatEditDiff(unittest.TestCase):
     def test_get_diff_colors_dark_and_light(self):
         from unittest.mock import MagicMock
 
-        from widgets.presentation.widgets.chat_diff import get_diff_colors, get_diff_word_colors
+        from johnston.tui.presentation.widgets.chat_diff import get_diff_colors, get_diff_word_colors
 
         # Dark theme mock
         dark_theme = MagicMock()
@@ -295,7 +295,7 @@ class TestFormatEditDiff(unittest.TestCase):
 
 
 def test_format_edit_diff_lex_cache_reuses_identical_inputs(monkeypatch):
-    import widgets.presentation.widgets.chat_diff as cd
+    import johnston.tui.presentation.widgets.chat_diff as cd
 
     diff = (
         "--- a/file.py\n"
@@ -335,7 +335,7 @@ def test_format_edit_diff_lex_cache_reuses_identical_inputs(monkeypatch):
 
 def test_format_edit_diff_lex_cache_never_serves_mutated_texts(monkeypatch):
     """Word-diff styling must not leak between cache hits (entries are copied out)."""
-    import widgets.presentation.widgets.chat_diff as cd
+    import johnston.tui.presentation.widgets.chat_diff as cd
 
     diff_a = "--- a/a.py\n+++ b/a.py\n@@ -1,1 +1,1 @@\n-if user_count > 10:\n+if user_count <= 10:\n"
     with cd._lex_cache_lock:

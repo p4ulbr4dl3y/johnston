@@ -1,8 +1,8 @@
 """Edge-case tests for update_plan tool and tool_display rendering (bug hunting)."""
 import unittest
 
-from core.tools.update_plan import UpdatePlanTool
-from widgets.presentation.tool_display import extract_tool_display, truncate
+from johnston.core.tools.update_plan import UpdatePlanTool
+from johnston.tui.presentation.tool_display import extract_tool_display, truncate
 
 
 class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):
@@ -116,7 +116,7 @@ class TestUpdatePlanEdge(unittest.IsolatedAsyncioTestCase):
                 self.current_plan = None
                 self.current_plan_explanation = None
 
-        from core.tools.context import ToolContext
+        from johnston.core.tools.context import ToolContext
 
         app = App()
         t = UpdatePlanTool()

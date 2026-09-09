@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from core.tools.base import truncate_output
+from johnston.core.tools.base import truncate_output
 
 
 class TestTruncateOutput(unittest.TestCase):
@@ -93,22 +93,22 @@ class TestTruncateOutput(unittest.TestCase):
     def test_truncate_output_default_uses_configured_cap(self):
         import unittest.mock as mock
 
-        from core.infrastructure.config.settings import JohnstonSettings, ToolsSettings
+        from johnston.core.infrastructure.config.settings import JohnstonSettings, ToolsSettings
 
         # Regression: with no explicit max_chars, truncate_output must honor the
         # configurable tools.max_tool_output_chars from config.json.
         cfg = JohnstonSettings(tools=ToolsSettings(max_tool_output_chars=10))
-        with mock.patch("core.infrastructure.config.settings.get_settings", return_value=cfg):
+        with mock.patch("johnston.core.infrastructure.config.settings.get_settings", return_value=cfg):
             res = truncate_output("X" * 100, tool_name="cap")
         self.assertIn("log ", res)
 
     def test_truncate_output_clips_log_at_max_size(self):
         import unittest.mock as mock
 
-        from core.infrastructure.config.settings import JohnstonSettings, ToolsSettings
+        from johnston.core.infrastructure.config.settings import JohnstonSettings, ToolsSettings
 
         cfg = JohnstonSettings(tools=ToolsSettings(max_snapshot_log_bytes=1000))
-        with mock.patch("core.infrastructure.config.settings.get_settings", return_value=cfg):
+        with mock.patch("johnston.core.infrastructure.config.settings.get_settings", return_value=cfg):
             res = truncate_output("X" * 5000, max_chars=100, tool_name="clip")
         log_path = [word for word in res.split() if ".log" in word][0].rstrip(".")
 
@@ -135,7 +135,7 @@ class TestTruncateOutput(unittest.TestCase):
         self.assertTrue(len(base) <= 40 + 1 + 4 + 4, base)
 
     def test_format_line_pagination_single_line_error_hint(self):
-        from core.tools.utils import format_line_pagination
+        from johnston.core.tools.utils import format_line_pagination
 
         res = format_line_pagination(["single line content"], start_line=140, path="test.log")
         self.assertIn("ERR: range 'read': start_line (140) exceeds line count (1)", res.display)

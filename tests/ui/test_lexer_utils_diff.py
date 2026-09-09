@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import patch
 
-from widgets.lexer_utils import build_edit_diff_text, generate_chunk_unified_diff
+from johnston.tui.lexer_utils import build_edit_diff_text, generate_chunk_unified_diff
 
 
 class TestGenerateChunkUnifiedDiff(unittest.TestCase):
@@ -33,7 +33,7 @@ class TestGenerateChunkUnifiedDiff(unittest.TestCase):
         self.assertIn("-a", lines)
 
     def test_fallback_when_git_unavailable(self):
-        with patch("core.infrastructure.runtime.git_utils.run_git", side_effect=OSError("no git")):
+        with patch("johnston.core.infrastructure.runtime.git_utils.run_git", side_effect=OSError("no git")):
             lines = generate_chunk_unified_diff("a\nb\n", "a\nc\n", "f.py", 2)
         self.assertIn("-b", lines)
         self.assertIn("+c", lines)
@@ -56,7 +56,7 @@ class TestLexBlockToLineTexts(unittest.TestCase):
     def test_preserves_leading_blank_lines(self):
         from pygments.lexers import get_lexer_by_name
 
-        from widgets.utils.lexer import lex_block_to_line_texts
+        from johnston.tui.utils.lexer import lex_block_to_line_texts
 
         code_lines = ["", "", "def main():", "    pass"]
         lexer = get_lexer_by_name("python")

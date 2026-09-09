@@ -3,12 +3,12 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import MagicMock, patch
 
-from cli import main
+from johnston.cli.main import main
 
 
 class TestCLIEdgeMain(unittest.TestCase):
     @patch("sys.argv", ["johnston"])
-    @patch("app.JohnstonApp")
+    @patch("johnston.tui.app.JohnstonApp")
     def test_main_empty_args_no_crash(self, mock_app_cls):
         """Empty argv (no flags) must launch the app cleanly without exception."""
         mock_app = mock_app_cls.return_value
@@ -28,7 +28,7 @@ class TestCLIEdgeMain(unittest.TestCase):
 
     @patch("sys.argv", ["johnston", "-v", "provider", "list"])
     def test_version_takes_precedence(self):
-        with patch("cli.get_version", return_value="1.2.3"):
+        with patch("johnston.cli.main.get_version", return_value="1.2.3"):
             f = io.StringIO()
             with redirect_stdout(f):
                 with self.assertRaises(SystemExit) as cm:
@@ -37,7 +37,7 @@ class TestCLIEdgeMain(unittest.TestCase):
             self.assertIn("1.2.3", f.getvalue())
 
     @patch("sys.argv", ["johnston", "--resume", "sess-юникод-1"])
-    @patch("app.JohnstonApp.run")
+    @patch("johnston.tui.app.JohnstonApp.run")
     def test_unicode_resume_arg_handled(self, mock_run):
         """Unicode args to --resume must not cause encode/parse errors."""
         with self.assertRaises(SystemExit) as cm:
@@ -46,7 +46,7 @@ class TestCLIEdgeMain(unittest.TestCase):
 
     def test_get_version_non_ascii_encoding(self):
         """Version string must be clean ASCII for buggy terminals."""
-        from cli import get_version
+        from johnston.cli.main import get_version
 
         ver = get_version()
         self.assertIsInstance(ver, str)
@@ -54,7 +54,7 @@ class TestCLIEdgeMain(unittest.TestCase):
 
 class TestCLIEdgeResumeTip(unittest.TestCase):
     @patch("sys.argv", ["johnston"])
-    @patch("app.JohnstonApp")
+    @patch("johnston.tui.app.JohnstonApp")
     def test_resume_tip_with_none_session_skips(self, mock_app_cls):
         """When current_session_id is None the tip code path must not crash."""
         mock_app = mock_app_cls.return_value

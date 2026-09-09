@@ -3,7 +3,7 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import MagicMock, mock_open, patch
 
-from cli import (
+from johnston.cli.main import (
     get_version,
     print_mcp,
     print_models,
@@ -11,7 +11,7 @@ from cli import (
     print_rules,
     print_skills,
 )
-from core.application.skills.manager import Skill, SkillScope
+from johnston.core.application.skills.manager import Skill, SkillScope
 
 
 class TestCLI(unittest.TestCase):
@@ -34,7 +34,7 @@ class TestCLI(unittest.TestCase):
         output = f.getvalue()
         self.assertIn("Available Johnston Skills:", output)
 
-    @patch("core.infrastructure.mcp.MCPManager.load_servers", return_value=[])
+    @patch("johnston.core.infrastructure.mcp.MCPManager.load_servers", return_value=[])
     def test_print_mcp(self, mock_load):
         f = io.StringIO()
         with redirect_stdout(f):
@@ -42,8 +42,8 @@ class TestCLI(unittest.TestCase):
         output = f.getvalue()
         self.assertIn("Configured MCP Servers:", output)
 
-    @patch("core.infrastructure.mcp.MCPManager.load_servers")
-    @patch("core.infrastructure.mcp.MCPManager.get_active_tools", return_value=[])
+    @patch("johnston.core.infrastructure.mcp.MCPManager.load_servers")
+    @patch("johnston.core.infrastructure.mcp.MCPManager.get_active_tools", return_value=[])
     def test_print_mcp_url_error(self, mock_tools, mock_load):
         mock_load.return_value = [
             {"name": "hf_server", "url": "https://hf.co/mcp", "scope": "global"}
@@ -56,8 +56,8 @@ class TestCLI(unittest.TestCase):
         self.assertIn("URL: https://hf.co/mcp", output)
         self.assertIn("HTTP/SSE URL transport not supported yet", output)
 
-    @patch("core.infrastructure.mcp.MCPManager.load_servers")
-    @patch("core.infrastructure.mcp.MCPManager.get_active_tools")
+    @patch("johnston.core.infrastructure.mcp.MCPManager.load_servers")
+    @patch("johnston.core.infrastructure.mcp.MCPManager.get_active_tools")
     def test_print_mcp_with_tools(self, mock_tools, mock_load):
         mock_load.return_value = [
             {"name": "my_server", "command": "node server.js", "scope": "project"}
@@ -90,28 +90,28 @@ class TestCLI(unittest.TestCase):
     @patch("sys.argv", ["johnston", "-v"])
     def test_main_version(self):
         with self.assertRaises(SystemExit) as cm:
-            from cli import main
+            from johnston.cli.main import main
 
             main()
         self.assertEqual(cm.exception.code, 0)
 
     @patch("sys.argv", ["johnston", "--resume", "sess123"])
-    @patch("app.JohnstonApp.run")
+    @patch("johnston.tui.app.JohnstonApp.run")
     def test_main_app_start(self, mock_app_run):
         with self.assertRaises(SystemExit) as cm:
-            from cli import main
+            from johnston.cli.main import main
 
             main()
         self.assertEqual(cm.exception.code, 0)
         self.assertTrue(mock_app_run.called)
 
     @patch("sys.argv", ["johnston", "--resume"])
-    @patch("app.JohnstonApp.run")
+    @patch("johnston.tui.app.JohnstonApp.run")
     def test_main_app_start_resume_no_arg(self, mock_app_run):
-        with patch("app.JohnstonApp") as mock_app_cls:
+        with patch("johnston.tui.app.JohnstonApp") as mock_app_cls:
             mock_app_cls.return_value.run = mock_app_run
             with self.assertRaises(SystemExit) as cm:
-                from cli import main
+                from johnston.cli.main import main
 
                 main()
             self.assertEqual(cm.exception.code, 0)
@@ -133,23 +133,23 @@ class TestCLIAdvanced(unittest.TestCase):
     def test_get_version_fallback_to_pyproject(self):
         from importlib.metadata import PackageNotFoundError
 
-        with patch("cli.version", side_effect=PackageNotFoundError("no pkg")):
+        with patch("johnston.cli.main.version", side_effect=PackageNotFoundError("no pkg")):
             with patch("pathlib.Path.exists", return_value=True):
                 with patch("builtins.open", mock_open(read_data='{"project": {"version": "9.9.9"}}')):
-                    with patch("cli.tomllib.load", return_value={"project": {"version": "9.9.9"}}):
+                    with patch("johnston.cli.main.tomllib.load", return_value={"project": {"version": "9.9.9"}}):
                         self.assertEqual(get_version(), "9.9.9")
 
     def test_get_version_pyproject_error_returns_dev(self):
         from importlib.metadata import PackageNotFoundError
 
-        with patch("cli.version", side_effect=PackageNotFoundError("no pkg")):
+        with patch("johnston.cli.main.version", side_effect=PackageNotFoundError("no pkg")):
             with patch("pathlib.Path.exists", return_value=True):
-                with patch("cli.tomllib.load", side_effect=Exception("bad tom")):
+                with patch("johnston.cli.main.tomllib.load", side_effect=Exception("bad tom")):
                     self.assertEqual(get_version(), "0.1.0-dev")
 
     def test_print_mcp_tools_scan_exception(self):
         f = io.StringIO()
-        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
+        with patch("johnston.core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.side_effect = Exception("boom")
@@ -167,7 +167,7 @@ class TestCLIAdvanced(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             (pathlib.Path(tmp) / "AGENTS.md").write_text("hello")
             with patch("pathlib.Path.cwd", return_value=pathlib.Path(tmp)):
-                with patch("core.application.rules.rules.RulesManager") as mock_cls:
+                with patch("johnston.core.application.rules.rules.RulesManager") as mock_cls:
                     rules_mgr = MagicMock()
                     rules_mgr.load_rules.return_value = []
                     mock_cls.get_instance.return_value = rules_mgr
@@ -181,12 +181,12 @@ class TestCLIAdvanced(unittest.TestCase):
         import pathlib
         import tempfile
 
-        from core.application.rules.rules import RuleDefinition
+        from johnston.core.application.rules.rules import RuleDefinition
 
         f = io.StringIO()
         with tempfile.TemporaryDirectory() as tmp:
             with patch("pathlib.Path.cwd", return_value=pathlib.Path(tmp)):
-                with patch("core.application.rules.rules.RulesManager") as mock_cls:
+                with patch("johnston.core.application.rules.rules.RulesManager") as mock_cls:
                     rule = RuleDefinition(name="R1", content="some content", source="project")
                     rules_mgr = MagicMock()
                     rules_mgr.load_rules.return_value = [rule]
@@ -202,9 +202,9 @@ class TestCLIAdvanced(unittest.TestCase):
         pm.load_providers.return_value = {"empty": {"name": "Empty"}}
         pm.get_active_provider_key.return_value = "empty"
         pm.get_api_key.return_value = ""
-        with patch("core.application.provider.provider_manager.ProviderManager", return_value=pm):
+        with patch("johnston.core.application.provider.provider_manager.ProviderManager", return_value=pm):
             with redirect_stdout(f):
-                from cli import print_models
+                from johnston.cli.main import print_models
 
                 print_models()
         self.assertIn("Available Johnston Providers & Models:", f.getvalue())
@@ -222,9 +222,9 @@ class TestCLIAdvanced(unittest.TestCase):
         }
         pm.get_active_provider_key.return_value = "openai"
         pm.get_api_key.return_value = "sk-123"
-        with patch("core.application.provider.provider_manager.ProviderManager", return_value=pm):
+        with patch("johnston.core.application.provider.provider_manager.ProviderManager", return_value=pm):
             with redirect_stdout(f):
-                from cli import print_models
+                from johnston.cli.main import print_models
 
                 print_models()
         out = f.getvalue()
@@ -235,7 +235,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_skills_empty(self):
         f = io.StringIO()
-        with patch("core.application.skills.manager.SkillManager") as mock_cls:
+        with patch("johnston.core.application.skills.manager.SkillManager") as mock_cls:
             mock_cls.return_value.list_skills.return_value = []
             with redirect_stdout(f):
                 print_skills()
@@ -243,7 +243,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_skills_with_hidden(self):
         f = io.StringIO()
-        with patch("core.application.skills.manager.SkillManager") as mock_cls:
+        with patch("johnston.core.application.skills.manager.SkillManager") as mock_cls:
             mock_cls.return_value.list_skills.return_value = [
                 Skill("a", "", "", "", SkillScope.GLOBAL, True),
                 Skill("b", "", "", "", SkillScope.PROJECT, False),
@@ -256,7 +256,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_empty(self):
         f = io.StringIO()
-        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
+        with patch("johnston.core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mock_get.return_value.load_servers.return_value = []
             with redirect_stdout(f):
                 print_mcp()
@@ -264,7 +264,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_cmd_with_args_disabled(self):
         f = io.StringIO()
-        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
+        with patch("johnston.core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [
                 {
@@ -285,7 +285,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_no_cmd_no_url(self):
         f = io.StringIO()
-        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
+        with patch("johnston.core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "scope": "global"}]
             mgr.get_active_tools.return_value = []
@@ -298,7 +298,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_client_error(self):
         f = io.StringIO()
-        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
+        with patch("johnston.core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.return_value = []
@@ -315,7 +315,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_mcp_no_tools_no_client(self):
         f = io.StringIO()
-        with patch("core.infrastructure.mcp.get_mcp_manager") as mock_get:
+        with patch("johnston.core.infrastructure.mcp.get_mcp_manager") as mock_get:
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"name": "srv", "command": "x", "scope": "global"}]
             mgr.get_active_tools.return_value = []
@@ -331,7 +331,7 @@ class TestCLIAdvanced(unittest.TestCase):
         f = io.StringIO()
         with tempfile.TemporaryDirectory() as tmp:
             with patch("pathlib.Path.cwd", return_value=__import__("pathlib").Path(tmp)):
-                with patch("core.application.rules.rules.RulesManager") as mock_cls:
+                with patch("johnston.core.application.rules.rules.RulesManager") as mock_cls:
                     rules_mgr = MagicMock()
                     rules_mgr.load_rules.return_value = []
                     mock_cls.get_instance.return_value = rules_mgr
@@ -341,7 +341,7 @@ class TestCLIAdvanced(unittest.TestCase):
 
     def test_print_roles_with_disallowed_tools(self):
         f = io.StringIO()
-        with patch("core.roles.role_registry.RoleRegistry") as mock_cls:
+        with patch("johnston.core.roles.role_registry.RoleRegistry") as mock_cls:
             role_mgr = MagicMock()
             role = MagicMock(
                 source="builtin",
@@ -365,16 +365,16 @@ class TestMainSubcommands(unittest.TestCase):
     def test_main_provider_list_cmd(self):
         with patch("sys.argv", ["johnston", "provider", "list"]):
             with self.assertRaises(SystemExit) as cm:
-                from cli import main
+                from johnston.cli.main import main
 
                 main()
         self.assertEqual(cm.exception.code, 0)
 
     def test_main_skills_cmd(self):
         with patch("sys.argv", ["johnston", "skills"]):
-            with patch("cli.print_skills"):
+            with patch("johnston.cli.main.print_skills"):
                 with self.assertRaises(SystemExit) as cm:
-                    from cli import main
+                    from johnston.cli.main import main
 
                     main()
         self.assertEqual(cm.exception.code, 0)
@@ -382,37 +382,37 @@ class TestMainSubcommands(unittest.TestCase):
     def test_main_mcp_list_cmd(self):
         with patch("sys.argv", ["johnston", "mcp", "list"]):
             with self.assertRaises(SystemExit) as cm:
-                from cli import main
+                from johnston.cli.main import main
 
                 main()
         self.assertEqual(cm.exception.code, 0)
 
     def test_main_roles_cmd(self):
         with patch("sys.argv", ["johnston", "roles"]):
-            with patch("cli.print_roles"):
+            with patch("johnston.cli.main.print_roles"):
                 with self.assertRaises(SystemExit) as cm:
-                    from cli import main
+                    from johnston.cli.main import main
 
                     main()
         self.assertEqual(cm.exception.code, 0)
 
     def test_main_rules_cmd(self):
         with patch("sys.argv", ["johnston", "rules"]):
-            with patch("cli.print_rules"):
+            with patch("johnston.cli.main.print_rules"):
                 with self.assertRaises(SystemExit) as cm:
-                    from cli import main
+                    from johnston.cli.main import main
 
                     main()
         self.assertEqual(cm.exception.code, 0)
 
     def test_main_app_keyboard_interrupt(self):
         with patch("sys.argv", ["johnston"]):
-            with patch("app.JohnstonApp") as mock_app_cls:
+            with patch("johnston.tui.app.JohnstonApp") as mock_app_cls:
                 mock_app = mock_app_cls.return_value
                 mock_app.run = MagicMock(side_effect=KeyboardInterrupt())
                 mock_app.current_session_id = None
                 with self.assertRaises(SystemExit) as cm:
-                    from cli import main
+                    from johnston.cli.main import main
 
                     main()
         self.assertEqual(cm.exception.code, 0)
@@ -420,7 +420,7 @@ class TestMainSubcommands(unittest.TestCase):
     def test_main_resume_tip_printed(self):
         f = io.StringIO()
         with patch("sys.argv", ["johnston"]):
-            with patch("app.JohnstonApp") as mock_app_cls:
+            with patch("johnston.tui.app.JohnstonApp") as mock_app_cls:
                 mock_app = mock_app_cls.return_value
                 mock_app.run = MagicMock()
                 mock_app.current_session_id = "sess123"
@@ -428,7 +428,7 @@ class TestMainSubcommands(unittest.TestCase):
                 mock_app.sm.get.return_value = MagicMock(messages=[{"type": "user", "text": "hi"}], agent_history=[])
                 with redirect_stdout(f):
                     with self.assertRaises(SystemExit) as cm:
-                        from cli import main
+                        from johnston.cli.main import main
 
                         main()
         self.assertEqual(cm.exception.code, 0)
@@ -436,14 +436,14 @@ class TestMainSubcommands(unittest.TestCase):
 
     def test_main_resume_tip_load_error(self):
         with patch("sys.argv", ["johnston"]):
-            with patch("app.JohnstonApp") as mock_app_cls:
+            with patch("johnston.tui.app.JohnstonApp") as mock_app_cls:
                 mock_app = mock_app_cls.return_value
                 mock_app.run = MagicMock()
                 mock_app.current_session_id = "sess123"
                 mock_app.sm = MagicMock()
                 mock_app.sm.get.side_effect = Exception("boom")
                 with self.assertRaises(SystemExit) as cm:
-                    from cli import main
+                    from johnston.cli.main import main
 
                     main()
         self.assertEqual(cm.exception.code, 0)

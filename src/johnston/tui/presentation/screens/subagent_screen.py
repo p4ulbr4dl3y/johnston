@@ -1,0 +1,472 @@
+import asyncio
+
+from textual.app import ComposeResult
+from textual.containers import Vertical
+from textual.screen import ModalScreen
+
+from johnston.tui.presentation.widgets.chat_container import ChatView
+from johnston.tui.presentation.widgets.chat_stream_driver import ChatStreamDriver
+from johnston.tui.presentation.widgets.plan_notch import (
+    PlanActionsMixin,
+    PlanNotch,
+    PlanNotchContainer,
+    extract_active_plan_from_messages,
+)
+from johnston.tui.presentation.widgets.subagent_footer import SubagentStatusFooter
+from johnston.tui.utils.key_aliases import expand_bindings
+
+
+class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
+    """Unified modal screen displaying an agent/subagent session chat transcript."""
+
+    inherit_bindings = False
+    BINDINGS = expand_bindings([
+        ("escape", "close", "Close Screen"),
+        ("ctrl+k", "kill_subagent", "Kill Subagent"),
+        ("ctrl+p", "toggle_plan", "Toggle Plan"),
+        ("ctrl+h", "toggle_plan_hidden", "Hide/Show Plan"),
+        ("ctrl+o", "toggle_expand", "Toggle Expand"),
+        ("pageup", "scroll_page_up", "Page Up"),
+        ("pagedown", "scroll_page_down", "Page Down"),
+        ("shift+pageup", "scroll_top", "Scroll Top"),
+        ("shift+pagedown", "scroll_bottom", "Scroll Bottom"),
+        ("home", "scroll_top", "Scroll Top"),
+        ("end", "scroll_bottom", "Scroll Bottom"),
+        ("up", "scroll_up", "Scroll Up"),
+        ("down", "scroll_down", "Scroll Down"),
+        ("ctrl+c", "quit_app", "Quit"),
+        ("ctrl+q", "quit_app", "Quit"),
+    ])
+
+    def __init__(self, session_id_or_desc: str, show_input: bool = False, from_tasks: bool = False):
+        super().__init__()
+        self.session_id_or_desc = session_id_or_desc
+        self.show_input = show_input
+        self.from_tasks = from_tasks
+        self.session = None
+        self.driver: ChatStreamDriver | None = None
+        self._last_tool_widget = None
+        self.event_queue = asyncio.Queue()
+        self.queue_task = None
+        self._notch_task = None
+
+    @property
+    def thinking_widget(self):
+        d = getattr(self, "driver", None)
+        return d.thinking_handle if d else getattr(self, "_legacy_thinking_widget", None)
+
+    @thinking_widget.setter
+    def thinking_widget(self, val):
+        d = getattr(self, "driver", None)
+        if d:
+            d.thinking_handle = val
+        self._legacy_thinking_widget = val
+
+    @property
+    def bot_msg(self):
+        d = getattr(self, "driver", None)
+        return d.bot_handle if d else getattr(self, "_legacy_bot_msg", None)
+
+    @bot_msg.setter
+    def bot_msg(self, val):
+        d = getattr(self, "driver", None)
+        if d:
+            d.bot_handle = val
+        self._legacy_bot_msg = val
+
+    @property
+    def current_tool_widget(self):
+        d = getattr(self, "driver", None)
+        if d and d.tool_handles:
+            return d.tool_handles[-1]
+        return getattr(self, "_last_tool_widget", None)
+
+    @current_tool_widget.setter
+    def current_tool_widget(self, val):
+        self._last_tool_widget = val
+        d = getattr(self, "driver", None)
+        if d:
+            if val:
+                if not d.tool_handles or d.tool_handles[-1] != val:
+                    d.tool_handles.append(val)
+            else:
+                d.tool_handles.clear()
+
+    def compose(self) -> ComposeResult:
+        yield PlanNotchContainer(id="plan-notch-container")
+        with Vertical(id="subagent-container"):
+            yield ChatView(id="subagent-chat-view", show_welcome=False)
+            yield SubagentStatusFooter(from_tasks=self.from_tasks, id="subagent-status-footer")
+
+    def on_mount(self) -> None:
+        self._kill_finalized = False
+        self._chat_view = self.query_one("#subagent-chat-view", ChatView)
+        try:
+            self._notch = self.query_one(PlanNotch)
+        except Exception:
+            self._notch = None
+        self._chat_view.focus()
+        self._chat_view.clear_welcome()
+
+        store = getattr(self.app, "sm", None) if self.app else None
+        if store is None:
+            from johnston.core.infrastructure.storage.session_store import SessionStore
+
+            store = SessionStore.get_instance()
+
+        curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
+        self.session = store.find_session_by_title_or_id(self.session_id_or_desc, parent_id=curr_session_id)
+        if not self.session:
+            self.session = store.find_session_by_title_or_id(self.session_id_or_desc)
+
+        if not self.session:
+
+            async def _no_sess():
+                bm = await self._chat_view.add_bot_message()
+                bm.content = f"Subagent `{self.session_id_or_desc}` session details not found."
+
+            self.run_worker(_no_sess())
+            return
+
+        footer = self.query_one("#subagent-status-footer", SubagentStatusFooter)
+        footer.update_session(self.session)
+
+        # Stop any stale interval from a previous mount
+        if getattr(self, "_footer_refresh", None) is not None:
+            try:
+                self._footer_refresh.stop()
+            except Exception:
+                pass
+            self._footer_refresh = None
+
+        self._history_worker = self.run_worker(self._load_history_session())
+
+    def _refresh_chrome(self) -> None:
+        try:
+            self.query_one("#subagent-status-footer", SubagentStatusFooter).update_session(self.session)
+        except Exception:
+            pass
+
+    def _get_app(self):
+        try:
+            return getattr(self, "_app", None) or self.app
+        except Exception:
+            return getattr(self, "_app", None)
+
+    def _save_expand_state(self) -> None:
+        app = self._get_app()
+        if not self.session or not app:
+            return
+        if not hasattr(app, "_subagent_expand_state") or not isinstance(app._subagent_expand_state, dict):
+            app._subagent_expand_state = {}
+        if not hasattr(app, "_subagent_plan_state") or not isinstance(app._subagent_plan_state, dict):
+            app._subagent_plan_state = {}
+
+        chat_view = getattr(self, "_chat_view", None)
+        if chat_view is None:
+            try:
+                chat_view = self.query_one("#subagent-chat-view", ChatView)
+            except Exception:
+                chat_view = None
+        if chat_view and getattr(chat_view, "_is_loading_session", False):
+            return
+
+        try:
+            if chat_view and chat_view.children:
+                expanded_indices = set()
+                for idx, child in enumerate(chat_view.children):
+                    if getattr(child, "is_expanded", False):
+                        expanded_indices.add(idx)
+                app._subagent_expand_state[self.session.id] = expanded_indices
+        except Exception:
+            pass
+        try:
+            notch = getattr(self, "_notch", None)
+            if notch is None:
+                notch = self.query_one(PlanNotch)
+            if notch and getattr(notch, "plan_items", None):
+                # Textual's Widget.display property evaluates to False during unmount/closing
+                # because `_closing` is True. Check `styles.display != "none"` instead.
+                is_visible = getattr(getattr(notch, "styles", None), "display", "") != "none"
+                app._subagent_plan_state[self.session.id] = {
+                    "is_expanded": getattr(notch, "is_expanded", False),
+                    "display": is_visible,
+                }
+        except Exception:
+            pass
+
+        max_cache = 50
+        while len(app._subagent_expand_state) > max_cache:
+            app._subagent_expand_state.pop(next(iter(app._subagent_expand_state)), None)
+        while len(app._subagent_plan_state) > max_cache:
+            app._subagent_plan_state.pop(next(iter(app._subagent_plan_state)), None)
+
+    def _on_plan_update(self, plan: list, explanation: str) -> None:
+        self.on_plan_update(plan, explanation)
+        if self.session:
+            setattr(self.session, "current_plan", plan)
+            setattr(self.session, "current_plan_explanation", explanation)
+        self._save_expand_state()
+
+    async def _load_history_session(self) -> None:
+        chat_view = self.query_one("#subagent-chat-view", ChatView)
+        chat_view.loading = True
+        chat_view._is_loading_session = True
+        try:
+            self.query_one(PlanNotch).clear_plan()
+        except Exception:
+            pass
+
+        self.driver = ChatStreamDriver(
+            chat_view,
+            on_tool_widget=lambda w: setattr(self, "_last_tool_widget", w),
+            on_plan_update=self._on_plan_update,
+        )
+
+        is_running = bool(self.session and getattr(self.session, "status", "") == "running")
+        app = self._get_app()
+        expand_state = set()
+        if app and self.session and hasattr(app, "_subagent_expand_state") and isinstance(app._subagent_expand_state, dict):
+            expand_state = app._subagent_expand_state.get(self.session.id, set())
+
+        # Drain any stale items from queue
+        while not self.event_queue.empty():
+            try:
+                self.event_queue.get_nowait()
+                self.event_queue.task_done()
+            except Exception:
+                break
+
+        if self.session:
+            self.session.remove_listener(self._on_live_event)
+            self.session.add_listener(self._on_live_event)
+
+            await ChatView.load_session(chat_view, self.session, driver=self.driver, is_running=is_running)
+
+            # Restore active plan from transcript or session object if present, delayed so dialogue renders first
+            async def _restore_notch_delayed() -> None:
+                await asyncio.sleep(0.15)
+                try:
+                    plan_data = extract_active_plan_from_messages(self.session.messages) if self.session else None
+                    p_items = None
+                    p_expl = ""
+                    if plan_data and plan_data[0]:
+                        p_items, p_expl = plan_data
+                    elif self.session and getattr(self.session, "current_plan", None):
+                        p_items = self.session.current_plan
+                        p_expl = getattr(self.session, "current_plan_explanation", "")
+
+                    if p_items:
+                        self.current_plan = p_items
+                        self.current_plan_explanation = p_expl
+                        notch = self.query_one(PlanNotch)
+                        notch.set_plan(p_items, p_expl)
+                        if app and hasattr(app, "_subagent_plan_state") and isinstance(app._subagent_plan_state, dict):
+                            p_state = app._subagent_plan_state.get(self.session.id)
+                            if isinstance(p_state, dict):
+                                if p_state.get("is_expanded") and not notch.is_expanded:
+                                    notch.toggle_expanded()
+                                if "display" in p_state:
+                                    notch.display = bool(p_state["display"])
+                                    notch.refresh_notch()
+                    else:
+                        self.query_one(PlanNotch).clear_plan()
+                except Exception:
+                    pass
+
+            if getattr(self, "_notch_task", None) is not None and not self._notch_task.done():
+                self._notch_task.cancel()
+            self._notch_task = asyncio.create_task(_restore_notch_delayed())
+
+            if not self.queue_task or self.queue_task.done():
+                self.queue_task = asyncio.create_task(self._process_queue())
+
+        for idx, child in enumerate(chat_view.children):
+            if idx in expand_state and hasattr(child, "set_expanded"):
+                child.set_expanded(True)
+
+        if not is_running and self.driver:
+            await self.driver.finalize_bot_stream()
+
+        await asyncio.sleep(0.1)
+        chat_view._is_loading_session = False
+        chat_view.loading = False
+        try:
+            chat_view.call_after_refresh(chat_view.scroll_end, animate=False)
+        except Exception:
+            pass
+
+        if not self.is_mounted:
+            return
+
+        self._refresh_chrome()
+
+    def on_unmount(self) -> None:
+        self._save_expand_state()
+        if getattr(self, "_footer_refresh", None) is not None:
+            try:
+                self._footer_refresh.stop()
+            except Exception:
+                pass
+            self._footer_refresh = None
+        if getattr(self, "_history_worker", None) is not None:
+            try:
+                self._history_worker.cancel()
+            except Exception:
+                pass
+            self._history_worker = None
+        if getattr(self, "_notch_task", None) is not None and not self._notch_task.done():
+            self._notch_task.cancel()
+        self._notch_task = None
+        if self.queue_task and not self.queue_task.done():
+            self.queue_task.cancel()
+        if self.session:
+            self.session.remove_listener(self._on_live_event)
+
+    def _on_live_event(self, evt: dict) -> None:
+        # Audit A5: after action_kill_subagent has finalized the screen, any
+        # late events emitted by the cancelled task's teardown (interruption
+        # divider, status_change) must be dropped, not re-rendered.
+        if getattr(self, "_kill_finalized", False):
+            return
+        if self.is_mounted and hasattr(self, "event_queue"):
+            self.event_queue.put_nowait(evt)
+
+    async def _process_queue(self) -> None:
+        while True:
+            try:
+                evt = await self.event_queue.get()
+                try:
+                    await self._render_event(evt, is_active=True)
+                    self._refresh_chrome()
+                finally:
+                    self.event_queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                pass
+
+    async def _render_event(
+        self,
+        evt: dict,
+        animate: bool = True,
+        is_expanded: bool = False,
+        is_active: bool = False,
+    ) -> None:
+        if getattr(self, "driver", None) is None:
+            try:
+                chat_view = self.query_one("#subagent-chat-view", ChatView)
+            except Exception:
+                chat_view = getattr(self, "chat_view", None)
+            self.driver = ChatStreamDriver(
+                chat_view,
+                on_tool_widget=lambda w: setattr(self, "_last_tool_widget", w),
+                on_plan_update=self._on_plan_update,
+            )
+            if getattr(self, "_legacy_bot_msg", None):
+                self.driver.bot_handle = self._legacy_bot_msg
+            if getattr(self, "_legacy_thinking_widget", None):
+                self.driver.thinking_handle = self._legacy_thinking_widget
+            if getattr(self, "_last_tool_widget", None):
+                self.driver.tool_handles.append(self._last_tool_widget)
+
+        await self.driver.consume_session_event(
+            evt,
+            animate=animate,
+            is_expanded=is_expanded,
+            is_active=is_active,
+        )
+
+    def action_close(self) -> None:
+        self._save_expand_state()
+        self.dismiss()
+
+    def action_toggle_plan(self) -> None:
+        super().action_toggle_plan()
+        self._save_expand_state()
+
+    def action_toggle_plan_hidden(self) -> None:
+        super().action_toggle_plan_hidden()
+        self._save_expand_state()
+
+    def on_click(self, event) -> None:
+        self._save_expand_state()
+
+    def action_kill_subagent(self) -> None:
+        """Kill the current subagent if running."""
+        self._save_expand_state()
+        if self.session and getattr(self.session, "status", "") == "running":
+            self._kill_finalized = True
+            from johnston.core.application.session.subagent_service import SubagentService
+            from johnston.core.infrastructure.storage.session_store import get_session_store
+
+            store = get_session_store(self.app)
+            SubagentService.kill_subagent(self.session, store)
+            if self.driver:
+                self.driver.finalize_thinking_stream()
+                while self.driver.tool_handles:
+                    w = self.driver.tool_handles.popleft()
+                    if hasattr(w, "mark_cancelled"):
+                        w.mark_cancelled()
+            self._refresh_chrome()
+
+    def action_toggle_expand(self) -> None:
+        """Toggle expand on all expandable widgets in subagent chat."""
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.toggle_expand("all")
+            self._save_expand_state()
+        except Exception:
+            pass
+
+    def action_scroll_page_up(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_page_up()
+        except Exception:
+            pass
+
+    def action_scroll_page_down(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_down_page()
+        except Exception:
+            pass
+
+    def action_scroll_up(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_up(animate=False)
+        except Exception:
+            pass
+
+    def action_scroll_down(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_down(animate=False)
+        except Exception:
+            pass
+
+    def action_scroll_top(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_to_top()
+        except Exception:
+            pass
+
+    def action_scroll_bottom(self) -> None:
+        try:
+            chat_view = self.query_one("#subagent-chat-view", ChatView)
+            chat_view.scroll_to_bottom()
+        except Exception:
+            pass
+
+    def action_quit_app(self) -> None:
+        """Quit the application."""
+        self._save_expand_state()
+        if self.app:
+            self.app.exit()
+
+
+SubagentViewScreen = SessionChatScreen
+

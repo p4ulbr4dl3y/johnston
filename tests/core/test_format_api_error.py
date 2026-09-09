@@ -5,8 +5,8 @@ from unittest import mock
 
 import httpx
 
-from core.base_provider import format_api_error
-from core.base_provider.errors import ErrorHandlingMixin
+from johnston.core.base_provider import format_api_error
+from johnston.core.base_provider.errors import ErrorHandlingMixin
 
 
 class TestFormatApiError(unittest.TestCase):

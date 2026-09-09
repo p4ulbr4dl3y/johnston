@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from textual.widgets import Label
 
-from widgets.presentation.widgets.chat_markdown import (
+from johnston.tui.presentation.widgets.chat_markdown import (
     CustomMarkdownBlockQuote,
     CustomMarkdownFence,
     CustomMarkdownTable,
@@ -156,7 +156,7 @@ class TestMarkdownHelpers(unittest.TestCase):
     def test_markdown_blocks_table_open_is_patched(self):
         from textual.widgets import Markdown
 
-        from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
+        from johnston.tui.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 
         _apply_chat_markdown_patches()
         self.assertIs(Markdown.BLOCKS["table_open"], CustomMarkdownTable)
@@ -201,7 +201,7 @@ class TestMarkdownHelpers(unittest.TestCase):
         child_mock.tooltip = None
 
     def test_handle_markdown_task_done(self):
-        from widgets.presentation.widgets.chat_markdown import _handle_markdown_task_done
+        from johnston.tui.presentation.widgets.chat_markdown import _handle_markdown_task_done
 
         cancelled = MagicMock()
         cancelled.cancelled.return_value = True
@@ -279,7 +279,7 @@ class TestMarkdownHelpers(unittest.TestCase):
         self.assertEqual(calls, [1])
 
     def test_markdown_block_inline_code_style(self):
-        from widgets.presentation.widgets.chat_markdown import _new_markdown_block_get_style
+        from johnston.tui.presentation.widgets.chat_markdown import _new_markdown_block_get_style
 
         style = _new_markdown_block_get_style(object(), ".code_inline")
         self.assertIsNotNone(style)
@@ -334,7 +334,7 @@ class TestFenceHighlightCache(unittest.TestCase):
     """
 
     def _clear_cache(self):
-        from widgets.presentation.widgets import chat_markdown
+        from johnston.tui.presentation.widgets import chat_markdown
 
         chat_markdown._highlight_cache.clear()
 
@@ -363,7 +363,7 @@ class TestFenceHighlightCache(unittest.TestCase):
         self.assertIsNot(py, light)
 
     def test_resolve_highlight_lexer_fallbacks(self):
-        from widgets.presentation.widgets.chat_markdown import resolve_highlight_lexer
+        from johnston.tui.presentation.widgets.chat_markdown import resolve_highlight_lexer
 
         self.assertEqual(resolve_highlight_lexer("python"), "python")
         self.assertEqual(resolve_highlight_lexer(" PYTHON "), "python")
@@ -373,7 +373,7 @@ class TestFenceHighlightCache(unittest.TestCase):
         self.assertEqual(resolve_highlight_lexer("log"), "text")
 
     def test_prewarm_fills_cache_and_compose_hits_it(self):
-        from widgets.presentation.widgets.chat_markdown import (
+        from johnston.tui.presentation.widgets.chat_markdown import (
             _highlight_cache,
             prewarm_fences_from_markdown,
         )
@@ -387,7 +387,7 @@ class TestFenceHighlightCache(unittest.TestCase):
         self.assertIn(content, list(_highlight_cache.values()))
 
     def test_prewarm_skips_empty_and_unclosed_blocks(self):
-        from widgets.presentation.widgets.chat_markdown import _highlight_cache, prewarm_fences_from_markdown
+        from johnston.tui.presentation.widgets.chat_markdown import _highlight_cache, prewarm_fences_from_markdown
 
         self.assertEqual(prewarm_fences_from_markdown("no fences here", dark=True), 0)
         self.assertEqual(len(_highlight_cache), 0)
@@ -398,13 +398,13 @@ class TestFenceHighlightCache(unittest.TestCase):
         self.assertEqual(len(_highlight_cache), 0)
 
     def test_prewarm_matches_indented_fence_like_clean_markdown(self):
-        from widgets.presentation.widgets.chat_markdown import prewarm_fences_from_markdown
+        from johnston.tui.presentation.widgets.chat_markdown import prewarm_fences_from_markdown
 
         md = "text\n\n  ```python\n  y = 3\n  ```\n"
         self.assertEqual(prewarm_fences_from_markdown(md, dark=True), 1)
 
     def test_highlight_cache_invalidated_by_theme_change(self):
-        from widgets.presentation.widgets import chat_markdown
+        from johnston.tui.presentation.widgets import chat_markdown
 
         code = "z = 9"
         before = CustomMarkdownFence.highlight(code, "python")
@@ -418,7 +418,7 @@ class TestFenceHighlightCache(unittest.TestCase):
         self.assertIsNot(before, after)
 
     def test_prepare_markdown_text_prewarms_and_cleans(self):
-        from widgets.presentation.widgets.chat_markdown import (
+        from johnston.tui.presentation.widgets.chat_markdown import (
             _highlight_cache,
             prepare_markdown_text,
         )
@@ -429,7 +429,7 @@ class TestFenceHighlightCache(unittest.TestCase):
         self.assertTrue(any("q = 4" in key[0] for key in _highlight_cache))
 
     def test_highlight_cache_lru_bounded(self):
-        from widgets.presentation.widgets.chat_markdown import (
+        from johnston.tui.presentation.widgets.chat_markdown import (
             _HIGHLIGHT_CACHE_MAX,
             _highlight_cache,
         )
@@ -472,7 +472,7 @@ class TestFenceHighlightCache(unittest.TestCase):
         from textual.widgets import Markdown
         from textual.widgets._markdown import MarkdownParagraph
 
-        from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
+        from johnston.tui.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 
         _apply_chat_markdown_patches()
 
@@ -498,7 +498,7 @@ class TestFenceHighlightCache(unittest.TestCase):
     def test_custom_markdown_blockquote_standard_quote(self):
         from textual.widgets import Markdown
 
-        from widgets.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
+        from johnston.tui.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 
         _apply_chat_markdown_patches()
         md_text = "> Just a regular quote"
@@ -513,7 +513,7 @@ class TestFenceHighlightCache(unittest.TestCase):
         from textual.widgets import Markdown
         from textual.widgets._markdown import MarkdownBullet
 
-        from widgets.presentation.widgets.chat_markdown import (
+        from johnston.tui.presentation.widgets.chat_markdown import (
             CustomMarkdownBulletList,
             _apply_chat_markdown_patches,
         )
@@ -539,7 +539,7 @@ class TestFenceHighlightCache(unittest.TestCase):
 
         from textual import events
 
-        from widgets.presentation.widgets.chat_markdown import DiagramScrollBox
+        from johnston.tui.presentation.widgets.chat_markdown import DiagramScrollBox
 
         box = DiagramScrollBox()
         self.assertFalse(box._scroll_left_for_pointer())
@@ -568,7 +568,7 @@ class TestFenceHighlightCache(unittest.TestCase):
     def test_thin_scrollbar_render(self):
         from rich.color import Color
 
-        from widgets.presentation.widgets.chat_markdown import DiagramScrollBox, ThinScrollBarRender
+        from johnston.tui.presentation.widgets.chat_markdown import DiagramScrollBox, ThinScrollBarRender
 
         segs = ThinScrollBarRender.render_bar(
             size=20,

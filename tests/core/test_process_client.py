@@ -1,5 +1,5 @@
 """
-Unit tests for core.infrastructure.mcp.process_client.MCPProcessClient.
+Unit tests for johnston.core.infrastructure.mcp.process_client.MCPProcessClient.
 
 All tests use mocks only; no real subprocesses are spawned.
 """
@@ -9,7 +9,7 @@ import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.infrastructure.mcp.process_client import MCPProcessClient
+from johnston.core.infrastructure.mcp.process_client import MCPProcessClient
 
 
 class TestStartAsyncReader(unittest.TestCase):
@@ -385,7 +385,7 @@ class TestReadResponse(unittest.TestCase):
             return True
 
         with patch.object(client._response_event, "wait", side_effect=fake_wait):
-            with patch("core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0]):
+            with patch("johnston.core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0]):
                 res = client._read_response(req_id=1, timeout=5.0)
         self.assertEqual(res["id"], 1)
 
@@ -396,7 +396,7 @@ class TestReadResponse(unittest.TestCase):
         read_task = MagicMock()
         read_task.done.return_value = False
         client._read_task = read_task
-        with patch("core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 101.0]):
+        with patch("johnston.core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 101.0]):
             res = client._read_response(req_id=1, timeout=1.0)
         self.assertIsNone(res)
 
@@ -413,7 +413,7 @@ class TestReadResponse(unittest.TestCase):
             return True
 
         with patch.object(client._response_event, "wait", side_effect=fake_wait):
-            with patch("core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0]):
+            with patch("johnston.core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0]):
                 res = client._read_response(req_id=1, timeout=5.0)
         self.assertIsNone(res)
 
@@ -444,7 +444,7 @@ class TestReadResponse(unittest.TestCase):
         client.process = MagicMock()
         client.process.stdout = MagicMock()
         client._buffer = "{not json}\n"
-        with patch("core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.6]):
+        with patch("johnston.core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.6]):
             with patch("select.select", return_value=([], [], [])):
                 res = client._read_response(req_id=1, timeout=0.5)
         self.assertIsNone(res)
@@ -454,7 +454,7 @@ class TestReadResponse(unittest.TestCase):
         client.process = MagicMock()
         client.process.stdout = MagicMock()
         with (
-            patch("core.infrastructure.mcp.process_client.sys.platform", "linux"),
+            patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "linux"),
             patch("select.select", side_effect=OSError("select failed")),
         ):
             res = client._read_response(req_id=1, timeout=0.1)
@@ -481,8 +481,8 @@ class TestReadResponse(unittest.TestCase):
         client.process.stdout.fileno.return_value = 42
         data_line = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}).encode() + b"\n"
         with (
-            patch("core.infrastructure.mcp.process_client.sys.platform", "linux"),
-            patch("core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0, 100.1]),
+            patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "linux"),
+            patch("johnston.core.infrastructure.mcp.process_client.time.time", side_effect=[100.0, 100.0, 100.1]),
             patch("select.select", side_effect=[([], [], []), ([client.process.stdout], [], [])]),
             patch("os.read", return_value=data_line),
         ):
@@ -495,7 +495,7 @@ class TestReadResponse(unittest.TestCase):
         client.process.stdout = MagicMock()
         client.process.stdout.fileno.return_value = 42
         with (
-            patch("core.infrastructure.mcp.process_client.sys.platform", "linux"),
+            patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "linux"),
             patch("select.select", return_value=([client.process.stdout], [], [])),
             patch("os.read", return_value=b""),
         ):
@@ -509,7 +509,7 @@ class TestReadResponse(unittest.TestCase):
         client.process.stdout.fileno.return_value = 42
         data_line = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}).encode() + b"\n"
         with (
-            patch("core.infrastructure.mcp.process_client.sys.platform", "linux"),
+            patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "linux"),
             patch("select.select", return_value=([client.process.stdout], [], [])),
             patch("os.read", side_effect=[BlockingIOError(11, "again"), data_line]),
         ):
@@ -522,7 +522,7 @@ class TestReadResponse(unittest.TestCase):
         client.process.stdout = MagicMock()
         client.process.stdout.fileno.return_value = 42
         with (
-            patch("core.infrastructure.mcp.process_client.sys.platform", "linux"),
+            patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "linux"),
             patch("select.select", return_value=([client.process.stdout], [], [])),
             patch("os.read", side_effect=ValueError("weird")),
         ):
@@ -534,7 +534,7 @@ class TestReadResponse(unittest.TestCase):
         client.process = MagicMock()
         client.process.stdout = MagicMock()
         client.process.stdout.readline.return_value = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}) + "\n"
-        with patch("core.infrastructure.mcp.process_client.sys.platform", "win32"):
+        with patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "win32"):
             res = client._read_response(req_id=1, timeout=0.1)
         self.assertEqual(res["id"], 1)
 
@@ -543,7 +543,7 @@ class TestReadResponse(unittest.TestCase):
         client.process = MagicMock()
         client.process.stdout = MagicMock()
         client.process.stdout.readline.return_value = ""
-        with patch("core.infrastructure.mcp.process_client.sys.platform", "win32"):
+        with patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "win32"):
             res = client._read_response(req_id=1, timeout=0.1)
         self.assertIsNone(res)
 
@@ -552,7 +552,7 @@ class TestReadResponse(unittest.TestCase):
         client.process = MagicMock()
         client.process.stdout = MagicMock()
         client.process.stdout.readline.side_effect = OSError("boom")
-        with patch("core.infrastructure.mcp.process_client.sys.platform", "win32"):
+        with patch("johnston.core.infrastructure.mcp.process_client.sys.platform", "win32"):
             res = client._read_response(req_id=1, timeout=0.1)
         self.assertIsNone(res)
 

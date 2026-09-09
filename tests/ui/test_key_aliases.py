@@ -1,6 +1,6 @@
 import unittest
 
-from widgets.utils.key_aliases import (
+from johnston.tui.utils.key_aliases import (
     KEY_CUT,
     KEY_DETACH,
     KEY_NEWLINE,

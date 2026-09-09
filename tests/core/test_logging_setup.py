@@ -1,4 +1,4 @@
-"""Tests for core.infrastructure.platform.logging_setup."""
+"""Tests for johnston.core.infrastructure.platform.logging_setup."""
 
 import asyncio
 import logging
@@ -6,7 +6,7 @@ import os
 import sys
 import time
 
-from core.infrastructure.platform.logging_setup import (
+from johnston.core.infrastructure.platform.logging_setup import (
     _asyncio_exception_handler,
     _log_task_done,
     _quiet_noisy_loggers,
@@ -83,7 +83,7 @@ def test_quiet_noisy_loggers_raises_level_to_warning():
 
 
 def test_install_excepthook_registers_and_is_idempotent():
-    import core.infrastructure.platform.logging_setup as ls
+    import johnston.core.infrastructure.platform.logging_setup as ls
 
     original_hook = sys.excepthook
     ls._excepthook_installed = False
@@ -110,7 +110,7 @@ def test_uncaught_exception_hook_logs_critical(caplog):
 def test_uncaught_exception_hook_forwards_keyboard_interrupt(monkeypatch):
     captured = []
     monkeypatch.setattr(
-        "core.infrastructure.platform.logging_setup._ORIGINAL_EXCEPTHOOK",
+        "johnston.core.infrastructure.platform.logging_setup._ORIGINAL_EXCEPTHOOK",
         lambda t, v, tb: captured.append(t),
     )
     _uncaught_exception_hook(KeyboardInterrupt, KeyboardInterrupt(), None)

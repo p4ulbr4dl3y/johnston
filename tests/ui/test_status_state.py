@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from widgets.app.status_state import (
+from johnston.tui.app.status_state import (
     _ensure_cache,
     build_status_kwargs,
     refresh_footer_cache,
@@ -23,35 +23,35 @@ class TestStatusState(unittest.IsolatedAsyncioTestCase):
         return app
 
     async def test_collect_cache_load_providers_raises(self):
-        from widgets.app import status_state as ss
+        from johnston.tui.app import status_state as ss
 
         pm = MagicMock()
         pm.load_providers.side_effect = Exception("boom")
         app = MagicMock(pm=pm)
-        with patch("core.application.skills.manager.SkillManager.list_skills"), patch(
-            "core.infrastructure.mcp.get_mcp_manager"
+        with patch("johnston.core.application.skills.manager.SkillManager.list_skills"), patch(
+            "johnston.core.infrastructure.mcp.get_mcp_manager"
         ):
             providers, vis, total, mcp = ss._collect_cache(app)
         self.assertEqual(providers, {})
 
     async def test_collect_cache_skills_raises(self):
-        from widgets.app import status_state as ss
+        from johnston.tui.app import status_state as ss
 
         with patch(
-            "core.application.skills.manager.SkillManager.list_skills", side_effect=Exception("boom")
-        ), patch("core.infrastructure.mcp.get_mcp_manager"):
+            "johnston.core.application.skills.manager.SkillManager.list_skills", side_effect=Exception("boom")
+        ), patch("johnston.core.infrastructure.mcp.get_mcp_manager"):
             vis, total = ss._collect_cache(MagicMock(pm=None))[1:3]
         self.assertEqual((vis, total), (0, 0))
 
     async def test_collect_cache_mcp_raises(self):
-        from widgets.app import status_state as ss
+        from johnston.tui.app import status_state as ss
 
-        with patch("core.infrastructure.mcp.get_mcp_manager", side_effect=Exception("boom")):
+        with patch("johnston.core.infrastructure.mcp.get_mcp_manager", side_effect=Exception("boom")):
             mcp = ss._collect_cache(MagicMock(pm=None))[3]
         self.assertEqual(mcp, [])
 
     async def test_refresh_footer_cache_collect_raises(self):
-        from widgets.app import status_state as ss
+        from johnston.tui.app import status_state as ss
 
         with patch.object(ss, "_collect_cache", side_effect=Exception("boom")):
             await refresh_footer_cache(MagicMock(), MagicMock())
@@ -67,7 +67,7 @@ class TestStatusState(unittest.IsolatedAsyncioTestCase):
 
     def test_ensure_cache_sync_fallback_collect_raises(self):
         # No running loop + _collect_cache raises -> swallowed, loading cleared.
-        from widgets.app import status_state as ss
+        from johnston.tui.app import status_state as ss
 
         app = MagicMock()
         widget = MagicMock()
@@ -92,7 +92,7 @@ class TestStatusState(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(widget._st_cache_loading)
 
     async def test_build_status_kwargs_no_widget_collect_raises(self):
-        from widgets.app import status_state as ss
+        from johnston.tui.app import status_state as ss
 
         app = self._status_app()
         with patch.object(ss, "_collect_cache", side_effect=Exception("boom")):
@@ -101,7 +101,7 @@ class TestStatusState(unittest.IsolatedAsyncioTestCase):
 
     async def test_build_status_kwargs_no_widget_loads_providers_and_mcp(self):
         app = self._status_app()
-        with patch("widgets.app.status_state.get_mcp_manager") as gm:
+        with patch("johnston.tui.app.status_state.get_mcp_manager") as gm:
             mgr = MagicMock()
             mgr.load_servers.return_value = [{"command": "python"}]
             gm.return_value = mgr

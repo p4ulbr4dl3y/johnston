@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from core.domain.defaults.errors import ToolResultStatus
-from core.tools.context import ToolContext
-from core.tools.kill import KillTool
+from johnston.core.domain.defaults.errors import ToolResultStatus
+from johnston.core.tools.context import ToolContext
+from johnston.core.tools.kill import KillTool
 
 
 @pytest.fixture
@@ -82,10 +82,10 @@ async def test_kill_subagent_success(kill_tool, monkeypatch):
     store = MagicMock()
     store.find_session_by_title_or_id.return_value = subagent_session
 
-    monkeypatch.setattr("core.infrastructure.storage.session_store.get_session_store", lambda host: store)
+    monkeypatch.setattr("johnston.core.infrastructure.storage.session_store.get_session_store", lambda host: store)
 
     kill_mock = MagicMock(return_value=MagicMock(status=ToolResultStatus.DONE, content="[killed sub-456]"))
-    monkeypatch.setattr("core.application.session.subagent_service.SubagentService.kill_subagent", kill_mock)
+    monkeypatch.setattr("johnston.core.application.session.subagent_service.SubagentService.kill_subagent", kill_mock)
 
     app = MagicMock()
     app.task_manager = []
@@ -103,7 +103,7 @@ async def test_kill_target_not_found(kill_tool, monkeypatch):
     store = MagicMock()
     store.find_session_by_title_or_id.return_value = None
 
-    monkeypatch.setattr("core.infrastructure.storage.session_store.get_session_store", lambda host: store)
+    monkeypatch.setattr("johnston.core.infrastructure.storage.session_store.get_session_store", lambda host: store)
 
     app = MagicMock()
     app.task_manager = []
@@ -156,7 +156,7 @@ async def test_kill_process_fallback(kill_tool, monkeypatch):
     task.process = proc
 
     term_mock = AsyncMock()
-    monkeypatch.setattr("core.infrastructure.platform.process.terminate_process_tree", term_mock)
+    monkeypatch.setattr("johnston.core.infrastructure.platform.process.terminate_process_tree", term_mock)
 
     app = MagicMock()
     app.task_manager = [task]

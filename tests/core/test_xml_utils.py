@@ -1,6 +1,6 @@
 import unittest
 
-from core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr, unescape_xml, wrap_cdata
+from johnston.core.infrastructure.runtime.xml_utils import escape_xml, escape_xml_attr, unescape_xml, wrap_cdata
 
 
 class TestXmlUtils(unittest.TestCase):

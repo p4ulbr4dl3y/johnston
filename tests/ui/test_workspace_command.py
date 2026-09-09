@@ -5,11 +5,11 @@ from unittest.mock import MagicMock, patch
 
 from textual.app import App
 
-from core.application.permission.permission_manager import PermissionManager
-from widgets.app.dispatch import handle_slash_command
-from widgets.presentation.commands.workspace_command import WorkspaceCommand
-from widgets.presentation.screens.permission_confirm import PermissionConfirmScreen
-from widgets.presentation.widgets.chat_container import ChatView
+from johnston.core.application.permission.permission_manager import PermissionManager
+from johnston.tui.app.dispatch import handle_slash_command
+from johnston.tui.presentation.commands.workspace_command import WorkspaceCommand
+from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
+from johnston.tui.presentation.widgets.chat_container import ChatView
 
 
 class HostApp(App[None]):
@@ -111,7 +111,7 @@ class TestPermissionConfirmScreenWorkspaceIntegration(unittest.IsolatedAsyncioTe
             self.assertFalse(any(k.startswith("add_root:") for k in screen._option_keys))
 
     async def test_confirm_permission_add_root_action(self):
-        from widgets.mixins.actions import ActionsMixin
+        from johnston.tui.mixins.actions import ActionsMixin
 
         class AppWithActions(ActionsMixin):
             def __init__(self, pm=None):
@@ -129,7 +129,7 @@ class TestPermissionConfirmScreenWorkspaceIntegration(unittest.IsolatedAsyncioTe
         self.assertIn(os.path.realpath("/var/custom/new_root"), roots)
 
     async def test_confirm_permission_save_tool_project(self):
-        from widgets.mixins.actions import ActionsMixin
+        from johnston.tui.mixins.actions import ActionsMixin
 
         class AppWithActions(ActionsMixin):
             def __init__(self, pm=None):
@@ -147,7 +147,7 @@ class TestPermissionConfirmScreenWorkspaceIntegration(unittest.IsolatedAsyncioTe
             mock_save.assert_called_once_with("shell", "allow", scope="auto")
 
     async def test_confirm_permission_save_pattern_project(self):
-        from widgets.mixins.actions import ActionsMixin
+        from johnston.tui.mixins.actions import ActionsMixin
 
         class AppWithActions(ActionsMixin):
             def __init__(self, pm=None):

@@ -11,15 +11,15 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from core.domain.entities.session import AgentSession, SessionStatus
-from core.interfaces.cli.commands.session_cmd import (
+from johnston.cli.commands.session_cmd import (
     export_session,
     list_sessions,
     prune_sessions,
     rm_session,
     run_session,
 )
-from core.interfaces.cli.entrypoint import main
+from johnston.cli.entrypoint import main
+from johnston.core.domain.entities.session import AgentSession, SessionStatus
 
 
 class TestCLISession(unittest.TestCase):
@@ -348,22 +348,22 @@ class TestCLISession(unittest.TestCase):
 
     def test_run_session_dispatcher(self):
         args_list = MagicMock(session_action="list", limit=5)
-        with patch("core.interfaces.cli.commands.session_cmd.list_sessions", return_value=0) as m_list:
+        with patch("johnston.cli.commands.session_cmd.list_sessions", return_value=0) as m_list:
             self.assertEqual(run_session(args_list, store=self.mock_store), 0)
             m_list.assert_called_once_with(limit=5, store=self.mock_store)
 
         args_rm = MagicMock(session_action="rm", session_id="s1")
-        with patch("core.interfaces.cli.commands.session_cmd.rm_session", return_value=0) as m_rm:
+        with patch("johnston.cli.commands.session_cmd.rm_session", return_value=0) as m_rm:
             self.assertEqual(run_session(args_rm, store=self.mock_store), 0)
             m_rm.assert_called_once_with("s1", store=self.mock_store)
 
         args_prune = MagicMock(session_action="prune", days=7)
-        with patch("core.interfaces.cli.commands.session_cmd.prune_sessions", return_value=0) as m_prune:
+        with patch("johnston.cli.commands.session_cmd.prune_sessions", return_value=0) as m_prune:
             self.assertEqual(run_session(args_prune, store=self.mock_store), 0)
             m_prune.assert_called_once_with(days=7, store=self.mock_store)
 
         args_export = MagicMock(session_action="export", session_id="s2", format="json", output="out.json")
-        with patch("core.interfaces.cli.commands.session_cmd.export_session", return_value=0) as m_exp:
+        with patch("johnston.cli.commands.session_cmd.export_session", return_value=0) as m_exp:
             self.assertEqual(run_session(args_export, store=self.mock_store), 0)
             m_exp.assert_called_once_with("s2", format_="json", output_file="out.json", store=self.mock_store)
 
@@ -374,7 +374,7 @@ class TestCLISession(unittest.TestCase):
         self.assertIn("Error: Unknown session action 'invalid'", err.getvalue())
 
     def test_cli_session_via_main(self):
-        with patch("core.interfaces.cli.commands.session_cmd.run_session", return_value=0) as m_run:
+        with patch("johnston.cli.commands.session_cmd.run_session", return_value=0) as m_run:
             with self.assertRaises(SystemExit) as cm:
                 main(["session", "list", "--limit", "10"])
             self.assertEqual(cm.exception.code, 0)

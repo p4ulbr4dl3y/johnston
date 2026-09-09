@@ -6,8 +6,8 @@ len+content each call), (c) stay bounded.
 """
 import unittest
 
-from core.infrastructure.runtime import token_util
-from core.infrastructure.runtime.token_util import estimate_tokens
+from johnston.core.infrastructure.runtime import token_util
+from johnston.core.infrastructure.runtime.token_util import estimate_tokens
 
 
 class TestEstimateTokensCache(unittest.TestCase):

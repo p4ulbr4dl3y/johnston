@@ -12,12 +12,12 @@ from unittest.mock import MagicMock as MMock
 
 import pytest
 
-from core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
-from core.domain.entities.session import SessionStatus
-from core.infrastructure.storage.session_store import SessionStore
-from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS
-from core.tools.context import ToolContext
-from core.tools.invoke_subagent import InvokeSubagentTool
+from johnston.core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
+from johnston.core.domain.entities.session import SessionStatus
+from johnston.core.infrastructure.storage.session_store import SessionStore
+from johnston.core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS
+from johnston.core.tools.context import ToolContext
+from johnston.core.tools.invoke_subagent import InvokeSubagentTool
 
 STATUS_CANCELLED = SessionStatus.CANCELLED
 STATUS_COMPLETED = SessionStatus.COMPLETED
@@ -168,8 +168,8 @@ async def test_role_falls_back_or_accepts(role, monkeypatch):
         base = {"worker": _FakeRole(key="worker", scope="any")}
         return base.get(low, base["worker"])
 
-    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.get_role", fake_get_role)
-    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
+    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.get_role", fake_get_role)
+    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
 
     store, app, tool, tmp = _make_env(agent)
     try:
@@ -199,8 +199,8 @@ async def test_main_scope_role_falls_back_to_worker(monkeypatch):
             return registry.get_role("orchestrator")
         return _FakeRole(key="worker", scope="any")
 
-    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.get_role", fake_get)
-    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
+    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.get_role", fake_get)
+    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
 
     store, app, tool, tmp = _make_env(agent)
     try:
@@ -227,8 +227,8 @@ async def test_role_pinned_provider_not_connected_raises(monkeypatch):
             return _FakeRole(key="heavymetal", scope="any", provider="zzz-not-connected")
         return _FakeRole(key="worker", scope="any")
 
-    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.get_role", fake_get)
-    monkeypatch.setattr("core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
+    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.get_role", fake_get)
+    monkeypatch.setattr("johnston.core.roles.role_registry.RoleRegistry.load_roles", lambda self, *a, **k: {})
 
     class _Pm:
         def load_providers(self):
@@ -240,7 +240,7 @@ async def test_role_pinned_provider_not_connected_raises(monkeypatch):
         def create_agent_for_provider(self, key):
             return _FakeRole(key="whatever", scope="any")
 
-    monkeypatch.setattr("core.application.provider.provider_manager.ProviderManager", _Pm)
+    monkeypatch.setattr("johnston.core.application.provider.provider_manager.ProviderManager", _Pm)
 
     store, app, tool, tmp = _make_env(agent)
     try:
@@ -303,7 +303,7 @@ async def test_worktree_create_raises_crashes_instead_of_err(monkeypatch):
         def is_git_repo(*a, **k):
             return True
 
-    monkeypatch.setattr("core.tools.invoke_subagent.SubagentWorktreeManager", _BadWorktree)
+    monkeypatch.setattr("johnston.core.tools.invoke_subagent.SubagentWorktreeManager", _BadWorktree)
     try:
         res = await tool.execute({"task": "do", "title": "t", "branch": "dev"})
         assert res.is_error
@@ -447,7 +447,7 @@ async def test_session_create_returns_none_crashes(monkeypatch):
     try:
         app.sm = None  # force singleton lookup path below
         # Use singleton path but override create_subagent to return None
-        import core.infrastructure.storage.session_store as sm
+        import johnston.core.infrastructure.storage.session_store as sm
 
         real = sm.SessionStore.create_subagent
         sm.SessionStore.create_subagent = lambda *a, **k: None
@@ -531,7 +531,7 @@ async def test_ctx_app_none_falls_back_to_singleton_store():
     store, app, tool, tmp = _make_env(_agent_with_stream(_gen_ok))
     try:
         app.sm = None
-        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
+        with patch("johnston.core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
             res, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
             assert "[subagent" in res or res.startswith("subagent ") or "subagent" in res
@@ -548,7 +548,7 @@ async def test_app_has_no_sm_uses_singleton():
     try:
         app.sm = None
         tool._ensure_context = lambda ctx=None: ToolContext(app=app)
-        with patch("core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
+        with patch("johnston.core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=store):
             res, sess = await _launch_and_wait(tool, {"task": "hi", "title": "t", "branch": "main"}, app, store)
             assert sess.status == STATUS_COMPLETED
             assert "[subagent" in res or "subagent" in res

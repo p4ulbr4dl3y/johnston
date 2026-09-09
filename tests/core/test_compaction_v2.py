@@ -8,12 +8,12 @@ These pin the security fixes:
 - Round-trip of summaries through wrap/strip
 
 The module is imported in isolation (without pulling agent.py, which has heavy
-runtime deps) by stubbing the `core.domain.policies.models_catalog` namespace.
+runtime deps) by stubbing the `johnston.core.domain.policies.models_catalog` namespace.
 """
 import unittest
 
-from core.base_provider import compaction as mod
-from core.base_provider.compaction import (
+from johnston.core.base_provider import compaction as mod
+from johnston.core.base_provider.compaction import (
     CHECKPOINT_CLOSE_TAG,
     CHECKPOINT_OPEN_TAG,
 )

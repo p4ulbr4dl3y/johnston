@@ -4,7 +4,7 @@ import unittest
 
 import pytest
 
-from widgets.presentation.tool_display import extract_tool_display
+from johnston.tui.presentation.tool_display import extract_tool_display
 
 
 class TestToolDisplay(unittest.TestCase):
@@ -146,7 +146,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(res, "/path/to/index.html")
 
     def test_image_read_not_expandable(self):
-        from widgets.chat_toolcall import ToolCallWidget
+        from johnston.tui.chat_toolcall import ToolCallWidget
 
         # Image file target
         w1 = ToolCallWidget("read", "/path/to/123.png", args={"path": "/path/to/123.png"})
@@ -157,7 +157,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertFalse(w2.is_expandable())
 
     def test_create_tool_widget_render_diff_vs_clean_code(self):
-        from widgets.chat_toolcall import ToolCallWidget
+        from johnston.tui.chat_toolcall import ToolCallWidget
 
         # Create with diff (file update)
         w_diff = ToolCallWidget(
@@ -180,7 +180,7 @@ class TestToolDisplay(unittest.TestCase):
         w_new.render_content()
 
     def test_edit_tool_cleaning_system_noise(self):
-        from widgets.chat_toolcall import ToolCallWidget
+        from johnston.tui.chat_toolcall import ToolCallWidget
 
         widget = ToolCallWidget(
             "edit",
@@ -194,7 +194,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertIn("b", formatted_text)
 
     def test_format_edit_diff_monotonic_line_numbers(self):
-        from widgets.presentation.widgets.chat_diff import format_edit_diff
+        from johnston.tui.presentation.widgets.chat_diff import format_edit_diff
 
         diff_text = (
             "--- a/main.py\n"
@@ -213,7 +213,7 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(num_strs, ["10", "11", "11", "12", "13"])
 
     def test_shell_cleaning_system_noise(self):
-        from widgets.chat_toolcall import ToolCallWidget
+        from johnston.tui.chat_toolcall import ToolCallWidget
 
         widget = ToolCallWidget("shell", "echo test", args={"command": "echo test"})
         cleaned = widget._clean_bash_output(
@@ -224,7 +224,7 @@ class TestToolDisplay(unittest.TestCase):
 
 
     def test_format_edit_diff_unspaced_context_lines(self):
-        from widgets.presentation.widgets.chat_diff import format_edit_diff
+        from johnston.tui.presentation.widgets.chat_diff import format_edit_diff
 
         diff_text = (
             "--- a/prompts.py\n"
@@ -245,7 +245,7 @@ class TestToolDisplay(unittest.TestCase):
     def test_shorten_path_rules(self):
         import os
 
-        from widgets.presentation.tool_display import shorten_path, split_path_suffix
+        from johnston.tui.presentation.tool_display import shorten_path, split_path_suffix
 
         # Suffix splitting
         self.assertEqual(split_path_suffix("foo.py:10-20"), ("foo.py", ":10-20"))
@@ -315,7 +315,7 @@ class TestToolDisplay(unittest.TestCase):
     def test_read_file_content_with_tilde_and_limit(self):
         import tempfile
 
-        from widgets.utils.file_reader import read_file_content
+        from johnston.tui.utils.file_reader import read_file_content
 
         self.assertIsNone(read_file_content(""))
         self.assertIsNone(read_file_content(None))
@@ -332,7 +332,7 @@ class TestToolDisplay(unittest.TestCase):
             os.remove(temp_name)
 
     def test_build_synthetic_create_diff_clean_header(self):
-        from widgets.presentation.tool_renderers import build_synthetic_create_diff
+        from johnston.tui.presentation.tool_renderers import build_synthetic_create_diff
 
         diff = build_synthetic_create_diff("/var/log/syslog", "line 1")
         self.assertNotIn("a//var", diff)

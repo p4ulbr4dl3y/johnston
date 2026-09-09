@@ -2,8 +2,8 @@ import os
 import unittest
 from unittest.mock import MagicMock
 
-from core.tools.context import ToolContext
-from core.tools.shell import ShellTool, _new_task_id
+from johnston.core.tools.context import ToolContext
+from johnston.core.tools.shell import ShellTool, _new_task_id
 
 
 class TestShellSmartSleep(unittest.IsolatedAsyncioTestCase):

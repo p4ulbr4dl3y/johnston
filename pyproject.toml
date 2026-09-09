@@ -38,7 +38,7 @@ Issues = "https://github.com/p4ulbr4dl3y/johnston/issues"
 Changelog = "https://github.com/p4ulbr4dl3y/johnston/blob/main/CHANGELOG.md"
 
 [project.scripts]
-johnston = "cli:main"
+johnston = "johnston.cli.main:main"
 
 [tool.hatch.build]
 exclude = [
@@ -55,13 +55,7 @@ exclude = [
 ]
 
 [tool.hatch.build.targets.wheel]
-only-include = [
-    "app.py",
-    "app.tcss",
-    "cli.py",
-    "core",
-    "widgets",
-]
+packages = ["src/johnston"]
 
 [dependency-groups]
 dev = [
@@ -75,6 +69,7 @@ dev = [
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+pythonpath = ["src"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
 markers = [
@@ -93,12 +88,13 @@ select = ["E", "F", "W", "I"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"app.py" = ["E402"]
+"src/johnston/tui/app.py" = ["E402"]
+"src/johnston/tui/app/app.py" = ["E402"]
 "scripts/preview_system_prompt.py" = ["E402"]
 
 [tool.coverage.run]
-source = ["app", "cli", "core", "widgets"]
-omit = ["*/__init__.py", "core/domain/defaults/skills/*"]
+source = ["johnston"]
+omit = ["*/__init__.py", "*/core/domain/defaults/skills/*"]
 
 [tool.coverage.report]
 fail_under = 90

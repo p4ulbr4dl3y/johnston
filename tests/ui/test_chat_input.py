@@ -8,8 +8,8 @@ from PIL import Image
 from textual.app import App, ComposeResult
 from textual.events import Key, MouseUp, Paste
 
-from widgets import chat_input as chat_input_mod
-from widgets.chat_input import ChatInput, ClipboardAttachment
+from johnston.tui import chat_input as chat_input_mod
+from johnston.tui.chat_input import ChatInput, ClipboardAttachment
 
 
 class DummyChatApp(App[None]):
@@ -44,7 +44,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.tmp_file = os.path.join(self.tmp_dir.name, "prompt_history.json")
-        self.patcher = patch("core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", self.tmp_file)
+        self.patcher = patch("johnston.core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", self.tmp_file)
         self.patcher.start()
 
     async def asyncTearDown(self):
@@ -82,7 +82,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ci_custom.placeholder, "Custom prompt...")
 
     def test_placeholder_responsiveness(self):
-        from widgets.chat_input import (
+        from johnston.tui.chat_input import (
             COMPACT_PLACEHOLDER,
             DEFAULT_PLACEHOLDER,
             FORK_PLACEHOLDER,
@@ -214,7 +214,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         async with app.run_test():
             mock_img = Image.new("L", (50, 50))
             with (
-                patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
+                patch("johnston.core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
                 patch("os.makedirs"),
                 patch("os.path.getsize", return_value=512),
                 patch.object(Image.Image, "save") as mock_save,
@@ -286,7 +286,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
     async def test_prompt_history_persistence(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_history_file = os.path.join(tmpdir, "prompt_history.json")
-            with patch("core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", tmp_history_file), patch("core.infrastructure.platform.paths.CONFIG_DIR", tmpdir):
+            with patch("johnston.core.infrastructure.platform.paths.PROMPT_HISTORY_FILE", tmp_history_file), patch("johnston.core.infrastructure.platform.paths.CONFIG_DIR", tmpdir):
                 ci = ChatInput()
                 self.assertEqual(ci.prompt_history, [])
 
@@ -408,7 +408,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
             mock_worker.is_running = True
             with patch.object(App, "workers", new_callable=PropertyMock, return_value=[mock_worker]):
                 with patch(
-                    "core.application.session.stream.cancel_running_subagents",
+                    "johnston.core.application.session.stream.cancel_running_subagents",
                 ) as mock_cancel:
                     event = Key("escape", "escape")
                     event.prevent_default = MagicMock()
@@ -425,7 +425,7 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
         app.current_session_id = "session-main"
         app.sm = MagicMock()
         async with app.run_test():
-            with patch("core.application.session.stream.cancel_running_subagents") as mock_cancel:
+            with patch("johnston.core.application.session.stream.cancel_running_subagents") as mock_cancel:
                 with patch.object(App, "workers", new_callable=PropertyMock, return_value=[]):
                     event = Key("escape", "escape")
                     event.prevent_default = MagicMock()
@@ -648,7 +648,7 @@ class TestChatInputClipboard(unittest.IsolatedAsyncioTestCase):
         chat_input.insert = MagicMock()
         chat_input._on_input_change = MagicMock()
 
-        with patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=("/tmp/sample.png", None)):
+        with patch("johnston.core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=("/tmp/sample.png", None)):
             res = await chat_input.try_paste_clipboard_image()
             self.assertTrue(res)
             chat_input.insert.assert_called_once_with("@/tmp/sample.png ")
@@ -660,7 +660,7 @@ class TestChatInputClipboard(unittest.IsolatedAsyncioTestCase):
 
         mock_img = Image.new("RGB", (100, 50))
         with (
-            patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
+            patch("johnston.core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, mock_img)),
             patch("os.makedirs"),
             patch("os.path.getsize", return_value=1024),
             patch.object(Image.Image, "save"),
@@ -672,7 +672,7 @@ class TestChatInputClipboard(unittest.IsolatedAsyncioTestCase):
 
     async def test_try_paste_clipboard_image_none(self):
         chat_input = ChatInput()
-        with patch("core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, None)):
+        with patch("johnston.core.infrastructure.platform.platform_utils.get_clipboard_image_or_file", return_value=(None, None)):
             res = await chat_input.try_paste_clipboard_image()
             self.assertFalse(res)
             self.assertEqual(len(chat_input.clipboard_attachments), 0)
@@ -873,13 +873,13 @@ class TestChatInputHistoryFile(unittest.TestCase):
     def test_load_prompt_history_invalid_json_returns_empty(self):
         ci = ChatInput()
         with patch.object(chat_input_mod.config, "PROMPT_HISTORY_FILE", "/nonexistent/history.json"):
-            with patch("widgets.chat_input.read_json", return_value=None):
+            with patch("johnston.tui.chat_input.read_json", return_value=None):
                 self.assertEqual(ci.load_prompt_history(), [])
 
     def test_save_prompt_history_swallows_write_error(self):
         ci = ChatInput()
         ci.prompt_history = ["a", "b"]
-        with patch("widgets.chat_input.atomic_write_json", side_effect=OSError("disk full")):
+        with patch("johnston.tui.chat_input.atomic_write_json", side_effect=OSError("disk full")):
             ci.save_prompt_history()  # must not raise
 
 
@@ -891,7 +891,7 @@ class TestChatInputScheduleSuggestions(unittest.TestCase):
     def test_schedule_runtime_error_swallowed(self):
         ci = ChatInput()
         with patch.object(type(ci), "is_mounted", new_callable=PropertyMock, return_value=True):
-            with patch("widgets.chat_input.asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
+            with patch("johnston.tui.chat_input.asyncio.get_running_loop", side_effect=RuntimeError("no loop")):
                 ci._schedule_suggestions_update()  # must not raise
 
 
@@ -1061,7 +1061,7 @@ class TestChatInputKeyboardScroll(unittest.IsolatedAsyncioTestCase):
 
 class TestChatInputHelpAndShellMode(unittest.IsolatedAsyncioTestCase):
     async def test_typing_question_mark_opens_help_modal(self):
-        from widgets.presentation.screens.help import HelpScreen
+        from johnston.tui.presentation.screens.help import HelpScreen
 
         ci, ctx = _app_context()
         await ctx.__aenter__()
@@ -1081,7 +1081,7 @@ class TestChatInputHelpAndShellMode(unittest.IsolatedAsyncioTestCase):
             event.stop.assert_called_once()
 
     async def test_typing_bang_enters_shell_mode(self):
-        from widgets.chat_input import DEFAULT_SHELL_PLACEHOLDER
+        from johnston.tui.chat_input import DEFAULT_SHELL_PLACEHOLDER
         ci, ctx = _app_context()
         await ctx.__aenter__()
         self.addAsyncCleanup(ctx.__aexit__, None, None, None)
@@ -1100,7 +1100,7 @@ class TestChatInputHelpAndShellMode(unittest.IsolatedAsyncioTestCase):
         event.stop.assert_called_once()
 
     async def test_backspace_on_empty_exits_shell_mode(self):
-        from widgets.chat_input import DEFAULT_PLACEHOLDER
+        from johnston.tui.chat_input import DEFAULT_PLACEHOLDER
         ci, ctx = _app_context()
         await ctx.__aenter__()
         self.addAsyncCleanup(ctx.__aexit__, None, None, None)

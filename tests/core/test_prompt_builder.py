@@ -1,6 +1,6 @@
 import unittest
 
-from core.application.generation.prompt_builder import PromptBuilder
+from johnston.core.application.generation.prompt_builder import PromptBuilder
 
 
 class TestPromptBuilder(unittest.TestCase):
@@ -149,7 +149,7 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertIn("<environment", prompt)
 
     def test_build_tools_subagent_hardens_shell(self):
-        from core.tools.shell import ShellTool
+        from johnston.core.tools.shell import ShellTool
 
         builder = PromptBuilder("Test", [ShellTool().schema], role="worker", is_subagent=True)
         tools = builder.build_tools()
@@ -189,7 +189,7 @@ class TestPromptBuilder(unittest.TestCase):
         import os
         import tempfile
 
-        from core.application.generation.prompt_builder import get_project_instruction_rules
+        from johnston.core.application.generation.prompt_builder import get_project_instruction_rules
 
         with tempfile.TemporaryDirectory() as tmp:
             # 1. .clinerules
@@ -229,8 +229,8 @@ class TestPromptBuilder(unittest.TestCase):
     def test_build_tools_disallowed_subagent_schema_not_appended(self):
         from unittest.mock import patch
 
-        from core.domain.policies.role_policy import AgentRole
-        from core.roles.role_registry import RoleRegistry
+        from johnston.core.domain.policies.role_policy import AgentRole
+        from johnston.core.roles.role_registry import RoleRegistry
 
         reg = RoleRegistry.get_instance()
         role = AgentRole(

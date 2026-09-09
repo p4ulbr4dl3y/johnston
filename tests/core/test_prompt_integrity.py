@@ -6,15 +6,15 @@ import re
 
 import pytest
 
-from core.application.generation.prompt_builder import PromptBuilder
-from core.domain.defaults.prompts import (
+from johnston.core.application.generation.prompt_builder import PromptBuilder
+from johnston.core.domain.defaults.prompts import (
     CODEBASE_NAVIGATION_SNIPPET,
     DEFAULT_SYSTEM_PROMPT,
     HEADLESS_DEFAULT_SYSTEM_PROMPT,
     SUBAGENT_DEFAULT_SYSTEM_PROMPT,
     TOOL_OUTPUT_FORMAT_SNIPPET,
 )
-from core.domain.policies.role_policy import AgentMode
+from johnston.core.domain.policies.role_policy import AgentMode
 
 
 def _strip_markdown_code(text: str) -> str:

@@ -4,10 +4,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from core.application.permission.permission_manager import PermissionManager
-from core.domain.policies.permission_policy import ExecutionMode
-from widgets.app.app import JohnstonApp
-from widgets.mixins.actions import ActionsMixin
+from johnston.core.application.permission.permission_manager import PermissionManager
+from johnston.core.domain.policies.permission_policy import ExecutionMode
+from johnston.tui.app.app import JohnstonApp
+from johnston.tui.mixins.actions import ActionsMixin
 
 
 class DummyActionApp(ActionsMixin):
@@ -27,7 +27,7 @@ class TestExecutionModeUI(unittest.IsolatedAsyncioTestCase):
         self.test_dir = tempfile.mkdtemp()
         self.old_cwd = os.getcwd()
         os.chdir(self.test_dir)
-        self.config_patcher = patch("core.application.permission.permission_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
+        self.config_patcher = patch("johnston.core.application.permission.permission_manager.CONFIG_FILE", os.path.join(self.test_dir, "config.json"))
         self.config_patcher.start()
         PermissionManager._instance = None
         self.pm = PermissionManager.get_instance()

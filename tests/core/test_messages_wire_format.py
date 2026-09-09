@@ -1,4 +1,4 @@
-"""Wire-format tests for synthetic-message helpers in core.domain.policies.messages.
+"""Wire-format tests for synthetic-message helpers in johnston.core.domain.policies.messages.
 
 These cover the structural guarantees the agent loop relies on when parsing
 or routing system_note / notification / compaction_checkpoint payloads:
@@ -15,7 +15,7 @@ import unittest
 
 
 # Sandbox may not have httpx/pygments installed; stub the heavy modules
-# before the core.base_provider package init runs.
+# before the johnston.core.base_provider package init runs.
 def _stub_runtime_deps():
     for name in ("httpx", "pygments", "pygments.token", "litellm"):
         if name not in sys.modules:
@@ -34,7 +34,7 @@ def _stub_runtime_deps():
 
 _stub_runtime_deps()
 
-from core.domain.policies.messages import (  # noqa: E402
+from johnston.core.domain.policies.messages import (  # noqa: E402
     NOTIFICATION_KIND_SHELL,
     NOTIFICATION_KIND_SUBAGENT,
     SYSTEM_NOTICE_KIND_CONTEXT_TRIMMED,
@@ -215,7 +215,7 @@ class VisionSanitizationInjectionTests(unittest.TestCase):
 
     def _make_mixin(self):
         # Bypass BaseAgent construction; only the sanitizer is exercised.
-        from core.base_provider.errors import ErrorHandlingMixin
+        from johnston.core.base_provider.errors import ErrorHandlingMixin
         return ErrorHandlingMixin()
 
     def test_user_text_is_xml_escaped(self):

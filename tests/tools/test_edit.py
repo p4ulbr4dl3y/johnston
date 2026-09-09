@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest import mock
 
-from core.tools.edit import EditTool, apply_edit
+from johnston.core.tools.edit import EditTool, apply_edit
 from tests.conftest import WindowsSafeTemporaryDirectory
 
 
@@ -127,7 +127,7 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("x = 1\n")
 
-        with mock.patch("core.tools.edit.apply_edit", side_effect=ValueError("boom")):
+        with mock.patch("johnston.core.tools.edit.apply_edit", side_effect=ValueError("boom")):
             res = str(await tool.execute({"path": file_path, "old_str": "x = 1", "new_str": "x = 2"}))
         self.assertIn("ERR: params", res)
         self.assertIn("boom", res)

@@ -10,9 +10,9 @@ import unittest
 
 import pytest
 
-from core.domain.defaults.errors import format_tool_error
-from core.infrastructure.tasks.output import tail_output
-from core.tools.base import (
+from johnston.core.domain.defaults.errors import format_tool_error
+from johnston.core.infrastructure.tasks.output import tail_output
+from johnston.core.tools.base import (
     BaseTool,
     execute_mcp_tool,
     format_background_notification,
@@ -20,8 +20,8 @@ from core.tools.base import (
     truncate_output,
     try_int,
 )
-from core.tools.context import ToolContext
-from core.tools.utils import format_line_pagination
+from johnston.core.tools.context import ToolContext
+from johnston.core.tools.utils import format_line_pagination
 
 
 class TestTryIntEdge(unittest.TestCase):

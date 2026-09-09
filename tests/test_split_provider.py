@@ -1,7 +1,7 @@
 """Unit tests for the shared provider/model split helper."""
 import pytest
 
-from core.domain.policies.provider import split_provider_model
+from johnston.core.domain.policies.provider import split_provider_model
 
 
 @pytest.mark.parametrize(

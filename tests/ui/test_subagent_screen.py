@@ -6,9 +6,9 @@ from unittest.mock import patch
 from textual.app import App
 from textual.screen import Screen
 
-from core.infrastructure.storage.session_store import SessionStore
-from widgets.presentation.screens.subagent_screen import SubagentViewScreen
-from widgets.presentation.widgets.chat_container import ChatView
+from johnston.core.infrastructure.storage.session_store import SessionStore
+from johnston.tui.presentation.screens.subagent_screen import SubagentViewScreen
+from johnston.tui.presentation.widgets.chat_container import ChatView
 
 
 class DummyHostApp(App[None]):
@@ -93,7 +93,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(sess.messages[0]["text"], "Hello world")
 
     def test_record_subagent_step_canonical_format(self):
-        from core.application.session.stream import record_subagent_step
+        from johnston.core.application.session.stream import record_subagent_step
 
         sess = self._mk("task-canon", "canonical", "prompt")
         acc = [""]
@@ -117,7 +117,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(acc[0], "Final answer")
 
     def test_record_subagent_step_multistep_tools_no_accumulation(self):
-        from core.application.session.stream import record_subagent_step
+        from johnston.core.application.session.stream import record_subagent_step
 
         sess = self._mk("task-multi", "multistep", "prompt")
         acc = [""]
@@ -151,7 +151,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(acc[0], "All done!")
 
     def test_record_subagent_step_bot_reset(self):
-        from core.application.session.stream import record_subagent_step
+        from johnston.core.application.session.stream import record_subagent_step
 
         sess = self._mk("task-reset", "reset", "prompt")
         acc = [""]
@@ -168,7 +168,7 @@ class TestSubagentStreamAndScreen(unittest.TestCase):
         self.assertEqual(acc[0], "clean reply")
 
     def test_record_subagent_step_thinking_info_and_outro(self):
-        from core.application.session.stream import record_subagent_step
+        from johnston.core.application.session.stream import record_subagent_step
 
         sess = self._mk("task-info", "info", "prompt")
         acc = [""]
@@ -325,8 +325,8 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
-            from widgets.chat_toolcall import ToolCallWidget
-            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+            from johnston.tui.chat_toolcall import ToolCallWidget
+            from johnston.tui.presentation.widgets.chat_messages import ThinkingWidget
 
             tw = screen.query_one(ThinkingWidget)
             tc = screen.query_one(ToolCallWidget)
@@ -349,7 +349,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
 
-            from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
+            from johnston.tui.presentation.widgets.subagent_footer import SubagentStatusFooter
 
             footer = screen.query_one("#subagent-status-footer", SubagentStatusFooter)
             self.assertTrue(footer.is_mounted)
@@ -385,7 +385,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         app = DummyHostApp(screen, store=self.store)
         async with app.run_test() as pilot:
             await pilot.pause(0.2)
-            from widgets.presentation.widgets.chat_messages import BotMessage, UserMessage
+            from johnston.tui.presentation.widgets.chat_messages import BotMessage, UserMessage
 
             bm = screen.query_one(BotMessage)
             um = screen.query_one(UserMessage)
@@ -393,12 +393,12 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(um.allow_select)
 
     def test_subagent_status_footer_token_cache(self):
-        from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
+        from johnston.tui.presentation.widgets.subagent_footer import SubagentStatusFooter
 
         footer = SubagentStatusFooter()
         sess = self._mk("task-tok-cache", "Tok Agent", "prompt")
         sess.messages = [{"type": "user", "text": "hello"}]
-        with patch("core.infrastructure.runtime.token_util.estimate_tokens", return_value=42) as mock_est:
+        with patch("johnston.core.infrastructure.runtime.token_util.estimate_tokens", return_value=42) as mock_est:
             footer.update_session(sess)
             self.assertEqual(mock_est.call_count, 1)
             # Re-render with same message count uses cached estimate
@@ -413,7 +413,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         """Regression: update_session on an unmounted footer used to call
         set_interval(); its Timer coroutine is created before the scheduling
         RuntimeError, leaking a 'Timer._run_timer never awaited' warning."""
-        from widgets.presentation.widgets.subagent_footer import SubagentStatusFooter
+        from johnston.tui.presentation.widgets.subagent_footer import SubagentStatusFooter
 
         footer = SubagentStatusFooter()
         sess = self._mk("task-unmounted-spin", "Spin Agent", "prompt")
@@ -426,7 +426,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(footer.is_generating)
 
     async def test_subagent_screen_plan_notch_update(self):
-        from widgets.presentation.widgets.plan_notch import PlanNotch
+        from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
         sess = self._mk("task-plan-sub", "Plan Agent", "Subagent Prompt")
         sess.add_event({
@@ -476,8 +476,8 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
         async with app2.run_test() as pilot:
             await pilot.pause(0.2)
-            from widgets.chat_toolcall import ToolCallWidget
-            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+            from johnston.tui.chat_toolcall import ToolCallWidget
+            from johnston.tui.presentation.widgets.chat_messages import ThinkingWidget
 
             tw = screen2.query_one(ThinkingWidget)
             self.assertTrue(tw.is_expanded)
@@ -485,7 +485,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(tc.is_expanded)
 
     async def test_subagent_screen_preserves_plan_state(self):
-        from widgets.presentation.widgets.plan_notch import PlanNotch
+        from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
         sess = self._mk("task-plan-persist", "Plan Persist Agent", "Subagent Prompt")
         sess.add_event({
@@ -533,7 +533,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(notch2.display)
 
     async def test_subagent_screen_reopen_plan_display_when_plan_added_later(self):
-        from widgets.presentation.widgets.plan_notch import PlanNotch
+        from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
         # Session initially has NO plan
         sess = self._mk("task-reopen-plan", "Reopen Agent", "Prompt")
@@ -576,7 +576,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(notch2.plan_items[0]["step"], "Created later")
 
     async def test_subagent_screen_plan_fallback_to_session_current_plan(self):
-        from widgets.presentation.widgets.plan_notch import PlanNotch
+        from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
         sess = self._mk("task-fallback-plan", "Fallback Agent", "Prompt")
         sess.current_plan = [{"step": "Fallback step", "status": "in_progress"}]
@@ -594,7 +594,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(notch.plan_explanation, "Fallback expl")
 
     async def test_subagent_screen_plan_displayed_on_second_visit(self):
-        from widgets.presentation.widgets.plan_notch import PlanNotch
+        from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
         sess = self._mk("task-revisit-plan", "Revisit Agent", "Prompt")
         sess.add_event({
@@ -684,7 +684,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
                 await screen._history_worker.wait()
             await pilot.pause(0.1)
             chat_view = screen.query_one(ChatView)
-            from widgets.presentation.widgets.plan_notch import PlanNotch
+            from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
             notch = screen.query_one(PlanNotch)
             self.assertTrue(notch.display)
@@ -714,7 +714,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             if getattr(screen, "_history_worker", None):
                 await screen._history_worker.wait()
             await pilot.pause(0.1)
-            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+            from johnston.tui.presentation.widgets.chat_messages import ThinkingWidget
 
             tw = screen.query_one(ThinkingWidget)
             self.assertFalse(tw.is_thinking)
@@ -734,7 +734,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             if getattr(screen, "_history_worker", None):
                 await screen._history_worker.wait()
             await pilot.pause(0.1)
-            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+            from johnston.tui.presentation.widgets.chat_messages import ThinkingWidget
 
             tw = screen.query_one(ThinkingWidget)
             self.assertTrue(tw.is_thinking)
@@ -766,7 +766,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             sess.add_event({"type": "thinking", "text": "Done planning", "duration": 1.2, "phase": "end"})
             await pilot.pause(0.1)
 
-            from widgets.presentation.widgets.chat_messages import ThinkingWidget
+            from johnston.tui.presentation.widgets.chat_messages import ThinkingWidget
 
             widgets = list(screen.query(ThinkingWidget))
             # Exactly 1 widget must exist, NOT 4 duplicate widgets
@@ -793,7 +793,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             sess.add_event({"type": "status_change", "status": "cancelled"})
             await pilot.pause(0.1)
 
-            from widgets.chat_toolcall import ToolCallWidget
+            from johnston.tui.chat_toolcall import ToolCallWidget
 
             tc = screen.query_one(ToolCallWidget)
             self.assertEqual(tc.status, "cancelled")
@@ -839,7 +839,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         """Audit A5: events emitted by the cancelled task's teardown AFTER the
         screen-local finalization (interruption divider, status_change) must be
         dropped, not rendered into the chat view."""
-        from widgets.presentation.widgets.chat_messages import EventDivider
+        from johnston.tui.presentation.widgets.chat_messages import EventDivider
 
         sess = self._mk("task-kill-late", "Kill Late", "prompt")
         sess.status = "running"
@@ -871,7 +871,7 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(sess.status, "cancelled")
 
     async def test_session_chat_screen_alias_and_init(self):
-        from widgets.presentation.screens.subagent_screen import SessionChatScreen, SubagentViewScreen
+        from johnston.tui.presentation.screens.subagent_screen import SessionChatScreen, SubagentViewScreen
 
         self.assertIs(SessionChatScreen, SubagentViewScreen)
         screen = SessionChatScreen("task-123", show_input=False)

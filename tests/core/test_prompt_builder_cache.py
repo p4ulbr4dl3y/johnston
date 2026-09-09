@@ -8,9 +8,9 @@ import os
 
 import pytest
 
-import core.application.generation.prompt_builder as pb
-from core.application.generation.prompt_builder import PromptBuilder
-from core.roles.role_registry import RoleRegistry
+import johnston.core.application.generation.prompt_builder as pb
+from johnston.core.application.generation.prompt_builder import PromptBuilder
+from johnston.core.roles.role_registry import RoleRegistry
 
 _CUSTOM_ROLE_MD = """---
 key: custom

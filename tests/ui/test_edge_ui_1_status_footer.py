@@ -3,7 +3,7 @@ import unittest
 
 from rich.console import Console
 
-from widgets.status_footer import StatusFooter
+from johnston.tui.status_footer import StatusFooter
 
 
 class FooterHarness(StatusFooter):

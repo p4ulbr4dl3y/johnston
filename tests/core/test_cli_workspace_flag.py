@@ -2,9 +2,9 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from core.application.permission.permission_manager import PermissionManager
-from core.interfaces.cli.commands.run_cmd import run_headless
-from core.interfaces.cli.entrypoint import build_parser, main
+from johnston.cli.commands.run_cmd import run_headless
+from johnston.cli.entrypoint import build_parser, main
+from johnston.core.application.permission.permission_manager import PermissionManager
 
 
 class TestCliWorkspaceFlag(unittest.TestCase):
@@ -29,7 +29,7 @@ class TestCliWorkspaceFlag(unittest.TestCase):
         ws1 = os.path.realpath("/tmp/test_ws1")
         ws2 = os.path.realpath("/tmp/test_ws2")
 
-        with patch("app.JohnstonApp") as mock_app_cls:
+        with patch("johnston.tui.app.JohnstonApp") as mock_app_cls:
             mock_app = MagicMock()
             mock_app_cls.return_value = mock_app
             with self.assertRaises(SystemExit) as ctx:
@@ -45,7 +45,7 @@ class TestCliWorkspaceFlag(unittest.TestCase):
         parser = build_parser()
         args = parser.parse_args(["run", "test prompt", "-w", ws])
 
-        with patch("core.interfaces.cli.commands.run_cmd.run_headless_async") as mock_async:
+        with patch("johnston.cli.commands.run_cmd.run_headless_async") as mock_async:
             mock_async.return_value = 0
             code = run_headless(args)
             self.assertEqual(code, 0)

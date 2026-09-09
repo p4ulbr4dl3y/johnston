@@ -6,23 +6,23 @@ from textual import events
 from textual.app import App, ComposeResult
 from textual.widgets import Input, OptionList, Static
 
-from core.application.session.actions import RewindEntry
-from widgets.presentation.screens.api_key import ApiKeyScreen
-from widgets.presentation.screens.constants import (
+from johnston.core.application.session.actions import RewindEntry
+from johnston.tui.presentation.screens.api_key import ApiKeyScreen
+from johnston.tui.presentation.screens.constants import (
     MODAL_HINT,
     MODAL_OPTION_LIST,
     MODAL_OPTION_LIST_ID,
     MODAL_SEARCH_INPUT,
     MODAL_SEARCH_INPUT_ID,
 )
-from widgets.presentation.screens.providers import ProvidersScreen
-from widgets.presentation.screens.rewind import (
+from johnston.tui.presentation.screens.providers import ProvidersScreen
+from johnston.tui.presentation.screens.rewind import (
     RewindScreen,
     RewindSelection,
     format_rewind_files,
 )
-from widgets.presentation.screens.rewind_action import RewindActionScreen
-from widgets.presentation.widgets.modal_hint import ModalHint
+from johnston.tui.presentation.screens.rewind_action import RewindActionScreen
+from johnston.tui.presentation.widgets.modal_hint import ModalHint
 
 
 class ModalTestApp(App):
@@ -148,7 +148,7 @@ class TestRewindActionScreen(unittest.IsolatedAsyncioTestCase):
             mock_cm = MagicMock()
             mock_cm.get_checkpoint_diff.return_value = [("foo.py", "@@ -1 +1 @@", 1, 1)]
 
-            with patch("core.domain.ports.checkpoint.get_checkpoint_manager", return_value=mock_cm), \
+            with patch("johnston.core.domain.ports.checkpoint.get_checkpoint_manager", return_value=mock_cm), \
                  patch.object(app, "push_screen") as mock_push:
                 screen._open_diff_viewer()
                 mock_cm.get_checkpoint_diff.assert_called_once_with(
@@ -169,7 +169,7 @@ class TestRewindActionScreen(unittest.IsolatedAsyncioTestCase):
             await app.push_screen(screen)
             await pilot.pause()
 
-            with patch("core.domain.ports.checkpoint.get_checkpoint_manager", side_effect=Exception("no cm")), \
+            with patch("johnston.core.domain.ports.checkpoint.get_checkpoint_manager", side_effect=Exception("no cm")), \
                  patch.object(app, "push_screen") as mock_push:
                 screen._open_diff_viewer()
                 mock_push.assert_called_once()
@@ -299,7 +299,7 @@ class TestRewindScreen(unittest.IsolatedAsyncioTestCase):
             await app.push_screen(screen)
             await pilot.pause()
 
-            with patch("widgets.utils.responsive.resolve_screen_width", return_value=30):
+            with patch("johnston.tui.utils.responsive.resolve_screen_width", return_value=30):
                 screen._refresh_options()
                 hint = screen.query_one(MODAL_HINT, ModalHint)
                 self.assertIn("enter", str(hint.left_text))
@@ -577,17 +577,17 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
 
         # 2. From cache file
         with patch("os.path.exists", return_value=True), \
-             patch("widgets.presentation.screens.providers.cached_json_read", return_value={"models": ["m1", "m2", "m3"]}):
+             patch("johnston.tui.presentation.screens.providers.cached_json_read", return_value={"models": ["m1", "m2", "m3"]}):
             self.assertEqual(screen._get_provider_model_count("cached_p", {}), 3)
 
         # 3. From models catalog
         with patch("os.path.exists", return_value=False), \
-             patch("widgets.presentation.screens.providers.catalog.get_catalog_provider", return_value={"models": ["cat1"]}):
+             patch("johnston.tui.presentation.screens.providers.catalog.get_catalog_provider", return_value={"models": ["cat1"]}):
             self.assertEqual(screen._get_provider_model_count("catalog_p", {}), 1)
 
         # 4. Fallback 0
         with patch("os.path.exists", return_value=False), \
-             patch("widgets.presentation.screens.providers.catalog.get_catalog_provider", side_effect=Exception("error")):
+             patch("johnston.tui.presentation.screens.providers.catalog.get_catalog_provider", side_effect=Exception("error")):
             self.assertEqual(screen._get_provider_model_count("none_p", {}), 0)
 
     async def test_mount_resize_and_filter(self):
@@ -673,7 +673,7 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
             opt_list = screen.query_one(MODAL_OPTION_LIST, OptionList)
             opt_list.highlighted = 0
 
-            with patch("widgets.app.role_service.reconcile_active_agent") as mock_reconcile:
+            with patch("johnston.tui.app.role_service.reconcile_active_agent") as mock_reconcile:
                 # Toggle p1 to disabled
                 screen.action_toggle_disabled()
                 self.assertIn("p1", screen.disabled_set)
@@ -730,10 +730,10 @@ class TestSkillsAndMCPScreenHint(unittest.IsolatedAsyncioTestCase):
     """Test hint right_text counter in SkillsScreen and MCPScreen."""
 
     async def test_skills_screen_hint_right_text(self):
-        from core.application.skills.manager import Skill, SkillScope
-        from widgets.presentation.screens.skills import SkillsScreen
+        from johnston.core.application.skills.manager import Skill, SkillScope
+        from johnston.tui.presentation.screens.skills import SkillsScreen
 
-        with patch("widgets.presentation.screens.skills.get_skill_manager") as mock_get_sm:
+        with patch("johnston.tui.presentation.screens.skills.get_skill_manager") as mock_get_sm:
             mock_sm = MagicMock()
             mock_sm.list_skills.return_value = [
                 Skill("skill-a", "A", "", "", SkillScope.GLOBAL, False),
@@ -756,9 +756,9 @@ class TestSkillsAndMCPScreenHint(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(hint.right_text, "1/2")
 
     async def test_mcp_screen_hint_right_text(self):
-        from widgets.presentation.screens.mcp import MCPScreen
+        from johnston.tui.presentation.screens.mcp import MCPScreen
 
-        with patch("widgets.presentation.screens.mcp.get_mcp_manager") as mock_get_mm:
+        with patch("johnston.tui.presentation.screens.mcp.get_mcp_manager") as mock_get_mm:
             mock_mm = MagicMock()
             mock_mm.load_servers.return_value = [
                 {"name": "srv-1", "scope": "global", "enabled": True},

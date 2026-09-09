@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import MagicMock
 
-from core.infrastructure.tasks.manager import TaskManager
-from core.tools.context import ToolContext
+from johnston.core.infrastructure.tasks.manager import TaskManager
+from johnston.core.tools.context import ToolContext
 
 
 class DummyAgent:

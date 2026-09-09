@@ -1,7 +1,7 @@
 import unittest
 
-from widgets.presentation.widgets.footer_layout import format_hint, get_theme_colors
-from widgets.presentation.widgets.modal_hint import ModalHint, ModalHintConfig
+from johnston.tui.presentation.widgets.footer_layout import format_hint, get_theme_colors
+from johnston.tui.presentation.widgets.modal_hint import ModalHint, ModalHintConfig
 
 
 class TestModalHintFormatting(unittest.TestCase):

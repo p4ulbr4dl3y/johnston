@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock
 
-from core.infrastructure.storage.session_store import SessionStore
-from core.roles.role_registry import RoleRegistry
+from johnston.core.infrastructure.storage.session_store import SessionStore
+from johnston.core.roles.role_registry import RoleRegistry
 
 
 class TestSubagentRoles(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestSubagentRoles(unittest.TestCase):
         self.assertIn("Read-only", explorer_def.prompt)
 
     def test_format_role_prompt(self):
-        from core.roles.prompt import format_role_prompt
+        from johnston.core.roles.prompt import format_role_prompt
 
         self.assertEqual(format_role_prompt("", ""), "")
         self.assertEqual(
@@ -102,8 +102,8 @@ class TestSubagentApplyRole(unittest.TestCase):
         must substitute the worker definition instead of using it verbatim."""
         import tempfile
 
-        from core.application.session.stream import configure_subagent_agent
-        from core.roles.role_registry import RoleRegistry
+        from johnston.core.application.session.stream import configure_subagent_agent
+        from johnston.core.roles.role_registry import RoleRegistry
 
         class _FakeAgent:
             pass
@@ -125,7 +125,7 @@ class TestSubagentApplyRole(unittest.TestCase):
             self.assertEqual(agent.role, "worker")
 
     def test_configure_subagent_agent_with_worktree_branch(self):
-        from core.application.session.stream import configure_subagent_agent
+        from johnston.core.application.session.stream import configure_subagent_agent
 
         class _FakeAgent:
             pass
@@ -140,8 +140,8 @@ class TestSubagentApplyRole(unittest.TestCase):
     def test_configure_agent_unified_main_and_subagent(self):
         import tempfile
 
-        from core.application.session.stream import configure_agent
-        from core.roles.role_registry import RoleRegistry
+        from johnston.core.application.session.stream import configure_agent
+        from johnston.core.roles.role_registry import RoleRegistry
 
         class _FakeAgent:
             def __init__(self):
@@ -190,7 +190,7 @@ class TestSubagentApplyProvider(unittest.TestCase):
         subagent object while preserving identity plumbing."""
         import types
 
-        from core.roles.provider import rebind_provider
+        from johnston.core.roles.provider import rebind_provider
 
         class _FakeRebuilt:
             def __init__(self):
@@ -216,7 +216,7 @@ class TestSubagentApplyProvider(unittest.TestCase):
 
         import unittest.mock as mock
 
-        with mock.patch("core.application.provider.provider_manager.ProviderManager", return_value=fake_pm):
+        with mock.patch("johnston.core.application.provider.provider_manager.ProviderManager", return_value=fake_pm):
             rebind_provider(agent, "clinepass")
 
         self.assertEqual(agent.provider_key, "clinepass")
@@ -230,14 +230,14 @@ class TestSubagentApplyProvider(unittest.TestCase):
         import types
         import unittest.mock as mock
 
-        from core.base_provider import BaseAgent
-        from core.roles.provider import rebind_provider
+        from johnston.core.base_provider import BaseAgent
+        from johnston.core.roles.provider import rebind_provider
 
         real_rebuilt = BaseAgent(api_key="sk-new", model="gpt-4", base_url="http://new")
         fake_pm = types.SimpleNamespace(create_agent_for_provider=lambda pk: real_rebuilt)
 
         subagent = BaseAgent(api_key="sk-old", model="gpt-3.5", base_url="http://old")
-        with mock.patch("core.application.provider.provider_manager.ProviderManager", return_value=fake_pm):
+        with mock.patch("johnston.core.application.provider.provider_manager.ProviderManager", return_value=fake_pm):
             rebind_provider(subagent, "openai")
 
         self.assertIsNone(subagent._client)
@@ -284,7 +284,7 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.id, "task-1")
 
     def test_subagent_default_prompt_directives(self):
-        from core.domain.defaults.prompts import SUBAGENT_DEFAULT_SYSTEM_PROMPT
+        from johnston.core.domain.defaults.prompts import SUBAGENT_DEFAULT_SYSTEM_PROMPT
 
         self.assertIn("Autonomous but Bounded", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
         self.assertIn("Strict Scope & Minimal Diff", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
@@ -294,9 +294,9 @@ class TestSubagentRoleStrictMatch(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Git Commits", SUBAGENT_DEFAULT_SYSTEM_PROMPT)
 
     def test_headless_prompt_directives(self):
-        from core.domain.defaults.prompts import HEADLESS_DEFAULT_SYSTEM_PROMPT
-        from core.domain.policies.role_policy import AgentMode
-        from core.roles.prompt import apply_prompt
+        from johnston.core.domain.defaults.prompts import HEADLESS_DEFAULT_SYSTEM_PROMPT
+        from johnston.core.domain.policies.role_policy import AgentMode
+        from johnston.core.roles.prompt import apply_prompt
 
         self.assertIn("Single-Shot Turn", HEADLESS_DEFAULT_SYSTEM_PROMPT)
         self.assertIn("ZERO conversational closing questions", HEADLESS_DEFAULT_SYSTEM_PROMPT)

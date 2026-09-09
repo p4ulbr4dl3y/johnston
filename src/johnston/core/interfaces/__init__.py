@@ -1,0 +1,9 @@
+"""Core interfaces package."""
+from __future__ import annotations
+
+from johnston.core.interfaces.host import HostProtocol, NullHost
+
+__all__ = [
+    "HostProtocol",
+    "NullHost",
+]

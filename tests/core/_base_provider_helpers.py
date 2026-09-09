@@ -1,4 +1,4 @@
-"""Shared stream/agent test helpers for the core.base_provider test cluster.
+"""Shared stream/agent test helpers for the johnston.core.base_provider test cluster.
 
 These used to live inside the (now-split) test_base_provider monolith. They are
 not collected as tests (no ``test_``/``_test`` suffix).
@@ -6,7 +6,7 @@ not collected as tests (no ``test_``/``_test`` suffix).
 import asyncio
 import unittest.mock
 
-from core.base_provider import BaseAgent
+from johnston.core.base_provider import BaseAgent
 
 
 def make_agent(**kwargs):

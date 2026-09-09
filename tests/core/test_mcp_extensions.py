@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.infrastructure.mcp.manager import MCPManager
-from core.infrastructure.mcp.process_client import MCPProcessClient
-from core.infrastructure.mcp.sse_client import MCPSSEClient
-from core.tools.read import ReadTool
+from johnston.core.infrastructure.mcp.manager import MCPManager
+from johnston.core.infrastructure.mcp.process_client import MCPProcessClient
+from johnston.core.infrastructure.mcp.sse_client import MCPSSEClient
+from johnston.core.tools.read import ReadTool
 
 
 @pytest.mark.asyncio
@@ -238,7 +238,7 @@ async def test_read_tool_mcp_resource_integration():
         return_value={"contents": [{"uri": "mcp://server/resource", "text": "MCP Resource Body"}]}
     )
 
-    with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr):
+    with patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr):
         result = await tool.execute({"path": "mcp://server/resource"})
         assert result.status == "done"
         assert "MCP Resource Body" in result.content
@@ -248,8 +248,8 @@ async def test_read_tool_mcp_resource_integration():
 @pytest.mark.asyncio
 async def test_mcp_prompt_command_suggestions_and_dispatch():
     """Test MCP prompts appear in suggestions and execute via slash dispatch."""
-    from widgets.app.command_provider import _build_command_suggestions
-    from widgets.app.dispatch import handle_slash_command
+    from johnston.tui.app.command_provider import _build_command_suggestions
+    from johnston.tui.app.dispatch import handle_slash_command
 
     mock_client = MagicMock()
     mock_client.prompts = [{"name": "fast_review", "description": "Review code quickly"}]
@@ -260,7 +260,7 @@ async def test_mcp_prompt_command_suggestions_and_dispatch():
         return_value={"messages": [{"role": "user", "content": "Please review this code carefully"}]}
     )
 
-    with patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr):
+    with patch("johnston.core.infrastructure.mcp.get_mcp_manager", return_value=mock_mgr):
         suggestions = _build_command_suggestions()
         cmd_names = [s[0] for s in suggestions]
         assert "/fast_review" in cmd_names

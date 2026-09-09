@@ -13,7 +13,7 @@ from textual.visual import RichVisual
 from textual.widget import Widget
 from textual.widgets import Static
 
-from widgets.patch import apply_textual_patches
+from johnston.tui.patch import apply_textual_patches
 
 
 class TestPatchCoverage(unittest.TestCase):

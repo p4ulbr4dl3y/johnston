@@ -4,9 +4,9 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Input
 
-from widgets.app.theme_manager import theme_manager
-from widgets.presentation.screens.base_selection import HeaderWrapOptionList
-from widgets.presentation.screens.theme import ThemeScreen
+from johnston.tui.app.theme_manager import theme_manager
+from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
+from johnston.tui.presentation.screens.theme import ThemeScreen
 
 
 class ThemeTestApp(App):

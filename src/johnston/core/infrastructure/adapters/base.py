@@ -1,0 +1,334 @@
+"""Neutral adapter helpers shared by the engine and provider adapters."""
+
+import asyncio
+import atexit
+import json
+import uuid
+from dataclasses import dataclass
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+
+from johnston.core.domain.defaults.config import DEFAULT_MAX_TOKENS
+
+
+class BaseApiAdapter:
+    """Base API Adapter interface for LLM formats.
+
+    Adapters yield normalized events so the agent loop can consume them
+    uniformly regardless of provider wire protocol:
+      - ("adapter_text", str)        : a text delta to append to the reply
+      - ("adapter_tool_call", dict)  : {"id", "name", "arguments"(JSON str)}
+      - ("adapter_usage", dict)      : {"prompt_tokens", "completion_tokens",
+                                        "total_tokens", "cache_read_tokens"}
+    """
+
+    def __init__(self) -> None:
+        # Reuse transport clients across calls instead of creating one per
+        # stream_chat invocation (which previously leaked HTTP connection
+        # pools). Clients are cached per (base_url, api_key) pair so different
+        # providers reached through the adapter branch each get their own
+        # client.
+        self._clients: Dict[Tuple[Any, ...], Any] = {}
+        atexit.register(self.close)
+
+    def _create_client(self, base_url: str, api_key: str, headers: Optional[Dict[str, str]] = None) -> Any:
+        """Create a fresh transport client for the given (base_url, api_key).
+
+        Subclasses override to instantiate their own client type.
+        """
+        raise NotImplementedError
+
+    def _client_is_closed(self, client: Any) -> bool:
+        """Whether a cached client is closed and should be recreated."""
+        return bool(getattr(client, "is_closed", False))
+
+    def _get_client(self, base_url: str, api_key: str, headers: Optional[Dict[str, str]] = None) -> Any:
+        header_key = tuple(sorted(headers.items())) if headers else ()
+        key = (base_url or "", api_key or "", header_key)
+        client = self._clients.get(key)
+        if client is None or self._client_is_closed(client):
+            try:
+                client = self._create_client(base_url, api_key, headers=headers)
+            except TypeError:
+                client = self._create_client(base_url, api_key)
+            self._clients[key] = client
+        return client
+
+    def close(self) -> None:
+        """Closes all cached clients to release HTTP connection pools.
+
+        Sync best-effort hook (e.g. registered via ``atexit``). Real cleanup
+        happens through :meth:`_close_all`; this runs the async close in a fresh
+        event loop when no loop is currently running.
+        """
+        clients, self._clients = self._clients, {}
+        if not clients:
+            return
+        close_coro = self._close_all(clients)
+        try:
+            asyncio.run(close_coro)
+        except Exception:
+            # asyncio.run raises immediately when a loop is already running,
+            # without ever touching the coroutine — close it so it does not
+            # leak as a "coroutine never awaited" RuntimeWarning. The close
+            # failure itself stays swallowed (best-effort atexit-style hook).
+            close_coro.close()
+
+    @staticmethod
+    async def _close_all(clients: Dict[Tuple[str, str], Any]) -> None:
+        for client in clients.values():
+            closer = getattr(client, "aclose", None) or getattr(client, "close", None)
+            if closer is None:
+                continue
+            try:
+                await closer()
+            except Exception:
+                pass
+
+    async def stream_chat(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        max_tokens: int = 32768,
+        thinking_effort: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        extra_body: Optional[Dict[str, Any]] = None,
+        stream_timeout: Optional[float] = None,
+        **kwargs: Any,
+    ) -> AsyncGenerator[Tuple[str, Any], None]:
+        raise NotImplementedError
+
+
+def build_stream_kwargs(
+    agent: Any,
+    *,
+    messages: List[Dict[str, Any]],
+    tools: Optional[List[Dict[str, Any]]] = None,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
+    model: Optional[str] = None,
+    openai_client: bool = True,
+    **overrides: Any,
+) -> Dict[str, Any]:
+    """Build the kwargs dict for ``adapter.stream_chat(**kwargs)``.
+
+    Collects the fields shared by every provider (``base_url``, ``api_key``,
+    ``model``, ``messages``, ``max_tokens``) plus ``headers``/``extra_body``
+    when set on the agent and ``tools`` when provided. The ``client`` is
+    forwarded only for ``api_type == "openai"`` (or any non-None ``_client``
+    when ``openai_client`` is False). Extra provider keys (``thinking_effort``,
+    ``chunk_timeout``, ``provider_key``, ...) can be injected via ``overrides``.
+    """
+    kwargs: Dict[str, Any] = {
+        "base_url": getattr(agent, "base_url", ""),
+        "api_key": getattr(agent, "api_key", ""),
+        "model": model if model is not None else getattr(agent, "model", ""),
+        "messages": messages,
+        "max_tokens": max_tokens,
+    }
+    if tools is not None:
+        kwargs["tools"] = tools
+    headers = getattr(agent, "headers", None)
+    if headers:
+        kwargs["headers"] = headers
+    extra_body = getattr(agent, "extra_body", None)
+    if extra_body:
+        kwargs["extra_body"] = extra_body
+    client = getattr(agent, "_client", None)
+    api_type = getattr(agent, "api_type", "openai")
+    if client is not None and (not openai_client or api_type == "openai"):
+        kwargs["client"] = client
+    kwargs.update(overrides)
+    return kwargs
+
+
+def resolve_stream_timeout(stream_timeout: Optional[float] = None) -> float:
+    """Return the per-request stream timeout, falling back to config/default.
+
+    Explicitly-passed ``stream_timeout`` wins; otherwise ``llm.stream_timeout``
+    is read from settings so config.json takes effect, and finally the 60s
+    default is used when settings are unavailable.
+    """
+    if stream_timeout is not None:
+        return stream_timeout
+    try:
+        from johnston.core.infrastructure.config.settings import get_settings
+
+        return get_settings().llm.stream_timeout
+    except Exception:
+        return 60.0
+
+
+def sort_keys_recursive(obj: Any, preserve_keys: Optional[Tuple[str, ...]] = None) -> Any:
+    """Recursively sorts dictionary keys to guarantee deterministic JSON serialization (stableStringify).
+
+    If ``preserve_keys`` is provided, dictionaries whose key in the parent matches one of the
+    names in ``preserve_keys`` (e.g. ``("properties",)``) retain their insertion order while
+    their nested values are still recursively normalized.
+    """
+    def _recurse(curr: Any, parent_key: Optional[str] = None) -> Any:
+        if isinstance(curr, dict):
+            if preserve_keys and parent_key in preserve_keys:
+                return {k: _recurse(v, k) for k, v in curr.items()}
+            return {
+                k: _recurse(v, k)
+                for k, v in sorted(curr.items(), key=lambda item: (type(item[0]).__name__, str(item[0])))
+            }
+        elif isinstance(curr, list):
+            return [_recurse(elem, parent_key) for elem in curr]
+        return curr
+
+    return _recurse(obj)
+
+
+def parse_tool_call_args(tc: dict) -> Tuple[str, Dict[str, Any]]:
+    """Helper to extract function name and normalized argument dict from tool call payloads."""
+    if not isinstance(tc, dict):
+        return "", {}
+    fn = tc.get("function", {})
+    if not isinstance(fn, dict):
+        fn = {}
+    fn_name = fn.get("name", "")
+    raw_args = fn.get("arguments", "{}")
+    if isinstance(raw_args, str):
+        try:
+            args_obj = json.loads(raw_args) if raw_args.strip() else {}
+        except Exception:
+            args_obj = {}
+    else:
+        args_obj = raw_args or {}
+    return fn_name, args_obj
+
+
+def extract_image_payload(tcontent: Any) -> Optional[Dict[str, Any]]:
+    """Extracts image payload dictionary from raw message content."""
+    if isinstance(tcontent, dict) and tcontent.get("type") == "image":
+        return tcontent
+    if isinstance(tcontent, str) and (tcontent.startswith('{"type": "image"') or '"type": "image"' in tcontent[:40]):
+        try:
+            data = json.loads(tcontent)
+            if isinstance(data, dict) and data.get("type") == "image":
+                return data
+        except Exception:
+            pass
+    return None
+
+
+@dataclass(frozen=True)
+class ImageDetails:
+    """Structured image metadata extracted from tool content."""
+
+    summary: str
+    media_type: str
+    base64: str
+    detail: str
+
+
+def extract_image_details(tcontent: Any) -> Optional[ImageDetails]:
+    """Extract structured image details from image tool content if present."""
+    parsed_img = extract_image_payload(tcontent)
+    if parsed_img and parsed_img.get("base64"):
+        summary_text = parsed_img.get("summary", "[Image content]")
+        media_type = parsed_img.get("media_type", "image/jpeg")
+        b64_data = parsed_img.get("base64")
+        detail_val = parsed_img.get("detail", "high")
+        return ImageDetails(summary=summary_text, media_type=media_type, base64=b64_data, detail=detail_val)
+    return None
+
+
+def image_url_block(media_type: str, b64_data: str, detail: str = "high") -> Dict[str, Any]:
+    """Builds an OpenAI-style image_url content block with base64 data URI."""
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"data:{media_type};base64,{b64_data}", "detail": detail},
+    }
+
+
+def _safe_int(val: Any) -> int:
+    """Coerce a token count to int, tolerating NaN/Inf/None/non-numeric input."""
+    if val is None or isinstance(val, bool):
+        return 0
+    try:
+        f = float(val)
+    except (ValueError, TypeError):
+        return 0
+    if f != f or f in (float("inf"), float("-inf")):  # NaN / ±Inf
+        return 0
+    return int(f)
+
+
+def build_adapter_usage_event(
+    prompt_tokens: Any = 0,
+    completion_tokens: Any = 0,
+    total_tokens: Optional[Any] = None,
+    cache_read_tokens: Any = 0,
+    cache_write_tokens: Any = 0,
+    cost: Optional[float] = None,
+) -> Tuple[str, Dict[str, Any]]:
+    """Formats standard ('adapter_usage', dict) tuple for provider adapters."""
+    p_tok = _safe_int(prompt_tokens)
+    c_tok = _safe_int(completion_tokens)
+    t_tok = _safe_int(total_tokens) if total_tokens is not None else (p_tok + c_tok)
+    payload: Dict[str, Any] = {
+        "prompt_tokens": p_tok,
+        "completion_tokens": c_tok,
+        "total_tokens": t_tok,
+        "cache_read_tokens": int(cache_read_tokens or 0),
+    }
+    if cache_write_tokens:
+        payload["cache_write_tokens"] = int(cache_write_tokens)
+    if cost is not None:
+        payload["cost"] = float(cost)
+    return ("adapter_usage", payload)
+
+
+def normalize_tool_arguments_str(raw: Any) -> str:
+    """Converts tool-call ``arguments`` into a clean, valid JSON string.
+
+    Unified normalization used by every provider path that builds a tool call
+    payload, so the ``arguments`` field is always a well-formed JSON string:
+
+    - ``None`` (or a missing value) -> ``"{}"``
+    - non-string (dict/list/etc.)   -> ``json.dumps(raw)``
+    - string ``"{}"``               -> returned unchanged
+    - any other string              -> validated via ``json.loads``; if the
+      string is not valid JSON (including empty/whitespace) it is replaced
+      with ``"{}"``
+    """
+    if raw is None:
+        return "{}"
+    if isinstance(raw, str):
+        if raw == "{}":
+            return raw
+        try:
+            json.loads(raw)
+        except Exception:
+            return "{}"
+        return raw
+    return json.dumps(raw, ensure_ascii=False, sort_keys=True)
+
+
+def parse_sse_line(line: str) -> Optional[Any]:
+    """Parses a Server-Sent Events line into its JSON payload.
+
+    Expects a line with a ``data:`` prefix (SSE wire format). Returns the parsed
+    JSON object, or None if the line is not a data frame / contains invalid JSON.
+    Handles the ``data: [DONE]`` sentinel transparently (returns None).
+    """
+    if not line or not line.startswith("data:"):
+        return None
+    line_data = line[5:].strip()
+    if not line_data or line_data == "[DONE]":
+        return None
+    try:
+        return json.loads(line_data)
+    except Exception:
+        return None
+
+
+def new_tool_call_id(idx: Optional[int] = None) -> str:
+    """Returns a unique tool-call id, derived from a stream index or generated."""
+    if idx is None:
+        return f"call_{uuid.uuid4().hex[:8]}"
+    return f"call_{idx}"
