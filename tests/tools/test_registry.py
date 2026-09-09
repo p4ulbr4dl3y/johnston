@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -462,6 +463,35 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             subagent_role="",
             server_name="postgres",
         )
+
+    async def test_check_and_confirm_permission_tty_uses_to_thread(self):
+        from johnston.core.domain.policies.permission_policy import PermissionAction, PermissionDecision
+        from johnston.core.tools.registry import check_and_confirm_permission
+
+        mock_pm = MagicMock()
+        mock_pm.check_permission.return_value = PermissionDecision(PermissionAction.ASK, "Need permission")
+
+        mock_stdin = MagicMock()
+        mock_stdin.isatty.return_value = True
+        mock_stdin.readline.return_value = "y\n"
+
+        to_thread_calls = []
+        orig_to_thread = asyncio.to_thread
+
+        async def _spy_to_thread(func, *args, **kwargs):
+            to_thread_calls.append(func)
+            return await orig_to_thread(func, *args, **kwargs)
+
+        with (
+            patch("johnston.core.application.permission.permission_manager.PermissionManager.get_instance", return_value=mock_pm),
+            patch("sys.stdin", mock_stdin),
+            patch("sys.stderr.write"),
+            patch("sys.stderr.flush"),
+            patch("asyncio.to_thread", side_effect=_spy_to_thread),
+        ):
+            res = await check_and_confirm_permission("shell", "shell", {"command": "ls"}, None)
+            self.assertIsNone(res)
+            self.assertIn(mock_stdin.readline, to_thread_calls)
 
 
 if __name__ == "__main__":

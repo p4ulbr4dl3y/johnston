@@ -39,7 +39,8 @@ def resolve_writable_path(ctx: Any, path_arg: Any) -> tuple[str, ToolResult | No
     if getattr(ctx, "sandbox_enabled", False):
         from johnston.core.infrastructure.platform.sandbox import is_path_writable_in_sandbox
 
-        if not is_path_writable_in_sandbox(path, cwd=ctx.cwd):
+        allow_workspace_writes = not getattr(ctx, "is_read_only", False)
+        if not is_path_writable_in_sandbox(path, cwd=ctx.cwd, allow_workspace_writes=allow_workspace_writes):
             return "", ToolResult.error("permission", f"sandbox restriction: write not permitted to '{path}' outside workspace")
     return path, None
 

@@ -472,6 +472,44 @@ class TestCreateTool(_Base):
         self.assertIn("[diff truncated:", diff)
         self.assertIn("lines omitted]", diff)
 
+    async def test_create_overwrite_binary_file_returns_error(self):
+        tool = CreateTool()
+        p = os.path.join(self.tmp, "binary.bin")
+        with open(p, "wb") as f:
+            f.write(b"\x00\x01\x02\x03\xff\xfe")
+        res = await tool.execute({"path": p, "content": "hello world"})
+        self.assertTrue(res.is_error)
+        self.assertIn("ERR: binary_file", res.content)
+        with open(p, "rb") as f:
+            self.assertEqual(f.read(), b"\x00\x01\x02\x03\xff\xfe")
+
+    async def test_resolve_writable_path_respects_read_only_in_sandbox(self):
+        from johnston.core.tools.context import ToolContext
+        from johnston.core.tools.utils import resolve_writable_path
+
+        fake_ws = os.path.realpath("/workspace/project")
+        ctx = ToolContext(cwd=fake_ws)
+        ctx.sandbox_enabled = True
+        ctx._is_read_only = True
+        target = os.path.join(fake_ws, "file.txt")
+        resolved, err = resolve_writable_path(ctx, target)
+        self.assertEqual(resolved, "")
+        self.assertIsNotNone(err)
+        self.assertTrue(err.is_error)
+        self.assertIn("sandbox restriction", err.content)
+
+    def test_resolve_path_realpath_consistency_for_absolute_paths(self):
+        from johnston.core.tools.base import resolve_path
+
+        real_target = os.path.join(self.tmp, "real.txt")
+        with open(real_target, "w") as f:
+            f.write("test")
+        symlink_path = os.path.join(self.tmp, "symlink.txt")
+        os.symlink(real_target, symlink_path)
+
+        resolved = resolve_path(os.path.abspath(symlink_path))
+        self.assertEqual(resolved, os.path.realpath(real_target))
+
 
 if __name__ == "__main__":
     unittest.main()

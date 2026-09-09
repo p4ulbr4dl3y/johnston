@@ -1,3 +1,4 @@
+import asyncio
 import difflib
 import inspect
 import logging
@@ -168,7 +169,8 @@ async def check_and_confirm_permission(
                     prompt = f"[permission] Allow {display_name} ({decision.reason})? [y(once)/n(deny)/a(always)]: "
                     sys.stderr.write(prompt)
                     sys.stderr.flush()
-                    ans = sys.stdin.readline().strip().lower()
+                    line = await asyncio.to_thread(sys.stdin.readline)
+                    ans = line.strip().lower()
                     if ans in ("y", "yes"):
                         return None
                     elif ans in ("a", "always"):

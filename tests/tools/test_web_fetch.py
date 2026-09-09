@@ -1,3 +1,4 @@
+import ipaddress
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -385,6 +386,19 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("host2.com", _DNS_CACHE)
         self.assertIn("host3.com", _DNS_CACHE)
         _DNS_CACHE.clear()
+
+    async def test_ipv6_unspecified_blocked_ssrf(self):
+        from johnston.core.tools.web_fetch import _is_blocked_ip, _is_private_host
+
+        addr = ipaddress.ip_address("::")
+        self.assertTrue(_is_blocked_ip(addr))
+
+        is_priv = await _is_private_host("http://[::]/admin")
+        self.assertTrue(is_priv)
+
+        tool = WebFetchTool()
+        res = str(await tool.execute({"url": "http://[::]/"}))
+        self.assertIn("blocked", res)
 
 
 if __name__ == "__main__":

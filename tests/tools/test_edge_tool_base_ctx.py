@@ -92,7 +92,7 @@ class TestResolvePathEdge(unittest.TestCase):
     def test_absolute_wins(self):
         base = tempfile.gettempdir()
         res = resolve_path("/etc/hosts", base)
-        self.assertEqual(os.path.abspath("/etc/hosts"), res)
+        self.assertEqual(os.path.realpath("/etc/hosts"), res)
 
     def test_unicode_relative(self):
         base = tempfile.mkdtemp()

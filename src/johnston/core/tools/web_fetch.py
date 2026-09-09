@@ -64,7 +64,7 @@ def _is_blocked_ip(addr: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
         addr = addr.ipv4_mapped
     if isinstance(addr, ipaddress.IPv4Address) and addr in _FAKE_IP_NET:
         return False
-    return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved
+    return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved or addr.is_unspecified
 
 
 async def _is_private_host(url: str) -> bool:

@@ -78,7 +78,7 @@ def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
     if not path_str:
         return base
     if os.path.isabs(path_str):
-        return os.path.abspath(os.path.expanduser(path_str))
+        return os.path.realpath(os.path.expanduser(path_str))
     return os.path.realpath(os.path.join(base, os.path.expanduser(path_str)))
 
 

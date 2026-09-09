@@ -443,7 +443,7 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"path": img_path}))
         data = json.loads(res)
         self.assertEqual(data["type"], "image")
-        self.assertEqual(data["path"], img_path)
+        self.assertEqual(data["path"], os.path.realpath(img_path))
         self.assertIn("base64", data)
         self.assertIn("sample.png", data["summary"])
         # Check resizing to max_dim 1568 (2000x1000 -> 1568x784)

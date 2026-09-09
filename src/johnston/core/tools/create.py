@@ -14,6 +14,7 @@ class _ProbeResult:
     existed: bool
     old_content: str
     diff_skipped: bool
+    is_binary: bool = False
 
 
 class CreateTool(BaseTool):
@@ -58,6 +59,11 @@ class CreateTool(BaseTool):
             if not os.path.isfile(path):
                 return _ProbeResult(is_dir=False, existed=False, old_content="", diff_skipped=False)
 
+            from johnston.core.tools.search.common import is_binary_file
+
+            if is_binary_file(path):
+                return _ProbeResult(is_dir=False, existed=True, old_content="", diff_skipped=False, is_binary=True)
+
             try:
                 if os.path.getsize(path) > get_max_tool_payload_bytes():
                     return _ProbeResult(is_dir=False, existed=True, old_content="", diff_skipped=True)
@@ -65,15 +71,22 @@ class CreateTool(BaseTool):
                 pass
 
             old = ""
+            is_bin = False
             try:
                 old = read_file_text(path)
+            except (UnicodeDecodeError, UnicodeError):
+                is_bin = True
             except Exception:
                 old = ""
+            if is_bin:
+                return _ProbeResult(is_dir=False, existed=True, old_content="", diff_skipped=False, is_binary=True)
             return _ProbeResult(is_dir=False, existed=True, old_content=old, diff_skipped=False)
 
         probe = await run_cancellable(_probe)
         if probe.is_dir:
             return ToolResult.error("is_directory", name=path, detail="path is an existing directory")
+        if probe.is_binary:
+            return ToolResult.error("binary_file", name=str(path_arg or path), detail="cannot overwrite binary file")
 
         raw_content = args.get("content")
         if raw_content is None:
