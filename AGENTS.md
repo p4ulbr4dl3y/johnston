@@ -35,7 +35,7 @@ TUI layering (`src/johnston/tui/`):
 
 ## Testing
 
-Pytest + `pytest-asyncio` (auto). Tests are FLAT in `tests/`, named `test_*.py`; area is encoded in the filename prefix (`test_edge_core.py`, `test_edge_ui_*`, or tool/manager name), not only a mirrored dir. Top-level test suites per area (adapters, tools, ui) also exist. Discover via `-k`.
+Pytest + `pytest-asyncio` (auto). Tests are organized in modular subdirectories in `tests/` (`adapters/`, `cli/`, `core/`, `domain/`, `tools/`, `ui/`), named `test_*.py`. Discover via `-k`.
 
 Add regression tests for bug fixes, focused unit tests for new behavior.
 
