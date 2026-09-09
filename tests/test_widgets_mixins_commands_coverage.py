@@ -787,7 +787,7 @@ def test_lifecycle_on_unmount_full_flow():
             with patch.object(app, "save_current_session") as mock_save:
                 with patch("core.infrastructure.mcp.get_mcp_manager") as mock_mcp:
                     with patch("core.domain.policies.models_catalog.catalog.close", new_callable=AsyncMock):
-                        with patch("tools.registry.aclose_tools", return_value=AsyncMock()()):
+                        with patch("core.tools.registry.aclose_tools", return_value=AsyncMock()()):
                             app.on_unmount()
 
                             assert app.is_app_active is False
@@ -1070,7 +1070,7 @@ def test_lifecycle_on_unmount_sync_and_error_handling():
                     with patch.object(app, "save_current_session", side_effect=RuntimeError("save err")):
                         with patch("core.infrastructure.mcp.get_mcp_manager", side_effect=RuntimeError("mcp err")):
                             with patch("core.domain.policies.models_catalog.catalog.close", new_callable=AsyncMock):
-                                with patch("tools.registry.aclose_tools") as mock_aclose:
+                                with patch("core.tools.registry.aclose_tools") as mock_aclose:
                                     mock_aclose.return_value = AsyncMock()()
                                     app.sm.release_all_locks.side_effect = RuntimeError("locks err")
 

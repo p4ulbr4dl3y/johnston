@@ -60,7 +60,6 @@ only-include = [
     "app.tcss",
     "cli.py",
     "core",
-    "tools",
     "widgets",
 ]
 
@@ -98,7 +97,7 @@ ignore = ["E501"]
 "scripts/preview_system_prompt.py" = ["E402"]
 
 [tool.coverage.run]
-source = ["app", "cli", "core", "tools", "widgets"]
+source = ["app", "cli", "core", "widgets"]
 omit = ["*/__init__.py", "core/domain/defaults/skills/*"]
 
 [tool.coverage.report]

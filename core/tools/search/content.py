@@ -7,7 +7,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Set, Tuple
 
-from tools.search.common import (
+from core.tools.search.common import (
     DEFAULT_EXCLUDE_DIRS,
     OUTLINE_WORKERS,
     _GitignoreMatcher,

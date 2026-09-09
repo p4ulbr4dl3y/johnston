@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-Johnston: Python terminal AI assistant, Textual UI. Entry: `app.py` (app), `cli.py` (CLI, `cli:main` script). Logic in `core/`, tools in `tools/`, widgets in `widgets/`. Styling `app.tcss`; install `install.sh`/`install.ps1`.
+Johnston: Python terminal AI assistant, Textual UI. Entry: `app.py` (app), `cli.py` (CLI, `cli:main` script). Logic and tools in `core/`, widgets in `widgets/`. Styling `app.tcss`; install `install.sh`/`install.ps1`.
 
 ## Build & Test
 

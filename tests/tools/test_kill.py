@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from core.domain.defaults.errors import ToolResultStatus
-from tools.context import ToolContext
-from tools.kill import KillTool
+from core.tools.context import ToolContext
+from core.tools.kill import KillTool
 
 
 @pytest.fixture

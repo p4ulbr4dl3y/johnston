@@ -3,7 +3,7 @@ import time
 from typing import Any, Tuple
 
 from core.infrastructure.runtime.lru import LruCache
-from tools.utils import DEFAULT_LINE_WINDOW
+from core.tools.utils import DEFAULT_LINE_WINDOW
 
 MAX_DOC_CACHE = 50
 DOC_CACHE_TTL = 600.0  # 10 minutes

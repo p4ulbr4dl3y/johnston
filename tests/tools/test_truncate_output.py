@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from tools.base import truncate_output
+from core.tools.base import truncate_output
 
 
 class TestTruncateOutput(unittest.TestCase):
@@ -135,7 +135,7 @@ class TestTruncateOutput(unittest.TestCase):
         self.assertTrue(len(base) <= 40 + 1 + 4 + 4, base)
 
     def test_format_line_pagination_single_line_error_hint(self):
-        from tools.utils import format_line_pagination
+        from core.tools.utils import format_line_pagination
 
         res = format_line_pagination(["single line content"], start_line=140, path="test.log")
         self.assertIn("ERR: range 'read': start_line (140) exceeds line count (1)", res.display)

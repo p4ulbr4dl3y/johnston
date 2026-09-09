@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from core.infrastructure.runtime.lru import LruCache
-from tools.search.common import (
+from core.tools.search.common import (
     CODE_EXTENSIONS,
     MAX_OUTLINE_FILE_BYTES,
     OUTLINE_WORKERS,
@@ -18,7 +18,7 @@ from tools.search.common import (
     get_line_number,
     is_binary_file,
 )
-from tools.search.treesitter import GLOBAL_TREE_SITTER
+from core.tools.search.treesitter import GLOBAL_TREE_SITTER
 
 
 class _OutlineCache:

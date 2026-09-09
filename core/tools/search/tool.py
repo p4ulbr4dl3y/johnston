@@ -4,7 +4,7 @@ import time
 from typing import Any, Callable, Dict, Optional
 
 from core.domain.defaults.errors import ToolResult
-from tools.base import (
+from core.tools.base import (
     ERROR_KIND_NOT_FOUND,
     ERROR_KIND_PARAMS,
     ERROR_KIND_PERMISSION,
@@ -15,17 +15,17 @@ from tools.base import (
     truncate_output,
     try_int,
 )
-from tools.cancel import run_cancellable
-from tools.search.common import (
+from core.tools.cancel import run_cancellable
+from core.tools.search.common import (
     _build_gitignore_matcher,
     _safe_relpath,
 )
-from tools.search.content import (
+from core.tools.search.content import (
     _search_content_python,
     _search_content_ripgrep,
 )
-from tools.search.files import _search_filename
-from tools.search.outline import _search_outline
+from core.tools.search.files import _search_filename
+from core.tools.search.outline import _search_outline
 
 
 def search_sync(

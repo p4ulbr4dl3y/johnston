@@ -154,7 +154,7 @@ def read_archive_member(
     import tarfile
     import zipfile
 
-    from tools.utils import get_max_tool_payload_bytes
+    from core.tools.utils import get_max_tool_payload_bytes
 
     lower = archive_path.lower()
     norm_inner = inner_path.replace("\\", "/").strip("/")

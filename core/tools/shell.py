@@ -22,7 +22,7 @@ from core.infrastructure.platform.platform_utils import (
 )
 from core.infrastructure.platform.process import spawn_shell_process, spawn_windows_process
 from core.infrastructure.tasks.shell_task import ShellTask
-from tools.base import BaseTool, resolve_path, truncate_output
+from core.tools.base import BaseTool, resolve_path, truncate_output
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def _attach_shell_widget(
     is_background: bool = False,
 ) -> None:
     """Link the shell tool card to the task for the completion repaint."""
-    from tools.context import ToolContext
+    from core.tools.context import ToolContext
 
     ToolContext(app=host).attach_shell_widget(
         task_id=task_id,

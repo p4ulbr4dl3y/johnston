@@ -3,8 +3,8 @@ from unittest.mock import ANY, AsyncMock, MagicMock
 import pytest
 
 from core.domain.defaults.errors import ToolResult, ToolResultStatus
-from tools.context import ToolContext
-from tools.message_subagent import MessageSubagentTool
+from core.tools.context import ToolContext
+from core.tools.message_subagent import MessageSubagentTool
 
 
 @pytest.fixture

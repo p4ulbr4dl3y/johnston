@@ -7,7 +7,7 @@ from core.base_provider.agent import BaseAgent
 from core.base_provider.message_queue import drain_queued_messages, has_queued_messages
 from core.infrastructure.runtime.subagent_tracker import mark_subagent_running, record_subagent_session
 from core.interfaces.host import HostProtocol, NullHost
-from tools.context import ToolContext
+from core.tools.context import ToolContext
 
 
 class TestHostProtocol(unittest.IsolatedAsyncioTestCase):

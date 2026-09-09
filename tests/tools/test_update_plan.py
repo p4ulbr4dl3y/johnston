@@ -1,6 +1,6 @@
 import unittest
 
-from tools.update_plan import UpdatePlanTool
+from core.tools.update_plan import UpdatePlanTool
 
 
 class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):

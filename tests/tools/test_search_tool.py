@@ -6,9 +6,9 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from core.domain.defaults.errors import ToolResultStatus
-from tools.context import ToolContext
-from tools.registry import REGISTRY, execute_tool
-from tools.search import (
+from core.tools.context import ToolContext
+from core.tools.registry import REGISTRY, execute_tool
+from core.tools.search import (
     _OUTLINE_CACHE,
     SearchTool,
     _GitignoreMatcher,
@@ -181,7 +181,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             "data class Config(val name: String)\n"
             "object Singleton {}\n"
         )
-        from tools.search import _outline_generic_content
+        from core.tools.search import _outline_generic_content
         result = _outline_generic_content(kt_code)
         self.assertTrue(any("UserService" in line for line in result))
         self.assertTrue(any("getUser" in line for line in result))
@@ -196,7 +196,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             "extension String {}\n"
             "enum Status {}\n"
         )
-        from tools.search import _outline_generic_content
+        from core.tools.search import _outline_generic_content
         result = _outline_generic_content(swift_code)
         self.assertTrue(any("ViewController" in line for line in result))
         self.assertTrue(any("viewDidLoad" in line for line in result))
@@ -213,7 +213,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             "object MainApp {}\n"
             "trait Configurable {}\n"
         )
-        from tools.search import _outline_generic_content
+        from core.tools.search import _outline_generic_content
         result = _outline_generic_content(scala_code)
         self.assertTrue(any("Server" in line for line in result))
         self.assertTrue(any("start" in line for line in result))
@@ -222,21 +222,21 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
     def test_outline_arrow_functions(self):
         ts_code = "const handler = (e) => { return e; }\nlet process = (x) => x + 1\n"
-        from tools.search import _outline_generic_content
+        from core.tools.search import _outline_generic_content
         result = _outline_generic_content(ts_code)
         self.assertTrue(any("handler" in line for line in result))
         self.assertTrue(any("process" in line for line in result))
 
     def test_outline_rust_impl(self):
         rs_code = "impl Data {\n    fn new() -> Self {}\n}\nmod utils {}\n"
-        from tools.search import _outline_generic_content
+        from core.tools.search import _outline_generic_content
         result = _outline_generic_content(rs_code)
         self.assertTrue(any("impl Data" in line for line in result))
         self.assertTrue(any("mod utils" in line for line in result))
 
     def test_outline_go_type(self):
         go_code = "type ServerConfig struct {\n    Port int\n}\ntype Handler interface {}\n"
-        from tools.search import _outline_generic_content
+        from core.tools.search import _outline_generic_content
         result = _outline_generic_content(go_code)
         self.assertTrue(any("ServerConfig" in line for line in result))
         self.assertTrue(any("Handler" in line for line in result))
@@ -269,7 +269,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
     def test_direct_ripgrep_with_context(self):
         """Verify _search_content_ripgrep executes with -B and -A flags successfully."""
-        from tools.search import _search_content_ripgrep
+        from core.tools.search import _search_content_ripgrep
         if not shutil.which("rg"):
             self.skipTest("rg not available")
         res = _search_content_ripgrep(
@@ -566,7 +566,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             self.assertIn("AppRunner", res.content)
 
     def test_ripgrep_line_parsing_windows_and_hyphens(self):
-        from tools.search import _search_content_ripgrep
+        from core.tools.search import _search_content_ripgrep
 
         mock_lines = [
             "C:\\repo\\main.py\x0010:def hello():\n",
@@ -707,7 +707,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
     def test_ripgrep_delimiter_during_stopping(self):
         import unittest.mock as mock
 
-        from tools.search.content import _search_content_ripgrep
+        from core.tools.search.content import _search_content_ripgrep
 
         mock_proc = mock.MagicMock()
         mock_proc.stdout = [
@@ -841,7 +841,7 @@ class TestLRUCache(unittest.TestCase):
         with open(test_file, "w") as f:
             f.write("def func1():\n    pass\n")
 
-        from tools.search import _outline_file
+        from core.tools.search import _outline_file
 
         # First call
         result1 = _outline_file(test_file, self.tmpdir, "*", None, use_cache=True)
@@ -858,7 +858,7 @@ class TestLRUCache(unittest.TestCase):
         with open(test_file, "w") as f:
             f.write("def func1():\n    pass\n")
 
-        from tools.search import _outline_file
+        from core.tools.search import _outline_file
 
         # First call
         result1 = _outline_file(test_file, self.tmpdir, "*", None, use_cache=True)
@@ -883,7 +883,7 @@ class TestLRUCache(unittest.TestCase):
         with open(test_file, "w") as f:
             f.write("def func1():\n    pass\n")
 
-        from tools.search import _outline_file
+        from core.tools.search import _outline_file
 
         _outline_file(test_file, self.tmpdir, "*", None, use_cache=True)
         self.assertGreater(len(_OUTLINE_CACHE._cache), 0)
@@ -912,7 +912,7 @@ class TestGeneratorWalk(unittest.TestCase):
 
     def test_early_termination(self):
         """Test that generator supports early termination."""
-        from tools.search import _walk_filtered
+        from core.tools.search import _walk_filtered
 
         for i in range(10):
             with open(os.path.join(self.tmpdir, f"file{i}.py"), "w") as f:
@@ -994,13 +994,13 @@ class TestTreeSitter(unittest.TestCase):
 
     def test_tree_sitter_available(self):
         """Test that tree-sitter availability is detected."""
-        from tools.search import TREE_SITTER_AVAILABLE
+        from core.tools.search import TREE_SITTER_AVAILABLE
         # Just check it's a boolean
         self.assertIsInstance(TREE_SITTER_AVAILABLE, bool)
 
     def test_python_perfect_accuracy(self):
         """Test tree-sitter ignores comments and strings in Python."""
-        from tools.search import TREE_SITTER_AVAILABLE
+        from core.tools.search import TREE_SITTER_AVAILABLE
         if not TREE_SITTER_AVAILABLE:
             self.skipTest("Tree-sitter not available")
 
@@ -1045,7 +1045,7 @@ x = "string: class YetAnotherFake"
 
     def test_javascript_perfect_accuracy(self):
         """Test tree-sitter ignores comments and strings in JavaScript."""
-        from tools.search import TREE_SITTER_AVAILABLE
+        from core.tools.search import TREE_SITTER_AVAILABLE
         if not TREE_SITTER_AVAILABLE:
             self.skipTest("Tree-sitter not available")
 
@@ -1073,7 +1073,7 @@ const x = "string: class YetAnotherFake";
 
     def test_typescript_perfect_accuracy(self):
         """Test tree-sitter ignores comments and strings in TypeScript."""
-        from tools.search import TREE_SITTER_AVAILABLE
+        from core.tools.search import TREE_SITTER_AVAILABLE
         if not TREE_SITTER_AVAILABLE:
             self.skipTest("Tree-sitter not available")
 
@@ -1208,7 +1208,7 @@ impl<T> Display for Widget<T> {
 
     def test_cache_hit_on_different_query(self):
         """Test that changing query reuses cached file symbols without re-parsing."""
-        from tools.search import _outline_file
+        from core.tools.search import _outline_file
 
         test_file = os.path.join(self.tmpdir, "cache_query_test.py")
         with open(test_file, "w") as f:
@@ -1254,7 +1254,7 @@ impl<T> Display for Widget<T> {
     def test_generic_outline_no_false_positive_on_line_query(self):
         """Test that query='line' does not match every symbol line from regex display."""
         sample_code = "class Greeter {\n    void sayHello() {}\n}\n"
-        from tools.search.outline import _outline_generic_content
+        from core.tools.search.outline import _outline_generic_content
         # Should not match unless symbol name literally contains 'line'
         res = _outline_generic_content(sample_code, query="line")
         self.assertEqual(len(res), 0)
@@ -1265,7 +1265,7 @@ impl<T> Display for Widget<T> {
             "struct Point { int x; int y; };\n"
             "inline int computeDistance(Point a, Point b) { return 0; }\n"
         )
-        from tools.search.outline import _outline_generic_content
+        from core.tools.search.outline import _outline_generic_content
         res = _outline_generic_content(sample_cpp)
         self.assertTrue(any("computeDistance" in line for line in res))
         self.assertTrue(any("Point" in line for line in res))
@@ -1379,7 +1379,7 @@ impl<T> Display for Widget<T> {
 
     def test_re_generic_def_no_empty_matches(self):
         """Test that RE_GENERIC_DEF does not match arbitrary non-definition text as empty string."""
-        from tools.search.outline import RE_GENERIC_DEF
+        from core.tools.search.outline import RE_GENERIC_DEF
 
         self.assertIsNone(RE_GENERIC_DEF.search("hello world"))
         self.assertIsNone(RE_GENERIC_DEF.search("int a = 123;"))
@@ -1387,7 +1387,7 @@ impl<T> Display for Widget<T> {
 
     def test_search_filename_ripgrep_path_normalization(self):
         """Test that _search_filename_ripgrep normalizes backslashes and strips ./ prefix."""
-        from tools.search.files import _search_filename_ripgrep
+        from core.tools.search.files import _search_filename_ripgrep
 
         mock_proc = MagicMock()
         mock_proc.stdout = MagicMock()

@@ -168,8 +168,8 @@ class TestAgentMode(unittest.TestCase):
     def test_tool_context_and_shell_wait_seconds_headless(self):
         import asyncio
 
-        from tools.context import ToolContext
-        from tools.shell import ShellTool
+        from core.tools.context import ToolContext
+        from core.tools.shell import ShellTool
 
         # Headless agent target
         agent = MagicMock()
@@ -225,11 +225,11 @@ class TestAgentMode(unittest.TestCase):
     def test_interactive_only_tools_context_guards(self):
         import asyncio
 
-        from tools.ask_user import AskUserTool
-        from tools.context import ToolContext
-        from tools.invoke_subagent import InvokeSubagentTool
-        from tools.kill import KillTool
-        from tools.message_subagent import MessageSubagentTool
+        from core.tools.ask_user import AskUserTool
+        from core.tools.context import ToolContext
+        from core.tools.invoke_subagent import InvokeSubagentTool
+        from core.tools.kill import KillTool
+        from core.tools.message_subagent import MessageSubagentTool
 
         tools = [
             (InvokeSubagentTool(), {"task": "t", "title": "tit"}),

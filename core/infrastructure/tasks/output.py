@@ -314,7 +314,7 @@ def truncate_subagent_result(text: str, session_id: str = "") -> str:
     """
     text = (text or "").strip()
     from core.infrastructure.config.settings import get_settings
-    from tools.base import truncate_output
+    from core.tools.base import truncate_output
 
     return truncate_output(
         text,

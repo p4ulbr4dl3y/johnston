@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.domain.policies.permission_policy import PermissionAction, PermissionDecision
 from core.infrastructure.runtime.tool_name import normalize_tool_name
-from tools.registry import REGISTRY, execute_tool, get_default_tools
+from core.tools.registry import REGISTRY, execute_tool, get_default_tools
 
 
 class TestRegistry(unittest.IsolatedAsyncioTestCase):
@@ -49,8 +49,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ERR: unknown_tool 'cat'", res_alias.content)
 
     async def test_execute_tool_edit_routes_to_edit_tool(self):
-        from tools.edit import EditTool
-        from tools.registry import REGISTRY
+        from core.tools.edit import EditTool
+        from core.tools.registry import REGISTRY
 
         self.assertIs(REGISTRY["edit"], EditTool)
         mock_pm = MagicMock()
@@ -67,7 +67,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
 
         PermissionManager.get_instance().set_session_override("read", "allow")
         with patch.object(REGISTRY["read"], "execute", side_effect=RuntimeError("Execute failed")):
-            with self.assertLogs("tools.registry", level="WARNING") as cm:
+            with self.assertLogs("core.tools.registry", level="WARNING") as cm:
                 res = await execute_tool("read", {"path": "foo.txt"})
         self.assertIn("ERR: execute 'read': Execute failed", res.content)
         self.assertTrue(any("Tool 'read' execution failed" in line for line in cm.output))
@@ -160,7 +160,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         with (
             patch("core.infrastructure.mcp.get_mcp_manager", return_value=mock_mcp_mgr),
             patch("core.roles.role_registry.RoleRegistry.get_instance", return_value=mock_role_registry),
-            self.assertLogs("tools.registry", level="WARNING") as cm,
+            self.assertLogs("core.tools.registry", level="WARNING") as cm,
         ):
             res = await execute_tool("faulty_mcp", {})
         self.assertIn("ERR: unavailable 'faulty_mcp': [mcp] MCP connection failed", res.content)
@@ -247,7 +247,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
             patch("sys.stdin.readline", return_value="y\n"),
             patch("sys.stderr.write"),
             patch("sys.stderr.flush"),
-            patch("tools.read.ReadTool.execute", return_value="file content"),
+            patch("core.tools.read.ReadTool.execute", return_value="file content"),
         ):
             res = await execute_tool("read", {"path": "foo.txt"})
         self.assertEqual(res.content, "file content")
@@ -373,8 +373,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertIn("log ", res.content)
 
     async def test_subagent_denies_ask_in_headless_mode(self):
-        from tools.context import ToolContext
-        from tools.read import ReadTool
+        from core.tools.context import ToolContext
+        from core.tools.read import ReadTool
 
         ctx = ToolContext(is_subagent=True)
         mock_pm = MagicMock()
@@ -389,8 +389,8 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertIn("requires user confirmation", res.content)
 
     async def test_subagent_confirms_ask_in_ui_mode(self):
-        from tools.context import ToolContext
-        from tools.read import ReadTool
+        from core.tools.context import ToolContext
+        from core.tools.read import ReadTool
 
         mock_app = MagicMock()
         mock_app.push_screen_wait = MagicMock()
@@ -418,7 +418,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_subagent_respects_explicit_deny(self):
-        from tools.context import ToolContext
+        from core.tools.context import ToolContext
 
         ctx = ToolContext(is_subagent=True)
         mock_pm = MagicMock()
@@ -430,7 +430,7 @@ class TestRegistry(unittest.IsolatedAsyncioTestCase):
         self.assertIn("ERR: denied 'shell'", res.content)
 
     async def test_mcp_tool_confirms_with_server_name(self):
-        from tools.context import ToolContext
+        from core.tools.context import ToolContext
 
         mock_app = MagicMock()
         mock_app.confirm_permission = AsyncMock(return_value=True)

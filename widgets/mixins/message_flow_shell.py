@@ -50,8 +50,8 @@ async def exec_shell_command(app: Any, cmd: str, user_text: Optional[str] = None
         status="running",
     )
 
-    from tools.context import ToolContext
-    from tools.shell import ShellTool
+    from core.tools.context import ToolContext
+    from core.tools.shell import ShellTool
 
     ctx = ToolContext(app)
     tool = ShellTool()

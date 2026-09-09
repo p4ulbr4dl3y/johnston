@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
-from tools.base import BaseTool
+from core.tools.base import BaseTool
 
 
 class MessageSubagentTool(BaseTool):

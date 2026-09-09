@@ -13,8 +13,8 @@ import unittest.mock
 from core.base_provider import BaseAgent
 from core.domain.defaults.errors import ToolResult
 from core.roles.role_registry import AgentRole
+from core.tools.registry import execute_tool
 from tests.core._base_provider_helpers import _MockStream, _text_chunk, _tool_call_chunk, make_agent
-from tools.registry import execute_tool
 
 
 class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
@@ -198,7 +198,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sessions[0].status, "running")
 
     def test_truncate_output_helper(self):
-        from tools.base import truncate_output
+        from core.tools.base import truncate_output
 
         short_text = "hello"
         self.assertEqual(truncate_output(short_text, max_chars=10), "hello")

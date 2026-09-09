@@ -5,7 +5,7 @@ import threading
 import time
 import unittest
 
-from tools.cancel import new_cancel_event, run_cancellable
+from core.tools.cancel import new_cancel_event, run_cancellable
 
 
 def _simple_blocking(seconds: float, cancel_event: threading.Event | None = None) -> str:
@@ -75,7 +75,7 @@ class TestRunCancellable(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(evt.is_set())
 
     async def test_nested_functions_with_same_qualname_do_not_collide(self):
-        from tools.cancel import _accepts_cancel_event
+        from core.tools.cancel import _accepts_cancel_event
 
         def make_worker(accepts: bool):
             if accepts:

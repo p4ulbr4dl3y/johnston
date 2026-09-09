@@ -4,7 +4,7 @@ import pytest
 
 from core.domain.policies.policy_shell import check_read_only_command_mutations
 from core.infrastructure.platform.process import spawn_shell_process, spawn_windows_process
-from tools.context import ToolContext
+from core.tools.context import ToolContext
 
 
 @pytest.mark.asyncio

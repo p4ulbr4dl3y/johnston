@@ -3,7 +3,7 @@ import re
 from typing import Any, Dict
 
 from core.domain.defaults.errors import ToolResult
-from tools.base import BaseTool
+from core.tools.base import BaseTool
 
 # Matches a standalone "recommended" marker, optionally wrapped in () or [].
 _RECOMMENDED_MARK_RE = re.compile(r"\(recommended\)|\[recommended\]|\brecommended\b", re.IGNORECASE)

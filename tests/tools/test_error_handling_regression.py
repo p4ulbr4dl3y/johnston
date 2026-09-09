@@ -12,8 +12,8 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from tools import ask_user, edit
-from tools.registry import execute_tool
+from core.tools import ask_user, edit
+from core.tools.registry import execute_tool
 
 
 class TestEditBareValueError(unittest.IsolatedAsyncioTestCase):
@@ -110,7 +110,7 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
     every agent turn: a failed full listing is remembered briefly."""
 
     def setUp(self):
-        from tools import registry
+        from core.tools import registry
 
         registry._mcp_name_misses.clear()
 
@@ -145,7 +145,7 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
         mock_mgr.get_active_tools_async.assert_called_once()
 
     def test_remember_and_forget_helpers(self):
-        from tools import registry
+        from core.tools import registry
 
         registry._remember_mcp_miss("srv__x")
         self.assertTrue(registry._mcp_name_recently_missed("srv__x"))
@@ -153,7 +153,7 @@ class TestMCPNameMissCache(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(registry._mcp_name_recently_missed("srv__x"))
 
     def test_ttl_expiry_forgets(self):
-        from tools import registry
+        from core.tools import registry
 
         registry._mcp_name_misses.clear()
         registry._mcp_name_misses["stale"] = 0.0  # long past TTL

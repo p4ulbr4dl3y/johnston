@@ -16,7 +16,7 @@ import pytest
 from app import JohnstonApp
 from core.application.generation.ai_generator import GenCanvas, generate_ai_response
 from core.base_provider import BaseAgent
-from tools.registry import execute_tool
+from core.tools.registry import execute_tool
 from widgets.presentation.widgets.chat_container import ChatView
 
 # Timing-sensitive (event-loop latency) — run serially via ``-m slow``.

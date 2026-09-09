@@ -8,7 +8,7 @@ from core.domain.defaults.errors import ToolResult
 from core.domain.policies.messages import format_background_notification
 from core.infrastructure.platform.paths import LOGS_DIR
 from core.infrastructure.platform.platform_utils import atomic_write_text
-from tools.context import ToolContext
+from core.tools.context import ToolContext
 
 __all__ = [
     "resolve_path",
@@ -84,7 +84,7 @@ def resolve_path(path_str: str | None = None, cwd: str | None = None) -> str:
 
 def resolve_writable_path(ctx: Any, path_arg: Any) -> tuple[str, "ToolResult | None"]:
     """Resolves a path argument and rejects missing values or sandbox-blocked writes."""
-    from tools.utils import resolve_writable_path as _resolve_writable_path
+    from core.tools.utils import resolve_writable_path as _resolve_writable_path
 
     return _resolve_writable_path(ctx, path_arg)
 
@@ -284,7 +284,7 @@ def truncate_output(
         header = f"[{' | '.join(parts)}]\n...\n"
         return header + truncated
     else:
-        from tools.utils import truncate_leading
+        from core.tools.utils import truncate_leading
 
         truncated, shown_lines = truncate_leading(text, max_chars)
         next_line = shown_lines + 1
@@ -315,7 +315,7 @@ def _resolve_app(ctx_or_app: Any) -> Any:
     host link is unwrapped, falling back to the caller-supplied object so headless
     callers degrade to themselves rather than to a dead ``.app`` mock.
     """
-    from tools.context import ToolContext
+    from core.tools.context import ToolContext
 
     if isinstance(ctx_or_app, ToolContext):
         return ctx_or_app.host
@@ -602,7 +602,7 @@ class BaseTool:
             fn["description"] = desc
 
     def _ensure_context(self, ctx_or_app: Any) -> ToolContext:
-        from tools.context import ToolContext
+        from core.tools.context import ToolContext
 
         if isinstance(ctx_or_app, ToolContext):
             return ctx_or_app

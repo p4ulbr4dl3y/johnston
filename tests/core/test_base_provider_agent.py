@@ -1030,8 +1030,8 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tool_schemas_parameter_orders(self):
-        from tools.invoke_subagent import InvokeSubagentTool
-        from tools.update_plan import UpdatePlanTool
+        from core.tools.invoke_subagent import InvokeSubagentTool
+        from core.tools.update_plan import UpdatePlanTool
 
         sub_props = list(InvokeSubagentTool.schema["function"]["parameters"]["properties"].keys())
         self.assertEqual(sub_props, ["role", "title", "task"])

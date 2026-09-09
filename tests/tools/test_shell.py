@@ -14,8 +14,8 @@ import pytest
 
 from core.infrastructure.tasks.manager import TaskManager
 from core.infrastructure.tasks.shell_task import ShellTask
-from tools.base import resolve_path
-from tools.shell import ShellTool, _new_task_id
+from core.tools.base import resolve_path
+from core.tools.shell import ShellTool, _new_task_id
 
 
 @pytest.fixture(autouse=True)
@@ -113,7 +113,7 @@ async def test_invalid_timeout_value_falls_back_to_default(tool):
 
 async def test_windows_execution_branch(tool):
     with (
-        patch("tools.shell.is_windows", return_value=True),
+        patch("core.tools.shell.is_windows", return_value=True),
         patch.object(ShellTool, "_create_windows_process", return_value=_process()) as mock_win_proc,
     ):
         res = str(await tool.execute({"command": "dir"}))
@@ -123,7 +123,7 @@ async def test_windows_execution_branch(tool):
 
 async def test_subprocess_creation_exception_cleanup_no_transport(tool):
     with (
-        patch("tools.shell.is_windows", return_value=False),
+        patch("core.tools.shell.is_windows", return_value=False),
         patch.object(ShellTool, "_create_std_process", side_effect=RuntimeError("Subprocess launch failed")),
     ):
         with pytest.raises(RuntimeError):
@@ -133,7 +133,7 @@ async def test_subprocess_creation_exception_cleanup_no_transport(tool):
 async def test_create_windows_process_powershell(tool):
     with (
         patch(
-            "tools.shell.shell_executable",
+            "core.tools.shell.shell_executable",
             return_value="C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
         ),
         patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec,
@@ -147,7 +147,7 @@ async def test_create_windows_process_powershell(tool):
 
 async def test_create_windows_process_cmd(tool):
     with (
-        patch("tools.shell.shell_executable", return_value="C:\\Windows\\System32\\cmd.exe"),
+        patch("core.tools.shell.shell_executable", return_value="C:\\Windows\\System32\\cmd.exe"),
         patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec,
     ):
         await tool._create_windows_process("dir", {"ENV": "1"})
@@ -161,7 +161,7 @@ async def test_create_windows_process_default_shell(tool):
     from core.infrastructure.platform.platform_utils import shell_subprocess_kwargs
 
     with (
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
         patch("asyncio.create_subprocess_shell", new_callable=AsyncMock) as mock_shell,
     ):
         await tool._create_windows_process("echo 1", {"ENV": "1"})
@@ -190,9 +190,9 @@ async def test_command_timeout_terminates_process(tool, make_app_mock, make_tool
     p.returncode = None
 
     with (
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
     ):
         res = str(await tool.execute({"command": "run_long_task", "timeout": 1}, ctx=ctx))
         assert "ERR: timeout 'shell': timed out after 1s" in res
@@ -221,8 +221,8 @@ async def test_move_to_background_during_sync_execution(tool, make_app_mock, mak
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch.object(ShellTask, "start_reading", _start),
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
         await task_started.wait()
@@ -261,8 +261,8 @@ async def test_move_to_background_no_output(tool, make_app_mock, make_tool_conte
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch.object(ShellTask, "start_reading", _start),
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
         await task_started.wait()
@@ -295,8 +295,8 @@ async def test_move_to_background_truncated_output(tool, make_app_mock, make_too
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch.object(ShellTask, "start_reading", _start),
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
         await task_started.wait()
@@ -331,7 +331,7 @@ async def test_main_sync_task_isolated_from_task_manager(tool, make_app_mock, ma
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch.object(ShellTask, "start_reading", _start),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "long_running_sync_cmd"}, ctx=ctx))
         await task_started.wait()
@@ -363,7 +363,7 @@ async def test_execute_cancelled_terminates_process(tool, make_app_mock, make_to
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch.object(ShellTask, "start_reading", _start),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f log.txt"}, ctx=ctx))
         await task_started.wait()
@@ -388,7 +388,7 @@ async def test_main_sync_timeout_with_output(tool, make_app_mock, make_tool_cont
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch.object(ShellTask, "start_reading", _start),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
     ):
         res = await tool.execute({"command": "tail -f x", "timeout": 1}, ctx=ctx)
         assert "ERR: timeout 'shell': timed out after 1s" in str(res)
@@ -409,7 +409,7 @@ async def test_main_sync_read_task_drain_timeout(tool, make_app_mock, make_tool_
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
+        patch("core.tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
     ):
         res = await tool.execute({"command": "echo test"}, ctx=ctx)
     assert _plain(res) == "[no output]" or '<cmd exit="0"' in str(res)
@@ -461,7 +461,7 @@ async def test_subagent_shell_execution_timeout(tool, make_app_mock, make_tool_c
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
     ):
         res = str(await tool.execute({"command": "run_long_task", "timeout": 1}, ctx=ctx))
         assert "ERR: timeout 'shell': timed out after 1s" in res
@@ -493,7 +493,7 @@ async def test_subagent_read_task_drain_timeout(tool, make_app_mock, make_tool_c
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
+        patch("core.tools.shell.asyncio.wait_for", side_effect=custom_wait_for),
     ):
         res = str(await tool.execute({"command": "true"}, ctx=ctx))
         assert _plain(res) == "[no output]"
@@ -508,7 +508,7 @@ async def test_subagent_timeout_read_task_exception_ignored(tool, make_app_mock,
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         res = str(await tool.execute({"command": "run_long_task", "timeout": 1}, ctx=ctx))
         assert "ERR: timeout 'shell': timed out after 1s" in res
@@ -529,7 +529,7 @@ async def test_subagent_shell_execution_cancelled(tool, make_tool_context):
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock) as mock_term,
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "run_long_task"}, ctx=ctx))
         await asyncio.wait_for(wait_invoked.wait(), timeout=5.0)
@@ -561,7 +561,7 @@ async def test_explicit_run_in_background(tool, make_app_mock, make_tool_context
     p = _process()
 
     with (
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=p),
     ):
         res = await tool.execute({"command": "tail -f log.txt", "wait_seconds": 0}, ctx=ctx)
@@ -576,10 +576,10 @@ async def test_background_task_kill_lifecycle(tool, make_app_mock):
     # kill tool terminates it.
     app = _app(make_app_mock, task_manager=TaskManager())
 
-    from tools.kill import KillTool
+    from core.tools.kill import KillTool
 
     killer = KillTool()
-    with patch("tools.shell.shell_executable", return_value="/bin/sh"):
+    with patch("core.tools.shell.shell_executable", return_value="/bin/sh"):
         res = await tool.execute({"command": "sleep 30", "wait_seconds": 0}, ctx=app)
     m = re.search(r'(?:Task ID: |id:\s*|id\s+|id=")(shell-[a-f0-9]+)', str(res.content) + " " + str(res.display))
     assert m is not None
@@ -697,7 +697,7 @@ async def test_shell_readonly_blocks_mutating_git_commands(tool, make_tool_conte
 
 
 async def test_shell_readonly_windows_mutations_blocked():
-    from tools.shell import _check_read_only_command_mutations
+    from core.tools.shell import _check_read_only_command_mutations
 
     with patch("platform.system", return_value="Windows"):
         assert _check_read_only_command_mutations(r"C:\Git\bin\git.exe commit -m test") is not None
@@ -1050,7 +1050,7 @@ def inspect_has_no_destructive_guard():
     but contains no rm/mkfs/dd/fdisk/format guard anywhere."""
     import inspect as _i
 
-    from tools import shell as shell_mod
+    from core.tools import shell as shell_mod
 
     return "mkfs" not in _i.getsource(shell_mod) and "rm -rf" not in _i.getsource(shell_mod)
 
@@ -1127,9 +1127,9 @@ async def test_shell_auto_derives_idle_timeout(tool, make_app_mock, make_tool_co
 
     # 1. wait_seconds=0 -> persistent daemon -> idle_timeout=0 (quiet)
     with (
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=_process()),
-        patch("tools.shell.ShellTask") as mock_task_cls,
+        patch("core.tools.shell.ShellTask") as mock_task_cls,
     ):
         mock_task = MagicMock()
         mock_task.log_path = "/tmp/test.log"
@@ -1147,9 +1147,9 @@ async def test_shell_auto_derives_idle_timeout(tool, make_app_mock, make_tool_co
 
     # 2. wait_seconds=5 -> batch task -> idle_timeout=60 (hang detection)
     with (
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=_process()),
-        patch("tools.shell.ShellTask") as mock_task_cls,
+        patch("core.tools.shell.ShellTask") as mock_task_cls,
     ):
         mock_task = MagicMock()
         mock_task.log_path = "/tmp/test.log"
@@ -1173,9 +1173,9 @@ async def test_shell_sync_wires_hard_timeout_to_task(tool, make_app_mock, make_t
     ctx = make_tool_context(app=app, is_subagent=False)
 
     with (
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=_process()),
-        patch("tools.shell.ShellTask") as mock_task_cls,
+        patch("core.tools.shell.ShellTask") as mock_task_cls,
     ):
         mock_task = MagicMock()
         mock_task.log_path = "/tmp/test.log"
@@ -1222,7 +1222,7 @@ async def test_shell_wait_seconds_positive_finishes_sync(tool, make_app_mock, ma
     p.returncode = 0
 
     with (
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=p),
     ):
         res = await tool.execute({"command": "echo fast", "wait_seconds": 5}, ctx=ctx)
@@ -1250,7 +1250,7 @@ async def test_shell_wait_seconds_positive_transitions_to_background(tool, make_
     p = NeverEndingProcess()
 
     with (
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=p),
     ):
         res = await tool.execute({"command": "sleep 100", "wait_seconds": 1}, ctx=ctx)
@@ -1283,7 +1283,7 @@ async def test_shell_subagent_routes_output_to_session_not_host_widget(tool, mak
     p = _process(wait_result=0, stdout=reader)
 
     with (
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
         patch.object(ShellTool, "_create_std_process", return_value=p),
     ):
         res = await tool.execute({"command": "echo sub"}, ctx=ctx)
@@ -1414,7 +1414,7 @@ async def test_shell_cwd_sandbox_write_blocked(tool, make_app_mock, make_tool_co
 
 
 def test_attach_shell_widget_sync_vs_background():
-    from tools.shell import _attach_shell_widget
+    from core.tools.shell import _attach_shell_widget
 
     host = MagicMock()
     host._background_shell_widgets = {}
@@ -1441,8 +1441,8 @@ async def test_sync_shell_cleans_up_background_registry_on_exit(tool, make_app_m
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         res = await tool.execute({"command": "echo hello"}, ctx=ctx)
         assert not res.is_error
@@ -1467,7 +1467,7 @@ async def test_shell_command_type_handling(tool):
 
 
 async def test_promote_task_to_background_helper(make_app_mock, make_tool_context):
-    from tools.shell import _promote_task_to_background
+    from core.tools.shell import _promote_task_to_background
 
     app = _app(make_app_mock, task_manager=TaskManager())
     app._background_shell_widgets = {}
@@ -1485,7 +1485,7 @@ async def test_promote_task_to_background_helper(make_app_mock, make_tool_contex
 
 
 async def test_cancel_read_task_helper():
-    from tools.shell import _cancel_read_task
+    from core.tools.shell import _cancel_read_task
 
     await _cancel_read_task(None)
 

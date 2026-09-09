@@ -44,7 +44,7 @@ def update_background_shell_widget(app: Any, task_id: str, result: str) -> None:
         )
     task_log = getattr(task, "log_path", None)
 
-    from tools.base import truncate_output
+    from core.tools.base import truncate_output
 
     final_result = truncate_output(
         result or "(no output)",
@@ -90,7 +90,7 @@ def on_background_shell_completed(app: Any, task_id: str, command_str: str, resu
         if not getattr(app, "is_app_active", True):
             return
         update_background_shell_widget(app, task_id, result)
-        from tools.base import format_background_notification, truncate_output
+        from core.tools.base import format_background_notification, truncate_output
 
         mgr = getattr(app, "task_manager", None)
         task = None
@@ -169,7 +169,7 @@ def on_background_shell_progress(
     if not getattr(app, "is_app_active", True):
         return
     try:
-        from tools.base import format_background_notification, truncate_output
+        from core.tools.base import format_background_notification, truncate_output
 
         mgr = getattr(app, "task_manager", None)
         task = None

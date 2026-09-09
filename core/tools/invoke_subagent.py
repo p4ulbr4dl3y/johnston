@@ -4,7 +4,7 @@ from typing import Any, Dict
 from core.domain.defaults.errors import ToolResult
 from core.infrastructure.config.settings import get_settings
 from core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
-from tools.base import BaseTool
+from core.tools.base import BaseTool
 
 
 class InvokeSubagentTool(BaseTool):

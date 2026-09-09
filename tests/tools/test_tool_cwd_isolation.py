@@ -2,8 +2,8 @@ import os
 import tempfile
 import unittest
 
-from tools.base import resolve_path
-from tools.context import ToolContext
+from core.tools.base import resolve_path
+from core.tools.context import ToolContext
 
 
 def _cwd_cmd() -> str:
@@ -94,7 +94,7 @@ class TestResolvePathCwd(unittest.TestCase):
 class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
     async def test_shell_uses_ctx_cwd_as_process_cwd(self):
 
-        from tools.shell import ShellTool
+        from core.tools.shell import ShellTool
 
         tool = ShellTool()
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
@@ -105,7 +105,7 @@ class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
 
     async def test_shell_uses_cwd_from_agent(self):
 
-        from tools.shell import ShellTool
+        from core.tools.shell import ShellTool
 
         tool = ShellTool()
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:
@@ -118,7 +118,7 @@ class TestShellCwdPropagation(unittest.IsolatedAsyncioTestCase):
 
 class TestCreateToolCwd(unittest.IsolatedAsyncioTestCase):
     async def test_create_writes_to_rel_path_under_agent_cwd(self):
-        from tools.create import CreateTool
+        from core.tools.create import CreateTool
 
         tool = CreateTool()
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as base:

@@ -149,7 +149,7 @@ class TestPromptBuilder(unittest.TestCase):
         self.assertIn("<environment", prompt)
 
     def test_build_tools_subagent_hardens_shell(self):
-        from tools.shell import ShellTool
+        from core.tools.shell import ShellTool
 
         builder = PromptBuilder("Test", [ShellTool().schema], role="worker", is_subagent=True)
         tools = builder.build_tools()

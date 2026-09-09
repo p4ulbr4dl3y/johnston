@@ -16,8 +16,8 @@ from core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
 from core.domain.entities.session import SessionStatus
 from core.infrastructure.storage.session_store import SessionStore
 from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS
-from tools.context import ToolContext
-from tools.invoke_subagent import InvokeSubagentTool
+from core.tools.context import ToolContext
+from core.tools.invoke_subagent import InvokeSubagentTool
 
 STATUS_CANCELLED = SessionStatus.CANCELLED
 STATUS_COMPLETED = SessionStatus.COMPLETED
@@ -303,7 +303,7 @@ async def test_worktree_create_raises_crashes_instead_of_err(monkeypatch):
         def is_git_repo(*a, **k):
             return True
 
-    monkeypatch.setattr("tools.invoke_subagent.SubagentWorktreeManager", _BadWorktree)
+    monkeypatch.setattr("core.tools.invoke_subagent.SubagentWorktreeManager", _BadWorktree)
     try:
         res = await tool.execute({"task": "do", "title": "t", "branch": "dev"})
         assert res.is_error

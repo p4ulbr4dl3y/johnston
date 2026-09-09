@@ -2,7 +2,7 @@ import os
 from typing import Any
 
 from core.domain.defaults.errors import ToolResult
-from tools.base import try_int
+from core.tools.base import try_int
 
 DEFAULT_LINE_WINDOW = 800
 DEFAULT_READ_MAX_CHARS = 100_000
@@ -33,7 +33,7 @@ def resolve_writable_path(ctx: Any, path_arg: Any) -> tuple[str, ToolResult | No
     """
     if not path_arg or not str(path_arg).strip():
         return "", ToolResult.error("params", name="path", detail="missing or empty")
-    from tools.base import resolve_path
+    from core.tools.base import resolve_path
 
     path = resolve_path(str(path_arg), cwd=ctx.cwd)
     if getattr(ctx, "sandbox_enabled", False):

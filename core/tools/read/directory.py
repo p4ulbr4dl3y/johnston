@@ -2,8 +2,8 @@ import os
 
 from core.domain.defaults.errors import ToolResult
 from core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
-from tools.read.archive import _format_entry_size
-from tools.read.cache import get_max_dir_entries
+from core.tools.read.archive import _format_entry_size
+from core.tools.read.cache import get_max_dir_entries
 
 
 def _inspect_directory(path: str, start_line_int: int | None, end_line_int: int | None) -> ToolResult:

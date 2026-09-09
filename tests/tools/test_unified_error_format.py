@@ -14,7 +14,7 @@ from pathlib import Path
 
 from core.domain.defaults.errors import format_tool_error
 
-TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
+TOOLS_DIR = Path(__file__).resolve().parents[2] / "core" / "tools"
 
 
 class TestFormatToolError(unittest.TestCase):

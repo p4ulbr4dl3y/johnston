@@ -7,18 +7,18 @@ from typing import Any, Dict, Type
 from core.domain.defaults.errors import ToolResult, ToolResultStatus, normalize_tool_result
 from core.domain.ports.tool_registry import set_default_tool_registry
 from core.infrastructure.runtime.tool_name import normalize_tool_name
-from tools.ask_user import AskUserTool
-from tools.base import BaseTool, _resolve_app
-from tools.create import CreateTool
-from tools.edit import EditTool
-from tools.invoke_subagent import InvokeSubagentTool
-from tools.kill import KillTool
-from tools.message_subagent import MessageSubagentTool
-from tools.read import ReadTool
-from tools.search import SearchTool
-from tools.shell import ShellTool
-from tools.update_plan import UpdatePlanTool
-from tools.web_fetch import WebFetchTool
+from core.tools.ask_user import AskUserTool
+from core.tools.base import BaseTool, _resolve_app
+from core.tools.create import CreateTool
+from core.tools.edit import EditTool
+from core.tools.invoke_subagent import InvokeSubagentTool
+from core.tools.kill import KillTool
+from core.tools.message_subagent import MessageSubagentTool
+from core.tools.read import ReadTool
+from core.tools.search import SearchTool
+from core.tools.shell import ShellTool
+from core.tools.update_plan import UpdatePlanTool
+from core.tools.web_fetch import WebFetchTool
 
 TOOL_CLASSES = [
     ReadTool,
@@ -134,7 +134,7 @@ async def check_and_confirm_permission(
     """
     from core.application.permission.permission_manager import PermissionManager
     from core.domain.policies.permission_policy import PermissionAction
-    from tools.base import confirm_permission, resolve_subagent_identity
+    from core.tools.base import confirm_permission, resolve_subagent_identity
 
     pm = PermissionManager.get_instance()
     app_obj = _resolve_app(context_or_app)
@@ -321,7 +321,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
     if not is_mcp:
         return _unknown_tool_result(name, clean_name)
 
-    from tools.base import check_mcp_role_policy
+    from core.tools.base import check_mcp_role_policy
 
     ctx_or_app = context or app
     policy_err = check_mcp_role_policy(ctx_or_app, resolved_name)
@@ -349,7 +349,7 @@ async def execute_tool(name: str, args: dict | None, app: Any = None, context: A
 
     try:
         from core.infrastructure.config.settings import get_settings
-        from tools.base import execute_mcp_tool, truncate_output
+        from core.tools.base import execute_mcp_tool, truncate_output
 
         # Execute against the exact server that owns the permission-checked
         # exposed name, so the permission decision and the executed tool can
@@ -388,7 +388,7 @@ class DefaultToolRegistry:
         return get_default_tools()
 
     def process_image_file(self, path: str) -> Any:
-        from tools.read import process_image_file_sync
+        from core.tools.read import process_image_file_sync
 
         return process_image_file_sync(path)
 

@@ -6,7 +6,7 @@ import pytest
 from core.infrastructure.mcp.manager import MCPManager
 from core.infrastructure.mcp.process_client import MCPProcessClient
 from core.infrastructure.mcp.sse_client import MCPSSEClient
-from tools.read import ReadTool
+from core.tools.read import ReadTool
 
 
 @pytest.mark.asyncio

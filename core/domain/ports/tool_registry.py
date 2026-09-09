@@ -50,7 +50,7 @@ def get_default_tool_registry() -> Optional[ToolRegistryPort]:
         try:
             import importlib
 
-            mod = importlib.import_module("tools.registry")
+            mod = importlib.import_module("core.tools.registry")
             if _default_tool_registry is None and hasattr(mod, "DefaultToolRegistry"):
                 _default_tool_registry = mod.DefaultToolRegistry()
         except Exception:

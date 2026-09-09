@@ -6,7 +6,7 @@ import subprocess
 import threading
 from typing import List, Optional, Tuple
 
-from tools.search.common import (
+from core.tools.search.common import (
     DEFAULT_EXCLUDE_DIRS,
     _GitignoreMatcher,
     _match_glob,

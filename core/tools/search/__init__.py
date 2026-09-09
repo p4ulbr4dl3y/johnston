@@ -1,4 +1,4 @@
-from tools.search.common import (
+from core.tools.search.common import (
     BINARY_EXTENSIONS,
     CODE_EXTENSIONS,
     DEFAULT_EXCLUDE_DIRS,
@@ -12,27 +12,27 @@ from tools.search.common import (
     _walk_filtered_list,
     is_binary_file,
 )
-from tools.search.content import (
+from core.tools.search.content import (
     _search_content_python,
     _search_content_ripgrep,
 )
-from tools.search.files import (
+from core.tools.search.files import (
     _search_filename,
     _search_filename_python,
     _search_filename_ripgrep,
 )
-from tools.search.outline import (
+from core.tools.search.outline import (
     _OUTLINE_CACHE,
     _outline_file,
     _outline_generic_content,
     _outline_python_content,
     _search_outline,
 )
-from tools.search.tool import (
+from core.tools.search.tool import (
     SearchTool,
     search_sync,
 )
-from tools.search.treesitter import (
+from core.tools.search.treesitter import (
     GLOBAL_TREE_SITTER,
     TREE_SITTER_AVAILABLE,
     TreeSitterExtractor,

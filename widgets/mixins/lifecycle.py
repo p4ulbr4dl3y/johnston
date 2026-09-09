@@ -29,7 +29,7 @@ def _close_catalog_sync() -> None:
 def _close_tools_sync() -> None:
     """Run aclose_tools() on a private loop (used from the shutdown thread)."""
     try:
-        from tools.registry import aclose_tools
+        from core.tools.registry import aclose_tools
 
         asyncio.run(aclose_tools())
     except Exception as err:

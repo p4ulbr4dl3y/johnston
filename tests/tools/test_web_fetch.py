@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 
-from tools.web_fetch import WebFetchTool
+from core.tools.web_fetch import WebFetchTool
 
 
 def _make_stream_client(content_bytes, content_type="text/html", status_code=200, url="https://example.com"):
@@ -96,7 +96,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_oversize_content_length_rejected(self, mock_client_cls):
         # A Content-Length header above the cap must be rejected before the body is
         # streamed into memory, preventing OOM on oversized responses.
-        from tools.utils import MAX_TOOL_PAYLOAD_BYTES
+        from core.tools.utils import MAX_TOOL_PAYLOAD_BYTES
 
         response = MagicMock()
         response.status_code = 200
@@ -131,7 +131,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_convert_content_to_md_sync(self):
-        from tools.web_fetch import _convert_content_to_md_sync
+        from core.tools.web_fetch import _convert_content_to_md_sync
 
         with patch("core.infrastructure.converter.convert_bytes", return_value="converted md"):
             res = _convert_content_to_md_sync(b"<p>hi</p>", ".html")
@@ -155,7 +155,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_streamed_oversize_rejected(self, mock_client_cls):
         # A chunked response without a Content-Length header must still be
         # capped at MAX_TOOL_PAYLOAD_BYTES while streaming.
-        from tools.utils import MAX_TOOL_PAYLOAD_BYTES
+        from core.tools.utils import MAX_TOOL_PAYLOAD_BYTES
 
         response = MagicMock()
         response.status_code = 200
@@ -221,8 +221,8 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
 
     @patch("httpx.AsyncClient")
     async def test_payload_cap_honors_configured_value(self, mock_client_cls):
-        # Regression: the payload size cap must come from tools.max_tool_payload_bytes.
-        with patch("tools.web_fetch.get_max_tool_payload_bytes", return_value=100):
+        # Regression: the payload size cap must come from core.tools.max_tool_payload_bytes.
+        with patch("core.tools.web_fetch.get_max_tool_payload_bytes", return_value=100):
             response = MagicMock()
             response.status_code = 200
             response.headers = {"content-type": "text/html", "content-length": "101"}
@@ -243,7 +243,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("exceeds", res)
 
     @patch("httpx.AsyncClient")
-    @patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
+    @patch("core.tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
     async def test_fetch_pdf_conversion_fallback(self, mock_convert, mock_client_cls):
         body = b"%PDF-1.4 fake body"
         mock_client_cls.return_value = _make_stream_client(body, "application/pdf")
@@ -253,7 +253,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("%PDF-1.4 fake body", res)
 
     @patch("httpx.AsyncClient")
-    @patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
+    @patch("core.tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
     async def test_fetch_docx_conversion_fallback(self, mock_convert, mock_client_cls):
         body = b"PK\x03\x04 fake docx"
         mock_client_cls.return_value = _make_stream_client(
@@ -265,7 +265,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("PK\x03\x04 fake docx", res)
 
     @patch("httpx.AsyncClient")
-    @patch("tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
+    @patch("core.tools.read.convert_doc_to_markdown_sync", side_effect=RuntimeError("no converter"))
     async def test_fetch_xlsx_conversion_fallback(self, mock_convert, mock_client_cls):
         body = b"PK\x03\x04 fake xlsx"
         mock_client_cls.return_value = _make_stream_client(
@@ -334,7 +334,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
             self.assertIn("blocked", res)
 
     def test_sanitize_web_content_strips_script_and_style_blocks(self):
-        from tools.web_fetch import _sanitize_web_content
+        from core.tools.web_fetch import _sanitize_web_content
 
         html = """
         <html>
@@ -355,7 +355,7 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Hello World", cleaned)
 
     def test_decode_response_bytes_encoding_and_fallback(self):
-        from tools.web_fetch import _decode_response_bytes
+        from core.tools.web_fetch import _decode_response_bytes
 
         win1251_bytes = "Привет".encode("windows-1251")
         decoded_win = _decode_response_bytes(win1251_bytes, "windows-1251")
@@ -366,10 +366,10 @@ class TestWebFetchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("hello", decoded_fallback)
         self.assertIn("\ufffd", decoded_fallback)
 
-    @patch("tools.web_fetch._dns_cache_policy", return_value=(60.0, 2))
+    @patch("core.tools.web_fetch._dns_cache_policy", return_value=(60.0, 2))
     @patch("socket.getaddrinfo")
     async def test_dns_lru_cache_eviction(self, mock_gai, mock_policy):
-        from tools.web_fetch import _DNS_CACHE, _is_private_host
+        from core.tools.web_fetch import _DNS_CACHE, _is_private_host
 
         mock_gai.return_value = [(2, 1, 6, "", ("8.8.8.8", 0))]
         _DNS_CACHE.clear()

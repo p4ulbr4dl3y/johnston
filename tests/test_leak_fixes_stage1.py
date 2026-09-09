@@ -10,8 +10,8 @@ from core.domain.entities.theme import Theme
 from core.infrastructure.tasks.manager import TaskManager
 from core.infrastructure.tasks.shell_task import ShellTask
 from core.infrastructure.tasks.task import BaseTask, TaskStatus
-from tools.context import ToolContext
-from tools.kill import KillTool
+from core.tools.context import ToolContext
+from core.tools.kill import KillTool
 from widgets.chat_toolcall import ToolCallWidget
 from widgets.mixins.message_flow_background import on_background_shell_completed, update_background_shell_widget
 from widgets.mixins.resize_debounce import ResizeDebounceMixin

@@ -15,8 +15,8 @@ from core.infrastructure.tasks.manage import extract_task_status_details
 from core.infrastructure.tasks.manager import TaskManager
 from core.infrastructure.tasks.shell_task import ShellTask
 from core.infrastructure.tasks.task import BaseTask, TaskStatus
-from tools.context import ToolContext
-from tools.shell import ShellTool
+from core.tools.context import ToolContext
+from core.tools.shell import ShellTool
 
 
 class ConcreteTask(BaseTask):
@@ -102,7 +102,7 @@ async def test_foreground_sync_isolated_from_task_manager():
 
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
     ):
         res = await tool.execute({"command": "echo sync"}, ctx=ctx)
         assert not res.is_error
@@ -136,8 +136,8 @@ async def test_foreground_sync_moves_to_background_registers_in_task_manager():
     with (
         patch.object(ShellTool, "_create_std_process", return_value=p),
         patch.object(ShellTask, "start_reading", _start),
-        patch("tools.shell.shell_executable", return_value="/bin/sh"),
-        patch("tools.shell.terminate_process", new_callable=AsyncMock),
+        patch("core.tools.shell.shell_executable", return_value="/bin/sh"),
+        patch("core.tools.shell.terminate_process", new_callable=AsyncMock),
     ):
         exec_task = asyncio.create_task(tool.execute({"command": "tail -f x"}, ctx=ctx))
         await task_started.wait()

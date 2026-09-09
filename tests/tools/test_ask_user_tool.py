@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from tools.ask_user import AskUserTool, _is_recommended_option, _sort_recommended_first
+from core.tools.ask_user import AskUserTool, _is_recommended_option, _sort_recommended_first
 
 
 class TestRecommendedSorting(unittest.TestCase):

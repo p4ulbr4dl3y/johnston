@@ -251,7 +251,7 @@ def extract_tool_display(tool_name: str, args: Dict[str, Any], max_len: int = 60
 
 def _extract_tool_display_inner(tool_name: str, args: Dict[str, Any], max_len: int = 60, mode: str = "middle") -> str:
     from core.infrastructure.runtime.tool_name import normalize_tool_name as _normalize
-    from tools.registry import REGISTRY
+    from core.tools.registry import REGISTRY
 
     name = _normalize(tool_name)
     args = args if isinstance(args, dict) else {}

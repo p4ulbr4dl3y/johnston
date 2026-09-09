@@ -6,7 +6,7 @@ from bisect import bisect_right
 from typing import Generator, List, Optional, Set, Tuple
 
 from core.domain.defaults.git_excludes import DEFAULT_BINARY_EXTENSIONS, DEFAULT_IGNORE_DIRS
-from tools.utils import get_max_tool_payload_bytes
+from core.tools.utils import get_max_tool_payload_bytes
 
 DEFAULT_EXCLUDE_DIRS: Set[str] = set(DEFAULT_IGNORE_DIRS) | {
     ".hg",

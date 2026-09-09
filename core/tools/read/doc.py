@@ -2,7 +2,7 @@ import logging
 import threading
 from typing import Any
 
-from tools.read.cache import get_cached_doc_markdown, set_cached_doc_markdown
+from core.tools.read.cache import get_cached_doc_markdown, set_cached_doc_markdown
 
 logger = logging.getLogger(__name__)
 

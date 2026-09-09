@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 
 from core.domain.defaults.errors import ToolResult
-from tools.base import BaseTool
+from core.tools.base import BaseTool
 
 VALID_STATUSES = {"pending", "in_progress", "completed"}
 

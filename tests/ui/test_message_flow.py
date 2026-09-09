@@ -256,7 +256,7 @@ class TestShellModeFlow(unittest.IsolatedAsyncioTestCase):
         app = JohnstonApp()
         async with app.run_test():
             mock_res = ToolResult.done(content="file1\nfile2", display="file1\nfile2", returncode=0)
-            with patch("tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
+            with patch("core.tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
                 mock_exec.return_value = mock_res
                 await app._exec_shell_command("ls", user_text="!ls")
                 mock_exec.assert_awaited_once()
@@ -264,7 +264,7 @@ class TestShellModeFlow(unittest.IsolatedAsyncioTestCase):
     async def test_exec_shell_command_error_handled(self):
         app = JohnstonApp()
         async with app.run_test():
-            with patch("tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
+            with patch("core.tools.shell.ShellTool.execute", new_callable=unittest.mock.AsyncMock) as mock_exec:
                 mock_exec.side_effect = RuntimeError("command failure")
                 await app._exec_shell_command("badcmd", user_text="!badcmd")
                 mock_exec.assert_awaited_once()

@@ -94,7 +94,7 @@ class TestMessageFlowShellModule(unittest.IsolatedAsyncioTestCase):
         )
 
         res = ToolResult.done(content="hello output", display="hello output", returncode=0)
-        with patch("tools.shell.ShellTool.execute", new_callable=AsyncMock, return_value=res):
+        with patch("core.tools.shell.ShellTool.execute", new_callable=AsyncMock, return_value=res):
             await exec_shell_command(app, "echo hello", user_text="!echo hello")
 
         chat_input.focus.assert_called_once()
@@ -120,7 +120,7 @@ class TestMessageFlowShellModule(unittest.IsolatedAsyncioTestCase):
             is_app_active=False,
         )
 
-        with patch("tools.shell.ShellTool.execute", new_callable=AsyncMock, side_effect=RuntimeError("exec error")):
+        with patch("core.tools.shell.ShellTool.execute", new_callable=AsyncMock, side_effect=RuntimeError("exec error")):
             await exec_shell_command(app, "broken")
 
         tool_widget.set_result.assert_called_once()

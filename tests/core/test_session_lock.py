@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 from core.domain.policies.session_naming import FORK_BASE_MAX_LEN
 from core.infrastructure.platform.session_lock import SessionLock
 from core.infrastructure.storage.session_store import SessionStore
-from tools.context import ToolContext
+from core.tools.context import ToolContext
 
 
 class TestSessionLock(unittest.TestCase):

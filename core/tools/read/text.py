@@ -1,7 +1,7 @@
 import itertools
 import os
 
-from tools.read.cache import _get_file_line_count, get_read_line_window
+from core.tools.read.cache import _get_file_line_count, get_read_line_window
 
 
 def _read_file_lines(

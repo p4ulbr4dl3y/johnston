@@ -17,7 +17,7 @@ def process_image_file_sync(path: str, detail: str | None = None, cancel_event: 
 
     from PIL import Image
 
-    from tools.read.cache import get_image_dimension_bounds
+    from core.tools.read.cache import get_image_dimension_bounds
 
     dim_low, dim_high, dim_default, png_keep_bytes = get_image_dimension_bounds()
 

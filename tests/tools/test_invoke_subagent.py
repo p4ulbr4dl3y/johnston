@@ -4,7 +4,7 @@ import unittest
 from core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
 from core.infrastructure.storage.session_store import SessionStore
 from core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS, truncate_subagent_result
-from tools.invoke_subagent import InvokeSubagentTool
+from core.tools.invoke_subagent import InvokeSubagentTool
 
 
 class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
@@ -70,7 +70,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             )
 
         # With limit=2, spawning should fail with "2 concurrent max"
-        with patch("tools.invoke_subagent.get_settings") as mock_st:
+        with patch("core.tools.invoke_subagent.get_settings") as mock_st:
             mock_st.return_value.subagents.max_concurrent = 2
             res = str(await tool.execute({"task": "another task", "title": "Over limit", "branch": "main"}))
             self.assertIn("ERR: limit: 2 concurrent max", res)
@@ -222,9 +222,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
             patch("core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("core.tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
@@ -259,9 +259,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
             patch("core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("core.tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
@@ -295,9 +295,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
             patch("core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("core.tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
 
@@ -524,7 +524,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=False),
+            patch("core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=False),
         ):
             res = await tool.execute({"task": "valid task", "title": 12345, "role": 999})
             self.assertFalse(res.is_error)

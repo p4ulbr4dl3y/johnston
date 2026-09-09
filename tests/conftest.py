@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from tools.context import ToolContext
+from core.tools.context import ToolContext
 
 DEFAULT_TOOLS: List[Dict[str, Any]] = [
     {"function": {"name": "read"}},
@@ -102,7 +102,7 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     monkeypatch.setattr("core.infrastructure.platform.logging_setup.LOGS_DIR", logs_dir)
     monkeypatch.setattr("core.infrastructure.platform.logging_setup.LOG_FILE", log_file)
     monkeypatch.setattr("core.infrastructure.tasks.output.LOGS_DIR", logs_dir)
-    monkeypatch.setattr("tools.base.LOGS_DIR", logs_dir)
+    monkeypatch.setattr("core.tools.base.LOGS_DIR", logs_dir)
 
     # 4. Reset singletons before test
     from core.application.permission.permission_manager import PermissionManager

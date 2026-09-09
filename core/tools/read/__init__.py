@@ -1,4 +1,4 @@
-from tools.read.archive import (
+from core.tools.read.archive import (
     ARCHIVE_EXTENSIONS,
     TAR_EXTENSIONS,
     ZIP_EXTENSIONS,
@@ -8,7 +8,7 @@ from tools.read.archive import (
     read_archive_member,
     split_archive_path,
 )
-from tools.read.cache import (
+from core.tools.read.cache import (
     _DOC_CACHE,
     _LINE_COUNT_CACHE,
     DOC_CACHE_TTL,
@@ -22,12 +22,12 @@ from tools.read.cache import (
     get_read_line_window,
     set_cached_doc_markdown,
 )
-from tools.read.directory import _inspect_directory
-from tools.read.doc import convert_doc_to_markdown_sync
-from tools.read.image import process_image_file_sync
-from tools.read.text import _read_file_lines
-from tools.read.tool import ReadTool
-from tools.utils import get_max_tool_payload_bytes
+from core.tools.read.directory import _inspect_directory
+from core.tools.read.doc import convert_doc_to_markdown_sync
+from core.tools.read.image import process_image_file_sync
+from core.tools.read.text import _read_file_lines
+from core.tools.read.tool import ReadTool
+from core.tools.utils import get_max_tool_payload_bytes
 
 __all__ = [
     "ReadTool",

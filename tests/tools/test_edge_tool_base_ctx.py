@@ -12,7 +12,7 @@ import pytest
 
 from core.domain.defaults.errors import format_tool_error
 from core.infrastructure.tasks.output import tail_output
-from tools.base import (
+from core.tools.base import (
     BaseTool,
     execute_mcp_tool,
     format_background_notification,
@@ -20,8 +20,8 @@ from tools.base import (
     truncate_output,
     try_int,
 )
-from tools.context import ToolContext
-from tools.utils import format_line_pagination
+from core.tools.context import ToolContext
+from core.tools.utils import format_line_pagination
 
 
 class TestTryIntEdge(unittest.TestCase):
