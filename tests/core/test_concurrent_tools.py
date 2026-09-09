@@ -328,6 +328,8 @@ class TestConcurrentToolsGeneratorAndSession(unittest.IsolatedAsyncioTestCase):
             notify=unittest.mock.MagicMock(),
             save_session=unittest.mock.AsyncMock(),
         )
+        from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
+        canvas.driver = ChatStreamDriver(canvas, on_tool_widget=canvas.register_tool_widget, notify=canvas.notify)
 
         class FakeAgent:
             def __init__(self):
@@ -384,6 +386,8 @@ class TestConcurrentToolsGeneratorAndSession(unittest.IsolatedAsyncioTestCase):
             notify=unittest.mock.MagicMock(),
             save_session=unittest.mock.AsyncMock(),
         )
+        from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
+        canvas.driver = ChatStreamDriver(canvas, on_tool_widget=canvas.register_tool_widget, notify=canvas.notify)
 
         class FakeAgent:
             def __init__(self):

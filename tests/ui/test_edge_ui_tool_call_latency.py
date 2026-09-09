@@ -132,6 +132,8 @@ class TestToolCallLatency(unittest.IsolatedAsyncioTestCase):
                 notify=MagicMock(),
                 save_session=AsyncMock(),
             )
+            from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
+            canvas.driver = ChatStreamDriver(canvas, on_tool_widget=canvas.register_tool_widget, notify=canvas.notify)
 
             async def _fake_stream(*args, **kwargs):
                 yield ("tool", "read", "test.py", {"path": "test.py"})

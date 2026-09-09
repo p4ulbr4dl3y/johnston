@@ -48,6 +48,9 @@ def _canvas(**overrides):
         notify=MagicMock(),
         save_session=AsyncMock(),
     )
+    from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
+
+    c.driver = ChatStreamDriver(c, on_tool_widget=c.register_tool_widget, notify=c.notify)
     for k, v in overrides.items():
         setattr(c, k, v)
     return c

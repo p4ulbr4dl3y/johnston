@@ -24,9 +24,22 @@ from core.domain.policies.messages import (
 )
 from core.domain.ports.checkpoint import get_checkpoint_manager
 from core.infrastructure.runtime.session_interruption import record_session_interruption
-from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
 
 logger = logging.getLogger(__name__)
+
+
+class NullStreamDriver:
+    """Fallback no-op stream driver when none is injected."""
+
+    thinking_handle = None
+    bot_handle = None
+    tool_handles = ()
+
+    async def consume_stream_step(self, step: tuple) -> None:
+        pass
+
+    def cleanup_unfinalized_tools(self, error_message: Optional[str] = "Interrupted") -> None:
+        pass
 
 
 class ProviderReadyState(Enum):
@@ -113,6 +126,7 @@ class GenCanvas:
     # parent session id when this generation is interrupted, so any subagent
     # tasks spawned by the parent session get cancelled too. None = no-op.
     cancel_subagents: Optional[Callable[[str], None]] = field(default=None)
+    driver: Optional[Any] = field(default=None)
 
 
 def ensure_provider_ready(pm: Any, agent: Any) -> Optional[ProviderReadyState]:
@@ -207,6 +221,7 @@ async def generate_ai_response(
     project_path: Optional[str] = None,
     display_text: Optional[str] = None,
     checkpoint_manager: Optional[Any] = None,
+    driver: Optional[Any] = None,
 ) -> None:
     """Run the agent stream for a user prompt, recording transcript events and
     driving UI handles via ``canvas``.
@@ -237,11 +252,11 @@ async def generate_ai_response(
     active_user_event = user_event
     has_tool_calls = False
     start_time = time.time()
-    driver = ChatStreamDriver(
-        canvas,
-        on_tool_widget=canvas.register_tool_widget,
-        notify=canvas.notify,
-    )
+    active_driver = driver if driver is not None else getattr(canvas, "driver", None)
+    if callable(active_driver) and not hasattr(active_driver, "consume_stream_step"):
+        active_driver = active_driver(canvas)
+    if active_driver is None:
+        active_driver = NullStreamDriver()
 
     try:
         # Batch all per-step persistence into one debounced write per turn.
@@ -287,7 +302,7 @@ async def generate_ai_response(
             else:
                 record_session_step(step, session, transcript_acc)
 
-            await driver.consume_stream_step(step)
+            await active_driver.consume_stream_step(step)
 
             if event_type == "tool":
                 has_tool_calls = True
@@ -307,40 +322,43 @@ async def generate_ai_response(
             agent,
             session,
             canvas,
-            driver.thinking_handle,
-            driver.bot_handle,
+            getattr(active_driver, "thinking_handle", None),
+            getattr(active_driver, "bot_handle", None),
             start_time=start_time,
-            tool_handles=driver.tool_handles,
+            tool_handles=getattr(active_driver, "tool_handles", None),
         )
         # _handle_interruption has already finished (attempted) the thinking
         # widget; drop the handle so the finally block cannot call
         # finish_thinking a second time when the widget leaves is_thinking
         # set (double-invoke, audit M7).
-        driver.thinking_handle = None
+        if hasattr(active_driver, "thinking_handle"):
+            active_driver.thinking_handle = None
         raise
     except Exception as e:  # noqa: BLE001
         logger.exception("AI generation failed: %s", e)
         canvas.notify(f"Generation failed: {e}", severity="error")
-        if hasattr(driver, "cleanup_unfinalized_tools"):
+        if hasattr(active_driver, "cleanup_unfinalized_tools"):
             try:
-                driver.cleanup_unfinalized_tools(f"Error: {e}")
+                active_driver.cleanup_unfinalized_tools(f"Error: {e}")
             except Exception:  # noqa: BLE001
                 pass
     finally:
-        if hasattr(driver, "cleanup_unfinalized_tools"):
+        if hasattr(active_driver, "cleanup_unfinalized_tools"):
             try:
-                driver.cleanup_unfinalized_tools()
+                active_driver.cleanup_unfinalized_tools()
             except Exception:  # noqa: BLE001
                 pass
-        if driver.thinking_handle is not None and getattr(driver.thinking_handle, "is_thinking", False):
+        thinking_handle = getattr(active_driver, "thinking_handle", None)
+        if thinking_handle is not None and getattr(thinking_handle, "is_thinking", False):
             try:
                 duration = time.time() - start_time
-                driver.thinking_handle.finish_thinking(duration)
+                thinking_handle.finish_thinking(duration)
             except Exception:  # noqa: BLE001
                 pass
-        if driver.bot_handle is not None and not getattr(driver.bot_handle, "content", "").strip():
+        bot_handle = getattr(active_driver, "bot_handle", None)
+        if bot_handle is not None and not getattr(bot_handle, "content", "").strip():
             try:
-                driver.bot_handle.remove()
+                bot_handle.remove()
             except Exception:  # noqa: BLE001
                 pass
         if has_tool_calls and session_id:

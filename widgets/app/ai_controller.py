@@ -11,6 +11,7 @@ from typing import Any, Callable, Optional
 
 from core.application.generation.ai_generator import GenCanvas
 from core.application.generation.ai_generator import generate_ai_response as _engine
+from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ def build_gen_canvas(
     notify: Callable[..., None],
     save_session: Callable[[], Any],
     cancel_subagents: Optional[Callable[[str], None]] = None,
+    driver: Optional[Any] = None,
 ) -> GenCanvas:
     """Build a GenCanvas bound to the given chat view and app callbacks (no app/self access)."""
     def _add_tool_call(name: str, desc: str, *args: Any, **kwargs: Any) -> Any:
@@ -30,7 +32,7 @@ def build_gen_canvas(
             return chat_view.add_tool_call(name, desc, args=args[0], **kwargs)
         return chat_view.add_tool_call(name, desc, *args, **kwargs)
 
-    return GenCanvas(
+    canvas = GenCanvas(
         add_user_message=lambda text, atts: chat_view.add_user_message(text, attachments=atts),
         add_thinking_widget=chat_view.add_thinking_widget,
         add_tool_call=_add_tool_call,
@@ -45,6 +47,14 @@ def build_gen_canvas(
         save_session=save_session,
         cancel_subagents=cancel_subagents,
     )
+    if driver is None:
+        driver = ChatStreamDriver(
+            canvas,
+            on_tool_widget=on_tool_widget,
+            notify=notify,
+        )
+    canvas.driver = driver
+    return canvas
 
 
 async def run_ai_generation(
@@ -58,6 +68,7 @@ async def run_ai_generation(
     attachments: Optional[list] = None,
     project_path: Optional[str] = None,
     display_text: Optional[str] = None,
+    driver: Optional[Any] = None,
 ) -> None:
     """Thin wrapper over the generation engine, forwarding the call unchanged.
 
@@ -76,4 +87,5 @@ async def run_ai_generation(
         attachments=attachments,
         project_path=project_path,
         display_text=display_text,
+        driver=driver,
     )

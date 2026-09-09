@@ -44,6 +44,9 @@ def _canvas(**overrides):
         notify=MagicMock(),
         save_session=AsyncMock(),
     )
+    from widgets.presentation.widgets.chat_stream_driver import ChatStreamDriver
+
+    c.driver = ChatStreamDriver(c, on_tool_widget=c.register_tool_widget, notify=c.notify)
     for k, v in overrides.items():
         setattr(c, k, v)
     return c
@@ -385,4 +388,11 @@ async def test_generate_waits_for_pending_restore_before_checkpoint():
     assert order == ["restore", "checkpoint"]
 
 
-
+def test_ai_generator_has_no_widget_or_textual_imports():
+    """ai_generator must have zero imports from widgets.* or textual.*."""
+    with open(ai_generator_module.__file__, "r") as f:
+        content = f.read()
+    assert "from widgets" not in content
+    assert "import widgets" not in content
+    assert "from textual" not in content
+    assert "import textual" not in content
