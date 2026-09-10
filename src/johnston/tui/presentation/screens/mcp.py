@@ -8,7 +8,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from johnston.core.infrastructure.mcp import MCPManager, get_mcp_manager
+from johnston.core.application.mcp.mcp_service import McpService
 from johnston.core.infrastructure.platform.paths import CONFIG_DIR
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen, status_tag
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
@@ -50,9 +50,9 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     def __init__(self):
         super().__init__()
-        self.mm = get_mcp_manager()
+        self.mcp_service = McpService()
         try:
-            self.servers = self.mm.load_servers()
+            self.servers = self.mcp_service.list_servers()
         except Exception:
             self.servers = []
         self.filtered_servers: list[Dict[str, Any]] = []
@@ -98,8 +98,8 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             # Coalesced background warmup: reuses an in-flight fetch and never
             # blocks on a cold (npx/uvx) server. Tools are rendered from cache
             # once the warmup finishes.
-            await self.mm.ensure_tools_ready_async()
-            task = getattr(self.mm, "_tools_refresh_task", None)
+            await self.mcp_service.warm_tools()
+            task = self.mcp_service.tools_refresh_task
             if task is not None and not task.done():
                 await task
             if getattr(self, "is_mounted", True):
@@ -116,7 +116,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
         def _load() -> None:
             try:
-                servers = self.mm.load_servers()
+                servers = self.mcp_service.list_servers()
             except Exception:
                 servers = getattr(self, "servers", []) or []
             self.servers = servers
@@ -171,7 +171,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             tools_per_server: Dict[str, int] = {}
             try:
-                get_status = getattr(self.mm, "get_server_status", None)
+                get_status = getattr(self.mcp_service, "get_server_status", None)
                 if callable(get_status):
                     for s in self.servers:
                         st = get_status(s.get("name", ""))
@@ -229,7 +229,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             return format_mcp_row(stag, name, badge, target_width=row_width)
 
         name = s["name"]
-        if not MCPManager.server_enabled(s):
+        if not self.mcp_service.server_enabled(s):
             opt_list.add_option(_row(status_tag("OFF"), name))
             return
 
@@ -242,7 +242,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
             opt_list.add_option(_row(status_tag("ON"), name, tool_info))
         else:
             try:
-                st = self.mm.get_server_status(name) if hasattr(self.mm, "get_server_status") else {}
+                st = self.mcp_service.get_server_status(name) if hasattr(self.mcp_service, "get_server_status") else {}
             except Exception:
                 st = {}
             err = st.get("error") if isinstance(st, dict) else None
@@ -280,7 +280,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
     async def _do_toggle(self, name: str) -> None:
         try:
-            enabled = await asyncio.to_thread(self.mm.toggle_server, name)
+            enabled = await asyncio.to_thread(self.mcp_service.toggle_server, name)
             if enabled:
                 # Freshly-enabled server: start it and fetch its tools right
                 # away so the row shows "N tools" without reopening the modal.
@@ -291,7 +291,7 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 # Runs off the UI thread and never blocks keystrokes; the
                 # in-flight toggle guard prevents duplicate warmups per server.
                 try:
-                    await self.mm.warm_server_async(name)
+                    await self.mcp_service.warm_server(name)
                 except Exception:
                     pass
         except asyncio.CancelledError:
