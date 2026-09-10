@@ -467,11 +467,10 @@ class SubagentsScreen(BaseTasksListScreen):
             return self._cached_tasks
 
         items = []
-        from johnston.core.infrastructure.storage.session_store import get_session_store
+        from johnston.core.application.session.facade import list_subagent_sessions
 
-        store = get_session_store(self.app)
         curr_sid = getattr(self.app, "current_session_id", None) if (hasattr(self, "app") and self.app) else None
-        sessions = store.children(curr_sid) if curr_sid else store.list(kind="subagent")
+        sessions = list_subagent_sessions(parent_id=curr_sid, app=self.app)
         self._sync_session_listeners(sessions)
 
         for s in sessions:
@@ -540,10 +539,8 @@ class SubagentsScreen(BaseTasksListScreen):
     async def _kill_item(self, item: dict) -> None:
         sess = item["raw_obj"]
         if is_subagent_running(sess):
-            from johnston.core.application.session.subagent_service import SubagentService
-            from johnston.core.infrastructure.storage.session_store import get_session_store
+            from johnston.core.application.session.facade import kill_subagent
 
-            store = get_session_store(self.app)
-            SubagentService.kill_subagent(sess, store)
+            kill_subagent(sess, self.app)
         self._invalidate_tasks_cache()
         self._on_session_event()

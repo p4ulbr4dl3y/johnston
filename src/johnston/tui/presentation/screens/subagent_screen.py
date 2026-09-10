@@ -397,11 +397,9 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         self._save_expand_state()
         if self.session and getattr(self.session, "status", "") == "running":
             self._kill_finalized = True
-            from johnston.core.application.session.subagent_service import SubagentService
-            from johnston.core.infrastructure.storage.session_store import get_session_store
+            from johnston.core.application.session.facade import kill_subagent
 
-            store = get_session_store(self.app)
-            SubagentService.kill_subagent(self.session, store)
+            kill_subagent(self.session, self.app)
             if self.driver:
                 self.driver.finalize_thinking_stream()
                 while self.driver.tool_handles:
