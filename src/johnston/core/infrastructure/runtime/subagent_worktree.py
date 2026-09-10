@@ -234,6 +234,9 @@ class SubagentWorktreeManager(GitWorktreeManager):
             reattached = SubagentWorktreeManager.attach_worktree(parent_dir, session.id, branch_name)
         if reattached:
             session.project_dir = reattached
+            # Re-register worktree as session workspace root after re-attachment.
+            from johnston.core.application.permission.permission_manager import PermissionManager
+            PermissionManager.get_instance().add_workspace_root(reattached)
             return reattached
         return project_dir
 
@@ -293,5 +296,8 @@ class SubagentWorktreeManager(GitWorktreeManager):
                 acc[0] = f"{prefix}{summary_text}"
             keep_b = True if is_followup else has_changes
             SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=keep_b)
+            # Remove worktree from session workspace roots after cleanup.
+            from johnston.core.application.permission.permission_manager import PermissionManager
+            PermissionManager.get_instance().remove_workspace_root(wt_path)
             return None, None
         return wt_path, wt_branch

@@ -153,6 +153,11 @@ class SubagentService:
             subagent.cwd = wt_path
             subagent.worktree_branch = wt_branch
 
+            # Register worktree as session workspace root so subagent tools
+            # don't trigger permission modal for files within the worktree.
+            from johnston.core.application.permission.permission_manager import PermissionManager
+            PermissionManager.get_instance().add_workspace_root(wt_path)
+
         from johnston.core.application.session.stream import configure_subagent_agent
 
         applied_role = configure_subagent_agent(
