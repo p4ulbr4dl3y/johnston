@@ -138,6 +138,34 @@ def test_check_read_only_command_mutations_policies():
     assert "git remote add is not permitted" in (check_read_only_command_mutations("git remote add upstream url") or "")
 
 
+def test_read_only_redirects_to_devnull_allowed():
+    # Non-mutating: /dev/null (POSIX) and nul (Windows) discard output.
+    assert check_read_only_command_mutations("echo hi > /dev/null") is None
+    assert check_read_only_command_mutations("echo hi >> /dev/null") is None
+    assert check_read_only_command_mutations("echo hi 2>/dev/null") is None
+    assert check_read_only_command_mutations("git status 2>/dev/null") is None
+    assert check_read_only_command_mutations("cmd &>/dev/null") is None
+    assert check_read_only_command_mutations("echo hi >& /dev/null") is None
+    assert check_read_only_command_mutations("echo hi 2>&1") is None
+    assert check_read_only_command_mutations("echo hi >nul") is None
+
+
+def test_read_only_redirects_to_real_files_blocked():
+    # Any redirect target that is NOT the null device writes a real file.
+    for cmd in (
+        "echo hi > out.txt",
+        "echo hi >> log.txt",
+        "echo hi 1>file",
+        "git status > status.txt",
+        "echo hi 2>err.txt",
+        "echo hi 2>/dev/null 1>out",
+        "cmd &>out.txt",
+    ):
+        assert "file write redirects are not permitted" in (
+            check_read_only_command_mutations(cmd) or ""
+        ), cmd
+
+
 def test_tool_context_shell_widget_helpers():
     from johnston.tui.mixins.task_widget_registry import TaskWidgetRegistryMixin
 

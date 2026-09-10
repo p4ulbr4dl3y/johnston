@@ -536,12 +536,23 @@ def check_read_only_command_mutations(cmd: str) -> Optional[str]:
                                 return f"git remote {r_tok} is not permitted in read-only role"
                     break
 
-        for t in sc:
-            if t in (">", ">>", "1>", "2>"):
-                return "file write redirects are not permitted in read-only role"
+        # Redirects to the null device are non-mutating (stderr suppression,
+        # output discard); any other redirect target writes a real file.
+        devnulls = {"/dev/null", "nul", "nul:"}
+        for i, t in enumerate(sc):
+            if t in (">", ">>", "1>", "2>", "&>"):
+                target = sc[i + 1] if i + 1 < len(sc) else ""
+                if target.lower() not in devnulls:
+                    return "file write redirects are not permitted in read-only role"
+            elif t == ">&":
+                target = sc[i + 1] if i + 1 < len(sc) else ""
+                if target.isdigit():
+                    # fd-to-fd duplicate (2>&1, >&2) — no file written.
+                    continue
+                if target.lower() not in devnulls:
+                    return "file write redirects are not permitted in read-only role"
 
         if base in ("del", "erase", "rmdir", "rd", "move", "ren", "rename", "rm", "unlink", "truncate"):
             return f"mutating command {base} is not permitted in read-only role"
 
     return None
-

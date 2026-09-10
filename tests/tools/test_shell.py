@@ -722,6 +722,21 @@ async def test_shell_readonly_allows_grep_with_commit_word(tool, make_tool_conte
         assert not res_safe.is_error or "not permitted in read-only role" not in str(res_safe)
 
 
+async def test_shell_readonly_allows_devnull_redirects(tool, make_tool_context):
+    ctx = make_tool_context(is_subagent=True, sandbox_enabled=True, is_read_only=True)
+    for cmd in ("echo hi > /dev/null", "echo hi 2>/dev/null", "echo hi >> /dev/null", "git status 2>/dev/null"):
+        res = await tool.execute({"command": cmd}, ctx=ctx)
+        assert not res.is_error, f"Expected {cmd} to be allowed, got: {res}"
+
+
+async def test_shell_readonly_blocks_real_file_redirects(tool, make_tool_context, tmp_path):
+    ctx = make_tool_context(is_subagent=True, sandbox_enabled=True, is_read_only=True)
+    out = tmp_path / "sink.txt"
+    for cmd in (f"echo hi > {out}", f"echo hi >> {out}", f"echo hi 2>{out}"):
+        res = await tool.execute({"command": cmd}, ctx=ctx)
+        assert res.is_error, f"Expected {cmd} to be blocked"
+        assert "file write redirects are not permitted" in str(res)
+    assert not out.exists()
 
 
 _SANDBOX_NOTICE = "[sandbox unavailable | executed unsandboxed]\n"
