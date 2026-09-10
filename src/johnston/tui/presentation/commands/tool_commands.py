@@ -123,16 +123,20 @@ class SandboxCommand(BaseCommand):
     description = "Toggle shell command sandbox"
 
     async def execute(self, app) -> None:
-        if not hasattr(app, "sandbox_enabled"):
-            app.sandbox_enabled = False
-        app.sandbox_enabled = not app.sandbox_enabled
+        client = getattr(app, "client", None)
+        if client is not None and hasattr(client, "toggle_sandbox"):
+            app.sandbox_enabled = client.toggle_sandbox()
+        else:
+            if not hasattr(app, "sandbox_enabled"):
+                app.sandbox_enabled = False
+            app.sandbox_enabled = not app.sandbox_enabled
 
-        from johnston.core.infrastructure.config.config_helpers import save_sandbox_config
+            from johnston.core.infrastructure.config.config_helpers import save_sandbox_config
 
-        try:
-            save_sandbox_config(app.sandbox_enabled)
-        except Exception:
-            pass
+            try:
+                save_sandbox_config(app.sandbox_enabled)
+            except Exception:
+                pass
 
         if hasattr(app, "refresh_status_footer"):
             app.refresh_status_footer()

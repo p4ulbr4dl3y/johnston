@@ -30,8 +30,9 @@ def configure_global_managers(tool_name_normalizer) -> None:
 
 
 def build_agent(app) -> None:
-    """Create provider manager, session store, task manager and the active agent."""
+    """Create provider manager, session store, task manager, active agent and client facade."""
     from johnston.core.application.provider.provider_manager import ProviderManager
+    from johnston.core.client import JohnstonClient
     from johnston.core.infrastructure.storage.session_store import SessionStore
     from johnston.core.infrastructure.tasks.manager import TaskManager
 
@@ -48,6 +49,13 @@ def build_agent(app) -> None:
     app.role = getattr(app.agent, "role", "worker") if app.agent else "worker"
     if app.agent:
         app.agent.app = app
+
+    app.client = JohnstonClient(
+        pm=app.pm,
+        store=app.sm,
+        agent=app.agent,
+        task_manager=app.task_manager,
+    )
 
     app.selection_copy_active = False
     app.message_queue = []
@@ -73,6 +81,11 @@ def resolve_session_id(app, sm, resume_session_id, continue_latest) -> None:
             app.current_session_id = sm.generate_session_id()
     else:
         app.current_session_id = sm.generate_session_id()
+
+    if hasattr(app, "client") and app.client is not None:
+        app.client.session_id = app.current_session_id
+        if hasattr(sm, "get"):
+            app.client.session = sm.get(app.current_session_id)
 
 
 def apply_startup_flags(app, theme, model, effort, sandbox, mode, role, initial_prompt) -> None:

@@ -33,14 +33,16 @@ def format_shell_task_row(
     task: Optional[object] = None,
     is_running: bool = False,
     target_width: int = MODAL_WIDE_ROW_WIDTH,
+    badge: Optional[str] = None,
 ) -> str:
     """Format a shell task row with human-like activity/status badge on the right."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(shell task)"
-    badge_plain = (
-        extract_shell_task_progress(task)
-        if task is not None
-        else ("running..." if is_running else "done")
-    )
+    if badge is not None:
+        badge_plain = badge
+    elif task is not None:
+        badge_plain = extract_shell_task_progress(task)
+    else:
+        badge_plain = "running..." if is_running else "done"
     return format_badge_row(clean, badge_plain, target_width=target_width)
 
 
@@ -49,30 +51,41 @@ def format_subagent_task_row(
     session: Optional[object] = None,
     is_running: bool = False,
     target_width: int = MODAL_WIDE_ROW_WIDTH,
+    badge: Optional[str] = None,
+    role: Optional[str] = None,
 ) -> str:
     """Format a subagent row with role prefix and human-like activity/status badge on the right."""
     clean = " ".join(cmd.replace("\n", " ").replace("\r", " ").split()) or "(subagent task)"
-    role_str = "Worker"
-    if session is not None:
+    if role is not None:
+        role_str = role
+    elif session is not None:
         agent = getattr(session, "agent", None)
         raw_rn = getattr(agent, "role_name", None) or getattr(session, "role_name", None)
         if isinstance(raw_rn, str) and raw_rn.strip():
             role_str = raw_rn
         else:
-            role = getattr(agent, "role", None) if agent else getattr(session, "role", None)
-            if isinstance(role, str) and role.strip():
+            r = getattr(agent, "role", None) if agent else getattr(session, "role", None)
+            if isinstance(r, str) and r.strip():
                 from johnston.core.application.roles.role_registry import get_role_display_name
 
-                role_str = get_role_display_name(role)
+                role_str = get_role_display_name(r)
+            else:
+                role_str = "Worker"
+    elif ":" in clean.partition(" ")[0]:
+        role_str = clean.partition(" ")[0].rstrip(":")
+    else:
+        role_str = "Worker"
+
     if not clean.lower().startswith(f"{role_str.lower()}:"):
         clean = f"{role_str}: {clean}"
     else:
         clean = f"{role_str}:{clean[len(role_str)+1:]}"
-    badge_plain = (
-        extract_subagent_progress(session)
-        if session is not None
-        else ("running..." if is_running else "done")
-    )
+    if badge is not None:
+        badge_plain = badge
+    elif session is not None:
+        badge_plain = extract_subagent_progress(session)
+    else:
+        badge_plain = "running..." if is_running else "done"
     return format_badge_row(clean, badge_plain, target_width=target_width)
 
 

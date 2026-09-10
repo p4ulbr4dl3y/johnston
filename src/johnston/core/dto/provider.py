@@ -18,3 +18,6 @@ class ProviderDTO:
     name: str
     is_configured: bool
     models: list[ModelInfoDTO] = field(default_factory=list)
+    key: str = ""
+    is_active: bool = False
+    is_disabled: bool = False

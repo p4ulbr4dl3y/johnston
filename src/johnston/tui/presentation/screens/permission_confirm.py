@@ -134,10 +134,12 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         self._options, self._option_keys = self._build_options()
 
     def _build_options(self) -> tuple[list[str], list[str]]:
-        from johnston.core.application.permission.interactor import build_permission_options
+        from johnston.core.client import JohnstonClient
 
-        self.suggested_pattern = build_permission_options(self.tool_name, self.args, self.server_name)[1]
-        raw_options, _suggested = build_permission_options(self.tool_name, self.args, self.server_name)
+        raw_options, suggested = JohnstonClient.build_permission_options(
+            self.tool_name, self.args, self.server_name
+        )
+        self.suggested_pattern = suggested
         options: list[str] = []
         keys: list[str] = []
         for i, (label, key) in enumerate(raw_options):

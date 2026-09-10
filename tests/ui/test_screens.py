@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, PropertyMock, patch
 from textual.events import Key
 
 from johnston.core.application.session.actions import RewindEntry
-from johnston.core.application.skills.manager import Skill, SkillScope
 from johnston.tui.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
 from johnston.tui.presentation.screens.help import HelpScreen
 from johnston.tui.presentation.screens.providers import ProvidersScreen
@@ -521,42 +520,43 @@ class TestProvidersEdge(unittest.TestCase):
 
 
 class TestSkillScreens(unittest.TestCase):
-    @patch("johnston.tui.presentation.screens.skills.get_skill_manager")
-    def test_list_init_with_skills(self, mock_get_sm):
-        mock_sm = MagicMock()
-        mock_sm.list_skills.return_value = [
-            Skill("skill-a", "", "", "", SkillScope.GLOBAL, False),
-            Skill("skill-b", "", "", "", SkillScope.PROJECT, False),
-        ]
-        mock_get_sm.return_value = mock_sm
+    def test_list_init_with_skills(self):
+        from johnston.core.dto import SkillDTO
         from johnston.tui.presentation.screens.skills import SkillsScreen
 
-        s = SkillsScreen()
+        mock_client = MagicMock()
+        mock_client.get_skills.return_value = [
+            SkillDTO(name="skill-a", description="", path="", enabled=True, scope="global"),
+            SkillDTO(name="skill-b", description="", path="", enabled=True, scope="project"),
+        ]
+
+        s = SkillsScreen(client=mock_client)
         self.assertEqual(len(s.options), 2)
         self.assertIn("skill-a", s.options[0])
         self.assertIn("●", s.options[0])
         self.assertIn("skill-b", s.options[1])
         self.assertIn("●", s.options[1])
 
-    @patch("johnston.tui.presentation.screens.skills.get_skill_manager")
-    def test_list_init_no_skills(self, mock_get_sm):
-        mock_sm = MagicMock()
-        mock_sm.list_skills.return_value = []
-        mock_get_sm.return_value = mock_sm
+    def test_list_init_no_skills(self):
         from johnston.tui.presentation.screens.skills import SkillsScreen
 
-        s = SkillsScreen()
+        mock_client = MagicMock()
+        mock_client.get_skills.return_value = []
+
+        s = SkillsScreen(client=mock_client)
         self.assertEqual(s.options, [])
 
-    @patch("johnston.tui.presentation.screens.skills.get_skill_manager")
-    def test_skills_screen_toggle_hidden(self, mock_get_sm):
-        mock_sm = MagicMock()
-        mock_sm.list_skills.return_value = [Skill("skill-a", "", "", "", SkillScope.GLOBAL, True)]
-        mock_sm.toggle_hidden.return_value = False
-        mock_get_sm.return_value = mock_sm
+    def test_skills_screen_toggle_hidden(self):
+        from johnston.core.dto import SkillDTO
         from johnston.tui.presentation.screens.skills import SkillsScreen
 
-        s = SkillsScreen()
+        mock_client = MagicMock()
+        mock_client.get_skills.return_value = [
+            SkillDTO(name="skill-a", description="", path="", enabled=False, scope="global"),
+        ]
+        mock_client.toggle_skill.return_value = True
+
+        s = SkillsScreen(client=mock_client)
         self.assertEqual(len(s.options), 1)
         self.assertIn("○", s.options[0])
 
@@ -566,7 +566,7 @@ class TestSkillScreens(unittest.TestCase):
         s.query_one.return_value = mock_opt_list
 
         s.action_toggle_hidden()
-        mock_sm.toggle_hidden.assert_called_once_with("skill-a")
+        mock_client.toggle_skill.assert_called_once_with("skill-a")
 
 
 if __name__ == "__main__":

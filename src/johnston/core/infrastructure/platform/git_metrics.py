@@ -9,13 +9,11 @@ from __future__ import annotations
 import asyncio
 import subprocess
 
+from johnston.core.dto.system import GitDiffDTO
 
-def get_diff_stats(cwd: str | None = None) -> str:
-    """Return ``"+N / -M"`` line-count diff vs HEAD, or ``""`` when unavailable.
 
-    Runs ``git diff HEAD --numstat`` with a 2 s timeout.  If that fails
-    (e.g. no commits yet) falls back to ``git diff --numstat``.
-    """
+def get_diff_metrics(cwd: str | None = None) -> GitDiffDTO:
+    """Return line-count insertions/deletions as GitDiffDTO vs HEAD."""
     try:
         target_cwd = cwd or None
 
@@ -45,10 +43,17 @@ def get_diff_stats(cwd: str | None = None) -> str:
                     dels += int(parts[1])
                 except ValueError:
                     pass
-            if adds or dels:
-                return f"+{adds} / -{dels}"
+            return GitDiffDTO(insertions=adds, deletions=dels)
     except Exception:
         pass
+    return GitDiffDTO(insertions=0, deletions=0)
+
+
+def get_diff_stats(cwd: str | None = None) -> str:
+    """Return ``"+N / -M"`` line-count diff vs HEAD, or ``""`` when unavailable."""
+    diff = get_diff_metrics(cwd)
+    if diff.insertions or diff.deletions:
+        return f"+{diff.insertions} / -{diff.deletions}"
     return ""
 
 

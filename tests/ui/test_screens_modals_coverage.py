@@ -570,25 +570,35 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
         self.assertIn("p_auth", screen.raw_items)
 
     def test_get_provider_model_count_sources(self):
+        from johnston.core.dto import ModelInfoDTO, ProviderDTO
+
         screen = ProvidersScreen({}, "", {})
 
         # 1. Directly in provider dict
         self.assertEqual(screen._get_provider_model_count("p1", {"models": ["a", "b"]}), 2)
 
-        # 2. From cache file
-        with patch("os.path.exists", return_value=True), \
-             patch("johnston.tui.presentation.screens.providers.cached_json_read", return_value={"models": ["m1", "m2", "m3"]}):
-            self.assertEqual(screen._get_provider_model_count("cached_p", {}), 3)
+        # 2. From ProviderDTO
+        p_dto = ProviderDTO(
+            name="cached_p",
+            is_configured=True,
+            models=[
+                ModelInfoDTO("m1", "m1", "cached_p"),
+                ModelInfoDTO("m2", "m2", "cached_p"),
+                ModelInfoDTO("m3", "m3", "cached_p"),
+            ],
+        )
+        self.assertEqual(screen._get_provider_model_count("cached_p", p_dto), 3)
 
-        # 3. From models catalog
-        with patch("os.path.exists", return_value=False), \
-             patch("johnston.tui.presentation.screens.providers.catalog.get_catalog_provider", return_value={"models": ["cat1"]}):
+        # 3. From client get_providers
+        mock_client = MagicMock()
+        mock_client.get_providers.return_value = [
+            ProviderDTO(name="catalog_p", is_configured=True, models=[ModelInfoDTO("cat1", "cat1", "catalog_p")])
+        ]
+        with patch.object(screen, "_get_client", return_value=mock_client):
             self.assertEqual(screen._get_provider_model_count("catalog_p", {}), 1)
 
         # 4. Fallback 0
-        with patch("os.path.exists", return_value=False), \
-             patch("johnston.tui.presentation.screens.providers.catalog.get_catalog_provider", side_effect=Exception("error")):
-            self.assertEqual(screen._get_provider_model_count("none_p", {}), 0)
+        self.assertEqual(screen._get_provider_model_count("none_p", {}), 0)
 
     async def test_mount_resize_and_filter(self):
         app = ModalTestApp()
@@ -730,30 +740,28 @@ class TestSkillsAndMCPScreenHint(unittest.IsolatedAsyncioTestCase):
     """Test hint right_text counter in SkillsScreen and MCPScreen."""
 
     async def test_skills_screen_hint_right_text(self):
-        from johnston.core.application.skills.manager import Skill, SkillScope
+        from johnston.core.dto import SkillDTO
         from johnston.tui.presentation.screens.skills import SkillsScreen
 
-        with patch("johnston.tui.presentation.screens.skills.get_skill_manager") as mock_get_sm:
-            mock_sm = MagicMock()
-            mock_sm.list_skills.return_value = [
-                Skill("skill-a", "A", "", "", SkillScope.GLOBAL, False),
-                Skill("skill-b", "B", "", "", SkillScope.GLOBAL, False),
-            ]
-            mock_get_sm.return_value = mock_sm
-            app = ModalTestApp()
-            async with app.run_test() as pilot:
-                screen = SkillsScreen()
-                await app.push_screen(screen)
-                await pilot.pause()
-                hint = screen.query_one(MODAL_HINT, ModalHint)
-                self.assertEqual(hint.right_text, "2/2")
+        mock_client = MagicMock()
+        mock_client.get_skills.return_value = [
+            SkillDTO(name="skill-a", description="A", path="", enabled=True, scope="global"),
+            SkillDTO(name="skill-b", description="B", path="", enabled=True, scope="global"),
+        ]
+        app = ModalTestApp()
+        async with app.run_test() as pilot:
+            screen = SkillsScreen(client=mock_client)
+            await app.push_screen(screen)
+            await pilot.pause()
+            hint = screen.query_one(MODAL_HINT, ModalHint)
+            self.assertEqual(hint.right_text, "2/2")
 
-                # Filter search
-                inp = screen.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
-                inp.value = "skill-a"
-                await pilot.pause()
-                hint = screen.query_one(MODAL_HINT, ModalHint)
-                self.assertEqual(hint.right_text, "1/2")
+            # Filter search
+            inp = screen.query_one(f"#{MODAL_SEARCH_INPUT_ID}", Input)
+            inp.value = "skill-a"
+            await pilot.pause()
+            hint = screen.query_one(MODAL_HINT, ModalHint)
+            self.assertEqual(hint.right_text, "1/2")
 
     async def test_mcp_screen_hint_right_text(self):
         from johnston.tui.presentation.screens.mcp import MCPScreen

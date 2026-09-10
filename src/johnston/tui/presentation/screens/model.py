@@ -4,7 +4,7 @@ from textual import events
 from textual.widgets import Input
 from textual.widgets.option_list import Option
 
-from johnston.core.domain.policies.models_catalog import catalog
+from johnston.core.dto import ModelInfoDTO
 from johnston.tui.presentation.screens.base_modal import status_tag
 from johnston.tui.presentation.screens.base_selection import BaseSelectionScreen
 from johnston.tui.presentation.screens.constants import MODAL_SEARCH_INPUT_ID
@@ -28,8 +28,17 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
         current_model: str = "",
         current_provider: str = "",
         pm: Optional[Any] = None,
+        client: Optional[Any] = None,
     ):
         self.pm = pm
+        if client is None:
+            try:
+                from johnston.core.client import JohnstonClient
+
+                client = JohnstonClient(pm=pm)
+            except Exception:
+                client = None
+        self.client = client
         self.models_data = models_data
         self.current_model = current_model
         self.current_provider = current_provider
@@ -121,18 +130,48 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
         except Exception as e:
             self.notify(f"Failed to refresh models: {e}", severity="error")
 
+    def _resolve_model_info(self, provider_key: str, model: Union[str, ModelInfoDTO]) -> ModelInfoDTO:
+        if isinstance(model, ModelInfoDTO):
+            return model
+        m_name = str(model)
+        client = self.client or getattr(getattr(self, "app", None), "client", None)
+        if client and hasattr(client, "get_model_info"):
+            try:
+                return client.get_model_info(provider_key, m_name)
+            except Exception:
+                pass
+        return ModelInfoDTO(name=m_name, display_name=m_name, provider=provider_key)
+
     @staticmethod
-    def _is_active_model(provider_key: str, model_name: str, target_provider: str, target_model: str) -> bool:
+    def _is_active_model(
+        provider_key: str,
+        model: Union[str, ModelInfoDTO],
+        target_provider: str,
+        target_model: str,
+        client: Optional[Any] = None,
+    ) -> bool:
         if not target_model:
             return False
         if target_provider and provider_key != target_provider:
             return False
-        if model_name == target_model:
+        m_name = model.name if isinstance(model, ModelInfoDTO) else str(model)
+        if m_name == target_model:
             return True
-        clean_target = catalog.get_model_display_name(provider_key, target_model)
-        clean_model = catalog.get_model_display_name(provider_key, model_name)
-        if clean_model and clean_target and clean_model == clean_target:
-            return True
+        if isinstance(model, ModelInfoDTO):
+            clean_display = model.display_name
+            if clean_display and (clean_display == target_model or clean_display.lower() == target_model.lower()):
+                return True
+        if client and hasattr(client, "get_model_info"):
+            try:
+                info = client.get_model_info(provider_key, m_name)
+                clean_display = info.display_name
+                clean_target = client.get_model_info(provider_key, target_model).display_name
+                if (clean_display and clean_display == target_model) or (
+                    clean_display and clean_target and clean_display == clean_target
+                ):
+                    return True
+            except Exception:
+                pass
         return False
 
     def _build_data(
@@ -164,18 +203,27 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
             active_idx = None
             if target_model:
                 for idx, m in enumerate(p_models):
-                    if self._is_active_model(p_key, m, target_prov, target_model):
+                    if self._is_active_model(p_key, m, target_prov, target_model, client=self.client):
                         active_idx = idx
                         break
 
             for idx, m in enumerate(p_models):
-                clean_m = catalog.get_model_display_name(p_key, m)
+                m_info = self._resolve_model_info(p_key, m)
+                m_name = m_info.name
+                clean_m = m_info.display_name or m_info.name
+                has_vis = m_info.supports_vision
+                has_thinking = m_info.supports_thinking
+
                 is_active = bool(active_idx is not None and idx == active_idx)
-                has_vis = catalog.has_vision(p_key, m)
-                badge = "vision" if has_vis else ""
+                badges = []
+                if has_vis:
+                    badges.append("vision")
+                if has_thinking:
+                    badges.append("thinking")
+                badge = ", ".join(badges) if badges else ""
                 prefix = f"{status_tag('ACTIVE')} " if is_active else "  "
                 opt_label = format_badge_row(clean_m, badge=badge, target_width=target_w, prefix=prefix)
-                item_val = (p_key, m, p_name)
+                item_val = (p_key, m_name, p_name)
                 options.append(opt_label)
                 items.append(item_val)
 

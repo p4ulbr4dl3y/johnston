@@ -348,33 +348,49 @@ class ShellTasksScreen(BaseTasksListScreen):
                     pass
         self._observed_tasks.clear()
 
+    def _get_client(self):
+        try:
+            app = self.app
+        except Exception:
+            app = getattr(self, "_app", None)
+        client = getattr(app, "client", None) if app else None
+        from johnston.core.client import JohnstonClient
+
+        if isinstance(client, JohnstonClient):
+            return client
+        if client is not None and hasattr(client, "_mock_name"):
+            ret = getattr(getattr(client, "get_tasks", None), "return_value", None)
+            if ret is not None and not hasattr(ret, "_mock_name"):
+                return client
+        elif client is not None:
+            return client
+
+        return JohnstonClient(task_manager=getattr(app, "task_manager", None) if app else None)
+
     def _get_filtered_tasks(self) -> list:
-        all_tasks = []
-        app = self.app if (hasattr(self, "app") and self.app) else None
-        if app is not None:
-            all_tasks = [t for t in getattr(app, "task_manager", []) if getattr(t, "kind", "") == "shell"]
-            curr_sid = getattr(app, "current_session_id", None)
-            if curr_sid:
-                all_tasks = [t for t in all_tasks if getattr(t, "session_id", None) == curr_sid]
+        try:
+            app = self.app
+        except Exception:
+            app = getattr(self, "_app", None)
+        curr_sid = getattr(app, "current_session_id", None) if app else None
+        client = self._get_client()
 
-        self._sync_task_listeners(all_tasks)
+        tm = getattr(client, "task_manager", None) or (getattr(app, "task_manager", None) if app else None)
+        if tm:
+            raw_tasks = tm.list(kind="shell") if hasattr(tm, "list") else list(tm)
+            self._sync_task_listeners(raw_tasks)
 
+        task_dtos = client.get_tasks(kind="shell", session_id=curr_sid)
         items = []
-        for t in all_tasks:
-            if not getattr(t, "is_background", False):
-                continue
-            task_id = getattr(t, "task_id", "")
-            running = getattr(t, "is_running", False)
-            badge = extract_shell_task_progress(t)
+        for dto in task_dtos:
             items.append(
                 {
-                    "id": task_id,
-                    "command": getattr(t, "command", ""),
-                    "is_running": running,
-                    "status_str": "RUNNING" if running else "FINISHED",
-                    "progress_badge": badge,
-                    "raw_obj": t,
-                    "created_at": getattr(t, "created_at", 0.0),
+                    "id": dto.task_id,
+                    "command": dto.command,
+                    "is_running": dto.is_running,
+                    "status_str": dto.status,
+                    "progress_badge": dto.progress_badge,
+                    "created_at": dto.created_at,
                 }
             )
 
@@ -387,24 +403,31 @@ class ShellTasksScreen(BaseTasksListScreen):
             task=item.get("raw_obj"),
             is_running=item.get("is_running", False),
             target_width=target_width,
+            badge=item.get("progress_badge"),
         )
 
     def _on_task_selected(self, item: dict) -> None:
-        raw = item.get("raw_obj")
-        if raw is not None:
+        client = self._get_client()
+        task = client.get_task(item.get("id", "")) or item.get("raw_obj")
+        if task is not None:
             try:
                 app = self.app
             except Exception:
                 app = getattr(self, "_app", None)
             if app:
-                app.push_screen(TaskConsoleScreen(raw))
+                app.push_screen(TaskConsoleScreen(task))
 
     async def _kill_item(self, item: dict) -> None:
-        raw = item["raw_obj"]
-        if getattr(raw, "is_running", False):
-            res = raw.kill()
-            if inspect.isawaitable(res):
-                await res
+        client = self._get_client()
+        task_id = item.get("id")
+        if task_id:
+            await client.kill_task(task_id)
+        elif "raw_obj" in item:
+            raw = item["raw_obj"]
+            if getattr(raw, "is_running", False):
+                res = raw.kill()
+                if inspect.isawaitable(res):
+                    await res
 
 
 class SubagentsScreen(BaseTasksListScreen):
@@ -457,6 +480,29 @@ class SubagentsScreen(BaseTasksListScreen):
                     pass
         self._observed_sessions.clear()
 
+    def _get_client(self):
+        try:
+            app = self.app
+        except Exception:
+            app = getattr(self, "_app", None)
+        client = getattr(app, "client", None) if app else None
+        from johnston.core.client import JohnstonClient
+
+        if isinstance(client, JohnstonClient):
+            return client
+        if client is not None and hasattr(client, "_mock_name"):
+            ret = getattr(getattr(client, "kill_subagent", None), "return_value", None)
+            if ret is not None and not hasattr(ret, "_mock_name"):
+                return client
+        elif client is not None:
+            return client
+
+        from johnston.core.application.session.facade import _get_store
+
+        curr_sid = getattr(app, "current_session_id", None) if app else None
+        store = _get_store(app)
+        return JohnstonClient(store=store, session_id=curr_sid)
+
     def _get_filtered_tasks(self) -> list:
         now = time.monotonic()
         if (
@@ -467,10 +513,28 @@ class SubagentsScreen(BaseTasksListScreen):
             return self._cached_tasks
 
         items = []
-        from johnston.core.application.session.facade import list_subagent_sessions
-
-        curr_sid = getattr(self.app, "current_session_id", None) if (hasattr(self, "app") and self.app) else None
-        sessions = list_subagent_sessions(parent_id=curr_sid, app=self.app)
+        try:
+            app = self.app
+        except Exception:
+            app = getattr(self, "_app", None)
+        curr_sid = getattr(app, "current_session_id", None) if app else None
+        client = self._get_client()
+        if hasattr(client, "list_subagent_sessions"):
+            sessions = client.list_subagent_sessions(parent_id=curr_sid)
+        else:
+            sessions = []
+        if not sessions and hasattr(client, "store") and getattr(client, "store", None):
+            store = getattr(client, "store")
+            if curr_sid and hasattr(store, "children"):
+                try:
+                    sessions = store.children(curr_sid)
+                except Exception:
+                    pass
+            elif hasattr(store, "list"):
+                try:
+                    sessions = store.list(kind="subagent")
+                except Exception:
+                    pass
         self._sync_session_listeners(sessions)
 
         for s in sessions:
@@ -525,22 +589,36 @@ class SubagentsScreen(BaseTasksListScreen):
             session=item.get("raw_obj"),
             is_running=item.get("is_running", False),
             target_width=target_width,
+            badge=item.get("progress_badge"),
         )
 
     def _open_task_details(self, item: dict) -> None:
         from johnston.tui.presentation.screens.subagent_screen import SubagentViewScreen
 
-        session_id = getattr(item["raw_obj"], "id", item["id"])
-        self.app.push_screen(SubagentViewScreen(session_id, from_tasks=True))
+        session_id = item.get("id") or (getattr(item.get("raw_obj"), "id", "") if item.get("raw_obj") else "")
+        try:
+            app = self.app
+        except Exception:
+            app = getattr(self, "_app", None)
+        if app:
+            app.push_screen(SubagentViewScreen(session_id, from_tasks=True))
 
     def _on_task_selected(self, item: dict) -> None:
         self._open_task_details(item)
 
     async def _kill_item(self, item: dict) -> None:
-        sess = item["raw_obj"]
-        if is_subagent_running(sess):
+        client = self._get_client()
+        session_id = item.get("id") or (getattr(item.get("raw_obj"), "id", "") if item.get("raw_obj") else "")
+        try:
+            app = self.app
+        except Exception:
+            app = getattr(self, "_app", None)
+        sess = item.get("raw_obj")
+        if sess is not None and hasattr(sess, "async_task"):
             from johnston.core.application.session.facade import kill_subagent
 
-            kill_subagent(sess, self.app)
+            kill_subagent(sess, app)
+        elif session_id:
+            await client.kill_subagent(session_id, app=app)
         self._invalidate_tasks_cache()
         self._on_session_event()

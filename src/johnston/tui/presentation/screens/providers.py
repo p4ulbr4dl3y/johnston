@@ -1,12 +1,9 @@
-import os
 from typing import Any
 
 from textual import events
 from textual.widgets import Input, OptionList
 
-from johnston.core.domain.policies.models_catalog import catalog
-from johnston.core.infrastructure.platform.paths import CONFIG_DIR
-from johnston.core.infrastructure.platform.platform_utils import cached_json_read
+from johnston.core.dto import ProviderDTO
 from johnston.tui.presentation.screens.api_key import ApiKeyScreen
 from johnston.tui.presentation.screens.base_modal import status_tag
 from johnston.tui.presentation.screens.base_selection import BaseSelectionScreen
@@ -31,7 +28,7 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
     ])
 
     def __init__(
-        self, providers: dict, active_key: str, configured_keys: dict, disabled_providers: list = None, pm=None
+        self, providers: dict | list, active_key: str, configured_keys: dict, disabled_providers: list = None, pm=None
     ):
         self.providers = providers
         self.active_key = active_key
@@ -51,6 +48,17 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             dialog_classes="modal-dialog-medium",
         )
 
+    def _get_client(self) -> Any:
+        try:
+            app = self.app
+            if hasattr(app, "client") and app.client is not None:
+                return app.client
+        except Exception:
+            pass
+        from johnston.core.client import JohnstonClient
+
+        return JohnstonClient()
+
     def _row_width(self) -> int:
         try:
             opt_list = self.query_one(f"#{self.option_list_id}")
@@ -58,26 +66,19 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
         except Exception:
             return option_list_row_width(None, MODAL_MEDIUM_ROW_WIDTH)
 
-    def _get_provider_model_count(self, key: str, p: dict) -> int:
-        models = p.get("models")
-        if isinstance(models, list) and models:
-            return len(models)
+    def _get_provider_model_count(self, key: str, p: Any) -> int:
+        if isinstance(p, ProviderDTO):
+            return len(p.models)
+        if isinstance(p, dict):
+            models = p.get("models")
+            if isinstance(models, list) and models:
+                return len(models)
         try:
-            cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{key}.json")
-            if os.path.exists(cache_path):
-                cdata = cached_json_read(cache_path, {})
-                if isinstance(cdata, dict):
-                    c_models = cdata.get("models", [])
-                    if isinstance(c_models, list) and c_models:
-                        return len(c_models)
-        except Exception:
-            pass
-        try:
-            cat_p = catalog.get_catalog_provider(key)
-            if isinstance(cat_p, dict):
-                cat_models = cat_p.get("models", [])
-                if isinstance(cat_models, list) and cat_models:
-                    return len(cat_models)
+            client = self._get_client()
+            if client and hasattr(client, "get_providers"):
+                for prov in client.get_providers():
+                    if prov.key == key or prov.name == key:
+                        return len(prov.models)
         except Exception:
             pass
         return 0
@@ -86,14 +87,30 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
         options = []
         items = []
         target_w = self._row_width()
-        for pkey, p in self.providers.items():
-            if not isinstance(p, dict):
+
+        prov_items: list[tuple[str, Any]] = []
+        if isinstance(self.providers, dict):
+            prov_items = list(self.providers.items())
+        elif isinstance(self.providers, list):
+            prov_items = [(p.key or p.name if isinstance(p, ProviderDTO) else getattr(p, "name", ""), p) for p in self.providers]
+
+        for pkey, p in prov_items:
+            if isinstance(p, ProviderDTO):
+                key = p.key or p.name or pkey
+                name = p.name or pkey
+                is_disabled = p.is_disabled or key in self.disabled_set
+                has_key = p.is_configured or bool(self.configured_keys.get(key))
+                cnt = len(p.models)
+            elif isinstance(p, dict):
+                key = p.get("key") or pkey
+                name = p.get("name") or pkey
+                has_key = bool(self.configured_keys.get(key))
+                is_disabled = key in self.disabled_set or not p.get("enabled", True)
+                cnt = self._get_provider_model_count(key, p)
+            else:
                 continue
-            key = p.get("key") or pkey
-            name = p.get("name") or pkey
-            has_key = bool(self.configured_keys.get(key))
+
             is_active = key == self.active_key
-            is_disabled = key in self.disabled_set or not p.get("enabled", True)
 
             if is_disabled:
                 stag = status_tag("OFF")
@@ -106,7 +123,6 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
 
             badge = ""
             if not is_disabled and (is_active or has_key):
-                cnt = self._get_provider_model_count(key, p)
                 if cnt > 0:
                     badge = f"{cnt} {'model' if cnt == 1 else 'models'}"
 

@@ -7,8 +7,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from johnston.core.application.skills.manager import get_skill_manager
-from johnston.core.infrastructure.platform.paths import CONFIG_DIR
+from johnston.core.dto import SkillDTO
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen, status_tag
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from johnston.tui.presentation.screens.constants import (
@@ -38,24 +37,50 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
         ("ctrl+q", "quit_app", "Quit"),
     ])
 
-    def __init__(self):
+    def __init__(self, client: Any = None):
         super().__init__()
-        self.sm = get_skill_manager()
-        self.skills = []
+        self._client = client
+        self.skills: list[Any] = []
         self.options: list[str] = []
         self.filtered_skills: list = []
         self.filtered_options: list[str] = []
         self.search_query = ""
         self.load_skills()
 
+    def _get_client(self) -> Any:
+        if self._client is not None:
+            return self._client
+        try:
+            app = self.app
+            if hasattr(app, "client") and app.client is not None:
+                return app.client
+        except Exception:
+            pass
+        from johnston.core.client import JohnstonClient
+
+        return JohnstonClient()
+
     def load_skills(self) -> None:
-        self.skills = self.sm.list_skills(include_hidden=True)
+        client = self._get_client()
+        if hasattr(client, "get_skills"):
+            self.skills = client.get_skills()
+        else:
+            self.skills = []
         self.options = []
         for s in self.skills:
-            stat_t = status_tag("HIDDEN" if getattr(s, "hidden", False) else "VISIBLE")
+            is_hidden = not getattr(s, "enabled", True) if hasattr(s, "enabled") else getattr(s, "hidden", False)
+            stat_t = status_tag("HIDDEN" if is_hidden else "VISIBLE")
             self.options.append(f"{stat_t} {getattr(s, 'name', '')}")
         self.filtered_skills = [
-            s.to_dict() if hasattr(s, "to_dict") else {"name": getattr(s, "name", ""), "hidden": getattr(s, "hidden", False)}
+            s.to_dict()
+            if hasattr(s, "to_dict")
+            else {
+                "name": getattr(s, "name", ""),
+                "hidden": not getattr(s, "enabled", True) if hasattr(s, "enabled") else getattr(s, "hidden", False),
+                "scope": getattr(s, "scope", "global"),
+                "description": getattr(s, "description", ""),
+                "path": getattr(s, "path", "") or getattr(s, "location", ""),
+            }
             for s in self.skills
         ]
         self.filtered_options = list(self.options)
@@ -126,7 +151,7 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             if not self.skills:
                 _, _, t_muted, _ = get_theme_colors()
                 opt_list.add_option(
-                    Text(f"No skills found in {CONFIG_DIR}/skills/ or .johnston/skills/.", style=t_muted)
+                    Text("No skills found in ~/.johnston/skills/ or .johnston/skills/.", style=t_muted)
                 )
             elif not any(s is not None for s in self.filtered_skills):
                 opt_list.highlighted = None
@@ -186,8 +211,9 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             return
 
         s_name = target["name"]
+        client = self._get_client()
         try:
-            now_hidden = self.sm.toggle_hidden(s_name)
+            now_hidden = client.toggle_skill(s_name)
         except Exception:
             # Disk state unchanged; keep showing the old tag.
             self.notify(f"Failed to toggle hidden for skill '{s_name}'", severity="error")
@@ -200,7 +226,17 @@ class SkillsScreen(ModalSearchNavMixin, BaseModalScreen[Optional[Dict[str, Any]]
             self.filtered_options[highlighted] = new_opt
         for i, s in enumerate(self.skills):
             if getattr(s, "name", "") == s_name:
-                setattr(s, "hidden", now_hidden)
+                if isinstance(s, SkillDTO):
+                    self.skills[i] = SkillDTO(
+                        name=s.name,
+                        description=s.description,
+                        path=s.path,
+                        enabled=not now_hidden,
+                        is_project=s.is_project,
+                        scope=s.scope,
+                    )
+                else:
+                    setattr(s, "hidden", now_hidden)
                 if i < len(self.options):
                     self.options[i] = new_opt
                 break

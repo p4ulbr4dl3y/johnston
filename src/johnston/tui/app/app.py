@@ -59,6 +59,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
         register_textual_themes(self)
         configure_global_managers(normalize_tool_name)
+        self.client = None
         build_agent(self)
         resolve_session_id(self, self.sm, resume_session_id, continue_latest)
         self.sandbox_enabled = load_sandbox_config()

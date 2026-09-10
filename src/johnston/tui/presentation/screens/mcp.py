@@ -9,7 +9,6 @@ from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
 from johnston.core.application.mcp.mcp_service import McpService
-from johnston.core.infrastructure.platform.paths import CONFIG_DIR
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen, status_tag
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from johnston.tui.presentation.screens.constants import (
@@ -143,6 +142,17 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         self._render_from_cache()
         self._load_servers_bg(refresh=True)
 
+    def _get_client(self) -> Any:
+        try:
+            app = self.app
+            if hasattr(app, "client") and app.client is not None:
+                return app.client
+        except Exception:
+            pass
+        from johnston.core.client import JohnstonClient
+
+        return JohnstonClient()
+
     def _render_from_cache(self) -> None:
         try:
             opt_list = self.query_one("#mcp-option-list", OptionList)
@@ -151,8 +161,15 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
 
             if not self.servers:
                 _, _, t_muted, _ = get_theme_colors()
+                cfg_dir = "~/.johnston"
+                try:
+                    client = self._get_client()
+                    if hasattr(client, "get_config_dir"):
+                        cfg_dir = client.get_config_dir()
+                except Exception:
+                    pass
                 opt_list.add_option(
-                    Text(f"No MCP servers configured ({CONFIG_DIR}/mcp.json or .johnston/mcp.json).", style=t_muted)
+                    Text(f"No MCP servers configured ({cfg_dir}/mcp.json or .johnston/mcp.json).", style=t_muted)
                 )
                 self.filtered_servers = []
                 return

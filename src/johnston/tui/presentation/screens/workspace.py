@@ -10,7 +10,6 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from johnston.core.application.permission.permission_manager import PermissionManager
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
 from johnston.tui.presentation.screens.confirm import ConfirmScreen
@@ -94,11 +93,11 @@ def format_workspace_path(path: str, max_width: int) -> str:
     return display[: max(0, max_width - 3)] + "..."
 
 
-def get_root_scope(pm: PermissionManager, path: str) -> str:
-    """Determine workspace root scope (delegated to core permission interactor)."""
-    from johnston.core.application.permission.interactor import get_root_scope as core_get_root_scope
+def get_root_scope(pm: Any, path: str) -> str:
+    """Determine workspace root scope (delegated to client facade)."""
+    from johnston.core.client import JohnstonClient
 
-    return core_get_root_scope(path)
+    return JohnstonClient(pm=pm).get_root_scope(path)
 
 
 class WorkspaceInput(Input):
@@ -174,9 +173,10 @@ class WorkspaceScreen(BaseModalScreen[None]):
         ("ctrl+q", "quit_app", "Quit"),
     ])
 
-    def __init__(self, pm: PermissionManager | None = None) -> None:
+    def __init__(self, pm: Any | None = None, client: Any | None = None) -> None:
         super().__init__()
-        self.pm = pm or PermissionManager.get_instance()
+        self.pm = pm
+        self._client = client
         self.roots_data: list[dict[str, str]] = []
         self._option_actions: list[tuple[str, Any]] = []
 
@@ -219,13 +219,28 @@ class WorkspaceScreen(BaseModalScreen[None]):
         self._apply_dialog_fit()
         self.refresh_list()
 
+    def _get_client(self) -> Any:
+        if self._client is not None:
+            return self._client
+        try:
+            app = self.app
+            if hasattr(app, "client") and app.client is not None:
+                return app.client
+        except Exception:
+            pass
+        from johnston.core.client import JohnstonClient
+
+        return JohnstonClient(perm_manager=self.pm)
+
     def _load_roots(self) -> list[dict[str, str]]:
-        all_roots = self.pm.get_workspace_roots()
-        results = []
-        for r in all_roots:
-            scope = get_root_scope(self.pm, r)
-            results.append({"path": r, "scope": scope})
-        return results
+        client = self._get_client()
+        if hasattr(client, "get_workspace_roots"):
+            roots = client.get_workspace_roots()
+            return [{"path": r.path, "scope": r.scope} for r in roots]
+        if self.pm and hasattr(self.pm, "get_workspace_roots"):
+            all_roots = self.pm.get_workspace_roots()
+            return [{"path": r, "scope": get_root_scope(self.pm, r)} for r in all_roots]
+        return []
 
     def refresh_list(self) -> None:
         self.roots_data = self._load_roots()
@@ -372,9 +387,9 @@ class WorkspaceScreen(BaseModalScreen[None]):
                 self.app.notify(f"Directory '{clean_path}' does not exist", severity="error")
             return
 
-        from johnston.core.application.permission.interactor import add_workspace_root
-
-        add_workspace_root(abs_path, scope="session")
+        client = self._get_client()
+        if hasattr(client, "add_workspace_root"):
+            client.add_workspace_root(abs_path, scope="session")
         event.input.value = ""
         self.refresh_list()
 
@@ -397,13 +412,13 @@ class WorkspaceScreen(BaseModalScreen[None]):
 
         lines = [line.strip() for line in raw.splitlines() if line.strip()]
         added_any = False
+        client = self._get_client()
         for line in lines:
             clean_path = decode_pasted_path(line)
             abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(clean_path)))
             if os.path.isdir(abs_path):
-                from johnston.core.application.permission.interactor import add_workspace_root
-
-                add_workspace_root(abs_path, scope="session")
+                if hasattr(client, "add_workspace_root"):
+                    client.add_workspace_root(abs_path, scope="session")
                 added_any = True
             elif len(lines) == 1:
                 if self.app and hasattr(self.app, "notify"):
@@ -453,9 +468,9 @@ class WorkspaceScreen(BaseModalScreen[None]):
     def _confirm_and_remove(self, path: str) -> None:
         def on_confirmed(confirmed: bool) -> None:
             if confirmed:
-                from johnston.core.application.permission.interactor import remove_workspace_root
-
-                remove_workspace_root(path)
+                client = self._get_client()
+                if hasattr(client, "remove_workspace_root"):
+                    client.remove_workspace_root(path)
                 self.refresh_list()
             try:
                 self.query_one("#workspace-option-list", OptionList).focus()
@@ -473,7 +488,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
                 callback=on_confirmed,
             )
         else:
-            from johnston.core.application.permission.interactor import remove_workspace_root
-
-            remove_workspace_root(path)
+            client = self._get_client()
+            if hasattr(client, "remove_workspace_root"):
+                client.remove_workspace_root(path)
             self.refresh_list()

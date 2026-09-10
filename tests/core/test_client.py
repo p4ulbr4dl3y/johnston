@@ -358,7 +358,8 @@ def test_client_get_providers(mock_pm: MagicMock, mock_store: MagicMock):
     assert len(providers) == 1
     p = providers[0]
     assert isinstance(p, ProviderDTO)
-    assert p.name == "mock_provider"
+    assert p.name == "Mock Provider"
+    assert p.key == "mock_provider"
     assert p.is_configured is True
     assert len(p.models) == 2
     assert isinstance(p.models[0], ModelInfoDTO)
@@ -375,11 +376,20 @@ def test_client_get_git_state(mock_pm: MagicMock, mock_store: MagicMock):
     ):
         client = JohnstonClient(pm=mock_pm, store=mock_store)
         git_state = client.get_git_state()
+        assert isinstance(git_state, GitStateDTO)
+        assert git_state.branch == "main"
+        assert git_state.is_dirty is True
+        assert git_state.changed_files == 2
 
-    assert isinstance(git_state, GitStateDTO)
-    assert git_state.branch == "main"
-    assert git_state.is_dirty is True
-    assert git_state.changed_files == 2
+
+def test_client_get_model_info(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    info = client.get_model_info("openai", "gpt-4o")
+    assert isinstance(info, ModelInfoDTO)
+    assert info.name == "gpt-4o"
+    assert info.provider == "openai"
+    assert isinstance(info.supports_vision, bool)
+    assert isinstance(info.supports_thinking, bool)
 
 
 def test_architecture_zero_textual_imports():

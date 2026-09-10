@@ -78,15 +78,6 @@ def _get_badge(item: Any) -> str:
     return "local"
 
 
-def _get_mgr() -> Any:
-    try:
-        from johnston.core.infrastructure.runtime.git_worktree import GitWorktreeManager
-
-        return GitWorktreeManager
-    except ImportError:
-        return None
-
-
 class BranchInput(Input):
     """Input widget that forwards vertical navigation keys to OptionList and prevents select-all."""
 
@@ -153,14 +144,28 @@ class BranchScreen(BaseModalScreen[Any]):
         ("ctrl+q", "quit_app", "Quit"),
     ])
 
-    def __init__(self, project_dir: str | None = None, manager: Any = None) -> None:
+    def __init__(self, project_dir: str | None = None, manager: Any = None, client: Any = None) -> None:
         super().__init__()
         self.project_dir = project_dir
         self.manager = manager
+        self._client = client
         self.branches_data: list[Any] = []
         self._option_actions: list[tuple[str, Any]] = []
         self.current_branch_name: str = ""
         self._shown_count: int = 0
+
+    def _get_client(self) -> Any:
+        if self._client is not None:
+            return self._client
+        try:
+            app = self.app
+            if hasattr(app, "client") and app.client is not None:
+                return app.client
+        except Exception:
+            pass
+        from johnston.core.client import JohnstonClient
+
+        return JohnstonClient()
 
     def compose(self) -> ComposeResult:
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
@@ -269,14 +274,17 @@ class BranchScreen(BaseModalScreen[Any]):
 
     async def refresh_list_async(self) -> None:
         pdir = self.project_dir or getattr(self.app, "project_dir", None) or os.getcwd()
-        mgr = self.manager or _get_mgr()
-        if mgr:
+        if self.manager:
             try:
-                self.branches_data = await self._list_branches(mgr, pdir) or []
+                self.branches_data = await self._list_branches(self.manager, pdir) or []
             except Exception:
                 self.branches_data = []
         else:
-            self.branches_data = []
+            client = self._get_client()
+            try:
+                self.branches_data = await client.list_worktrees_async(pdir) or []
+            except Exception:
+                self.branches_data = []
 
         self.current_branch_name = ""
         for b in self.branches_data:
@@ -450,13 +458,16 @@ class BranchScreen(BaseModalScreen[Any]):
     async def _handle_action_select(self, action_tuple: tuple[str, Any]) -> None:
         action_type, data = action_tuple
         pdir = self.project_dir or getattr(self.app, "project_dir", None) or os.getcwd()
-        mgr = self.manager or _get_mgr()
 
         if action_type == "new":
             branch = data.get("branch", "")
             if not branch:
                 return
-            wt_res = await self._create_wt(mgr, pdir, branch)
+            if self.manager:
+                wt_res = await self._create_wt(self.manager, pdir, branch)
+            else:
+                client = self._get_client()
+                wt_res = await client.create_worktree_async(branch_name=branch, project_dir=pdir)
             target_dir = wt_res[0] if isinstance(wt_res, (tuple, list)) else wt_res
             if target_dir:
                 if hasattr(self.app, "switch_project_dir"):
@@ -477,7 +488,11 @@ class BranchScreen(BaseModalScreen[Any]):
                     self.app.switch_project_dir(path, branch)
                 self.dismiss(path)
             else:
-                wt_res = await self._create_wt(mgr, pdir, branch)
+                if self.manager:
+                    wt_res = await self._create_wt(self.manager, pdir, branch)
+                else:
+                    client = self._get_client()
+                    wt_res = await client.create_worktree_async(branch_name=branch, project_dir=pdir)
                 target_dir = wt_res[0] if isinstance(wt_res, (tuple, list)) else wt_res
                 if target_dir:
                     if hasattr(self.app, "switch_project_dir"):
@@ -523,9 +538,11 @@ class BranchScreen(BaseModalScreen[Any]):
             return
 
         pdir = self.project_dir or getattr(self.app, "project_dir", None) or os.getcwd()
-        mgr = self.manager or _get_mgr()
-
-        conflicts = await self._check_conflicts(mgr, pdir, source_branch, target_branch)
+        if self.manager:
+            conflicts = await self._check_conflicts(self.manager, pdir, source_branch, target_branch)
+        else:
+            client = self._get_client()
+            conflicts = await client.check_merge_conflicts_async(source=source_branch, target=target_branch, project_dir=pdir)
         has_conflicts = False
         if isinstance(conflicts, tuple):
             has_conflicts = bool(conflicts[0])
@@ -541,7 +558,11 @@ class BranchScreen(BaseModalScreen[Any]):
 
         async def on_confirm(confirmed: bool) -> None:
             if confirmed:
-                merge_res = await self._merge(mgr, pdir, source_branch, target_branch)
+                if self.manager:
+                    merge_res = await self._merge(self.manager, pdir, source_branch, target_branch)
+                else:
+                    client = self._get_client()
+                    merge_res = await client.merge_branch_async(source=source_branch, target=target_branch, project_dir=pdir)
                 success = merge_res if isinstance(merge_res, bool) else getattr(merge_res, "success", True)
                 if isinstance(merge_res, (tuple, list)):
                     success = bool(merge_res[0])
@@ -620,13 +641,15 @@ class BranchScreen(BaseModalScreen[Any]):
             return
 
         pdir = self.project_dir or getattr(self.app, "project_dir", None) or os.getcwd()
-        mgr = self.manager or _get_mgr()
-
         wt_path = path or ""
 
         async def on_confirm(confirmed: bool) -> None:
             if confirmed:
-                await self._remove_wt(mgr, pdir, wt_path=wt_path, branch_name=branch, delete_branch=False)
+                if self.manager:
+                    await self._remove_wt(self.manager, pdir, wt_path=wt_path, branch_name=branch, delete_branch=False)
+                else:
+                    client = self._get_client()
+                    await client.remove_worktree_async(wt_path, branch_name=branch, project_dir=pdir, delete_branch=False)
                 if hasattr(self.app, "notify"):
                     self.app.notify(f"Deleted worktree for '{branch}'", severity="information")
                 await self.refresh_list_async()

@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 from textual.app import App
 from textual.widgets.option_list import Option
@@ -20,12 +20,16 @@ class TestModelScreenBuildData(unittest.TestCase):
         self.assertTrue(ModelScreen._is_active_model("p1", "model-a", "p1", "model-a"))
 
     def test_is_active_model_display_name_match(self):
-        with patch("johnston.core.domain.policies.models_catalog.catalog.get_model_display_name", return_value="display name"):
-            self.assertTrue(ModelScreen._is_active_model("p1", "model-a", "p1", "Model A"))
+        from johnston.core.dto import ModelInfoDTO
+
+        model = ModelInfoDTO(name="model-a", display_name="Model A", provider="p1")
+        self.assertTrue(ModelScreen._is_active_model("p1", model, "p1", "Model A"))
 
     def test_is_active_model_display_name_no_match(self):
-        with patch("johnston.core.domain.policies.models_catalog.catalog.get_model_display_name", side_effect=["foo", "bar"]):
-            self.assertFalse(ModelScreen._is_active_model("p1", "model-a", "", "Model A"))
+        from johnston.core.dto import ModelInfoDTO
+
+        model = ModelInfoDTO(name="model-a", display_name="Other Name", provider="p1")
+        self.assertFalse(ModelScreen._is_active_model("p1", model, "", "Model A"))
 
     def test_build_data_dict_single_provider_active(self):
         data = {"prov1": {"name": "Provider 1", "models": ["model-a", "model-b"]}}
@@ -60,11 +64,39 @@ class TestModelScreenBuildData(unittest.TestCase):
         self.assertNotIn("●", screen.raw_options[1])
 
     def test_build_data_vision_badge(self):
-        with patch("johnston.core.domain.policies.models_catalog.catalog.has_vision", side_effect=lambda prov, m: m == "gpt-4o"):
-            data = {"openai": {"name": "OpenAI", "models": ["gpt-4o", "gpt-3.5-turbo"]}}
-            screen = ModelScreen(models_data=data, current_model="", current_provider="openai")
-            self.assertIn("vision", screen.raw_options[1])
-            self.assertNotIn("vision", screen.raw_options[2])
+        from johnston.core.dto import ModelInfoDTO
+
+        data = {
+            "openai": {
+                "name": "OpenAI",
+                "models": [
+                    ModelInfoDTO(name="gpt-4o", display_name="gpt-4o", provider="openai", supports_vision=True),
+                    ModelInfoDTO(name="gpt-3.5-turbo", display_name="gpt-3.5-turbo", provider="openai", supports_vision=False),
+                ],
+            }
+        }
+        screen = ModelScreen(models_data=data, current_model="", current_provider="openai")
+        self.assertIn("vision", screen.raw_options[1])
+    def test_build_data_resolves_string_models_via_client(self):
+        from johnston.core.dto import ModelInfoDTO
+
+        mock_client = MagicMock()
+        mock_client.get_model_info.side_effect = lambda p, m: ModelInfoDTO(
+            name=m,
+            display_name="GPT-4 Omni" if m == "gpt-4o" else m,
+            provider=p,
+            supports_vision=(m == "gpt-4o"),
+        )
+        data = {
+            "openai": {
+                "name": "OpenAI",
+                "models": ["gpt-4o", "gpt-3.5-turbo"],
+            }
+        }
+        screen = ModelScreen(models_data=data, current_model="", current_provider="openai", client=mock_client)
+        self.assertIn("GPT-4 Omni", screen.raw_options[1])
+        self.assertIn("vision", screen.raw_options[1])
+        self.assertNotIn("vision", screen.raw_options[2])
 
 
 class ModelHostApp(App[None]):

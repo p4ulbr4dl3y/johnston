@@ -14,7 +14,16 @@ from johnston.core.dto.events import (
 )
 from johnston.core.dto.provider import ModelInfoDTO, ProviderDTO
 from johnston.core.dto.session import MessageDTO, RewindPointDTO, SessionDTO, SessionSummaryDTO
-from johnston.core.dto.system import GitStateDTO, PermissionRequestDTO, RuleDTO, SkillDTO, TaskDTO
+from johnston.core.dto.system import (
+    GitDiffDTO,
+    GitStateDTO,
+    PermissionRequestDTO,
+    RuleDTO,
+    SkillDTO,
+    TaskDTO,
+    WorkspaceRootDTO,
+    WorktreeDTO,
+)
 
 __all__ = [
     "CommandResultDTO",
@@ -22,6 +31,7 @@ __all__ = [
     "CompactionResultDTO",
     "ContentDeltaDTO",
     "ErrorEventDTO",
+    "GitDiffDTO",
     "GitStateDTO",
     "MessageDTO",
     "ModelInfoDTO",
@@ -38,5 +48,7 @@ __all__ = [
     "ToolCallDTO",
     "ToolResultDTO",
     "TurnCompletedDTO",
+    "WorkspaceRootDTO",
+    "WorktreeDTO",
     "parse_event_dto",
 ]
