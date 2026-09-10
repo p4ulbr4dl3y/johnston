@@ -47,13 +47,13 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
         shutil.rmtree(self.test_dir)
 
     async def test_mcp_screen_pilot(self):
-        with patch("johnston.tui.presentation.screens.mcp.get_mcp_manager") as mock_get_mgr:
-            mock_mgr = MagicMock()
-            mock_mgr.load_servers.return_value = [
+        with patch("johnston.tui.presentation.screens.mcp.McpService") as MockMcpService:
+            mock_svc = MagicMock()
+            mock_svc.list_servers.return_value = [
                 {"name": "srv1", "command": "python", "scope": "global"}
             ]
-            mock_mgr.toggle_server.return_value = False
-            mock_get_mgr.return_value = mock_mgr
+            mock_svc.toggle_server.return_value = False
+            MockMcpService.return_value = mock_svc
 
             screen = MCPScreen()
             app = DummyHostApp(screen)

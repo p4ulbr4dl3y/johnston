@@ -76,7 +76,7 @@ async def restore_message_item(
                     from johnston.core.application.session.facade import resolve_session_by_title
 
                     curr_sid = getattr(app, "current_session_id", None) if app else None
-                    found = resolve_session_by_title(str(title), parent_id=curr_sid)
+                    found = resolve_session_by_title(str(title), parent_id=curr_sid, app=app)
                     if found and getattr(found, "id", None):
                         sub_id = str(found.id)
                         f_status = getattr(found, "status", None)

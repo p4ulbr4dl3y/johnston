@@ -111,7 +111,7 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         from johnston.core.application.session.facade import resolve_session_by_title
 
         curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
-        self.session = resolve_session_by_title(self.session_id_or_desc, parent_id=curr_session_id)
+        self.session = resolve_session_by_title(self.session_id_or_desc, parent_id=curr_session_id, app=self.app)
 
         if not self.session:
 
