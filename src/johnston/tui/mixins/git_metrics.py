@@ -58,20 +58,10 @@ class GitMetricsMixin:
             pass
 
     def _compute_branch_sync(self, cwd: str | None = None) -> str:
-        """(sync) Run git branch detection off the event loop thread."""
-        try:
-            from johnston.core.application.generation.prompt_builder import get_git_info
+        """(sync) Delegate branch detection to the core git metrics service."""
+        from johnston.core.infrastructure.platform.git_metrics import get_branch_info
 
-            target_cwd = cwd or os.getcwd()
-            info = (get_git_info(cwd=target_cwd) or "").strip()
-            # format_git_branch_info returns a bare branch name (e.g. "main"),
-            # "detached HEAD (<sha>)", or "" when not a repo.
-            if info.startswith("detached HEAD"):
-                return info.replace("detached HEAD (", "detached (")
-            return info
-        except Exception:
-            pass
-        return ""
+        return get_branch_info(cwd)
 
     def _git_diff_stats(self, cwd: str | None = None) -> str:
         """Return '+add/-del' line-count diff vs HEAD, cached 5s. Returns '' when unavailable."""
@@ -94,18 +84,19 @@ class GitMetricsMixin:
         try:
             asyncio.get_running_loop().create_task(self._compute_diff_async(target_cwd))
         except RuntimeError:
-            text = self._compute_diff_sync(target_cwd)
+            from johnston.core.infrastructure.platform.git_metrics import get_diff_stats
+
+            text = get_diff_stats(target_cwd)
             self._diff_loading = False
             self._diff_text = text
             self._diff_time = time.time()
         return getattr(self, "_diff_text", "") or ""
 
     async def _compute_diff_async(self, cwd: str | None = None) -> None:
-        import asyncio
-        import time
+        from johnston.core.infrastructure.platform.git_metrics import get_diff_stats_async
 
         try:
-            text = await asyncio.to_thread(self._compute_diff_sync, cwd)
+            text = await get_diff_stats_async(cwd)
         finally:
             self._diff_loading = False
         self._diff_text = text
@@ -115,44 +106,6 @@ class GitMetricsMixin:
                 self._on_diff_updated()
         except Exception:
             pass
-
-    def _compute_diff_sync(self, cwd: str | None = None) -> str:
-        text = ""
-        try:
-            import subprocess
-
-            target_cwd = cwd or os.getcwd()
-            res = subprocess.run(
-                ["git", "diff", "HEAD", "--numstat"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-                cwd=target_cwd,
-            )
-            if res.returncode != 0:
-                res = subprocess.run(
-                    ["git", "diff", "--numstat"],
-                    capture_output=True,
-                    text=True,
-                    timeout=2,
-                    cwd=target_cwd,
-                )
-            if res.returncode == 0 and res.stdout.strip():
-                adds = dels = 0
-                for line in res.stdout.splitlines():
-                    parts = line.split("\t")
-                    if len(parts) < 2:
-                        continue
-                    try:
-                        adds += int(parts[0])
-                        dels += int(parts[1])
-                    except ValueError:
-                        pass
-                if adds or dels:
-                    text = f"+{adds} / -{dels}"
-        except Exception:
-            pass
-        return text
 
     def _on_diff_updated(self) -> None:
         """Hook called after an async diff finishes; override in subclasses."""
