@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shutil
 from typing import Any, Optional, Tuple
 
 from johnston.core.infrastructure.platform.paths import WORKTREES_DIR
@@ -81,8 +82,15 @@ class SubagentWorktreeManager(GitWorktreeManager):
         os.makedirs(base_worktree_dir, exist_ok=True)
 
         wt_path = os.path.join(base_worktree_dir, session_id)
+        # Existing live worktree: return as-is. Stale/partial dir (crash leftovers,
+        # orphan checkout) must not be reused — remove it and recreate from git state.
         if os.path.exists(wt_path):
-            return wt_path
+            if SubagentWorktreeManager.is_git_repo(wt_path):
+                return wt_path
+            try:
+                shutil.rmtree(wt_path, ignore_errors=True)
+            except Exception:
+                pass
 
         # Clean up any leftover worktree registration with same session_id (keep branch)
         SubagentWorktreeManager.cleanup_worktree(project_dir, wt_path, branch_name, keep_branch=True)
@@ -219,7 +227,7 @@ class SubagentWorktreeManager(GitWorktreeManager):
         branch_name = getattr(session, "branch_name", "") or ""
         if not project_dir or not branch_name:
             return project_dir
-        if os.path.isdir(project_dir):
+        if os.path.isdir(project_dir) and SubagentWorktreeManager.is_git_repo(project_dir):
             return project_dir
         reattached = None
         if parent_dir:
@@ -277,15 +285,6 @@ class SubagentWorktreeManager(GitWorktreeManager):
     ) -> Tuple[Optional[str], Optional[str]]:
         """Appends branch merge notice to acc if changes exist, and cleans up worktree."""
         if wt_path and wt_branch and os.path.isdir(wt_path):
-            is_cancelled = False
-            if session is not None:
-                st = str(getattr(session, "status", "")).lower()
-                is_cancelled = "cancel" in st or bool(getattr(session, "was_killed", False))
-
-            if is_cancelled:
-                SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=False)
-                return None, None
-
             summary_text, has_changes = SubagentWorktreeManager.get_worktree_diff_summary(
                 parent_dir, wt_path, wt_branch
             )

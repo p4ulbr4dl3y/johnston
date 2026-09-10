@@ -70,14 +70,34 @@ async def test_message_subagent_rejects_legacy_session_id_alias(msg_tool, monkey
 
 
 @pytest.mark.asyncio
-async def test_send_subagent_followup_cancelled_session_rejected():
+async def test_send_subagent_followup_resumes_cancelled_session(monkeypatch):
+    import tempfile
+
     from johnston.core.application.session.stream_followup import send_subagent_followup
     from johnston.core.domain.entities.session import AgentSession, SessionStatus
+    from johnston.core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
     session = AgentSession(session_id="sub-cancelled", kind="subagent", status=SessionStatus.CANCELLED)
-    res = await send_subagent_followup(session, "try again", ctx=MagicMock(), store=MagicMock())
-    assert res.status == ToolResultStatus.ERROR
-    assert "cancelled" in res.content.lower()
+    session.branch_name = "subagent/x"
+    session.agent = MagicMock()
+
+    ctx = MagicMock()
+    ctx.project_dir = "/tmp/fake"
+    ctx.host = MagicMock()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        async def _fake_ensure(sess, parent_dir=None):
+            return tmp
+
+        monkeypatch.setattr(
+            SubagentWorktreeManager,
+            "ensure_worktree_available_async",
+            _fake_ensure,
+        )
+
+        res = await send_subagent_followup(session, "try again", ctx=ctx, store=None)
+        assert res.status == ToolResultStatus.RUNNING
+        assert "[subagent resumed | id sub-cancelled]" in res.content
 
 
 @pytest.mark.asyncio
@@ -96,6 +116,37 @@ async def test_send_subagent_followup_returns_running_status():
     res = await send_subagent_followup(session, "continue", ctx=ctx, store=None)
     assert res.status == ToolResultStatus.RUNNING
     assert "[subagent resumed | id sub-active]" in res.content
+
+
+@pytest.mark.asyncio
+async def test_send_subagent_followup_dead_worktree_fails(monkeypatch):
+    from johnston.core.application.session.stream_followup import send_subagent_followup
+    from johnston.core.domain.entities.session import AgentSession, SessionStatus
+    from johnston.core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
+
+    session = AgentSession(session_id="sub-dead", kind="subagent", status=SessionStatus.COMPLETED)
+    session.project_dir = "/does/not/exist"
+    session.branch_name = "subagent/x"
+    session.agent = MagicMock()
+
+    ctx = MagicMock()
+    ctx.project_dir = "/tmp/fake"
+    ctx.host = MagicMock()
+
+    async def _fake_ensure(sess, parent_dir=None):
+        return sess.project_dir
+
+    monkeypatch.setattr(
+        SubagentWorktreeManager,
+        "ensure_worktree_available_async",
+        _fake_ensure,
+    )
+
+    res = await send_subagent_followup(session, "continue", ctx=ctx, store=None)
+    assert res.status == ToolResultStatus.ERROR
+    assert res.is_error
+    assert "worktree" in res.content.lower()
+    assert "subagent" in res.content.lower()
 
 
 def test_message_subagent_is_concurrency_safe():

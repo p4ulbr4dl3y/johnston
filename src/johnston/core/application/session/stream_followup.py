@@ -1,6 +1,7 @@
 """Follow-up messages for existing subagent sessions."""
 
 import asyncio
+import os
 from typing import Any
 
 from johnston.core.application.session.stream_agent import configure_subagent_agent
@@ -21,9 +22,6 @@ async def send_subagent_followup(
     """
     if not message:
         return ToolResult.error("params", name="message", detail="required for 'message_subagent'")
-
-    if getattr(session, "status", None) == SessionStatus.CANCELLED:
-        return ToolResult.error("status", name=session.id, detail="subagent session is cancelled")
 
     # Mirror the main agent's semantics: a follow-up can be sent in any
     # status. If the subagent is currently busy (live async_task), the
@@ -77,6 +75,12 @@ async def send_subagent_followup(
             project_dir = await SubagentWorktreeManager.ensure_worktree_available_async(
                 session, parent_dir=ctx.project_dir
             )
+            if not project_dir or not os.path.isdir(project_dir):
+                return ToolResult.error(
+                    "worktree",
+                    name=session.id,
+                    detail=f"subagent worktree unavailable (project_dir='{session.project_dir}', branch='{session.branch_name}')",
+                )
             subagent.project_dir = project_dir
             subagent.cwd = project_dir
             subagent.worktree_branch = session.branch_name

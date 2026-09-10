@@ -217,6 +217,8 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
 
         wt_path = os.path.join(WORKTREES_DIR, "attach-existing")
         os.makedirs(wt_path, exist_ok=True)
+        # Real live git worktree on disk -> returned as-is
+        subprocess.run(["git", "init", "-b", "main"], cwd=wt_path, capture_output=True, text=True)
         try:
             result = SubagentWorktreeManager.attach_worktree(self.repo_dir, "attach-existing", "branch-x")
             self.assertEqual(result, wt_path)
@@ -224,6 +226,30 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
             import shutil
 
             shutil.rmtree(wt_path, ignore_errors=True)
+
+    def test_attach_worktree_stale_dir_recreated(self):
+        from unittest.mock import patch
+
+        from johnston.core.infrastructure.platform.paths import WORKTREES_DIR
+
+        wt_path = os.path.join(WORKTREES_DIR, "attach-stale")
+        os.makedirs(wt_path, exist_ok=True)  # orphan dir, no git
+
+        def fake_run_git(args, **kwargs):
+            if args[:2] == ["worktree", "add"]:
+                os.makedirs(wt_path, exist_ok=True)
+            return subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with (
+            patch.object(SubagentWorktreeManager, "is_git_repo", side_effect=lambda p: p != wt_path),
+            patch("johnston.core.infrastructure.runtime.subagent_worktree.run_git", side_effect=fake_run_git),
+        ):
+            result = SubagentWorktreeManager.attach_worktree(self.repo_dir, "attach-stale", "branch-x")
+        self.assertIsNotNone(result)
+        self.assertEqual(result, wt_path)
+        import shutil
+
+        shutil.rmtree(wt_path, ignore_errors=True)
 
     def test_attach_worktree_add_failure(self):
         from unittest.mock import patch

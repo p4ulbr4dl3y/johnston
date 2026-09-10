@@ -443,7 +443,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             res = SubagentService.kill_subagent(session, self.store)
             self.assertEqual(res.content, f"[killed {session.id}]")
             mock_cleanup.assert_called_once_with(
-                self.store.project_path, "/tmp/wt/task-kill-wt", "subagent/task-kill-wt", keep_branch=False
+                self.store.project_path, "/tmp/wt/task-kill-wt", "subagent/task-kill-wt", keep_branch=True
             )
 
     def test_prune_merged_subagent_branches(self):

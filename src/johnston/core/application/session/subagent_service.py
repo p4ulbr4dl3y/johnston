@@ -291,13 +291,20 @@ class SubagentService:
                 if store:
                     store.save(session)
 
-            # Cleanup worktree and discard branch on explicit kill when no live task is running
+            # Cleanup worktree when no live task is running: auto-commit any
+            # pending work first, then keep the branch if it holds commits
+            # beyond parent HEAD (reversible via message_subagent); discard
+            # it only when empty.
             wt_path = getattr(session, "project_dir", "") or ""
             wt_branch = getattr(session, "branch_name", "") or ""
             parent_dir = getattr(store, "project_path", "") or ""
             if wt_branch and parent_dir:
                 try:
-                    SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=False)
+                    SubagentWorktreeManager.get_worktree_diff_summary(parent_dir, wt_path, wt_branch)
+                except Exception:
+                    pass
+                try:
+                    SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=True)
                 except Exception:
                     pass
 
