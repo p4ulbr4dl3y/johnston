@@ -3,11 +3,12 @@ from johnston.tui.utils.patch import apply_textual_patches
 apply_textual_patches()
 
 import asyncio
+import os
 from pathlib import Path
 
 from textual.app import App
 
-from johnston.core.infrastructure.platform.logging_setup import adopt_task_exception
+from johnston.tui.adapters import core_bridge
 from johnston.tui.mixins.actions import ActionsMixin
 from johnston.tui.mixins.lifecycle import LifecycleMixin
 from johnston.tui.mixins.message_flow import MessageFlowMixin
@@ -19,7 +20,13 @@ _CSS_PATH = Path(__file__).resolve().parents[1] / "app.tcss"
 
 
 class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, ActionsMixin, TaskWidgetRegistryMixin, App):
-    """Minimalist Johnston TUI agent with provider/model configuration and isolated project sessions"""
+    """Minimalist Johnston TUI agent with provider/model configuration and isolated project sessions
+
+    Satisfies ``core.interfaces.host.HostProtocol`` structurally (runtime-checkable
+    Protocol — cannot be listed as a base because Textual ``App`` uses a fixed
+    metaclass). core/tools reach the UI through that contract, TUI reaches core
+    through ``tui.adapters.core_bridge`` — one arrow in each direction.
+    """
 
     ENABLE_COMMAND_PALETTE = False
     CSS_PATH = str(_CSS_PATH)
@@ -47,7 +54,6 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         theme: str | None = None,
     ):
         super().__init__()
-        from johnston.core.infrastructure.config.config_helpers import load_sandbox_config
         from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
         from johnston.tui.app.startup import (
             apply_startup_flags,
@@ -62,7 +68,13 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         self.client = None
         build_agent(self)
         resolve_session_id(self, self.sm, resume_session_id, continue_latest)
-        self.sandbox_enabled = load_sandbox_config()
+        self.sandbox_enabled = core_bridge.load_sandbox_config()
+        # Declared HostProtocol attributes (structurally checked by core).
+        # ``project_dir`` was only set on switch before; defaulting to cwd lets
+        # tools/context resolve it without getattr fallbacks.
+        self.project_dir = os.getcwd()
+        self.is_read_only = False
+        self.session = None
         apply_startup_flags(
             self,
             theme=theme,
@@ -81,7 +93,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             task = loop.create_task(coro)
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
-            adopt_task_exception(task)
+            core_bridge.adopt_task_exception(task)
             return task
         except RuntimeError:
             return None
@@ -94,9 +106,9 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             super().copy_to_clipboard(text)
         except Exception:
             pass
-        from johnston.core.infrastructure.platform.platform_utils import copy_to_os_clipboard_async
+        from johnston.tui.adapters import core_bridge as _cb
 
-        self.create_tracked_task(copy_to_os_clipboard_async(text))
+        self.create_tracked_task(_cb.copy_to_os_clipboard_async(text))
         if notify and hasattr(self, "notify"):
             try:
                 self.notify("Copied to clipboard", severity="information", timeout=1.5)
@@ -134,9 +146,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
     def get_theme_variable_defaults(self) -> dict[str, str]:
         """Return design token defaults for TCSS stylesheet compilation."""
-        from johnston.core.domain.defaults.themes import ZINC_DARK
-
-        return dict(ZINC_DARK.tcss_vars)
+        return core_bridge.get_theme_variable_defaults()
 
     def action_quit(self) -> None:
         """Exit application immediately, cancelling in-flight workers."""

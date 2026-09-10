@@ -4,10 +4,12 @@ Pure functions that build the app's managers, agent, resolved session id and
 startup flags. Each takes the app instance explicitly as its first argument so
 the composition root (``JohnstonApp.__init__``) stays a thin list of calls and
 the side-effect order remains identical to the historical inline code.
+
+All core access goes through ``tui.adapters.core_bridge`` — no direct core
+imports in this module.
 """
 
-import asyncio
-from typing import Any
+from johnston.tui.adapters import core_bridge
 
 
 def register_textual_themes(app) -> None:
@@ -22,47 +24,13 @@ def register_textual_themes(app) -> None:
 
 def configure_global_managers(tool_name_normalizer) -> None:
     """Configure the global PermissionManager and RoleRegistry singletons."""
-    from johnston.core.application.permission.permission_manager import PermissionManager
-    from johnston.core.application.roles.role_registry import RoleRegistry
-
-    PermissionManager.configure_instance(tool_name_normalizer=tool_name_normalizer)
-    RoleRegistry._instance = RoleRegistry(tool_name_normalizer=tool_name_normalizer)
+    core_bridge.configure_permission_manager(tool_name_normalizer)
+    core_bridge.configure_role_registry(tool_name_normalizer)
 
 
 def build_agent(app) -> None:
     """Create provider manager, session store, task manager, active agent and client facade."""
-    from johnston.core.application.provider.provider_manager import ProviderManager
-    from johnston.core.client import JohnstonClient
-    from johnston.core.infrastructure.storage.session_store import SessionStore
-    from johnston.core.infrastructure.tasks.manager import TaskManager
-
-    app.pm = ProviderManager()
-    app.sm = SessionStore()
-    app.task_manager = TaskManager()
-    app._subagent_tools: dict[str, Any] = {}
-    # task_id -> shell tool card: completion handle for the message-flow
-    # repaint once a background shell task exits (chunks stream via the
-    # task's output listeners; this registry is only for the final status).
-    app._background_shell_widgets: dict[str, Any] = {}
-    app._foreground_shell_tasks: dict[str, Any] = {}
-    app.agent = app.pm.create_active_agent()
-    app.role = getattr(app.agent, "role", "worker") if app.agent else "worker"
-    if app.agent:
-        app.agent.app = app
-
-    app.client = JohnstonClient(
-        pm=app.pm,
-        store=app.sm,
-        agent=app.agent,
-        task_manager=app.task_manager,
-    )
-
-    app.selection_copy_active = False
-    app.message_queue = []
-    app.is_generating = False
-    app._is_compacting = False
-    app.is_compacting = False
-    app._background_tasks: set[asyncio.Task] = set()
+    core_bridge.build_core_services(app)
 
 
 def resolve_session_id(app, sm, resume_session_id, continue_latest) -> None:
@@ -129,25 +97,13 @@ def apply_sandbox(app, sandbox) -> None:
 def apply_mode(app, mode) -> None:
     """Set the permission execution mode from the ``--mode`` flag."""
     if mode:
-        from johnston.core.application.permission.permission_manager import PermissionManager
-        from johnston.core.domain.policies.permission_policy import ExecutionMode
-
-        try:
-            PermissionManager.get_instance().set_session_mode(ExecutionMode(mode.lower()))
-        except Exception:
-            pass
+        core_bridge.apply_execution_mode(app, mode)
 
 
 def apply_role(app, role) -> None:
     """Apply the role to the agent and track it on the app from the ``--role`` flag."""
     if role and getattr(app, "agent", None):
-        from johnston.core.application.roles.apply import apply_role as apply_role_to_agent
-
-        try:
-            apply_role_to_agent(app.agent, role, is_subagent=False)
-            app.role = role
-        except Exception:
-            pass
+        core_bridge.apply_role_to_agent(app, role)
 
 
 def apply_initial_prompt(app, initial_prompt) -> None:

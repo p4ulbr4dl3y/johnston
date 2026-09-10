@@ -26,6 +26,12 @@ from johnston.core.dto.system import (
     WorkspaceRootDTO,
     WorktreeDTO,
 )
+from johnston.core.dto.tui import (
+    FooterCacheDTO,
+    RoleInfoDTO,
+    SessionSnapshotDTO,
+    StatusFooterDTO,
+)
 
 __all__ = [
     "CommandResultDTO",
@@ -54,5 +60,9 @@ __all__ = [
     "TurnCompletedDTO",
     "WorkspaceRootDTO",
     "WorktreeDTO",
+    "FooterCacheDTO",
+    "RoleInfoDTO",
+    "SessionSnapshotDTO",
+    "StatusFooterDTO",
     "parse_event_dto",
 ]
