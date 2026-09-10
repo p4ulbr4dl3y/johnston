@@ -1,7 +1,6 @@
 """Modal screen for managing workspace roots."""
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
@@ -96,40 +95,10 @@ def format_workspace_path(path: str, max_width: int) -> str:
 
 
 def get_root_scope(pm: PermissionManager, path: str) -> str:
-    """Determine the scope ('primary', 'project', 'local', or 'session') of a workspace root."""
-    norm = os.path.realpath(os.path.abspath(path))
-    primary = os.path.realpath(os.path.abspath(pm.current_project_dir or os.getcwd()))
-    if norm == primary:
-        return "primary"
+    """Determine workspace root scope (delegated to core permission interactor)."""
+    from johnston.core.application.permission.interactor import get_root_scope as core_get_root_scope
 
-    pdir = primary
-    for cfg_file, scope in (("config.local.json", "local"), ("config.json", "project")):
-        target = os.path.join(pdir, ".johnston", cfg_file)
-        if os.path.isfile(target):
-            try:
-                with open(target, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                perms = data.get("permissions", {})
-                roots = perms.get("writable_roots", [])
-                if any(os.path.realpath(os.path.abspath(r)) == norm for r in roots if isinstance(r, str)):
-                    return scope
-            except Exception:
-                pass
-
-    try:
-        from johnston.core.application.permission.permission_manager import CONFIG_FILE as global_path
-
-        if os.path.isfile(global_path):
-            with open(global_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            perms = data.get("permissions", {})
-            roots = perms.get("writable_roots", [])
-            if any(os.path.realpath(os.path.abspath(r)) == norm for r in roots if isinstance(r, str)):
-                return "global"
-    except Exception:
-        pass
-
-    return "session"
+    return core_get_root_scope(path)
 
 
 class WorkspaceInput(Input):
@@ -403,7 +372,9 @@ class WorkspaceScreen(BaseModalScreen[None]):
                 self.app.notify(f"Directory '{clean_path}' does not exist", severity="error")
             return
 
-        self.pm.add_workspace_root(abs_path)
+        from johnston.core.application.permission.interactor import add_workspace_root
+
+        add_workspace_root(abs_path, scope="session")
         event.input.value = ""
         self.refresh_list()
 
@@ -430,7 +401,9 @@ class WorkspaceScreen(BaseModalScreen[None]):
             clean_path = decode_pasted_path(line)
             abs_path = os.path.realpath(os.path.abspath(os.path.expanduser(clean_path)))
             if os.path.isdir(abs_path):
-                self.pm.add_workspace_root(abs_path)
+                from johnston.core.application.permission.interactor import add_workspace_root
+
+                add_workspace_root(abs_path, scope="session")
                 added_any = True
             elif len(lines) == 1:
                 if self.app and hasattr(self.app, "notify"):
@@ -480,7 +453,9 @@ class WorkspaceScreen(BaseModalScreen[None]):
     def _confirm_and_remove(self, path: str) -> None:
         def on_confirmed(confirmed: bool) -> None:
             if confirmed:
-                self.pm.remove_persisted_workspace_root(path)
+                from johnston.core.application.permission.interactor import remove_workspace_root
+
+                remove_workspace_root(path)
                 self.refresh_list()
             try:
                 self.query_one("#workspace-option-list", OptionList).focus()
@@ -498,5 +473,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
                 callback=on_confirmed,
             )
         else:
-            self.pm.remove_persisted_workspace_root(path)
+            from johnston.core.application.permission.interactor import remove_workspace_root
+
+            remove_workspace_root(path)
             self.refresh_list()

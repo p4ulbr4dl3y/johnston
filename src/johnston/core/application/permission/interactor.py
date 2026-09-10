@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Tuple
 
-from johnston.core.application.permission.helpers import CONFIG_FILE
+from johnston.core.application.permission.helpers import get_global_config_file
 from johnston.core.application.permission.permission_manager import PermissionManager
 from johnston.core.domain.policies.permission_policy import (
     ExecutionMode,
@@ -20,6 +20,8 @@ from johnston.core.infrastructure.platform.platform_utils import read_json
 
 __all__ = [
     "get_root_scope",
+    "add_workspace_root",
+    "remove_workspace_root",
     "cycle_execution_mode",
     "apply_permission_choice",
     "build_permission_options",
@@ -178,6 +180,25 @@ def build_permission_options(
     return raw_options, suggested
 
 
+def add_workspace_root(path: str, *, scope: str = "auto") -> None:
+    """Persists a workspace root, delegating to the PermissionManager singleton.
+
+    scope matches ``save_workspace_root`` ('session', 'local', 'project', or
+    'auto'). The default 'auto' resolves to local when the project is a git
+    repository, else project.
+    """
+    PermissionManager.get_instance().save_workspace_root(path, scope=scope)
+
+
+def remove_workspace_root(path: str, *, project_dir: str | None = None) -> None:
+    """Removes a workspace root from memory and persisted config.
+
+    project_dir resolves the project config directory; defaults to the current
+    project dir on the PermissionManager singleton.
+    """
+    PermissionManager.get_instance().remove_persisted_workspace_root(path, project_dir=project_dir)
+
+
 def get_root_scope(path: str) -> str:
     """Determines the scope of a workspace root path.
 
@@ -203,8 +224,8 @@ def get_root_scope(path: str) -> str:
             ):
                 return scope
 
-    if os.path.isfile(CONFIG_FILE):
-        data = read_json(CONFIG_FILE, default={})
+    if os.path.isfile(get_global_config_file()):
+        data = read_json(get_global_config_file(), default={})
         if isinstance(data, dict) and any(
             os.path.realpath(os.path.abspath(r)) == norm
             for r in data.get("permissions", {}).get("writable_roots", [])
