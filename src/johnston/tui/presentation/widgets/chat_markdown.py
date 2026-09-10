@@ -35,10 +35,10 @@ from textual.widgets._markdown import (
     MarkdownTableContent,
 )
 
-from johnston.core.domain.defaults.themes import ZINC_DARK
 from johnston.tui.adapters import core_bridge
 
 LruCache = core_bridge.LruCache
+ZINC_DARK = core_bridge.get_theme_vars()
 
 
 class TransparentSyntax(Syntax):

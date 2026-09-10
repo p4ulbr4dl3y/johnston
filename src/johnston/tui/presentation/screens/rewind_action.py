@@ -132,9 +132,9 @@ class RewindActionScreen(BaseModalScreen[Optional[RewindSelection]]):
                         scoped_files=scoped,
                     )
                 else:
-                    from johnston.core.client import JohnstonClient
+                    from johnston.tui.adapters import core_bridge
 
-                    diff_items = JohnstonClient().get_checkpoint_diff(
+                    diff_items = core_bridge.JohnstonClient().get_checkpoint_diff(
                         self.session_id,
                         seq_idx,
                         project_path=self.project_path,

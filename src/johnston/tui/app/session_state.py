@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from johnston.core.domain.policies.messages import is_ui_visible_user_message
+from johnston.tui.adapters import core_bridge
+
+is_ui_visible_user_message = core_bridge.is_ui_visible_user_message
 
 
 def collect_session_data(app: Any) -> Optional[dict]:

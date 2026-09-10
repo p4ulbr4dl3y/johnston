@@ -44,9 +44,9 @@ def update_background_shell_widget(app: Any, task_id: str, result: str) -> None:
         )
     task_log = getattr(task, "log_path", None)
 
-    from johnston.core.tools.base import truncate_output
+    from johnston.tui.adapters import core_bridge
 
-    final_result = truncate_output(
+    final_result = core_bridge.truncate_output(
         result or "(no output)",
         max_chars=4000,
         tool_name="shell",
@@ -90,7 +90,7 @@ def on_background_shell_completed(app: Any, task_id: str, command_str: str, resu
         if not getattr(app, "is_app_active", True):
             return
         update_background_shell_widget(app, task_id, result)
-        from johnston.core.tools.base import format_background_notification, truncate_output
+        from johnston.tui.adapters import core_bridge
 
         mgr = getattr(app, "task_manager", None)
         task = None
@@ -103,7 +103,7 @@ def on_background_shell_completed(app: Any, task_id: str, command_str: str, resu
             return
         task_log = getattr(task, "log_path", None)
 
-        body = truncate_output(
+        body = core_bridge.truncate_output(
             result,
             max_chars=4000,
             tool_name="shell",
@@ -135,7 +135,7 @@ def on_background_shell_completed(app: Any, task_id: str, command_str: str, resu
                 )
                 body = f"{state_hint}\n{body}"
 
-        msg = format_background_notification(
+        msg = core_bridge.format_background_notification(
             "shell",
             command_str,
             task_id,
@@ -169,7 +169,7 @@ def on_background_shell_progress(
     if not getattr(app, "is_app_active", True):
         return
     try:
-        from johnston.core.tools.base import format_background_notification, truncate_output
+        from johnston.tui.adapters import core_bridge
 
         mgr = getattr(app, "task_manager", None)
         task = None
@@ -182,7 +182,7 @@ def on_background_shell_progress(
             return
         task_log = getattr(task, "log_path", None)
 
-        body = truncate_output(
+        body = core_bridge.truncate_output(
             result,
             max_chars=4000,
             tool_name="shell",
@@ -197,7 +197,7 @@ def on_background_shell_progress(
         )
         body = f"{hint}\n{body}"
 
-        msg = format_background_notification(
+        msg = core_bridge.format_background_notification(
             "shell",
             command_str,
             task_id,

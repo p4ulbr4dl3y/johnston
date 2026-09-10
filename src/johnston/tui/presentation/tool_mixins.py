@@ -6,11 +6,7 @@ from typing import Any
 
 from rich.text import Text
 
-from johnston.core.domain.defaults.config import (
-    COLOR_STATUS_ERROR,
-    COLOR_STATUS_RUNNING,
-    COLOR_STATUS_SUCCESS,
-)
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.tool_renderers import (
     format_code_with_line_numbers,
     format_plan_display,
@@ -18,6 +14,8 @@ from johnston.tui.presentation.tool_renderers import (
 )
 from johnston.tui.presentation.widgets.chat_diff import format_edit_diff
 from johnston.tui.utils.lexer import guess_lexer_name
+
+_STATUS_COLORS = core_bridge.get_theme_constants()
 
 _MISSING = object()
 
@@ -148,10 +146,10 @@ class ParsingMixin:
 
         if self.status in ("running", "generating"):
             val = getattr(theme, "accent_warning", None) if theme else None
-            return val if isinstance(val, str) else COLOR_STATUS_RUNNING
+            return val if isinstance(val, str) else _STATUS_COLORS["COLOR_STATUS_RUNNING"]
         elif self.status in ("error", "cancelled") or (self.returncode is not None and self.returncode != 0):
             val = getattr(theme, "accent_error", None) if theme else None
-            return val if isinstance(val, str) else COLOR_STATUS_ERROR
+            return val if isinstance(val, str) else _STATUS_COLORS["COLOR_STATUS_ERROR"]
         else:
             val = getattr(theme, "accent_success", None) if theme else None
-            return val if isinstance(val, str) else COLOR_STATUS_SUCCESS
+            return val if isinstance(val, str) else _STATUS_COLORS["COLOR_STATUS_SUCCESS"]

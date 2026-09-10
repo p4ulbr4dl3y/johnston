@@ -5,7 +5,6 @@ import asyncio
 import inspect
 from typing import Any
 
-from johnston.core.domain.policies.session_naming import FORK_BASE_MAX_LEN
 from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.commands.helpers import (
@@ -281,10 +280,10 @@ def _extract_user_messages(app, session=None) -> list[tuple[int, str]]:
     """Extract list of (idx, text) user messages from session transcript or chat view."""
     user_msgs: list[tuple[int, str]] = []
     if session and getattr(session, "messages", None):
-        from johnston.core.domain.policies.messages import USER_EVENT_TYPE, is_ui_visible_user_message
+        from johnston.tui.adapters import core_bridge
 
         for i, m in enumerate(session.messages):
-            if isinstance(m, dict) and m.get("type") == USER_EVENT_TYPE and is_ui_visible_user_message(m):
+            if isinstance(m, dict) and m.get("type") == core_bridge.get_user_event_type() and core_bridge.is_ui_visible_user_message(m):
                 text = m.get("display_text") or m.get("text", "")
                 user_msgs.append((i, text))
         if user_msgs:
@@ -434,6 +433,8 @@ class ForkCommand(BaseCommand):
     description = "Fork session from a selected message"
 
     async def execute(self, app) -> None:
+        from johnston.tui.adapters import core_bridge
+
         curr_sid = getattr(app, "current_session_id", None)
         if not curr_sid or not hasattr(app, "sm"):
             app.notify("No active session to fork", severity="warning")
@@ -465,7 +466,7 @@ class ForkCommand(BaseCommand):
                 up_to_idx = seq_idx
                 # Base hint only: the store strips any old marker, numbers the
                 # fork among its siblings and appends the "(fork N)" marker.
-                fork_base = clean_heuristic_title(msg_text, max_len=FORK_BASE_MAX_LEN) or None
+                fork_base = clean_heuristic_title(msg_text, max_len=core_bridge.get_fork_base_max_len()) or None
 
             # Wait out cancelled-worker teardown (the "Response Interrupted"
             # divider) before re-rendering the view, so it cannot land
@@ -489,11 +490,10 @@ class ForkCommand(BaseCommand):
             if up_to_idx is not None:
                 try:
                     cv = app.query_one(ChatView)
-                    from johnston.core.domain.policies.messages import transcript_before_turn
 
                     target_msgs = []
                     if up_to_idx > 0 and session and isinstance(getattr(session, "messages", None), list):
-                        target_msgs = transcript_before_turn(session.messages, up_to_idx)
+                        target_msgs = core_bridge.transcript_before_turn(session.messages, up_to_idx)
                     raw_page_size = getattr(cv, "PAGE_SIZE", 50)
                     page_size = raw_page_size if isinstance(raw_page_size, int) else 50
                     if len(target_msgs) > page_size:
@@ -511,7 +511,6 @@ class ForkCommand(BaseCommand):
                     else:
                         cv.rollback_to(-1 if up_to_idx == 0 else selected_child_idx - 1)
                     try:
-                        from johnston.tui.adapters import core_bridge
                         restore_plan_from_messages = core_bridge.get_session_actions()['restore_plan_from_messages']
                         from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
@@ -612,7 +611,6 @@ class DiffCommand(BaseCommand):
         from johnston.tui.adapters import core_bridge
         S2 = core_bridge.get_session_actions()
         _touched_files, get_session_diff = S2['_touched_files'], S2['get_session_diff']
-        from johnston.core.domain.policies.messages import is_ui_visible_user_message
 
         curr_sid = getattr(app, "current_session_id", None)
         proj_path = getattr(app.sm, "project_path", None) if hasattr(app, "sm") else None
@@ -624,7 +622,7 @@ class DiffCommand(BaseCommand):
         scoped_files: list[str] | None = None
         session = app.sm.get(curr_sid, reload=False) if (hasattr(app, "sm") and app.sm and curr_sid) else None
         if session and getattr(session, "messages", None):
-            user_events = [m for m in session.messages if is_ui_visible_user_message(m)]
+            user_events = [m for m in session.messages if core_bridge.is_ui_visible_user_message(m)]
             scoped = _touched_files(user_events, 0)
             if scoped is not None:
                 if not scoped:

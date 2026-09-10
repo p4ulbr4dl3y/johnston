@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from johnston.core.domain.policies.models_catalog import format_context_tokens
+from johnston.tui.adapters import core_bridge
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES
 from johnston.tui.presentation.widgets.footer_layout import (
     format_display_path,
@@ -21,6 +21,8 @@ from johnston.tui.utils.row_format import (
     ellipsize,
     format_cost,
 )
+
+format_context_tokens = core_bridge.format_context_tokens
 
 __all__ = [
     "resolve_status_defaults",

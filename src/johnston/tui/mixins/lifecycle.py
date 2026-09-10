@@ -6,7 +6,6 @@ import threading
 from textual.app import ComposeResult
 from textual.containers import Vertical
 
-from johnston.core.domain.policies.models_catalog import catalog
 from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.attachment_bar import AttachmentBar
 from johnston.tui.presentation.widgets.chat_container import ChatView
@@ -23,7 +22,9 @@ logger = logging.getLogger("johnston.app")
 def _close_catalog_sync() -> None:
     """Run catalog.close() on a private loop (used from the shutdown thread)."""
     try:
-        asyncio.run(catalog.close())
+        from johnston.tui.adapters import core_bridge
+
+        asyncio.run(core_bridge.catalog.close())
     except Exception as err:
         logger.debug(f"Catalog close error: {err}")
 
@@ -31,9 +32,9 @@ def _close_catalog_sync() -> None:
 def _close_tools_sync() -> None:
     """Run aclose_tools() on a private loop (used from the shutdown thread)."""
     try:
-        from johnston.core.tools.registry import aclose_tools
+        from johnston.tui.adapters import core_bridge
 
-        asyncio.run(aclose_tools())
+        asyncio.run(core_bridge.aclose_tools())
     except Exception as err:
         logger.debug(f"Tool instance close error: {err}")
 
@@ -106,12 +107,12 @@ class LifecycleMixin:
                     asyncio.create_task(ResumeCommand().execute(self))
         from johnston.tui.adapters import core_bridge
 
-        catalog.load_cache()
+        core_bridge.catalog.load_cache()
         self.refresh_status_footer()
 
         async def _refresh_catalog_bg() -> None:
             try:
-                await catalog.refresh(force=False)
+                await core_bridge.catalog.refresh(force=False)
             except Exception:
                 pass
 
@@ -226,7 +227,7 @@ class LifecycleMixin:
             logger.debug(f"MCP cleanup error: {err}")
 
         try:
-            from johnston.core.domain.policies.models_catalog import catalog
+            from johnston.tui.adapters import core_bridge
 
             if loop is not None and loop.is_running():
                 # A fire-and-forget create_task() here races app shutdown: the
@@ -240,7 +241,9 @@ class LifecycleMixin:
                 # No running loop: run the close coroutine to completion in a
                 # dedicated loop instead of leaving it un-awaited.
                 try:
-                    asyncio.run(catalog.close())
+                    from johnston.tui.adapters import core_bridge
+
+                    asyncio.run(core_bridge.catalog.close())
                 except Exception:
                     pass
         except Exception as err:

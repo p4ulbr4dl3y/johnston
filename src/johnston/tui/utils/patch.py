@@ -218,13 +218,13 @@ def apply_textual_patches() -> None:
     from textual.color import Color, Gradient
     from textual.widgets import LoadingIndicator
 
-    from johnston.core.domain.defaults.themes import ZINC_DARK
+    from johnston.tui.adapters import core_bridge
     from johnston.tui.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 
     _old_get_theme_variable_defaults = getattr(App, 'get_theme_variable_defaults', lambda self: {})
 
     def _patched_get_theme_variable_defaults(self) -> dict[str, str]:
-        res = dict(ZINC_DARK.tcss_vars)
+        res = dict(core_bridge.get_theme_vars().tcss_vars)
         res.update(_old_get_theme_variable_defaults(self))
         return res
 

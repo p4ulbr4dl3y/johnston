@@ -19,7 +19,9 @@ from rich.cells import cell_len
 from rich.markup import escape
 from rich.text import Text
 
-from johnston.core.domain.policies.models_catalog import format_context_tokens
+from johnston.tui.adapters import core_bridge
+
+format_context_tokens = core_bridge.format_context_tokens
 
 MODAL_WIDE_ROW_WIDTH = 98
 MODAL_MEDIUM_ROW_WIDTH = 80

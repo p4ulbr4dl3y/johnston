@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from johnston.core.client import extract_task_status_details
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.tool_display import extract_subagent_progress
 from johnston.tui.utils.row_format import MODAL_WIDE_ROW_WIDTH, format_badge_row
 
@@ -10,7 +10,7 @@ def extract_shell_task_progress(task: Any) -> str:
     if task is None:
         return ""
 
-    status, dur = extract_task_status_details(task)
+    status, dur = core_bridge.extract_task_status_details(task)
 
     if status == "running":
         return dur if dur and dur != "-" else "running..."
@@ -66,9 +66,9 @@ def format_subagent_task_row(
         else:
             r = getattr(agent, "role", None) if agent else getattr(session, "role", None)
             if isinstance(r, str) and r.strip():
-                from johnston.core.client import get_role_display_name
+                from johnston.tui.adapters import core_bridge
 
-                role_str = get_role_display_name(r)
+                role_str = core_bridge.get_role_display_name(r)
             else:
                 role_str = "Worker"
     elif ":" in clean.partition(" ")[0]:

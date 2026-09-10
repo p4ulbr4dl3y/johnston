@@ -3,7 +3,7 @@ import asyncio
 import logging
 from typing import Any
 
-from johnston.core.domain.policies.messages import is_ui_visible_user_message
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.chat_welcome import WelcomeWidget
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ class ChatViewSessionLoaderMixin:
             msg_list = [dict(m) for m in raw_msgs if isinstance(m, dict)]
 
             has_user_msg = any(
-                isinstance(m, dict) and m.get("type") == "user" and is_ui_visible_user_message(m)
+                isinstance(m, dict) and m.get("type") == "user" and core_bridge.is_ui_visible_user_message(m)
                 for m in msg_list
             )
             if not has_user_msg and getattr(session, "prompt", None):

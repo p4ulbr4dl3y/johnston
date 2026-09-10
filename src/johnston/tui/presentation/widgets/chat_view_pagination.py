@@ -166,13 +166,13 @@ class ChatViewPaginationMixin:
 
     def get_total_user_message_count(self) -> int:
         """Return total count of visible user turns (both unloaded and mounted)."""
-        from johnston.core.domain.policies.messages import is_ui_visible_user_message
+        from johnston.tui.adapters import core_bridge
         from johnston.tui.presentation.widgets.chat_messages import UserMessage
 
         unloaded_count = sum(
             1
             for m in self._unloaded_messages
-            if isinstance(m, dict) and m.get("type") == "user" and is_ui_visible_user_message(m)
+            if isinstance(m, dict) and m.get("type") == "user" and core_bridge.is_ui_visible_user_message(m)
         )
         mounted_count = sum(1 for c in self.children if isinstance(c, UserMessage))
         return unloaded_count + mounted_count

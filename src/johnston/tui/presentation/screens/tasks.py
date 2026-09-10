@@ -8,6 +8,8 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
+from johnston.tui.adapters import core_bridge
+from johnston.tui.adapters.core_bridge import JohnstonClient
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from johnston.tui.presentation.screens.constants import (
@@ -354,7 +356,6 @@ class ShellTasksScreen(BaseTasksListScreen):
         except Exception:
             app = getattr(self, "_app", None)
         client = getattr(app, "client", None) if app else None
-        from johnston.core.client import JohnstonClient
 
         if isinstance(client, JohnstonClient):
             return client
@@ -486,7 +487,6 @@ class SubagentsScreen(BaseTasksListScreen):
         except Exception:
             app = getattr(self, "_app", None)
         client = getattr(app, "client", None) if app else None
-        from johnston.core.client import JohnstonClient
 
         if isinstance(client, JohnstonClient):
             return client
@@ -497,10 +497,8 @@ class SubagentsScreen(BaseTasksListScreen):
         elif client is not None:
             return client
 
-        from johnston.core.client import _get_store
-
         curr_sid = getattr(app, "current_session_id", None) if app else None
-        store = _get_store(app)
+        store = core_bridge.get_store(app)
         return JohnstonClient(store=store, session_id=curr_sid)
 
     def _get_filtered_tasks(self) -> list:
@@ -554,9 +552,9 @@ class SubagentsScreen(BaseTasksListScreen):
             if not role_display:
                 role = getattr(agent, "role", None) if agent else getattr(s, "role", None)
                 if role and isinstance(role, str) and role.strip() and role.strip().lower() not in ("worker", "subagent", "default"):
-                    from johnston.core.client import get_role_display_name
+                    from johnston.tui.adapters import core_bridge
 
-                    role_display = get_role_display_name(role)
+                    role_display = core_bridge.get_role_display_name(role)
             if role_display and isinstance(role_display, str) and role_display.lower() not in ("worker", "subagent", "default"):
                 if not clean_title.lower().startswith(role_display.lower()):
                     display_cmd = f"{role_display}: {clean_title}"
@@ -615,10 +613,10 @@ class SubagentsScreen(BaseTasksListScreen):
             app = getattr(self, "_app", None)
         sess = item.get("raw_obj")
         if sess is not None and hasattr(sess, "async_task"):
-            from johnston.core.client import kill_subagent
+            from johnston.tui.adapters import core_bridge
 
-            kill_subagent(sess, app)
+            core_bridge.kill_subagent(sess, app)
         elif session_id:
-            await client.kill_subagent(session_id, app=app)
+            await client.core_bridge.kill_subagent(session_id, app=app)
         self._invalidate_tasks_cache()
         self._on_session_event()

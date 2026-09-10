@@ -7,11 +7,15 @@ import re
 from rich.markup import escape
 from rich.table import Table
 
-from johnston.core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
-from johnston.core.domain.policies.models_catalog import format_context_tokens
 from johnston.tui.adapters import core_bridge
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES
 from johnston.tui.utils.row_format import build_status_right_text, ellipsize, format_cost
+
+THEME_MUTED = core_bridge.get_theme_constants()["THEME_MUTED"]
+THEME_PRIMARY = core_bridge.get_theme_constants()["THEME_PRIMARY"]
+THEME_SECONDARY = core_bridge.get_theme_constants()["THEME_SECONDARY"]
+THEME_SUBTLE = core_bridge.get_theme_constants()["THEME_SUBTLE"]
+format_context_tokens = core_bridge.format_context_tokens
 
 STATUS_SEP = f"  [{THEME_MUTED}]•[/]  "
 STATUS_SEP_COMPACT = f" [{THEME_MUTED}]•[/] "

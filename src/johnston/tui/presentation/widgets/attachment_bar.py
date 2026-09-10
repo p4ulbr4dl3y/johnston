@@ -16,7 +16,9 @@ class AttachmentChip(Static):
             t = theme_manager.current_theme
             muted, secondary = t.muted, t.secondary
         except Exception:
-            from johnston.core.domain.defaults.config import THEME_MUTED, THEME_SECONDARY
+            from johnston.tui.adapters import core_bridge
+            _TC2 = core_bridge.get_theme_constants()
+            THEME_MUTED, THEME_SECONDARY = _TC2['THEME_MUTED'], _TC2['THEME_SECONDARY']
             muted, secondary = THEME_MUTED, THEME_SECONDARY
         text = (
             f"[{muted}]\\[[/{muted}]"

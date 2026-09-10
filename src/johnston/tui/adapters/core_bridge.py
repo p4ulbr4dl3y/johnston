@@ -248,6 +248,13 @@ def close_tools() -> None:
     asyncio.run(aclose_tools())
 
 
+def aclose_tools() -> Any:
+    """Core tool registry async close (live lookup)."""
+    from johnston.core.tools.registry import aclose_tools as _f
+
+    return _f()
+
+
 def install_asyncio_exception_handler() -> None:
     """Install the global asyncio exception handler."""
     from johnston.core.infrastructure.platform.logging_setup import install_asyncio_exception_handler as _f
@@ -630,3 +637,162 @@ def estimate_tokens(text: Any) -> int:
     import johnston.core.infrastructure.runtime.token_util as _m
 
     return _m.estimate_tokens(text)
+
+
+def get_effort_auto() -> str:
+    """Sentinel value for 'auto' thinking effort."""
+    from johnston.core.client import EFFORT_AUTO as _f
+
+    return _f
+
+
+def is_windows() -> bool:
+    """True on Windows platform (core platform helper)."""
+    from johnston.core.client import is_windows as _f
+
+    return _f()
+
+
+def get_mcp_service(*args: Any, **kwargs: Any):
+    """Instantiate core McpService."""
+    from johnston.core.client import McpService as _f
+
+    return _f(*args, **kwargs)
+
+
+def kill_subagent(session, app=None) -> bool:
+    """Kill a subagent session (core client facade)."""
+    from johnston.core.client import kill_subagent as _f
+
+    return _f(session, app)
+
+
+def get_store(app=None):
+    """Resolve the session store (core client facade, live lookup)."""
+    from johnston.core.client import _get_store as _f
+
+    return _f(app)
+
+
+def get_extract_task_status_details():
+    """Core task status extraction helper."""
+    from johnston.core.client import extract_task_status_details as _f
+
+    return _f
+
+
+def get_theme_constants():
+    """Theme/status color constants from core domain defaults."""
+    from johnston.core.domain.defaults.config import (
+        COLOR_DIFF_ADD_BG,
+        COLOR_DIFF_ADD_FG,
+        COLOR_DIFF_GUTTER,
+        COLOR_DIFF_REMOVE_BG,
+        COLOR_DIFF_REMOVE_FG,
+        COLOR_STATUS_ERROR,
+        COLOR_STATUS_RUNNING,
+        COLOR_STATUS_SUCCESS,
+        THEME_MUTED,
+        THEME_PRIMARY,
+        THEME_SECONDARY,
+        THEME_SUBTLE,
+    )
+
+    return dict(
+        COLOR_DIFF_ADD_BG=COLOR_DIFF_ADD_BG,
+        COLOR_DIFF_ADD_FG=COLOR_DIFF_ADD_FG,
+        COLOR_DIFF_GUTTER=COLOR_DIFF_GUTTER,
+        COLOR_DIFF_REMOVE_BG=COLOR_DIFF_REMOVE_BG,
+        COLOR_DIFF_REMOVE_FG=COLOR_DIFF_REMOVE_FG,
+        COLOR_STATUS_ERROR=COLOR_STATUS_ERROR,
+        COLOR_STATUS_RUNNING=COLOR_STATUS_RUNNING,
+        COLOR_STATUS_SUCCESS=COLOR_STATUS_SUCCESS,
+        THEME_MUTED=THEME_MUTED,
+        THEME_PRIMARY=THEME_PRIMARY,
+        THEME_SECONDARY=THEME_SECONDARY,
+        THEME_SUBTLE=THEME_SUBTLE,
+    )
+
+
+def get_fork_base_max_len() -> int:
+    """Max length for fork titles (core session naming policy)."""
+    from johnston.core.domain.policies.session_naming import FORK_BASE_MAX_LEN as _f
+
+    return _f
+
+
+def get_theme_vars():
+    """Design tokens used by the markdown/theme layer (core defaults)."""
+    from johnston.core.domain.defaults.themes import ZINC_DARK as _f
+
+    return _f
+
+
+def list_themes():
+    """List available themes (core defaults, live lookup)."""
+    import johnston.core.domain.defaults.themes as _m
+
+    return _m.list_themes()
+
+
+def get_theme_by_name(name: str):
+    """Resolve a theme by name (core defaults, live lookup)."""
+    import johnston.core.domain.defaults.themes as _m
+
+    return _m.get_theme(name)
+
+
+def is_ansi_theme(theme) -> bool:
+    """Whether a theme is ANSI-based (core entity helper)."""
+    from johnston.core.domain.entities.theme import is_ansi_theme as _f
+
+    return _f(theme)
+
+
+def get_theme_class():
+    """Core Theme entity class."""
+    from johnston.core.domain.entities.theme import Theme as _f
+
+    return _f
+
+
+def get_ignore_dirs() -> list[str]:
+    """Default git-ignore directory names (core defaults)."""
+    from johnston.core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS as _f
+
+    return _f
+
+
+def truncate_output(*args, **kwargs):
+    """Truncate tool output for display (core tools base, live lookup)."""
+    from johnston.core.tools.base import truncate_output as _f
+
+    return _f(*args, **kwargs)
+
+
+def format_background_notification(*args, **kwargs):
+    """Format a background-task completion notification (core tools base)."""
+    from johnston.core.tools.base import format_background_notification as _f
+
+    return _f(*args, **kwargs)
+
+
+def is_builtin_tool(name: str) -> bool:
+    """Whether a tool name is registered in the core tool registry."""
+    from johnston.core.tools.registry import REGISTRY as _r
+
+    return name in _r
+
+
+def get_user_event_type() -> str:
+    """Transcript event type for user messages (core messages policy)."""
+    from johnston.core.domain.policies.messages import USER_EVENT_TYPE as _f
+
+    return _f
+
+
+def transcript_before_turn(messages, up_to_idx):
+    """Slice transcript events up to (not including) a user turn (core policy)."""
+    from johnston.core.domain.policies.messages import transcript_before_turn as _f
+
+    return _f(messages, up_to_idx)

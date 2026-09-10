@@ -6,9 +6,12 @@ from typing import Optional
 
 from textual.theme import Theme as TextualTheme
 
-from johnston.core.domain.defaults.themes import ZINC_DARK
-from johnston.core.domain.entities.theme import Theme, is_ansi_theme
+from johnston.tui.adapters import core_bridge
 from johnston.tui.app.base_theme import BaseThemeManager
+
+Theme = core_bridge.get_theme_class()
+is_ansi_theme = core_bridge.is_ansi_theme
+ZINC_DARK = core_bridge.get_theme_vars()
 
 
 class ThemeManager(BaseThemeManager):
@@ -39,9 +42,7 @@ class ThemeManager(BaseThemeManager):
         adapted_tcss["bg-overlay"] = "transparent"
 
         if not palette["dark"]:
-            from johnston.core.domain.defaults.themes import get_theme
-
-            latte = get_theme("catppuccin-latte")
+            latte = core_bridge.get_theme_by_name("catppuccin-latte")
             md_styles = dict(latte.markdown_styles) if latte else dict(theme.markdown_styles)
             syntax_tokens = latte.syntax_tokens if latte else theme.syntax_tokens
         else:

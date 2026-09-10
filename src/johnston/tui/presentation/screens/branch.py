@@ -1,3 +1,4 @@
+
 """Modal screen for managing git branches and worktrees."""
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
+from johnston.tui.adapters.core_bridge import JohnstonClient
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen, status_tag
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
 from johnston.tui.presentation.screens.confirm import ConfirmScreen
@@ -163,8 +165,6 @@ class BranchScreen(BaseModalScreen[Any]):
                 return app.client
         except Exception:
             pass
-        from johnston.core.client import JohnstonClient
-
         return JohnstonClient()
 
     def compose(self) -> ComposeResult:

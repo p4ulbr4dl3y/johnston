@@ -8,7 +8,8 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from johnston.core.client import McpService
+from johnston.tui.adapters import core_bridge
+from johnston.tui.adapters.core_bridge import JohnstonClient
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen, status_tag
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from johnston.tui.presentation.screens.constants import (
@@ -28,6 +29,8 @@ from johnston.tui.utils.row_format import (
     format_badge_row,
     option_list_row_width,
 )
+
+McpService = core_bridge.get_mcp_service
 
 
 def format_mcp_row(stag: str, name: str, badge: str = "", target_width: int = MODAL_DEFAULT_ROW_WIDTH) -> str:
@@ -149,8 +152,6 @@ class MCPScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 return app.client
         except Exception:
             pass
-        from johnston.core.client import JohnstonClient
-
         return JohnstonClient()
 
     def _render_from_cache(self) -> None:

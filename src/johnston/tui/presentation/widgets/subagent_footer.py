@@ -4,7 +4,6 @@ from __future__ import annotations
 from rich.table import Table
 from textual.widgets import Static
 
-from johnston.core.domain.policies.models_catalog import format_context_tokens
 from johnston.tui.adapters import core_bridge
 from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
@@ -16,6 +15,9 @@ from johnston.tui.presentation.widgets.footer_layout import (
 )
 from johnston.tui.utils.responsive import BREAKPOINT_COMPACT, is_compact_width, resolve_width
 from johnston.tui.utils.row_format import ellipsize
+
+format_context_tokens = core_bridge.format_context_tokens
+
 
 
 class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Static):

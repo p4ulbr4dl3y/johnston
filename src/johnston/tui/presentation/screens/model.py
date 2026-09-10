@@ -33,9 +33,9 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
         self.pm = pm
         if client is None:
             try:
-                from johnston.core.client import JohnstonClient
+                from johnston.tui.adapters import core_bridge
 
-                client = JohnstonClient(pm=pm)
+                client = core_bridge.JohnstonClient(pm=pm)
             except Exception:
                 client = None
         self.client = client

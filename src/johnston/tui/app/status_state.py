@@ -15,11 +15,11 @@ import asyncio
 import os
 import time
 
-from johnston.core.domain.policies.models_catalog import catalog
 from johnston.tui.adapters import core_bridge
 
 display_thinking_effort = core_bridge.display_thinking_effort
 collect_current_tasks = core_bridge.collect_current_tasks
+catalog = core_bridge.catalog
 
 
 def get_mcp_manager():

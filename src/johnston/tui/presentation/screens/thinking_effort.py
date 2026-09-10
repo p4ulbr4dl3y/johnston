@@ -1,6 +1,10 @@
-from johnston.core.client import EFFORT_AUTO, display_thinking_effort
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.screens.base_modal import status_tag
 from johnston.tui.presentation.screens.base_selection import BaseSelectionScreen
+
+EFFORT_AUTO = core_bridge.get_effort_auto()
+display_thinking_effort = core_bridge.display_thinking_effort
+
 
 
 class ThinkingEffortScreen(BaseSelectionScreen[str]):

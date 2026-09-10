@@ -1,3 +1,4 @@
+
 """Modal screen for managing workspace roots."""
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
+from johnston.tui.adapters.core_bridge import JohnstonClient
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
 from johnston.tui.presentation.screens.confirm import ConfirmScreen
@@ -95,8 +97,6 @@ def format_workspace_path(path: str, max_width: int) -> str:
 
 def get_root_scope(pm: Any, path: str) -> str:
     """Determine workspace root scope (delegated to client facade)."""
-    from johnston.core.client import JohnstonClient
-
     return JohnstonClient(pm=pm).get_root_scope(path)
 
 
@@ -228,8 +228,6 @@ class WorkspaceScreen(BaseModalScreen[None]):
                 return app.client
         except Exception:
             pass
-        from johnston.core.client import JohnstonClient
-
         return JohnstonClient(perm_manager=self.pm)
 
     def _load_roots(self) -> list[dict[str, str]]:

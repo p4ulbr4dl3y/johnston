@@ -8,9 +8,11 @@ import weakref
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from johnston.core.domain.defaults.themes import ZINC_DARK, list_themes
-from johnston.core.domain.entities.theme import Theme
 from johnston.tui.adapters import core_bridge
+
+ZINC_DARK = core_bridge.get_theme_vars()
+list_themes = core_bridge.list_themes
+Theme = core_bridge.get_theme_class()
 
 logger = logging.getLogger(__name__)
 

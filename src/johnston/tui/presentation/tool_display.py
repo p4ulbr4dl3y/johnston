@@ -352,13 +352,12 @@ def _extract_tool_display_inner(
     result_text: Optional[str] = None,
     status: Optional[str] = None,
 ) -> str:
-    from johnston.core.tools.registry import REGISTRY
     from johnston.tui.adapters import core_bridge
     _normalize = core_bridge.normalize_tool_name
 
     name = _normalize(tool_name)
     args = args if isinstance(args, dict) else {}
-    is_builtin = name in REGISTRY
+    is_builtin = core_bridge.is_builtin_tool(name)
 
     if not is_builtin:
         # MCP/custom tools: single predefined format — compact ``{k: v, ...}``

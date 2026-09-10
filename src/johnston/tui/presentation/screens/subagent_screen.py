@@ -116,9 +116,9 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
                 self.session_id_or_desc, parent_id=curr_session_id, app=app
             )
         else:
-            from johnston.core.client import JohnstonClient
+            from johnston.tui.adapters import core_bridge
 
-            self.session = JohnstonClient().resolve_session_by_title(
+            self.session = core_bridge.JohnstonClient().resolve_session_by_title(
                 self.session_id_or_desc, parent_id=curr_session_id, app=app
             )
 
@@ -405,9 +405,9 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
             if client and hasattr(client, "kill_subagent_sync"):
                 client.kill_subagent_sync(self.session, app)
             else:
-                from johnston.core.client import JohnstonClient
+                from johnston.tui.adapters import core_bridge
 
-                JohnstonClient().kill_subagent_sync(self.session, app)
+                core_bridge.JohnstonClient().kill_subagent_sync(self.session, app)
             if self.driver:
                 self.driver.finalize_thinking_stream()
                 while self.driver.tool_handles:

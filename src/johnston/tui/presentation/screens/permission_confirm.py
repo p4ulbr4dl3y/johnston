@@ -134,9 +134,9 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         self._options, self._option_keys = self._build_options()
 
     def _build_options(self) -> tuple[list[str], list[str]]:
-        from johnston.core.client import JohnstonClient
+        from johnston.tui.adapters import core_bridge
 
-        raw_options, suggested = JohnstonClient.build_permission_options(
+        raw_options, suggested = core_bridge.JohnstonClient.build_permission_options(
             self.tool_name, self.args, self.server_name
         )
         self.suggested_pattern = suggested
@@ -276,9 +276,9 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                     yield Static(formatted_diff, classes="modal-diff-view")
             elif self.tool_name == "shell":
                 cmd = nargs.get("command") or ""
-                from johnston.core.client import is_windows
+                from johnston.tui.adapters import core_bridge
 
-                lang = "powershell" if is_windows() else "bash"
+                lang = "powershell" if core_bridge.is_windows() else "bash"
                 with ToolScrollBox(classes="tool-scroll-box"):
                     yield Markdown(f"```{lang}\n{cmd.strip()}\n```", classes="modal-diff-view")
             elif self.tool_name == "message_subagent":

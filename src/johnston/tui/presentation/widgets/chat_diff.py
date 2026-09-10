@@ -7,14 +7,15 @@ from typing import Any
 from pygments.lexers import get_lexer_by_name
 from rich.text import Span, Text
 
-from johnston.core.domain.defaults.config import (
-    COLOR_DIFF_ADD_BG,
-    COLOR_DIFF_ADD_FG,
-    COLOR_DIFF_GUTTER,
-    COLOR_DIFF_REMOVE_BG,
-    COLOR_DIFF_REMOVE_FG,
-)
+from johnston.tui.adapters import core_bridge
 from johnston.tui.utils.lexer import HUNK_HEADER_RE, guess_lexer_name, lex_block_to_line_texts
+
+_DIFF_COLORS = core_bridge.get_theme_constants()
+COLOR_DIFF_ADD_BG = _DIFF_COLORS["COLOR_DIFF_ADD_BG"]
+COLOR_DIFF_ADD_FG = _DIFF_COLORS["COLOR_DIFF_ADD_FG"]
+COLOR_DIFF_GUTTER = _DIFF_COLORS["COLOR_DIFF_GUTTER"]
+COLOR_DIFF_REMOVE_BG = _DIFF_COLORS["COLOR_DIFF_REMOVE_BG"]
+COLOR_DIFF_REMOVE_FG = _DIFF_COLORS["COLOR_DIFF_REMOVE_FG"]
 
 
 class DiffLine:

@@ -45,7 +45,8 @@ class CommandSuggestions(HeaderWrapOptionList):
             cfg_limit = 1000
         max_files = min(300, cfg_limit) if is_home_or_root else cfg_limit
 
-        from johnston.core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS
+        from johnston.tui.adapters import core_bridge
+        DEFAULT_IGNORE_DIRS = core_bridge.get_ignore_dirs()
 
         ignore_dirs = DEFAULT_IGNORE_DIRS | {
             ".idea",

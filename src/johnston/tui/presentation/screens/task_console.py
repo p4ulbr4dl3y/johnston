@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, RichLog
 
-from johnston.core.client import is_windows, process_carriage_returns, strip_ansi
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID
 from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox
@@ -69,7 +69,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
     def compose(self) -> ComposeResult:
         cmd = getattr(self.bg_task, "command", "") or "(shell task)"
         is_running = getattr(self.bg_task, "is_running", False)
-        lang = "powershell" if is_windows() else "bash"
+        lang = "powershell" if core_bridge.is_windows() else "bash"
 
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-wide task-console-dialog"):
             yield ModalHeader("### **Shell Task**", esc_hint="")
@@ -151,7 +151,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         for chunk in getattr(getattr(self.bg_task, "output", None), "history", []):
             if chunk.strip():
                 has_history = True
-            self._consume(strip_ansi(chunk))
+            self._consume(core_bridge.strip_ansi(chunk))
         if not has_history:
             if getattr(self.bg_task, "is_running", False):
                 self.log_widget.write("(Waiting for command output...)")
@@ -208,12 +208,12 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self._pending_line = parts.pop()
         at_bottom = self._is_at_bottom()
         for line in parts:
-            self.log_widget.write(process_carriage_returns(line), scroll_end=at_bottom)
+            self.log_widget.write(core_bridge.process_carriage_returns(line), scroll_end=at_bottom)
 
     def _flush_pending(self) -> None:
         if self._pending_line and self.log_widget:
             at_bottom = self._is_at_bottom()
-            self.log_widget.write(process_carriage_returns(self._pending_line), scroll_end=at_bottom)
+            self.log_widget.write(core_bridge.process_carriage_returns(self._pending_line), scroll_end=at_bottom)
             self._pending_line = ""
 
 
