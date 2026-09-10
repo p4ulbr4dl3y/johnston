@@ -7,7 +7,6 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList, Static
 
-from johnston.core.domain.policies.permission_policy import suggest_pattern
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
 from johnston.tui.presentation.tool_renderers import build_synthetic_create_diff
@@ -27,7 +26,7 @@ from johnston.tui.utils.responsive import (
     modal_content_width,
     resolve_width,
 )
-from johnston.tui.utils.row_format import display_width, ellipsize
+from johnston.tui.utils.row_format import display_width
 
 
 class RejectReasonInput(Input):
@@ -132,66 +131,13 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             self.server_name = self.tool_name.split("__", 1)[0].strip()
         else:
             self.server_name = ""
-        self.suggested_pattern = suggest_pattern(self.tool_name, self.args)
         self._options, self._option_keys = self._build_options()
 
     def _build_options(self) -> tuple[list[str], list[str]]:
-        raw_options: list[tuple[str, str]] = []
-        raw_options.append(("Allow once", "allow"))
+        from johnston.core.application.permission.interactor import build_permission_options
 
-        is_mcp = bool(self.server_name or "__" in self.tool_name)
-        server_name = self.server_name or (self.tool_name.split("__", 1)[0] if is_mcp else "")
-
-        if self.suggested_pattern:
-            pat_clean = " ".join(self.suggested_pattern.split())
-            raw_options.append((f'Allow pattern "{pat_clean}" [dim](session)[/]', f"pattern:{self.suggested_pattern}"))
-
-        raw_options.append((f'Always allow "{self.tool_name}" [dim](session)[/]', "always_allow"))
-
-        if is_mcp and server_name:
-            raw_options.append((f'Always allow ALL tools from "{server_name}" [dim](session)[/]', f"server_allow:{server_name}__*"))
-
-        if self.suggested_pattern:
-            pat_clean = " ".join(self.suggested_pattern.split())
-            raw_options.append((f'Allow pattern "{pat_clean}" [dim](project)[/]', f"pattern:{self.suggested_pattern}:project"))
-
-        raw_options.append((f'Always allow "{self.tool_name}" [dim](project)[/]', "always_allow:project"))
-
-        if is_mcp and server_name:
-            raw_options.append((f'Always allow ALL tools from "{server_name}" [dim](project)[/]', f"server_allow:{server_name}__*:project"))
-
-        nargs = self.args if isinstance(self.args, dict) else {}
-        from johnston.core.application.permission.permission_manager import PermissionManager
-        from johnston.core.domain.policies.permission_policy import extract_tool_target_value, is_path_within_workspace
-
-        pm = PermissionManager.get_instance()
-        target_path = (
-            (nargs.get("cwd") if self.tool_name == "shell" else "")
-            or extract_tool_target_value(self.tool_name, self.args)
-            or nargs.get("path")
-            or ""
-        )
-        if target_path and isinstance(target_path, str) and not is_path_within_workspace(target_path, pm.get_workspace_roots()):
-            if os.path.isdir(target_path) or (self.tool_name == "shell" and nargs.get("cwd") == target_path):
-                root_to_add = target_path
-            else:
-                root_to_add = os.path.dirname(target_path) or target_path
-            norm_root = os.path.realpath(os.path.abspath(os.path.expanduser(root_to_add)))
-            # Never offer the filesystem root (e.g. "/" for a nonexistent
-            # top-level file — it would unboundedly widen the workspace), and
-            # never offer a path already inside the workspace.
-            if (
-                norm_root
-                and norm_root != os.path.abspath(os.sep)
-                and not is_path_within_workspace(norm_root, pm.get_workspace_roots())
-            ):
-                raw_options.append(
-                    (f'Add "{ellipsize(root_to_add, 36)}" to roots [dim](workspace)[/]', f"add_root:{root_to_add}")
-                )
-
-        raw_options.append(("Deny", "deny"))
-        raw_options.append(("Reject with feedback...", "reject_reason"))
-
+        self.suggested_pattern = build_permission_options(self.tool_name, self.args, self.server_name)[1]
+        raw_options, _suggested = build_permission_options(self.tool_name, self.args, self.server_name)
         options: list[str] = []
         keys: list[str] = []
         for i, (label, key) in enumerate(raw_options):
