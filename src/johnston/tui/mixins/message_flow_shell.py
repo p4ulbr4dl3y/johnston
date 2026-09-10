@@ -50,31 +50,18 @@ async def exec_shell_command(app: Any, cmd: str, user_text: Optional[str] = None
         status="running",
     )
 
-    from johnston.core.tools.context import ToolContext
-    from johnston.core.tools.shell import ShellTool
+    from johnston.core.application.session.shell_executor import execute_shell_command
 
-    ctx = ToolContext(app)
-    tool = ShellTool()
+    agent = getattr(app, "agent", None)
     app.current_tool_widget = tool_widget
     try:
-        res = await tool.execute({"command": cmd}, ctx=ctx)
-        content = res.content or ""
-        returncode = getattr(res, "returncode", None)
-        is_error = getattr(res, "is_error", False) or (returncode is not None and returncode != 0)
-        res_status = getattr(res, "status", None)
-        if hasattr(res_status, "value"):
-            status = res_status.value
-        elif isinstance(res_status, str):
-            status = res_status
-        else:
-            status = "error" if is_error else "done"
-    except Exception as e:
-        content = f"ERR: {e}"
-        returncode = 1
-        is_error = True
-        status = "error"
+        res = await execute_shell_command(cmd, host=app, session=session, agent=agent)
     finally:
         app.current_tool_widget = None
+    content = res.content
+    returncode = res.returncode
+    is_error = res.is_error
+    status = res.status
 
     if tool_widget is not None:
         tool_widget.set_result(content, is_error=is_error, status=status, returncode=returncode)
@@ -82,22 +69,6 @@ async def exec_shell_command(app: Any, cmd: str, user_text: Optional[str] = None
             tool_widget.render_header()
         if hasattr(tool_widget, "render_content"):
             tool_widget.render_content()
-
-    if session is not None and hasattr(session, "add_event"):
-        session.add_event({
-            "type": "tool",
-            "tool_type": "shell",
-            "target": cmd,
-            "result_text": content,
-            "args": {"command": cmd},
-            "status": status,
-            "returncode": returncode,
-        })
-
-    agent = getattr(app, "agent", None)
-    if agent is not None and hasattr(agent, "history") and isinstance(agent.history, list):
-        history_text = f"! {cmd}\n\n{content}".rstrip() if content else f"! {cmd}"
-        agent.history.append({"role": "user", "content": history_text})
 
     if hasattr(app, "save_current_session_async"):
         await app.save_current_session_async(force=True)
