@@ -63,6 +63,12 @@ class GitMetricsMixin:
 
         return get_branch_info(cwd)
 
+    def _compute_diff_sync(self, cwd: str | None = None) -> str:
+        """(sync) Delegate diff stats to the core git metrics service."""
+        from johnston.core.infrastructure.platform.git_metrics import get_diff_stats
+
+        return get_diff_stats(cwd)
+
     def _git_diff_stats(self, cwd: str | None = None) -> str:
         """Return '+add/-del' line-count diff vs HEAD, cached 5s. Returns '' when unavailable."""
         now = time.time()
@@ -84,19 +90,17 @@ class GitMetricsMixin:
         try:
             asyncio.get_running_loop().create_task(self._compute_diff_async(target_cwd))
         except RuntimeError:
-            from johnston.core.infrastructure.platform.git_metrics import get_diff_stats
-
-            text = get_diff_stats(target_cwd)
+            text = self._compute_diff_sync(target_cwd)
             self._diff_loading = False
             self._diff_text = text
             self._diff_time = time.time()
         return getattr(self, "_diff_text", "") or ""
 
     async def _compute_diff_async(self, cwd: str | None = None) -> None:
-        from johnston.core.infrastructure.platform.git_metrics import get_diff_stats_async
+        import asyncio
 
         try:
-            text = await get_diff_stats_async(cwd)
+            text = await asyncio.to_thread(self._compute_diff_sync, cwd)
         finally:
             self._diff_loading = False
         self._diff_text = text
