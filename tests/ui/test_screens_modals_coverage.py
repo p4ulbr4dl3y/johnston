@@ -7,6 +7,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Input, OptionList, Static
 
 from johnston.core.application.session.actions import RewindEntry
+from johnston.core.dto import ModelInfoDTO, ProviderDTO
 from johnston.tui.presentation.screens.api_key import ApiKeyScreen
 from johnston.tui.presentation.screens.constants import (
     MODAL_HINT,
@@ -548,13 +549,13 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
     """Coverage tests for ProvidersScreen."""
 
     def test_init_and_build_options_status_tags(self):
-        providers = {
-            "p_disabled": {"name": "Disabled Provider", "enabled": False},
-            "p_active": {"name": "Active Provider", "models": ["m1", "m2"]},
-            "p_configured": {"name": "Configured Provider", "models": ["m1"]},
-            "p_auth": {"name": "Auth Needed Provider"},
-            "invalid_entry": "not_a_dict",
-        }
+        providers = [
+            ProviderDTO(key="p_disabled", name="Disabled Provider", is_configured=False, models=[], is_disabled=True),
+            ProviderDTO(key="p_active", name="Active Provider", is_configured=False, models=[ModelInfoDTO("m1", "m1", "p_active"), ModelInfoDTO("m2", "m2", "p_active")]),
+            ProviderDTO(key="p_configured", name="Configured Provider", is_configured=False, models=[ModelInfoDTO("m1", "m1", "p_configured")]),
+            ProviderDTO(key="p_auth", name="Auth Needed Provider", is_configured=False),
+            "invalid_entry",
+        ]
         configured = {"p_active": "key1", "p_configured": "key2"}
         screen = ProvidersScreen(
             providers=providers,
@@ -569,15 +570,11 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
         self.assertIn("p_disabled", screen.raw_items)
         self.assertIn("p_auth", screen.raw_items)
 
-    def test_get_provider_model_count_sources(self):
-        from johnston.core.dto import ModelInfoDTO, ProviderDTO
+    def test_model_count_from_dto_and_skipped_entries(self):
+        """Model count renders straight from ProviderDTO models; non-DTO entries are skipped."""
+        screen = ProvidersScreen([], "", {})
 
-        screen = ProvidersScreen({}, "", {})
-
-        # 1. Directly in provider dict
-        self.assertEqual(screen._get_provider_model_count("p1", {"models": ["a", "b"]}), 2)
-
-        # 2. From ProviderDTO
+        # DTO with models
         p_dto = ProviderDTO(
             name="cached_p",
             is_configured=True,
@@ -587,26 +584,18 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
                 ModelInfoDTO("m3", "m3", "cached_p"),
             ],
         )
-        self.assertEqual(screen._get_provider_model_count("cached_p", p_dto), 3)
-
-        # 3. From client get_providers
-        mock_client = MagicMock()
-        mock_client.get_providers.return_value = [
-            ProviderDTO(name="catalog_p", is_configured=True, models=[ModelInfoDTO("cat1", "cat1", "catalog_p")])
-        ]
-        with patch.object(screen, "_get_client", return_value=mock_client):
-            self.assertEqual(screen._get_provider_model_count("catalog_p", {}), 1)
-
-        # 4. Fallback 0
-        self.assertEqual(screen._get_provider_model_count("none_p", {}), 0)
+        screen.providers = [p_dto, "junk", None]
+        opts, items = screen._build_options()
+        self.assertEqual(items, ["cached_p"])
+        self.assertIn("3 models", opts[0])
 
     async def test_mount_resize_and_filter(self):
         app = ModalTestApp()
         async with app.run_test() as pilot:
-            providers = {
-                "openai": {"name": "OpenAI", "models": ["gpt-4o"]},
-                "anthropic": {"name": "Anthropic", "models": ["claude-3-5-sonnet"]},
-            }
+            providers = [
+                ProviderDTO(key="openai", name="OpenAI", is_configured=False, models=[ModelInfoDTO("gpt-4o", "gpt-4o", "openai")]),
+                ProviderDTO(key="anthropic", name="Anthropic", is_configured=False, models=[ModelInfoDTO("claude-3-5-sonnet", "claude-3-5-sonnet", "anthropic")]),
+            ]
             screen = ProvidersScreen(providers, "openai", {"openai": "key"})
             await app.push_screen(screen)
             await pilot.pause()
@@ -620,9 +609,7 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
     async def test_handle_selection_pushes_api_key_modal(self):
         app = ModalTestApp()
         async with app.run_test() as pilot:
-            providers = {
-                "openai": {"name": "OpenAI"},
-            }
+            providers = [ProviderDTO(key="openai", name="OpenAI", is_configured=False)]
             mock_pm = MagicMock()
             mock_pm.get_api_key.return_value = "pm-key"
 
@@ -669,10 +656,10 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
     async def test_toggle_disabled_action_and_reconciliation(self):
         app = ModalTestApp()
         async with app.run_test() as pilot:
-            providers = {
-                "p1": {"name": "Provider One"},
-                "p2": {"name": "Provider Two"},
-            }
+            providers = [
+                ProviderDTO(key="p1", name="Provider One", is_configured=False),
+                ProviderDTO(key="p2", name="Provider Two", is_configured=False),
+            ]
             mock_pm = MagicMock()
             mock_pm.get_active_provider_key.return_value = "p1"
 
@@ -703,7 +690,7 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
     async def test_key_handling_bindings(self):
         app = ModalTestApp()
         async with app.run_test() as pilot:
-            screen = ProvidersScreen({"p1": {"name": "P1"}}, "p1", {})
+            screen = ProvidersScreen([ProviderDTO(key="p1", name="P1", is_configured=False)], "p1", {})
             await app.push_screen(screen)
             await pilot.pause()
 
@@ -724,14 +711,14 @@ class TestProvidersScreen(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(toggled), 1)
 
     def test_action_cancel(self):
-        screen = ProvidersScreen({}, "", {})
+        screen = ProvidersScreen([], "", {})
         dismissed = []
         screen.dismiss = lambda val: dismissed.append(val)
         screen.action_cancel()
         self.assertEqual(dismissed, [None])
 
     def test_row_width_fallback(self):
-        screen = ProvidersScreen({}, "", {})
+        screen = ProvidersScreen([], "", {})
         w = screen._row_width()
         self.assertGreater(w, 0)
 

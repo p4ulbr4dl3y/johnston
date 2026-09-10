@@ -17,6 +17,7 @@ get_current_thinking_effort = P['get_current_thinking_effort']
 select_model = P['select_model']
 set_provider_credentials = P['set_provider_credentials']
 set_thinking_effort = P['set_thinking_effort']
+providers_to_dtos = core_bridge.providers_to_dtos
 
 
 class ProvidersCommand(BaseCommand):
@@ -65,7 +66,7 @@ class ProvidersCommand(BaseCommand):
                 return
             app.push_screen(
                 ProvidersScreen(
-                    provs,
+                    providers_to_dtos(provs),
                     act_key,
                     cfg_keys,
                     disabled_providers=dis_provs,
@@ -91,7 +92,7 @@ class ProvidersCommand(BaseCommand):
         dis_provs = app.pm.get_disabled_providers()
         app.push_screen(
             ProvidersScreen(
-                provs,
+                providers_to_dtos(provs),
                 focus_key or act_key,
                 cfg_keys,
                 disabled_providers=dis_provs,

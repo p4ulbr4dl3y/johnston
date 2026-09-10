@@ -23,6 +23,8 @@ from johnston.core.domain.policies.models_catalog import catalog, format_context
 # DTOs (data-only, safe for the rest of TUI)
 from johnston.core.dto import (
     FooterCacheDTO,
+    ModelInfoDTO,
+    ProviderDTO,
     RoleInfoDTO,
     SessionSnapshotDTO,
     StatusFooterDTO,
@@ -38,6 +40,8 @@ from johnston.core.infrastructure.tasks.output import (
 
 __all__ = [
     "FooterCacheDTO",
+    "ModelInfoDTO",
+    "ProviderDTO",
     "RoleInfoDTO",
     "SessionSnapshotDTO",
     "StatusFooterDTO",
@@ -615,6 +619,40 @@ def get_provider_actions():
         set_provider_credentials=set_provider_credentials,
         set_thinking_effort=set_thinking_effort,
     )
+
+
+def providers_to_dtos(raw: dict[str, Any]) -> list[ProviderDTO]:
+    """Convert the core ``load_providers`` dict shape into render-ready DTOs.
+
+    The screen never sees raw provider dicts: the boundary normalizes
+    ``{key: {...to_dict() shape...}}`` into ``ProviderDTO`` objects carrying
+    the fields the view renders (name, models, configured/disabled state).
+    """
+    dtos: list[ProviderDTO] = []
+    for pkey, pdata in raw.items():
+        if not isinstance(pdata, dict):
+            continue
+        models_raw = pdata.get("models") or []
+        models = [
+            ModelInfoDTO(
+                name=str(m),
+                display_name=str(m),
+                provider=str(pkey),
+            )
+            for m in models_raw
+        ]
+        enabled = bool(pdata.get("enabled", True))
+        dtos.append(
+            ProviderDTO(
+                name=str(pdata.get("name") or pkey),
+                is_configured=False,
+                models=models,
+                key=str(pdata.get("key") or pkey),
+                is_active=False,
+                is_disabled=not enabled,
+            )
+        )
+    return dtos
 
 
 def get_skill_helpers():

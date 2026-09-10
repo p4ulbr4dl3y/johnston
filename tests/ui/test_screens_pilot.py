@@ -8,6 +8,7 @@ from textual.app import App
 from textual.widgets import Input, OptionList, RichLog
 from textual.widgets.option_list import Option
 
+from johnston.core.dto import ProviderDTO
 from johnston.core.infrastructure.tasks.manager import TaskManager
 from johnston.tui.presentation.screens.help import HelpScreen
 from johnston.tui.presentation.screens.mcp import MCPScreen
@@ -82,7 +83,10 @@ class TestScreensPilot(unittest.IsolatedAsyncioTestCase):
     async def test_providers_screen_pilot(self):
         from johnston.tui.presentation.screens.api_key import ApiKeyScreen
 
-        providers = {"opencode": {"key": "opencode", "name": "OpenCode"}, "openai": {"key": "openai", "name": "OpenAI"}}
+        providers = [
+            ProviderDTO(key="opencode", name="OpenCode", is_configured=False),
+            ProviderDTO(key="openai", name="OpenAI", is_configured=False),
+        ]
         screen = ProvidersScreen(providers=providers, active_key="opencode", configured_keys={})
         app = DummyHostApp(screen)
 

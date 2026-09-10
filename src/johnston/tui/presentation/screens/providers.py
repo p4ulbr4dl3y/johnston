@@ -29,7 +29,12 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
     ])
 
     def __init__(
-        self, providers: dict | list, active_key: str, configured_keys: dict, disabled_providers: list = None, pm=None
+        self,
+        providers: list[ProviderDTO],
+        active_key: str,
+        configured_keys: dict,
+        disabled_providers: list = None,
+        pm=None,
     ):
         self.providers = providers
         self.active_key = active_key
@@ -49,14 +54,14 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             dialog_classes="modal-dialog-medium",
         )
 
-    def _get_client(self) -> Any:
+    def _get_client(self):
+        """Resolve the active JohnstonClient facade from the host app (test/test-pilot resilience)."""
         try:
             app = self.app
             if hasattr(app, "client") and app.client is not None:
                 return app.client
         except Exception:
             pass
-
         return JohnstonClient()
 
     def _row_width(self) -> int:
@@ -66,49 +71,19 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
         except Exception:
             return option_list_row_width(None, MODAL_MEDIUM_ROW_WIDTH)
 
-    def _get_provider_model_count(self, key: str, p: Any) -> int:
-        if isinstance(p, ProviderDTO):
-            return len(p.models)
-        if isinstance(p, dict):
-            models = p.get("models")
-            if isinstance(models, list) and models:
-                return len(models)
-        try:
-            client = self._get_client()
-            if client and hasattr(client, "get_providers"):
-                for prov in client.get_providers():
-                    if prov.key == key or prov.name == key:
-                        return len(prov.models)
-        except Exception:
-            pass
-        return 0
-
     def _build_options(self):
         options = []
         items = []
         target_w = self._row_width()
 
-        prov_items: list[tuple[str, Any]] = []
-        if isinstance(self.providers, dict):
-            prov_items = list(self.providers.items())
-        elif isinstance(self.providers, list):
-            prov_items = [(p.key or p.name if isinstance(p, ProviderDTO) else getattr(p, "name", ""), p) for p in self.providers]
-
-        for pkey, p in prov_items:
-            if isinstance(p, ProviderDTO):
-                key = p.key or p.name or pkey
-                name = p.name or pkey
-                is_disabled = p.is_disabled or key in self.disabled_set
-                has_key = p.is_configured or bool(self.configured_keys.get(key))
-                cnt = len(p.models)
-            elif isinstance(p, dict):
-                key = p.get("key") or pkey
-                name = p.get("name") or pkey
-                has_key = bool(self.configured_keys.get(key))
-                is_disabled = key in self.disabled_set or not p.get("enabled", True)
-                cnt = self._get_provider_model_count(key, p)
-            else:
+        for p in self.providers:
+            if not isinstance(p, ProviderDTO):
                 continue
+            key = p.key or p.name
+            name = p.name or key
+            is_disabled = p.is_disabled or key in self.disabled_set
+            has_key = p.is_configured or bool(self.configured_keys.get(key))
+            cnt = len(p.models)
 
             is_active = key == self.active_key
 
@@ -162,8 +137,8 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
         if item is None:
             return
 
-        p_info = self.providers.get(item, {})
-        p_name = (p_info.get("name") or item) if isinstance(p_info, dict) else item
+        prov = next((p for p in self.providers if (p.key or p.name) == item), None)
+        p_name = prov.name if prov is not None else item
         curr_key = self.configured_keys.get(item) or (self.pm.get_api_key(item) if self.pm else "")
 
         try:

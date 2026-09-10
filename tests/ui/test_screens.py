@@ -5,12 +5,27 @@ from unittest.mock import MagicMock, PropertyMock, patch
 from textual.events import Key
 
 from johnston.core.application.session.actions import RewindEntry
+from johnston.core.dto import ModelInfoDTO, ProviderDTO
 from johnston.tui.presentation.screens.base_selection import BaseSelectionScreen, HeaderWrapOptionList
 from johnston.tui.presentation.screens.help import HelpScreen
 from johnston.tui.presentation.screens.providers import ProvidersScreen
 from johnston.tui.presentation.screens.resume import ResumeScreen
 from johnston.tui.presentation.screens.rewind import RewindScreen
 from johnston.tui.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen, TaskConsoleScreen
+
+
+def providers_dtos(specs: list[tuple[str, str, list | None, bool]]) -> list[ProviderDTO]:
+    """Build ProviderDTOs from (key, name, models, enabled) tuples for tests."""
+    return [
+        ProviderDTO(
+            key=key,
+            name=name,
+            is_configured=False,
+            models=[ModelInfoDTO(name=m, display_name=m, provider=key) for m in (models or [])],
+            is_disabled=not enabled,
+        )
+        for key, name, models, enabled in specs
+    ]
 
 
 class TestHelpScreen(unittest.TestCase):
@@ -384,12 +399,12 @@ class TestTaskScreens(unittest.TestCase):
 
 class TestProvidersScreen(unittest.TestCase):
     def test_build_options_status_tags(self):
-        providers = {
-            "active": {"key": "active", "name": "ActiveProv"},
-            "off": {"key": "off", "name": "OffProv", "enabled": False},
-            "auth": {"key": "auth", "name": "AuthProv"},
-            "on": {"key": "on", "name": "OnProv"},
-        }
+        providers = providers_dtos([
+            ("active", "ActiveProv", None, True),
+            ("off", "OffProv", None, False),
+            ("auth", "AuthProv", None, True),
+            ("on", "OnProv", None, True),
+        ])
         s = ProvidersScreen(
             providers=providers, active_key="active", configured_keys={"on": "key"}, disabled_providers=["off"]
         )
@@ -402,20 +417,20 @@ class TestProvidersScreen(unittest.TestCase):
 
     def test_provider_without_key_shows_auth(self):
         s = ProvidersScreen(
-            providers={"custom": {"key": "custom", "name": "Custom"}}, active_key="", configured_keys={}
+            providers=providers_dtos([("custom", "Custom", None, True)]), active_key="", configured_keys={}
         )
         self.assertNotIn("●", s.raw_options[0])
 
     def test_default_falls_back_to_first(self):
-        s = ProvidersScreen(providers={"p1": {"key": "p1", "name": "P1"}}, active_key="nope", configured_keys={})
+        s = ProvidersScreen(providers=providers_dtos([("p1", "P1", None, True)]), active_key="nope", configured_keys={})
         self.assertEqual(s.default_value, "p1")
 
     def test_provider_model_count_badge(self):
-        providers = {
-            "p1": {"key": "p1", "name": "P1", "models": ["m1", "m2"]},
-            "p2": {"key": "p2", "name": "P2", "models": ["m3"]},
-            "p3": {"key": "p3", "name": "P3", "models": ["m4"]},
-        }
+        providers = providers_dtos([
+            ("p1", "P1", ["m1", "m2"], True),
+            ("p2", "P2", ["m3"], True),
+            ("p3", "P3", ["m4"], True),
+        ])
         s = ProvidersScreen(
             providers=providers,
             active_key="p1",
@@ -426,8 +441,20 @@ class TestProvidersScreen(unittest.TestCase):
         self.assertIn("1 model", s.raw_options[1])
         self.assertNotIn("model", s.raw_options[2])  # p3 is disabled/off
 
+    def test_non_dto_entries_skipped(self):
+        """Non-DTO entries (malformed payload) are skipped, not fatal."""
+        s = ProvidersScreen(
+            providers=[
+                ProviderDTO(key="p1", name="P1", is_configured=False, models=[], is_disabled=False),
+                "not_a_dto",
+            ],
+            active_key="p1",
+            configured_keys={},
+        )
+        self.assertEqual(s.raw_items, ["p1"])
+
     def test_tab_key_toggles_disabled(self):
-        providers = {"p1": {"key": "p1", "name": "P1"}}
+        providers = providers_dtos([("p1", "P1", None, True)])
         pm = MagicMock()
         s = ProvidersScreen(providers=providers, active_key="p1", configured_keys={}, pm=pm)
         # Mock query_one and event
@@ -448,7 +475,7 @@ class TestProvidersScreen(unittest.TestCase):
     def test_step_transitions_and_esc_back(self):
         from johnston.tui.presentation.screens.api_key import ApiKeyScreen
 
-        providers = {"p1": {"key": "p1", "name": "P1"}}
+        providers = providers_dtos([("p1", "P1", None, True)])
         s = ProvidersScreen(providers=providers, active_key="", configured_keys={"p1": "secret-key"})
         dismissed = []
         s.dismiss = lambda val: dismissed.append(val)
@@ -501,22 +528,29 @@ class TestProvidersScreen(unittest.TestCase):
 
 
 class TestProvidersEdge(unittest.TestCase):
-    def test_provider_missing_key_uses_get(self):
-        """Provider dicts missing 'key' (malformed payload) must not raise KeyError."""
+    def test_provider_missing_key_uses_name(self):
+        """Provider without key falls back to name, never raises KeyError."""
         try:
-            s = ProvidersScreen({"p1": {"name": "P1"}}, "p1", {})
+            s = ProvidersScreen(
+                providers=[ProviderDTO(name="P1", key="", models=[], is_configured=False)],
+                active_key="",
+                configured_keys={},
+            )
         except KeyError as exc:
             self.fail(f"missing key raised KeyError: {exc}")
-        self.assertEqual(s.raw_items, ["p1"])
+        self.assertEqual(s.raw_items, ["P1"])
 
     def test_provider_target_is_none_value(self):
-        """A provider value that is None (malformed payload) must not raise
-        AttributeError during option building."""
+        """A None entry (malformed payload) must not raise during option building."""
         try:
-            s = ProvidersScreen({"p1": None}, "", {})
+            s = ProvidersScreen(
+                providers=[ProviderDTO(name="P1", key="p1", models=[], is_configured=False), None],
+                active_key="",
+                configured_keys={},
+            )
         except (KeyError, AttributeError, TypeError) as exc:
             self.fail(f"None provider value raised {type(exc).__name__}: {exc}")
-        self.assertEqual(s.raw_items, [])
+        self.assertEqual(s.raw_items, ["p1"])
 
 
 class TestSkillScreens(unittest.TestCase):
