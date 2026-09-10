@@ -758,14 +758,14 @@ class TestSkillsAndMCPScreenHint(unittest.IsolatedAsyncioTestCase):
     async def test_mcp_screen_hint_right_text(self):
         from johnston.tui.presentation.screens.mcp import MCPScreen
 
-        with patch("johnston.tui.presentation.screens.mcp.get_mcp_manager") as mock_get_mm:
-            mock_mm = MagicMock()
-            mock_mm.load_servers.return_value = [
-                {"name": "srv-1", "scope": "global", "enabled": True},
-                {"name": "srv-2", "scope": "global", "enabled": True},
-            ]
-            mock_mm.ensure_tools_ready_async = MagicMock(return_value=asyncio.sleep(0))
-            mock_get_mm.return_value = mock_mm
+        mock_svc = MagicMock()
+        mock_svc.list_servers.return_value = [
+            {"name": "srv-1", "scope": "global", "enabled": True},
+            {"name": "srv-2", "scope": "global", "enabled": True},
+        ]
+        mock_svc.warm_tools = MagicMock()
+        mock_svc.tools_refresh_task = None
+        with patch("johnston.tui.presentation.screens.mcp.McpService", return_value=mock_svc):
             app = ModalTestApp()
             async with app.run_test() as pilot:
                 screen = MCPScreen()

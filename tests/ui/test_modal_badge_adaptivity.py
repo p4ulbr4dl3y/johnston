@@ -135,8 +135,8 @@ class TestTasksScreenAdaptivity(unittest.TestCase):
 
 
 class TestMCPScreenAdaptivity(unittest.TestCase):
-    @patch("johnston.tui.presentation.screens.mcp.get_mcp_manager")
-    def test_on_resize_renders_from_cache_when_mounted(self, mock_get_mm):
+    @patch("johnston.tui.presentation.screens.mcp.McpService", return_value=MagicMock())
+    def test_on_resize_renders_from_cache_when_mounted(self, mock_svc_cls):
         screen = MCPScreen()
         screen._render_from_cache = MagicMock()
 
