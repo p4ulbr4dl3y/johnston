@@ -77,7 +77,7 @@ def _format_ast_args(args: ast.arguments) -> str:
 def _outline_python_content(
     code: str,
     file_rel_path: str = "",
-    query: Optional[str] = None,
+    pattern: Optional[str] = None,
 ) -> List[Tuple[str, int, str]]:
     """Parse Python AST and extract classes, methods, and functions."""
     try:
@@ -86,7 +86,7 @@ def _outline_python_content(
         return []
 
     symbols: List[Tuple[str, int, str]] = []
-    q = query.lower().strip() if query and query.strip() and query.strip() != "*" else None
+    q = pattern.lower().strip() if pattern and pattern.strip() and pattern.strip() != "*" else None
 
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
@@ -269,10 +269,10 @@ def _outline_generic_symbols(code: str) -> List[Tuple[str, int, str]]:
     return symbols
 
 
-def _outline_generic_content(code: str, query: Optional[str] = None) -> List[str]:
+def _outline_generic_content(code: str, pattern: Optional[str] = None) -> List[str]:
     """Regex-based outline extractor for languages without Tree-sitter."""
     symbols = _outline_generic_symbols(code)
-    q = query.lower().strip() if query and query.strip() and query.strip() != "*" else None
+    q = pattern.lower().strip() if pattern and pattern.strip() and pattern.strip() != "*" else None
     if q is None:
         return [s[0] for s in symbols]
     return [s[0] for s in symbols if q in s[2].lower()]
@@ -281,7 +281,7 @@ def _outline_generic_content(code: str, query: Optional[str] = None) -> List[str
 def _outline_file(
     abs_fpath: str,
     cwd: str,
-    query: Optional[str],
+    pattern: Optional[str],
     glob_pattern: Optional[str],
     case_sensitive: bool = False,
     use_cache: bool = True,
@@ -343,11 +343,11 @@ def _outline_file(
     if not all_symbols:
         return None
 
-    q_str = query.strip() if query and query.strip() and query.strip() != "*" else None
+    q_str = pattern.strip() if pattern and pattern.strip() and pattern.strip() != "*" else None
     if q_str and not case_sensitive:
         q_str = q_str.lower()
 
-    # Filter symbols by query in memory
+    # Filter symbols by pattern in memory
     filtered_lines: List[str] = []
     for display, _, name in all_symbols:
         if q_str is None:
@@ -366,7 +366,7 @@ def _outline_file(
 
 def _search_outline(
     target_path: str,
-    query: str,
+    pattern: str,
     cwd: str,
     case_sensitive: bool = False,
     glob_pattern: Optional[str] = None,
@@ -411,7 +411,7 @@ def _search_outline(
                     break
                 batch = files_to_process[i : i + batch_size]
                 futures = {
-                    executor.submit(_outline_file, f, cwd, query, glob_pattern, case_sensitive): f
+                    executor.submit(_outline_file, f, cwd, pattern, glob_pattern, case_sensitive): f
                     for f in batch
                 }
 
@@ -448,7 +448,7 @@ def _search_outline(
         for abs_fpath in files_to_process:
             if cancel_event and cancel_event.is_set():
                 break
-            res = _outline_file(abs_fpath, cwd, query, glob_pattern, case_sensitive=case_sensitive)
+            res = _outline_file(abs_fpath, cwd, pattern, glob_pattern, case_sensitive=case_sensitive)
             if res:
                 results.append(res)
 

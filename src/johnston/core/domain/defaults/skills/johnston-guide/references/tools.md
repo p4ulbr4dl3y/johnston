@@ -9,8 +9,8 @@ Johnston equips the primary agent and subagents with a suite of 11 builtin tools
    - Rich documents (PDF, DOCX, XLSX, PPTX, EPUB, IPYNB) automatically convert to clean markdown.
    - Images are processed into base64 JSON payloads with configurable `detail` (`"low"`, `"high"`, `"original"`).
    - MCP resources can be read via `read(path="resource://...")`.
-2. **`search`**: Fast codebase search across files (`query`, `path`, `mode`, `glob`, `case_sensitive`, `max_results`, `context_lines`, `before`, `after`, `include_hidden`).
-   - `query`: required for `mode="content"`; optional for `mode="filename"` (filepath pattern) and `mode="outline"` (symbol name filter; empty matches all symbols).
+2. **`search`**: Fast codebase search across files (`pattern`, `path`, `mode`, `glob`, `case_sensitive`, `max_results`, `context_lines`, `before`, `after`, `include_hidden`).
+   - `pattern`: required for `mode="content"`; optional for `mode="filename"` (filepath pattern) and `mode="outline"` (symbol name filter; empty matches all symbols).
    - `before`: int (0..20), context lines before matches (`mode="content"` only, overrides `context_lines`).
    - `after`: int (0..20), context lines after matches (`mode="content"` only, overrides `context_lines`).
    - `include_hidden`: bool (default `false`), include hidden files/directories starting with `.`.

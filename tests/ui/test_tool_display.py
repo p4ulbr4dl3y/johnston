@@ -303,9 +303,9 @@ class TestToolDisplay(unittest.TestCase):
         # Edit
         self.assertEqual(extract_tool_display("edit", {"path": in_cwd}), "tests/test_foo.py")
         # Search
-        self.assertEqual(extract_tool_display("search", {"query": "fn", "path": in_cwd}), '"fn" in tests/test_foo.py')
-        self.assertEqual(extract_tool_display("search", {"query": "fn", "path": cwd}), '"fn"')
-        self.assertEqual(extract_tool_display("search", {"query": "fn", "path": "./"}), '"fn"')
+        self.assertEqual(extract_tool_display("search", {"pattern": "fn", "path": in_cwd}), '"fn" in tests/test_foo.py')
+        self.assertEqual(extract_tool_display("search", {"pattern": "fn", "path": cwd}), '"fn"')
+        self.assertEqual(extract_tool_display("search", {"pattern": "fn", "path": "./"}), '"fn"')
 
         home = os.path.abspath(os.path.expanduser("~"))
         in_home = os.path.join(home, ".test_cfg.json")

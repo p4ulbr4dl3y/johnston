@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _search_filename_ripgrep(
     target_path: str,
-    query: str,
+    pattern: str,
     cwd: str,
     case_sensitive: bool = False,
     glob_pattern: Optional[str] = None,
@@ -64,7 +64,7 @@ def _search_filename_ripgrep(
         return None
 
     matched_paths: List[str] = []
-    q = query.strip() if query else ""
+    q = pattern.strip() if pattern else ""
     q_is_wild = not q or q == "*"
 
     buffer = b""
@@ -131,7 +131,7 @@ def _search_filename_ripgrep(
 
 def _search_filename_python(
     target_path: str,
-    query: str,
+    pattern: str,
     cwd: str,
     case_sensitive: bool = False,
     glob_pattern: Optional[str] = None,
@@ -140,9 +140,9 @@ def _search_filename_python(
     gitignore_matcher: Optional[_GitignoreMatcher] = None,
     cancel_event: Optional[threading.Event] = None,
 ) -> Tuple[List[str], int]:
-    """Find files/directories matching query/glob pattern in pure Python."""
+    """Find files/directories matching pattern/glob in pure Python."""
     matched_paths: List[str] = []
-    q = query.strip() if query else ""
+    q = pattern.strip() if pattern else ""
     q_is_wild = not q or q == "*"
 
     def _matches_query(rel: str, fname: str) -> bool:
@@ -184,7 +184,7 @@ def _search_filename_python(
 
 def _search_filename(
     target_path: str,
-    query: str,
+    pattern: str,
     cwd: str,
     case_sensitive: bool = False,
     glob_pattern: Optional[str] = None,
@@ -195,7 +195,7 @@ def _search_filename(
 ) -> Tuple[List[str], int, int]:
     rg_result = _search_filename_ripgrep(
         target_path=target_path,
-        query=query,
+        pattern=pattern,
         cwd=cwd,
         case_sensitive=case_sensitive,
         glob_pattern=glob_pattern,
@@ -209,7 +209,7 @@ def _search_filename(
 
     paths, count = _search_filename_python(
         target_path=target_path,
-        query=query,
+        pattern=pattern,
         cwd=cwd,
         case_sensitive=case_sensitive,
         glob_pattern=glob_pattern,

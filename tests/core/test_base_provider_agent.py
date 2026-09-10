@@ -1181,7 +1181,7 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         messages = [{"role": "user", "content": "run concurrent tools"}]
         tool_calls_dict = {
             0: {"id": "call_1", "name": "read", "arguments": '{"path": "a.py"}'},
-            1: {"id": "call_2", "name": "search", "arguments": '{"query": "foo"}'},
+            1: {"id": "call_2", "name": "search", "arguments": '{"pattern": "foo"}'},
         }
         res = {}
         events = []

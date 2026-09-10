@@ -325,7 +325,7 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget6 = self._widget("my_custom_thing", "target")
         widget6.render_header()
 
-        widget7 = self._widget("mcp_search", "", args={"query": "x"})
+        widget7 = self._widget("mcp_search", "", args={"pattern": "x"})
         widget7.render_header()
 
     def test_render_header_edit_and_create_diff_stats(self):
@@ -1057,7 +1057,7 @@ class TestToolCallWidgetRenderContent(unittest.TestCase):
 
     def test_search_tool_adapts_to_max_len_and_mode(self):
         long_q = "very_long_search_query_" + "x" * 60
-        widget = ToolCallWidget("search", long_q, args={"query": long_q, "mode": "content"}, status="generating")
+        widget = ToolCallWidget("search", long_q, args={"pattern": long_q, "mode": "content"}, status="generating")
         # In-flight search generating should right-truncate with ...
         widget.render_header(max_len=40)
         rendered = str(widget.header_label.render())

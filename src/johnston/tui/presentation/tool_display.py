@@ -495,7 +495,7 @@ def _extract_tool_display_inner(
         return ""
 
     if name == "search":
-        q = str(args.get("query") or "").strip()
+        q = str(args.get("pattern") or "").strip()
         p = str(args.get("path") or "").strip()
         search_mode = str(args.get("mode") or "").strip()
         glob_pat = str(args.get("glob") or "").strip()

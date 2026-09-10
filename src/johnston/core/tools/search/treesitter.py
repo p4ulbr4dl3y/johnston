@@ -199,7 +199,7 @@ class TreeSitterExtractor:
         self,
         code: str,
         ext: str,
-        query: Optional[str] = None,
+        pattern: Optional[str] = None,
     ) -> List[Tuple[str, int, str]]:
         """Extract symbols using Tree-sitter.
 
@@ -219,7 +219,7 @@ class TreeSitterExtractor:
         matches = cursor.matches(tree.root_node)
 
         raw_results: List[Tuple[str, int, str, int]] = []
-        q_lower = query.lower().strip() if query and query.strip() and query.strip() != "*" else None
+        q_lower = pattern.lower().strip() if pattern and pattern.strip() and pattern.strip() != "*" else None
 
         for _, captures in matches:
             symbol_tuple = self._format_capture(captures, ext)

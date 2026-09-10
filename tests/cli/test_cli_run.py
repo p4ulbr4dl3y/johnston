@@ -191,7 +191,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_headless_async_json_flag(self):
         agent = MockAgent(steps=[
             ("content", "First chunk ", ""),
-            ("tool", "search", "query", {"query": "python"}, "call_1"),
+            ("tool", "search", "pattern", {"pattern": "python"}, "call_1"),
             ("tool_result", "found 3 docs", "", False, None, None, "call_1"),
             ("content", "final answer", ""),
         ])
@@ -217,7 +217,7 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["response"], "First chunk final answer")
         self.assertEqual(len(data["tool_calls"]), 1)
         self.assertEqual(data["tool_calls"][0]["name"], "search")
-        self.assertEqual(data["tool_calls"][0]["args"], {"query": "python"})
+        self.assertEqual(data["tool_calls"][0]["args"], {"pattern": "python"})
         self.assertEqual(data["tool_calls"][0]["result"], "found 3 docs")
         self.assertEqual(data["usage"]["tokens_input"], 10)
         self.assertEqual(data["usage"]["tokens_output"], 20)

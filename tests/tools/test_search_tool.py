@@ -125,7 +125,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         schema = self.tool.get_schema()
         self.assertIn("function", schema)
         params = schema["function"]["parameters"]
-        self.assertIn("query", params["properties"])
+        self.assertIn("pattern", params["properties"])
         self.assertIn("path", params["properties"])
         self.assertIn("mode", params["properties"])
         self.assertIn("glob", params["properties"])
@@ -245,7 +245,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         # Force pure Python fallback by patching shutil.which
         with patch("shutil.which", return_value=None):
             ctx = ToolContext(cwd=self.tmpdir)
-            res = await self.tool.execute({"query": "AppRunner", "path": "."}, ctx=ctx)
+            res = await self.tool.execute({"pattern": "AppRunner", "path": "."}, ctx=ctx)
             self.assertEqual(res.status, ToolResultStatus.DONE)
             self.assertIn("[search=content", res.content)
             self.assertIn("main.py", res.content)
@@ -260,7 +260,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         if not shutil.which("rg"):
             self.skipTest("rg binary not installed")
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "AppRunner", "path": "."}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "AppRunner", "path": "."}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("[search=content", res.content)
         self.assertIn("AppRunner", res.content)
@@ -274,7 +274,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             self.skipTest("rg not available")
         res = _search_content_ripgrep(
             target_path=self.tmpdir,
-            query="AppRunner",
+            pattern="AppRunner",
             cwd=self.tmpdir,
             context_lines=1,
         )
@@ -286,24 +286,24 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
     async def test_content_search_case_sensitivity(self):
         ctx = ToolContext(cwd=self.tmpdir)
         # Case-insensitive match
-        res1 = await self.tool.execute({"query": "apprunner", "case_sensitive": False}, ctx=ctx)
+        res1 = await self.tool.execute({"pattern": "apprunner", "case_sensitive": False}, ctx=ctx)
         self.assertIn("AppRunner", res1.content)
 
         # Case-sensitive match
-        res2 = await self.tool.execute({"query": "apprunner", "case_sensitive": True}, ctx=ctx)
+        res2 = await self.tool.execute({"pattern": "apprunner", "case_sensitive": True}, ctx=ctx)
         self.assertIn("0 matches found", res2.content)
 
     async def test_content_search_glob_filter(self):
         ctx = ToolContext(cwd=self.tmpdir)
         # Filter to only .py files
-        res = await self.tool.execute({"query": "AppRunner", "glob": "*.py"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "AppRunner", "glob": "*.py"}, ctx=ctx)
         self.assertIn("main.py", res.content)
         self.assertNotIn("notes.txt", res.content)
 
     async def test_content_search_context_lines(self):
         ctx = ToolContext(cwd=self.tmpdir)
         res = await self.tool.execute(
-            {"query": "def run", "path": "main.py", "context_lines": 1},
+            {"pattern": "def run", "path": "main.py", "context_lines": 1},
             ctx=ctx,
         )
         self.assertIn("main.py:", res.content)
@@ -314,23 +314,23 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
     async def test_content_search_regex_and_invalid_regex_fallback(self):
         ctx = ToolContext(cwd=self.tmpdir)
         # Valid regex
-        res = await self.tool.execute({"query": r"def\s+\w+\("}, ctx=ctx)
+        res = await self.tool.execute({"pattern": r"def\s+\w+\("}, ctx=ctx)
         self.assertIn("def calculate_total", res.content)
 
         # Invalid regex syntax falls back to literal search gracefully
         with patch("shutil.which", return_value=None):
-            res_bad = await self.tool.execute({"query": "[unclosed"}, ctx=ctx)
+            res_bad = await self.tool.execute({"pattern": "[unclosed"}, ctx=ctx)
             self.assertIn("0 matches found", res_bad.content)
 
     async def test_content_search_single_file(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "calculate_total", "path": "utils.py"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "calculate_total", "path": "utils.py"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("calculate_total", res.content)
 
     async def test_filename_mode(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "helper", "mode": "filename"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "helper", "mode": "filename"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("helper.py", res.content)
         self.assertNotIn("hidden.py", res.content)
@@ -338,16 +338,16 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_filename_mode_case_sensitive(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res_ci = await self.tool.execute({"query": "HELPER", "mode": "filename", "case_sensitive": False}, ctx=ctx)
+        res_ci = await self.tool.execute({"pattern": "HELPER", "mode": "filename", "case_sensitive": False}, ctx=ctx)
         self.assertIn("helper.py", res_ci.content)
         self.assertIn("matches=1", res_ci.content)
 
-        res_cs = await self.tool.execute({"query": "HELPER", "mode": "filename", "case_sensitive": True}, ctx=ctx)
+        res_cs = await self.tool.execute({"pattern": "HELPER", "mode": "filename", "case_sensitive": True}, ctx=ctx)
         self.assertIn("0 matches found", res_cs.content)
 
     async def test_filename_mode_wildcard(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "*", "mode": "filename", "glob": "*.py"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "*", "mode": "filename", "glob": "*.py"}, ctx=ctx)
         self.assertIn("main.py", res.content)
         self.assertIn("utils.py", res.content)
         self.assertNotIn("notes.txt", res.content)
@@ -356,12 +356,12 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         if not shutil.which("rg"):
             self.skipTest("rg binary not installed")
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "helper", "mode": "filename"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "helper", "mode": "filename"}, ctx=ctx)
         self.assertIn("helper.py", res.content)
 
     async def test_outline_mode_python(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "*", "path": "main.py", "mode": "outline"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "*", "path": "main.py", "mode": "outline"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("class AppRunner:", res.content)
         self.assertIn("def run(self)", res.content)
@@ -370,24 +370,24 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
     async def test_outline_mode_with_symbol_query(self):
         ctx = ToolContext(cwd=self.tmpdir)
         # Search for specific function symbol
-        res = await self.tool.execute({"query": "calculate_total", "mode": "outline"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "calculate_total", "mode": "outline"}, ctx=ctx)
         self.assertIn("def calculate_total", res.content)
         self.assertNotIn("helper_func", res.content)
 
     async def test_outline_mode_case_sensitive(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res_ci = await self.tool.execute({"query": "apprunner", "mode": "outline", "case_sensitive": False}, ctx=ctx)
+        res_ci = await self.tool.execute({"pattern": "apprunner", "mode": "outline", "case_sensitive": False}, ctx=ctx)
         self.assertIn("class AppRunner:", res_ci.content)
 
-        res_cs = await self.tool.execute({"query": "apprunner", "mode": "outline", "case_sensitive": True}, ctx=ctx)
+        res_cs = await self.tool.execute({"pattern": "apprunner", "mode": "outline", "case_sensitive": True}, ctx=ctx)
         self.assertIn("0 matches found", res_cs.content)
 
-        res_cs_match = await self.tool.execute({"query": "AppRunner", "mode": "outline", "case_sensitive": True}, ctx=ctx)
+        res_cs_match = await self.tool.execute({"pattern": "AppRunner", "mode": "outline", "case_sensitive": True}, ctx=ctx)
         self.assertIn("class AppRunner:", res_cs_match.content)
 
     async def test_outline_mode_generic_ts(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "*", "path": "service.ts", "mode": "outline"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "*", "path": "service.ts", "mode": "outline"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("class UserService", res.content)
         self.assertIn("function fetchAuthToken", res.content)
@@ -397,30 +397,30 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
     async def test_outline_mode_directory(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "*", "mode": "outline", "glob": "*.py"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "*", "mode": "outline", "glob": "*.py"}, ctx=ctx)
         self.assertIn("main.py:", res.content)
         self.assertIn("utils.py:", res.content)
         self.assertNotIn("service.ts:", res.content)
 
     async def test_error_handling_not_found(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "foo", "path": "nonexistent_dir_123"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "foo", "path": "nonexistent_dir_123"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.ERROR)
         self.assertIn("ERR: not_found", res.content)
 
     async def test_error_handling_invalid_mode(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "foo", "mode": "invalid_mode"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "foo", "mode": "invalid_mode"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.ERROR)
         self.assertIn("ERR: params", res.content)
         self.assertIn("invalid mode", res.content)
 
     async def test_error_handling_missing_query_content_mode(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "", "mode": "content"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "", "mode": "content"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.ERROR)
         self.assertIn("ERR: params", res.content)
-        self.assertIn("query parameter is required", res.content)
+        self.assertIn("pattern parameter is required", res.content)
 
     async def test_search_omitted_mode_with_glob_infers_filename(self):
         ctx = ToolContext(cwd=self.tmpdir)
@@ -433,7 +433,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         ctx.cwd = self.tmpdir
         ctx.sandbox_enabled = True
         with patch("johnston.core.infrastructure.platform.sandbox.is_path_readable_in_sandbox", return_value=False):
-            res = await self.tool.execute({"query": "foo", "path": "/etc/passwd"}, ctx=ctx)
+            res = await self.tool.execute({"pattern": "foo", "path": "/etc/passwd"}, ctx=ctx)
             self.assertEqual(res.status, ToolResultStatus.ERROR)
             self.assertIn("ERR: permission", res.content)
             self.assertIn("sandbox restriction", res.content)
@@ -442,7 +442,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         cancel_event = threading.Event()
         cancel_event.set()
         res = search_sync(
-            query="AppRunner",
+            pattern="AppRunner",
             path=self.tmpdir,
             cwd=self.tmpdir,
             cancel_event=cancel_event,
@@ -451,10 +451,10 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("0 matches found", res.content)
 
     def test_extract_tool_display_chip(self):
-        d1 = extract_tool_display("search", {"query": "AppRunner", "path": "src"})
+        d1 = extract_tool_display("search", {"pattern": "AppRunner", "path": "src"})
         self.assertEqual(d1, '"AppRunner" in src')
 
-        d2 = extract_tool_display("search", {"query": "run", "mode": "outline"})
+        d2 = extract_tool_display("search", {"pattern": "run", "mode": "outline"})
         self.assertEqual(d2, 'outline "run"')
 
         d3 = extract_tool_display("search", {})
@@ -468,7 +468,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
                 f.write(f"match_item_{i}\n")
 
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "match_item", "path": "many.txt", "max_results": 5}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "match_item", "path": "many.txt", "max_results": 5}, ctx=ctx)
         self.assertIn("matches=5", res.content)
 
     async def test_outline_syntax_error_file(self):
@@ -477,7 +477,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
             f.write("def invalid_syntax(:\n")
 
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "*", "path": "broken.py", "mode": "outline"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "*", "path": "broken.py", "mode": "outline"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("0 matches found", res.content)
 
@@ -536,24 +536,24 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
         ctx = ToolContext(cwd=self.tmpdir)
 
-        res_go = await self.tool.execute({"query": "*", "path": "server.go", "mode": "outline"}, ctx=ctx)
+        res_go = await self.tool.execute({"pattern": "*", "path": "server.go", "mode": "outline"}, ctx=ctx)
         self.assertIn("HandleRequest", res_go.content)
         self.assertIn("ServerConfig", res_go.content)
 
-        res_rs = await self.tool.execute({"query": "*", "path": "lib.rs", "mode": "outline"}, ctx=ctx)
+        res_rs = await self.tool.execute({"pattern": "*", "path": "lib.rs", "mode": "outline"}, ctx=ctx)
         self.assertIn("process_event", res_rs.content)
         self.assertIn("EventQueue", res_rs.content)
         self.assertIn("impl", res_rs.content)
 
-        res_kt = await self.tool.execute({"query": "*", "path": "Main.kt", "mode": "outline"}, ctx=ctx)
+        res_kt = await self.tool.execute({"pattern": "*", "path": "Main.kt", "mode": "outline"}, ctx=ctx)
         self.assertIn("UserService", res_kt.content)
         self.assertIn("getUser", res_kt.content)
 
-        res_swift = await self.tool.execute({"query": "*", "path": "Service.swift", "mode": "outline"}, ctx=ctx)
+        res_swift = await self.tool.execute({"pattern": "*", "path": "Service.swift", "mode": "outline"}, ctx=ctx)
         self.assertIn("ViewController", res_swift.content)
         self.assertIn("viewDidLoad", res_swift.content)
 
-        res_scala = await self.tool.execute({"query": "*", "path": "App.scala", "mode": "outline"}, ctx=ctx)
+        res_scala = await self.tool.execute({"pattern": "*", "path": "App.scala", "mode": "outline"}, ctx=ctx)
         self.assertIn("Server", res_scala.content)
         self.assertIn("start", res_scala.content)
 
@@ -561,7 +561,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         ctx = ToolContext(cwd=self.tmpdir)
         # Mock ripgrep raising an exception to test graceful python fallback
         with patch("subprocess.Popen", side_effect=OSError("rg failed")):
-            res = await self.tool.execute({"query": "AppRunner", "path": "."}, ctx=ctx)
+            res = await self.tool.execute({"pattern": "AppRunner", "path": "."}, ctx=ctx)
             self.assertEqual(res.status, ToolResultStatus.DONE)
             self.assertIn("AppRunner", res.content)
 
@@ -581,7 +581,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
         with patch("subprocess.Popen", return_value=mock_proc):
             lines, count, files_count = _search_content_ripgrep(
-                target_path=".", query="test", cwd="C:\\repo"
+                target_path=".", pattern="test", cwd="C:\\repo"
             )
             self.assertEqual(count, 2)
             self.assertEqual(files_count, 2)
@@ -596,7 +596,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         with open(txt_file, "w", encoding="utf-8") as f:
             f.write("class FakeNote:\n    def read(self): pass\n")
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "FakeNote", "path": "notes.txt", "mode": "outline"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "FakeNote", "path": "notes.txt", "mode": "outline"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("0 matches found", res.content)
 
@@ -615,7 +615,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         self.assertIn("search", REGISTRY)
         self.assertIs(REGISTRY["search"], SearchTool)
 
-        res = await execute_tool("search", {"query": "AppRunner", "path": self.tmpdir})
+        res = await execute_tool("search", {"pattern": "AppRunner", "path": self.tmpdir})
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("AppRunner", res.content)
 
@@ -627,16 +627,16 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
         ctx = ToolContext(cwd=self.tmpdir)
         # Without include_hidden
-        res1 = await self.tool.execute({"query": "SECRET_KEY"}, ctx=ctx)
+        res1 = await self.tool.execute({"pattern": "SECRET_KEY"}, ctx=ctx)
         self.assertNotIn(".hidden_config.py", res1.content)
 
         # With include_hidden
-        res2 = await self.tool.execute({"query": "SECRET_KEY", "include_hidden": True}, ctx=ctx)
+        res2 = await self.tool.execute({"pattern": "SECRET_KEY", "include_hidden": True}, ctx=ctx)
         self.assertIn(".hidden_config.py", res2.content)
 
     async def test_lean_header_no_elapsed_ms(self):
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "AppRunner"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "AppRunner"}, ctx=ctx)
         self.assertNotIn("elapsed_ms=", res.content)
 
     async def test_parallel_outline_processing(self):
@@ -647,7 +647,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
                 f.write(f"def function_{i}():\n    return {i}\n")
 
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "*", "mode": "outline", "glob": "file_*.py"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "*", "mode": "outline", "glob": "file_*.py"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         # Should find all functions (function_0 .. function_24)
         self.assertIn("function_0", res.content)
@@ -662,7 +662,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
         ctx = ToolContext(cwd=self.tmpdir)
         with patch("shutil.which", return_value=None):  # Force Python fallback
-            res = await self.tool.execute({"query": "test content"}, ctx=ctx)
+            res = await self.tool.execute({"pattern": "test content"}, ctx=ctx)
             self.assertEqual(res.status, ToolResultStatus.DONE)
             self.assertIn("search_000.txt", res.content)
             self.assertIn("search_024.txt", res.content)
@@ -675,7 +675,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
 
         ctx = ToolContext(cwd=self.tmpdir)
         with patch("shutil.which", return_value=None):  # Force Python fallback
-            res = await self.tool.execute({"query": "needle", "max_results": 5}, ctx=ctx)
+            res = await self.tool.execute({"pattern": "needle", "max_results": 5}, ctx=ctx)
             self.assertEqual(res.status, ToolResultStatus.DONE)
             self.assertIn("matches=5", res.content)
             match_lines = [line for line in res.content.splitlines() if ":" in line and "needle" in line]
@@ -686,7 +686,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         with open(fpath, "w") as f:
             f.write("def sample(): pass\n")
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "nonexistent", "path": "sample.py"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "nonexistent", "path": "sample.py"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("path=sample.py", res.content)
         self.assertIn("0 matches found", res.content)
@@ -696,7 +696,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         with open(fpath, "w") as f:
             f.write("line 1\nline 2\nTARGET\nline 4\nline 5\n")
         ctx = ToolContext(cwd=self.tmpdir)
-        res = await self.tool.execute({"query": "TARGET", "context_lines": 1, "path": "ctx.txt"}, ctx=ctx)
+        res = await self.tool.execute({"pattern": "TARGET", "context_lines": 1, "path": "ctx.txt"}, ctx=ctx)
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertNotIn("line 1", res.content)
         self.assertIn("line 2", res.content)
@@ -723,7 +723,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         with mock.patch("subprocess.Popen", return_value=mock_proc):
             res = _search_content_ripgrep(
                 target_path=self.tmpdir,
-                query="match",
+                pattern="match",
                 cwd=self.tmpdir,
                 case_sensitive=False,
                 context_lines=2,
@@ -742,7 +742,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         cancel_evt = threading.Event()
         cancel_evt.set()
         res = search_sync(
-            query="test",
+            pattern="test",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="content",
@@ -750,7 +750,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(res.status, ToolResultStatus.DONE)
         self.assertIn("0 matches found", res.content)
-        self.assertNotIn("query=", res.content)
+        self.assertNotIn("pattern=", res.content)
 
 
 class TestGitignoreMatcher(unittest.TestCase):
@@ -948,7 +948,7 @@ class TestProgressCallback(unittest.TestCase):
             progress_events.append(event)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -971,7 +971,7 @@ class TestProgressCallback(unittest.TestCase):
             progress_events.append(event)
 
         search_sync(
-            query="func",
+            pattern="func",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="content",
@@ -1015,7 +1015,7 @@ x = "string: class YetAnotherFake"
 """)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1034,7 +1034,7 @@ x = "string: class YetAnotherFake"
             f.write("def complex_func(x: int, y: str = 'hello', *args, **kwargs): pass\n")
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1059,7 +1059,7 @@ const x = "string: class YetAnotherFake";
 """)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1086,7 +1086,7 @@ export function helper() {}
 """)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1109,7 +1109,7 @@ func (r *RealType) RealMethod() {}
 """)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1136,7 +1136,7 @@ impl RealStruct {
 """)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1160,7 +1160,7 @@ impl Simple {
 }
 """)
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1178,7 +1178,7 @@ abstract class BaseService {
 }
 """)
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1198,7 +1198,7 @@ impl<T> Display for Widget<T> {
 }
 """)
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1252,11 +1252,11 @@ impl<T> Display for Widget<T> {
         self.assertTrue(_match_glob("src/utils/math.py", "math.py", "src\\**\\*.py"))
 
     def test_generic_outline_no_false_positive_on_line_query(self):
-        """Test that query='line' does not match every symbol line from regex display."""
+        """Test that pattern='line' does not match every symbol line from regex display."""
         sample_code = "class Greeter {\n    void sayHello() {}\n}\n"
         from johnston.core.tools.search.outline import _outline_generic_content
         # Should not match unless symbol name literally contains 'line'
-        res = _outline_generic_content(sample_code, query="line")
+        res = _outline_generic_content(sample_code, pattern="line")
         self.assertEqual(len(res), 0)
 
     def test_c_cpp_outline(self):
@@ -1277,7 +1277,7 @@ impl<T> Display for Widget<T> {
             f.write(ts_code)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1292,7 +1292,7 @@ impl<T> Display for Widget<T> {
             f.write(rs_code)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1307,7 +1307,7 @@ impl<T> Display for Widget<T> {
             f.write(py_code)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1322,7 +1322,7 @@ impl<T> Display for Widget<T> {
             f.write(b"def dummy(): pass\n\x00\x00\xff\xfe binary stuff")
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1337,7 +1337,7 @@ impl<T> Display for Widget<T> {
             f.write("message UserProfile {\n  string name = 1;\n}\nservice UserService {\n  rpc GetUser();\n}\n")
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1353,7 +1353,7 @@ impl<T> Display for Widget<T> {
             f.write(py_code)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1368,7 +1368,7 @@ impl<T> Display for Widget<T> {
             f.write(go_code)
 
         result = search_sync(
-            query="*",
+            pattern="*",
             path=self.tmpdir,
             cwd=self.tmpdir,
             mode="outline",
@@ -1398,7 +1398,7 @@ impl<T> Display for Widget<T> {
         with patch("shutil.which", return_value="/usr/bin/rg"), patch("subprocess.Popen", return_value=mock_proc):
             res = _search_filename_ripgrep(
                 target_path=".",
-                query="",
+                pattern="",
                 cwd=self.tmpdir,
             )
             self.assertIsNotNone(res)

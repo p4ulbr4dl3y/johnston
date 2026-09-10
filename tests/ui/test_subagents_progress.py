@@ -254,12 +254,12 @@ class TestSubagentProgressDisplay(unittest.TestCase):
         self.assertEqual(extract_subagent_progress(sess), "reading 2 files")
 
     def test_format_active_tool_generic(self):
-        self.assertEqual(_format_active_tool_progress("search", {"query": "foo"}), "searching codebase")
+        self.assertEqual(_format_active_tool_progress("search", {"pattern": "foo"}), "searching codebase")
         turn_evts = [
-            {"type": "tool", "tool_type": "search", "args": {"query": "a"}},
-            {"type": "tool", "tool_type": "search", "args": {"query": "b"}},
+            {"type": "tool", "tool_type": "search", "args": {"pattern": "a"}},
+            {"type": "tool", "tool_type": "search", "args": {"pattern": "b"}},
         ]
-        self.assertEqual(_format_active_tool_progress("search", {"query": "b"}, turn_events=turn_evts), "searching codebase (2)")
+        self.assertEqual(_format_active_tool_progress("search", {"pattern": "b"}, turn_events=turn_evts), "searching codebase (2)")
         self.assertEqual(_format_active_tool_progress("custom_mcp_query", {}), "tool: custom_mcp_query")
         self.assertEqual(_format_active_tool_progress("update_plan", {}), "updating plan")
         self.assertEqual(_format_active_tool_progress("", {}), "running...")

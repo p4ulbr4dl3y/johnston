@@ -28,7 +28,7 @@ from johnston.core.tools.utils import resolve_readable_path
 
 
 def search_sync(
-    query: str,
+    pattern: str,
     path: str,
     cwd: str,
     mode: str = "content",
@@ -64,8 +64,8 @@ def search_sync(
             name="mode",
         )
 
-    if mode == "content" and not query.strip():
-        return fail(ERROR_KIND_PARAMS, "query parameter is required for content search", name="query")
+    if mode == "content" and not pattern.strip():
+        return fail(ERROR_KIND_PARAMS, "pattern parameter is required for content search", name="pattern")
 
     if progress_callback:
         progress_callback({"stage": "start", "mode": mode})
@@ -83,7 +83,7 @@ def search_sync(
     if mode == "content":
         rg_res = _search_content_ripgrep(
             target_path=path,
-            query=query,
+            pattern=pattern,
             cwd=cwd,
             case_sensitive=case_sensitive,
             context_lines=context_lines,
@@ -97,7 +97,7 @@ def search_sync(
         else:
             raw_lines, match_count, file_count = _search_content_python(
                 target_path=path,
-                query=query,
+                pattern=pattern,
                 cwd=cwd,
                 case_sensitive=case_sensitive,
                 context_lines=context_lines,
@@ -110,7 +110,7 @@ def search_sync(
     elif mode == "filename":
         raw_lines, match_count, file_count = _search_filename(
             target_path=path,
-            query=query,
+            pattern=pattern,
             cwd=cwd,
             case_sensitive=case_sensitive,
             glob_pattern=glob_pattern,
@@ -122,7 +122,7 @@ def search_sync(
     else:  # outline
         raw_lines, match_count, file_count = _search_outline(
             target_path=path,
-            query=query,
+            pattern=pattern,
             cwd=cwd,
             case_sensitive=case_sensitive,
             glob_pattern=glob_pattern,
@@ -167,11 +167,11 @@ class SearchTool(BaseTool):
     parameters = {
         "type": "object",
         "properties": {
-            "query": {
+            "pattern": {
                 "type": "string",
                 "description": (
-                    "Search query: required for 'content' (regex or text); "
-                    "optional for 'filename' (filepath pattern) and 'outline' (symbol name, empty matches all)."
+                    "Search regex/text pattern: required for 'content' (regex or text); "
+                    "optional for 'filename' (filepath) and 'outline' (symbol name, empty matches all)."
                 ),
             },
             "path": {
@@ -221,7 +221,7 @@ class SearchTool(BaseTool):
         args = args or {}
         ctx = self._ensure_context(ctx)
 
-        query = str(args.get("query") or "")
+        pattern = str(args.get("pattern") or "")
         raw_path = str(args.get("path") or ".").strip() or "."
         resolved_path, err = resolve_readable_path(ctx, raw_path)
         if err is not None:
@@ -229,7 +229,7 @@ class SearchTool(BaseTool):
 
         raw_mode = args.get("mode")
         glob_pattern = str(args.get("glob") or "").strip() or None
-        if not raw_mode and not query.strip() and glob_pattern:
+        if not raw_mode and not pattern.strip() and glob_pattern:
             mode = "filename"
         else:
             mode = str(raw_mode or "content").strip()
@@ -245,7 +245,7 @@ class SearchTool(BaseTool):
 
         return await run_cancellable(
             search_sync,
-            query=query,
+            pattern=pattern,
             path=resolved_path,
             cwd=cwd,
             mode=mode,

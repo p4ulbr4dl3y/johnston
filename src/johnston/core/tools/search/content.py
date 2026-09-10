@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def _search_content_ripgrep(
     target_path: str,
-    query: str,
+    pattern: str,
     cwd: str,
     case_sensitive: bool = False,
     context_lines: int = 0,
@@ -75,7 +75,7 @@ def _search_content_ripgrep(
     for exc in DEFAULT_EXCLUDE_DIRS:
         cmd.extend(["-g", f"!**/{exc}/**"])
 
-    cmd.extend(["--", query, target_path])
+    cmd.extend(["--", pattern, target_path])
 
     rg_rest_re = re.compile(r"^(\d+)([:-])(.*)$")
     try:
@@ -184,7 +184,7 @@ def _search_content_ripgrep(
 
 def _search_content_python(
     target_path: str,
-    query: str,
+    pattern: str,
     cwd: str,
     case_sensitive: bool = False,
     context_lines: int = 0,
@@ -197,9 +197,9 @@ def _search_content_python(
     """Pure Python fallback for content regex/literal search."""
     flags = 0 if case_sensitive else re.IGNORECASE
     try:
-        pattern = re.compile(query, flags)
+        regex_pattern = re.compile(pattern, flags)
     except re.error:
-        pattern = re.compile(re.escape(query), flags)
+        regex_pattern = re.compile(re.escape(pattern), flags)
 
     matched_files: Set[str] = set()
     output_lines: List[str] = []
@@ -241,7 +241,7 @@ def _search_content_python(
 
         local_matches: List[int] = []
         for idx, l_text in enumerate(file_lines):
-            if pattern.search(l_text):
+            if regex_pattern.search(l_text):
                 local_matches.append(idx)
 
         if not local_matches:
