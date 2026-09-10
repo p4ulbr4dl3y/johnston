@@ -72,36 +72,27 @@ async def restore_message_item(
                     app = chat_view.app
                 except Exception:
                     pass
-                store = getattr(app, "sm", None) if app else None
-                if store is None:
-                    try:
-                        from johnston.core.infrastructure.storage.session_store import SessionStore
+                try:
+                    from johnston.core.application.session.facade import resolve_session_by_title
 
-                        store = SessionStore.get_instance()
-                    except Exception:
-                        store = None
-                if store is not None and hasattr(store, "find_session_by_title_or_id"):
-                    try:
-                        curr_sid = getattr(app, "current_session_id", None) if app else None
-                        found = store.find_session_by_title_or_id(str(title), parent_id=curr_sid)
-                        if not found:
-                            found = store.find_session_by_title_or_id(str(title))
-                        if found and getattr(found, "id", None):
-                            sub_id = str(found.id)
-                            f_status = getattr(found, "status", None)
-                            if status in ("running", "cancelled") and f_status in (
-                                "error",
-                                "cancelled",
-                                "done",
-                                "completed",
-                            ):
-                                status = (
-                                    "error"
-                                    if f_status == "error"
-                                    else ("cancelled" if f_status == "cancelled" else "done")
-                                )
-                    except Exception:
-                        pass
+                    curr_sid = getattr(app, "current_session_id", None) if app else None
+                    found = resolve_session_by_title(str(title), parent_id=curr_sid)
+                    if found and getattr(found, "id", None):
+                        sub_id = str(found.id)
+                        f_status = getattr(found, "status", None)
+                        if status in ("running", "cancelled") and f_status in (
+                            "error",
+                            "cancelled",
+                            "done",
+                            "completed",
+                        ):
+                            status = (
+                                "error"
+                                if f_status == "error"
+                                else ("cancelled" if f_status == "cancelled" else "done")
+                            )
+                except Exception:
+                    pass
 
         widget = await chat_view.add_tool_call(
             ttype,

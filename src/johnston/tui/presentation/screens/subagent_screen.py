@@ -108,16 +108,10 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         self._chat_view.focus()
         self._chat_view.clear_welcome()
 
-        store = getattr(self.app, "sm", None) if self.app else None
-        if store is None:
-            from johnston.core.infrastructure.storage.session_store import SessionStore
-
-            store = SessionStore.get_instance()
+        from johnston.core.application.session.facade import resolve_session_by_title
 
         curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
-        self.session = store.find_session_by_title_or_id(self.session_id_or_desc, parent_id=curr_session_id)
-        if not self.session:
-            self.session = store.find_session_by_title_or_id(self.session_id_or_desc)
+        self.session = resolve_session_by_title(self.session_id_or_desc, parent_id=curr_session_id)
 
         if not self.session:
 
