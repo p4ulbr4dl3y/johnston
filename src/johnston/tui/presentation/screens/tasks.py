@@ -497,7 +497,7 @@ class SubagentsScreen(BaseTasksListScreen):
         elif client is not None:
             return client
 
-        from johnston.core.application.session.facade import _get_store
+        from johnston.core.client import _get_store
 
         curr_sid = getattr(app, "current_session_id", None) if app else None
         store = _get_store(app)
@@ -554,7 +554,7 @@ class SubagentsScreen(BaseTasksListScreen):
             if not role_display:
                 role = getattr(agent, "role", None) if agent else getattr(s, "role", None)
                 if role and isinstance(role, str) and role.strip() and role.strip().lower() not in ("worker", "subagent", "default"):
-                    from johnston.core.application.roles.role_registry import get_role_display_name
+                    from johnston.core.client import get_role_display_name
 
                     role_display = get_role_display_name(role)
             if role_display and isinstance(role_display, str) and role_display.lower() not in ("worker", "subagent", "default"):
@@ -615,7 +615,7 @@ class SubagentsScreen(BaseTasksListScreen):
             app = getattr(self, "_app", None)
         sess = item.get("raw_obj")
         if sess is not None and hasattr(sess, "async_task"):
-            from johnston.core.application.session.facade import kill_subagent
+            from johnston.core.client import kill_subagent
 
             kill_subagent(sess, app)
         elif session_id:

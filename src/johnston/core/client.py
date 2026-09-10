@@ -44,6 +44,71 @@ from johnston.core.infrastructure.storage.session_store import SessionStore
 logger = logging.getLogger(__name__)
 
 
+EFFORT_AUTO = "auto"
+
+
+def normalize_thinking_effort(value: str | None) -> str | None:
+    from johnston.core.infrastructure.runtime.thinking_effort import normalize_thinking_effort as _norm
+
+    return _norm(value)
+
+
+def display_thinking_effort(value: str | None) -> str:
+    from johnston.core.infrastructure.runtime.thinking_effort import display_thinking_effort as _disp
+
+    return _disp(value)
+
+
+def get_role_display_name(role_or_key: Any, project_dir: str | None = None) -> str:
+    """Return human-readable role name for a key, entity, or role definition."""
+    from johnston.core.application.roles.role_registry import get_role_display_name as _get_name
+
+    return _get_name(role_or_key, project_dir=project_dir)
+
+
+def extract_task_status_details(task: Any) -> tuple[str, str]:
+    """Extract (status, duration_badge) from a task object."""
+    from johnston.core.infrastructure.tasks.manage import extract_task_status_details as _extract
+
+    return _extract(task)
+
+
+def is_windows() -> bool:
+    from johnston.core.infrastructure.platform.platform_utils import is_windows as _iw
+
+    return _iw()
+
+
+def process_carriage_returns(text: str) -> str:
+    from johnston.core.infrastructure.tasks.output import process_carriage_returns as _pcr
+
+    return _pcr(text)
+
+
+def strip_ansi(text: str) -> str:
+    from johnston.core.infrastructure.tasks.output import strip_ansi as _sa
+
+    return _sa(text)
+
+
+def kill_subagent(session: Any, app: Any = None) -> bool:
+    from johnston.core.application.session.facade import kill_subagent as _kill
+
+    return _kill(session, app)
+
+
+def _get_store(app: Any = None) -> Any:
+    from johnston.core.application.session.facade import _get_store as _gs
+
+    return _gs(app)
+
+
+def McpService(*args: Any, **kwargs: Any) -> Any:
+    from johnston.core.application.mcp.mcp_service import McpService as _McpService
+
+    return _McpService(*args, **kwargs)
+
+
 def _parse_rewind_stat_numbers(git_stats: str) -> tuple[int, int, bool]:
     """Extract (insertions, deletions, is_available) from git_stats summary."""
     if not git_stats:
@@ -180,16 +245,23 @@ class JohnstonClient:
 
         # Record user prompt in active session if present
         if self.session is not None and hasattr(self.session, "messages"):
-            user_msg = {
-                "type": "user",
-                "role": "user",
-                "text": prompt,
-                "content": prompt,
-                "timestamp": time.time(),
-            }
-            if attachments:
-                user_msg["attachments"] = attachments
-            self.session.messages.append(user_msg)
+            last_msg = self.session.messages[-1] if self.session.messages else None
+            is_dup = (
+                isinstance(last_msg, dict)
+                and (last_msg.get("role") == "user" or last_msg.get("type") == "user")
+                and (last_msg.get("text") == prompt or last_msg.get("content") == prompt)
+            )
+            if not is_dup:
+                user_msg = {
+                    "type": "user",
+                    "role": "user",
+                    "text": prompt,
+                    "content": prompt,
+                    "timestamp": time.time(),
+                }
+                if attachments:
+                    user_msg["attachments"] = attachments
+                self.session.messages.append(user_msg)
 
         try:
             if attachments is not None:
@@ -513,6 +585,14 @@ class JohnstonClient:
             supports_vision=has_vis,
             supports_thinking=has_thinking,
         )
+
+    def estimate_cost(self, provider_key: str, model_name: str, total_tokens: int) -> float:
+        """Estimate token cost for provider/model."""
+        from johnston.core.domain.policies.models_catalog import catalog
+
+        if hasattr(catalog, "estimate_cost_from_totals"):
+            return float(catalog.estimate_cost_from_totals(provider_key, model_name, total_tokens))
+        return 0.0
 
     def get_providers(self) -> list[ProviderDTO]:
         """List configured/available providers and their models as ProviderDTO."""
@@ -883,20 +963,31 @@ class JohnstonClient:
             return True
         return False
 
-    async def kill_subagent(self, session_id: str, app: Any = None) -> bool:
-        """Kill a running subagent session by ID."""
+    def kill_subagent_sync(self, session: Any, app: Any = None) -> bool:
+        """Synchronously kill a subagent session."""
+        from johnston.core.application.session.facade import kill_subagent
+
+        target_app = app or getattr(self, "app", None)
+        return kill_subagent(session, app=target_app)
+
+    async def kill_subagent(self, session_id: Any, app: Any = None) -> bool:
+        """Kill a running subagent session by ID or session object."""
         from johnston.core.application.session.facade import kill_subagent, list_subagent_sessions
 
-        sessions = list_subagent_sessions(parent_id=self.session_id, app=app)
+        target_app = app or getattr(self, "app", None)
+        if not isinstance(session_id, str):
+            return kill_subagent(session_id, app=target_app)
+
+        sessions = list_subagent_sessions(parent_id=self.session_id, app=target_app)
         for s in sessions:
             if getattr(s, "id", "") == session_id:
-                kill_subagent(s, app)
+                kill_subagent(s, target_app)
                 return True
         # If not found under current session_id, check all subagent sessions
-        all_sessions = list_subagent_sessions(parent_id=None, app=app)
+        all_sessions = list_subagent_sessions(parent_id=None, app=target_app)
         for s in all_sessions:
             if getattr(s, "id", "") == session_id:
-                kill_subagent(s, app)
+                kill_subagent(s, target_app)
                 return True
         return False
 
@@ -951,3 +1042,121 @@ class JohnstonClient:
             insertions=ins,
             deletions=dels,
         )
+
+    def get_thinking_effort(self) -> str:
+        """Get current thinking effort for active provider and model."""
+        provider_key = self.provider or (
+            self.pm.get_active_provider_key() if hasattr(self.pm, "get_active_provider_key") else ""
+        )
+        model_name = getattr(self.agent, "model", "") or (
+            self.pm.get_provider_model(provider_key) if hasattr(self.pm, "get_provider_model") else ""
+        )
+        effort = ""
+        if hasattr(self.pm, "get_provider_thinking_effort"):
+            effort = self.pm.get_provider_thinking_effort(provider_key, model_name)
+        return effort or self.effort or EFFORT_AUTO
+
+    def set_thinking_effort(self, effort: str, app: Any = None) -> None:
+        """Persist thinking effort and update active agent."""
+        provider_key = self.provider or (
+            self.pm.get_active_provider_key() if hasattr(self.pm, "get_active_provider_key") else ""
+        )
+        model_name = getattr(self.agent, "model", "") or (
+            self.pm.get_provider_model(provider_key) if hasattr(self.pm, "get_provider_model") else ""
+        )
+        if hasattr(self.pm, "set_provider_thinking_effort"):
+            self.pm.set_provider_thinking_effort(provider_key, model_name, effort)
+        self.effort = effort
+        norm_effort = effort.strip().lower()
+        if self.agent is not None:
+            setattr(self.agent, "thinking_effort", norm_effort)
+            setattr(self.agent, "reasoning_effort", norm_effort)
+        if app is not None and hasattr(app, "agent") and app.agent is not None:
+            setattr(app.agent, "thinking_effort", norm_effort)
+            setattr(app.agent, "reasoning_effort", norm_effort)
+
+    def resolve_session_by_title(
+        self,
+        title: str,
+        parent_id: str | None = None,
+        app: Any = None,
+    ) -> Any | None:
+        """Find a session by title or ID, scoped to parent_id first then globally."""
+        from johnston.core.application.session.facade import resolve_session_by_title
+
+        pid = parent_id if parent_id is not None else (self.session_id or None)
+        found = resolve_session_by_title(title, parent_id=pid, app=app)
+        if found is None and self.store is not None and hasattr(self.store, "find_session_by_title_or_id"):
+            found = self.store.find_session_by_title_or_id(title, parent_id=pid)
+            if found is None and pid:
+                found = self.store.find_session_by_title_or_id(title)
+        return found
+
+    def get_checkpoint_diff(
+        self,
+        session_id: str,
+        checkpoint_idx: int,
+        project_path: str | None = None,
+        scoped_files: list[str] | tuple[str, ...] | None = None,
+    ) -> list[Any]:
+        """Fetch diff items for a specific checkpoint."""
+        from johnston.core.domain.ports.checkpoint import get_checkpoint_manager
+
+        cm = get_checkpoint_manager()
+        if not cm:
+            return []
+        pdir = project_path or getattr(self.store, "project_path", None)
+        return cm.get_checkpoint_diff(
+            session_id,
+            checkpoint_idx,
+            project_path=pdir,
+            scoped_files=list(scoped_files) if scoped_files is not None else None,
+        )
+
+    def rewind_to(
+        self,
+        point_index: int,
+        restore_code: bool = True,
+        project_path: str | None = None,
+    ) -> bool:
+        """Rewind session history and optionally restore git checkpoint to point_index."""
+        from johnston.core.application.session.actions import rewind_session
+
+        user_msgs: list[tuple[int, str]] = []
+        if self.session and getattr(self.session, "messages", None):
+            from johnston.core.domain.policies.messages import USER_EVENT_TYPE, is_ui_visible_user_message
+
+            for i, m in enumerate(self.session.messages):
+                if isinstance(m, dict) and m.get("type") == USER_EVENT_TYPE and is_ui_visible_user_message(m):
+                    text = str(m.get("display_text") or m.get("text") or "")
+                    user_msgs.append((i, text))
+
+        pdir = project_path or getattr(self.store, "project_path", None)
+
+        def _save():
+            if self.store and self.session and hasattr(self.store, "save"):
+                try:
+                    self.store.save(self.session)
+                except Exception:
+                    pass
+
+        rewind_session(
+            self.agent,
+            self.session_id,
+            pdir,
+            user_msgs,
+            point_index,
+            restore_git=restore_code,
+            session=self.session,
+            rollback_ui=lambda _: None,
+            load_text_into_input=lambda _: None,
+            save_session_cb=_save,
+            refresh_footer_cb=lambda: None,
+            store=self.store,
+            task_manager=self.task_manager,
+        )
+        return True
+
+    get_role_display_name = staticmethod(get_role_display_name)
+    extract_task_status_details = staticmethod(extract_task_status_details)
+

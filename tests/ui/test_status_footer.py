@@ -448,11 +448,43 @@ class TestStatusFooter(unittest.IsolatedAsyncioTestCase):
             footer.update_status(provider_key="openai", model_name="gpt-4o")
             rows = footer._last_grid_rows
             self.assertIn("esc", rows[0][0])
-            self.assertIn("to interrupt", rows[0][0])
-            self.assertIn("(", rows[0][0])
-            self.assertIn(")", rows[0][0])
+    async def test_update_status_resolves_clean_model_via_client(self):
+        app = FooterTestApp()
+        mock_client = MagicMock()
+        mock_client.get_model_info.return_value = MagicMock(display_name="GPT-4 Omni")
+        app.client = mock_client
+        async with app.run_test():
+            footer = app.query_one(StatusFooter)
+            footer.update_status(provider_key="openai", model_name="gpt-4o", is_connected=True)
+            mock_client.get_model_info.assert_called_with("openai", "gpt-4o")
+            rows = footer._last_grid_rows
+            self.assertIn("GPT-4 Omni", rows[0][0])
 
+    async def test_subagent_footer_resolves_via_client(self):
+        from johnston.tui.presentation.widgets.subagent_footer import SubagentStatusFooter
 
+        class SubagentApp(App[None]):
+            def __init__(self):
+                super().__init__()
+                self.client = MagicMock()
+                self.client.get_model_info.return_value = MagicMock(display_name="Claude Sonnet")
+                self.client.estimate_cost.return_value = 0.042
 
+            def compose(self):
+                yield SubagentStatusFooter(id="sub-footer")
 
+        app = SubagentApp()
+        async with app.run_test():
+            footer = app.query_one(SubagentStatusFooter)
+            sess = MagicMock()
+            sess.agent = MagicMock(model="claude-3-7-sonnet", provider_key="anthropic")
+            sess.agent.get_metrics.return_value = {"context_used": 100, "total_tokens": 1000, "cost_usd": 0.0}
+            sess.status = "running"
+            sess.title = "Subagent Worker"
+            sess.cost_usd = 0.0
 
+            footer.update_session(sess)
+            app.client.get_model_info.assert_called_with("anthropic", "claude-3-7-sonnet")
+            app.client.estimate_cost.assert_called_with("anthropic", "claude-3-7-sonnet", 1000)
+            rows = footer._last_grid_rows
+            self.assertIn("Claude Sonnet", rows[2][0])

@@ -11,6 +11,11 @@ from pathlib import Path
 
 SCREENS_DIR = Path(__file__).resolve().parents[2] / "src" / "johnston" / "tui" / "presentation" / "screens"
 
+ALLOWED_CORE_PREFIXES = (
+    "johnston.core.client",
+    "johnston.core.dto",
+)
+
 GLOBAL_FORBIDDEN_NAMES = {
     "catalog",
     "models_catalog",
@@ -58,8 +63,9 @@ class TestTuiArchitectureBoundaries(unittest.TestCase):
         self.assertTrue(SCREENS_DIR.is_dir(), f"Screens directory not found: {SCREENS_DIR}")
 
     def test_no_forbidden_imports_in_screens(self) -> None:
+        """Verify ALL .py files in screens forbid any internal core modules (only client/dto allowed)."""
         screen_files = sorted(SCREENS_DIR.glob("*.py"))
-        self.assertGreater(len(screen_files), 10, "Expected multiple screen modules")
+        self.assertGreater(len(screen_files), 20, "Expected all screen modules to be present")
 
         violations: list[str] = []
 
@@ -76,6 +82,14 @@ class TestTuiArchitectureBoundaries(unittest.TestCase):
             for lineno, import_target, asname in visitor.imports:
                 parts = import_target.split(".")
                 imported_symbols = set(parts) | {asname}
+
+                # Strictly forbid any internal core imports: only johnston.core.client and johnston.core.dto allowed
+                if import_target == "johnston.core" or import_target.startswith("johnston.core."):
+                    if not any(import_target.startswith(prefix) for prefix in ALLOWED_CORE_PREFIXES):
+                        violations.append(
+                            f"{file_name}:{lineno} forbidden internal core import '{import_target}' "
+                            f"(only johnston.core.client and johnston.core.dto are allowed)"
+                        )
 
                 # Check globally forbidden symbols
                 for forbidden in GLOBAL_FORBIDDEN_NAMES:
@@ -94,6 +108,25 @@ class TestTuiArchitectureBoundaries(unittest.TestCase):
         if violations:
             msg = "Architecture boundary violations found in TUI screens:\n" + "\n".join(violations)
             self.fail(msg)
+
+    def test_footer_widgets_no_catalog_import(self) -> None:
+        """Verify status_footer.py and subagent_footer.py do not directly import models_catalog.catalog."""
+        widgets_dir = SCREENS_DIR.parent / "widgets"
+        for widget_name in ("status_footer.py", "subagent_footer.py"):
+            widget_path = widgets_dir / widget_name
+            self.assertTrue(widget_path.exists(), f"Widget file missing: {widget_name}")
+            source = widget_path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(widget_path))
+            visitor = ImportVisitor()
+            visitor.visit(tree)
+            for lineno, import_target, asname in visitor.imports:
+                self.assertNotIn(
+                    "models_catalog.catalog",
+                    import_target,
+                    f"{widget_name}:{lineno} forbidden models_catalog.catalog import in '{import_target}'",
+                )
+                if asname == "catalog" or import_target.endswith(".catalog"):
+                    self.fail(f"{widget_name}:{lineno} direct catalog import '{import_target}'")
 
     def test_all_screens_use_client_or_dtos(self) -> None:
         """Sanity check that key screens rely on JohnstonClient facade or core DTOs."""

@@ -1,4 +1,4 @@
-from johnston.core.infrastructure.runtime.thinking_effort import EFFORT_AUTO, display_thinking_effort
+from johnston.core.client import EFFORT_AUTO, display_thinking_effort
 from johnston.tui.presentation.screens.base_modal import status_tag
 from johnston.tui.presentation.screens.base_selection import BaseSelectionScreen
 

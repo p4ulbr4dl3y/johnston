@@ -38,6 +38,9 @@ class NullStreamDriver:
     async def consume_stream_step(self, step: tuple) -> None:
         pass
 
+    async def consume_session_event(self, event: Any, animate: bool = True, is_active: bool = True) -> None:
+        pass
+
     def cleanup_unfinalized_tools(self, error_message: Optional[str] = "Interrupted") -> None:
         pass
 

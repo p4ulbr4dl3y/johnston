@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 from rich.markup import escape
 from rich.text import Text
@@ -9,7 +9,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from johnston.core.application.session.actions import RewindEntry
+from johnston.core.dto import RewindPointDTO
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from johnston.tui.presentation.screens.constants import (
@@ -26,6 +26,7 @@ from johnston.tui.presentation.widgets.modal_header import ModalHeader
 from johnston.tui.presentation.widgets.modal_hint import ModalHint
 from johnston.tui.utils.row_format import MODAL_WIDE_ROW_WIDTH, ellipsize, format_badge_row, option_list_row_width
 
+RewindEntry = RewindPointDTO
 REWIND_CURRENT_STATE = -1
 
 
@@ -36,7 +37,7 @@ class RewindSelection:
 
 
 def format_rewind_files(
-    changed_files: list[str], git_stats: str = "", max_show: int = 4, max_width: int = 0
+    changed_files: list[str] | tuple[str, ...], git_stats: str = "", max_show: int = 4, max_width: int = 0
 ) -> Text:
     """Format rewind file list with rich styling without bullet/indent noise."""
     t = Text()
@@ -73,7 +74,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
 
     def __init__(
         self,
-        user_messages: list[RewindEntry],
+        user_messages: list[Any],
         checkpoints_enabled: bool = True,
         session_id: Optional[str] = None,
         project_path: Optional[str] = None,
@@ -84,7 +85,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         self.session_id = session_id
         self.project_path = project_path
         self.search_query = ""
-        self.filtered_entries: list[RewindEntry] = list(user_messages)
+        self.filtered_entries: list[Any] = list(user_messages)
 
         options = self._format_step1_options(MODAL_WIDE_ROW_WIDTH, self.filtered_entries)
 
@@ -105,13 +106,14 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
             opt_list = None
         return option_list_row_width(opt_list, MODAL_WIDE_ROW_WIDTH)
 
-    def _format_step1_options(self, target_width: int, entries: list[RewindEntry]) -> list[str]:
+    def _format_step1_options(self, target_width: int, entries: list[Any]) -> list[str]:
         options = []
         for m in entries:
-            clean = " ".join(m.text.replace("\n", " ").replace("\r", " ").split())
+            clean = " ".join(getattr(m, "text", "").replace("\n", " ").replace("\r", " ").split())
             if not clean:
                 clean = "(empty message)"
-            badge_plain = (m.git_stats or "no checkpoint") if self.checkpoints_enabled else ""
+            git_stats = getattr(m, "git_stats", "")
+            badge_plain = (git_stats or "no checkpoint") if self.checkpoints_enabled else ""
             if self.checkpoints_enabled and badge_plain:
                 options.append(format_badge_row(clean, badge_plain, target_width=target_width))
             else:
@@ -126,7 +128,7 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
         else:
             tokens = query_clean.split()
             self.filtered_entries = [
-                m for m in self.user_messages if all(t in m.text.lower() for t in tokens)
+                m for m in self.user_messages if all(t in getattr(m, "text", "").lower() for t in tokens)
             ]
         target_w = self._row_width()
         self.filtered_options = self._format_step1_options(target_w, self.filtered_entries)
@@ -257,10 +259,11 @@ class RewindScreen(ModalSearchNavMixin, BaseModalScreen[Optional[RewindSelection
 
         if 0 <= idx < len(self.filtered_entries):
             selected_entry = self.filtered_entries[idx]
+            git_stats = getattr(selected_entry, "git_stats", "")
             has_changes = bool(
                 self.checkpoints_enabled
-                and selected_entry.git_stats
-                and selected_entry.git_stats not in ("no changes", "no checkpoint")
+                and git_stats
+                and git_stats not in ("no changes", "no checkpoint")
             )
             if not has_changes:
                 self.dismiss(RewindSelection(index=selected_entry.index, restore_code=False))

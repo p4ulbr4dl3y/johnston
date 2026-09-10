@@ -382,6 +382,65 @@ def test_client_get_git_state(mock_pm: MagicMock, mock_store: MagicMock):
         assert git_state.changed_files == 2
 
 
+def test_client_thinking_effort(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    mock_pm.get_provider_thinking_effort.return_value = "high"
+    assert client.get_thinking_effort() == "high"
+
+    client.set_thinking_effort("low")
+    assert client.effort == "low"
+    assert client.agent.thinking_effort == "low"
+    mock_pm.set_provider_thinking_effort.assert_called_with("mock_provider", "mock-model", "low")
+
+
+def test_client_resolve_session_by_title(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    mock_store.find_session_by_title_or_id.return_value = MagicMock(id="found-id")
+
+    with patch("johnston.core.application.session.facade.resolve_session_by_title", return_value=None):
+        sess = client.resolve_session_by_title("Test")
+        assert sess is not None
+        assert sess.id == "found-id"
+
+
+def test_client_kill_subagent_sync(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    sess = MagicMock(id="sub-1")
+
+    with patch("johnston.core.application.session.facade.kill_subagent", return_value=True) as mock_kill:
+        assert client.kill_subagent_sync(sess) is True
+        mock_kill.assert_called_once()
+
+
+def test_client_get_checkpoint_diff(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    mock_cm = MagicMock()
+    mock_cm.get_checkpoint_diff.return_value = [("a.py", "diff", 1, 1)]
+
+    with patch("johnston.core.domain.ports.checkpoint.get_checkpoint_manager", return_value=mock_cm):
+        res = client.get_checkpoint_diff("s1", 0)
+        assert len(res) == 1
+        assert res[0][0] == "a.py"
+
+
+def test_client_rewind_to(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    client.session.messages = [{"type": "user", "text": "hello"}]
+
+    with patch("johnston.core.application.session.actions.rewind_session") as mock_rewind:
+        res = client.rewind_to(0, restore_code=False)
+        assert res is True
+        mock_rewind.assert_called_once()
+
+
+def test_client_static_helpers():
+    with patch("johnston.core.application.roles.role_registry.get_role_display_name", return_value="Worker"):
+        assert JohnstonClient.get_role_display_name("worker") == "Worker"
+
+    with patch("johnston.core.infrastructure.tasks.manage.extract_task_status_details", return_value=("running", "5s")):
+        assert JohnstonClient.extract_task_status_details(MagicMock()) == ("running", "5s")
+
+
 def test_client_get_model_info(mock_pm: MagicMock, mock_store: MagicMock):
     client = JohnstonClient(pm=mock_pm, store=mock_store)
     info = client.get_model_info("openai", "gpt-4o")

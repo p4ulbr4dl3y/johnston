@@ -108,10 +108,19 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         self._chat_view.focus()
         self._chat_view.clear_welcome()
 
-        from johnston.core.application.session.facade import resolve_session_by_title
+        app = self._get_app()
+        client = getattr(app, "client", None) if app else None
+        curr_session_id = getattr(app, "current_session_id", None) if app else None
+        if client and hasattr(client, "resolve_session_by_title"):
+            self.session = client.resolve_session_by_title(
+                self.session_id_or_desc, parent_id=curr_session_id, app=app
+            )
+        else:
+            from johnston.core.client import JohnstonClient
 
-        curr_session_id = getattr(self.app, "current_session_id", None) if self.app else None
-        self.session = resolve_session_by_title(self.session_id_or_desc, parent_id=curr_session_id, app=self.app)
+            self.session = JohnstonClient().resolve_session_by_title(
+                self.session_id_or_desc, parent_id=curr_session_id, app=app
+            )
 
         if not self.session:
 
@@ -391,9 +400,14 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         self._save_expand_state()
         if self.session and getattr(self.session, "status", "") == "running":
             self._kill_finalized = True
-            from johnston.core.application.session.facade import kill_subagent
+            app = self._get_app()
+            client = getattr(app, "client", None) if app else None
+            if client and hasattr(client, "kill_subagent_sync"):
+                client.kill_subagent_sync(self.session, app)
+            else:
+                from johnston.core.client import JohnstonClient
 
-            kill_subagent(self.session, self.app)
+                JohnstonClient().kill_subagent_sync(self.session, app)
             if self.driver:
                 self.driver.finalize_thinking_stream()
                 while self.driver.tool_handles:

@@ -6,8 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, RichLog
 
-from johnston.core.infrastructure.platform.platform_utils import is_windows
-from johnston.core.infrastructure.tasks.output import process_carriage_returns, strip_ansi
+from johnston.core.client import is_windows, process_carriage_returns, strip_ansi
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID
 from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox

@@ -4,7 +4,6 @@ from __future__ import annotations
 from rich.table import Table
 from textual.widgets import Static
 
-from johnston.core.domain.policies.models_catalog import catalog
 from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
@@ -173,6 +172,15 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
         sandbox_enabled: bool = False,
         execution_mode: str = "review",
     ) -> None:
+        if clean_model is None and model_name:
+            client = getattr(self.app, "client", None) if self.app else None
+            if client and hasattr(client, "get_model_info"):
+                try:
+                    info = client.get_model_info(provider_key, model_name)
+                    clean_model = getattr(info, "display_name", "")
+                except Exception:
+                    clean_model = ""
+
         resolved = resolve_status_defaults(
             provider_key=provider_key,
             provider_display=provider_display,
@@ -182,7 +190,6 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
             agent_role=agent_role,
             directory=directory,
             app=self.app,
-            catalog_mod=catalog,
             is_generating=self.is_generating,
             spinner_idx=self._spinner_idx,
         )

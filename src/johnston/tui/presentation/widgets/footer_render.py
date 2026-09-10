@@ -39,7 +39,7 @@ def resolve_status_defaults(
     agent_role: str,
     directory: str,
     app,
-    catalog_mod,
+    catalog_mod=None,
     is_generating: bool,
     spinner_idx: int,
 ) -> dict:
@@ -63,7 +63,15 @@ def resolve_status_defaults(
             pass
         is_connected = pm.is_provider_connected(provider_key) if (pm and provider_key) else bool(provider_key)
     if clean_model is None:
-        clean_model = catalog_mod.get_model_display_name(provider_key, model_name)
+        client = getattr(app, "client", None) if app else None
+        if client and hasattr(client, "get_model_info") and model_name:
+            try:
+                info = client.get_model_info(provider_key, model_name)
+                clean_model = getattr(info, "display_name", "") or model_name
+            except Exception:
+                clean_model = ""
+        elif catalog_mod and hasattr(catalog_mod, "get_model_display_name") and model_name:
+            clean_model = catalog_mod.get_model_display_name(provider_key, model_name)
         if not clean_model:
             clean_model = "[Select model: /models]"
     from johnston.core.application.roles.role_registry import get_role_display_name

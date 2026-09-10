@@ -8,7 +8,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from johnston.core.application.mcp.mcp_service import McpService
+from johnston.core.client import McpService
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen, status_tag
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from johnston.tui.presentation.screens.constants import (

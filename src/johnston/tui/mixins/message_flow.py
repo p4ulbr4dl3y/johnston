@@ -290,6 +290,7 @@ class MessageFlowMixin:
                 attachments=attachments,
                 project_path=project_path,
                 display_text=display_text,
+                app=self,
             )
         except asyncio.CancelledError:
             # The engine raises CancelledError outwards after cleaning up

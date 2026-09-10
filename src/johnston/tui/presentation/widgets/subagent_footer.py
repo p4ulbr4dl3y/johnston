@@ -4,7 +4,7 @@ from __future__ import annotations
 from rich.table import Table
 from textual.widgets import Static
 
-from johnston.core.domain.policies.models_catalog import catalog, format_context_tokens
+from johnston.core.domain.policies.models_catalog import format_context_tokens
 from johnston.core.infrastructure.runtime.thinking_effort import display_thinking_effort
 from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
@@ -137,7 +137,15 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
                 if agent
                 else (getattr(app_agent, "model", "") if app_agent else provider_info.get("model", ""))
             )
-            clean_model = catalog.get_model_display_name(provider_key, model_name) if model_name else ""
+            clean_model = ""
+            if model_name:
+                client = getattr(cur_app, "client", None) if cur_app else None
+                if client and hasattr(client, "get_model_info"):
+                    try:
+                        info = client.get_model_info(provider_key, model_name)
+                        clean_model = getattr(info, "display_name", "")
+                    except Exception:
+                        clean_model = ""
             if not clean_model:
                 clean_model = "[Select model: /models]"
 
@@ -160,7 +168,9 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
             total_tokens = metrics.get("total_tokens") or getattr(session, "total_tokens", 0) or history_tokens
             cost_usd = metrics.get("cost_usd") or getattr(session, "cost_usd", 0.0)
             if cost_usd == 0.0 and total_tokens > 0 and (provider_key or model_name):
-                cost_usd = catalog.estimate_cost_from_totals(provider_key, model_name, total_tokens)
+                client = getattr(cur_app, "client", None) if cur_app else None
+                if client and hasattr(client, "estimate_cost"):
+                    cost_usd = client.estimate_cost(provider_key, model_name, total_tokens)
 
             raw_limit = (
                 metrics.get("context_limit")

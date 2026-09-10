@@ -276,7 +276,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                     yield Static(formatted_diff, classes="modal-diff-view")
             elif self.tool_name == "shell":
                 cmd = nargs.get("command") or ""
-                from johnston.core.infrastructure.platform.platform_utils import is_windows
+                from johnston.core.client import is_windows
 
                 lang = "powershell" if is_windows() else "bash"
                 with ToolScrollBox(classes="tool-scroll-box"):

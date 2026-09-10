@@ -73,8 +73,7 @@ class TestStatusFooterCoverage(unittest.TestCase):
     def test_status_footer_no_pm_and_bad_app_size(self):
         footer = FooterHarness()
         footer._harness_app = None
-        with patch("johnston.tui.presentation.widgets.status_footer.catalog.get_model_display_name", return_value=""):
-            footer.update_status(provider_key="openai", is_connected=None, model_name="")
+        footer.update_status(provider_key="openai", is_connected=None, model_name="")
         self.assertIsNotNone(footer.last_update)
         self.assertIsNotNone(footer._last_grid_rows)
 
@@ -281,12 +280,12 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         cm.get_active_provider_key.return_value = "openai"
         cm.load_providers.return_value = {}
         cm.is_provider_connected.return_value = False
-        app.pm = cm
+        app.client = MagicMock()
+        app.client.get_model_info.return_value = MagicMock(display_name="")
+        app.client.estimate_cost.return_value = 0.0
         footer._harness_app = app
         footer.session = session
-        with patch("johnston.tui.presentation.widgets.status_footer.catalog.get_model_display_name", return_value=""), patch(
-            "johnston.tui.presentation.widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
-        ), patch.object(footer, "_git_diff_stats", return_value=""):
+        with patch.object(footer, "_git_diff_stats", return_value=""):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
         self.assertIn("Test Subagent Task", footer._last_grid_rows[0][0])
@@ -317,11 +316,11 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
 
         pm = PermissionManager.get_instance()
         orig_mode = pm.session_mode
-        pm.set_session_mode("yolo")
+        footer._harness_app.client = MagicMock()
+        footer._harness_app.client.get_model_info.return_value = MagicMock(display_name="")
+        footer._harness_app.client.estimate_cost.return_value = 0.0
         try:
-            with patch("johnston.tui.presentation.widgets.status_footer.catalog.get_model_display_name", return_value=""), patch(
-                "johnston.tui.presentation.widgets.status_footer.catalog.estimate_cost_from_totals", return_value=0.0,
-            ), patch.object(footer, "_git_diff_stats", return_value=""):
+            with patch.object(footer, "_git_diff_stats", return_value=""):
                 footer._render_footer()
             self.assertIn("Task Title", footer._last_grid_rows[0][0])
             self.assertEqual(footer._last_grid_rows[1], ("", ""))
@@ -349,11 +348,11 @@ class TestSubagentStatusFooterCoverage(unittest.TestCase):
         cm.load_providers.return_value = {}
         cm.is_provider_connected.return_value = True
         app.pm = cm
+        app.client = MagicMock()
+        app.client.get_model_info.return_value = MagicMock(display_name="gpt-4o")
         footer._harness_app = app
         footer.session = session
-        with patch("johnston.tui.presentation.widgets.status_footer.catalog.get_model_display_name", return_value="gpt-4o"), patch.object(
-            footer, "_git_diff_stats", return_value="+2/-1"
-        ):
+        with patch.object(footer, "_git_diff_stats", return_value="+2/-1"):
             footer._render_footer()
         self.assertIsNotNone(footer._last_grid_rows)
         self.assertIn("Compact", footer._last_grid_rows[0][0])

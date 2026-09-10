@@ -1,11 +1,11 @@
-from typing import Optional
+from typing import Any, Optional
 
 from textual import events
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import OptionList, Static
 
-from johnston.core.application.session.actions import RewindEntry
+from johnston.core.dto import RewindPointDTO
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
 from johnston.tui.presentation.screens.constants import (
@@ -25,16 +25,18 @@ from johnston.tui.utils.responsive import (
 )
 from johnston.tui.utils.row_format import MODAL_DEFAULT_ROW_WIDTH, ellipsize, option_list_row_width
 
+RewindEntry = RewindPointDTO
+
 
 class RewindActionScreen(BaseModalScreen[Optional[RewindSelection]]):
     """Modal dialog for selecting rollback action (conversation vs code vs diff)."""
 
     def __init__(
         self,
-        entry: RewindEntry,
+        entry: Any,
         session_id: Optional[str] = None,
         project_path: Optional[str] = None,
-        user_messages: Optional[list[RewindEntry]] = None,
+        user_messages: Optional[list[Any]] = None,
     ):
         super().__init__()
         self.entry = entry
@@ -108,7 +110,6 @@ class RewindActionScreen(BaseModalScreen[Optional[RewindSelection]]):
             pass
 
     def _open_diff_viewer(self) -> None:
-        from johnston.core.domain.ports.checkpoint import get_checkpoint_manager
         from johnston.tui.presentation.screens.diff import DiffScreen
 
         seq_idx = 0
@@ -120,13 +121,24 @@ class RewindActionScreen(BaseModalScreen[Optional[RewindSelection]]):
         diff_items = []
         if self.session_id:
             try:
-                cm = get_checkpoint_manager()
-                if cm:
-                    diff_items = cm.get_checkpoint_diff(
+                app = getattr(self, "app", None)
+                client = getattr(app, "client", None) if app else None
+                scoped = list(self.entry.changed_files) if self.entry.changed_files else None
+                if client and hasattr(client, "get_checkpoint_diff"):
+                    diff_items = client.get_checkpoint_diff(
                         self.session_id,
                         seq_idx,
                         project_path=self.project_path,
-                        scoped_files=self.entry.changed_files if self.entry.changed_files else None,
+                        scoped_files=scoped,
+                    )
+                else:
+                    from johnston.core.client import JohnstonClient
+
+                    diff_items = JohnstonClient().get_checkpoint_diff(
+                        self.session_id,
+                        seq_idx,
+                        project_path=self.project_path,
+                        scoped_files=scoped,
                     )
             except Exception:
                 diff_items = []

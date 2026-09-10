@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from johnston.core.infrastructure.tasks.manage import extract_task_status_details
+from johnston.core.client import extract_task_status_details
 from johnston.tui.presentation.tool_display import extract_subagent_progress
 from johnston.tui.utils.row_format import MODAL_WIDE_ROW_WIDTH, format_badge_row
 
@@ -66,7 +66,7 @@ def format_subagent_task_row(
         else:
             r = getattr(agent, "role", None) if agent else getattr(session, "role", None)
             if isinstance(r, str) and r.strip():
-                from johnston.core.application.roles.role_registry import get_role_display_name
+                from johnston.core.client import get_role_display_name
 
                 role_str = get_role_display_name(r)
             else:

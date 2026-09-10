@@ -40,3 +40,15 @@ class RewindPointDTO:
     deletions: int = 0
     changed_files: tuple[str, ...] = ()
     is_checkpoint_available: bool = True
+    git_stats: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.git_stats:
+            if not self.is_checkpoint_available:
+                stats = "diff unavailable"
+            elif self.insertions or self.deletions:
+                stats = f"+{self.insertions} / -{self.deletions}"
+            else:
+                stats = ""
+            object.__setattr__(self, "git_stats", stats)
+
