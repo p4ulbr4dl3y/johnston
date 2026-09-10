@@ -17,6 +17,9 @@ def _get_store(app: Any = None) -> Any:
     """Resolve the session store, preferring ``app.sm`` then the singleton."""
     from johnston.core.infrastructure.storage.session_store import SessionStore, get_session_store
 
+    if app is not None and getattr(app, "sm", None) is not None:
+        # Prefer the app-owned store (may be a mock in tests) over the singleton.
+        return getattr(app, "sm")
     if app is not None:
         return get_session_store(app)
     return SessionStore.get_instance()
@@ -30,6 +33,7 @@ def _get_store(app: Any = None) -> Any:
 def resolve_session_by_title(
     title: str,
     parent_id: Optional[str] = None,
+    app: Any = None,
 ) -> Optional[AgentSession]:
     """Find a session by title or ID, scoped to *parent_id* first then globally.
 
@@ -37,7 +41,7 @@ def resolve_session_by_title(
     """
     if not title:
         return None
-    store = _get_store()
+    store = _get_store(app)
     found = store.find_session_by_title_or_id(title, parent_id=parent_id)
     if found is None and parent_id:
         # Fallback: full project-wide search when parent-scoped lookup misses.
@@ -114,7 +118,7 @@ def resolve_subagent_from_toolcall(
         if title:
             app_ref = app
             curr_sid = getattr(app_ref, "current_session_id", None) if app_ref else None
-            sess = resolve_session_by_title(str(title), parent_id=curr_sid)
+            sess = resolve_session_by_title(str(title), parent_id=curr_sid, app=app_ref)
             if sess is not None and isinstance(getattr(sess, "id", None), str):
                 return sess.id
 

@@ -12,44 +12,19 @@ class ToolCallActionsMixin:
         """Check whether this toolcall is associated with an existing subagent session."""
         if getattr(self, "subagent_session_id", None):
             return True
+        from johnston.core.application.session.facade import resolve_subagent_from_toolcall
+
         args = self.args if isinstance(self.args, dict) else {}
-        session_id = args.get("id") or args.get("session_id")
-        if not session_id and getattr(self, "result_text", None):
-            m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", self.result_text, re.IGNORECASE)
-            if m:
-                session_id = m.group(1)
-        if session_id:
-            return True
-
-        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "message_subagent"):
-            title = args.get("title") or args.get("prompt")
-            if title:
-                app = None
-                try:
-                    app = self.app
-                except Exception:
-                    pass
-                store = getattr(app, "sm", None) if app else None
-                if store is None:
-                    try:
-                        from johnston.core.infrastructure.storage.session_store import SessionStore
-
-                        store = SessionStore.get_instance()
-                    except Exception:
-                        store = None
-                if store is not None and hasattr(store, "find_session_by_title_or_id"):
-                    try:
-                        curr_sid = getattr(app, "current_session_id", None) if app else None
-                        sess = store.find_session_by_title_or_id(str(title), parent_id=curr_sid)
-                        if not sess:
-                            sess = store.find_session_by_title_or_id(str(title))
-                        if sess is not None and getattr(sess, "id", None) and (
-                            isinstance(sess.id, str) or type(sess).__name__ == "MagicMock"
-                        ):
-                            return True
-                    except Exception:
-                        pass
-        return False
+        call_args = dict(args)
+        if getattr(self, "result_text", None):
+            call_args.setdefault("result_text", self.result_text)
+        app = None
+        try:
+            app = self.app
+        except Exception:
+            pass
+        session_id = resolve_subagent_from_toolcall(getattr(self, "canonical_tool", None) or "", call_args, app)
+        return bool(session_id)
 
     def bind_subagent_session(self, session_id: str | None = None) -> str | None:
         """Explicitly bind subagent_session_id once during initialization or on explicit event."""
@@ -59,46 +34,21 @@ class ToolCallActionsMixin:
         if getattr(self, "subagent_session_id", None):
             return self.subagent_session_id
 
+        from johnston.core.application.session.facade import resolve_subagent_from_toolcall
+
         args = self.args if isinstance(self.args, dict) else {}
-        sid = args.get("session_id")
-        if not sid and getattr(self, "result_text", None):
-            m = re.search(r"(?:\|\s*id\s+|session[_\s-]?id[:=\s]+)([a-zA-Z0-9_-]+)", self.result_text, re.IGNORECASE)
-            if m:
-                sid = m.group(1)
+        call_args = dict(args)
+        if getattr(self, "result_text", None):
+            call_args.setdefault("result_text", self.result_text)
+        app = None
+        try:
+            app = self.app
+        except Exception:
+            pass
+        sid = resolve_subagent_from_toolcall(getattr(self, "canonical_tool", None) or "", call_args, app)
         if sid:
             self.subagent_session_id = str(sid)
             return self.subagent_session_id
-
-        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "message_subagent"):
-            title = args.get("title") or args.get("prompt")
-            if title:
-                app = None
-                try:
-                    app = self.app
-                except Exception:
-                    pass
-                store = getattr(app, "sm", None) if app else None
-                if store is None:
-                    try:
-                        from johnston.core.infrastructure.storage.session_store import SessionStore
-
-                        store = SessionStore.get_instance()
-                    except Exception:
-                        store = None
-                if store is not None and hasattr(store, "find_session_by_title_or_id"):
-                    try:
-                        curr_sid = getattr(app, "current_session_id", None) if app else None
-                        sess = store.find_session_by_title_or_id(str(title), parent_id=curr_sid)
-                        if not sess:
-                            sess = store.find_session_by_title_or_id(str(title))
-                        if sess is not None and getattr(sess, "id", None) and (
-                            isinstance(sess.id, str) or type(sess).__name__ == "MagicMock"
-                        ):
-                            if isinstance(sess.id, str):
-                                self.subagent_session_id = sess.id
-                            return self.subagent_session_id
-                    except Exception:
-                        pass
         return getattr(self, "subagent_session_id", None)
 
     def is_clickable_header(self) -> bool:
@@ -148,15 +98,10 @@ class ToolCallActionsMixin:
                 or args.get("prompt")
                 or getattr(self, "target", "")
             )
-            store = getattr(app, "sm", None) if app else None
-            if store is None:
-                from johnston.core.infrastructure.storage.session_store import SessionStore
+            from johnston.core.application.session.facade import resolve_session_by_title
 
-                store = SessionStore.get_instance()
             curr_session_id = getattr(app, "current_session_id", None) if app else None
-            session = store.find_session_by_title_or_id(str(identifier), parent_id=curr_session_id) if store else None
-            if not session and store:
-                session = store.find_session_by_title_or_id(str(identifier))
+            session = resolve_session_by_title(str(identifier), parent_id=curr_session_id, app=app) if identifier else None
             if not session:
                 if app and hasattr(app, "notify"):
                     app.notify("Subagent session not found", severity="warning")
@@ -182,17 +127,10 @@ class ToolCallActionsMixin:
             args = self.args if isinstance(self.args, dict) else {}
             session_id = getattr(self, "subagent_session_id", None) or args.get("id") or args.get("session_id")
             if session_id:
-                store = getattr(app, "sm", None) if app else None
-                if store is None:
-                    from johnston.core.infrastructure.storage.session_store import SessionStore
+                from johnston.core.application.session.facade import resolve_session_by_title
 
-                    store = SessionStore.get_instance()
                 curr_session_id = getattr(app, "current_session_id", None) if app else None
-                session = (
-                    store.find_session_by_title_or_id(session_id, parent_id=curr_session_id)
-                    if store
-                    else None
-                )
+                session = resolve_session_by_title(str(session_id), parent_id=curr_session_id, app=app)
                 if not session:
                     if app and hasattr(app, "notify"):
                         app.notify("Subagent session not found", severity="warning")
