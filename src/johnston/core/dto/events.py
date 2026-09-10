@@ -47,6 +47,8 @@ class CompactionEventDTO(StreamEventDTO):
 class TurnCompletedDTO(StreamEventDTO):
     duration_s: float = 0.0
     usage: dict[str, Any] = field(default_factory=dict)
+    text: str = ""
+    tool_calls: list[Any] = field(default_factory=list)
 
 
 @dataclass(slots=True, frozen=True)
