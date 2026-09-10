@@ -425,7 +425,7 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
         self.assertEqual((wt, branch), (None, None))
         self.assertEqual(acc[0], "")
 
-    def test_create_and_attach_worktree_symlinks_env_files(self):
+    def test_create_and_attach_worktree_no_env_files_copied(self):
         env_file = os.path.join(self.repo_dir, ".env")
         with open(env_file, "w", encoding="utf-8") as f:
             f.write("SECRET_KEY=12345\n")
@@ -443,13 +443,13 @@ class TestSubagentWorktreeEdgeCases(unittest.TestCase):
             wt_env = os.path.join(wt_path, ".env")
             wt_venv = os.path.join(wt_path, ".venv")
             self.assertFalse(os.path.lexists(wt_env))
-            self.assertTrue(os.path.islink(wt_venv))
+            self.assertFalse(os.path.lexists(wt_venv))
 
-            # Test attach_worktree also ensures safe symlinks (refuses .env)
+            # Test attach_worktree also keeps worktree clean
             attached_path = SubagentWorktreeManager.attach_worktree(self.repo_dir, session_id, branch_name)
             self.assertEqual(attached_path, wt_path)
             self.assertFalse(os.path.lexists(wt_env))
-            self.assertTrue(os.path.islink(wt_venv))
+            self.assertFalse(os.path.lexists(wt_venv))
         finally:
             SubagentWorktreeManager.cleanup_worktree(self.repo_dir, wt_path, branch_name, keep_branch=False)
 

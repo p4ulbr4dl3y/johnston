@@ -68,7 +68,7 @@ class TestGitWorktreeManager(unittest.TestCase):
         repo_name = os.path.basename(self.repo_dir)
         self.assertTrue(path.endswith(os.path.join(repo_name, "feat-my-branch")))
 
-    def test_create_worktree_with_symlinks_and_cleanup(self):
+    def test_create_worktree_does_not_symlink_env_files_and_cleanup(self):
         # Create .env and .venv in repo root
         env_file = os.path.join(self.repo_dir, ".env")
         with open(env_file, "w", encoding="utf-8") as f:
@@ -85,11 +85,11 @@ class TestGitWorktreeManager(unittest.TestCase):
             self.assertEqual(created_branch, branch_name)
             self.assertTrue(os.path.isdir(wt_path))
 
-            # Verify symlinks: .venv is linked, but secret .env is refused
+            # Verify worktree stays clean: no .env, no .venv symlink/copy
             wt_env = os.path.join(wt_path, ".env")
             wt_venv = os.path.join(wt_path, ".venv")
             self.assertFalse(os.path.lexists(wt_env))
-            self.assertTrue(os.path.islink(wt_venv))
+            self.assertFalse(os.path.lexists(wt_venv))
 
             # Modify file in worktree
             wt_readme = os.path.join(wt_path, "README.md")

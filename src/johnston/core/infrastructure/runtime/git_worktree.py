@@ -69,26 +69,6 @@ class GitWorktreeManager:
         return False
 
     @staticmethod
-    def _symlink_env_files(repo_root: str, wt_path: str, candidates: Optional[List[str]] = None) -> None:
-        """Symlinks safe environment tooling (.venv) from repo_root to wt_path if they exist.
-
-        Refuses to symlink .env or any secret/credential files into isolated worktrees.
-        """
-        if not repo_root or not wt_path or os.path.realpath(repo_root) == os.path.realpath(wt_path):
-            return
-        items = candidates if candidates is not None else [".venv"]
-        for item in items:
-            if GitWorktreeManager.is_secret_file(item):
-                continue
-            src = os.path.join(repo_root, item)
-            dst = os.path.join(wt_path, item)
-            if os.path.exists(src) and not os.path.lexists(dst):
-                try:
-                    os.symlink(src, dst)
-                except OSError:
-                    pass
-
-    @staticmethod
     def list_branches_and_worktrees(project_dir: str) -> List[Dict[str, Any]]:
         """Returns list of branches and worktrees with keys:
         name, is_current, is_worktree, is_root, path.
@@ -189,7 +169,7 @@ class GitWorktreeManager:
     def create_worktree(
         project_dir: str, branch_name: str, base_branch: str = "HEAD"
     ) -> Tuple[Optional[str], Optional[str]]:
-        """Creates a git worktree at ~/.johnston/worktrees/<repo>/<branch>, symlinks safe environment (.venv).
+        """Creates a git worktree at ~/.johnston/worktrees/<repo>/<branch>.
 
         Returns (wt_path, branch_name) on success, (None, None) on failure.
         """
@@ -204,7 +184,6 @@ class GitWorktreeManager:
 
         if os.path.exists(wt_path):
             if GitWorktreeManager.is_git_repo(wt_path):
-                GitWorktreeManager._symlink_env_files(repo_root, wt_path)
                 return wt_path, branch_name
             GitWorktreeManager.remove_worktree(repo_root, wt_path, keep_branch=True)
 
@@ -223,7 +202,6 @@ class GitWorktreeManager:
             res = run_git(["worktree", "add", "-b", branch_name, wt_path, base], cwd=repo_root, timeout=wt_timeout)
 
         if res.returncode == 0 and os.path.exists(wt_path):
-            GitWorktreeManager._symlink_env_files(repo_root, wt_path)
             return wt_path, branch_name
 
         return None, None
@@ -248,7 +226,6 @@ class GitWorktreeManager:
 
         wt_path = GitWorktreeManager.get_worktree_path(repo_root, branch_name)
         if os.path.exists(wt_path) and GitWorktreeManager.is_git_repo(wt_path):
-            GitWorktreeManager._symlink_env_files(repo_root, wt_path)
             return wt_path
 
         GitWorktreeManager.remove_worktree(repo_root, wt_path, keep_branch=True)
@@ -268,7 +245,6 @@ class GitWorktreeManager:
             res = run_git(["worktree", "add", "-b", branch_name, wt_path, "HEAD"], cwd=repo_root, timeout=wt_timeout)
 
         if res.returncode == 0 and os.path.exists(wt_path):
-            GitWorktreeManager._symlink_env_files(repo_root, wt_path)
             return wt_path
 
         return None

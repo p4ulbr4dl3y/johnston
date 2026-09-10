@@ -257,14 +257,14 @@ class TestGitWorktreeSecretsProtection(unittest.TestCase):
             self.assertIsNotNone(wt_path)
             self.assertEqual(created_branch, branch_name)
 
-            # Check that none of the non-env credentials/secrets were symlinked
+            # Check that none of the non-env credentials/secrets were copied or symlinked
             for s in secrets:
                 wt_secret = os.path.join(wt_path, s)
                 self.assertFalse(os.path.lexists(wt_secret), f"Secret file {s} was symlinked into worktree!")
 
-            # Check that safe .venv was symlinked
+            # Check that no .venv symlink/copy was created either
             wt_venv = os.path.join(wt_path, ".venv")
-            self.assertTrue(os.path.islink(wt_venv))
+            self.assertFalse(os.path.lexists(wt_venv))
         finally:
             if wt_path:
                 GitWorktreeManager.remove_worktree(self.repo_dir, wt_path, branch_name, delete_branch=True)
