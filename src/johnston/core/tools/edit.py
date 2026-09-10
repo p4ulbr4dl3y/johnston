@@ -383,6 +383,13 @@ class EditTool(BaseTool):
 
         old_str = args.get("old_str")
 
+        if "new_string" in args and "new_str" not in args:
+            return ToolResult.error(
+                "params",
+                name="new_str",
+                detail="unknown parameter 'new_string'; schema requires 'new_str'",
+            )
+
         new_str = args.get("new_str")
         if new_str is None:
             # Absent key means deletion (pinned by test_edit_missing_new_str_is_delete):

@@ -182,3 +182,25 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         # Should be bounded, not containing subline 49
         self.assertNotIn("subline 49", res.content)
 
+    async def test_edit_new_string_unknown_param_does_not_silently_delete(self):
+        tool = EditTool()
+        file_path = os.path.join(self.test_dir, "test_guard.py")
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("def foo():\n    return 1\n")
+
+        # Passing new_string instead of new_str must fail with clear error, NOT silently delete return 1
+        res = str(await tool.execute({
+            "path": file_path,
+            "old_str": "    return 1",
+            "new_string": "    return 2",
+        }))
+        self.assertIn("ERR: params", res)
+        self.assertIn("new_string", res)
+        self.assertIn("new_str", res)
+        # Verify content was NOT modified or deleted
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertEqual(content, "def foo():\n    return 1\n")
+
+
+

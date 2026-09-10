@@ -395,6 +395,7 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         screen = SubagentsScreen()
         mock_app = MagicMock()
         mock_store = MagicMock()
+        mock_app.sm = mock_store
         mock_app.current_session_id = "parent-123"
 
         sess_with_title = MagicMock()
