@@ -58,11 +58,10 @@ def recompute_context_tokens(agent: Any, ctx: int) -> int:
     if ctx or not getattr(agent, "history", []):
         return ctx
 
-    from johnston.core.application.generation.prompt_builder import PromptBuilder
-    from johnston.core.infrastructure.runtime.token_util import estimate_tokens
+    from johnston.tui.adapters import core_bridge
 
     is_subagent = getattr(agent, "is_subagent", False)
-    builder = PromptBuilder(
+    builder = core_bridge.build_prompt_builder(
         agent.system_prompt,
         agent.tools,
         role=getattr(agent, "role", "worker"),
@@ -71,4 +70,4 @@ def recompute_context_tokens(agent: Any, ctx: int) -> int:
     )
     sys_prompt = builder.build_system_prompt()
     all_tools = builder.build_tools()
-    return estimate_tokens(sys_prompt) + estimate_tokens(all_tools) + estimate_tokens(agent.history)
+    return core_bridge.estimate_tokens(sys_prompt) + core_bridge.estimate_tokens(all_tools) + core_bridge.estimate_tokens(agent.history)

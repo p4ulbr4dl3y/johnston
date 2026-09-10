@@ -9,6 +9,7 @@ from rich.table import Table
 
 from johnston.core.domain.defaults.config import THEME_MUTED, THEME_PRIMARY, THEME_SECONDARY, THEME_SUBTLE
 from johnston.core.domain.policies.models_catalog import format_context_tokens
+from johnston.tui.adapters import core_bridge
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES
 from johnston.tui.utils.row_format import build_status_right_text, ellipsize, format_cost
 
@@ -81,10 +82,10 @@ def format_display_path(raw_path: str, max_length: int = 40) -> str:
         # 1. Check if path is within worktrees directory
         wt_candidates: list[str] = []
         try:
-            from johnston.core.infrastructure.platform.paths import WORKTREES_DIR
+            wt_dir = core_bridge.worktrees_dir()
 
-            if WORKTREES_DIR:
-                wt_candidates.append(os.path.abspath(os.path.expanduser(WORKTREES_DIR)))
+            if wt_dir:
+                wt_candidates.append(os.path.abspath(os.path.expanduser(wt_dir)))
         except Exception:
             pass
         default_wt = os.path.abspath(os.path.expanduser("~/.johnston/worktrees"))
@@ -196,9 +197,7 @@ def _build_subagent_grid(
     title_part = ellipsize(clean_title, max_title_len)
     row1_left = f"[bold {t_primary}]{escape(title_part)}[/]"
 
-    from johnston.core.application.roles.role_registry import get_role_display_name
-
-    role_str = get_role_display_name(agent_role)
+    role_str = core_bridge.get_role_display_name(agent_role)
     if is_generating:
         frame = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
         role_formatted = f"{frame} {role_str}"

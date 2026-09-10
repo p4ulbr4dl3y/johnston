@@ -17,10 +17,12 @@ import math
 from collections import deque
 from typing import Any, Callable, Optional
 
-from johnston.core.application.session.stream import stream_step_to_session_event
 from johnston.core.domain.policies.messages import is_ui_visible_user_message
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.chat_messages import BotMessage, ThinkingWidget
 from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
+
+stream_step_to_session_event = core_bridge.stream_step_to_session_event
 
 logger = logging.getLogger(__name__)
 

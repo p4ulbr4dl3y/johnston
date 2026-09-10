@@ -3,7 +3,7 @@ import sys
 from typing import Any
 
 from johnston.core.domain.policies.messages import is_ui_visible_user_message
-from johnston.core.infrastructure.config.settings import get_settings
+from johnston.tui.adapters import core_bridge
 
 __all__ = ["restore_message_item", "resolve_restore_message_item", "resolve_settings"]
 
@@ -73,10 +73,10 @@ async def restore_message_item(
                 except Exception:
                     pass
                 try:
-                    from johnston.core.application.session.facade import resolve_session_by_title
+                    from johnston.tui.adapters import core_bridge
 
                     curr_sid = getattr(app, "current_session_id", None) if app else None
-                    found = resolve_session_by_title(str(title), parent_id=curr_sid, app=app)
+                    found = core_bridge.resolve_session_by_title(str(title), parent_id=curr_sid, app=app)
                     if found and getattr(found, "id", None):
                         sub_id = str(found.id)
                         f_status = getattr(found, "status", None)
@@ -137,5 +137,5 @@ def resolve_settings() -> Any:
     """
     mod = sys.modules.get("johnston.tui.presentation.widgets.chat_container")
     if mod is not None and hasattr(mod, "get_settings"):
-        return getattr(mod, "get_settings")()
-    return get_settings()
+        return mod.get_settings()
+    return core_bridge.get_settings()

@@ -4,6 +4,7 @@ from __future__ import annotations
 from rich.table import Table
 from textual.widgets import Static
 
+from johnston.tui.adapters import core_bridge
 from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
@@ -70,9 +71,8 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
                 self._spinner_timer = None
         self.refresh_footer()
         try:
-            from johnston.core.infrastructure.mcp import get_mcp_manager
 
-            mgr = get_mcp_manager()
+            mgr = core_bridge.get_mcp_manager()
             if mgr and hasattr(mgr, "add_listener"):
                 mgr.add_listener(self._on_mcp_event)
         except Exception:
@@ -80,9 +80,8 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
 
     def on_unmount(self) -> None:
         try:
-            from johnston.core.infrastructure.mcp import get_mcp_manager
 
-            mgr = get_mcp_manager()
+            mgr = core_bridge.get_mcp_manager()
             if mgr and hasattr(mgr, "remove_listener"):
                 mgr.remove_listener(self._on_mcp_event)
         except Exception:

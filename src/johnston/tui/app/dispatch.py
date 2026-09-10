@@ -13,16 +13,13 @@ from __future__ import annotations
 import asyncio
 import inspect
 
-from johnston.core.application.skills.inject import (
-    load_skill_blocks as _load_skill_blocks,
-)
-from johnston.core.application.skills.inject import (
-    normalize_homoglyphs,
-)
-from johnston.core.application.skills.inject import (
-    resolve_skills as _resolve_skills,
-)
-from johnston.core.application.skills.manager import get_skill_manager
+from johnston.tui.adapters import core_bridge
+
+SH = core_bridge.get_skill_helpers()
+_load_skill_blocks = SH['load_skill_blocks']
+normalize_homoglyphs = SH['normalize_homoglyphs']
+_resolve_skills = SH['resolve_skills']
+get_skill_manager = core_bridge.get_skill_manager
 
 
 def build_command_registry() -> dict:
@@ -104,9 +101,9 @@ async def handle_slash_command(app, command_text: str, attachments: list | None 
         raw_mcp_name = words[0][1:]
         clean_mcp_name = normalize_homoglyphs(raw_mcp_name.lower())
         try:
-            from johnston.core.infrastructure.mcp import get_mcp_manager
+            from johnston.tui.adapters import core_bridge
 
-            mm = get_mcp_manager()
+            mm = core_bridge.get_mcp_manager()
             args_dict: dict[str, str] = {}
             extra_text = []
             for w in words[1:]:

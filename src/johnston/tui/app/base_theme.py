@@ -10,9 +10,7 @@ from typing import Any, Callable, Optional
 
 from johnston.core.domain.defaults.themes import ZINC_DARK, list_themes
 from johnston.core.domain.entities.theme import Theme
-from johnston.core.infrastructure.config.config_helpers import load_theme_config, save_theme_config
-from johnston.core.infrastructure.platform.paths import THEMES_DIR
-from johnston.core.infrastructure.platform.platform_utils import read_json
+from johnston.tui.adapters import core_bridge
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +39,7 @@ class BaseThemeManager:
         chosen = default_theme
         if load_config:
             try:
-                saved = load_theme_config()
+                saved = core_bridge.load_theme_config()
                 if saved and saved in self._themes:
                     chosen = saved
             except Exception as e:
@@ -63,14 +61,14 @@ class BaseThemeManager:
 
     def load_user_themes(self, themes_dir: Optional[str | Path] = None) -> list[Theme]:
         """Load and register user-defined themes from JSON files in themes_dir."""
-        target_dir = Path(themes_dir or THEMES_DIR)
+        target_dir = Path(themes_dir or core_bridge.THEMES_DIR)
         loaded: list[Theme] = []
         if not target_dir.exists() or not target_dir.is_dir():
             return loaded
 
         for file_path in sorted(target_dir.glob("*.json")):
             try:
-                data = read_json(str(file_path), default=None)
+                data = core_bridge.read_json(str(file_path), default=None)
                 if isinstance(data, dict):
                     user_theme = Theme.from_dict(data)
                     self.register(user_theme)
@@ -116,7 +114,7 @@ class BaseThemeManager:
 
         if persist:
             try:
-                save_theme_config(theme.name)
+                core_bridge.save_theme_config(theme.name)
             except Exception as e:
                 logger.warning("Failed to persist theme config: %s", e)
 

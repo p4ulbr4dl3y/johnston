@@ -9,9 +9,12 @@ from __future__ import annotations
 import asyncio
 import time
 
-from johnston.core.application.skills.manager import get_skill_manager
+from johnston.tui.adapters import core_bridge
 from johnston.tui.app.dispatch import COMMAND_REGISTRY
 from johnston.tui.presentation.commands.workspace_command import WorkspaceCommand
+
+# Module alias kept for tests that monkeypatch command_provider.get_skill_manager.
+get_skill_manager = core_bridge.get_skill_manager
 
 __all__ = [
     "WorkspaceCommand",
@@ -46,9 +49,9 @@ def _build_command_suggestions() -> list[tuple[str, str]]:
         pass
 
     try:
-        from johnston.core.infrastructure.mcp import get_mcp_manager
+        from johnston.tui.adapters import core_bridge
 
-        mm = get_mcp_manager()
+        mm = core_bridge.get_mcp_manager()
         for s_name, client in mm.clients.items():
             for p in getattr(client, "prompts", []):
                 p_name = p.get("name")

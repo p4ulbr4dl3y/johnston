@@ -9,17 +9,18 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
-from johnston.core.application.session.actions import restore_plan_from_messages
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.footer_layout import format_hint, get_theme_colors
 from johnston.tui.utils.row_format import display_width, ellipsize
+
+SH = core_bridge.get_session_actions()
+restore_plan_from_messages = SH['restore_plan_from_messages']
+extract_active_plan_from_messages = restore_plan_from_messages
 
 
 class PlanItem(TypedDict, total=False):
     step: str
     status: str
-
-
-extract_active_plan_from_messages = restore_plan_from_messages
 
 
 class PlanActionsMixin:

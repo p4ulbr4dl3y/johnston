@@ -16,14 +16,15 @@ import os
 import time
 
 from johnston.core.domain.policies.models_catalog import catalog
-from johnston.core.infrastructure.runtime.thinking_effort import display_thinking_effort
+from johnston.tui.adapters import core_bridge
+
+display_thinking_effort = core_bridge.display_thinking_effort
+collect_current_tasks = core_bridge.collect_current_tasks
 
 
 def get_mcp_manager():
     """Resolve MCP manager dynamically from core infrastructure."""
-    import johnston.core.infrastructure.mcp as mcp_mod
-
-    return mcp_mod.get_mcp_manager()
+    return core_bridge.get_mcp_manager()
 
 
 def _collect_cache(app):
@@ -34,9 +35,7 @@ def _collect_cache(app):
     except Exception:
         providers = {}
     try:
-        from johnston.core.application.skills.manager import get_skill_manager
-
-        all_skills = get_skill_manager().list_skills(include_hidden=True)
+        all_skills = core_bridge.get_skill_manager().list_skills(include_hidden=True)
         skills_total = len(all_skills)
         skills_visible = sum(1 for s in all_skills if not s.hidden)
     except Exception:
@@ -124,7 +123,7 @@ def build_status_kwargs(app, widget=None) -> dict:
         except Exception:
             providers, skills_visible, skills_total, mcp_servers = {}, 0, 0, []
 
-    from johnston.core.infrastructure.runtime.task_collection import collect_current_tasks
+    tasks = collect_current_tasks(app, getattr(app, "current_session_id", None))
 
     pm = getattr(app, "pm", None)
     pkey = pm.get_active_provider_key() if pm else "default"
@@ -180,9 +179,7 @@ def build_status_kwargs(app, widget=None) -> dict:
     except Exception:
         attachments_count = 0
 
-    from johnston.core.application.permission.permission_manager import PermissionManager
-
-    execution_mode = PermissionManager.get_instance().execution_mode.value
+    execution_mode = core_bridge.get_permission_manager().get_instance().execution_mode.value
 
     return {
         "provider_key": pkey,

@@ -41,13 +41,14 @@ class BranchCommand(BaseCommand):
         try:
             import asyncio
 
-            from johnston.core.infrastructure.runtime.git_worktree import GitWorktreeManager
+            from johnston.tui.adapters import core_bridge
 
-            if hasattr(GitWorktreeManager, "list_branches_and_worktrees_async"):
-                res = GitWorktreeManager.list_branches_and_worktrees_async(pdir)
+            GitWorktreeManagerCls = core_bridge.get_git_worktree_manager()
+            if hasattr(GitWorktreeManagerCls, "list_branches_and_worktrees_async"):
+                res = GitWorktreeManagerCls.list_branches_and_worktrees_async(pdir)
                 branches = await res if asyncio.iscoroutine(res) else res
-            elif hasattr(GitWorktreeManager, "list_branches_and_worktrees"):
-                branches = await asyncio.to_thread(GitWorktreeManager.list_branches_and_worktrees, pdir)
+            elif hasattr(GitWorktreeManagerCls, "list_branches_and_worktrees"):
+                branches = await asyncio.to_thread(GitWorktreeManagerCls.list_branches_and_worktrees, pdir)
             else:
                 branches = []
         except Exception:

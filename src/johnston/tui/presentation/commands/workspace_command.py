@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from johnston.core.application.permission.permission_manager import PermissionManager
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.widgets.chat_container import ChatView
 
@@ -38,7 +38,7 @@ class WorkspaceCommand(BaseCommand):
                     pass
 
     async def _handle_list(self, app: Any) -> None:
-        pm = PermissionManager.get_instance()
+        pm = core_bridge.get_permission_manager().get_instance()
         primary = os.path.realpath(os.getcwd())
         all_roots = pm.get_workspace_roots()
 

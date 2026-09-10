@@ -8,8 +8,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
-from johnston.core.infrastructure.config.settings import get_settings
-from johnston.core.infrastructure.tasks.output import strip_ansi
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 from johnston.tui.presentation.tool_mixins import FormattingMixin, ParsingMixin
 from johnston.tui.presentation.tool_renderers import format_truncation_for_ui
@@ -22,6 +21,11 @@ from johnston.tui.presentation.toolcall_shell import (
     bash_safe_boundary,
 )
 from johnston.tui.presentation.widgets.chat_markdown import TransparentSyntax
+
+# Module aliases kept for tests that monkeypatch chat_toolcall.get_*
+# (tests/ui/test_config_ui_wiring.py).
+get_settings = core_bridge.get_settings
+strip_ansi = core_bridge.strip_ansi
 
 DISPLAY_NAMES: dict[str, str] = {
     "read": "Read",
@@ -96,11 +100,11 @@ class ToolCallWidget(
         if is_sequential:
             classes += " tool-sequential"
         super().__init__(classes=classes)
-        from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
+        from johnston.tui.adapters import core_bridge
 
         self.is_sequential = is_sequential
         self.tool_type = tool_type
-        self.canonical_tool = normalize_tool_name(tool_type)
+        self.canonical_tool = core_bridge.normalize_tool_name(tool_type)
         if isinstance(target, str):
             target = re.sub(r"\s+", " ", target.replace("\n", " ").replace("\r", " ")).strip()
         self.target = target
@@ -145,9 +149,9 @@ class ToolCallWidget(
     def is_expandable(self) -> bool:
         if self.status == "generating":
             return False
-        from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
+        from johnston.tui.adapters import core_bridge
 
-        canonical = getattr(self, "canonical_tool", None) or normalize_tool_name(self.tool_type)
+        canonical = getattr(self, "canonical_tool", None) or core_bridge.normalize_tool_name(self.tool_type)
         if canonical == "shell":
             return True
         if self.status in ("error", "cancelled"):

@@ -30,13 +30,10 @@ class ThemeManager(BaseThemeManager):
         if not is_ansi:
             return theme
 
-        from johnston.core.infrastructure.platform.terminal_theme import (
-            compute_adaptive_palette,
-            query_terminal_palette,
-        )
+        from johnston.tui.adapters import core_bridge
 
-        detected_bg, detected_fg = query_terminal_palette()
-        palette = compute_adaptive_palette(detected_bg, detected_fg)
+        detected_bg, detected_fg = core_bridge.query_terminal_palette()
+        palette = core_bridge.compute_adaptive_palette(detected_bg, detected_fg)
         adapted_tcss = dict(tcss_vars)
         adapted_tcss.update(palette["tcss_vars"])
         adapted_tcss["bg-overlay"] = "transparent"
@@ -108,16 +105,17 @@ def prewarm_terminal_palette() -> None:
     """
     import asyncio
 
-    from johnston.core.infrastructure.platform.terminal_theme import query_terminal_palette
 
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         return
 
+    from johnston.tui.adapters import core_bridge
+
     async def _warm() -> None:
         try:
-            await asyncio.to_thread(query_terminal_palette)
+            await asyncio.to_thread(core_bridge.query_terminal_palette)
         except Exception:
             pass
 

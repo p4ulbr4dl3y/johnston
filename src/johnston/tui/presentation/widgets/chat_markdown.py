@@ -36,7 +36,9 @@ from textual.widgets._markdown import (
 )
 
 from johnston.core.domain.defaults.themes import ZINC_DARK
-from johnston.core.infrastructure.runtime.lru import LruCache
+from johnston.tui.adapters import core_bridge
+
+LruCache = core_bridge.LruCache
 
 
 class TransparentSyntax(Syntax):

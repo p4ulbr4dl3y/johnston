@@ -4,13 +4,12 @@ from __future__ import annotations
 import asyncio
 import re
 
-from johnston.core.infrastructure.config.settings import get_settings
-from johnston.core.infrastructure.tasks.output import (
-    is_spinner_line,
-    process_carriage_returns,
-    process_carriage_returns_lines,
-)
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.tool_renderers import format_truncation_for_ui
+
+is_spinner_line = core_bridge.is_spinner_line
+process_carriage_returns = core_bridge.process_carriage_returns
+process_carriage_returns_lines = core_bridge.process_carriage_returns_lines
 
 _TRUNC_BANNER_START = re.compile(r"(?:\.\.\.\s*)?\[(?:Output\s+truncated|Truncated)", re.IGNORECASE)
 
@@ -74,7 +73,7 @@ class ToolCallShellMixin:
         fn = getattr(mod, "get_settings", None) if mod else None
         if fn is not None:
             return fn().tools.shell_stream_buffer_bytes
-        return get_settings().tools.shell_stream_buffer_bytes
+        return core_bridge.get_settings().tools.shell_stream_buffer_bytes
 
     def append_shell_output(self, text: str) -> None:
         if not hasattr(self, "_raw_bash_buffer"):
@@ -95,7 +94,7 @@ class ToolCallShellMixin:
 
         mod = sys.modules.get("johnston.tui.presentation.widgets.chat_toolcall")
         fn = getattr(mod, "get_settings", None) if mod else None
-        interval = (fn() if fn else get_settings()).ui.stream_flush_interval
+        interval = (fn() if fn else core_bridge.get_settings()).ui.stream_flush_interval
         try:
             loop = asyncio.get_running_loop()
             self._shell_update_handle = loop.call_later(interval, self._flush_shell_update)

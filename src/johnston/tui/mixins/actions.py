@@ -22,9 +22,9 @@ class ActionsMixin(PlanActionsMixin):
 
     def action_toggle_mode(self) -> None:
         """Cycle execution mode: review -> edits -> yolo -> review"""
-        from johnston.core.application.permission.interactor import cycle_execution_mode
+        from johnston.tui.adapters import core_bridge
 
-        cycle_execution_mode()
+        core_bridge.cycle_execution_mode()
         if hasattr(self, "refresh_status_footer"):
             self.refresh_status_footer()
 
@@ -46,12 +46,12 @@ class ActionsMixin(PlanActionsMixin):
         left as-is: an open expansion keeps streaming live output until the task
         completes and the completion callback repaints it.
         """
-        from johnston.core.infrastructure.tasks.manage import filter_to_session
+        from johnston.tui.adapters import core_bridge
 
         count = 0
         shell_tasks = [t for t in self.task_manager if getattr(t, "kind", "") == "shell"]
         fg_tasks = list(getattr(self, "_foreground_shell_tasks", {}).values())
-        all_tasks = filter_to_session(shell_tasks + fg_tasks, getattr(self, "current_session_id", None))
+        all_tasks = core_bridge.filter_to_session(shell_tasks + fg_tasks, getattr(self, "current_session_id", None))
         for t in list(all_tasks):
             if getattr(t, "is_active", getattr(t, "is_running", False)) and not getattr(t, "is_background", False):
                 if hasattr(t, "move_to_background"):
@@ -173,7 +173,7 @@ class ActionsMixin(PlanActionsMixin):
         This is the UI-side implementation of tool permission prompting, owned by the app
         layer so that the tools layer stays independent of Textual widgets.
         """
-        from johnston.core.application.permission.interactor import apply_permission_choice
+        from johnston.tui.adapters import core_bridge
         from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         screen = PermissionConfirmScreen(
@@ -194,7 +194,7 @@ class ActionsMixin(PlanActionsMixin):
         self.push_screen(screen, callback=on_dismiss)
         result = await future
 
-        return apply_permission_choice(result, perm_name)
+        return core_bridge.apply_permission_choice(result, perm_name)
 
     async def ask_user(self, questions: list[Dict[str, Any]]) -> str:
         """Shows the AskUserWizardScreen and returns the user's answer.

@@ -2,8 +2,7 @@ from typing import Any
 
 from textual.containers import VerticalScroll
 
-from johnston.core.infrastructure.config.settings import get_settings
-from johnston.core.infrastructure.mcp import mcp_tool_is_known
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 from johnston.tui.presentation.widgets.chat_messages import (
     BotMessage,
@@ -20,6 +19,10 @@ from johnston.tui.presentation.widgets.chat_view_history import (
 )
 from johnston.tui.presentation.widgets.chat_view_scroll import ChatViewScrollMixin
 from johnston.tui.presentation.widgets.chat_welcome import WelcomeWidget
+
+# Module alias kept for tests that monkeypatch chat_container.get_settings
+# (tests/ui/test_config_ui_wiring.py).
+get_settings = core_bridge.get_settings
 
 
 class ChatView(ChatViewHintsMixin, ChatViewScrollMixin, ChatViewHistoryMixin, VerticalScroll):
@@ -131,7 +134,7 @@ class ChatView(ChatViewHintsMixin, ChatViewScrollMixin, ChatViewHistoryMixin, Ve
         )
         # MCP tool names aren't in the builtin registry; mark the widget so the
         # header display can snake_case them (e.g. "get-file-info").
-        is_mcp = mcp_tool_is_known(tool_type)
+        is_mcp = core_bridge.mcp_tool_is_known(tool_type)
         widget = ToolCallWidget(
             tool_type,
             target,

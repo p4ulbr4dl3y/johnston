@@ -11,17 +11,6 @@ import logging
 import time
 from typing import Any, Callable, Optional
 
-from johnston.core.application.generation.engine import (
-    GenCanvas,
-    NullStreamDriver,
-    _await_pending_git_restore,
-    _create_git_checkpoint_async,
-    _finalize_git_turn_async,
-    _handle_interruption,
-    _SessionSaveDebounce,
-)
-from johnston.core.application.session.stream import sync_session_metrics
-from johnston.core.client import JohnstonClient
 from johnston.core.dto import (
     CompactionEventDTO,
     ContentDeltaDTO,
@@ -33,7 +22,18 @@ from johnston.core.dto import (
     ToolResultDTO,
     TurnCompletedDTO,
 )
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.chat_stream_driver import ChatStreamDriver
+
+GenCanvas = core_bridge.get_gen_engine()['GenCanvas']
+NullStreamDriver = core_bridge.get_gen_engine()['NullStreamDriver']
+_await_pending_git_restore = core_bridge.get_gen_engine()['_await_pending_git_restore']
+_create_git_checkpoint_async = core_bridge.get_gen_engine()['_create_git_checkpoint_async']
+_finalize_git_turn_async = core_bridge.get_gen_engine()['_finalize_git_turn_async']
+_handle_interruption = core_bridge.get_gen_engine()['_handle_interruption']
+_SessionSaveDebounce = core_bridge.get_gen_engine()['_SessionSaveDebounce']
+sync_session_metrics = core_bridge.sync_session_metrics
+JohnstonClient = core_bridge.JohnstonClient
 
 logger = logging.getLogger(__name__)
 
@@ -456,7 +456,7 @@ async def run_ai_generation(
                 session_id, active_msg_idx, active_user_event, project_path, checkpoint_manager
             )
         try:
-            sync_session_metrics(session, agent)
+            core_bridge.sync_session_metrics(session, agent)
         except Exception:
             pass
         try:

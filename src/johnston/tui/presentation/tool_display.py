@@ -10,8 +10,10 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from johnston.core.infrastructure.runtime.lru import LruCache
+from johnston.tui.adapters import core_bridge
 from johnston.tui.utils.row_format import format_duration
+
+LruCache = core_bridge.LruCache
 
 # Textual markup-aware escaping: literal [ and \ would otherwise be swallowed as
 # style tags, so escape them for the chat tool chip (] does not open tags in Rich).
@@ -350,8 +352,9 @@ def _extract_tool_display_inner(
     result_text: Optional[str] = None,
     status: Optional[str] = None,
 ) -> str:
-    from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name as _normalize
     from johnston.core.tools.registry import REGISTRY
+    from johnston.tui.adapters import core_bridge
+    _normalize = core_bridge.normalize_tool_name
 
     name = _normalize(tool_name)
     args = args if isinstance(args, dict) else {}
@@ -377,9 +380,7 @@ def _extract_tool_display_inner(
     if name == "invoke_subagent":
         title = str(args.get("title") or "").strip()
         role = str(args.get("type") or args.get("role") or "worker").strip()
-        from johnston.core.application.roles.role_registry import get_role_display_name
-
-        role_cap = get_role_display_name(role)
+        role_cap = core_bridge.get_role_display_name(role)
         if title:
             return truncate(f'{role_cap}: "{title}"', max_len=max_len, mode=mode)
         return truncate(role_cap, max_len=max_len, mode=mode)
@@ -525,7 +526,8 @@ def _format_active_tool_progress(
     turn_events: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """Format an active tool invocation into a short, human-like activity badge."""
-    from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name as _normalize
+    from johnston.tui.adapters import core_bridge
+    _normalize = core_bridge.normalize_tool_name
 
     name = _normalize(tool_name) if tool_name else ""
     if not isinstance(args, dict):

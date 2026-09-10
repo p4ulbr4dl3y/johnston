@@ -6,8 +6,7 @@ from typing import Any
 
 from textual import events
 
-from johnston.core.infrastructure.config.settings import get_settings
-from johnston.core.infrastructure.platform.paths import IMAGE_EXTENSIONS
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.screens.constants import STATUS_FOOTER
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")
@@ -68,10 +67,7 @@ async def try_paste_clipboard_image(widget: Any) -> bool:
     """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
     import time
 
-    from johnston.core.infrastructure.platform.paths import TEMP_IMAGES_DIR
-    from johnston.core.infrastructure.platform.platform_utils import get_clipboard_image_or_file
-
-    file_path, img = await asyncio.to_thread(get_clipboard_image_or_file)
+    file_path, img = await asyncio.to_thread(core_bridge.get_clipboard_image_or_file)
 
     if file_path:
         widget.insert(f"@{file_path} ")
@@ -79,7 +75,7 @@ async def try_paste_clipboard_image(widget: Any) -> bool:
         return True
 
     if img:
-        out_dir = TEMP_IMAGES_DIR
+        out_dir = core_bridge.TEMP_IMAGES_DIR
         os.makedirs(out_dir, exist_ok=True)
         final_path = os.path.join(out_dir, f"clip_{int(time.time())}.png")
         if img.mode not in ("RGB", "RGBA"):
@@ -145,7 +141,7 @@ class ChatInputPasteMixin:
         import sys
 
         chat_mod = sys.modules.get("johnston.tui.presentation.widgets.chat_input")
-        _get_settings = getattr(chat_mod, "get_settings", get_settings) if chat_mod else get_settings
+        _get_settings = getattr(chat_mod, "get_settings", core_bridge.get_settings) if chat_mod else core_bridge.get_settings
         return _get_settings().ui.paste_line_threshold
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -221,7 +217,7 @@ class ChatInputPasteMixin:
 
         expanded = self._decode_pasted_path(event.text)
         exists = await asyncio.to_thread(os.path.exists, expanded)
-        is_existing_image_path = exists and any(expanded.lower().endswith(ext) for ext in IMAGE_EXTENSIONS)
+        is_existing_image_path = exists and any(expanded.lower().endswith(ext) for ext in core_bridge.IMAGE_EXTENSIONS)
 
         if not is_existing_image_path and not event.text.strip():
             if await self.try_paste_clipboard_image():

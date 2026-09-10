@@ -4,18 +4,19 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from johnston.core.application.provider.actions import (
-    fetch_grouped_models,
-    get_current_thinking_effort,
-    select_model,
-    set_provider_credentials,
-    set_thinking_effort,
-)
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.screens.constants import MESSAGE_INPUT
 from johnston.tui.presentation.screens.model import ModelScreen
 from johnston.tui.presentation.screens.thinking_effort import ThinkingEffortScreen
 from johnston.tui.presentation.widgets.chat_input import ChatInput
+
+P = core_bridge.get_provider_actions()
+fetch_grouped_models = P['fetch_grouped_models']
+get_current_thinking_effort = P['get_current_thinking_effort']
+select_model = P['select_model']
+set_provider_credentials = P['set_provider_credentials']
+set_thinking_effort = P['set_thinking_effort']
 
 
 class ProvidersCommand(BaseCommand):

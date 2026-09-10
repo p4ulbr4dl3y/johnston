@@ -5,7 +5,7 @@ from rich.table import Table
 from textual.widgets import Static
 
 from johnston.core.domain.policies.models_catalog import format_context_tokens
-from johnston.core.infrastructure.runtime.thinking_effort import display_thinking_effort
+from johnston.tui.adapters import core_bridge
 from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin
@@ -116,7 +116,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
             agent = getattr(session, "agent", None)
             app_agent = getattr(cur_app, "agent", None) if cur_app else None
             effort_val = getattr(agent, "thinking_effort", None) if agent else getattr(app_agent, "thinking_effort", None)
-            thinking_effort = display_thinking_effort(effort_val) if effort_val else "auto"
+            thinking_effort = core_bridge.display_thinking_effort(effort_val) if effort_val else "auto"
             metrics = agent.get_metrics() if (agent and hasattr(agent, "get_metrics")) else {}
             provider_key = (
                 getattr(agent, "provider_key", "")
@@ -149,8 +149,6 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
             if not clean_model:
                 clean_model = "[Select model: /models]"
 
-            from johnston.core.infrastructure.runtime.token_util import estimate_tokens
-
             msgs = getattr(session, "messages", None)
             msg_count = len(msgs) if msgs else 0
             cached_count = getattr(self, "_cached_msg_count", None)
@@ -159,7 +157,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
             if cached_count == msg_count and cached_sess_id == cur_sess_id and hasattr(self, "_cached_history_tokens"):
                 history_tokens = self._cached_history_tokens
             else:
-                history_tokens = estimate_tokens(msgs) if msgs else 0
+                history_tokens = core_bridge.estimate_tokens(msgs) if msgs else 0
                 self._cached_msg_count = msg_count
                 self._cached_sess_id = cur_sess_id
                 self._cached_history_tokens = history_tokens

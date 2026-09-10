@@ -28,10 +28,10 @@ def schedule_auto_title(app: Any, session: Any) -> None:
         ):
             return
         try:
-            from johnston.core.application.session.auto_title import auto_title_session
+            from johnston.tui.adapters import core_bridge
 
             agent = getattr(app, "agent", None)
-            title = await auto_title_session(agent, session)
+            title = await core_bridge.auto_title_session(agent, session)
             if title:
                 if hasattr(app, "sm"):
                     app.sm.save(session)

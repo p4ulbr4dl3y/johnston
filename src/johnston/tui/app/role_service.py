@@ -7,7 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from johnston.core.application.roles.role_registry import RoleRegistry
+from johnston.tui.adapters import core_bridge
+
+RoleRegistry = core_bridge.get_role_registry()
 
 
 def toggle_agent_role(app: Any) -> bool:
@@ -26,9 +28,7 @@ def toggle_agent_role(app: Any) -> bool:
     project_dir = getattr(app, "project_dir", None)
 
     if getattr(app, "agent", None) is not None:
-        from johnston.core.application.session.stream import configure_agent
-
-        role_def = configure_agent(app.agent, new_role, app=app, project_dir=project_dir, is_subagent=False)
+        role_def = core_bridge.configure_agent(app.agent, new_role, app=app, project_dir=project_dir, is_subagent=False)
         new_role_name = getattr(role_def, "name", new_role.replace("_", " ").replace("-", " ").title())
     else:
         role_def = RoleRegistry.get_instance().get_role(new_role, project_dir=project_dir)
@@ -77,9 +77,7 @@ def reconcile_active_agent(
 
     project_dir = getattr(app, "project_dir", None)
     if agent is not None:
-        from johnston.core.application.session.stream import configure_agent
-
-        role_def = configure_agent(agent, current_role, app=app, project_dir=project_dir, is_subagent=False)
+        role_def = core_bridge.configure_agent(agent, current_role, app=app, project_dir=project_dir, is_subagent=False)
         current_role_name = getattr(role_def, "name", current_role.title())
         app.agent = agent
     else:

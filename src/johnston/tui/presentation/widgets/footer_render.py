@@ -74,9 +74,9 @@ def resolve_status_defaults(
             clean_model = catalog_mod.get_model_display_name(provider_key, model_name)
         if not clean_model:
             clean_model = "[Select model: /models]"
-    from johnston.core.application.roles.role_registry import get_role_display_name
+    from johnston.tui.adapters import core_bridge
 
-    role_str = get_role_display_name(agent_role)
+    role_str = core_bridge.get_role_display_name(agent_role)
     if is_generating:
         frame = SPINNER_FRAMES[spinner_idx % len(SPINNER_FRAMES)]
         role_formatted = f"{frame} {role_str}"

@@ -7,13 +7,15 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 
 from johnston.core.domain.policies.models_catalog import catalog
-from johnston.core.infrastructure.platform.logging_setup import install_asyncio_exception_handler
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.attachment_bar import AttachmentBar
 from johnston.tui.presentation.widgets.chat_container import ChatView
 from johnston.tui.presentation.widgets.chat_input import ChatInput
 from johnston.tui.presentation.widgets.command_suggestions import CommandSuggestions
 from johnston.tui.presentation.widgets.plan_notch import PlanNotchContainer
 from johnston.tui.presentation.widgets.status_footer import StatusFooter
+
+install_asyncio_exception_handler = core_bridge.install_asyncio_exception_handler
 
 logger = logging.getLogger("johnston.app")
 
@@ -102,7 +104,7 @@ class LifecycleMixin:
                     self.create_tracked_task(ResumeCommand().execute(self))
                 else:
                     asyncio.create_task(ResumeCommand().execute(self))
-        from johnston.core.infrastructure.mcp import get_mcp_manager
+        from johnston.tui.adapters import core_bridge
 
         catalog.load_cache()
         self.refresh_status_footer()
@@ -114,12 +116,12 @@ class LifecycleMixin:
                 pass
 
         if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
-            self.create_tracked_task(get_mcp_manager().ensure_tools_ready_async())
+            self.create_tracked_task(core_bridge.get_mcp_manager().ensure_tools_ready_async())
             self.create_tracked_task(self._check_initial_setup())
             if not os.environ.get("PYTEST_CURRENT_TEST"):
                 self.create_tracked_task(_refresh_catalog_bg())
         else:
-            asyncio.create_task(get_mcp_manager().ensure_tools_ready_async())
+            asyncio.create_task(core_bridge.get_mcp_manager().ensure_tools_ready_async())
             asyncio.create_task(self._check_initial_setup())
             if not os.environ.get("PYTEST_CURRENT_TEST"):
                 asyncio.create_task(_refresh_catalog_bg())
@@ -205,9 +207,9 @@ class LifecycleMixin:
         except Exception as err:
             logger.debug(f"Background task cleanup error: {err}")
         try:
-            from johnston.core.application.session.stream import cancel_running_subagents
+            from johnston.tui.adapters import core_bridge
 
-            cancel_running_subagents(self.sm)
+            core_bridge.cancel_running_subagents(self.sm)
         except Exception as err:
             logger.debug(f"Subagent cleanup error: {err}")
 
@@ -217,9 +219,9 @@ class LifecycleMixin:
             logger.debug(f"Unmount session save error: {err}")
 
         try:
-            from johnston.core.infrastructure.mcp import get_mcp_manager
+            from johnston.tui.adapters import core_bridge
 
-            get_mcp_manager().stop_all()
+            core_bridge.get_mcp_manager().stop_all()
         except Exception as err:
             logger.debug(f"MCP cleanup error: {err}")
 
@@ -304,9 +306,9 @@ class LifecycleMixin:
             os.chdir(new_dir)
         except Exception:
             pass
-        from johnston.core.application.permission.permission_manager import PermissionManager
+        from johnston.tui.adapters import core_bridge
 
-        PermissionManager.get_instance().set_project_dir(new_dir)
+        core_bridge.get_permission_manager().get_instance().set_project_dir(new_dir)
         if getattr(self, "agent", None):
             self.agent.project_dir = new_dir
             self.agent.worktree_branch = branch

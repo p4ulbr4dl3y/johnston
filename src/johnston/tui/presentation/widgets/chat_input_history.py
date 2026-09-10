@@ -1,9 +1,14 @@
 import asyncio
 from typing import Any
 
-from johnston.core.infrastructure.config.settings import get_settings
-from johnston.core.infrastructure.platform import paths as config
-from johnston.core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from johnston.tui.adapters import core_bridge
+
+# Module-level aliases used by the sys.modules fallback below; `config` mirrors
+# the chat_input module namespace so runtime-injected overrides keep working.
+config = core_bridge.get_config_paths()
+read_json = core_bridge.read_json
+atomic_write_json = core_bridge.atomic_write_json
+get_settings = core_bridge.get_settings
 
 
 def load_prompt_history(max_history: int) -> list[str]:

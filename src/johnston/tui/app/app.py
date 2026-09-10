@@ -54,7 +54,8 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         theme: str | None = None,
     ):
         super().__init__()
-        from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name
+        from johnston.tui.adapters import core_bridge as cb
+        normalize_tool_name = cb.normalize_tool_name
         from johnston.tui.app.startup import (
             apply_startup_flags,
             build_agent,

@@ -5,16 +5,8 @@ import asyncio
 import inspect
 from typing import Any
 
-from johnston.core.application.session.actions import (
-    compact_session,
-    find_selected_user_message,
-    get_rewind_git_stats,
-    new_session,
-    rewind_session,
-    truncate_agent_history,
-)
-from johnston.core.application.session.auto_title import clean_heuristic_title
 from johnston.core.domain.policies.session_naming import FORK_BASE_MAX_LEN
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.commands.helpers import (
     WORKER_TEARDOWN_TIMEOUT,
@@ -30,6 +22,15 @@ from johnston.tui.presentation.screens.resume import ResumeScreen
 from johnston.tui.presentation.screens.rewind import RewindScreen, RewindSelection
 from johnston.tui.presentation.widgets.chat_container import ChatView
 from johnston.tui.presentation.widgets.chat_input import ChatInput
+
+S = core_bridge.get_session_actions()
+compact_session = S['compact_session']
+find_selected_user_message = S['find_selected_user_message']
+get_rewind_git_stats = S['get_rewind_git_stats']
+new_session = S['new_session']
+rewind_session = S['rewind_session']
+truncate_agent_history = S['truncate_agent_history']
+clean_heuristic_title = core_bridge.clean_heuristic_title
 
 
 class NewCommand(BaseCommand):
@@ -55,9 +56,9 @@ class NewCommand(BaseCommand):
             await app.task_manager.kill_all()
 
         def cancel_subagents():
-            from johnston.core.application.session.stream import cancel_running_subagents
+            from johnston.tui.adapters import core_bridge
 
-            cancel_running_subagents(app.sm)
+            core_bridge.cancel_running_subagents(app.sm)
 
         old_id = getattr(app, "current_session_id", None)
         if old_id and hasattr(app.sm, "release_session_lock"):
@@ -362,7 +363,8 @@ class RewindCommand(BaseCommand):
                         else:
                             cv.rollback_to(target_idx)
                         try:
-                            from johnston.core.application.session.actions import restore_plan_from_messages
+                            from johnston.tui.adapters import core_bridge
+                            restore_plan_from_messages = core_bridge.get_session_actions()['restore_plan_from_messages']
                             from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
                             restored_plan, restored_explanation = restore_plan_from_messages(target_msgs)
@@ -509,7 +511,8 @@ class ForkCommand(BaseCommand):
                     else:
                         cv.rollback_to(-1 if up_to_idx == 0 else selected_child_idx - 1)
                     try:
-                        from johnston.core.application.session.actions import restore_plan_from_messages
+                        from johnston.tui.adapters import core_bridge
+                        restore_plan_from_messages = core_bridge.get_session_actions()['restore_plan_from_messages']
                         from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
                         restored_plan, restored_explanation = restore_plan_from_messages(target_msgs)
@@ -606,7 +609,9 @@ class DiffCommand(BaseCommand):
     description = "View workspace diff for files modified in this session"
 
     async def execute(self, app) -> None:
-        from johnston.core.application.session.actions import _touched_files, get_session_diff
+        from johnston.tui.adapters import core_bridge
+        S2 = core_bridge.get_session_actions()
+        _touched_files, get_session_diff = S2['_touched_files'], S2['get_session_diff']
         from johnston.core.domain.policies.messages import is_ui_visible_user_message
 
         curr_sid = getattr(app, "current_session_id", None)

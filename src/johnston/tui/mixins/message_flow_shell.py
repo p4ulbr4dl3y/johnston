@@ -50,12 +50,12 @@ async def exec_shell_command(app: Any, cmd: str, user_text: Optional[str] = None
         status="running",
     )
 
-    from johnston.core.application.session.shell_executor import execute_shell_command
+    from johnston.tui.adapters import core_bridge
 
     agent = getattr(app, "agent", None)
     app.current_tool_widget = tool_widget
     try:
-        res = await execute_shell_command(cmd, host=app, session=session, agent=agent)
+        res = await core_bridge.execute_shell_command(cmd, host=app, session=session, agent=agent)
     finally:
         app.current_tool_widget = None
     content = res.content

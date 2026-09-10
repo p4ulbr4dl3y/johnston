@@ -3,14 +3,16 @@ from __future__ import annotations
 
 import asyncio
 
-from johnston.core.application.skills.manager import get_skill_manager
-from johnston.core.infrastructure.mcp import get_mcp_manager
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.screens.constants import MESSAGE_INPUT
 from johnston.tui.presentation.screens.mcp import MCPScreen
 from johnston.tui.presentation.screens.skills import SkillsScreen
 from johnston.tui.presentation.screens.tasks import ShellTasksScreen, SubagentsScreen
 from johnston.tui.presentation.widgets.chat_input import ChatInput
+
+get_skill_manager = core_bridge.get_skill_manager
+get_mcp_manager = core_bridge.get_mcp_manager
 
 
 class SkillsCommand(BaseCommand):
@@ -131,10 +133,8 @@ class SandboxCommand(BaseCommand):
                 app.sandbox_enabled = False
             app.sandbox_enabled = not app.sandbox_enabled
 
-            from johnston.core.infrastructure.config.config_helpers import save_sandbox_config
-
             try:
-                save_sandbox_config(app.sandbox_enabled)
+                core_bridge.save_sandbox_config(app.sandbox_enabled)
             except Exception:
                 pass
 

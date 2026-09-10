@@ -8,13 +8,17 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import Label, Markdown, Static
 
-from johnston.core.infrastructure.config.settings import get_settings
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.chat_markdown import (
     _handle_markdown_task_done,
     prepare_markdown_text,
     safe_update_markdown,
 )
 from johnston.tui.utils.row_format import ellipsize
+
+# Module alias kept for tests that monkeypatch chat_messages.get_settings
+# (tests/ui/test_config_ui_wiring.py).
+get_settings = core_bridge.get_settings
 
 logger = logging.getLogger(__name__)
 

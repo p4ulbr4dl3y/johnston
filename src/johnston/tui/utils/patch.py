@@ -250,9 +250,9 @@ def apply_textual_patches() -> None:
             or getattr(curr_theme, "name", "") == "native"
         )
         if is_ansi:
-            from johnston.core.infrastructure.platform.terminal_theme import query_terminal_palette
+            from johnston.tui.adapters import core_bridge
 
-            detected_bg, _ = query_terminal_palette()
+            detected_bg, _ = core_bridge.query_terminal_palette()
             if detected_bg:
                 bg_color = Color.parse(detected_bg)
                 base_color = bg_color.blend(color, 0.35)

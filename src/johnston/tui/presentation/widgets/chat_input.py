@@ -4,9 +4,7 @@ from textual import events
 from textual.message import Message
 from textual.widgets import TextArea
 
-from johnston.core.infrastructure.config.settings import get_settings
-from johnston.core.infrastructure.platform import paths as config
-from johnston.core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.chat_input_placeholders import (
     COMPACT_PLACEHOLDER,
     COMPACT_SHELL_PLACEHOLDER,
@@ -38,6 +36,14 @@ from johnston.tui.utils.key_aliases import (
     KEY_TOGGLE_ROLE,
 )
 from johnston.tui.utils.responsive import resolve_width
+
+# Module-level aliases kept for tests that monkeypatch these names
+# (tests/ui/test_config_ui_wiring.py, tests/ui/test_chat_input.py).  Callers
+# reach through core_bridge, but the patch target must still resolve.
+get_settings = core_bridge.get_settings
+read_json = core_bridge.read_json
+atomic_write_json = core_bridge.atomic_write_json
+config = core_bridge.get_config_paths()
 
 
 class ChatInput(ChatInputHistoryMixin, ChatInputSuggestionsMixin, ChatInputPasteMixin, TextArea):
@@ -397,6 +403,7 @@ __all__ = [
     "KEY_QUIT",
     "asyncio",
     "config",
+    "get_settings",
     "read_json",
     "atomic_write_json",
 ]
