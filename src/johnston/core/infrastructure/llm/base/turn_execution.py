@@ -3,6 +3,7 @@ import logging
 from typing import Any, AsyncGenerator, Dict, List, Tuple
 
 from johnston.core.application.roles.role_registry import RoleRegistry
+from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
 from johnston.core.domain.defaults.errors import ToolResult
 from johnston.core.infrastructure.llm.base.compaction import format_compaction_title
 from johnston.core.infrastructure.llm.models.base import (
@@ -201,6 +202,7 @@ class TurnExecutionMixin:
             # it); resync the accumulator so self.history == messages[1:]
             # holds for the next step's estimate.
             self._set_history(messages[1:])
+            yield ("event_divider", COMPACTING_DIVIDER_TITLE, "")
             yield ("event_divider", format_compaction_title(compact_msg), "")
 
         result["messages"] = messages

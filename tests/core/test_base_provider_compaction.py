@@ -550,7 +550,9 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
 
         dividers = [e for e in events if e[0] == "event_divider" and e[1] == "Session Compacted"]
         notices = [e for e in events if e[0] == "thinking" and "Context budget reached" in e[1]]
+        placeholders = [e for e in events if e[0] == "event_divider" and e[1] == "Compacting session..."]
         self.assertEqual(len(dividers), 1)
+        self.assertEqual(len(placeholders), 1)
         self.assertEqual(len(notices), 0)
         self.assertEqual(events[-1], ("bot_text", "ok", ""))
 
@@ -610,7 +612,9 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         # Verified that mid-turn compaction ran on both tool turns (rolling)
         self.assertEqual(compact_calls, 2)
         dividers = [e for e in events if e[0] == "event_divider" and "Session Compacted" in e[1]]
+        placeholders = [e for e in events if e[0] == "event_divider" and e[1] == "Compacting session..."]
         self.assertEqual(len(dividers), 2)
+        self.assertEqual(len(placeholders), 2)
         self.assertEqual(events[-1], ("bot_text", "done everything", ""))
 
     async def test_auto_compact_token_limit_clips_threshold(self):
