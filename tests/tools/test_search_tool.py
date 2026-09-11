@@ -824,6 +824,108 @@ class TestGitignoreMatcher(unittest.TestCase):
         self.assertTrue(matcher.is_ignored("src/sub/deep/file.bak"))
 
 
+class TestGitignoreMatcherCache(unittest.TestCase):
+    """Tests for the bounded LRU cache of gitignore matchers (mtime/size invalidation)."""
+
+    def setUp(self):
+        import johnston.core.tools.search.common as common_mod
+        from johnston.core.tools.search.common import _clear_gitignore_matcher_cache
+
+        self._common_mod = common_mod
+        self._orig_cache_max = common_mod.GITIGNORE_MATCHER_CACHE_MAX
+        self.tmpdir = tempfile.mkdtemp()
+        _clear_gitignore_matcher_cache()
+
+    def tearDown(self):
+        from johnston.core.tools.search.common import _clear_gitignore_matcher_cache
+
+        self._common_mod.GITIGNORE_MATCHER_CACHE_MAX = self._orig_cache_max
+        _clear_gitignore_matcher_cache()
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _write_gitignore(self, root, content):
+        gitignore = os.path.join(root, ".gitignore")
+        with open(gitignore, "w") as f:
+            f.write(content)
+        return gitignore
+
+    def test_cache_hit_reuses_same_matcher_object(self):
+        """Repeated loads of an unchanged root skip re-read/recompile (same object)."""
+        import johnston.core.tools.search.common as common_mod
+        from johnston.core.tools.search.common import _build_gitignore_matcher
+
+        self._write_gitignore(self.tmpdir, "*.log\nbuild/\n")
+        orig = common_mod._load_gitignore_spec
+
+        with patch("johnston.core.tools.search.common._load_gitignore_spec", wraps=orig) as mocked_load:
+            matcher1 = _build_gitignore_matcher(self.tmpdir)
+            matcher2 = _build_gitignore_matcher(self.tmpdir)
+
+        self.assertIsNotNone(matcher1)
+        self.assertIs(matcher1, matcher2)
+        self.assertEqual(mocked_load.call_count, 1)
+        self.assertTrue(matcher2.is_ignored("app.log"))
+
+    def test_mtime_change_invalidates(self):
+        """Rewriting a .gitignore with same-size content (mtime bump) rebuilds the matcher."""
+        import time
+
+        from johnston.core.tools.search.common import _build_gitignore_matcher
+
+        self._write_gitignore(self.tmpdir, "*.log\n")
+        matcher1 = _build_gitignore_matcher(self.tmpdir)
+        self.assertIsNotNone(matcher1)
+        self.assertTrue(matcher1.is_ignored("a.log"))
+        self.assertFalse(matcher1.is_ignored("a.txt"))
+
+        # Same-size rewrite -> stat size identical, only mtime changes
+        time.sleep(0.01)
+        self._write_gitignore(self.tmpdir, "*.txt\n")
+        new_mtime = time.time() + 10
+        os.utime(os.path.join(self.tmpdir, ".gitignore"), (new_mtime, new_mtime))
+
+        matcher2 = _build_gitignore_matcher(self.tmpdir)
+        self.assertIsNot(matcher1, matcher2)
+        self.assertFalse(matcher2.is_ignored("a.log"))
+        self.assertTrue(matcher2.is_ignored("a.txt"))
+
+    def test_cache_bound_eviction(self):
+        """Cache is capped; a new root evicts the least-recently-used entry."""
+        from johnston.core.tools.search.common import _build_gitignore_matcher, _gitignore_matcher_cache
+
+        self._common_mod.GITIGNORE_MATCHER_CACHE_MAX = 2
+        roots = []
+        for i in range(3):
+            d = tempfile.mkdtemp()
+            self.addCleanup(shutil.rmtree, d, ignore_errors=True)
+            self._write_gitignore(d, f"*.{chr(ord('a') + i)}\n")
+            roots.append(d)
+
+        first = _build_gitignore_matcher(roots[0])
+        self.assertIsNotNone(first)
+        _build_gitignore_matcher(roots[1])
+        _build_gitignore_matcher(roots[2])  # over capacity -> evicts roots[0]
+
+        self.assertLessEqual(len(_gitignore_matcher_cache), 2)
+        # Rebuilding the evicted root must produce a fresh matcher object
+        rebuilt = _build_gitignore_matcher(roots[0])
+        self.assertIsNot(first, rebuilt)
+        self.assertTrue(rebuilt.is_ignored(f"x.{chr(ord('a'))}"))
+
+    def test_cache_clear(self):
+        from johnston.core.tools.search.common import (
+            _build_gitignore_matcher,
+            _clear_gitignore_matcher_cache,
+            _gitignore_matcher_cache,
+        )
+
+        self._write_gitignore(self.tmpdir, "*.log\n")
+        _build_gitignore_matcher(self.tmpdir)
+        self.assertEqual(len(_gitignore_matcher_cache), 1)
+        _clear_gitignore_matcher_cache()
+        self.assertEqual(len(_gitignore_matcher_cache), 0)
+
+
 class TestLRUCache(unittest.TestCase):
     """Tests for outline LRU cache with mtime invalidation."""
 

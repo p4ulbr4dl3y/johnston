@@ -3,6 +3,7 @@ import os
 import re
 import threading
 from bisect import bisect_right
+from collections import OrderedDict
 from typing import Generator, List, Optional, Set, Tuple
 
 from johnston.core.domain.defaults.git_excludes import DEFAULT_BINARY_EXTENSIONS, DEFAULT_IGNORE_DIRS
@@ -133,6 +134,16 @@ CODE_EXTENSIONS: Set[str] = {
 MAX_SEARCH_FILE_BYTES = 10 * 1024 * 1024  # 10 MB fallback constant
 MAX_OUTLINE_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
 OUTLINE_WORKERS = 4
+GITIGNORE_MATCHER_CACHE_MAX = 32  # bounded LRU: max distinct roots cached
+
+_lock = threading.Lock()
+_gitignore_matcher_cache: "OrderedDict[str, Tuple[Tuple[Tuple[str, int, int], ...], Optional[_GitignoreMatcher]]]" = OrderedDict()
+
+
+def _clear_gitignore_matcher_cache() -> None:
+    """Drop all cached gitignore matchers (test helper)."""
+    with _lock:
+        _gitignore_matcher_cache.clear()
 
 
 def get_max_search_bytes() -> int:
@@ -411,8 +422,58 @@ def _load_gitignore_spec(root: str) -> Optional[_GitignoreMatcher]:
     return _GitignoreMatcher(patterns, root)
 
 
+def _gitignore_entries(root: str) -> Tuple[Tuple[str, int, int], ...]:
+    """Fingerprint of ``.gitignore`` files under ``root`` as (path, mtime_ns, size).
+
+    Stat-only walk (no file content reads); used for mtime/size invalidation of
+    the cached gitignore matcher, mirroring the ``(stat_key, value)`` idiom of
+    ``platform_utils.cached_json_read``. Returns an empty tuple entry when
+    nothing is found so stat failures / missing ignore files map to a stable key.
+    """
+    scan_root = root if os.path.isdir(root) else (os.path.dirname(root) or ".")
+    if not os.path.isdir(scan_root):
+        return ()
+    entries: List[Tuple[str, int, int]] = []
+    for dirpath, dirnames, filenames in os.walk(scan_root):
+        dirnames[:] = [
+            d for d in dirnames
+            if d not in DEFAULT_EXCLUDE_DIRS and not d.startswith(".git")
+        ]
+        if ".gitignore" in filenames:
+            gitignore_path = os.path.join(dirpath, ".gitignore")
+            try:
+                st = os.stat(gitignore_path)
+            except OSError:
+                continue
+            entries.append((gitignore_path, st.st_mtime_ns, st.st_size))
+    return tuple(sorted(entries)) or (("", 0, 0),)
+
+
+def _cached_gitignore_matcher(root: str) -> Optional[_GitignoreMatcher]:
+    """Return a cached gitignore matcher for ``root``, rebuilt only when the
+    underlying ``.gitignore`` files change (mtime/size-based invalidation).
+
+    The cache is bounded (LRU eviction past ``GITIGNORE_MATCHER_CACHE_MAX``
+    entries); a cached matcher object is reused while the collected
+    ``(path, mtime_ns, size)`` tuples of the scanned ignore files are unchanged.
+    """
+    entries = _gitignore_entries(root)
+    with _lock:
+        cached = _gitignore_matcher_cache.get(root)
+        if cached is not None and cached[0] == entries:
+            _gitignore_matcher_cache.move_to_end(root)
+            return cached[1]
+    matcher = _load_gitignore_spec(root)
+    with _lock:
+        _gitignore_matcher_cache[root] = (entries, matcher)
+        _gitignore_matcher_cache.move_to_end(root)
+        while len(_gitignore_matcher_cache) > GITIGNORE_MATCHER_CACHE_MAX:
+            _gitignore_matcher_cache.popitem(last=False)
+    return matcher
+
+
 def _build_gitignore_matcher(cwd: str) -> Optional[_GitignoreMatcher]:
-    return _load_gitignore_spec(cwd)
+    return _cached_gitignore_matcher(cwd)
 
 
 def _walk_filtered(
