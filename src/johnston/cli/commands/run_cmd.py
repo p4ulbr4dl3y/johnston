@@ -36,6 +36,11 @@ __all__ = [
     "run_headless_async",
 ]
 
+# Minimum seconds between flush calls per stream in the batched emitter.
+# This caps the number of flush() syscalls during high-frequency delta output
+# (e.g. character-by-character streaming) while still keeping latency <100ms.
+_FLUSH_INTERVAL_S: float = 0.1
+
 
 def _emit_early_error(error_msg: str, is_json: bool = False, is_stream_json: bool = False) -> int:
     """Emit startup or validation error according to output mode format."""
@@ -396,19 +401,33 @@ class _StreamEmitter:
         self.is_stream_json = is_stream_json
         self.has_written_text = False
         self.pending_lead_ws: list[str] = []
+        # Start at -inf so the first write always flushes immediately.
+        self._last_stdout_flush: float = float("-inf")
+        self._last_stderr_flush: float = float("-inf")
 
     def _write_stdout(self, text: str) -> None:
         sys.stdout.write(text)
-        sys.stdout.flush()
+        now = time.monotonic()
+        if now - self._last_stdout_flush >= _FLUSH_INTERVAL_S:
+            sys.stdout.flush()
+            self._last_stdout_flush = now
 
     def _write_stderr(self, text: str) -> None:
         sys.stderr.write(text)
-        sys.stderr.flush()
+        now = time.monotonic()
+        if now - self._last_stderr_flush >= _FLUSH_INTERVAL_S:
+            sys.stderr.flush()
+            self._last_stderr_flush = now
 
     def reset_text_state(self) -> None:
         """Start a fresh plain-text segment (e.g. after a tool call)."""
         self.pending_lead_ws.clear()
         self.has_written_text = False
+
+    def flush_all(self) -> None:
+        """Force-flush any pending buffered output (call after stream completes)."""
+        sys.stdout.flush()
+        sys.stderr.flush()
 
     def emit_delta(self, chunk: str) -> None:
         """Emit a content/bot_delta chunk, stripping leading blank lines in plain mode."""
@@ -519,6 +538,7 @@ async def _process_stream(
         has_error = True
         emitter.emit_error(str(exc))
 
+    emitter.flush_all()
     return response_parts, tool_calls, has_error, compacted, turn_completed
 
 
@@ -650,7 +670,11 @@ def _persist_session(sess: Any, store: Any, agent: Any) -> None:
 
 
 async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) -> int:
-    """Async execution logic for johnston run."""
+    """Async execution logic for johnston run.
+
+    A fresh JohnstonClient is created per invocation (no pool reuse) — see
+    ``run_headless`` docstring for architectural rationale.
+    """
     if getattr(args, "debug", False) is True:
         logging.getLogger().setLevel(logging.DEBUG)
 
@@ -745,7 +769,14 @@ async def run_headless_async(args: Any, pm: Optional[ProviderManager] = None) ->
 
 
 def run_headless(args: Any, pm: Optional[ProviderManager] = None) -> int:
-    """Headless run command synchronous entrypoint."""
+    """Headless run command synchronous entrypoint.
+
+    NOTE: A fresh JohnstonClient (and underlying agent/transport) is created per
+    invocation because ``asyncio.run()`` creates and destroys an event loop each
+    call. Event-loop-bound resources (HTTP sessions, agent transport state) cannot
+    be safely reused across separate loops.  This is intentional — each run may
+    target a different provider/model/role configuration.
+    """
     if getattr(args, "debug", False) is True:
         logging.getLogger().setLevel(logging.DEBUG)
 

@@ -9,7 +9,10 @@ from contextlib import redirect_stderr, redirect_stdout
 from typing import Any, AsyncGenerator
 from unittest.mock import MagicMock, patch
 
+import johnston.cli.commands.run_cmd as run_cmd_module
 from johnston.cli.commands.run_cmd import (
+    _FLUSH_INTERVAL_S,
+    _StreamEmitter,
     format_args_summary,
     format_meta_footer,
     format_result_summary,
@@ -1064,6 +1067,105 @@ class TestCLIRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(code, 0)
         self.assertEqual(agent.model, "override-model-123")
         self.assertEqual(agent.thinking_effort, "high")
+
+
+class _CountingStream(io.StringIO):
+    """StringIO that counts flush() calls (for flush-batching assertions)."""
+
+    def __init__(self):
+        super().__init__()
+        self.flush_count = 0
+
+    def flush(self) -> None:
+        self.flush_count += 1
+        super().flush()
+
+
+class TestFlushBatching(unittest.IsolatedAsyncioTestCase):
+    """Regression tests: per-delta flushing is time-batched (perf audit #12)."""
+
+    def test_emitter_flush_count_bounded_for_many_deltas(self):
+        out = _CountingStream()
+        err = _CountingStream()
+        with (
+            patch.object(run_cmd_module.time, "monotonic", return_value=1.5),
+            patch.object(run_cmd_module.sys, "stdout", out),
+            patch.object(run_cmd_module.sys, "stderr", err),
+        ):
+            emitter = _StreamEmitter(is_quiet=False, is_json=False, is_stream_json=False)
+            for i in range(100):
+                emitter.emit_delta(f"line {i}\n")
+            emitter.flush_all()
+
+        # All 100 chunks made it to the buffer, but flush happened at most
+        # twice: once on first write (interval elapsed), once on flush_all().
+        self.assertEqual(out.getvalue().count("line"), 100)
+        self.assertLessEqual(out.flush_count, 2)
+
+    def test_emitter_flush_eventually_elapses_interval(self):
+        out = _CountingStream()
+        err = _CountingStream()
+        step = _FLUSH_INTERVAL_S + 0.05
+        # Writes spaced > _FLUSH_INTERVAL_S apart; the third wraps around the
+        # stream. Every write except the second one triggers a flush.
+        ticks = iter([0.0, 0.0, step, 2 * step, 2 * step, 3 * step])
+        with (
+            patch.object(run_cmd_module.time, "monotonic", side_effect=lambda: next(ticks)),
+            patch.object(run_cmd_module.sys, "stdout", out),
+            patch.object(run_cmd_module.sys, "stderr", err),
+        ):
+            emitter = _StreamEmitter(is_quiet=False, is_json=False, is_stream_json=True)
+            for _ in range(6):
+                emitter.emit_delta("x")
+            emitter.flush_all()
+
+        # Baseline: every write flushes if the interval hasn't passed... a
+        # write at the same timestamp as the previous flush is skipped.
+        self.assertLessEqual(out.flush_count, 5)
+        self.assertEqual(out.getvalue(), "".join('{"event": "delta", "text": "x"}\n' for _ in range(6)))
+
+    def test_stderr_flush_batched(self):
+        out = _CountingStream()
+        err = _CountingStream()
+        with (
+            patch.object(run_cmd_module.time, "monotonic", return_value=2.0),
+            patch.object(run_cmd_module.sys, "stdout", out),
+            patch.object(run_cmd_module.sys, "stderr", err),
+        ):
+            emitter = _StreamEmitter(is_quiet=False, is_json=False, is_stream_json=False)
+            for i in range(50):
+                emitter.emit_tool_call("grep", {"q": i}, [])
+            emitter.flush_all()
+
+        self.assertLessEqual(err.flush_count, 2)
+        self.assertEqual(err.getvalue().count("[tool] grep"), 50)
+
+    async def test_run_headless_async_flush_count_sublinear(self):
+        steps = [("content", f"line {i} ", "") for i in range(100)]
+        agent = MockAgent(steps=steps)
+        pm = MagicMock()
+        pm.get_active_provider_key.return_value = "openai"
+        pdef = ProviderDef(key="openai", name="OpenAI", model="gpt-4o", enabled=True, requires_key=False)
+        pm.load_provider_def.return_value = pdef
+        pm.provider_needs_key.return_value = False
+        pm.create_agent_for_provider.return_value = agent
+        pm.close = MagicMock()
+
+        args = MagicMock(prompt="many lines", provider=None, model=None, role="worker", quiet=False, json=False)
+        out = _CountingStream()
+        err = _CountingStream()
+        with (
+            patch.object(run_cmd_module.sys, "stdout", out),
+            patch.object(run_cmd_module.sys, "stderr", err),
+        ):
+            code = await run_headless_async(args, pm=pm)
+
+        # 100 output deltas produced but << 100 flush syscalls (sublinear),
+        # and all output is still flushed by completion (final flush).
+        self.assertEqual(code, 0)
+        self.assertEqual(out.getvalue().count("line"), 100)
+        self.assertTrue(out.getvalue().endswith("\n"))
+        self.assertLessEqual(out.flush_count, 5)
 
 
 class TestCLIRunSyncWrapper(unittest.TestCase):
