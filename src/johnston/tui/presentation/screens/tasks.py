@@ -79,6 +79,8 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
         self.total_tasks_count = 0
         self._last_signatures = None
         self.search_nav_option_list_id = self.option_list_id
+        self._refresh_scheduled = False
+        self._poll_timer: Optional[Any] = None
 
     def _get_header_md(self) -> str:
         raise NotImplementedError
@@ -140,7 +142,22 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                 self._get_option_list().focus()
             except Exception:
                 pass
-        self.set_interval(0.5, self.update_tasks_list)
+        # Listener events (_on_task_event / _on_session_event) drive the fast
+        # refresh path; the 2s interval is only a safety net for events missed
+        # while the modal is open.
+        try:
+            self._poll_timer = self.set_interval(2.0, self.update_tasks_list)
+        except Exception:
+            self._poll_timer = None
+
+    def _stop_poll_timer(self) -> None:
+        """Stop the safety-net polling interval (safe to call repeatedly)."""
+        timer, self._poll_timer = getattr(self, "_poll_timer", None), None
+        if timer is not None:
+            try:
+                timer.stop()
+            except Exception:
+                pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
         self.search_query = event.value
@@ -218,6 +235,7 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
     def update_tasks_list(self) -> None:
         if not self.is_mounted or getattr(self, "_is_dismissed", False):
             return
+        self._refresh_scheduled = False
         tasks = self._get_filtered_tasks()
         row_width = self._row_width()
         new_signatures = [
@@ -276,6 +294,26 @@ class BaseTasksListScreen(ModalSearchNavMixin, BaseModalScreen[None]):
                     break
         self._update_hint()
 
+    def _refresh_from_event(self) -> None:
+        """Coalesce listener-event refreshes: N events in one tick -> one update.
+
+        Resets the signature guard so changed rows (progress badges) re-render,
+        then schedules the actual update via ``call_from_thread`` (listeners may
+        fire from worker threads).
+        """
+        if getattr(self, "_refresh_scheduled", False):
+            return
+        self._refresh_scheduled = True
+        self._last_signatures = None
+        if hasattr(self, "app") and self.app and self.is_mounted:
+            try:
+                self.app.call_from_thread(self.update_tasks_list)
+            except Exception:
+                try:
+                    self.update_tasks_list()
+                except Exception:
+                    pass
+
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if 0 <= event.option_index < len(self.filtered_tasks):
             item = self.filtered_tasks[event.option_index]
@@ -314,14 +352,7 @@ class ShellTasksScreen(BaseTasksListScreen):
         return "### **Shell Tasks**"
 
     def _on_task_event(self, _text: str = "") -> None:
-        if hasattr(self, "app") and self.app and self.is_mounted:
-            try:
-                self.app.call_from_thread(self.update_tasks_list)
-            except Exception:
-                try:
-                    self.update_tasks_list()
-                except Exception:
-                    pass
+        self._refresh_from_event()
 
     def _sync_task_listeners(self, tasks: list) -> None:
         for t in list(self._observed_tasks):
@@ -342,6 +373,7 @@ class ShellTasksScreen(BaseTasksListScreen):
                     pass
 
     def on_unmount(self) -> None:
+        self._stop_poll_timer()
         for t in list(self._observed_tasks):
             if hasattr(t, "remove_listener"):
                 try:
@@ -454,14 +486,7 @@ class SubagentsScreen(BaseTasksListScreen):
 
     def _on_session_event(self, _event: Any = None) -> None:
         self._invalidate_tasks_cache()
-        if hasattr(self, "app") and self.app and self.is_mounted:
-            try:
-                self.app.call_from_thread(self.update_tasks_list)
-            except Exception:
-                try:
-                    self.update_tasks_list()
-                except Exception:
-                    pass
+        self._refresh_from_event()
 
     def _sync_session_listeners(self, sessions: list) -> None:
         for s in sessions:
@@ -473,6 +498,7 @@ class SubagentsScreen(BaseTasksListScreen):
                     pass
 
     def on_unmount(self) -> None:
+        self._stop_poll_timer()
         for s in list(self._observed_sessions):
             if hasattr(s, "remove_listener"):
                 try:
