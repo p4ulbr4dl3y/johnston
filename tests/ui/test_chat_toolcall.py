@@ -328,31 +328,32 @@ class TestToolCallWidgetRendering(unittest.TestCase):
         widget7 = self._widget("mcp_search", "", args={"pattern": "x"})
         widget7.render_header()
 
-    def test_render_header_edit_and_create_diff_stats(self):
+    def test_render_header_edit_and_create_without_diff_stats(self):
         diff = "--- a/f.py\n+++ b/f.py\n@@ -1,2 +1,3 @@\n-a\n+b\n+c\n"
         widget = self._widget("edit", "f.py", args={"path": "f.py"}, result_text=diff, status="done")
         widget.render_header()
         text = str(widget.header_label.render())
         self.assertIn("Edit", text)
         self.assertIn("f.py", text)
-        self.assertIn("+2", text)
-        self.assertIn("-1", text)
-        self.assertIn("/", text)
+        # No diff-stat badge (e.g. [+2 / -1]).
+        self.assertNotIn("+2", text)
+        self.assertNotIn("-1", text)
+        self.assertNotIn("/", text)
 
-        # Set result updates header with badge
+        # Set result updates header but still no badge
         widget_live = self._widget("edit", "f.py", args={"path": "f.py"}, status="running")
         widget_live.render_header()
         self.assertNotIn("+2", str(widget_live.header_label.render()))
         widget_live.set_result(diff)
         live_text = str(widget_live.header_label.render())
-        self.assertIn("+2", live_text)
-        self.assertIn("-1", live_text)
-        self.assertIn("/", live_text)
+        self.assertNotIn("+2", live_text)
+        self.assertNotIn("-1", live_text)
+        self.assertNotIn("/", live_text)
 
         # Create tool with line count
         widget_create = self._widget("create", "new.py", args={"path": "new.py"}, result_text="[created new.py | 10 lines]", status="done")
         widget_create.render_header()
-        self.assertIn("+10", str(widget_create.header_label.render()))
+        self.assertNotIn("+10", str(widget_create.header_label.render()))
 
     def test_set_result_shell_background(self):
         widget = self._widget("shell", "cmd")

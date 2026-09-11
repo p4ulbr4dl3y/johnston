@@ -341,20 +341,18 @@ class TestToolDisplay(unittest.TestCase):
     def test_diff_stats_edit(self):
         diff = "--- a/x.py\n+++ b/x.py\n@@ -1,3 +1,4 @@\n a\n-b\n+c\n+d\n"
         res = extract_tool_display("edit", {"path": "x.py"}, result_text=diff, status="done")
-        self.assertIn("x.py", res)
-        self.assertIn("+2", res)
-        self.assertIn("-1", res)
-        self.assertIn("/", res)
+        self.assertEqual(res, "x.py")
+        self.assertNotIn("+", res)
+        self.assertNotIn("-", res)
+        self.assertNotIn("/", res)
 
         diff_add = "--- a/x.py\n+++ b/x.py\n@@ -1 +1,3 @@\n a\n+b\n+c\n"
         res_add = extract_tool_display("edit", {"path": "x.py"}, result_text=diff_add, status="done")
-        self.assertIn("x.py", res_add)
-        self.assertIn("+2", res_add)
+        self.assertEqual(res_add, "x.py")
 
         diff_del = "--- a/x.py\n+++ b/x.py\n@@ -1,3 +1 @@\n a\n-b\n-c\n"
         res_del = extract_tool_display("edit", {"path": "x.py"}, result_text=diff_del, status="done")
-        self.assertIn("x.py", res_del)
-        self.assertIn("-2", res_del)
+        self.assertEqual(res_del, "x.py")
 
         # No diff changes -> no badge
         res_no_chg = extract_tool_display("edit", {"path": "x.py"}, result_text="--- a/x.py\n+++ b/x.py\n", status="done")
@@ -371,8 +369,8 @@ class TestToolDisplay(unittest.TestCase):
     def test_diff_stats_create(self):
         # Newly created file with lines
         res = extract_tool_display("create", {"path": "foo.py"}, result_text="[created foo.py | 42 lines]", status="done")
-        self.assertIn("foo.py", res)
-        self.assertIn("+42", res)
+        self.assertEqual(res, "foo.py")
+        self.assertNotIn("+", res)
 
         # Empty created file -> no badge
         res_empty = extract_tool_display("create", {"path": "foo.py"}, result_text="[created foo.py | 0 lines]", status="done")
@@ -381,21 +379,17 @@ class TestToolDisplay(unittest.TestCase):
         # Overwritten file with unified diff
         diff_ow = "--- a/foo.py\n+++ b/foo.py\n@@ -1 +1,2 @@\n-old\n+new1\n+new2\n"
         res_ow = extract_tool_display("create", {"path": "foo.py"}, result_text=diff_ow, status="done")
-        self.assertIn("foo.py", res_ow)
-        self.assertIn("+2", res_ow)
-        self.assertIn("-1", res_ow)
-        self.assertIn("/", res_ow)
+        self.assertEqual(res_ow, "foo.py")
 
         # Fallback to args content
         res_content = extract_tool_display("create", {"path": "foo.py", "content": "a\nb\nc"}, status="done")
-        self.assertIn("foo.py", res_content)
-        self.assertIn("+3", res_content)
+        self.assertEqual(res_content, "foo.py")
 
         # Running status -> no badge
         res_run = extract_tool_display("create", {"path": "foo.py"}, result_text="[created foo.py | 42 lines]", status="running")
         self.assertEqual(res_run, "foo.py")
 
-    def test_build_toolcall_header_with_diff_stats(self):
+    def test_build_toolcall_header_without_diff_stats(self):
         from johnston.tui.presentation.toolcall_header import build_toolcall_header
         from johnston.tui.presentation.widgets.chat_toolcall import DISPLAY_NAMES, SYSTEM_TOOLS
 
@@ -418,8 +412,9 @@ class TestToolDisplay(unittest.TestCase):
         )
         self.assertIn("Edit", hdr)
         self.assertIn("x.py", hdr)
-        self.assertIn("+2", hdr)
-        self.assertIn("-1", hdr)
+        # No diff-stat badge (e.g. [+2 / -1]).
+        self.assertNotIn("+2", hdr)
+        self.assertNotIn("-1", hdr)
 
 
 if __name__ == "__main__":
