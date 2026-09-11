@@ -102,10 +102,11 @@ def build_status_kwargs(app, widget=None) -> dict:
     """Collect all footer status values from the app into a render kwargs dict.
 
     ``widget`` is optional and used only as a small TTL-cache holder for the
-    provider/skills/mcp-server enumerations (5s) plus the ``_active_mcp_count``
-    hook. Heavy reads (``pm.load_providers()``, skills listing, MCP server file
-    load) run off the event loop via ``refresh_footer_cache``; this function
-    only reads the cached values so the footer timer never blocks.
+    provider/skills/mcp-server enumerations (5s) plus a short-lived
+    ``_st_mcp_active`` count (0.5s). Heavy reads (``pm.load_providers()``,
+    skills listing, MCP server file load) run off the event loop via
+    ``refresh_footer_cache``; this function only reads the cached values so
+    the footer timer never blocks.
     """
     if widget is not None:
         _ensure_cache(app, widget)
@@ -122,8 +123,6 @@ def build_status_kwargs(app, widget=None) -> dict:
             providers, skills_visible, skills_total, mcp_servers = _collect_cache(app)
         except Exception:
             providers, skills_visible, skills_total, mcp_servers = {}, 0, 0, []
-
-    tasks = collect_current_tasks(app, getattr(app, "current_session_id", None))
 
     pm = getattr(app, "pm", None)
     pkey = pm.get_active_provider_key() if pm else "default"
@@ -148,13 +147,23 @@ def build_status_kwargs(app, widget=None) -> dict:
     # errored servers don't count, so while loading the footer flips to
     # the spinner.
     mcp_total = len(mcp_servers)
-    try:
-        count_fn = getattr(get_mcp_manager(), "active_server_count", None)
-        mcp_active = 0
-        if callable(count_fn):
-            mcp_active = count_fn(mcp_servers) or 0
-    except Exception:
-        mcp_active = 0
+    # TTL cache for the per-server proc.poll() sweep: the footer rebuilds
+    # ~3x/sec during generation (spinner), so reuse the last count within
+    # 0.5s instead of polling every subprocess on each rebuild.
+    mcp_active = 0
+    now = time.time()
+    if widget is not None and (now - getattr(widget, "_st_mcp_active_time", 0.0) < 0.5):
+        mcp_active = getattr(widget, "_st_mcp_active", 0)
+    else:
+        try:
+            count_fn = getattr(get_mcp_manager(), "active_server_count", None)
+            if callable(count_fn):
+                mcp_active = count_fn(mcp_servers) or 0
+        except Exception:
+            mcp_active = 0
+        if widget is not None:
+            widget._st_mcp_active = mcp_active
+            widget._st_mcp_active_time = now
 
     tasks = collect_current_tasks(app, getattr(app, "current_session_id", None))
     bg_tasks = tasks.shell_tasks
