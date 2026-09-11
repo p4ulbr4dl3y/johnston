@@ -422,6 +422,9 @@ async def run_ai_generation(
         )
         if hasattr(active_driver, "thinking_handle"):
             active_driver.thinking_handle = None
+        # Re-raise after handling interruption: the teardown in ``finally``
+        # runs on the way out, and callers (message_flow) treat CancelledError
+        # as the normal stop signal to reset mixin state silently.
         raise
     except Exception as e:
         logger.exception("AI generation failed: %s", e)

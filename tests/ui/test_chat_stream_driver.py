@@ -229,6 +229,7 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         bm = MagicMock()
         bm.content = "   "
         bm._stream_parts = []
+        bm._join_stream_content.return_value = ""
         bm.remove = MagicMock()
         self.driver.bot_handle = bm
 

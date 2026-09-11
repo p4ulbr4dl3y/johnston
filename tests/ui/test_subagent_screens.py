@@ -97,6 +97,7 @@ class TestSubagentMixins(unittest.IsolatedAsyncioTestCase):
         obj = _sub_host()
         bm = MagicMock()
         bm.content = "   "
+        bm._join_stream_content.return_value = ""
         bm.remove = MagicMock()
         obj.bot_msg = bm
         await obj._render_event({"type": "tool", "tool_type": "shell", "target": "ls", "result_text": "r"})
@@ -107,6 +108,7 @@ class TestSubagentMixins(unittest.IsolatedAsyncioTestCase):
         obj = _sub_host()
         bm = MagicMock()
         bm.content = "   "
+        bm._join_stream_content.return_value = ""
         bm.remove = MagicMock(side_effect=Exception("gone"))
         obj.bot_msg = bm
         await obj._render_event({"type": "tool", "tool_type": "read", "target": "a", "result_text": "r"})

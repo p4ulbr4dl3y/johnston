@@ -119,7 +119,7 @@ class ChatView(ChatViewHintsMixin, ChatViewScrollMixin, ChatViewHistoryMixin, Ve
                     if hasattr(child, "raw_text")
                     else (
                         child._join_stream_content()
-                        if hasattr(child, "_join_stream_content") and child._stream_parts
+                        if hasattr(child, "_join_stream_content")
                         else getattr(child, "content", "")
                     )
                 )

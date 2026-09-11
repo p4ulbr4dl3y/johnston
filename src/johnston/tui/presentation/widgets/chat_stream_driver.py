@@ -114,9 +114,15 @@ class ChatStreamDriver:
                 except Exception:
                     pass
             content_str = getattr(self.bot_handle, "content", "")
-            stream_parts = getattr(self.bot_handle, "_stream_parts", None)
-            if isinstance(stream_parts, list) and stream_parts and hasattr(self.bot_handle, "_join_stream_content"):
-                content_str = self.bot_handle._join_stream_content()
+            if hasattr(self.bot_handle, "_join_stream_content"):
+                # Prefer the joined buffer: it includes not-yet-flushed deltas
+                # that ``content`` (only updated on debounced flushes) misses.
+                try:
+                    joined = self.bot_handle._join_stream_content()
+                    if joined:
+                        content_str = joined
+                except Exception:
+                    pass
             content_val = str(content_str) if not isinstance(content_str, str) else content_str
             if not content_val.strip():
                 if hasattr(self.bot_handle, "remove"):

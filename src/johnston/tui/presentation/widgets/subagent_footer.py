@@ -42,7 +42,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
     def on_mount(self) -> None:
         if self.is_generating and not self._spinner_timer:
             try:
-                self._spinner_timer = self.set_interval(0.15, self._spin)
+                self._spinner_timer = self.set_interval(0.3, self._spin)
             except Exception:
                 self._spinner_timer = None
         self._render_footer()
@@ -71,7 +71,7 @@ class SubagentStatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixi
             # coroutine as a "never awaited" RuntimeWarning — guard first.
             if not self._spinner_timer and self.is_mounted:
                 try:
-                    self._spinner_timer = self.set_interval(0.15, self._spin)
+                    self._spinner_timer = self.set_interval(0.3, self._spin)
                 except Exception:
                     self._spinner_timer = None
         elif not is_running and self.is_generating:

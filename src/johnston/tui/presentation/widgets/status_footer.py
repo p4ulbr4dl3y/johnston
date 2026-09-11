@@ -43,7 +43,8 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
         if generating:
             if not self._spinner_timer and self.is_mounted:
                 try:
-                    self._spinner_timer = self.set_interval(0.15, self._spin)
+                    # Spinner is cosmetic; 0.3s tick halves UI-loop wakeups vs 0.15s.
+                    self._spinner_timer = self.set_interval(0.3, self._spin)
                 except Exception:
                     self._spinner_timer = None
         else:
@@ -66,7 +67,7 @@ class StatusFooter(ResizeDebounceMixin, GitMetricsMixin, StreamFrameMixin, Stati
     def on_mount(self) -> None:
         if self.is_generating and not self._spinner_timer:
             try:
-                self._spinner_timer = self.set_interval(0.15, self._spin)
+                self._spinner_timer = self.set_interval(0.3, self._spin)
             except Exception:
                 self._spinner_timer = None
         self.refresh_footer()

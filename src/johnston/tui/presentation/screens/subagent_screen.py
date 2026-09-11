@@ -49,6 +49,8 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
         self.event_queue = asyncio.Queue()
         self.queue_task = None
         self._notch_task = None
+        self._chrome_dirty = False
+        self._chrome_handle: asyncio.TimerHandle | None = None
 
     @property
     def thinking_widget(self):
@@ -144,11 +146,32 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
 
         self._history_worker = self.run_worker(self._load_history_session())
 
+    _CHROME_DEBOUNCE_SECONDS = 0.4
+
     def _refresh_chrome(self) -> None:
+        """Debounced chrome re-render (footer + expand state).
+
+        Footer re-render computes token estimates and provider lookups, and
+        expand-state save iterates every chat child — both are heavy for
+        per-event calls. Bursts of stream events coalesce into one refresh.
+        """
+        if getattr(self, "_chrome_dirty", False):
+            return
+        self._chrome_dirty = True
+        try:
+            loop = asyncio.get_running_loop()
+            self._chrome_handle = loop.call_later(self._CHROME_DEBOUNCE_SECONDS, self._flush_chrome)
+        except RuntimeError:
+            self._flush_chrome()
+
+    def _flush_chrome(self) -> None:
+        self._chrome_handle = None
+        self._chrome_dirty = False
         try:
             self.query_one("#subagent-status-footer", SubagentStatusFooter).update_session(self.session)
         except Exception:
             pass
+        self._save_expand_state()
 
     def _get_app(self):
         try:
@@ -306,6 +329,13 @@ class SessionChatScreen(PlanActionsMixin, ModalScreen[None]):
 
     def on_unmount(self) -> None:
         self._save_expand_state()
+        if getattr(self, "_chrome_handle", None) is not None:
+            try:
+                self._chrome_handle.cancel()
+            except Exception:
+                pass
+            self._chrome_handle = None
+        self._chrome_dirty = False
         if getattr(self, "_footer_refresh", None) is not None:
             try:
                 self._footer_refresh.stop()

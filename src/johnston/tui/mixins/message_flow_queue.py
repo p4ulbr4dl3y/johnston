@@ -49,6 +49,9 @@ async def process_queued_message(
     **kwargs: Any,
 ) -> None:
     """Run a queued message on the next event-loop iteration after the @work task."""
+    # Yield once so the Textual work task can finish its teardown before the
+    # next generation starts; run_ai_generation is cooperative, so a single
+    # yield is enough (no busy-wait spin needed).
     await asyncio.sleep(0)
     user_text = (prompt or "").strip()
     if user_text.startswith("!"):

@@ -217,7 +217,9 @@ class BotMessage(Vertical):
         self._markdown_render_task: asyncio.Task | None = None
         self._pending_markdown_content: str | None = None
         self._stream_parts: list[str] = []
-        self._joined_content: str | None = None
+        self._joined_content: str = ""
+        self._pending_parts: list[str] = []
+        self._last_rendered_stream_text: str | None = None
 
     def compose(self) -> ComposeResult:
         yield self.stream_widget
@@ -245,8 +247,10 @@ class BotMessage(Vertical):
             self._streaming = True
             self.stream_widget.display = True
             self.md_widget.display = False
-        self._stream_parts.append(content)
-        self._joined_content = None
+        # CPU: during streaming the plain-text widget is the only visible
+        # render; there is no reason to schedule a markdown rebuild per chunk.
+        # The full markdown render happens once in set_final_content.
+        self._pending_parts.append(content)
         self._schedule_stream_update()
 
     def set_stream_content(self, content: str) -> None:
@@ -255,21 +259,41 @@ class BotMessage(Vertical):
             self._streaming = True
             self.stream_widget.display = True
             self.md_widget.display = False
-        self._stream_parts = [content]
-        self._joined_content = None
+        self._discard_pending_parts()
+        self._joined_content = content
+        self._stream_parts = []
         self._schedule_stream_update()
 
-    def _join_stream_content(self) -> str:
-        """Join pending stream parts into a single string (lazy-cached)."""
-        if self._joined_content is None:
-            self._joined_content = "".join(self._stream_parts)
+    def _discard_pending_parts(self) -> None:
+        if self._pending_parts:
+            # No render has committed these deltas yet.
+            self._pending_parts = []
+            self._schedule_stream_update()
+
+    def _pop_stream_parts(self) -> str:
+        """Commit any pending deltas in one O(n) pass and return the new text.
+
+        Parts appended during the flush call_after_refresh (the renderer may
+        await a yielding update) are moved to the next scheduled flush, so the
+        committed text is never rebuilt from the full history on the hot path.
+        """
+        if not self._pending_parts:
+            return self._joined_content
+        parts = self._pending_parts
+        self._pending_parts = []
+        self._joined_content += "".join(parts)
         return self._joined_content
+
+    def _join_stream_content(self) -> str:
+        """Join all streamed parts into a single string (syncs on flush)."""
+        return self._pop_stream_parts()
 
     async def reset_stream(self) -> None:
         """Clear partial streamed text on retry so the new attempt starts blank."""
         self._streaming = False
         self._stream_parts = []
-        self._joined_content = None
+        self._joined_content = ""
+        self._pending_parts = []
         self._suppress_content_watch = True
         try:
             self.content = ""
@@ -307,7 +331,7 @@ class BotMessage(Vertical):
         self._stream_update_scheduled = False
         self._stream_update_handle = None
         try:
-            text = self._join_stream_content()
+            text = self._pop_stream_parts()
             self._suppress_content_watch = True
             try:
                 self.content = text
@@ -316,16 +340,21 @@ class BotMessage(Vertical):
             if text != getattr(self, "_last_rendered_stream_text", None):
                 self.stream_widget.update(text)
                 self._last_rendered_stream_text = text
+                # Deltas may have arrived between the flush callback and this
+                # render (update() awaits renderer callbacks); sync and schedule
+                # the next flush so text committed under us lands on screen.
+                if self._pending_parts:
+                    self._schedule_stream_update()
                 self._scroll_if_needed()
         except Exception:
             logger.debug("Stream flush failed", exc_info=True)
 
     def flush_pending_stream(self) -> None:
         """Immediately render any still-pending debounced stream content."""
-        if self._stream_parts:
+        if self._pending_parts:
             self._suppress_content_watch = True
             try:
-                self.content = self._join_stream_content()
+                self.content = self._pop_stream_parts()
             finally:
                 self._suppress_content_watch = False
         if self._stream_update_scheduled:
@@ -333,8 +362,9 @@ class BotMessage(Vertical):
 
     async def set_final_content(self, content: str) -> None:
         """Render final Markdown once and wait until its widget tree is mounted."""
-        self._stream_parts = [content]
+        self._stream_parts = []
         self._joined_content = content
+        self._pending_parts = []
         self._suppress_content_watch = True
         try:
             self.content = content
@@ -430,7 +460,8 @@ class ThinkingWidget(Vertical):
         super().__init__(classes=classes)
         initial = "" if thinking_text == "Thinking..." else thinking_text
         self._thinking_parts: list[str] = [initial] if initial else []
-        self._cached_thinking_text: str | None = initial
+        self._thinking_text_joined: str = initial
+        self._pending_thinking_parts: list[str] = []
         self.duration_seconds = 0.0
         self.is_thinking = is_active
         self.is_expanded = False
@@ -485,14 +516,22 @@ class ThinkingWidget(Vertical):
 
     @property
     def thinking_text(self) -> str:
-        if self._cached_thinking_text is None:
-            self._cached_thinking_text = "".join(self._thinking_parts)
-        return self._cached_thinking_text
+        return self._pop_thinking_parts()
 
     @thinking_text.setter
     def thinking_text(self, value: str) -> None:
+        self._pending_thinking_parts = []
         self._thinking_parts = [value] if value else []
-        self._cached_thinking_text = value
+        self._thinking_text_joined = value
+
+    def _pop_thinking_parts(self) -> str:
+        """Commit pending thinking deltas in one O(n) pass and return the text."""
+        if not self._pending_thinking_parts:
+            return self._thinking_text_joined
+        parts = self._pending_thinking_parts
+        self._pending_thinking_parts = []
+        self._thinking_text_joined += "".join(parts)
+        return self._thinking_text_joined
 
     def compose(self) -> ComposeResult:
         yield self.header_label
@@ -538,14 +577,16 @@ class ThinkingWidget(Vertical):
             if txt != getattr(self, "_last_rendered_thinking", None):
                 self.content_widget.update(txt)
                 self._last_rendered_thinking = txt
+                # Deltas arriving during the render await get flushed next.
+                if self._pending_thinking_parts:
+                    self._schedule_content_update()
                 self._scroll_if_needed()
         except Exception:
             logger.debug("Thinking flush failed", exc_info=True)
 
     def update_thinking(self, content: str) -> None:
         if content and content != "Thinking...":
-            self._thinking_parts.append(content)
-            self._cached_thinking_text = None
+            self._pending_thinking_parts.append(content)
             if self.is_expanded:
                 self._schedule_content_update()
 
@@ -559,8 +600,9 @@ class ThinkingWidget(Vertical):
         else:
             self._show_hints = False
         if thinking_content and thinking_content != "Thinking...":
+            self._pending_thinking_parts = []
             self._thinking_parts = [thinking_content]
-            self._cached_thinking_text = thinking_content
+            self._thinking_text_joined = thinking_content
         if self._update_handle is not None:
             self._update_handle.cancel()
             self._update_handle = None

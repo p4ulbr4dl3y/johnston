@@ -220,11 +220,16 @@ class TestBotMessageInternals(unittest.IsolatedAsyncioTestCase):
         with patch.object(bot, "_schedule_stream_update"):
             bot.append_stream_content("hello ")
             bot.append_stream_content("world")
-            self.assertEqual(bot._stream_parts, ["hello ", "world"])
+            # Appends buffer into pending parts; nothing is joined until a flush.
+            self.assertEqual(bot._pending_parts, ["hello ", "world"])
+            self.assertEqual(bot._stream_parts, [])
             self.assertEqual(bot.content, "")
             self.assertEqual(bot._join_stream_content(), "hello world")
+            self.assertEqual(bot._pending_parts, [])
+            self.assertEqual(bot._last_rendered_stream_text, None)
             bot._flush_stream_update()
             self.assertEqual(bot.stream_widget.render(), "hello world")
+            self.assertEqual(bot._last_rendered_stream_text, "hello world")
             bot.flush_pending_stream()
             self.assertEqual(bot.content, "hello world")
 
@@ -244,11 +249,13 @@ class TestThinkingWidget(unittest.TestCase):
     def test_thinking_widget_accumulates_parts_and_debounces(self):
         widget = self._make_widget()
         widget.is_expanded = True
-        with patch.object(widget.content_widget, "update") as update_mock:
+        with patch.object(widget, "_schedule_content_update"):
             widget.update_thinking("part1 ")
             widget.update_thinking("part2")
-            self.assertEqual(widget._thinking_parts, ["part1 ", "part2"])
+            self.assertEqual(widget._pending_thinking_parts, ["part1 ", "part2"])
             self.assertEqual(widget.thinking_text, "part1 part2")
+            self.assertEqual(widget._pending_thinking_parts, [])
+        with patch.object(widget.content_widget, "update") as update_mock:
             widget._flush_content_update()
             update_mock.assert_called_with("part1 part2")
 
@@ -408,7 +415,7 @@ class TestThinkingWidgetCoverage(unittest.TestCase):
         tw = ThinkingWidget("initial")
         tw.thinking_text = "new value"
         self.assertEqual(tw._thinking_parts, ["new value"])
-        self.assertEqual(tw._cached_thinking_text, "new value")
+        self.assertEqual(tw._thinking_text_joined, "new value")
 
     def test_schedule_content_update_skips_when_collapsed(self):
         tw = ThinkingWidget("x")
