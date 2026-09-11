@@ -509,9 +509,24 @@ class PromptBuilder:
 
         # Identity key lets us reuse the last pre-sorted build when the tool
         # schemas (and role flags) are unchanged this turn, skipping the
-        # per-schema deepcopy + re-sort. Deterministic hash of name and content
-        # avoids unstable id(t) object references across turns.
-        def _tool_ident(t: Dict[str, Any]) -> tuple:
+        # per-schema deepcopy + re-sort.
+        #
+        # MCP tools: cheap generation-level fingerprint. The manager's
+        # _generation counter is bumped on stop_all / project resets, and
+        # clear_mcp_cache() drops clients entirely, so a restart or config
+        # change always produces a new key. Per-tool content hashing is
+        # avoided here because MCP schemas can be large (10-20 tools x big
+        # schemas) and get_cached_tools() freshly formats the dicts every
+        # call, so id()/content-based keys would defeat the cache entirely.
+        def _mcp_names(tools: List[Dict[str, Any]]) -> tuple:
+            return tuple(t.get("function", {}).get("name", "") for t in tools)
+
+        # Base tools: static registry entries with small schemas; content
+        # identity (name + sha256) keeps the cache correct when a registry
+        # schema changes without a role change (non-interactive hardening also
+        # rebuilds the shell dict every call, so referential identity would
+        # permanently miss).
+        def _base_tool_ident(t: Dict[str, Any]) -> tuple:
             if not isinstance(t, dict):
                 return ("", str(t))
             fn = t.get("function") if isinstance(t.get("function"), dict) else {}
@@ -524,8 +539,8 @@ class PromptBuilder:
             return (name, content_hash)
 
         key = (
-            tuple(_tool_ident(t) for t in filtered_base),
-            tuple(_tool_ident(t) for t in filtered_mcp),
+            ("mcp", getattr(mcp_mgr, "_generation", 0), len(clean_mcp_tools), _mcp_names(clean_mcp_tools)),
+            ("base", str(self.role), tuple(_base_tool_ident(t) for t in filtered_base)),
             self.mode,
             self.allow_task,
         )
