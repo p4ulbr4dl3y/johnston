@@ -49,6 +49,40 @@ class TestResumeScreen(unittest.TestCase):
         self.assertEqual(len(ordered), 2)
         self.assertEqual(ordered_ids, {"s1", "s2"})
 
+    def test_order_sessions_hierarchically_key_computed_once_per_session(self):
+        """Perf audit #11: subtree key must be computed at most once per session per sort.
+
+        Both sort passes (roots + children) share one cache, so an instrumented
+        helper must fire exactly once per session for an acyclic hierarchy.
+        """
+        from unittest.mock import patch
+
+        import johnston.tui.presentation.screens.resume as resume_module
+
+        sessions = [
+            {"id": "p1", "updated_at": 100, "title": "Root"},
+            {"id": "p2", "updated_at": 200, "title": "Other Root"},
+            {"id": "c1", "parent_id": "p1", "updated_at": 150, "title": "Child"},
+            {"id": "gc1", "parent_id": "c1", "updated_at": 250, "title": "Grandchild"},
+        ]
+        original_key = resume_module._session_key
+        call_counts: dict[str, int] = {}
+
+        def counting_key(s: dict, indices: dict[str, int]) -> tuple:
+            sid = str(s.get("id"))
+            call_counts[sid] = call_counts.get(sid, 0) + 1
+            return original_key(s, indices)
+
+        with patch.object(resume_module, "_session_key", counting_key):
+            ordered = _order_sessions_hierarchically(sessions)
+
+        # Sort ordering unchanged
+        self.assertEqual([s["id"] for s in ordered], ["p1", "c1", "gc1", "p2"])
+        # Base key fetched exactly once per session across the whole sort
+        self.assertEqual(set(call_counts), {str(s["id"]) for s in sessions})
+        for sid, count in call_counts.items():
+            self.assertEqual(count, 1, f"session {sid} recomputed {count} times")
+
     def test_resume_screen_fork_branch_prefix(self):
         from rich.cells import cell_len
         from rich.text import Text
