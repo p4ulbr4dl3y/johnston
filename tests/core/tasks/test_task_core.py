@@ -7,6 +7,7 @@ real short subprocess, and SubagentTask mapping/kill over a mock AgentSession.
 import asyncio
 import os
 import sys
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -354,6 +355,62 @@ def test_output_log_append_after_close_is_noop(monkeypatch, tmp_path):
     log.close()  # idempotent
     assert "a\n" in open(log.path).read()
     assert "b\n" not in open(log.path).read()
+
+
+def test_output_log_flush_count_is_sublinear_in_chunk_count(monkeypatch, tmp_path):
+    """Perf audit #13: a burst of chunks must not flush once per chunk.
+
+    With 50 chunks arriving back-to-back the time-based batching must cap the
+    flush syscalls at a small constant (interval + drain + final), independent
+    of the chunk count.
+    """
+    import johnston.core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    flush_count = 0
+
+    class CountingFile:
+        def __init__(self):
+            self._buf = []
+
+        def write(self, item):
+            self._buf.append(item)
+
+        def flush(self):
+            nonlocal flush_count
+            flush_count += 1
+
+        def close(self):
+            pass
+
+    fake_open = MagicMock(return_value=CountingFile())
+    monkeypatch.setattr("builtins.open", fake_open)
+
+    log = _out.OutputLog(str(tmp_path / "burst.log"))
+    try:
+        for i in range(50):
+            log.append(f"chunk {i}\n")
+        log.flush_now()  # drains the queue without closing
+        assert flush_count <= 3, f"expected <=3 flushes for 50 chunks, got {flush_count}"
+        assert flush_count >= 1  # at least one intermediate flush happened
+    finally:
+        log.close()
+
+
+def test_output_log_final_flush_on_close_emits_all_data(monkeypatch, tmp_path):
+    """Completion durability: close() flushes every queued chunk to the file."""
+    import johnston.core.infrastructure.tasks.output as _out
+
+    monkeypatch.setattr(_out, "LOGS_DIR", str(tmp_path))
+    log = _out.OutputLog.create("final")
+    try:
+        for i in range(50):
+            log.append(f"line {i}\n")
+    finally:
+        log.close()
+    content = open(log.path).read()
+    for i in range(50):
+        assert f"line {i}\n" in content
 
 
 def test_output_log_create_failure_returns_closed_noop(monkeypatch):

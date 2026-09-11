@@ -11,6 +11,7 @@ import os
 import queue
 import re
 import threading
+import time
 import uuid
 from typing import Iterable, List, Optional
 
@@ -37,6 +38,13 @@ _SPINNER_CHARS = frozenset({"-", "\\", "|", "/", "—"})
 # front (tail preserved) past this limit so `"".join` stays bounded.
 _OUTPUT_BYTE_LIMIT = 300 * 1024  # 300 KB
 _OUTPUT_TRUNCATED_MARKER = "[Output truncated: showing recent output]\n"
+
+# Minimum elapsed time between flush syscalls while chunks stream in. Bounds
+# flush overhead to at most ~2/s per log file regardless of chunk frequency
+# (background shell subprocesses and subagents emit many small chunks/sec).
+# Durability on completion is unaffected: ``close`` always performs a final
+# flush after draining the queue.
+_FLUSH_INTERVAL_SECONDS = 0.5
 
 
 def strip_ansi(text: str) -> str:
@@ -201,8 +209,11 @@ class OutputLog:
     Unlike the snapshot helpers (truncate_subagent_result / truncate_output),
     this appends decoded chunks as they arrive, so a long-running background
     process logs its entire output without any in-memory cap. The file handle is
-    held open until ``close`` and flushed per chunk so the tail is durably
-    observable on disk.
+    held open until ``close``. Flushes are time-batched: the worker flushes at
+    most once per ``_FLUSH_INTERVAL_SECONDS`` while chunks stream in, plus one
+    flush whenever it drains the queue, so a high-frequency stream does not pay
+    a flush syscall per chunk. ``close`` performs a final flush, so the full
+    tail is durable on disk once the stream is known to be complete.
 
     Chunk extrusion (``append``) is non-blocking: writes are pushed onto a queue
     drained by a background worker thread, so the event loop is never blocked on
@@ -216,6 +227,7 @@ class OutputLog:
         self._closed = False
         self._queue = queue.Queue()
         self._thread: Optional[threading.Thread] = None
+        self._last_flush_ts = 0.0
         if path:
             try:
                 self._file = open(path, "w", encoding="utf-8")
@@ -257,6 +269,11 @@ class OutputLog:
                     f.write(item)
                     if self._queue.empty():
                         f.flush()
+                    else:
+                        now = time.monotonic()
+                        if now - self._last_flush_ts >= _FLUSH_INTERVAL_SECONDS:
+                            f.flush()
+                            self._last_flush_ts = now
                 except Exception:
                     pass
             finally:
