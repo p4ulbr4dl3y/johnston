@@ -368,15 +368,42 @@ class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreC
                 pass
             self._session_write_state.pop(fpath, None)
         else:
+            # No in-memory session. Never blindly remove a file for an id that
+            # is not indexed anywhere: a subagent spawned in a live turn whose
+            # session was never persisted (e.g. an errored spawn before the
+            # first save) is NOT on disk, and its eventual first save must not
+            # be erased pre-emptively. Deleting an unknown id is a no-op unless
+            # the file provably belongs to this store and kind.
             fpath = self._main_path(session_id)
-            try:
-                os.remove(fpath)
-            except OSError:
-                pass
-            self._session_write_state.pop(fpath, None)
+            if os.path.exists(fpath) and self._is_main_indexed(session_id):
+                try:
+                    os.remove(fpath)
+                except OSError:
+                    pass
+                self._session_write_state.pop(fpath, None)
+            elif not self._is_anywhere_indexed(session_id):
+                return
         self._sessions.pop(session_id, None)
         self._invalidate_disk_cache()
         self.index_db.delete_session(session_id)
+
+    def _is_main_indexed(self, session_id: str) -> bool:
+        try:
+            with self.index_db._connection() as conn:
+                cursor = conn.execute(
+                    "SELECT 1 FROM session_index WHERE id = ? AND kind = ?", (session_id, SessionKind.MAIN.value)
+                )
+                return cursor.fetchone() is not None
+        except Exception:
+            return False
+
+    def _is_anywhere_indexed(self, session_id: str) -> bool:
+        try:
+            with self.index_db._connection() as conn:
+                cursor = conn.execute("SELECT 1 FROM session_index WHERE id = ?", (session_id,))
+                return cursor.fetchone() is not None
+        except Exception:
+            return False
 
     def set_active_session_id(self, session_id: str) -> None:
         # Skip the config rewrite when unchanged: saves call this on every write.

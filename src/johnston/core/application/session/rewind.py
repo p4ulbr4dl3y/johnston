@@ -319,23 +319,6 @@ def _cleanup_rewound_subagents(session: Any, dropped_msgs: list[dict], store: An
             if sub_id:
                 dropped_sub_ids.add(str(sub_id))
 
-    remaining_sub_ids: set[str] = set()
-    for msg in getattr(session, "messages", []):
-        if not isinstance(msg, dict):
-            continue
-        if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in (
-            "invoke_subagent",
-            "message_subagent",
-        ):
-            args = msg.get("args") or {}
-            if isinstance(args, dict):
-                sid = args.get("id") or args.get("session_id")
-                if sid:
-                    remaining_sub_ids.add(str(sid))
-            sub_id = msg.get("subagent_session_id")
-            if sub_id:
-                remaining_sub_ids.add(str(sub_id))
-
     try:
         children = store.children(curr_sid)
     except Exception:
@@ -343,17 +326,22 @@ def _cleanup_rewound_subagents(session: Any, dropped_msgs: list[dict], store: An
 
     for child in children:
         c_id = str(child.id)
-        if c_id in dropped_sub_ids or (c_id not in remaining_sub_ids and dropped_msgs):
-            async_task = getattr(child, "async_task", None)
-            if async_task and not async_task.done():
-                try:
-                    async_task.cancel()
-                except Exception:
-                    pass
+        # Only subagents whose spawn/follow-up message was actually dropped by
+        # the rewind are touched. Children of surviving turns (even when their
+        # session file was never persisted, e.g. an errored spawn) must stay
+        # untouched — deleting them would destroy their history for the user.
+        if c_id not in dropped_sub_ids:
+            continue
+        async_task = getattr(child, "async_task", None)
+        if async_task and not async_task.done():
             try:
-                store.delete(c_id)
-            except Exception as e:
-                logger.warning("Failed to delete rewound subagent session %s: %s", c_id, e)
+                async_task.cancel()
+            except Exception:
+                pass
+        try:
+            store.delete(c_id)
+        except Exception as e:
+            logger.warning("Failed to delete rewound subagent session %s: %s", c_id, e)
 
 
 def _cleanup_rewound_shell_tasks(dropped_msgs: list[dict], task_manager: Any = None) -> None:

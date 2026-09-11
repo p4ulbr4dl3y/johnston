@@ -660,6 +660,63 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
         mock_store.delete.assert_called_once_with("sub-child-1")
         mock_tm.drop.assert_called_once_with("task-123")
 
+    def test_rewind_keeps_unrelated_subagent_files(self):
+        """A subagent spawned before the rollback point must NOT be deleted.
+
+        Regression: rewind used to delete any child not present in
+        ``remaining_sub_ids`` whenever ``dropped_msgs`` was non-empty, which
+        nuked sessions of surviving turns (e.g. an errored spawn whose jsonl
+        was never written but whose invoke message still lives in the
+        transcript).
+        """
+        from johnston.core.application.session.actions import rewind_session
+
+        mock_store = MagicMock()
+        dropped_child = MagicMock(id="sub-dropped")
+        dropped_child.async_task = MagicMock(done=lambda: False)
+        kept_child = MagicMock(id="sub-kept")
+        kept_child.async_task = MagicMock(done=lambda: True)
+        mock_store.children.return_value = [dropped_child, kept_child]
+
+        sess = MagicMock(id="parent-1")
+        sess.messages = [
+            {"type": "user", "text": "turn 0", "show_in_ui": True},
+            {"type": "tool", "tool_type": "invoke_subagent", "args": {"session_id": "sub-kept"}},
+            {"type": "bot", "text": "ans 0"},
+            {"type": "user", "text": "turn 1", "show_in_ui": True},
+            {"type": "tool", "tool_type": "invoke_subagent", "args": {"session_id": "sub-dropped"}},
+            {"type": "bot", "text": "ans 1"},
+        ]
+
+        agent = MockAgent()
+        agent.history = [
+            {"role": "user", "content": "turn 0"},
+            {"role": "assistant", "content": "ans 0"},
+            {"role": "user", "content": "turn 1"},
+            {"role": "assistant", "content": "ans 1"},
+        ]
+
+        rewind_session(
+            agent,
+            "parent-1",
+            "/tmp",
+            [(0, "turn 0"), (2, "turn 1")],
+            2,
+            restore_git=False,
+            session=sess,
+            rollback_ui=lambda i: None,
+            load_text_into_input=lambda t: None,
+            save_session_cb=lambda: None,
+            refresh_footer_cb=lambda: None,
+            store=mock_store,
+            task_manager=MagicMock(),
+        )
+
+        # Only the dropped turn's subagent is removed; the surviving turn's
+        # subagent (even though its session file never existed) survives.
+        dropped_child.async_task.cancel.assert_called_once()
+        mock_store.delete.assert_called_once_with("sub-dropped")
+
     def test_touched_files_untracked_turn_returns_none(self):
         from johnston.core.application.session.actions import _touched_files
 

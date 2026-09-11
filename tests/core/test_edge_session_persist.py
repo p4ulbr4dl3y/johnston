@@ -535,6 +535,48 @@ def test_children_fast_path_cold_and_warm(store):
     assert cold_children1[0].id == "sub1"
 
 
+def test_delete_unknown_subagent_is_noop(store):
+    """Deleting a subagent id the store never persisted must not remove any file.
+
+    Regression: a subagent spawned in a live turn whose session was never
+    saved to disk (e.g. an errored spawn before the first save) used to be
+    actively deleted when its id was missing from the index, erasing the
+    record of a surviving turn on rollback/cleanup paths.
+    """
+    main1 = store.create_main("main1")
+    store.save(main1)
+    sub1 = store.create_subagent("main1", "sub1")
+    store.save(sub1)
+
+    subdir = store._subagent_dir("main1")
+    assert os.path.exists(os.path.join(subdir, "sub1.jsonl"))
+
+    # Unknown id: must not touch disk (no unlink, no index cascade).
+    store.delete("subagent-never-saved")
+    assert os.path.exists(os.path.join(subdir, "sub1.jsonl"))
+    found = store.get("subagent-never-saved", reload=False)
+    assert found is None
+    # Index still holds the known sessions.
+    rows = store.index_db.query_subagent_ids(store.project_key, parent_id="main1")
+    ids = {r["id"] for r in rows}
+    assert "sub1" in ids
+    assert "subagent-never-saved" not in ids
+
+
+def test_delete_known_subagent_removes_file(store):
+    """Deleting a persisted subagent still removes its jsonl as before."""
+    main1 = store.create_main("main1")
+    store.save(main1)
+    sub1 = store.create_subagent("main1", "sub1")
+    store.save(sub1)
+
+    subdir = store._subagent_dir("main1")
+    assert os.path.exists(os.path.join(subdir, "sub1.jsonl"))
+
+    store.delete("sub1")
+    assert not os.path.exists(os.path.join(subdir, "sub1.jsonl"))
+
+
 def test_fork_session_persistence_fields(store):
     """fork_msg_count and auto_titled roundtrip correctly through SessionStore."""
     parent = store.create_main("parent_sess")
