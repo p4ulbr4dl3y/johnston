@@ -105,6 +105,14 @@ class TurnContextMixin:
         history_tokens = self._current_history_tokens() if getattr(self, "history", None) else 0
         total_tokens = sys_overhead + history_tokens
 
+        # API-anchored context for the compaction decision: current_context_tokens()
+        # already includes system+tools overhead, so sys_overhead is passed as 0 to
+        # should_compact (it sums sys_overhead + history_tokens args).
+        if callable(getattr(self, "current_context_tokens", None)):
+            ctx_for_compact = self.current_context_tokens()
+        else:
+            ctx_for_compact = sys_overhead + history_tokens
+
         # 1. Model Downshift detection
         last_limit = getattr(self, "_last_model_limit", None)
         self._last_model_limit = cur_limit
@@ -123,7 +131,7 @@ class TurnContextMixin:
         )
 
         need_compact = (
-            should_compact(len(self.history), sys_overhead, history_tokens, threshold)
+            should_compact(len(self.history), 0, ctx_for_compact, threshold)
             or model_downshift
             or hash_changed
         )

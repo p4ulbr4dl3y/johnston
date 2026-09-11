@@ -153,6 +153,8 @@ def reset_token_counters(agent: Any, *, reset_context: bool = True) -> None:
         ("last_context_tokens", 0),
         ("total_tokens", 0),
         ("cost_usd", 0.0),
+        ("_ctx_api_tokens", 0),
+        ("_ctx_api_hist_tokens", 0),
     ):
         if attr == "last_context_tokens" and not reset_context:
             continue
