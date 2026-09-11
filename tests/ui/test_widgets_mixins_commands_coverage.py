@@ -794,7 +794,7 @@ def test_lifecycle_on_unmount_full_flow():
                             assert app.is_app_active is False
                             mock_rm_listener.assert_called_once_with(app._theme_listener)
                             git_task.cancel.assert_called_once()
-                            mock_subagents.assert_called_once_with(app.sm)
+                            mock_subagents.assert_called_once_with(app.sm, None)
                             mock_save.assert_called_once()
                             mock_mcp.return_value.stop_all.assert_called_once()
                             app.sm.release_all_locks.assert_called_once()

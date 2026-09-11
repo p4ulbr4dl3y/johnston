@@ -240,14 +240,15 @@ def apply_role_to_agent(app, role) -> None:
         pass
 
 
-def cancel_running_subagents(sm) -> None:
-    """Cancel running subagent sessions (used on app shutdown)."""
+def cancel_running_subagents(sm, parent_id: str | None = None) -> int:
+    """Cancel running subagent sessions (used on app shutdown / rewind)."""
     from johnston.core.application.session.stream import cancel_running_subagents as _c
 
     try:
-        _c(sm)
+        return _c(sm, parent_id)
     except Exception:
         pass
+    return 0
 
 
 def close_tools() -> None:

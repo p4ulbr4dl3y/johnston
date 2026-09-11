@@ -347,8 +347,10 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         bg_task.is_background = True
         app.task_manager.register(bg_task)
 
-        # Running subagent session that must be cancelled.
+        # Running subagent session that must be cancelled (spawned inside the
+        # rolled-back turn, so it is dropped together with its messages).
         subagent = MagicMock()
+        subagent.id = "sub-dropped"
         subagent.status = "running"
         subagent.async_task = MagicMock()
         subagent.async_task.done.return_value = False
@@ -356,7 +358,10 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         app.sm.save = MagicMock()
 
         session = MagicMock()
-        session.messages = [{"type": "user", "text": "First", "show_in_ui": True}]
+        session.messages = [
+            {"type": "user", "text": "First", "show_in_ui": True},
+            {"type": "tool", "tool_type": "invoke_subagent", "args": {"session_id": "sub-dropped"}},
+        ]
         app.sm.get.return_value = session
         app.agent.history = [{"role": "user", "content": "First"}]
         app.agent.truncate_history_to_user_message = lambda idx: None
