@@ -188,6 +188,7 @@ class MCPProcessLifecycleMixin:
         self._fail_pending_futures()
         self._terminate_process_group()
         self._join_reader_thread()
+        self._join_writer_thread()
         self._join_stderr_thread()
 
     async def stop_async(self) -> None:

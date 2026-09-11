@@ -6,6 +6,7 @@ import asyncio
 import collections
 import logging
 import os  # noqa: F401
+import queue
 import select  # noqa: F401
 import signal  # noqa: F401
 import subprocess
@@ -69,6 +70,10 @@ class MCPProcessClient(
         self._stderr_tail: Deque[str] = collections.deque(maxlen=STDERR_TAIL_LINES)
         self._queue: Optional[asyncio.Queue] = None
         self._response_event = threading.Event()
+        self._write_queue = queue.SimpleQueue()
+        self._write_thread: Optional[threading.Thread] = None
+        self._write_spawn_lock = threading.Lock()
+        self._writer_loop: Optional[asyncio.AbstractEventLoop] = None
 
     # ── Request ID generation (thread-safe) ────────────────────────────────
 

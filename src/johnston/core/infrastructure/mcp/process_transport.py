@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import queue
 import select
 import sys
 import threading
@@ -11,6 +12,27 @@ import time
 from typing import Any, Dict, Optional
 
 _default_logger = logging.getLogger("johnston.core.infrastructure.mcp.process_client")
+
+
+# Upper bound on how long an async write may take to be acknowledged by the
+# writer thread before we give up waiting. The request still fails cleanly at
+# the response-stage timeout if the write never landed; this only prevents an
+# await on an ack that can never arrive (e.g. the writer thread was torn down).
+_WRITE_ACK_TIMEOUT = 10.0
+
+
+def _resolve_write_ack(done: Any, exc: Optional[BaseException]) -> None:
+    """Resolve a write-ack future on the event loop (writer-thread → loop hop).
+
+    Runs via ``call_soon_threadsafe`` so the awaiting coroutine resumes and a
+    parked loop is woken; tolerates acks that raced with cancellation/timeout.
+    """
+    if done.done():
+        return
+    if exc is None:
+        done.set_result(None)
+    else:
+        done.set_exception(exc)
 
 
 class _ProcessClientLoggerProxy:
@@ -46,6 +68,10 @@ class MCPProcessTransportMixin:
     _reader_loop: Optional[asyncio.AbstractEventLoop]
     _queue: Optional[asyncio.Queue]
     _response_event: threading.Event
+    _write_queue: queue.SimpleQueue
+    _write_thread: Optional[threading.Thread]
+    _write_spawn_lock: threading.Lock
+    _writer_loop: Optional[asyncio.AbstractEventLoop]
 
     # ── Stdio line parsing ─────────────────────────────────────────────────
 
@@ -164,6 +190,76 @@ class MCPProcessTransportMixin:
             logger.debug("Reader thread for MCP server '%s' did not exit in time", self.name)
         self._reader_thread = None
 
+    # ── Writer thread lifecycle ───────────────────────────────────────────
+
+    def _writer_thread_target(self) -> None:
+        """Long-lived daemon thread that drains the write queue onto process stdin.
+
+        A single thread owns the blocking write+flush so async callers only pay
+        a queue put plus a lightweight ack round-trip (resolved via
+        ``call_soon_threadsafe``) instead of a thread-pool hand-off per message
+        (``asyncio.to_thread`` spun up a worker per JSON-RPC write). Order is
+        guaranteed by the queue; a ``None`` sentinel flushes the remaining
+        pending writes and signals shutdown.
+        """
+        loop = self._writer_loop
+        while True:
+            item = self._write_queue.get()
+            if item is None:
+                break
+            message, done = item
+            exc: Optional[Exception] = None
+            if self.process and self.process.stdin:
+                try:
+                    line = json.dumps(message, ensure_ascii=False) + "\n"
+                    with self._write_lock:
+                        self.process.stdin.write(line)
+                        self.process.stdin.flush()
+                except Exception:
+                    logger.debug("Writer thread error for MCP server '%s'", self.name, exc_info=True)
+                    exc = sys.exc_info()[1]
+            # Hand the write result back to the loop so the awaiting coroutine
+            # resumes. ``call_soon_threadsafe`` also wakes a parked loop, which
+            # mirrors the wakeup the old ``asyncio.to_thread`` path provided.
+            if loop is not None:
+                try:
+                    loop.call_soon_threadsafe(_resolve_write_ack, done, exc)
+                except RuntimeError:
+                    pass
+
+    def _spawn_writer_thread(self, loop: asyncio.AbstractEventLoop) -> Optional[threading.Thread]:
+        """Lazily start the single writer thread (guarded against races)."""
+        with self._write_spawn_lock:
+            if self._write_thread and self._write_thread.is_alive():
+                return self._write_thread
+            if self._stopped:
+                return None
+            self._writer_loop = loop
+            self._write_thread = threading.Thread(
+                target=self._writer_thread_target, name=f"mcp-writer-{self.name}", daemon=True
+            )
+            self._write_thread.start()
+            return self._write_thread
+
+    def _join_writer_thread(self, timeout: float = 1.0) -> None:
+        """Signal the writer thread to stop and wait for it (bounded)."""
+        with self._write_spawn_lock:
+            thread = self._write_thread
+            if thread is None:
+                return
+            self._write_queue.put_nowait(None)
+            self._write_thread = None
+        thread.join(timeout=timeout)
+        if thread.is_alive():
+            logger.debug("Writer thread for MCP server '%s' did not exit in time", self.name)
+        # Drop any items that raced in after the sentinel so a later respawn
+        # never drains stale writes (their callers already gave up awaiting).
+        while True:
+            try:
+                self._write_queue.get_nowait()
+            except queue.Empty:
+                break
+
     # ── Async read loop (stdio transport) ──────────────────────────────────
 
     async def _async_read_loop(self) -> None:
@@ -236,12 +332,40 @@ class MCPProcessTransportMixin:
     async def _send_async(self, message: Dict[str, Any]) -> None:
         """Send a JSON-RPC message without blocking the event loop.
 
-        ``_write_lock`` (threading) still guards the write; the actual blocking
-        write+flush runs in a worker thread so it never stalls the loop.
+        The write is handed to a single long-lived daemon writer thread via an
+        O(1) queue put, so the loop never blocks on stdin and we never pay a
+        thread-pool hand-off per write (the old ``asyncio.to_thread`` cost).
+        ``message`` is paired with an ack future that the writer thread resolves
+        on the loop (``call_soon_threadsafe``), which preserves the previous
+        error propagation — a failed write raises here — and wakes the loop so
+        responses delivered by foreign threads are processed promptly.
+        Falls back to ``asyncio.to_thread`` when no writer thread can be
+        spawned (e.g. no running loop, or the thread failed to start).
         """
-        if not self.process or not self.process.stdin:
+        if self._stopped or not self.process or not self.process.stdin:
             return
-        await asyncio.to_thread(self._send, message)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            await asyncio.to_thread(self._send, message)
+            return
+        thread = self._spawn_writer_thread(loop)
+        if thread is None or not thread.is_alive():
+            await asyncio.to_thread(self._send, message)
+            return
+        done = loop.create_future()
+        self._write_queue.put_nowait((message, done))
+        try:
+            await asyncio.wait_for(asyncio.shield(done), timeout=_WRITE_ACK_TIMEOUT)
+        except asyncio.TimeoutError:
+            # Write still in flight (e.g. a full pipe) but we cannot risk
+            # hanging the call forever on the ack; the response stage has its
+            # own timeout and surfaces a proper error if nothing landed.
+            done.cancel()
+            logger.debug("Timed out awaiting MCP write ack for server '%s'", self.name)
+        except asyncio.CancelledError:
+            done.cancel()
+            raise
 
     async def _send_notification_async(self, message: Dict[str, Any]) -> None:
         """Send a JSON-RPC notification or response over stdin."""
