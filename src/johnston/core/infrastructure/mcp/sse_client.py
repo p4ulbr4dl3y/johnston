@@ -3,8 +3,12 @@ SSE and HTTP JSON-RPC 2.0 client for remote MCP servers.
 """
 
 import asyncio
+import atexit
 import json
 import logging
+import threading
+import weakref
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
@@ -19,6 +23,63 @@ from johnston.core.infrastructure.mcp.base import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ── Sync-lifecycle resource pooling ────────────────────────────────────────
+# Perf audit finding #14: the old start()/stop() built a fresh single-worker
+# ThreadPoolExecutor and ran ``asyncio.run`` (a fresh event loop) on every sync
+# lifecycle call, churning threads and loops under MCP SSE-heavy workloads.
+# Now one shared, bounded executor plus one persistent per-client loop thread
+# are reused across all calls and released on stop/exit.
+
+_SSE_EXECUTOR_MAX_WORKERS = 4
+_SSE_EXECUTOR: Optional[ThreadPoolExecutor] = None
+_SSE_EXECUTOR_LOCK = threading.Lock()
+
+
+def _get_sse_executor() -> ThreadPoolExecutor:
+    """Shared, lazily-created executor for sync calls made from a running loop.
+
+    Module-level (no owning client) so the bounded pool is shared by every
+    ``MCPSSEClient``; it is shut down once at interpreter exit via ``atexit``.
+    Created lazily so processes that never use SSE spawn no extra threads.
+    """
+    global _SSE_EXECUTOR
+    if _SSE_EXECUTOR is None:
+        with _SSE_EXECUTOR_LOCK:
+            if _SSE_EXECUTOR is None:
+                _SSE_EXECUTOR = ThreadPoolExecutor(
+                    max_workers=_SSE_EXECUTOR_MAX_WORKERS,
+                    thread_name_prefix="johnston-mcp-sse",
+                )
+                atexit.register(_SSE_EXECUTOR.shutdown, wait=True)
+    return _SSE_EXECUTOR
+
+
+def _run_loop_forever(loop: asyncio.AbstractEventLoop, ready: threading.Event) -> None:
+    """Body of the per-client loop thread: run one loop until ``stop`` is requested."""
+    asyncio.set_event_loop(loop)
+    ready.set()
+    try:
+        loop.run_forever()
+    finally:
+        try:
+            loop.close()
+        except RuntimeError:
+            pass
+
+
+def _finalize_loop_state(state: Dict[str, Any]) -> None:
+    """Backstop for clients GC'd without ``stop()``: stop + join the loop thread."""
+    thread = state.get("thread")
+    loop = state.get("loop")
+    if thread is not None and loop is not None and not loop.is_closed():
+        try:
+            loop.call_soon_threadsafe(loop.stop)
+        except RuntimeError:
+            pass
+        if thread is not threading.current_thread() and thread.is_alive():
+            thread.join(timeout=1.0)
+    state.clear()
 
 
 class MCPSSEClient(MCPClientBase):
@@ -39,6 +100,10 @@ class MCPSSEClient(MCPClientBase):
         self._http_client: Optional[httpx.AsyncClient] = None
         self._sse_task: Optional[asyncio.Task] = None
         self._endpoint_ready = asyncio.Event()
+        # Persistent event loop used by sync lifecycle calls (see _ensure_loop).
+        self._loop_state: Dict[str, Any] = {"loop": None, "thread": None, "stopping": False}
+        self._loop_lock = threading.Lock()
+        weakref.finalize(self, _finalize_loop_state, self._loop_state)
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -89,14 +154,7 @@ class MCPSSEClient(MCPClientBase):
     def start(self, timeout: float | None = None) -> bool:
         if timeout is None:
             timeout = _config_init_timeout()
-        try:
-            asyncio.get_running_loop()
-            import concurrent.futures
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                return pool.submit(lambda: asyncio.run(self.start_async(timeout=timeout))).result(timeout=timeout)
-        except RuntimeError:
-            return asyncio.run(self.start_async(timeout=timeout))
+        return self._run_sync_lifecycle(lambda: self.start_async(timeout=timeout), timeout)
 
     async def stop_async(self) -> None:
         self._stopped = True
@@ -120,15 +178,106 @@ class MCPSSEClient(MCPClientBase):
                 fut.set_exception(RuntimeError("MCP SSE client stopped"))
         self._pending_futures.clear()
 
+        # Release the persistent loop thread (no-op for async-only usage).
+        self._shutdown_loop()
+
     def stop(self) -> None:
+        loop_thread = self._loop_state.get("thread")
+        try:
+            self._run_sync_lifecycle(self.stop_async, 5.0)
+        except Exception:
+            # Teardown must never raise: log and let the loop thread finish
+            # tearing down state on its own.
+            logger.debug("MCP SSE stop failed for '%s'", self.name, exc_info=True)
+        finally:
+            if (
+                loop_thread is not None
+                and loop_thread.is_alive()
+                and loop_thread is not threading.current_thread()
+            ):
+                loop_thread.join(timeout=1.0)
+
+    # ── Sync loop/executor reuse ──────────────────────────────────────────
+
+    def _ensure_loop(self) -> asyncio.AbstractEventLoop:
+        """Create (or reuse) this client's persistent event-loop thread.
+
+        Sync lifecycle calls schedule their coroutines on this one loop via
+        ``asyncio.run_coroutine_threadsafe`` instead of paying for a fresh
+        event loop per call (``asyncio.run``). All async state for the client
+        stays on this single loop for its lifetime; the loop is recreated after
+        ``stop``/restart cycles.
+        """
+        with self._loop_lock:
+            state = self._loop_state
+            thread = state["thread"]
+            if state["stopping"]:
+                # A shutdown is in flight (stop_async ran on the loop and
+                # scheduled stop): never schedule new work on that loop.
+                if thread is not None and thread is not threading.current_thread() and thread.is_alive():
+                    thread.join(timeout=1.0)
+                state["stopping"] = False
+                state["loop"] = None
+                state["thread"] = None
+                thread = None
+            if thread is not None and thread.is_alive() and not state["loop"].is_closed():
+                return state["loop"]
+            loop = asyncio.new_event_loop()
+            ready = threading.Event()
+            thread = threading.Thread(
+                target=_run_loop_forever,
+                args=(loop, ready),
+                name=f"johnston-mcp-sse-{self.name}",
+                daemon=True,
+            )
+            thread.start()
+            ready.wait(timeout=2.0)
+            state["loop"] = loop
+            state["thread"] = thread
+            return loop
+
+    def _shutdown_loop(self) -> None:
+        """Stop the persistent loop thread (idempotent; safe from any thread)."""
+        with self._loop_lock:
+            state = self._loop_state
+            thread = state["thread"]
+            loop = state["loop"]
+            if thread is None or loop is None:
+                return
+            state["stopping"] = True
+            if not loop.is_closed():
+                try:
+                    loop.call_soon_threadsafe(loop.stop)
+                except RuntimeError:
+                    pass
+            if thread is not threading.current_thread() and thread.is_alive():
+                thread.join(timeout=1.0)
+            state["loop"] = None
+            state["thread"] = None
+
+    def _run_coro_blocking(self, coro_factory: Any, timeout: Optional[float]) -> Any:
+        """Schedule ``coro_factory()`` on the persistent loop and block for the result."""
+        loop = self._ensure_loop()
+        fut = asyncio.run_coroutine_threadsafe(coro_factory(), loop)
+        if timeout is None:
+            return fut.result()
+        return fut.result(timeout=timeout)
+
+    def _run_sync_lifecycle(self, coro_factory: Any, timeout: Optional[float]) -> Any:
+        """Run a lifecycle coroutine synchronously with pooled resources.
+
+        No loop in this thread (plain sync caller): schedule on this client's
+        persistent loop and block — replaces the old per-call ``asyncio.run``.
+        A loop IS running (async caller using the sync API): offload to the
+        shared ``_get_sse_executor`` pool so the caller's loop is never
+        blocked; the worker still runs on the client's persistent loop —
+        replaces the old per-call ``ThreadPoolExecutor`` + fresh loop combo.
+        """
         try:
             asyncio.get_running_loop()
-            import concurrent.futures
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                pool.submit(lambda: asyncio.run(self.stop_async())).result(timeout=5.0)
         except RuntimeError:
-            asyncio.run(self.stop_async())
+            return self._run_coro_blocking(coro_factory, None)
+        return _get_sse_executor().submit(self._run_coro_blocking, coro_factory, timeout).result(timeout=timeout)
 
     # ── SSE listener ───────────────────────────────────────────────────────
 

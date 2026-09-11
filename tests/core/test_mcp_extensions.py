@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -271,4 +272,73 @@ async def test_mcp_prompt_command_suggestions_and_dispatch():
         mock_app.trigger_ai_response.assert_called_once()
         args = mock_app.trigger_ai_response.call_args[0]
         assert "Please review this code carefully" in args[0]
+
+
+# ── Sync lifecycle resource reuse (perf audit finding #14) ─────────────────
+
+
+def test_sse_sync_start_reuses_single_event_loop():
+    """Repeated sync lifecycle calls share one persistent loop instead of creating one per call."""
+    import asyncio as _asyncio
+
+    client = MCPSSEClient("reuse_loop", "https://example.com/sse")
+    seen = set()
+
+    async def _fake_start_async(timeout=None):
+        seen.add(_asyncio.get_running_loop())
+        return True
+
+    client.start_async = _fake_start_async
+    assert client.start() is True
+    assert client.start() is True
+    assert client.start() is True
+    assert len(seen) == 1
+    client.stop()
+
+
+def test_sse_sync_start_shuts_down_loop_thread():
+    """stop() tears down the loop thread so no threads leak."""
+    client = MCPSSEClient("shutdown_loop", "https://example.com/sse")
+
+    async def _fake_start_async(timeout=None):
+        return True
+
+    client.start_async = _fake_start_async
+    assert client.start() is True
+    thread = client._loop_state["thread"]
+    assert thread is not None and thread.is_alive()
+    client.stop()
+    assert not thread.is_alive()
+
+
+@pytest.mark.asyncio
+async def test_sse_sync_lifecycle_uses_shared_executor():
+    """Sync lifecycle calls from a running loop share one pooled executor."""
+    import johnston.core.infrastructure.mcp.sse_client as sse_mod
+
+    existing = sse_mod._SSE_EXECUTOR
+    if existing is not None:
+        existing.shutdown(wait=True)
+        sse_mod._SSE_EXECUTOR = None
+
+    original = ThreadPoolExecutor
+    client = MCPSSEClient("exec_reuse", "https://example.com/sse")
+    seen_executors = set()
+
+    async def _fake_start_async(timeout=None):
+        seen_executors.add(id(sse_mod._SSE_EXECUTOR))
+        return True
+
+    client.start_async = _fake_start_async
+
+    with patch("johnston.core.infrastructure.mcp.sse_client.ThreadPoolExecutor", wraps=original) as mock_exec:
+        with patch.object(client, "_run_coro_blocking", wraps=client._run_coro_blocking) as mock_blocking:
+            assert client.start() is True
+            assert client.start() is True
+            assert client.start() is True
+
+    assert mock_exec.call_count == 1  # one pooled executor, reused across all calls
+    assert mock_blocking.call_count == 3
+    assert len(seen_executors) == 1  # every call ran on the same shared pool
+    client.stop()
 
