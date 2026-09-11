@@ -18,6 +18,11 @@ from johnston.tui.utils.row_format import (
 )
 
 
+def _session_key(s: dict, indices: dict[str, int]) -> tuple:
+    """Base activity key for a single session: (updated_at, created_at, recency index)."""
+    return (s.get("updated_at") or 0, s.get("created_at") or 0, indices.get(str(s.get("id")), 0))
+
+
 def _order_sessions_hierarchically(sessions: list[dict]) -> list[dict]:
     session_map = {str(s.get("id")): s for s in sessions}
     children_map: dict[str, list[dict]] = {}
@@ -32,16 +37,23 @@ def _order_sessions_hierarchically(sessions: list[dict]) -> list[dict]:
 
     indices = {str(s.get("id")): -i for i, s in enumerate(sessions)}
 
+    # Per-session subtree keys are computed at most once per sort pass and
+    # reused across every sort-key comparison (perf audit #11).
+    subtree_keys: dict[str, tuple] = {}
+
     def subtree_updated(s: dict, seen: set[str] | None = None) -> tuple:
         sid = str(s.get("id"))
+        if sid in subtree_keys:
+            return subtree_keys[sid]
         if seen is None:
             seen = set()
         if sid in seen:
-            return (s.get("updated_at") or 0, s.get("created_at") or 0, indices.get(sid, 0))
+            return _session_key(s, indices)
         seen.add(sid)
-        ts = (s.get("updated_at") or 0, s.get("created_at") or 0, indices.get(sid, 0))
+        ts = _session_key(s, indices)
         for child in children_map.get(sid, []):
             ts = max(ts, subtree_updated(child, seen))
+        subtree_keys[sid] = ts
         return ts
 
     roots.sort(key=subtree_updated, reverse=True)
