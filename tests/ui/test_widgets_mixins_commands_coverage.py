@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from textual.app import App
 
+from johnston.core.infrastructure.platform.git_metrics import clear_git_metrics_cache
 from johnston.core.infrastructure.tasks.manager import TaskManager
 from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.lifecycle import LifecycleMixin
@@ -967,6 +968,7 @@ def test_git_metrics_compute_diff_sync_subprocess():
     res_head.returncode = 0
     res_head.stdout = "5\t2\tfile.py\ninvalid_line\nfoo\tbar\tfile2.py\n3\t0\tfile3.py\n"
 
+    clear_git_metrics_cache()
     with patch("subprocess.run", return_value=res_head):
         diff = widget._compute_diff_sync("/repo")
         assert diff == "+8 / -2"
@@ -975,15 +977,18 @@ def test_git_metrics_compute_diff_sync_subprocess():
     res_fail = MagicMock(returncode=1, stdout="")
     res_fallback = MagicMock(returncode=0, stdout="1\t4\tfile.py\n")
 
+    clear_git_metrics_cache()
     with patch("subprocess.run", side_effect=[res_fail, res_fallback]):
         diff = widget._compute_diff_sync("/repo")
         assert diff == "+1 / -4"
 
     # 3. Both fail or no output
+    clear_git_metrics_cache()
     with patch("subprocess.run", return_value=MagicMock(returncode=0, stdout="")):
         assert widget._compute_diff_sync("/repo") == ""
 
     # 4. Subprocess raises Exception
+    clear_git_metrics_cache()
     with patch("subprocess.run", side_effect=Exception("subp error")):
         assert widget._compute_diff_sync("/repo") == ""
 

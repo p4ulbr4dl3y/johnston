@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -26,6 +27,7 @@ from johnston.core.dto import (
     ToolResultDTO,
     TurnCompletedDTO,
 )
+from johnston.core.infrastructure.platform.git_metrics import clear_git_metrics_cache
 
 
 class MockAgent:
@@ -368,6 +370,7 @@ def test_client_get_providers(mock_pm: MagicMock, mock_store: MagicMock):
 
 
 def test_client_get_git_state(mock_pm: MagicMock, mock_store: MagicMock):
+    clear_git_metrics_cache()
     with patch("johnston.core.client.get_branch_info", return_value="main"), patch(
         "johnston.core.client.get_diff_stats", return_value="+5 / -1"
     ), patch(
@@ -380,6 +383,27 @@ def test_client_get_git_state(mock_pm: MagicMock, mock_store: MagicMock):
         assert git_state.branch == "main"
         assert git_state.is_dirty is True
         assert git_state.changed_files == 2
+
+
+def test_client_get_git_state_status_cached(mock_pm: MagicMock, mock_store: MagicMock):
+    clear_git_metrics_cache()
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    status_res = MagicMock(returncode=0, stdout=" M file1.py\n M file2.py\n M file3.py\n")
+
+    with patch("johnston.core.client.get_branch_info", return_value="main"), patch(
+        "johnston.core.client.get_diff_metrics",
+        return_value=SimpleNamespace(insertions=0, deletions=0),
+    ), patch("johnston.core.client.get_diff_stats", return_value=""), patch(
+        "subprocess.run", return_value=status_res
+    ) as mock_run:
+        first = client.get_git_state()
+        second = client.get_git_state()
+        assert first.changed_files == 3
+        assert second.changed_files == 3
+        assert first.is_dirty is True
+        # Only the first call forks git status; the second hits the TTL cache.
+        assert mock_run.call_count == 1
+    clear_git_metrics_cache()
 
 
 def test_client_thinking_effort(mock_pm: MagicMock, mock_store: MagicMock):

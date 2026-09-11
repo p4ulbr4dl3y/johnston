@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import re
-import subprocess
 import time
 from typing import Any, AsyncIterator
 
@@ -38,7 +37,12 @@ from johnston.core.dto import (
     WorktreeDTO,
     parse_event_dto,
 )
-from johnston.core.infrastructure.platform.git_metrics import get_branch_info, get_diff_metrics, get_diff_stats
+from johnston.core.infrastructure.platform.git_metrics import (
+    get_branch_info,
+    get_changed_file_count,
+    get_diff_metrics,
+    get_diff_stats,
+)
 from johnston.core.infrastructure.storage.session_store import SessionStore
 
 logger = logging.getLogger(__name__)
@@ -1019,21 +1023,15 @@ class JohnstonClient:
         changed_files = 0
 
         try:
-            res = subprocess.run(
-                ["git", "status", "--porcelain"],
-                capture_output=True,
-                text=True,
-                timeout=2,
-            )
-            if res.returncode == 0:
-                lines = [ln for ln in res.stdout.splitlines() if ln.strip()]
-                changed_files = len(lines)
-                is_dirty = changed_files > 0
-            elif is_dirty:
-                changed_files = 1
+            changed_files = get_changed_file_count()
+            if changed_files:
+                is_dirty = True
         except Exception:
             if is_dirty:
                 changed_files = 1
+
+        if changed_files == 0 and is_dirty:
+            changed_files = 1
 
         return GitStateDTO(
             branch=branch,
