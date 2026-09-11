@@ -2,6 +2,7 @@
 
 from typing import Optional, Sequence
 
+from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
 from johnston.core.domain.defaults.errors import parse_stream_step, parse_tool_result_step
 from johnston.core.domain.entities.session import AgentSession
 
@@ -115,9 +116,15 @@ def record_session_step(step: tuple, session: AgentSession, text_accumulator: li
     Raw stream events (thinking_start/delta/end, bot_delta/text,
     tool_result) are canonicalized here into shared types (thinking/bot/tool)
     before being appended via AgentSession.add_event.
+
+    The transient auto-compaction placeholder divider ("Compacting session...")
+    is skipped: it is a live-UI affordance that gets updated in-place with the
+    result title, and persisting both would replay two dividers on restore.
     """
     event = stream_step_to_session_event(step, text_accumulator)
     if event is not None:
+        if event.get("type") == "event_divider" and event.get("text") == COMPACTING_DIVIDER_TITLE:
+            return event
         session.add_event(event)
     return event
 

@@ -186,6 +186,7 @@ def configure_role_registry(tool_name_normalizer) -> None:
 def build_core_services(app) -> None:
     """Create provider manager, session store, task manager, agent and client facade."""
     from johnston.core.application.provider.provider_manager import ProviderManager
+    from johnston.core.domain.policies.role_policy import AgentMode
     from johnston.core.infrastructure.storage.session_store import SessionStore
     from johnston.core.infrastructure.tasks.manager import TaskManager
 
@@ -199,6 +200,10 @@ def build_core_services(app) -> None:
     app.role = getattr(app.agent, "role", "worker") if app.agent else "worker"
     if app.agent:
         app.agent.app = app
+        # Fresh TUI agents are interactive; the client default is HEADLESS.
+        app.agent.mode = AgentMode.INTERACTIVE
+        app.agent.is_headless = False
+        app.agent.is_subagent = False
     app.client = JohnstonClient(
         pm=app.pm,
         store=app.sm,

@@ -110,6 +110,29 @@ def test_client_init_defaults(mock_pm: MagicMock, mock_store: MagicMock):
     assert client.agent.model == "mock-model"
 
 
+def test_client_init_preserves_supplied_agent_mode(mock_pm: MagicMock, mock_store: MagicMock):
+    """A caller-supplied agent (e.g. TUI) must not be flipped to HEADLESS by the client default."""
+    from johnston.core.domain.policies.role_policy import AgentMode
+
+    agent = MockAgent()
+    agent.mode = AgentMode.INTERACTIVE
+    agent.is_headless = False
+    agent.is_subagent = False
+
+    client = JohnstonClient(pm=mock_pm, store=mock_store, agent=agent)
+    assert client.agent.mode == AgentMode.INTERACTIVE
+    assert client.agent.is_headless is False
+
+
+def test_client_init_created_agent_uses_client_mode(mock_pm: MagicMock, mock_store: MagicMock):
+    """An agent created by the client follows the requested mode (headless CLI default)."""
+    from johnston.core.domain.policies.role_policy import AgentMode
+
+    client = JohnstonClient(pm=mock_pm, store=mock_store, mode=AgentMode.HEADLESS)
+    assert client.agent.mode == AgentMode.HEADLESS
+    assert client.agent.is_headless is True
+
+
 def test_client_init_explicit(mock_pm: MagicMock, mock_store: MagicMock):
     agent = MockAgent()
     client = JohnstonClient(

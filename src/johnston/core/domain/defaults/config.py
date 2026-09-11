@@ -5,6 +5,11 @@ DEFAULT_CONTEXT_LIMIT = 128000
 DEFAULT_COMPACTION_THRESHOLD_RATIO = 0.75
 DEFAULT_COMPACTION_SUMMARIZE_RATIO = 0.90
 DEFAULT_COMPACTION_USER_BUDGET = 20_000
+# Canonical divider title shown while session compaction is in progress.
+# Single source of truth shared by /compact and auto-compaction paths so the
+# visual behavior is unified (a "Compacting session..." divider that updates
+# in-place to the result title).
+COMPACTING_DIVIDER_TITLE = "Compacting session..."
 DEFAULT_STREAM_TIMEOUT = 60.0
 DEFAULT_CHUNK_TIMEOUT = 30.0
 DEFAULT_MAX_TOKENS = 32768

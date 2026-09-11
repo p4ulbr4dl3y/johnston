@@ -5,6 +5,7 @@ import asyncio
 import inspect
 from typing import Any
 
+from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
 from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.commands.helpers import (
@@ -204,7 +205,7 @@ class CompactCommand(BaseCommand):
                 try:
                     cv = app.query_one(ChatView)
                     if cv and hasattr(cv, "add_event_divider"):
-                        divider = await cv.add_event_divider("Compacting session...")
+                        divider = await cv.add_event_divider(COMPACTING_DIVIDER_TITLE)
                 except Exception:
                     pass
 

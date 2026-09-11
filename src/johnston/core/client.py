@@ -178,15 +178,22 @@ class JohnstonClient:
         # Agent creation or assignment
         if agent is not None:
             self.agent = agent
+            # A caller-supplied agent (e.g. the interactive TUI) already carries
+            # its execution mode. Do not flip it to HEADLESS just because the
+            # client default applies — only role/model/effort settings are synced.
+            agent_has_mode = getattr(agent, "mode", None) is not None or getattr(agent, "is_headless", None) is not None
+            effective_mode = self.mode if agent_has_mode is False else getattr(agent, "mode", self.mode)
         elif self.provider and hasattr(self.pm, "create_agent_for_provider"):
             self.agent = self.pm.create_agent_for_provider(self.provider)
+            effective_mode = self.mode
         else:
             self.agent = None
+            effective_mode = self.mode
 
         if self.agent is not None:
             if self.role:
                 try:
-                    apply_role(self.agent, self.role, mode=self.mode)
+                    apply_role(self.agent, self.role, mode=effective_mode)
                 except Exception:
                     logger.debug("Failed to apply role %s to agent", self.role, exc_info=True)
             if self.model:

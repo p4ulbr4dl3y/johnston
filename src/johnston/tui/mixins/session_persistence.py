@@ -5,6 +5,7 @@ import threading
 import time
 from typing import Any, Optional
 
+from johnston.core.domain.policies.role_policy import AgentMode
 from johnston.tui.presentation.widgets.chat_container import ChatView
 
 logger = logging.getLogger(__name__)
@@ -97,6 +98,12 @@ class SessionPersistenceMixin:
 
         if self.agent is not None:
             self.agent.app = self
+            # Resumed TUI agents are interactive (client default is HEADLESS).
+            agent_is_subagent = getattr(self.agent, "is_subagent", False) is True
+            self.agent.mode = (
+                AgentMode.SUBAGENT if agent_is_subagent else AgentMode.INTERACTIVE
+            )
+            self.agent.is_headless = False
         if self.agent is not None and hasattr(self.agent, "history"):
             self.agent.history = session.agent_history
             self.agent.tokens_input = session.tokens_input

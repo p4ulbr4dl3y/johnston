@@ -77,6 +77,13 @@ def reconcile_active_agent(
 
     project_dir = getattr(app, "project_dir", None)
     if agent is not None:
+        # Recreated agents lose the interactive-mode stamp; restore it before
+        # role configuration so tools/prompt stay interactive.
+        from johnston.core.domain.policies.role_policy import AgentMode
+
+        agent.mode = AgentMode.INTERACTIVE
+        agent.is_headless = False
+        agent.is_subagent = False
         role_def = core_bridge.configure_agent(agent, current_role, app=app, project_dir=project_dir, is_subagent=False)
         current_role_name = getattr(role_def, "name", current_role.title())
         app.agent = agent

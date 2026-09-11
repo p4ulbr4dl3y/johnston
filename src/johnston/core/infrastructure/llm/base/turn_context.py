@@ -5,7 +5,10 @@ import logging
 import os
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
-from johnston.core.domain.defaults.config import DEFAULT_CONTEXT_LIMIT
+from johnston.core.domain.defaults.config import (
+    COMPACTING_DIVIDER_TITLE,
+    DEFAULT_CONTEXT_LIMIT,
+)
 from johnston.core.infrastructure.config.settings import get_settings
 from johnston.core.infrastructure.llm.base.compaction import (
     format_compaction_title,  # noqa: F401  (re-exported)
@@ -126,7 +129,7 @@ class TurnContextMixin:
         )
         self._compacted_count_this_turn = 0
         if need_compact:
-            yield ("thinking", "Auto-compacting conversation history (context reached threshold)...", "")
+            yield ("event_divider", COMPACTING_DIVIDER_TITLE, "")
             try:
                 success, msg = await self.compact_history()
                 if success:
@@ -134,7 +137,7 @@ class TurnContextMixin:
                 else:
                     yield ("event_divider", "Compaction Failed", "")
             except Exception as compact_err:
-                yield ("thinking", f"Auto-compaction warning: {compact_err}", "")
+                yield ("event_divider", f"Compaction Failed ({compact_err})", "")
 
         sanitized_history = await sanitize_history_cached(self, self.history)
         if attachments:

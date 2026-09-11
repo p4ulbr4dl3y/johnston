@@ -440,7 +440,7 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(agent.close)
         return agent
 
-    async def test_auto_compaction_error_yields_warning(self):
+    async def test_auto_compaction_error_yields_failed_divider(self):
         agent = self._make_agent()
         agent.history = [
             {"role": "user", "content": "a"},
@@ -480,9 +480,10 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                         except Exception:
                             pass
 
-        warnings = [e for e in events if e[0] == "thinking" and "Auto-compaction warning" in e[1]]
-        self.assertEqual(len(warnings), 1)
-        self.assertIn("ctx overflow", warnings[0][1])
+        dividers = [e for e in events if e[0] == "event_divider"]
+        self.assertEqual(len(dividers), 2)
+        self.assertEqual(dividers[0][1], "Compacting session...")
+        self.assertEqual(dividers[1][1], "Compaction Failed (ctx overflow)")
 
     async def test_auto_compaction_failure_yields_failed_divider(self):
         agent = self._make_agent()
@@ -525,8 +526,9 @@ class TestCompactionStreamEdgeCases(unittest.IsolatedAsyncioTestCase):
                             pass
 
         dividers = [e for e in events if e[0] == "event_divider"]
-        self.assertEqual(len(dividers), 1)
-        self.assertEqual(dividers[0][1], "Compaction Failed")
+        self.assertEqual(len(dividers), 2)
+        self.assertEqual(dividers[0][1], "Compacting session...")
+        self.assertEqual(dividers[1][1], "Compaction Failed")
 
     async def test_compaction_in_loop_after_tool_turn(self):
         agent = self._make_agent()

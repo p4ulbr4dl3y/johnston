@@ -11,6 +11,7 @@ import logging
 import time
 from typing import Any, Callable, Optional
 
+from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
 from johnston.core.dto import (
     CompactionEventDTO,
     ContentDeltaDTO,
@@ -36,6 +37,15 @@ sync_session_metrics = core_bridge.sync_session_metrics
 JohnstonClient = core_bridge.JohnstonClient
 
 logger = logging.getLogger(__name__)
+
+
+def _interactive_mode(agent: Any):
+    """Return AgentMode.INTERACTIVE unless the agent is already a subagent."""
+    from johnston.core.domain.policies.role_policy import AgentMode
+
+    if getattr(agent, "is_subagent", False):
+        return AgentMode.SUBAGENT
+    return AgentMode.INTERACTIVE
 
 
 def build_gen_canvas(
@@ -151,6 +161,7 @@ async def run_ai_generation(
             agent=agent,
             session_id=session_id,
             task_manager=tm_cand,
+            mode=_interactive_mode(agent),
         )
         if app is not None and not hasattr(app, "_mock_return_value"):
             app.client = client
@@ -325,7 +336,7 @@ async def run_ai_generation(
             elif isinstance(event, CompactionEventDTO):
                 summary = event.summary or "Session Compacted"
                 comp_evt = {"type": "event_divider", "text": summary, "from_stream_step": True}
-                if session is not None and hasattr(session, "add_event"):
+                if summary != COMPACTING_DIVIDER_TITLE and session is not None and hasattr(session, "add_event"):
                     session.add_event(comp_evt)
                 await active_driver.consume_session_event(
                     comp_evt,

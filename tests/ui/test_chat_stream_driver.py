@@ -225,6 +225,54 @@ class TestChatStreamDriver(unittest.IsolatedAsyncioTestCase):
         await self.driver.consume_stream_step(("event_divider", "Turn Compacted", ""))
         self.chat_view.add_event_divider.assert_awaited_once_with("Turn Compacted")
 
+    async def test_stream_compaction_init_divider_updated_in_place(self):
+        """Auto-compaction divider ("Compacting session...") is updated in-place
+        by the following event_divider, like /compact, instead of stacking."""
+        from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
+
+        divider = MagicMock()
+        self.chat_view.add_event_divider.return_value = divider
+
+        await self.driver.consume_stream_step(("event_divider", COMPACTING_DIVIDER_TITLE, ""))
+        self.chat_view.add_event_divider.assert_awaited_once_with(COMPACTING_DIVIDER_TITLE)
+        self.assertEqual(self.driver._pending_compaction_divider, divider)
+
+        await self.driver.consume_stream_step(("event_divider", "Session Compacted (10,000 → 4,000 tokens)", ""))
+        divider.update_title.assert_called_once_with("Session Compacted (10,000 → 4,000 tokens)")
+        # No second divider was created.
+        self.chat_view.add_event_divider.assert_awaited_once_with(COMPACTING_DIVIDER_TITLE)
+        self.assertIsNone(self.driver._pending_compaction_divider)
+
+    async def test_stream_compaction_failure_updates_in_place(self):
+        from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
+
+        divider = MagicMock()
+        self.chat_view.add_event_divider.return_value = divider
+
+        await self.driver.consume_stream_step(("event_divider", COMPACTING_DIVIDER_TITLE, ""))
+        await self.driver.consume_stream_step(("event_divider", "Compaction Failed", ""))
+        divider.update_title.assert_called_once_with("Compaction Failed")
+        self.assertIsNone(self.driver._pending_compaction_divider)
+
+    async def test_stream_compaction_init_divider_consumed_by_next_divider(self):
+        """The next divider after the placeholder consumes it in-place; a stale
+        placeholder never lingers to clobber a later unrelated divider."""
+        from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
+
+        divider = MagicMock()
+        self.chat_view.add_event_divider.return_value = divider
+
+        await self.driver.consume_stream_step(("event_divider", COMPACTING_DIVIDER_TITLE, ""))
+        await self.driver.consume_stream_step(("event_divider", "Turn Completed", ""))
+        # The pending placeholder was consumed (updated in place, not stacked).
+        self.assertIsNone(self.driver._pending_compaction_divider)
+        self.assertEqual(self.chat_view.add_event_divider.await_count, 1)
+
+        # A fresh placeholder still works for the next compaction cycle.
+        await self.driver.consume_stream_step(("event_divider", COMPACTING_DIVIDER_TITLE, ""))
+        self.assertEqual(self.chat_view.add_event_divider.await_count, 2)
+        self.assertIs(self.driver._pending_compaction_divider, divider)
+
     async def test_finalize_bot_stream_removes_empty(self):
         bm = MagicMock()
         bm.content = "   "

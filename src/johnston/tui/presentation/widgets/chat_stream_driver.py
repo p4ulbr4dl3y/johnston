@@ -17,6 +17,7 @@ import math
 from collections import deque
 from typing import Any, Callable, Optional
 
+from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
 from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.chat_messages import BotMessage, ThinkingWidget
 from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
@@ -47,6 +48,7 @@ class ChatStreamDriver:
         self.bot_handle: Optional[BotMessage] = None
         self.thinking_handle: Optional[ThinkingWidget] = None
         self.tool_handles: deque[ToolCallWidget] = deque()
+        self._pending_compaction_divider: Any = None
         # Running tool cards that were in flight when a retry was issued. They
         # are removed from the FIFO queue so a stale result cannot misattach,
         # but stay mounted awaiting finalization (status_change/error, reuse by
@@ -575,4 +577,11 @@ class ChatStreamDriver:
         elif etype == "event_divider":
             self.finalize_thinking_stream()
             div_kw = {} if evt.get("from_stream_step") else {"animate": animate}
-            await self.chat_view.add_event_divider(evt.get("text", "Session Compacted"), **div_kw)
+            text = evt.get("text", "Session Compacted")
+            if self._pending_compaction_divider is not None and hasattr(self._pending_compaction_divider, "update_title"):
+                self._pending_compaction_divider.update_title(text)
+                self._pending_compaction_divider = None
+            else:
+                divider = await self.chat_view.add_event_divider(text, **div_kw)
+                if text == COMPACTING_DIVIDER_TITLE:
+                    self._pending_compaction_divider = divider
