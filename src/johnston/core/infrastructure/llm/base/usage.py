@@ -49,6 +49,10 @@ def accumulate_usage(
         agent.tokens_output += out_tok
         agent.tokens_cache_read += cache_read_tok
         agent.last_context_tokens = in_tok
+        agent._ctx_api_tokens = in_tok
+        agent._ctx_api_hist_tokens = getattr(agent, "_history_tokens", 0) or getattr(
+            agent, "_current_history_tokens", lambda: 0
+        )()
         agent.total_tokens += step_usage.get("total_tokens", in_tok + out_tok)
         agent.cost_usd += cost
     else:

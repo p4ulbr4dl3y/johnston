@@ -437,6 +437,12 @@ async def _handle_interruption(
             sys_tok = getattr(agent, "_last_sys_tokens", 0)
             hist_tok = estimate_tokens(agent.history)
             agent.last_context_tokens = sys_tok + hist_tok
+            if hasattr(agent, "_ctx_api_tokens"):
+                # The API anchor belongs to the pre-interruption truncated
+                # context; after an interruption the footer falls back to the
+                # heuristic until the next API report.
+                agent._ctx_api_tokens = 0
+                agent._ctx_api_hist_tokens = 0
             canvas.refresh_status_footer()
         except Exception:  # noqa: BLE001
             pass

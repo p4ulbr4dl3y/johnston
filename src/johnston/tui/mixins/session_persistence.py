@@ -125,6 +125,12 @@ class SessionPersistenceMixin:
 
                 ctx = recompute_context_tokens(self.agent, session.last_context_tokens)
             self.agent.last_context_tokens = ctx
+            if hasattr(self.agent, "_ctx_api_tokens"):
+                # Resumed sessions use the stored ctx as baseline: drop the
+                # API anchor so current_context_tokens() falls back to the
+                # heuristic until the next API report.
+                self.agent._ctx_api_tokens = 0
+                self.agent._ctx_api_hist_tokens = 0
         elif hasattr(session, "role") and session.role:
             self.role = session.role
 

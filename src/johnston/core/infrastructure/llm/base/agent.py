@@ -116,7 +116,9 @@ class BaseAgent(
         self.tokens_input = 0
         self.tokens_output = 0
         self.tokens_cache_read = 0
-        self.last_context_tokens = 0
+        self.last_context_tokens = 0  # peek for persistence; API anchor lives in _ctx_api_tokens
+        self._ctx_api_tokens = 0  # prompt_tokens from last real API usage report
+        self._ctx_api_hist_tokens = 0  # _history_tokens snapshot at that API report
         self.total_tokens = 0
         self.cost_usd = 0.0
         self.role = "worker"
@@ -189,16 +191,41 @@ class BaseAgent(
         # zero, so keeping a stale value here makes a fresh session (after /new)
         # show the previous session's sys+tools overhead (e.g. ~3k tokens).
         self._last_sys_tokens = 0
+        self._ctx_api_tokens = 0
+        self._ctx_api_hist_tokens = 0
+
+    def current_context_tokens(self) -> int:
+        """API-anchored best estimate of current context usage (system+tools+history).
+
+        When a real API usage report is available (``_ctx_api_tokens > 0``), the
+        reported prompt_tokens anchor the estimate and only the heuristic delta
+        since that report is added — so Cyrillic/CJK-heavy sessions display and
+        compact against the true API count instead of an undercounting
+        heuristic. Without an anchor, falls back to the pure heuristic sum.
+        """
+        if getattr(self, "_ctx_api_tokens", 0) > 0:
+            return self._ctx_api_tokens + max(
+                0, self._current_history_tokens() - getattr(self, "_ctx_api_hist_tokens", 0)
+            )
+        return getattr(self, "_last_sys_tokens", 0) + self._current_history_tokens()
 
     def get_metrics(self) -> Dict[str, Any]:
-        ctx_used = getattr(self, "last_context_tokens", 0)
-        if ctx_used <= 0:
-            # Avoid expensive prompt/tool rebuilds (and MCP connections) on every
-            # status-footer refresh: reuse the cached system+tools token count from
-            # the last stream and add the current history estimate.
-            sys_tok = getattr(self, "_last_sys_tokens", 0)
-            hist_tok = self._current_history_tokens() if getattr(self, "history", None) else 0
-            ctx_used = sys_tok + hist_tok
+        if callable(getattr(self, "current_context_tokens", None)):
+            ctx_used = self.current_context_tokens()
+        else:
+            # Exotic mocks without the new method: legacy peek/fallback behavior.
+            ctx_used = getattr(self, "last_context_tokens", 0)
+            if ctx_used <= 0:
+                # Avoid expensive prompt/tool rebuilds (and MCP connections) on every
+                # status-footer refresh: reuse the cached system+tools token count from
+                # the last stream and add the current history estimate.
+                sys_tok = getattr(self, "_last_sys_tokens", 0)
+                hist_tok = self._current_history_tokens() if getattr(self, "history", None) else 0
+                ctx_used = sys_tok + hist_tok
+        if ctx_used > 0:
+            # Keep the persisted peek fresh (API value flows straight through when
+            # no history growth since the report) but never zero out a stored value.
+            self.last_context_tokens = ctx_used
         return {
             "total_tokens": self.total_tokens,
             "tokens_input": self.tokens_input,

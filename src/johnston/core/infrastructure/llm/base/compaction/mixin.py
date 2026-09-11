@@ -129,6 +129,11 @@ class CompactionMixin:
         sys_tok = getattr(self, "_last_sys_tokens", 0)
         hist_tok = self._current_history_tokens() if self.history else 0
         self.last_context_tokens = sys_tok + hist_tok
+        if hasattr(self, "_ctx_api_tokens"):
+            # Truncation invalidates the API anchor; current_context_tokens()
+            # falls back to the heuristic until the next API report.
+            self._ctx_api_tokens = 0
+            self._ctx_api_hist_tokens = 0
 
     def sanitize_history_for_model(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Adapts and normalizes session history for the active provider & model.
@@ -263,7 +268,13 @@ class CompactionMixin:
             history_tokens = self._current_history_tokens()
         else:
             history_tokens = 0
-        if not should_compact(len(messages) - 1, sys_overhead, history_tokens, threshold):
+        if callable(getattr(self, "current_context_tokens", None)):
+            ctx_val = self.current_context_tokens()
+        else:
+            ctx_val = sys_overhead + history_tokens
+        # sys_overhead=0: ctx_val already includes system+tools overhead, and
+        # should_compact sums its sys_overhead and history_tokens arguments.
+        if not should_compact(len(messages) - 1, 0, ctx_val, threshold):
             # NOTE: do NOT clobber last_context_tokens here. When a step reports
             # real prompt_tokens (API usage), the footer's context_used reflects
             # the true context size; overwriting it with the heuristic
@@ -487,6 +498,11 @@ class CompactionMixin:
             raw_tokens_after = sys_tokens + self._current_history_tokens()
             tokens_after = max(1, round(raw_tokens_after * scale_factor))
             self.last_context_tokens = tokens_after
+            # Re-anchor the API counter at the calibrated compacted size so
+            # current_context_tokens() grows from there (delta over the
+            # post-compaction history snapshot) until the next API report.
+            self._ctx_api_tokens = tokens_after
+            self._ctx_api_hist_tokens = self._history_tokens
 
             from johnston.core.domain.ports.tool_registry import reset_tool_circuit_breakers
 
