@@ -294,20 +294,33 @@ class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreC
             # same session is frequently re-saved with NO persistent change. The
             # cheap signature (lengths + metadata + last entries) detects common
             # changes (appends, truncations, touches, coalescing) in O(1); when it
-            # matches, the full serialized content is compared against the last
-            # written bytes — this catches in-place mutation of an EARLIER message
-            # (e.g. tool result_text/status merged by the widget layer). When both
-            # match, the atomic rewrite is skipped entirely; the file on disk is
-            # byte-identical to what the rewrite would have produced, so readers
-            # (AgentSession.from_file) observe the exact same state as before.
+            # matches, written-vs-current message/history counts are compared
+            # first:
+            #   * APPEND-ONLY (counts grew): the content MUST differ from the last
+            #     written bytes, so the atomic rewrite is required and the full
+            #     re-serialization happens exactly once (at write time) — no
+            #     serialize+md5 comparison for the hash check.
+            #   * EQUAL-LENGTH (counts unchanged): the only possible difference is
+            #     in-place mutation of an earlier message (e.g. tool
+            #     result_text/status merged by the widget layer), so the full
+            #     serialized content is compared against the last written bytes.
+            #     When both match, the atomic rewrite is skipped entirely; the
+            #     file on disk is byte-identical to what the rewrite would have
+            #     produced, so readers (AgentSession.from_file) observe the exact
+            #     same state as before.
             state = self._session_write_state.get(fpath)
             sig = _session_change_signature(sess)
             content: Optional[str] = None
             if state is not None and state["sig"] == sig:
-                content = _serialize_session_jsonl(sess)
-                if state["content_hash"] == hashlib.md5(content.encode("utf-8")).hexdigest():
-                    self._sessions[sess.id] = sess
-                    return True
+                msg_count = len(sess.messages) + len(_session_history(sess))
+                if msg_count > state["msg_len"] + state["hist_len"]:
+                    # Appends/truncations-away: bytes differ from disk, rewrite.
+                    pass
+                else:
+                    content = _serialize_session_jsonl(sess)
+                    if state["content_hash"] == hashlib.md5(content.encode("utf-8")).hexdigest():
+                        self._sessions[sess.id] = sess
+                        return True
 
             if content is None:
                 content = _serialize_session_jsonl(sess)
@@ -316,6 +329,8 @@ class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreC
             self._session_write_state[fpath] = {
                 "sig": sig,
                 "content_hash": hashlib.md5(content.encode("utf-8")).hexdigest(),
+                "msg_len": len(sess.messages),
+                "hist_len": len(_session_history(sess)),
             }
             if self._disk_cache is not None:
                 self._disk_cache[sess.id] = sess

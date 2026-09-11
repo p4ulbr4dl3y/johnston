@@ -381,3 +381,120 @@ def test_file_is_valid_jsonl_after_mixed_saves(store):
     assert all(entry["_type"] == "msg" for entry in msg_lines)
     assert meta["id"] == "jsonl"
     assert len(msg_lines) == 10
+
+
+# ---------------------------------------------------------------------------
+# msg_len / hist_len tracking on _session_write_state
+# ---------------------------------------------------------------------------
+
+def test_write_state_records_msg_and_hist_lengths(store):
+    sess = store.create_main("counts")
+    sess.messages = [{"type": "user", "text": "q"}, {"type": "bot", "text": "a"}]
+    sess.agent_history = [{"role": "user", "content": "q"}]
+    store.save(sess)
+
+    fpath = _path(store, "counts.jsonl")
+    state = store._session_write_state[fpath]
+    assert state["msg_len"] == 2
+    assert state["hist_len"] == 1
+
+
+def test_write_state_updates_counts_after_append(store):
+    sess = store.create_main("growcounts")
+    sess.messages = [{"type": "user", "text": "q"}]
+    sess.agent_history = []
+    store.save(sess)
+    fpath = _path(store, "growcounts.jsonl")
+    assert store._session_write_state[fpath]["msg_len"] == 1
+
+    sess.add_event({"type": "bot", "text": "a", "final": True})
+    store.save(sess)
+    assert store._session_write_state[fpath]["msg_len"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Spy on _serialize_session_jsonl: no unnecessary serializations
+# ---------------------------------------------------------------------------
+
+def test_noop_save_avoids_redundant_serialize(store, monkeypatch):
+    """When sig+hash match, _serialize_session_jsonl is still called once
+    (for the hash comparison), but the file is NOT rewritten."""
+    calls = []
+    real = session_store_mod._serialize_session_jsonl
+
+    def counting_serialize(sess):
+        calls.append(("serialize", len(sess.messages)))
+        return real(sess)
+
+    monkeypatch.setattr(session_store_mod, "_serialize_session_jsonl", counting_serialize)
+
+    sess = store.create_main("spy1")
+    sess.messages = [{"type": "user", "text": "hello"}]
+    store.save(sess)
+    assert len(calls) == 1  # first save: 1 serialize + write
+
+    calls.clear()
+    store.save(sess)  # no-op: sig+hash match → 1 serialize for hash, no write
+    assert len(calls) == 1  # hash-compare path still serializes once
+
+
+def test_append_only_save_serializes_once_for_write(store, monkeypatch):
+    """When counts grow (sig differs), serialize happens once for the write,
+    not redundantly for a hash comparison."""
+    calls = []
+    real = session_store_mod._serialize_session_jsonl
+
+    def counting_serialize(sess):
+        calls.append("serialize")
+        return real(sess)
+
+    monkeypatch.setattr(session_store_mod, "_serialize_session_jsonl", counting_serialize)
+
+    sess = store.create_main("spy2")
+    sess.messages = [{"type": "user", "text": "q1"}]
+    store.save(sess)
+    calls.clear()
+
+    sess.add_event({"type": "bot", "text": "a1", "final": True})
+    store.save(sess)
+    assert len(calls) == 1  # serialize once for the atomic write
+
+
+def test_inplace_mutation_still_detected_via_hash(store, monkeypatch):
+    """Equal-length in-place mutation of an earlier message hits the
+    serialize+hash path and the atomic rewrite IS performed."""
+    write_calls = []
+    real_write = session_store_mod.atomic_write_text
+
+    def counting_write(path, data):
+        write_calls.append(path)
+        real_write(path, data)
+
+    monkeypatch.setattr(session_store_mod, "atomic_write_text", counting_write)
+
+    serialize_calls = []
+    real_ser = session_store_mod._serialize_session_jsonl
+
+    def counting_serialize(sess):
+        serialize_calls.append("serialize")
+        return real_ser(sess)
+
+    monkeypatch.setattr(session_store_mod, "_serialize_session_jsonl", counting_serialize)
+
+    sess = store.create_main("spy3")
+    sess.messages = [
+        {"type": "user", "text": "run"},
+        {"type": "tool", "tool_type": "shell", "target": "x", "args": {}},
+    ]
+    store.save(sess)
+    serialize_calls.clear()
+    write_calls.clear()
+
+    # In-place mutation: same count, different content
+    sess.messages[1]["result_text"] = "output"
+    store.save(sess)
+
+    assert len(serialize_calls) >= 1, "hash-compare path must serialize"
+    assert len(write_calls) == 1, "in-place mutation must trigger atomic write"
+    loaded = _reload_from_disk(store, "spy3")
+    assert loaded.messages[1]["result_text"] == "output"
