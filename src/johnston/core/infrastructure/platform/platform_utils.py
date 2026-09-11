@@ -6,6 +6,7 @@ import signal
 import subprocess
 import threading
 import time
+from collections import OrderedDict
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Set, Union
@@ -133,7 +134,11 @@ def read_json(path: str, default: Any = None) -> Any:
         return default
 
 
-_json_read_cache: Dict[str, tuple] = {}
+_JSON_READ_CACHE_MAX_SIZE = 256
+_json_read_cache: "OrderedDict[str, tuple]" = OrderedDict()
+_LOCK_BACKOFF_INITIAL = 0.005
+_LOCK_BACKOFF_MAX = 0.25
+_LOCK_TIMEOUT_MAX_OVERRUN = 30.0
 
 
 def invalidate_json_read_cache(path: Optional[str] = None) -> None:
@@ -161,6 +166,7 @@ def interprocess_file_lock(lock_path: str, timeout: float = 10.0) -> Iterator[No
 
     start_time = time.time()
     acquired = False
+    retry_delay = _LOCK_BACKOFF_INITIAL
     try:
         while True:
             try:
@@ -175,9 +181,11 @@ def interprocess_file_lock(lock_path: str, timeout: float = 10.0) -> Iterator[No
                 acquired = True
                 break
             except (BlockingIOError, OSError, PermissionError):
-                if time.time() - start_time >= timeout:
+                elapsed = time.time() - start_time
+                if elapsed >= timeout or elapsed >= _LOCK_TIMEOUT_MAX_OVERRUN:
                     break
-                time.sleep(0.01)
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, _LOCK_BACKOFF_MAX)
         yield
     finally:
         if acquired:
@@ -227,7 +235,11 @@ def update_json_config(
 
 
 def cached_json_read(path: str, default: Any = None) -> Any:
-    """Reads a JSON file, returning a cache value when the file mtime/size is unchanged."""
+    """Reads a JSON file, returning a cache value when the file mtime/size is unchanged.
+
+    The shared cache is bounded (LRU eviction past ``_JSON_READ_CACHE_MAX_SIZE``
+    entries); changed mtimes/sizes replace the cached entry in place.
+    """
     path = os.fspath(path)
     try:
         st = os.stat(path)
@@ -237,9 +249,13 @@ def cached_json_read(path: str, default: Any = None) -> Any:
         return default
     cached = _json_read_cache.get(path)
     if cached is not None and cached[0] == stat_key:
+        _json_read_cache.move_to_end(path)
         return cached[1]
     data = read_json(path, default)
     _json_read_cache[path] = (stat_key, data)
+    _json_read_cache.move_to_end(path)
+    while len(_json_read_cache) > _JSON_READ_CACHE_MAX_SIZE:
+        _json_read_cache.popitem(last=False)
     return data
 
 
