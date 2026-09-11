@@ -358,7 +358,14 @@ async def run_ai_generation(
                 if event.usage and agent is not None:
                     for attr in ("tokens_input", "tokens_output", "total_tokens", "cost_usd"):
                         if attr in event.usage and hasattr(agent, attr):
-                            setattr(agent, attr, event.usage[attr])
+                            # Monotonic max: metrics can only increase, never
+                            # be reset by a stale DTO from a cancelled turn.
+                            current = getattr(agent, attr, 0)
+                            incoming = event.usage[attr]
+                            if isinstance(incoming, (int, float)) and isinstance(current, (int, float)):
+                                setattr(agent, attr, max(current, incoming))
+                            else:
+                                setattr(agent, attr, incoming)
                 if canvas.refresh_status_footer:
                     canvas.refresh_status_footer()
                 try:
