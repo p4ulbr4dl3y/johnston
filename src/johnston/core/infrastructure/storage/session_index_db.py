@@ -1,6 +1,7 @@
 import logging
 import os
 import sqlite3
+import threading
 from contextlib import contextmanager
 from typing import Any, Dict, Generator, List, Optional
 
@@ -15,19 +16,27 @@ class SessionIndexDb:
     def __init__(self, db_path: str):
         self.db_path = db_path
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+        self._conn_lock = threading.Lock()
+        self._conn = sqlite3.connect(db_path, timeout=5.0, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA journal_mode=WAL;")
+        self._conn.execute("PRAGMA synchronous=NORMAL;")
         self._ensure_schema()
+
+    def close(self) -> None:
+        """Close the persistent connection. Safe to call multiple times."""
+        with self._conn_lock:
+            if self._conn is not None:
+                self._conn.close()
+                self._conn = None
+
+    def __del__(self) -> None:
+        self.close()
 
     @contextmanager
     def _connection(self) -> Generator[sqlite3.Connection, None, None]:
-        os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
-        conn = sqlite3.connect(self.db_path, timeout=5.0)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-        try:
-            yield conn
-        finally:
-            conn.close()
+        with self._conn_lock:
+            yield self._conn
 
     def _ensure_schema(self) -> None:
         try:
