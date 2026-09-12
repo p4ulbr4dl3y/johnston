@@ -7,7 +7,7 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
-## [0.31.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.30.0...johnston-v0.31.0) (2026-09-10)
+## [0.31.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.30.0...johnston-v0.31.0) (2026-09-12)
 
 
 ### Features
@@ -15,6 +15,8 @@
 * **application:** add core MCP service facade ([2f3c0b3](https://github.com/p4ulbr4dl3y/johnston/commit/2f3c0b3866b58f11f34375b71878b2bb5a3b471f))
 * **application:** add core shell executor service ([1eb8936](https://github.com/p4ulbr4dl3y/johnston/commit/1eb8936c7142a346b8f0a988d508a2bac16bb329))
 * **branch:** add git worktree command, screen, and cli flag ([57d3896](https://github.com/p4ulbr4dl3y/johnston/commit/57d3896a9e1108f43fe05f9dc4c3efa474ef24a1))
+* **compaction:** unify /compact and auto-compaction UI ([282e074](https://github.com/p4ulbr4dl3y/johnston/commit/282e07453677f7aad7e34808bfbba16fbb05b36f))
+* **compaction:** unify mid-turn auto-compaction divider ([76c3d75](https://github.com/p4ulbr4dl3y/johnston/commit/76c3d7515b66fd46bc255b222989f65ace459994))
 * **core:** add in-process DTO layer ([5676f0d](https://github.com/p4ulbr4dl3y/johnston/commit/5676f0dc6d689805b558d16eb3c6bc933f8e9b46))
 * **core:** implement JohnstonClient facade ([fa4e803](https://github.com/p4ulbr4dl3y/johnston/commit/fa4e803d446b7696441cae9eeb4ba716818959f3))
 * **core:** non-interactive shell and atomic kill/message_subagent ([1956c90](https://github.com/p4ulbr4dl3y/johnston/commit/1956c90c8e9d60d65c4ba809847121fd529c83ee))
@@ -74,7 +76,9 @@
 * **prompts:** backtick tag refs in prose and add integrity tests ([8171b34](https://github.com/p4ulbr4dl3y/johnston/commit/8171b34ae3a0d9d3044fc84b341b876da05bcceb))
 * **prompts:** harmonize tool schemas, role rules, and offset guidance ([c3e85cc](https://github.com/p4ulbr4dl3y/johnston/commit/c3e85cc7cd05f72d8d33a15b120280f854eaa339))
 * **prompts:** refine plan completion, skill trigger, and error kinds ([7727ad6](https://github.com/p4ulbr4dl3y/johnston/commit/7727ad64957a2ca35d9b82c0b2698aa1a7f1b1b7))
+* **rewind:** restore subagent cancellation via core bridge parent_id ([911e2ad](https://github.com/p4ulbr4dl3y/johnston/commit/911e2ad7211d9c9a85b5768ddcb954732eacf27e))
 * **security:** harden shell policy against interpreter bypass ([578bd49](https://github.com/p4ulbr4dl3y/johnston/commit/578bd490571721c1b304cf8b0dd089ee17e52d04))
+* **session:** keep unrelated subagent sessions on rewind ([e50ea52](https://github.com/p4ulbr4dl3y/johnston/commit/e50ea52e09beb8d33fb2baaab836bf61c779fb28))
 * **shell:** allow redirects to null device in read-only mode ([fda33bb](https://github.com/p4ulbr4dl3y/johnston/commit/fda33bb8b3ca47c8e58b16736bab17faba24632a))
 * **shell:** harden read-only command mutation parser against bypasses ([58cf788](https://github.com/p4ulbr4dl3y/johnston/commit/58cf788e1e7e45a2a3165b857ccac177467d9aaa))
 * **shell:** harden read-only shell parser against token and wrapper bypasses ([10144fc](https://github.com/p4ulbr4dl3y/johnston/commit/10144fc0a12c2c2251271de1b664a1c98aed89ce))
@@ -89,6 +93,7 @@
 * **tools:** harden argument normalization, schemas and error handling ([7800379](https://github.com/p4ulbr4dl3y/johnston/commit/780037938fb3f391f76dd306ecf5b2b2df2b23cd))
 * **tools:** harden security and path resolution ([8dd2dca](https://github.com/p4ulbr4dl3y/johnston/commit/8dd2dca5287e0ad1bbaec132d3b927329e777091))
 * **tools:** surface non-zero shell exit code and honor allow_task ([48cff17](https://github.com/p4ulbr4dl3y/johnston/commit/48cff1778c6b595bff51fe49517acda149a38b7d))
+* **tui:** guard TurnCompletedDTO usage with monotonic max ([fab1488](https://github.com/p4ulbr4dl3y/johnston/commit/fab1488272f0d414bf9b17b9c3e3ef6b33e0b553))
 * **tui:** pass app to facade + fix MCP pilot test after Phase 2-3 migrations ([7fcbcf4](https://github.com/p4ulbr4dl3y/johnston/commit/7fcbcf4b7ce780fdaa62ee6761bc998139fbfaf5))
 * **tui:** restore diff delegate to keep git metrics mixin API stable ([c3cf17b](https://github.com/p4ulbr4dl3y/johnston/commit/c3cf17bab05085e9b726c5ebb3d7126c2110d15c))
 * **ui:** accept subagent_role in PermissionConfirmScreen ([961fdf9](https://github.com/p4ulbr4dl3y/johnston/commit/961fdf9627bf2e6b614be00ec8d06f04bd5de777))
@@ -101,6 +106,18 @@
 * **widgets:** allow legacy session fallback for background shell task ([dd03364](https://github.com/p4ulbr4dl3y/johnston/commit/dd03364af90d53ef01ebb418a1d906c412895cac))
 * **workspace:** clear list highlight when input has focus ([51041f5](https://github.com/p4ulbr4dl3y/johnston/commit/51041f5ae733ce6979ec8fa7e0b13f0ff548c6da))
 * **workspace:** remove redundant toast notifications ([b2253b4](https://github.com/p4ulbr4dl3y/johnston/commit/b2253b4731019a58dce5a9a13762f7656e2d8d7b))
+
+
+### Performance Improvements
+
+* **cli:** throttle stream flush in run_cmd emitter ([ed9ad2e](https://github.com/p4ulbr4dl3y/johnston/commit/ed9ad2e4b643e98a3a89e362d72d117c00ae5377))
+* **core:** cache git status and diff metrics in footer hot path ([cf6faae](https://github.com/p4ulbr4dl3y/johnston/commit/cf6faae33abbdeb7eef7f986c19e044f2e3d388a))
+* **generation:** cheap generation-level key for MCP tools in build_tools cache ([59e0090](https://github.com/p4ulbr4dl3y/johnston/commit/59e009072720c053951586271a49852af85ba240))
+* **mcp:** replace per-write to_thread with a single writer thread ([2c0f0db](https://github.com/p4ulbr4dl3y/johnston/commit/2c0f0db0ea342e4b2b29afc3ec80de92c99e386d))
+* **storage:** skip full re-serialization on session save append-only fast path ([bbfd695](https://github.com/p4ulbr4dl3y/johnston/commit/bbfd695ed1cb3a3efc5c2d4e6f2139095e87c996))
+* **tui:** cache MCP active count and reuse task collection in footer ([924eaf3](https://github.com/p4ulbr4dl3y/johnston/commit/924eaf3f480c717296ebfcd01f8d769d034cf6b2))
+* **tui:** debounce stream flushes and throttle spinner/footer churn ([f99012e](https://github.com/p4ulbr4dl3y/johnston/commit/f99012e528160e5f3ed9b8f34a4b0cd5f2551b09))
+* **tui:** make tasks screens event-driven with 2s polling safety net ([b55f363](https://github.com/p4ulbr4dl3y/johnston/commit/b55f36317377f018f0cdb20976f67a655d58ebdb))
 
 
 ### Reverts
