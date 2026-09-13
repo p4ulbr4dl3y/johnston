@@ -510,5 +510,54 @@ class TestActionsConfirmPermission(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(result)
 
 
+class TestUserInteractionService(unittest.IsolatedAsyncioTestCase):
+    async def test_interaction_service_initialized(self):
+        from johnston.tui.app.interaction_service import UserInteractionService
+
+        app = JohnstonApp()
+        self.assertIsInstance(app.interaction_service, UserInteractionService)
+        self.assertIs(app._get_interaction_service(), app.interaction_service)
+
+    async def test_interaction_service_pending_property(self):
+        app = JohnstonApp()
+        svc = app.interaction_service
+        self.assertIsNone(svc.pending_ask_user)
+
+        def dummy():
+            pass
+
+        svc.pending_ask_user = dummy
+        self.assertIs(svc.pending_ask_user, dummy)
+        self.assertIs(app._pending_ask_user, dummy)
+
+    async def test_interaction_service_direct_confirm_permission(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            def on_push(screen, callback):
+                callback("allow")
+
+            with patch.object(app, "push_screen", side_effect=on_push):
+                res = await app.interaction_service.confirm_permission("read", {"path": "x"}, "Confirm")
+            self.assertTrue(res)
+
+    async def test_interaction_service_direct_ask_user(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            def on_push(screen, callback):
+                callback("answer-1")
+
+            with patch.object(app, "push_screen", side_effect=on_push):
+                res = await app.interaction_service.ask_user([{"question": "Q?", "options": ["A"]}])
+            self.assertEqual(res, "answer-1")
+
+    async def test_interaction_service_direct_background_all(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            app.notify = MagicMock()
+            app.interaction_service.background_all()
+            app.notify.assert_called_once()
+            self.assertIn("No active foreground tasks", app.notify.call_args[0][0])
+
+
 if __name__ == "__main__":
     unittest.main()

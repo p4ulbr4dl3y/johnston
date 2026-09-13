@@ -184,4 +184,34 @@ class TestSessionRolePersistence(unittest.TestCase):
         app.notify.assert_called_once()
         self.assertIn("no longer exists", app.notify.call_args[0][0])
 
+    def test_session_service_instantiation_and_delegation(self):
+        from johnston.tui.app.session_service import SessionPersistenceService
+
+        app = DummyApp()
+        svc = app._get_session_service()
+        self.assertIsInstance(svc, SessionPersistenceService)
+        self.assertIs(svc.app, app)
+        self.assertIs(app.session_service, svc)
+
+    def test_session_service_direct_calls(self):
+        from johnston.tui.app.session_service import SessionPersistenceService
+
+        app = DummyApp()
+        svc = SessionPersistenceService(app)
+        session = AgentSession(session_id="test-session", role="worker")
+        app.sm.get.return_value = session
+
+        session_data = {
+            "title": "Direct Title",
+            "role": "explorer",
+            "messages": [],
+            "agent_history": [],
+        }
+        res = svc.write_session_data(session_data)
+        self.assertTrue(res)
+        self.assertEqual(session.title, "Direct Title")
+        self.assertEqual(session.role, "explorer")
+        app.sm.save.assert_called_once_with(session)
+
+
 

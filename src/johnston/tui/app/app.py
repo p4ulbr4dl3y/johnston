@@ -9,6 +9,8 @@ from pathlib import Path
 from textual.app import App
 
 from johnston.tui.adapters import core_bridge
+from johnston.tui.app.interaction_service import UserInteractionService
+from johnston.tui.app.session_service import SessionPersistenceService
 from johnston.tui.mixins.actions import ActionsMixin
 from johnston.tui.mixins.lifecycle import LifecycleMixin
 from johnston.tui.mixins.message_flow import MessageFlowMixin
@@ -68,6 +70,8 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         configure_global_managers(normalize_tool_name)
         self.client = None
         build_agent(self)
+        self.session_service = SessionPersistenceService(self)
+        self.interaction_service = UserInteractionService(self)
         resolve_session_id(self, self.sm, resume_session_id, continue_latest)
         self.sandbox_enabled = core_bridge.load_sandbox_config()
         # Declared HostProtocol attributes (structurally checked by core).

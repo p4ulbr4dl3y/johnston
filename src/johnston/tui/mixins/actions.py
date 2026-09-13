@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import asyncio
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
 from textual import events
 
@@ -8,9 +10,44 @@ from johnston.tui.presentation.widgets.chat_input import ChatInput
 from johnston.tui.presentation.widgets.chat_welcome import WelcomeWidget
 from johnston.tui.presentation.widgets.plan_notch import PlanActionsMixin
 
+if TYPE_CHECKING:
+    from johnston.tui.app.interaction_service import UserInteractionService
+
 
 class ActionsMixin(PlanActionsMixin):
     """Actions and pointer/selection event handlers for JohnstonApp."""
+
+    @classmethod
+    def _resolve_interaction_service(cls, host: Any) -> UserInteractionService:
+        service = getattr(host, "interaction_service", None)
+        if service is None or getattr(service, "app", None) is not host:
+            from johnston.tui.app.interaction_service import UserInteractionService
+
+            service = UserInteractionService(host)
+            try:
+                host.interaction_service = service
+            except Exception:
+                pass
+        return service
+
+    def _get_interaction_service(self) -> UserInteractionService:
+        """Get or lazily create UserInteractionService for this app."""
+        return ActionsMixin._resolve_interaction_service(self)
+
+    @property
+    def interaction_service(self) -> UserInteractionService:
+        """UserInteractionService managing confirmations, wizards, and backgrounding."""
+        service = getattr(self, "_interaction_service", None)
+        if service is None or getattr(service, "app", None) is not self:
+            from johnston.tui.app.interaction_service import UserInteractionService
+
+            service = UserInteractionService(self)
+            self._interaction_service = service
+        return service
+
+    @interaction_service.setter
+    def interaction_service(self, value: Any) -> None:
+        self._interaction_service = value
 
     def action_toggle_role(self) -> None:
         """Toggle agent role across all registered roles (builtin, global, project)"""
@@ -46,22 +83,7 @@ class ActionsMixin(PlanActionsMixin):
         left as-is: an open expansion keeps streaming live output until the task
         completes and the completion callback repaints it.
         """
-        from johnston.tui.adapters import core_bridge
-
-        count = 0
-        shell_tasks = [t for t in self.task_manager if getattr(t, "kind", "") == "shell"]
-        fg_tasks = list(getattr(self, "_foreground_shell_tasks", {}).values())
-        all_tasks = core_bridge.filter_to_session(shell_tasks + fg_tasks, getattr(self, "current_session_id", None))
-        for t in list(all_tasks):
-            if getattr(t, "is_active", getattr(t, "is_running", False)) and not getattr(t, "is_background", False):
-                if hasattr(t, "move_to_background"):
-                    t.move_to_background()
-                    count += 1
-                else:
-                    t.is_background = True
-                    count += 1
-        if count == 0:
-            self.notify("No active foreground tasks to move to background", severity="warning")
+        ActionsMixin._resolve_interaction_service(self).background_all()
 
     def on_click(self, event: events.Click) -> None:
         """Any mouse click returns focus to input unless text is selected or interacting with focusable widgets"""
@@ -161,11 +183,13 @@ class ActionsMixin(PlanActionsMixin):
         self,
         screen_name: str,
         args: Dict[str, Any],
-        reason: str,
+        reason: str = "",
         perm_name: str | None = None,
         is_subagent: bool = False,
         subagent_role: str = "",
         server_name: str | None = None,
+        *call_args: Any,
+        **kwargs: Any,
     ) -> bool | str:
         """Shows the permission confirmation screen and applies session overrides for confirmed tools.
 
@@ -173,28 +197,17 @@ class ActionsMixin(PlanActionsMixin):
         This is the UI-side implementation of tool permission prompting, owned by the app
         layer so that the tools layer stays independent of Textual widgets.
         """
-        from johnston.tui.adapters import core_bridge
-        from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
-
-        screen = PermissionConfirmScreen(
-            tool_name=screen_name,
-            args=args,
+        return await ActionsMixin._resolve_interaction_service(self).confirm_permission(
+            screen_name,
+            args,
+            reason=reason,
+            perm_name=perm_name,
             is_subagent=is_subagent,
             subagent_role=subagent_role,
             server_name=server_name,
+            *call_args,
+            **kwargs,
         )
-
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-
-        def on_dismiss(r: Any) -> None:
-            if not future.done():
-                future.set_result(r)
-
-        self.push_screen(screen, callback=on_dismiss)
-        result = await future
-
-        return core_bridge.apply_permission_choice(result, perm_name)
 
     async def ask_user(self, questions: list[Dict[str, Any]]) -> str:
         """Shows the AskUserWizardScreen and returns the user's answer.
@@ -202,53 +215,4 @@ class ActionsMixin(PlanActionsMixin):
         Owned by the app layer so the tools layer stays independent of Textual widgets.
         Returns the selected answer string, or "cancelled by user" on cancel/error.
         """
-        from johnston.tui.presentation.screens.ask_user import AskUserWizardScreen
-
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-        active_screen = None
-
-        def _show_wizard(question_list, answers=None, q_idx=0):
-            nonlocal active_screen
-            active_screen = AskUserWizardScreen(question_list, answers=answers, q_idx=q_idx)
-
-            def on_dismiss(result):
-                if isinstance(result, dict) and result.get("action") == "minimize":
-                    saved_answers = result.get("answers", {})
-                    saved_q_idx = result.get("q_idx", 0)
-                    setattr(
-                        self,
-                        "_pending_ask_user",
-                        lambda: _show_wizard(question_list, saved_answers, saved_q_idx),
-                    )
-                    if hasattr(self, "notify"):
-                        try:
-                            self.notify("Questions minimized: type /questions to resume", severity="information")
-                        except Exception:
-                            pass
-                else:
-                    if hasattr(self, "_pending_ask_user"):
-                        setattr(self, "_pending_ask_user", None)
-                    if not future.done():
-                        future.set_result(result)
-
-            self.push_screen(active_screen, callback=on_dismiss)
-
-        _show_wizard(questions)
-
-        try:
-            res = await future
-        finally:
-            if hasattr(self, "_pending_ask_user") and future.done():
-                setattr(self, "_pending_ask_user", None)
-            if not future.done():
-                future.cancel()
-                if active_screen is not None:
-                    try:
-                        active_screen.dismiss(None)
-                    except Exception:
-                        pass
-
-        if isinstance(res, str) and res.strip() and res != "cancelled":
-            return res
-        return "cancelled by user"
+        return await ActionsMixin._resolve_interaction_service(self).ask_user(questions)
