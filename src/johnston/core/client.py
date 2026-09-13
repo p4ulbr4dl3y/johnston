@@ -13,7 +13,6 @@ from typing import Any, AsyncIterator
 from johnston.core.application.provider.provider_manager import ProviderManager
 from johnston.core.application.roles.apply import apply_role
 from johnston.core.application.rules.rules import RulesManager
-from johnston.core.application.session.actions import compact_session, get_rewind_git_stats
 from johnston.core.application.skills.manager import get_skill_manager
 from johnston.core.domain.policies.role_policy import AgentMode
 from johnston.core.dto import (
@@ -37,15 +36,37 @@ from johnston.core.dto import (
     WorktreeDTO,
     parse_event_dto,
 )
-from johnston.core.infrastructure.platform.git_metrics import (
-    get_branch_info,
-    get_changed_file_count,
-    get_diff_metrics,
-    get_diff_stats,
-)
 from johnston.core.infrastructure.storage.session_store import SessionStore
 
 logger = logging.getLogger(__name__)
+
+_LAZY_EXPORTS = {
+    "get_rewind_git_stats": ("johnston.core.application.session.actions", "get_rewind_git_stats"),
+    "compact_session": ("johnston.core.application.session.actions", "compact_session"),
+    "get_branch_info": ("johnston.core.infrastructure.platform.git_metrics", "get_branch_info"),
+    "get_changed_file_count": ("johnston.core.infrastructure.platform.git_metrics", "get_changed_file_count"),
+    "get_diff_metrics": ("johnston.core.infrastructure.platform.git_metrics", "get_diff_metrics"),
+    "get_diff_stats": ("johnston.core.infrastructure.platform.git_metrics", "get_diff_stats"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    if name in _LAZY_EXPORTS:
+        mod_name, attr_name = _LAZY_EXPORTS[name]
+        import importlib
+
+        mod = importlib.import_module(mod_name)
+        val = getattr(mod, attr_name)
+        globals()[name] = val
+        return val
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def _resolve_symbol(name: str) -> Any:
+    val = globals().get(name)
+    if val is not None:
+        return val
+    return __getattr__(name)
 
 
 EFFORT_AUTO = "auto"
@@ -451,7 +472,7 @@ class JohnstonClient:
                     pass
 
         try:
-            outcome = await compact_session(
+            outcome = await _resolve_symbol("compact_session")(
                 self.agent,
                 save_session_cb=_save,
                 on_begin=lambda: None,
@@ -491,7 +512,7 @@ class JohnstonClient:
 
         proj_path = getattr(self.store, "project_path", None) if self.store else None
         try:
-            entries = await get_rewind_git_stats(
+            entries = await _resolve_symbol("get_rewind_git_stats")(
                 self.session_id,
                 user_msgs,
                 proj_path,
@@ -1017,11 +1038,14 @@ class JohnstonClient:
 
     def get_git_state(self) -> GitStateDTO:
         """Get current repository git state as GitStateDTO."""
-        branch = get_branch_info()
-        diff_metrics = get_diff_metrics() if callable(get_diff_metrics) else None
+        get_branch_fn = _resolve_symbol("get_branch_info")
+        branch = get_branch_fn() if callable(get_branch_fn) else ""
+        diff_metrics_fn = _resolve_symbol("get_diff_metrics")
+        diff_metrics = diff_metrics_fn() if callable(diff_metrics_fn) else None
         ins = diff_metrics.insertions if diff_metrics else 0
         dels = diff_metrics.deletions if diff_metrics else 0
-        diff_stat = get_diff_stats() if callable(get_diff_stats) else ""
+        diff_stats_fn = _resolve_symbol("get_diff_stats")
+        diff_stat = diff_stats_fn() if callable(diff_stats_fn) else ""
         if (not ins and not dels) and diff_stat:
             adds_p, dels_p, _ = _parse_rewind_stat_numbers(diff_stat)
             ins, dels = adds_p, dels_p
@@ -1030,7 +1054,8 @@ class JohnstonClient:
         changed_files = 0
 
         try:
-            changed_files = get_changed_file_count()
+            get_count_fn = _resolve_symbol("get_changed_file_count")
+            changed_files = get_count_fn() if callable(get_count_fn) else 0
             if changed_files:
                 is_dirty = True
         except Exception:

@@ -68,17 +68,21 @@ def compute_dir_signature_hash(
     dirs: Sequence[str],
     extensions: Optional[Sequence[str]] = None,
 ) -> Optional[int]:
-    """XOR-hash of (path, mtime_ns, size) for files under non-recursive ``dirs``.
+    """Deterministic hash of (path, mtime_ns, size) for files under non-recursive ``dirs``.
 
     Used when only a cheap equality check is needed (sessions cache) instead
     of retaining the full entry list. Returns None when no entries exist.
+    Deterministic across process invocations (unlike built-in hash()).
     """
+    import zlib
+
     signature = compute_dir_signature(dirs, extensions)
     if signature is None:
         return None
     acc = 0
     for entry in signature:
-        acc ^= hash((entry.path, entry.mtime_ns, entry.size))
+        val = zlib.crc32(f"{entry.path}:{entry.mtime_ns}:{entry.size}".encode("utf-8"))
+        acc = (acc * 31 + val) & 0x7FFFFFFFFFFFFFFF
     return acc
 
 

@@ -332,11 +332,14 @@ class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreC
                 "msg_len": len(sess.messages),
                 "hist_len": len(_session_history(sess)),
             }
+            current_sig = self._disk_signature()
             if self._disk_cache is not None:
                 self._disk_cache[sess.id] = sess
-                self._disk_cache_signature = self._disk_signature()
+                self._disk_cache_signature = current_sig
                 self._disk_cache_ts = time.time()
             self.index_db.upsert_session(sess)
+            if current_sig is not None:
+                self.index_db.set_meta("signature", str(current_sig))
             return True
         except Exception:
             logger.exception("Failed to save session %s", sess.id)
@@ -386,6 +389,9 @@ class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreC
         self._sessions.pop(session_id, None)
         self._invalidate_disk_cache()
         self.index_db.delete_session(session_id)
+        current_sig = self._disk_signature()
+        if current_sig is not None:
+            self.index_db.set_meta("signature", str(current_sig))
 
     def _is_main_indexed(self, session_id: str) -> bool:
         try:

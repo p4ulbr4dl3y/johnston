@@ -134,11 +134,38 @@ class SessionLock:
         if not os.path.exists(lock_path):
             return False, None
 
-        # Attempt to acquire and immediately release to verify lock state
-        test_lock = cls(lock_path)
-        if test_lock.acquire():
-            test_lock.release()
+        # Non-blocking lock probe without mutating disk or writing sidecar metadata
+        flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0)
+        try:
+            fd = os.open(lock_path, flags)
+        except OSError:
             return False, None
+
+        try:
+            if _is_windows():
+                import msvcrt
+
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                try:
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
+            else:
+                import fcntl
+
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                except OSError:
+                    pass
+            return False, None
+        except (BlockingIOError, OSError, PermissionError):
+            pass
+        finally:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
 
         # Lock is held — read holder metadata. Prefer the sidecar (readable on
         # Windows even while byte 0 is locked) and fall back to the lock file.

@@ -20,7 +20,10 @@ class SessionStoreLocksMixin:
             return False
         if session_id in self._active_locks:
             return False
-        is_locked, _ = SessionLock.probe(self._lock_path(session_id))
+        lock_path = self._lock_path(session_id)
+        if not os.path.exists(lock_path):
+            return False
+        is_locked, _ = SessionLock.probe(lock_path)
         return is_locked
 
     def acquire_session_lock(self, session_id: str) -> bool:
