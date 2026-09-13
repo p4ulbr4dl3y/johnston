@@ -7,6 +7,14 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [0.31.1](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.31.0...johnston-v0.31.1) (2026-09-13)
+
+
+### Performance Improvements
+
+* **core:** accelerate session store listing and lock probing ([ec28ebf](https://github.com/p4ulbr4dl3y/johnston/commit/ec28ebf605cf1ac9ae8bd05824c55026b0a16622))
+* **storage:** lazy load session messages to reduce memory usage ([27d75f4](https://github.com/p4ulbr4dl3y/johnston/commit/27d75f4e7434089262ffc970bfd201f25a2f1247))
+
 ## [0.31.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.30.0...johnston-v0.31.0) (2026-09-10)
 
 
