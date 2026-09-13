@@ -275,6 +275,9 @@ def get_diff_word_colors(theme: Any = None) -> tuple[str, str]:
     return "on #acf2bd", "on #ffb3ba"
 
 
+MAX_WORD_DIFF_LINE_LEN = 1000
+
+
 def apply_word_diff(
     old_text: Text,
     new_text: Text,
@@ -284,10 +287,13 @@ def apply_word_diff(
     add_word_bg: str,
 ) -> None:
     """Apply intra-line difference highlighting using difflib sequence matching."""
-    if not old_str and not new_str:
+    if not old_str or not new_str:
+        return
+    # Guard against quadratic difflib freeze on minified/long lines
+    if len(old_str) > MAX_WORD_DIFF_LINE_LEN or len(new_str) > MAX_WORD_DIFF_LINE_LEN:
         return
     matcher = difflib.SequenceMatcher(None, old_str, new_str, autojunk=False)
-    if matcher.ratio() < 0.2:
+    if matcher.quick_ratio() < 0.2 or matcher.ratio() < 0.2:
         return
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag in ("replace", "delete") and i2 > i1:
