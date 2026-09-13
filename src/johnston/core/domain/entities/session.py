@@ -135,8 +135,10 @@ class AgentSession:
         self.prompt = prompt
         self.auto_titled = auto_titled
         self.fork_msg_count = fork_msg_count
-        self.messages: List[Dict[str, Any]] = []
-        self.agent_history: List[Dict[str, Any]] = []
+        self._messages: Optional[List[Dict[str, Any]]] = []
+        self._agent_history: Optional[List[Dict[str, Any]]] = []
+        self._messages_loaded: bool = True
+        self._fpath: Optional[str] = None
         self.tokens_input: int = 0
         self.tokens_output: int = 0
         self.total_tokens: int = 0
@@ -267,6 +269,61 @@ class AgentSession:
         )
 
         reconcile_compaction_divider(self)
+
+    def _ensure_messages_loaded(self) -> None:
+        if self._messages_loaded:
+            return
+        self._messages_loaded = True
+        self._messages = []
+        self._agent_history = []
+        if self._fpath:
+            import json
+            import os
+
+            if os.path.exists(self._fpath):
+                try:
+                    with open(self._fpath, "r", encoding="utf-8") as f:
+                        f.readline()  # Skip meta header
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            try:
+                                entry = json.loads(line)
+                            except Exception:
+                                continue
+                            if not isinstance(entry, dict):
+                                continue
+                            etype = entry.get("_type")
+                            if etype == MessageType.MSG.value if hasattr(MessageType, "MSG") else "msg":
+                                data = entry.get("data")
+                                self._messages.append(data if data is not None else {})
+                            elif etype == "history":
+                                data = entry.get("data")
+                                self._agent_history.append(data if data is not None else {})
+                    self.reconcile_compaction_divider()
+                except Exception:
+                    pass
+
+    @property
+    def messages(self) -> List[Dict[str, Any]]:
+        self._ensure_messages_loaded()
+        return self._messages if self._messages is not None else []
+
+    @messages.setter
+    def messages(self, val: List[Dict[str, Any]]) -> None:
+        self._messages_loaded = True
+        self._messages = val
+
+    @property
+    def agent_history(self) -> List[Dict[str, Any]]:
+        self._ensure_messages_loaded()
+        return self._agent_history if self._agent_history is not None else []
+
+    @agent_history.setter
+    def agent_history(self, val: List[Dict[str, Any]]) -> None:
+        self._messages_loaded = True
+        self._agent_history = val
 
     @property
     def title(self) -> str:

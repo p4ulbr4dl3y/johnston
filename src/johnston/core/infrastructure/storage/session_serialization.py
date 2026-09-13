@@ -93,8 +93,10 @@ def from_dict(data: Dict[str, Any]) -> AgentSession:
         auto_titled=bool(data.get("auto_titled", False)),
         fork_msg_count=_coerce_int(data.get("fork_msg_count")),
     )
-    sess.messages = data.get("messages", [])
-    sess.agent_history = data.get("agent_history", [])
+    if "messages" in data and data["messages"] is not None:
+        sess.messages = data["messages"]
+    if "agent_history" in data and data["agent_history"] is not None:
+        sess.agent_history = data["agent_history"]
     sess.tokens_input = _coerce_int(data.get("tokens_input"))
     sess.tokens_output = _coerce_int(data.get("tokens_output"))
     sess.total_tokens = _coerce_int(data.get("total_tokens"))
@@ -106,7 +108,7 @@ def from_dict(data: Dict[str, Any]) -> AgentSession:
     return sess
 
 
-def from_file(fpath: str) -> Optional[AgentSession]:
+def from_file(fpath: str, load_messages: bool = True) -> Optional[AgentSession]:
     """Load a session from the on-disk JSONL format; None on missing/corrupt input."""
     if not fpath or not os.path.exists(fpath):
         return None
@@ -125,6 +127,16 @@ def from_file(fpath: str) -> Optional[AgentSession]:
 
             sess = from_dict(first)
             sess._loaded_from_disk = True
+            sess._fpath = fpath
+            if not load_messages:
+                sess._messages_loaded = False
+                sess._messages = None
+                sess._agent_history = None
+                return sess
+
+            sess._messages = []
+            sess._agent_history = []
+            sess._messages_loaded = True
             for line in f:
                 line = line.strip()
                 if not line:

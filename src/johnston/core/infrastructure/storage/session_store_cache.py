@@ -109,7 +109,7 @@ class SessionStoreCacheMixin:
 
     def _load_file(self, sessions: Dict[str, AgentSession], fpath: str) -> None:
         try:
-            sess = _session_from_file(fpath)
+            sess = _session_from_file(fpath, load_messages=False)
             if sess:
                 sessions[sess.id] = sess
         except Exception:
