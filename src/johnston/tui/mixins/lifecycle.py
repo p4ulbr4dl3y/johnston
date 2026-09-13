@@ -1,12 +1,22 @@
-import asyncio
+"""Lifecycle mixin for JohnstonApp.
+
+Textual requires compose() to yield child widgets in the App class.
+Delegates mount, unmount, project switching, and status refresh to AppLifecycleService.
+"""
+from __future__ import annotations
+
 import logging
-import os
-import threading
+from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
 
 from johnston.tui.adapters import core_bridge
+from johnston.tui.app.lifecycle_service import (
+    AppLifecycleService,
+    _close_catalog_sync,
+    _close_tools_sync,
+)
 from johnston.tui.presentation.widgets.attachment_bar import AttachmentBar
 from johnston.tui.presentation.widgets.chat_container import ChatView
 from johnston.tui.presentation.widgets.chat_input import ChatInput
@@ -18,29 +28,31 @@ install_asyncio_exception_handler = core_bridge.install_asyncio_exception_handle
 
 logger = logging.getLogger("johnston.app")
 
-
-def _close_catalog_sync() -> None:
-    """Run catalog.close() on a private loop (used from the shutdown thread)."""
-    try:
-        from johnston.tui.adapters import core_bridge
-
-        asyncio.run(core_bridge.catalog.close())
-    except Exception as err:
-        logger.debug(f"Catalog close error: {err}")
-
-
-def _close_tools_sync() -> None:
-    """Run aclose_tools() on a private loop (used from the shutdown thread)."""
-    try:
-        from johnston.tui.adapters import core_bridge
-
-        asyncio.run(core_bridge.aclose_tools())
-    except Exception as err:
-        logger.debug(f"Tool instance close error: {err}")
+__all__ = [
+    "LifecycleMixin",
+    "install_asyncio_exception_handler",
+    "_close_catalog_sync",
+    "_close_tools_sync",
+]
 
 
 class LifecycleMixin:
     """Compose, mount, unmount and initial setup handling for JohnstonApp."""
+
+    @classmethod
+    def _resolve_lifecycle_service(cls, host: Any) -> AppLifecycleService:
+        service = getattr(host, "lifecycle_service", None)
+        if service is None or getattr(service, "app", None) is not host:
+            service = AppLifecycleService(host)
+            try:
+                host.lifecycle_service = service
+            except Exception:
+                pass
+        return service
+
+    def _get_lifecycle_service(self) -> AppLifecycleService:
+        """Get or lazily create AppLifecycleService for this app."""
+        return LifecycleMixin._resolve_lifecycle_service(self)
 
     def compose(self) -> ComposeResult:
         yield PlanNotchContainer(id="plan-notch-container")
@@ -53,270 +65,25 @@ class LifecycleMixin:
 
     def on_mount(self) -> None:
         """Instant focus on start, background catalog refresh and status bar refresh"""
-        install_asyncio_exception_handler()
-        from johnston.tui.app.theme_manager import prewarm_terminal_palette, theme_manager
-
-        prewarm_terminal_palette()
-        if hasattr(self, 'register_theme'):
-            available = getattr(self, 'available_themes', {})
-            for t in theme_manager.get_all_textual_themes():
-                if t.name not in available:
-                    self.register_theme(t)
-            self.theme = theme_manager.current_theme.name
-        self._theme_listener = lambda _: self.refresh_status_footer() if hasattr(self, "refresh_status_footer") else None
-        theme_manager.add_listener(self._theme_listener)
-        self.is_app_active = True
-        self.query_one("#message-input", ChatInput).focus()
-        if getattr(self, "resume_session_id", None):
-            res_id = self.resume_session_id
-            if hasattr(self, "sm") and self.sm.is_session_locked(res_id) is True:
-                from johnston.tui.presentation.screens.session_conflict import SessionConflictScreen
-
-                def on_init_conflict(choice: str | None) -> None:
-                    if choice == "steal":
-                        self.sm.steal_session_lock(res_id)
-                        self.load_session_ui(res_id)
-                    elif choice == "readonly":
-                        self.load_session_ui(res_id, read_only=True)
-                    else:
-                        new_id = self.sm.generate_session_id() if hasattr(self.sm, "generate_session_id") else ""
-                        self.current_session_id = new_id
-                        if hasattr(self.sm, "acquire_session_lock"):
-                            self.sm.acquire_session_lock(new_id)
-                        if hasattr(self.sm, "set_active_session_id"):
-                            self.sm.set_active_session_id(new_id)
-                        self.is_read_only = False
-                        if hasattr(self, "notify"):
-                            self.notify("Resume cancelled. Started new session.", severity="information")
-                        if hasattr(self, "refresh_status_footer"):
-                            self.refresh_status_footer()
-
-                self.push_screen(SessionConflictScreen(res_id), callback=on_init_conflict)
-            else:
-                self.load_session_ui(res_id)
-        else:
-            if getattr(self, "current_session_id", None) and hasattr(self, "sm"):
-                if hasattr(self.sm, "acquire_session_lock"):
-                    self.sm.acquire_session_lock(self.current_session_id)
-            if getattr(self, "resume_session_id", None) == "":
-                from johnston.tui.presentation.commands import ResumeCommand
-
-                if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
-                    self.create_tracked_task(ResumeCommand().execute(self))
-                else:
-                    asyncio.create_task(ResumeCommand().execute(self))
-        from johnston.tui.adapters import core_bridge
-
-        core_bridge.catalog.load_cache()
-        self.refresh_status_footer()
-
-        async def _refresh_catalog_bg() -> None:
-            try:
-                await core_bridge.catalog.refresh(force=False)
-            except Exception:
-                pass
-
-        if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
-            self.create_tracked_task(core_bridge.get_mcp_manager().ensure_tools_ready_async())
-            self.create_tracked_task(self._check_initial_setup())
-            if not os.environ.get("PYTEST_CURRENT_TEST"):
-                self.create_tracked_task(_refresh_catalog_bg())
-        else:
-            asyncio.create_task(core_bridge.get_mcp_manager().ensure_tools_ready_async())
-            asyncio.create_task(self._check_initial_setup())
-            if not os.environ.get("PYTEST_CURRENT_TEST"):
-                asyncio.create_task(_refresh_catalog_bg())
-
-        if getattr(self, "initial_prompt", None) and not getattr(self, "_initial_prompt_posted", False):
-            self._initial_prompt_posted = True
-            init_prompt = self.initial_prompt
-
-            async def _post_initial_prompt() -> None:
-                await asyncio.sleep(0.05)
-                try:
-                    chat_input = self.query_one("#message-input", ChatInput)
-                    chat_input.load_text("")
-                    chat_input.add_to_history(init_prompt)
-                    chat_input.post_message(ChatInput.Submitted(init_prompt))
-                except Exception:
-                    pass
-
-            if hasattr(self, "create_tracked_task") and callable(self.create_tracked_task):
-                self.create_tracked_task(_post_initial_prompt())
-            else:
-                asyncio.create_task(_post_initial_prompt())
+        LifecycleMixin._resolve_lifecycle_service(self).handle_mount()
 
     async def _check_initial_setup(self) -> None:
         """Auto-prompt for provider/model selection on first launch if unconfigured"""
-        if (
-            getattr(self, "resume_session_id", None) is not None
-            or getattr(self, "initial_prompt", None) is not None
-            or os.environ.get("PYTEST_CURRENT_TEST")
-            or not getattr(self, "is_app_active", True)
-        ):
-            return
-
-        active_key = self.pm.get_active_provider_key()
-        if not active_key or not self.pm.is_provider_connected(active_key):
-            if not getattr(self, "is_app_active", True):
-                return
-            from johnston.tui.presentation.commands import ProvidersCommand
-
-            await ProvidersCommand().execute(self)
-        elif not getattr(getattr(self, "agent", None), "model", ""):
-            from johnston.tui.presentation.commands import ModelsCommand
-
-            await ModelsCommand().execute(self)
+        await LifecycleMixin._resolve_lifecycle_service(self).check_initial_setup()
 
     def on_unmount(self) -> None:
         """Clean up all running MCP servers and background processes when closing application"""
-        self.is_app_active = False
-
-        for w in getattr(self, "workers", []):
-            if getattr(w, "is_running", False):
-                w.cancel()
-
-        if hasattr(self, "_theme_listener"):
-            try:
-                from johnston.tui.app.theme_manager import theme_manager
-                theme_manager.remove_listener(self._theme_listener)
-            except Exception:
-                pass
-
-        # Cancel an in-flight rewind git-restore task (kept on the agent by
-        # rewind_session) so shutdown does not leave the worktree half-restored.
-        git_task = getattr(getattr(self, "agent", None), "rewind_git_restore_task", None)
-        if git_task is not None and not git_task.done():
-            git_task.cancel()
-
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-        try:
-            if loop is not None:
-                kill_coro = self._kill_all_tasks()
-                try:
-                    loop.create_task(kill_coro)
-                except Exception:
-                    # Coroutine was built before create_task could fail — close
-                    # it so it never surfaces as a "never awaited" warning.
-                    kill_coro.close()
-                    raise
-            else:
-                self._kill_all_tasks_sync()
-        except Exception as err:
-            logger.debug(f"Background task cleanup error: {err}")
-        try:
-            from johnston.tui.adapters import core_bridge
-
-            core_bridge.cancel_running_subagents(self.sm)
-        except Exception as err:
-            logger.debug(f"Subagent cleanup error: {err}")
-
-        try:
-            self.save_current_session()
-        except Exception as err:
-            logger.debug(f"Unmount session save error: {err}")
-
-        try:
-            from johnston.tui.adapters import core_bridge
-
-            core_bridge.get_mcp_manager().stop_all()
-        except Exception as err:
-            logger.debug(f"MCP cleanup error: {err}")
-
-        try:
-            from johnston.tui.adapters import core_bridge
-
-            if loop is not None and loop.is_running():
-                # A fire-and-forget create_task() here races app shutdown: the
-                # loop can close before the task ever runs, leaking the close
-                # coroutine ("never awaited") and skipping the client close.
-                # A short-lived daemon thread with its own loop always runs it.
-                threading.Thread(
-                    target=_close_catalog_sync, name="johnston-catalog-close", daemon=True
-                ).start()
-            else:
-                # No running loop: run the close coroutine to completion in a
-                # dedicated loop instead of leaving it un-awaited.
-                try:
-                    from johnston.tui.adapters import core_bridge
-
-                    asyncio.run(core_bridge.catalog.close())
-                except Exception:
-                    pass
-        except Exception as err:
-            logger.debug(f"Catalog cleanup error: {err}")
-
-        try:
-            if loop is not None and loop.is_running():
-                threading.Thread(
-                    target=_close_tools_sync, name="johnston-tools-close", daemon=True
-                ).start()
-            else:
-                _close_tools_sync()
-        except Exception as err:
-            logger.debug(f"Tool instance cleanup error: {err}")
-
-        try:
-            if hasattr(self, "sm") and hasattr(self.sm, "release_all_locks"):
-                self.sm.release_all_locks()
-        except Exception as err:
-            logger.debug(f"Session lock cleanup error: {err}")
+        LifecycleMixin._resolve_lifecycle_service(self).handle_unmount()
 
     async def _kill_all_tasks(self) -> None:
-        try:
-            await self.task_manager.kill_all()
-        except Exception:
-            pass
+        await LifecycleMixin._resolve_lifecycle_service(self).kill_all_tasks()
 
     def _kill_all_tasks_sync(self) -> None:
-        for task in list(self.task_manager):
-            try:
-                kill_sync = getattr(task, "kill_sync", None)
-                if callable(kill_sync) and not hasattr(task, "_mock_return_value"):
-                    kill_sync()
-                else:
-                    kill = getattr(task, "kill", None)
-                    if callable(kill) and asyncio.iscoroutinefunction(kill):
-                        # Only schedule when a loop is actually running: creating
-                        # the coroutine first (asyncio.create_task) and failing
-                        # afterwards leaks it as a "never awaited" warning, and
-                        # without a loop nothing could ever run it anyway.
-                        try:
-                            asyncio.get_running_loop().create_task(kill())
-                        except RuntimeError:
-                            pass
-                    elif callable(kill):
-                        kill()
-                    elif callable(kill_sync):
-                        kill_sync()
-            except Exception:
-                pass
+        LifecycleMixin._resolve_lifecycle_service(self).kill_all_tasks_sync()
 
     def refresh_status_footer(self) -> None:
         """Refresh status bar with directory, provider, model, context, tokens, cost, and subagents"""
-        try:
-            footer = self.query_one("#status-footer", StatusFooter)
-            footer.refresh_footer()
-        except Exception as e:
-            logger.debug(f"Error refreshing status footer: {e}")
+        LifecycleMixin._resolve_lifecycle_service(self).refresh_status_footer()
 
     def switch_project_dir(self, new_dir: str, branch: str = "") -> None:
-        self.project_dir = new_dir
-        try:
-            os.chdir(new_dir)
-        except Exception:
-            pass
-        from johnston.tui.adapters import core_bridge
-
-        core_bridge.get_permission_manager().get_instance().set_project_dir(new_dir)
-        if getattr(self, "agent", None):
-            self.agent.project_dir = new_dir
-            self.agent.worktree_branch = branch
-        if getattr(self, "session", None):
-            self.session.project_dir = new_dir
-            self.session.branch_name = branch
-        if hasattr(self, "refresh_status_footer"):
-            self.refresh_status_footer()
+        LifecycleMixin._resolve_lifecycle_service(self).switch_project_dir(new_dir, branch)
