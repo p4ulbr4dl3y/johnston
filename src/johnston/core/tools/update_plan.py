@@ -88,16 +88,24 @@ class UpdatePlanTool(BaseTool):
             return ToolResult.error("params", name="plan", detail="items need 'step'/'status'")
 
         host = ctx.host
-        if host:
-            setattr(host, "current_plan", validated_plan)
-            setattr(host, "current_plan_explanation", explanation)
-            if getattr(ctx, "is_subagent", False):
-                target_sess = getattr(host, "session", None)
-                if target_sess:
-                    setattr(target_sess, "current_plan", validated_plan)
-                    setattr(target_sess, "current_plan_explanation", explanation)
-                    setattr(target_sess, "plan", validated_plan)
-            else:
+        if getattr(ctx, "is_subagent", False):
+            target = getattr(ctx, "agent", None) or getattr(ctx, "raw_target", None)
+            if target and target is not host:
+                setattr(target, "current_plan", validated_plan)
+                setattr(target, "current_plan_explanation", explanation)
+            elif target and not hasattr(target, "on_plan_update"):
+                setattr(target, "current_plan", validated_plan)
+                setattr(target, "current_plan_explanation", explanation)
+
+            target_sess = getattr(ctx, "session", None)
+            if target_sess:
+                setattr(target_sess, "current_plan", validated_plan)
+                setattr(target_sess, "current_plan_explanation", explanation)
+                setattr(target_sess, "plan", validated_plan)
+        else:
+            if host:
+                setattr(host, "current_plan", validated_plan)
+                setattr(host, "current_plan_explanation", explanation)
                 app_target = getattr(host, "app", None) or host
                 if app_target is not host:
                     setattr(app_target, "current_plan", validated_plan)

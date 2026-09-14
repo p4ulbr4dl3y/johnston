@@ -175,6 +175,41 @@ class TestUpdatePlanTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(subagent.current_plan, [{"step": "Sub step", "status": "completed"}])
         self.assertEqual(subagent.current_plan_explanation, "Subagent internal plan")
 
+    async def test_update_plan_subagent_unwrapped_host_isolation(self):
+        class RealApp:
+            def __init__(self):
+                self.updated = False
+                self.current_plan = [{"step": "Main task", "status": "in_progress"}]
+                self.current_plan_explanation = "Main plan"
+
+            def on_plan_update(self, plan, explanation):
+                self.updated = True
+
+        class WorkerAgent:
+            def __init__(self, host_app):
+                self.app = host_app
+                self.is_subagent = True
+                self.role = "subagent"
+                self.session = None
+
+        app = RealApp()
+        worker = WorkerAgent(app)
+        tool = UpdatePlanTool()
+
+        res = await tool.execute(
+            {
+                "explanation": "Worker internal plan",
+                "plan": [{"step": "Worker step", "status": "completed"}],
+            },
+            ctx=worker,
+        )
+        self.assertIn("[plan updated | 1/1 done | Worker internal plan]", res.content)
+        self.assertFalse(app.updated)
+        self.assertEqual(app.current_plan_explanation, "Main plan")
+        self.assertEqual(app.current_plan, [{"step": "Main task", "status": "in_progress"}])
+        self.assertEqual(worker.current_plan, [{"step": "Worker step", "status": "completed"}])
+        self.assertEqual(worker.current_plan_explanation, "Worker internal plan")
+
     async def test_update_plan_status_case_insensitivity(self):
         tool = UpdatePlanTool()
         args = {

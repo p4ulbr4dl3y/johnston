@@ -42,6 +42,8 @@ class ToolContext:
                     role = getattr(target, "role", "")
                 target = inner_app
         self.host = target
+        self.agent = raw_target
+        self.raw_target = raw_target
         session = None
         if raw_target is not None:
             if type(raw_target).__name__.startswith(("MagicMock", "Mock", "AsyncMock")):
