@@ -686,5 +686,29 @@ def test_serialize_session_jsonl_corrupted_fallback(store):
     assert "preserved" in lines[2]
 
 
+def test_lazy_load_messages_separates_history(store):
+    """Regression: lazy load must keep _type: history in agent_history, not messages."""
+    content = (
+        '{"_type": "meta", "id": "sub_test", "kind": "subagent"}\n'
+        '{"_type": "msg", "data": {"type": "user", "text": "hello"}}\n'
+        '{"_type": "history", "data": {"role": "assistant", "content": "hi"}}\n'
+    )
+    fpath = os.path.join(store.sessions_dir, "sub_test.jsonl")
+    with open(fpath, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    from johnston.core.infrastructure.storage.session_serialization import from_file
+    sess = from_file(fpath, load_messages=False)
+    assert not sess._messages_loaded
+    # Accessing messages triggers lazy loading
+    msgs = sess.messages
+    hist = sess.agent_history
+    assert len(msgs) == 1
+    assert msgs[0] == {"type": "user", "text": "hello"}
+    assert len(hist) == 1
+    assert hist[0] == {"role": "assistant", "content": "hi"}
+
+
+
 
 

@@ -32,8 +32,12 @@ async def send_subagent_followup(
         if not hasattr(session, "pending_messages"):
             session.pending_messages = []
         session.pending_messages.append(message)
-        from johnston.core.infrastructure.runtime.subagent_tracker import _mark_subagent_running
+        from johnston.core.infrastructure.runtime.subagent_tracker import (
+            _mark_subagent_running,
+            _record_subagent_session,
+        )
 
+        _record_subagent_session(ctx.host, session.id)
         _mark_subagent_running(ctx.host, session.id, text=f"follow-up queued for {session.id}")
         return ToolResult(status=ToolResultStatus.RUNNING, content=f"[queued | id {session.id}]")
 
@@ -98,7 +102,10 @@ async def send_subagent_followup(
                 store._sessions[session.id] = session
             await _safe_save(store, session)
 
-        from johnston.core.infrastructure.runtime.subagent_tracker import _mark_subagent_running
+        from johnston.core.infrastructure.runtime.subagent_tracker import (
+            _mark_subagent_running,
+            _record_subagent_session,
+        )
         from johnston.core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
         cleanup_fn = SubagentWorktreeManager.make_worktree_cleanup_fn(
@@ -124,6 +131,7 @@ async def send_subagent_followup(
         )
         session.async_task = bg_task
 
+        _record_subagent_session(ctx.host, session.id)
         _mark_subagent_running(ctx.host, session.id, text=f"follow-up sent to {session.id}")
         return ToolResult(status=ToolResultStatus.RUNNING, content=f"[subagent resumed | id {session.id}]")
     except Exception as err:

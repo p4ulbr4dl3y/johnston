@@ -170,6 +170,37 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(updated.messages[0]["status"], "done")
             self.assertEqual(updated.messages[0]["result_text"], "done work")
 
+    async def test_subagent_completed_updates_message_subagent_tool(self):
+        app = JohnstonApp()
+        async with app.run_test():
+            session = app.sm.create_main(app.current_session_id)
+            session.messages = [
+                {
+                    "type": "tool",
+                    "tool_type": "invoke_subagent",
+                    "args": {"description": "worker", "prompt": "do work"},
+                    "result_text": "subagent 'worker' launched (session_id: sub_999)",
+                    "status": "done",
+                },
+                {
+                    "type": "tool",
+                    "tool_type": "message_subagent",
+                    "args": {"id": "sub_999", "message": "followup"},
+                    "result_text": "[subagent resumed | id sub_999]",
+                    "status": "running",
+                },
+            ]
+            app.sm.save(session)
+
+            app.on_subagent_tool_completed("sub_999", "completed", "followup finished")
+
+            updated = app.sm.get(app.current_session_id)
+            # Original invoke_subagent stays done
+            self.assertEqual(updated.messages[0]["status"], "done")
+            # Most recent message_subagent is updated to done
+            self.assertEqual(updated.messages[1]["status"], "done")
+            self.assertEqual(updated.messages[1]["result_text"], "followup finished")
+
     async def test_progress_generating_queues_running_notification(self):
         app = JohnstonApp()
         async with app.run_test():

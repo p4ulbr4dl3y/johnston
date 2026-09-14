@@ -295,7 +295,7 @@ class AgentSession:
                             if not isinstance(entry, dict):
                                 continue
                             etype = entry.get("_type")
-                            if etype == MessageType.MSG.value if hasattr(MessageType, "MSG") else "msg":
+                            if etype == "msg":
                                 data = entry.get("data")
                                 self._messages.append(data if data is not None else {})
                             elif etype == "history":

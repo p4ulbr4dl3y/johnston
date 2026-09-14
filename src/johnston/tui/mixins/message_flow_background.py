@@ -69,8 +69,11 @@ def _find_tool_msg_for_task(session: Any, task_id: str) -> Any:
     return None
 
 
+_SUBAGENT_TOOL_TYPES = ("invoke_subagent", "message_subagent")
+
+
 def _ensure_subagent_msg_index(session: Any) -> dict[str, int]:
-    """Build or return a cached {session_id → message-index} for invoke_subagent messages."""
+    """Build or return a cached {session_id → message-index} for subagent tool messages."""
     msgs = session.messages
     expected_len = len(msgs)
     cached = getattr(session, "_subagent_msg_idx", None)
@@ -80,41 +83,48 @@ def _ensure_subagent_msg_index(session: Any) -> dict[str, int]:
     for i, msg in enumerate(msgs):
         if not isinstance(msg, dict) or msg.get("type") != "tool":
             continue
-        if msg.get("tool_type") != "invoke_subagent":
+        if msg.get("tool_type") not in _SUBAGENT_TOOL_TYPES:
             continue
         sub_id = msg.get("subagent_session_id")
-        if sub_id and str(sub_id) not in idx:
+        if sub_id:
             idx[str(sub_id)] = i
         args = msg.get("args")
         if isinstance(args, dict):
             aid = args.get("id") or args.get("session_id")
-            if aid and str(aid) not in idx:
+            if aid:
                 idx[str(aid)] = i
         rtext = msg.get("result_text", "")
         if rtext:
             m = _SESSION_ID_RE.search(str(rtext))
-            if m and m.group(1) not in idx:
+            if m:
                 idx[m.group(1)] = i
     session._subagent_msg_idx = idx  # type: ignore[attr-defined]
     return idx
 
 
 def _find_tool_msg_for_subagent(session: Any, session_id: str) -> Any:
-    """Find an invoke_subagent tool message by session_id. O(1) amortized."""
+    """Find the most recent subagent tool message by session_id. O(1) amortized."""
     idx = _ensure_subagent_msg_index(session)
     pos = idx.get(session_id)
     if pos is not None and pos < len(session.messages):
         msg = session.messages[pos]
-        if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") == "invoke_subagent":
+        if isinstance(msg, dict) and msg.get("type") == "tool" and msg.get("tool_type") in _SUBAGENT_TOOL_TYPES:
             return msg
-    # Fallback: original linear scan for edge cases where the index didn't
+    # Fallback: reverse linear scan for edge cases where the index didn't
     # capture the session_id (e.g. unusual result_text format).
-    for msg in session.messages:
+    for msg in reversed(session.messages):
         if (
             isinstance(msg, dict)
             and msg.get("type") == "tool"
-            and msg.get("tool_type") == "invoke_subagent"
-            and (session_id in msg.get("result_text", "") or session_id in str(msg.get("args", {})))
+            and msg.get("tool_type") in _SUBAGENT_TOOL_TYPES
+            and (
+                msg.get("subagent_session_id") == session_id
+                or (
+                    isinstance(msg.get("args"), dict)
+                    and (msg["args"].get("id") == session_id or msg["args"].get("session_id") == session_id)
+                )
+                or session_id in str(msg.get("result_text", ""))
+            )
         ):
             return msg
     return None
