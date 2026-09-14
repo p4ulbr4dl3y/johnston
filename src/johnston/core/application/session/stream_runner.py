@@ -257,15 +257,20 @@ async def run_subagent_stream_bg(
                         else:
                             result_text = base_text or "Completed with no text output."
 
+                        has_changes = getattr(session, "has_worktree_changes", True)
                         branch = getattr(session, "branch_name", None) or None
+                        if not has_changes:
+                            branch = None
+
                         if status_val == "completed":
                             if branch:
                                 hint = f"\n\n[Next: inspect diff & 'git merge {branch}'. If incomplete/broken: call message_subagent(id=\"{sid}\", message=\"...\")]"
                             else:
-                                hint = f"\n\n[If incomplete/fixes needed: call message_subagent(id=\"{sid}\", message=\"...\")]"
+                                hint = f"\n\n[Next: inspect output. If follow-up needed: call message_subagent(id=\"{sid}\", message=\"...\")]"
                             result_text += hint
                         elif status_val == "error":
-                            result_text += f"\n\n[If fixable: call message_subagent(id=\"{sid}\", message=\"...\")]"
+                            no_changes_note = "\n\nNo changes made." if not has_changes else ""
+                            result_text += f"{no_changes_note}\n\n[If fixable: call message_subagent(id=\"{sid}\", message=\"...\")]"
 
                         from johnston.core.domain.policies.messages import format_background_notification
 

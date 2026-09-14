@@ -1077,6 +1077,26 @@ class TestSubagentStepAndErrorHandling:
         assert ctx.subagent_statuses[0][1] == STATUS_ERROR
 
     @pytest.mark.asyncio
+    async def test_notification_omits_branch_when_no_worktree_changes(self):
+        sub = FakeSubagent(steps=[("error", "API failure", "")])
+        sess = make_session(description="No changes task")
+        sess.branch_name = "subagent/empty-branch"
+        sess.has_worktree_changes = False
+        ctx = FakeCtx()
+        store = FakeStore()
+        await run_subagent_stream_bg(
+            sub, "initial prompt", sess, ctx, store, notification_template=True
+        )
+        assert sess.status == STATUS_ERROR
+        assert len(ctx.messages) == 1
+        notif = ctx.messages[0]
+        assert 'status="error"' in notif
+        assert 'branch=' not in notif
+        assert 'git merge' not in notif
+        assert 'No changes made.' in notif
+        assert '[If fixable: call message_subagent' in notif
+
+    @pytest.mark.asyncio
     async def test_subagent_suppress_notification_skips_trigger_ai(self):
         sub = FakeSubagent(steps=[("bot_delta", "ok")])
         sess = make_session()

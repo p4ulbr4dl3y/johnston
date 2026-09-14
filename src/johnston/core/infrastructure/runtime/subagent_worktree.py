@@ -163,8 +163,10 @@ class SubagentWorktreeManager(GitWorktreeManager):
                 if base_res.returncode == 0 and base_res.stdout.strip():
                     base_sha = base_res.stdout.strip()
 
-            # Diff worktree against parent project_dir base commit
-            diff_res = run_git(["diff", "--name-only", base_sha], cwd=wt_path, timeout=10)
+            # Diff worktree against parent project_dir base commit (3-dot diff: changes on branch not in base)
+            diff_res = run_git(["diff", "--name-only", f"{base_sha}...HEAD"], cwd=wt_path, timeout=10)
+            if diff_res.returncode != 0:
+                diff_res = run_git(["diff", "--name-only", base_sha], cwd=wt_path, timeout=10)
             if not diff_res.stdout.strip():
                 return "", False
 
@@ -294,7 +296,9 @@ class SubagentWorktreeManager(GitWorktreeManager):
             if has_changes and summary_text:
                 prefix = f"{acc[0].rstrip()}\n\n" if acc[0].strip() else ""
                 acc[0] = f"{prefix}{summary_text}"
-            keep_b = True if is_followup else has_changes
+            if session is not None:
+                setattr(session, "has_worktree_changes", has_changes)
+            keep_b = True if (is_followup and has_changes) else has_changes
             SubagentWorktreeManager.cleanup_worktree(parent_dir, wt_path, wt_branch, keep_branch=keep_b)
             # Remove worktree from session workspace roots after cleanup.
             from johnston.core.application.permission.permission_manager import PermissionManager
