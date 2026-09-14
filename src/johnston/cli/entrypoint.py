@@ -332,6 +332,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print only assistant text without tool call status headers",
     )
 
+    # serve subparser
+    serve_p = subparsers.add_parser(
+        "serve",
+        help="Run the JSON-RPC 2.0 daemon over stdio hosting the core client facade",
+    )
+    serve_p.add_argument("--provider", default=None, help="Override active provider")
+    serve_p.add_argument("--model", default=None, help="Override active model")
+    serve_p.add_argument(
+        "--role",
+        default="worker",
+        help="Agent execution role (default: worker)",
+    )
+    serve_p.add_argument(
+        "--effort",
+        choices=["low", "medium", "high"],
+        default=None,
+        help="Thinking/reasoning effort",
+    )
+    serve_p.add_argument(
+        "--mode",
+        choices=["review", "edits", "yolo"],
+        default=None,
+        help="Permission mode (review, edits, yolo)",
+    )
+    serve_sandbox = serve_p.add_mutually_exclusive_group()
+    serve_sandbox.add_argument("--sandbox", action="store_true", help="Enable execution sandbox")
+    serve_sandbox.add_argument("--no-sandbox", action="store_true", help="Disable execution sandbox")
+    serve_p.add_argument(
+        "-w",
+        "--workspace",
+        action="append",
+        default=[],
+        help="Additional allowed workspace root directory",
+    )
+    serve_p.add_argument("-C", "--cwd", default=None, help="Change working directory")
+    serve_p.add_argument("--debug", action="store_true", help="Enable DEBUG logging level")
+
     return parser
 
 
@@ -423,6 +460,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         from johnston.cli.commands.run_cmd import run_headless
 
         code = run_headless(args)
+        sys.exit(code if code is not None else 0)
+    elif args.subcommand == "serve":
+        from johnston.cli.commands.serve_cmd import run_serve_entry
+
+        code = run_serve_entry(args)
         sys.exit(code if code is not None else 0)
 
     from johnston.tui.app import JohnstonApp
