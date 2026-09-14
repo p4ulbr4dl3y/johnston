@@ -525,7 +525,7 @@ class SubagentsScreen(BaseTasksListScreen):
 
         curr_sid = getattr(app, "current_session_id", None) if app else None
         store = core_bridge.get_store(app)
-        return JohnstonClient(store=store, session_id=curr_sid)
+        return JohnstonClient(store=store, session_id=curr_sid, app=app)
 
     def _get_filtered_tasks(self) -> list:
         now = time.monotonic()
@@ -643,6 +643,6 @@ class SubagentsScreen(BaseTasksListScreen):
 
             core_bridge.kill_subagent(sess, app)
         elif session_id:
-            await client.core_bridge.kill_subagent(session_id, app=app)
+            await client.kill_subagent(session_id, app=app)
         self._invalidate_tasks_cache()
         self._on_session_event()

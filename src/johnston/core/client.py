@@ -169,7 +169,9 @@ class JohnstonClient:
         agent: Any | None = None,
         task_manager: Any | None = None,
         perm_manager: Any | None = None,
+        app: Any | None = None,
     ) -> None:
+        self.app = app
         self.pm = pm if pm is not None else ProviderManager()
         self.store = store if store is not None else SessionStore.get_instance()
         self.task_manager = task_manager
@@ -1008,18 +1010,18 @@ class JohnstonClient:
 
         target_app = app or getattr(self, "app", None)
         if not isinstance(session_id, str):
-            return kill_subagent(session_id, app=target_app)
+            return kill_subagent(session_id, app=target_app, store=self.store)
 
-        sessions = list_subagent_sessions(parent_id=self.session_id, app=target_app)
+        sessions = list_subagent_sessions(parent_id=self.session_id, app=target_app, store=self.store)
         for s in sessions:
             if getattr(s, "id", "") == session_id:
-                kill_subagent(s, target_app)
+                kill_subagent(s, app=target_app, store=self.store)
                 return True
         # If not found under current session_id, check all subagent sessions
-        all_sessions = list_subagent_sessions(parent_id=None, app=target_app)
+        all_sessions = list_subagent_sessions(parent_id=None, app=target_app, store=self.store)
         for s in all_sessions:
             if getattr(s, "id", "") == session_id:
-                kill_subagent(s, target_app)
+                kill_subagent(s, app=target_app, store=self.store)
                 return True
         return False
 
@@ -1028,7 +1030,7 @@ class JohnstonClient:
         from johnston.core.application.session.facade import list_subagent_sessions
 
         pid = parent_id if parent_id is not None else self.session_id
-        return list_subagent_sessions(parent_id=pid, app=getattr(self, "app", None))
+        return list_subagent_sessions(parent_id=pid, app=getattr(self, "app", None), store=self.store)
 
     def get_config_dir(self) -> str:
         """Return the core configuration directory path."""

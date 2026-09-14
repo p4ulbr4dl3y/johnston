@@ -13,13 +13,17 @@ from johnston.core.domain.entities.session import AgentSession
 logger = logging.getLogger(__name__)
 
 
-def _get_store(app: Any = None) -> Any:
-    """Resolve the session store, preferring ``app.sm`` then the singleton."""
+def _get_store(app: Any = None, store: Any = None) -> Any:
+    """Resolve the session store, preferring explicit store, app.sm, app.store, then singleton."""
     from johnston.core.infrastructure.storage.session_store import SessionStore, get_session_store
 
+    if store is not None:
+        return store
     if app is not None and getattr(app, "sm", None) is not None:
         # Prefer the app-owned store (may be a mock in tests) over the singleton.
         return getattr(app, "sm")
+    if app is not None and getattr(app, "store", None) is not None:
+        return getattr(app, "store")
     if app is not None:
         return get_session_store(app)
     return SessionStore.get_instance()
@@ -49,14 +53,28 @@ def resolve_session_by_title(
     return found
 
 
-def kill_subagent(session: Any, app: Any = None) -> bool:
+def kill_subagent(
+    session_or_id: Any,
+    app: Any = None,
+    store: Any = None,
+) -> bool:
     """Kill a running subagent session.
 
-    Returns ``True`` on success, ``False`` on failure.
+    Accepts an :class:`AgentSession` object or a string session ID. Scans
+    both in-memory active tasks and on-disk sessions (including uncommitted
+    worktrees) so cancelled/abandoned subagents are cleanly terminated.
+
+    Returns ``True`` on success, ``False`` if not found or cancellation failed.
     """
+    store = _get_store(app, store=store)
+    if isinstance(session_or_id, str):
+        session = store.get(session_or_id) if hasattr(store, "get") else None
+    else:
+        session = session_or_id
+    if not session:
+        return False
     from johnston.core.application.session.subagent_service import SubagentService
 
-    store = _get_store(app)
     result = SubagentService.kill_subagent(session, store)
     return result is not None and not getattr(result, "is_error", False)
 
@@ -64,9 +82,10 @@ def kill_subagent(session: Any, app: Any = None) -> bool:
 def list_subagent_sessions(
     parent_id: Optional[str] = None,
     app: Any = None,
+    store: Any = None,
 ) -> List[AgentSession]:
     """Return subagent sessions, optionally filtered by *parent_id*."""
-    store = _get_store(app)
+    store = _get_store(app, store=store)
     if parent_id:
         return store.children(parent_id)
     return store.list(kind="subagent")

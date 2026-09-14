@@ -154,6 +154,7 @@ def build_core_services(app: Any) -> None:
         store=app.sm,
         agent=app.agent,
         task_manager=app.task_manager,
+        app=app,
     )
     app.selection_copy_active = False
     app.message_queue = []

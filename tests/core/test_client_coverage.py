@@ -757,7 +757,7 @@ async def test_client_kill_subagent_non_string(mock_pm: MagicMock, mock_store: M
     sess_obj = MagicMock()
     with patch("johnston.core.application.session.facade.kill_subagent", return_value=True) as mkill:
         assert await client.kill_subagent(sess_obj) is True
-    mkill.assert_called_with(sess_obj, app=None)
+    mkill.assert_called_with(sess_obj, app=None, store=mock_store)
 
 
 @pytest.mark.asyncio
@@ -785,9 +785,9 @@ def test_client_list_subagent_sessions(mock_pm: MagicMock, mock_store: MagicMock
     with patch("johnston.core.application.session.facade.list_subagent_sessions", return_value=["s1"]) as ml:
         client = JohnstonClient(pm=mock_pm, store=mock_store)
         assert client.list_subagent_sessions() == ["s1"]
-        ml.assert_called_with(parent_id="session-test-123", app=None)
+        ml.assert_called_with(parent_id="session-test-123", app=None, store=mock_store)
         assert client.list_subagent_sessions("custom-pid") == ["s1"]
-        ml.assert_called_with(parent_id="custom-pid", app=None)
+        ml.assert_called_with(parent_id="custom-pid", app=None, store=mock_store)
 
 
 def test_client_get_config_dir(mock_pm: MagicMock, mock_store: MagicMock):

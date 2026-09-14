@@ -465,8 +465,57 @@ class TestShellTaskProgressDisplay(unittest.TestCase):
         ]
         self.assertEqual(extract_subagent_progress(sess), "[2/2] running command")
 
+    def test_subagents_screen_displays_running_in_memory_subagent(self):
+        from unittest.mock import PropertyMock, patch
+
+        from johnston.core.client import JohnstonClient
+        from johnston.core.domain.entities.session import SessionStatus
+        from johnston.tui.presentation.screens.tasks import SubagentsScreen
+
+        screen = SubagentsScreen()
+        mock_app = MagicMock()
+        mock_store = MagicMock()
+        mock_app.sm = mock_store
+        mock_app.current_session_id = "parent-sess"
+
+        # Running subagent in RAM (e.g. store.children returns it)
+        running_sub = MagicMock()
+        running_sub.id = "sub-running-1"
+        running_sub.status = SessionStatus.RUNNING
+        running_sub.title = "Ink inline TUI POC"
+        running_sub.role = "worker"
+        running_sub.agent = None
+        running_sub.messages = []
+        running_sub.created_at = 100.0
+
+        completed_sub = MagicMock()
+        completed_sub.id = "sub-completed-1"
+        completed_sub.status = SessionStatus.COMPLETED
+        completed_sub.title = "JSON-RPC protocol spec"
+        completed_sub.role = "worker"
+        completed_sub.agent = None
+        completed_sub.messages = []
+        completed_sub.created_at = 50.0
+
+        mock_store.children.return_value = [completed_sub, running_sub]
+        client = JohnstonClient(store=mock_store, app=mock_app, session_id="parent-sess")
+        mock_app.client = client
+
+        with patch.object(SubagentsScreen, "app", new_callable=PropertyMock, return_value=mock_app):
+            tasks = screen._get_filtered_tasks()
+
+        self.assertEqual(len(tasks), 2)
+        # Running subagent should be sorted first
+        self.assertEqual(tasks[0]["id"], "sub-running-1")
+        self.assertTrue(tasks[0]["is_running"])
+        self.assertIn("Ink inline TUI POC", tasks[0]["command"])
+        # Completed subagent second
+        self.assertEqual(tasks[1]["id"], "sub-completed-1")
+        self.assertFalse(tasks[1]["is_running"])
+
 
 if __name__ == "__main__":
     unittest.main()
+
 
 
