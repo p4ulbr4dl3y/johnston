@@ -156,7 +156,7 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             session.messages = [
                 {
                     "type": "tool",
-                    "tool_type": "invoke_subagent",
+                    "tool_type": "spawn_subagent",
                     "args": {"description": "worker", "prompt": "do work"},
                     "result_text": "subagent 'worker' launched (session_id: sub_999)",
                     "status": "running",
@@ -177,7 +177,7 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             session.messages = [
                 {
                     "type": "tool",
-                    "tool_type": "invoke_subagent",
+                    "tool_type": "spawn_subagent",
                     "args": {"description": "worker", "prompt": "do work"},
                     "result_text": "subagent 'worker' launched (session_id: sub_999)",
                     "status": "done",
@@ -195,7 +195,7 @@ class TestBackgroundShellCompleted(unittest.IsolatedAsyncioTestCase):
             app.on_subagent_tool_completed("sub_999", "completed", "followup finished")
 
             updated = app.sm.get(app.current_session_id)
-            # Original invoke_subagent stays done
+            # Original spawn_subagent stays done
             self.assertEqual(updated.messages[0]["status"], "done")
             # Most recent message_subagent is updated to done
             self.assertEqual(updated.messages[1]["status"], "done")

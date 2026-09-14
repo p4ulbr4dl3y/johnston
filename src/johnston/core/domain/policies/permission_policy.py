@@ -119,7 +119,7 @@ BUILTIN_TOOLS = frozenset(
         "search",
         "ask_user",
         "web_fetch",
-        "invoke_subagent",
+        "spawn_subagent",
         "message_subagent",
         "kill",
         "update_plan",

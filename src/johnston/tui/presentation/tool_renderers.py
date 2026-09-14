@@ -224,7 +224,7 @@ def compute_tool_call_content(
         elif canonical_tool in ("kill", "message_subagent"):
             clean_res = clean_hints(result_text or "(No result)")
             return "markup", clean_markup(clean_res)
-        elif canonical_tool == "invoke_subagent":
+        elif canonical_tool == "spawn_subagent":
             clean_res = clean_hints(result_text or "")
             if not clean_res.strip():
                 prompt = args.get("prompt", "")

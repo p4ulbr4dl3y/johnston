@@ -26,7 +26,7 @@ def record_subagent_session(app: Any, session_id: str) -> None:
 
 
 def mark_subagent_running(app: Any, session_id: str, text: str = "") -> None:
-    """Flip the host's invoke_subagent widget for session_id back to running (yellow)."""
+    """Flip the host's spawn_subagent widget for session_id back to running (yellow)."""
     if app is None:
         return
     reg = getattr(app, "_subagent_tools", None)

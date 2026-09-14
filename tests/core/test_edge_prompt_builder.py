@@ -199,40 +199,40 @@ def test_build_tools_cache_isolated_from_caller_mutation():
 
 
 def test_build_tools_subagent_excluded_tools():
-    """Subagent must drop SUBAGENT_EXCLUDED_TOOLS (invoke_subagent etc)."""
+    """Subagent must drop SUBAGENT_EXCLUDED_TOOLS (spawn_subagent etc)."""
     base = [
-        {"function": {"name": "invoke_subagent"}},
+        {"function": {"name": "spawn_subagent"}},
         {"function": {"name": "ask_user"}},
         {"function": {"name": "read"}},
     ]
     b = PromptBuilder("p", base, role="worker", allow_task=False, is_subagent=True)
     names = [t["function"]["name"] for t in b.build_tools()]
-    assert "invoke_subagent" not in names
+    assert "spawn_subagent" not in names
     assert "ask_user" not in names
     assert "read" in names
 
 
-_SUBAGENT_SCHEMA = {"type": "function", "function": {"name": "invoke_subagent"}}
+_SUBAGENT_SCHEMA = {"type": "function", "function": {"name": "spawn_subagent"}}
 
 
-def test_build_tools_no_duplicate_invoke_subagent_when_present():
-    """If invoke_subagent already present, allow_task must not append a second."""
-    base = [{"function": {"name": "invoke_subagent"}}]
+def test_build_tools_no_duplicate_spawn_subagent_when_present():
+    """If spawn_subagent already present, allow_task must not append a second."""
+    base = [{"function": {"name": "spawn_subagent"}}]
     b = PromptBuilder("p", base, role="worker", allow_task=True)
     names = [t["function"]["name"] for t in b.build_tools()]
-    assert names.count("invoke_subagent") == 1
+    assert names.count("spawn_subagent") == 1
 
 
 def test_build_tools_float_allow_task_truthy():
     b = PromptBuilder("p", [], role="worker", allow_task=1.5, subagent_schema=_SUBAGENT_SCHEMA)
     names = [t["function"]["name"] for t in b.build_tools()]
-    assert "invoke_subagent" in names
+    assert "spawn_subagent" in names
 
 
 def test_build_tools_allow_task_zero_falsy():
     b = PromptBuilder("p", [], role="worker", allow_task=0)
     names = [t["function"]["name"] for t in b.build_tools()]
-    assert "invoke_subagent" not in names
+    assert "spawn_subagent" not in names
 
 
 def test_build_tools_partitioned_mcp_after_builtins(monkeypatch):

@@ -27,7 +27,7 @@ Johnston equips the primary agent and subagents with a suite of 11 builtin tools
 6. **`kill`**: Terminate a running background shell task or subagent session by ID (`id`).
 
 ## Delegation & Subagents
-7. **`invoke_subagent`**: Spawn a specialized background subagent (`title`, `task`, `role`).
+7. **`spawn_subagent`**: Spawn a specialized background subagent (`title`, `task`, `role`).
    - Non-read-only roles (e.g. `worker`) automatically run in an isolated git worktree with an auto-generated branch, auto-committing on completion.
    - Read-only roles (e.g. `explorer`) run directly in the main workspace.
 8. **`message_subagent`**: Send follow-up instructions to an active or completed subagent session (`id`, `message`).
@@ -47,7 +47,7 @@ Johnston equips the primary agent and subagents with a suite of 11 builtin tools
 
 ## Subagent & Non-Interactive Exclusions
 To prevent recursive spawning, interactive stalls, and process collisions, the delegation and UI-orchestration tools (`NON_INTERACTIVE_EXCLUDED_TOOLS`) are strictly disabled in all non-interactive modes (subagent + headless execution):
-- `invoke_subagent`
+- `spawn_subagent`
 - `message_subagent`
 - `kill`
 - `ask_user`

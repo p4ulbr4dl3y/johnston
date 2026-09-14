@@ -149,7 +149,7 @@ def _make_agent_mock(
     """Build a MagicMock agent with the standard fields tests rely on.
 
     ``stream_steps`` is an ``AsyncMock``; ``tools``/``system_prompt`` default to
-    sensible values so tools like invoke_subagent can inspect them. Pass any extra
+    sensible values so tools like spawn_subagent can inspect them. Pass any extra
     kwargs to override or extend the mock (e.g. ``app=...``, ``is_subagent=True``).
     """
     agent = MagicMock()

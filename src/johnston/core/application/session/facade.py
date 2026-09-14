@@ -131,8 +131,8 @@ def resolve_subagent_from_toolcall(
         if m:
             return m.group(1)
 
-    # 3. Title-based lookup (invoke_subagent / message_subagent).
-    if tool_name in ("invoke_subagent", "message_subagent"):
+    # 3. Title-based lookup (spawn_subagent / message_subagent).
+    if tool_name in ("spawn_subagent", "message_subagent"):
         title = args.get("title") or args.get("prompt")
         if title:
             app_ref = app

@@ -627,7 +627,7 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
             {"type": "user", "text": "turn 0", "show_in_ui": True},
             {"type": "bot", "text": "ans 0"},
             {"type": "user", "text": "turn 1", "show_in_ui": True},
-            {"type": "tool", "tool_type": "invoke_subagent", "args": {"session_id": "sub-child-1"}},
+            {"type": "tool", "tool_type": "spawn_subagent", "args": {"session_id": "sub-child-1"}},
             {"type": "tool", "tool_type": "shell", "background_task_id": "task-123"},
             {"type": "bot", "text": "ans 1"},
         ]
@@ -681,10 +681,10 @@ class TestRewindSession(unittest.IsolatedAsyncioTestCase):
         sess = MagicMock(id="parent-1")
         sess.messages = [
             {"type": "user", "text": "turn 0", "show_in_ui": True},
-            {"type": "tool", "tool_type": "invoke_subagent", "args": {"session_id": "sub-kept"}},
+            {"type": "tool", "tool_type": "spawn_subagent", "args": {"session_id": "sub-kept"}},
             {"type": "bot", "text": "ans 0"},
             {"type": "user", "text": "turn 1", "show_in_ui": True},
-            {"type": "tool", "tool_type": "invoke_subagent", "args": {"session_id": "sub-dropped"}},
+            {"type": "tool", "tool_type": "spawn_subagent", "args": {"session_id": "sub-dropped"}},
             {"type": "bot", "text": "ans 1"},
         ]
 

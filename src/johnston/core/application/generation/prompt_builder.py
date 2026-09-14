@@ -457,7 +457,7 @@ class PromptBuilder:
             filtered_base = [
                 t
                 for t in filtered_base
-                if t.get("function", {}).get("name", "").lower() not in ("invoke_subagent", "message_subagent")
+                if t.get("function", {}).get("name", "").lower() not in ("spawn_subagent", "message_subagent")
             ]
 
         filtered_mcp = [
@@ -470,9 +470,9 @@ class PromptBuilder:
             self.mode.is_interactive
             and self.allow_task
             and self.subagent_schema
-            and role_tool_error(role_def, "invoke_subagent", mode=self.mode) is None
+            and role_tool_error(role_def, "spawn_subagent", mode=self.mode) is None
             and not any(
-                t.get("function", {}).get("name", "").lower() == "invoke_subagent"
+                t.get("function", {}).get("name", "").lower() == "spawn_subagent"
                 for t in filtered_base
             )
         ):

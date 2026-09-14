@@ -97,18 +97,18 @@ You run tests and report coverage.""")
         role_ro = AgentRole(
             key="reviewer",
             name="Reviewer",
-            disallowed_tools=["invoke_subagent", "create"],
+            disallowed_tools=["spawn_subagent", "create"],
             tool_name_normalizer=normalize_tool_name,
         )
 
         # normalize_tool_name no longer resolves aliases: 'subagent' is not in the
-        # disallowed list (which holds 'invoke_subagent'), so it is allowed.
+        # disallowed list (which holds 'spawn_subagent'), so it is allowed.
         self.assertIsNone(role_tool_error(role_ro, "subagent"))
         # Without a normalizer the result is the same (identity on lowercase).
-        role_no_norm = AgentRole(key="reviewer", name="Reviewer", disallowed_tools=["invoke_subagent", "create"])
+        role_no_norm = AgentRole(key="reviewer", name="Reviewer", disallowed_tools=["spawn_subagent", "create"])
         self.assertIsNone(role_tool_error(role_no_norm, "subagent"))
-        # Canonical 'invoke_subagent' is blocked by the disallowed list.
-        self.assertIsNotNone(role_tool_error(role_ro, "invoke_subagent"))
+        # Canonical 'spawn_subagent' is blocked by the disallowed list.
+        self.assertIsNotNone(role_tool_error(role_ro, "spawn_subagent"))
         self.assertIsNone(role_tool_error(role_ro, "write_file"))
         self.assertIsNotNone(role_tool_error(role_ro, "create"))
 

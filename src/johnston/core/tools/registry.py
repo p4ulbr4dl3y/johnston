@@ -12,12 +12,12 @@ from johnston.core.tools.ask_user import AskUserTool
 from johnston.core.tools.base import BaseTool, _resolve_app
 from johnston.core.tools.create import CreateTool
 from johnston.core.tools.edit import EditTool
-from johnston.core.tools.invoke_subagent import InvokeSubagentTool
 from johnston.core.tools.kill import KillTool
 from johnston.core.tools.message_subagent import MessageSubagentTool
 from johnston.core.tools.read import ReadTool
 from johnston.core.tools.search import SearchTool
 from johnston.core.tools.shell import ShellTool
+from johnston.core.tools.spawn_subagent import SpawnSubagentTool
 from johnston.core.tools.update_plan import UpdatePlanTool
 from johnston.core.tools.web_fetch import WebFetchTool
 
@@ -29,7 +29,7 @@ TOOL_CLASSES = [
     SearchTool,
     AskUserTool,
     KillTool,
-    InvokeSubagentTool,
+    SpawnSubagentTool,
     MessageSubagentTool,
     UpdatePlanTool,
     WebFetchTool,
@@ -395,7 +395,7 @@ class DefaultToolRegistry:
         return process_image_file_sync(path)
 
     def get_subagent_schema(self) -> Dict[str, Any] | None:
-        return getattr(InvokeSubagentTool, "schema", None)
+        return getattr(SpawnSubagentTool, "schema", None)
 
     def is_tool_concurrency_safe(self, name: str, args: dict | None = None) -> bool:
         return is_tool_concurrency_safe(name, args)

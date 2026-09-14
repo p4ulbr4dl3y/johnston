@@ -122,7 +122,7 @@ class ToolContext:
     def mark_subagent_status(self, session_id: str, status: str, result: str = "") -> None:
         """Notify the host that a background subagent finished with ``status``.
 
-        The host (UI zone) repaints the linked invoke_subagent tool card from
+        The host (UI zone) repaints the linked spawn_subagent tool card from
         running (yellow) to done/error/cancelled. No-op when unsupported.
         """
         self._host_call("on_subagent_tool_completed", session_id, status, result)

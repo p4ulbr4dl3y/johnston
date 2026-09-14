@@ -904,10 +904,10 @@ class TestApplyRole:
 
         worker_role = AgentRole(key="worker", scope="any", prompt="worker prompt")
         self._fake_registry(monkeypatch, {"worker": worker_role})
-        sub = FakeSubagentAgent(tools=[_tool("shell"), _tool("invoke_subagent"), _tool("ask_user")])
+        sub = FakeSubagentAgent(tools=[_tool("shell"), _tool("spawn_subagent"), _tool("ask_user")])
         configure_subagent_agent(sub, "worker")
         names = [t["function"]["name"] for t in sub.tools]
-        assert "invoke_subagent" not in names
+        assert "spawn_subagent" not in names
         assert "ask_user" not in names
         assert "shell" in names
 

@@ -54,7 +54,7 @@ def build_toolcall_header(
     marker = "○" if is_generating else "●"
     trunc_mode = "right" if is_generating else ("path" if canonical_tool in ("read", "edit", "create") else "middle")
     if canonical_tool in system_tools or canonical_tool in (
-        "invoke_subagent",
+        "spawn_subagent",
         "message_subagent",
         "kill",
         "ask_user",

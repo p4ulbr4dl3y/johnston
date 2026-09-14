@@ -55,16 +55,16 @@ class ToolCallActionsMixin:
         if getattr(self, "status", None) == "generating":
             return False
         canonical = getattr(self, "canonical_tool", "")
-        if canonical in ("invoke_subagent", "message_subagent"):
+        if canonical in ("spawn_subagent", "message_subagent"):
             if self.has_subagent_session():
                 return True
             if getattr(self, "status", None) in ("error", "cancelled"):
                 return False
-            return canonical == "invoke_subagent"
+            return canonical == "spawn_subagent"
 
         if getattr(self, "status", None) in ("error", "cancelled"):
             return canonical == "shell" and bool((getattr(self, "result_text", "") or "").strip())
-        return self.is_expandable() or canonical in ("invoke_subagent", "ask_user")
+        return self.is_expandable() or canonical in ("spawn_subagent", "ask_user")
 
     def _resume_ask_user_wizard(self) -> None:
         """Resume a minimized ask_user wizard if present."""
@@ -84,7 +84,7 @@ class ToolCallActionsMixin:
             pass
 
         canonical = getattr(self, "canonical_tool", "")
-        if canonical == "invoke_subagent":
+        if canonical == "spawn_subagent":
             args = self.args if isinstance(self.args, dict) else {}
             session_id = getattr(self, "subagent_session_id", None)
             if not session_id and getattr(self, "result_text", None):

@@ -34,13 +34,13 @@ class TestPromptBuilder(unittest.TestCase):
             "System prompt test",
             [],
             role="explorer",
-            subagent_schema={"type": "function", "function": {"name": "invoke_subagent"}},
+            subagent_schema={"type": "function", "function": {"name": "spawn_subagent"}},
         )
         tools = builder.build_tools()
         names = [t["function"]["name"] for t in tools]
         self.assertNotIn("create", names)
         self.assertNotIn("edit", names)
-        self.assertIn("invoke_subagent", names)
+        self.assertIn("spawn_subagent", names)
 
     def test_build_tools_sorted_alphabetically(self):
         base_tools = [
@@ -236,18 +236,18 @@ class TestPromptBuilder(unittest.TestCase):
         role = AgentRole(
             key="no_sub",
             name="No Sub",
-            disallowed_tools=["invoke_subagent"],
+            disallowed_tools=["spawn_subagent"],
         )
         with patch.object(reg, "get_role", return_value=role):
             builder = PromptBuilder(
                 "Test",
                 [],
                 role="no_sub",
-                subagent_schema={"type": "function", "function": {"name": "invoke_subagent"}},
+                subagent_schema={"type": "function", "function": {"name": "spawn_subagent"}},
             )
             tools = builder.build_tools()
             names = [t.get("function", {}).get("name") for t in tools]
-            self.assertNotIn("invoke_subagent", names)
+            self.assertNotIn("spawn_subagent", names)
 
 
 if __name__ == "__main__":

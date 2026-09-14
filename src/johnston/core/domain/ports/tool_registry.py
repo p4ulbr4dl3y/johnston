@@ -31,7 +31,7 @@ class ToolRegistryPort(Protocol):
         ...
 
     def get_subagent_schema(self) -> Optional[Dict[str, Any]]:
-        """Return the schema for invoke_subagent tool."""
+        """Return the schema for spawn_subagent tool."""
         ...
 
     def is_tool_concurrency_safe(self, name: str, args: Optional[Dict[str, Any]] = None) -> bool:

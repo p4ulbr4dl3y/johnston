@@ -64,7 +64,7 @@ _SHARED_SYSTEM_NOTES = (
 )
 
 _SHARED_NON_INTERACTIVE_LIMITS = (
-    "- Tool restrictions: CANNOT call `invoke_subagent`, `message_subagent`, `kill`, or `ask_user` (filtered out of toolset).\n"
+    "- Tool restrictions: CANNOT call `spawn_subagent`, `message_subagent`, `kill`, or `ask_user` (filtered out of toolset).\n"
     "- Shell: synchronous only; non-interactive flags required; no interactive pagers/editors (`vim`, `less`, `nano`)."
 )
 
@@ -102,7 +102,7 @@ DEFAULT_SYSTEM_PROMPT = f"""<identity>{{model_name}} in Johnston CLI. Solve codi
   - Shell background tasks and subagents are reactive. After launching, STOP calling tools immediately to yield the turn.
   - NEVER poll or check process status: no `sleep`, no reading log files, no `ps`/`pgrep`/`kill -0`.
   - Runtime automatically wakes execution via `<notification>` on completion or inactivity ping. Stop calling tools to wait.
-- **Subagents**: Use `invoke_subagent` for bounded, isolated, or parallel sub-tasks (see `<subagents>`).
+- **Subagents**: Use `spawn_subagent` for bounded, isolated, or parallel sub-tasks (see `<subagents>`).
 </tool_io>
 
 <context>

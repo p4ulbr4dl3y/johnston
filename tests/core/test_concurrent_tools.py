@@ -10,12 +10,12 @@ from johnston.core.tools.ask_user import AskUserTool
 from johnston.core.tools.base import BaseTool
 from johnston.core.tools.create import CreateTool
 from johnston.core.tools.edit import EditTool
-from johnston.core.tools.invoke_subagent import InvokeSubagentTool
 from johnston.core.tools.kill import KillTool
 from johnston.core.tools.message_subagent import MessageSubagentTool
 from johnston.core.tools.read import ReadTool
 from johnston.core.tools.registry import is_tool_concurrency_safe
 from johnston.core.tools.shell import ShellTool
+from johnston.core.tools.spawn_subagent import SpawnSubagentTool
 from johnston.core.tools.update_plan import UpdatePlanTool
 from johnston.core.tools.web_fetch import WebFetchTool
 
@@ -37,7 +37,7 @@ class TestToolConcurrencySafety(unittest.TestCase):
         self.assertFalse(ShellTool().is_concurrency_safe())
         self.assertFalse(AskUserTool().is_concurrency_safe())
         self.assertFalse(KillTool().is_concurrency_safe())
-        self.assertFalse(InvokeSubagentTool().is_concurrency_safe())
+        self.assertFalse(SpawnSubagentTool().is_concurrency_safe())
         self.assertFalse(MessageSubagentTool().is_concurrency_safe())
         self.assertFalse(UpdatePlanTool().is_concurrency_safe())
 

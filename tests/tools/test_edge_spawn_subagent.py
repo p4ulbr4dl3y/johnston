@@ -1,4 +1,4 @@
-"""Edge-case tests for tools/invoke_subagent.py.
+"""Edge-case tests for tools/spawn_subagent.py.
 
 These probe failure/abuse paths with fake app/agent/provider mocks. Each test is
 independent (fresh temp SessionStore). Red tests here document genuine product
@@ -17,7 +17,7 @@ from johnston.core.domain.entities.session import SessionStatus
 from johnston.core.infrastructure.storage.session_store import SessionStore
 from johnston.core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS
 from johnston.core.tools.context import ToolContext
-from johnston.core.tools.invoke_subagent import InvokeSubagentTool
+from johnston.core.tools.spawn_subagent import SpawnSubagentTool
 
 STATUS_CANCELLED = SessionStatus.CANCELLED
 STATUS_COMPLETED = SessionStatus.COMPLETED
@@ -78,7 +78,7 @@ def _make_env(agent):
     app.cwd = store_tmp.name
     app.agent = MMock()  # main agent for metric merging
 
-    tool = InvokeSubagentTool()
+    tool = SpawnSubagentTool()
     tool._ensure_context = lambda ctx=None: ToolContext(app=app)
     return store, app, tool, store_tmp
 
@@ -89,7 +89,7 @@ def _agent_with_stream(gen):
     agent.tools = [
         {"function": {"name": "read"}},
         {"function": {"name": "shell"}},
-        {"function": {"name": "invoke_subagent"}},
+        {"function": {"name": "spawn_subagent"}},
     ]
     agent.system_prompt = "base"
     agent.stream_steps = gen
@@ -303,7 +303,7 @@ async def test_worktree_create_raises_crashes_instead_of_err(monkeypatch):
         def is_git_repo(*a, **k):
             return True
 
-    monkeypatch.setattr("johnston.core.tools.invoke_subagent.SubagentWorktreeManager", _BadWorktree)
+    monkeypatch.setattr("johnston.core.tools.spawn_subagent.SubagentWorktreeManager", _BadWorktree)
     try:
         res = await tool.execute({"task": "do", "title": "t", "branch": "dev"})
         assert res.is_error

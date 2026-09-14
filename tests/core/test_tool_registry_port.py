@@ -58,7 +58,7 @@ def test_provider_manager_create_agent_with_custom_tool_registry():
     mock_registry.get_default_tools.return_value = custom_tools
     mock_registry.execute_tool = AsyncMock()
     mock_registry.process_image_file = MagicMock()
-    mock_registry.get_subagent_schema.return_value = {"name": "invoke_subagent"}
+    mock_registry.get_subagent_schema.return_value = {"name": "spawn_subagent"}
 
     pm = ProviderManager()
     agent = pm.create_agent_for_provider("openai", tool_registry=mock_registry)
@@ -66,7 +66,7 @@ def test_provider_manager_create_agent_with_custom_tool_registry():
     assert agent.tools == custom_tools
     assert agent.tool_executor == mock_registry.execute_tool
     assert agent.default_tools_provider == mock_registry.get_default_tools
-    assert agent.subagent_schema == {"name": "invoke_subagent"}
+    assert agent.subagent_schema == {"name": "spawn_subagent"}
 
 
 def test_set_default_tool_registry_override():

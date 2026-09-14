@@ -4,10 +4,10 @@ import unittest
 from johnston.core.domain.defaults.config import DEFAULT_MAX_CONCURRENT_SUBAGENTS
 from johnston.core.infrastructure.storage.session_store import SessionStore
 from johnston.core.infrastructure.tasks.output import MAX_SUBAGENT_RESULT_CHARS, truncate_subagent_result
-from johnston.core.tools.invoke_subagent import InvokeSubagentTool
+from johnston.core.tools.spawn_subagent import SpawnSubagentTool
 
 
-class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
+class TestSpawnSubagentTool(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -22,7 +22,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_max_concurrent_subagents_limit(self):
         from unittest.mock import MagicMock
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_app = MagicMock()
         mock_app.current_session_id = "sess-main"
         mock_app.sm = self.store
@@ -49,7 +49,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_custom_max_concurrent_subagents_limit(self):
         from unittest.mock import MagicMock, patch
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_app = MagicMock()
         mock_app.current_session_id = "sess-main"
         mock_app.sm = self.store
@@ -70,7 +70,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             )
 
         # With limit=2, spawning should fail with "2 concurrent max"
-        with patch("johnston.core.tools.invoke_subagent.get_settings") as mock_st:
+        with patch("johnston.core.tools.spawn_subagent.get_settings") as mock_st:
             mock_st.return_value.subagents.max_concurrent = 2
             res = str(await tool.execute({"task": "another task", "title": "Over limit", "branch": "main"}))
             self.assertIn("ERR: limit: 2 concurrent max", res)
@@ -78,7 +78,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_explore_subagent_tool_filtering(self):
         from unittest.mock import MagicMock
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
 
         # Mock app context and agent
         mock_app = MagicMock()
@@ -113,14 +113,14 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_subagent_tool_exclusion_of_kill_and_recursion_guards(self):
         from unittest.mock import MagicMock
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
 
         mock_app = MagicMock()
         mock_agent = MagicMock()
         mock_agent.tools = [
             {"function": {"name": "read"}},
             {"function": {"name": "shell"}},
-            {"function": {"name": "invoke_subagent"}},
+            {"function": {"name": "spawn_subagent"}},
             {"function": {"name": "message_subagent"}},
             {"function": {"name": "kill"}},
         ]
@@ -142,14 +142,14 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool_names = [t.get("function", {}).get("name") for t in mock_agent.tools]
         self.assertIn("read", tool_names)
         self.assertIn("shell", tool_names)
-        self.assertNotIn("invoke_subagent", tool_names)
+        self.assertNotIn("spawn_subagent", tool_names)
         self.assertNotIn("message_subagent", tool_names)
         self.assertNotIn("kill", tool_names)
 
-    async def test_invoke_subagent_without_branch_succeeds(self):
+    async def test_spawn_subagent_without_branch_succeeds(self):
         from unittest.mock import MagicMock
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
 
         mock_app = MagicMock()
         mock_agent = MagicMock()
@@ -174,10 +174,10 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sessions[0].branch_name, "")
         self.assertEqual(sessions[0].project_dir, "")
 
-    async def test_invoke_subagent_with_branch_non_git_sets_empty_branch(self):
+    async def test_spawn_subagent_with_branch_non_git_sets_empty_branch(self):
         from unittest.mock import MagicMock
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
 
         mock_app = MagicMock()
         mock_agent = MagicMock()
@@ -201,10 +201,10 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sessions[0].branch_name, "")
         self.assertEqual(sessions[0].project_dir, "")
 
-    async def test_invoke_subagent_auto_branch_worker_in_git(self):
+    async def test_spawn_subagent_auto_branch_worker_in_git(self):
         from unittest.mock import AsyncMock, MagicMock, patch
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_app = MagicMock()
         mock_agent = MagicMock()
         mock_agent.tools = [{"function": {"name": "read"}}]
@@ -222,9 +222,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("johnston.core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("johnston.core.tools.spawn_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
             patch("johnston.core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("johnston.core.tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("johnston.core.tools.spawn_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
@@ -238,10 +238,10 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(sessions[0].branch_name, called_branch)
             self.assertEqual(sessions[0].project_dir, f"/tmp/wt/{sessions[0].id}")
 
-    async def test_invoke_subagent_non_ascii_title_fallback_in_git(self):
+    async def test_spawn_subagent_non_ascii_title_fallback_in_git(self):
         from unittest.mock import AsyncMock, MagicMock, patch
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_app = MagicMock()
         mock_agent = MagicMock()
         mock_agent.tools = [{"function": {"name": "read"}}]
@@ -259,9 +259,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("johnston.core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("johnston.core.tools.spawn_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
             patch("johnston.core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("johnston.core.tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("johnston.core.tools.spawn_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
             mock_wt.side_effect = lambda pdir, sid, branch: (f"/tmp/wt/{sid}", branch)
@@ -274,10 +274,10 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
             sessions = self.store.list(kind="subagent")
             self.assertEqual(sessions[0].branch_name, called_branch)
 
-    async def test_invoke_subagent_explorer_read_only_skips_worktree_in_git(self):
+    async def test_spawn_subagent_explorer_read_only_skips_worktree_in_git(self):
         from unittest.mock import AsyncMock, MagicMock, patch
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_app = MagicMock()
         mock_agent = MagicMock()
         mock_agent.tools = [{"function": {"name": "read"}}]
@@ -295,9 +295,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("johnston.core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
+            patch("johnston.core.tools.spawn_subagent.SubagentWorktreeManager.is_git_repo", return_value=True),
             patch("johnston.core.infrastructure.runtime.git_utils.run_git_async", new_callable=AsyncMock) as mock_git,
-            patch("johnston.core.tools.invoke_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
+            patch("johnston.core.tools.spawn_subagent.SubagentWorktreeManager.create_worktree_async", new_callable=AsyncMock) as mock_wt,
         ):
             mock_git.return_value.stdout = "main\n"
 
@@ -311,7 +311,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
     async def test_max_concurrent_counts_active_status_subagents(self):
         from unittest.mock import MagicMock
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_app = MagicMock()
         mock_app.current_session_id = "sess-main"
         mock_app.sm = self.store
@@ -334,18 +334,18 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         res = str(await tool.execute({"task": "another task", "title": "Over limit", "branch": "main"}))
         self.assertIn("ERR: limit: 5 concurrent max", res)
 
-    async def test_invoke_subagent_none_type_and_branch_does_not_crash(self):
-        tool = InvokeSubagentTool()
+    async def test_spawn_subagent_none_type_and_branch_does_not_crash(self):
+        tool = SpawnSubagentTool()
         mock_ctx = None
         # Passing type=None, branch=None should not raise AttributeError on strip
         res = await tool.execute({"task": "", "role": None, "branch": None}, ctx=mock_ctx)
         self.assertTrue(res.is_error)
         self.assertIn("ERR: params 'task'", str(res))
 
-    async def test_invoke_subagent_with_task_param(self):
+    async def test_spawn_subagent_with_task_param(self):
         from unittest.mock import MagicMock
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_app = MagicMock()
         mock_agent = MagicMock()
         mock_agent.tools = [{"function": {"name": "read"}}]
@@ -369,10 +369,10 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sessions[0].prompt, "implement feature")
         self.assertEqual(res.content, f"[subagent started | id {sessions[0].id} | role worker]")
 
-    async def test_invoke_subagent_empty_task_returns_task_param_error(self):
+    async def test_spawn_subagent_empty_task_returns_task_param_error(self):
         from unittest.mock import MagicMock
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_ctx = MagicMock()
         tool._ensure_context = lambda app=None: mock_ctx
 
@@ -380,13 +380,13 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(res.is_error)
         self.assertIn("ERR: params 'task'", str(res))
 
-    async def test_invoke_subagent_branch_equals_current_creates_isolated_branch(self):
+    async def test_spawn_subagent_branch_equals_current_creates_isolated_branch(self):
         from unittest.mock import AsyncMock, MagicMock, patch
 
         from johnston.core.application.session.subagent_service import SubagentService
         from johnston.core.infrastructure.runtime.subagent_worktree import SubagentWorktreeManager
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_app = MagicMock()
         mock_agent = MagicMock()
         mock_agent.tools = [{"function": {"name": "read"}}]
@@ -489,13 +489,13 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         result = truncate_subagent_result(long_text, session_id="subagent-3a1f9b")
         self.assertIn("subagent-3a1f9b.md", result)
 
-    def test_invoke_subagent_is_concurrency_safe_explicit_false(self):
-        tool = InvokeSubagentTool()
+    def test_spawn_subagent_is_concurrency_safe_explicit_false(self):
+        tool = SpawnSubagentTool()
         self.assertFalse(tool.is_concurrency_safe())
 
     async def test_subagent_cannot_spawn_nested_subagents(self):
         from unittest.mock import MagicMock
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_ctx = MagicMock()
         mock_ctx.is_subagent = True
         tool._ensure_context = lambda app=None: mock_ctx
@@ -504,9 +504,9 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(res.is_error)
         self.assertIn("cannot spawn nested subagents", res.content)
 
-    async def test_invoke_subagent_coerces_non_string_args(self):
+    async def test_spawn_subagent_coerces_non_string_args(self):
         from unittest.mock import MagicMock, patch
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         mock_app = MagicMock()
         mock_agent = MagicMock()
         mock_agent.tools = [{"function": {"name": "read"}}]
@@ -524,7 +524,7 @@ class TestInvokeSubagentTool(unittest.IsolatedAsyncioTestCase):
         tool._ensure_context = lambda app=None: mock_ctx
 
         with (
-            patch("johnston.core.tools.invoke_subagent.SubagentWorktreeManager.is_git_repo", return_value=False),
+            patch("johnston.core.tools.spawn_subagent.SubagentWorktreeManager.is_git_repo", return_value=False),
         ):
             res = await tool.execute({"task": "valid task", "title": 12345, "role": 999})
             self.assertFalse(res.is_error)

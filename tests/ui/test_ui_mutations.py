@@ -15,7 +15,7 @@ from johnston.tui.presentation.widgets.chat_view_restore import restore_message_
 
 def test_has_subagent_session_is_pure_predicate_no_mutation():
     widget = ToolCallWidget(
-        tool_type="invoke_subagent",
+        tool_type="spawn_subagent",
         target="research",
         result_text="Task started session_id: sess_xyz_123",
         args={},
@@ -37,7 +37,7 @@ def test_has_subagent_session_is_pure_predicate_no_mutation():
 
 def test_has_subagent_session_store_lookup_no_mutation():
     widget = ToolCallWidget(
-        tool_type="invoke_subagent",
+        tool_type="spawn_subagent",
         target="worker",
         result_text="",
         args={"title": "subagent-task"},
@@ -82,7 +82,7 @@ async def test_restore_message_item_does_not_mutate_msg_dict():
 
     input_msg = {
         "type": "tool",
-        "tool_type": "invoke_subagent",
+        "tool_type": "spawn_subagent",
         "target": "worker",
         "args": {"title": "Find Subagent"},
         "result_text": "working",

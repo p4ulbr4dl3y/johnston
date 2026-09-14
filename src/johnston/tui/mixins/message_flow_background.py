@@ -69,7 +69,7 @@ def _find_tool_msg_for_task(session: Any, task_id: str) -> Any:
     return None
 
 
-_SUBAGENT_TOOL_TYPES = ("invoke_subagent", "message_subagent")
+_SUBAGENT_TOOL_TYPES = ("spawn_subagent", "message_subagent")
 
 
 def _ensure_subagent_msg_index(session: Any) -> dict[str, int]:

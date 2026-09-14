@@ -61,13 +61,13 @@ Johnston provides 11 builtin tools:
 - `edit`: Surgical string replacements in existing files.
 - `shell`: Run commands in persistent session (with idle timeouts).
 - `kill`: Terminate background processes or subagents.
-- `invoke_subagent`: Launch autonomous child agents in background.
+- `spawn_subagent`: Launch autonomous child agents in background.
 - `message_subagent`: Send follow-up messages to running subagents.
 - `ask_user`: Interactive multiple-choice prompts for user feedback.
 - `update_plan`: Maintain persistent task list / progress tracking.
 - `web_fetch`: Retrieve URL contents as markdown or HTML.
 
-*Note: Non-interactive contexts (subagents and headless runs) automatically disable `invoke_subagent`, `message_subagent`, `kill`, `ask_user`, and `shell(wait_seconds=...)`.*
+*Note: Non-interactive contexts (subagents and headless runs) automatically disable `spawn_subagent`, `message_subagent`, `kill`, `ask_user`, and `shell(wait_seconds=...)`.*
 
 ## 4. Role Templates
 
@@ -141,7 +141,7 @@ Application security auditor. Identify vulnerabilities and risk patterns without
   - Subagents running with **write roles** (`read_only: false`) automatically execute inside an isolated Git worktree on an independent branch (`subagent/<title>-<id>`), automatically committing on completion. **Requires workspace to be inside a Git repository**; in non-Git workspaces, executes directly in place.
   - Subagents running with **read-only roles** (`read_only: true`) execute directly within the current workspace without worktree creation, with OS-level sandbox enforced.
 - **Non-Interactive Exclusions**:
-  - `invoke_subagent`, `message_subagent`, `kill`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in subagent roles to prevent recursive agent loops.
+  - `spawn_subagent`, `message_subagent`, `kill`, `ask_user`, and `shell(wait_seconds=...)` are automatically disabled in subagent roles to prevent recursive agent loops.
 
 ## 6. Creation & Verification Steps
 
@@ -154,7 +154,7 @@ Application security auditor. Identify vulnerabilities and risk patterns without
    - Run `johnston roles --json` via `shell`.
    - Verify the role appears with correct name, allowed/disallowed tools, model, and read_only status.
 4. **Test Role**:
-   - For subagent roles: launch a test task with `invoke_subagent(title="Test <key> execution", task="...", role="<key>")`.
+   - For subagent roles: launch a test task with `spawn_subagent(title="Test <key> execution", task="...", role="<key>")`.
    - For interactive roles: cycle with `Tab` in the TUI, or launch with CLI flag `johnston -r <key>` (note: there is no `/role` slash command).
 
 ## 7. Good vs Bad Practices

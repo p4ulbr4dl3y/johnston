@@ -148,7 +148,7 @@ class TestSubagentApplyRole(unittest.TestCase):
                 self.tools = [
                     {"function": {"name": "read"}},
                     {"function": {"name": "shell", "parameters": {"properties": {"timeout": {}, "wait_seconds": {}}}}},
-                    {"function": {"name": "invoke_subagent"}},
+                    {"function": {"name": "spawn_subagent"}},
                 ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -166,18 +166,18 @@ class TestSubagentApplyRole(unittest.TestCase):
             self.assertEqual(main_agent.role, "lead")
             self.assertTrue(getattr(main_agent, "allow_task", True))
             main_tool_names = [t["function"]["name"] for t in main_agent.tools]
-            self.assertIn("invoke_subagent", main_tool_names)
+            self.assertIn("spawn_subagent", main_tool_names)
             shell_tool = next(t for t in main_agent.tools if t["function"]["name"] == "shell")
             self.assertIn("wait_seconds", shell_tool["function"]["parameters"]["properties"])
 
-            # Subagent configuration: falls back to worker, hardens shell, strips invoke_subagent
+            # Subagent configuration: falls back to worker, hardens shell, strips spawn_subagent
             sub_agent = _FakeAgent()
             configure_agent(sub_agent, "lead", project_dir=tmpdir, is_subagent=True)
             self.assertTrue(sub_agent.is_subagent)
             self.assertEqual(sub_agent.role, "worker")
             self.assertFalse(sub_agent.allow_task)
             sub_tool_names = [t["function"]["name"] for t in sub_agent.tools]
-            self.assertNotIn("invoke_subagent", sub_tool_names)
+            self.assertNotIn("spawn_subagent", sub_tool_names)
             sub_shell_tool = next(t for t in sub_agent.tools if t["function"]["name"] == "shell")
             self.assertNotIn("wait_seconds", sub_shell_tool["function"]["parameters"]["properties"])
 

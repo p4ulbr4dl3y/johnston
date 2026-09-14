@@ -205,7 +205,7 @@ class TestAgentMode(unittest.TestCase):
         # Headless agent
         agent_headless = DummyAgent(provider_key="anthropic", api_key="k")
         agent_headless.mode = AgentMode.HEADLESS
-        err_headless = agent_headless._tool_policy_error("invoke_subagent", role_def)
+        err_headless = agent_headless._tool_policy_error("spawn_subagent", role_def)
         self.assertIsNotNone(err_headless)
         self.assertIn("disabled for headless mode", err_headless.content)
 
@@ -219,7 +219,7 @@ class TestAgentMode(unittest.TestCase):
         # Interactive agent
         agent_interactive = DummyAgent(provider_key="anthropic", api_key="k")
         agent_interactive.mode = AgentMode.INTERACTIVE
-        err_interactive = agent_interactive._tool_policy_error("invoke_subagent", role_def)
+        err_interactive = agent_interactive._tool_policy_error("spawn_subagent", role_def)
         self.assertIsNone(err_interactive)
 
     def test_interactive_only_tools_context_guards(self):
@@ -227,12 +227,12 @@ class TestAgentMode(unittest.TestCase):
 
         from johnston.core.tools.ask_user import AskUserTool
         from johnston.core.tools.context import ToolContext
-        from johnston.core.tools.invoke_subagent import InvokeSubagentTool
         from johnston.core.tools.kill import KillTool
         from johnston.core.tools.message_subagent import MessageSubagentTool
+        from johnston.core.tools.spawn_subagent import SpawnSubagentTool
 
         tools = [
-            (InvokeSubagentTool(), {"task": "t", "title": "tit"}),
+            (SpawnSubagentTool(), {"task": "t", "title": "tit"}),
             (MessageSubagentTool(), {"id": "sub-1", "message": "msg"}),
             (KillTool(), {"id": "sub-1"}),
             (AskUserTool(), {"questions": [{"question": "q?", "options": [{"label": "opt"}]}]}),

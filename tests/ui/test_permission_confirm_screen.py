@@ -111,8 +111,8 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
             ("create", {"path": "b.py", "content": "print(1)"}),
             ("read", {"path": "c.py"}),
             ("web_fetch", {"url": "https://example.com"}),
-            ("invoke_subagent", {"title": "Task 1", "role": "coder", "prompt": "fix bug"}),
-            ("invoke_subagent", {"type": "worker"}),
+            ("spawn_subagent", {"title": "Task 1", "role": "coder", "prompt": "fix bug"}),
+            ("spawn_subagent", {"type": "worker"}),
             ("kill", {"id": "t1"}),
             ("message_subagent", {"id": "s1", "message": "hello sub"}),
             ("update_plan", {"explanation": "step 1", "plan": [{"step": "Step one", "status": "completed"}]}),
@@ -139,7 +139,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNotNone(screen.query_one(Static))
 
     async def test_compose_subagent_without_prompt(self):
-        screen = PermissionConfirmScreen("invoke_subagent", {"role": "coder"})
+        screen = PermissionConfirmScreen("spawn_subagent", {"role": "coder"})
         async with HostApp(screen).run_test() as pilot:
             await pilot.pause()
 
@@ -334,7 +334,7 @@ class TestPermissionConfirmScreenPilot(unittest.IsolatedAsyncioTestCase):
 
     def test_content_width_calculation_subagent_prompt_capped(self):
         screen_prompt = PermissionConfirmScreen(
-            "invoke_subagent",
+            "spawn_subagent",
             {
                 "title": "Audit permission handlers",
                 "type": "Codebase Researcher",

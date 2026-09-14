@@ -94,33 +94,33 @@ class TestEdgeToolCallStatus(unittest.TestCase):
         self.assertEqual(widget.status, "done")
 
 
-class TestEdgeToolCallInvokeSubagentStatus(unittest.TestCase):
+class TestEdgeToolCallSpawnSubagentStatus(unittest.TestCase):
     def test_launch_result_is_running_when_status_running(self):
-        """Invoke-subagent status comes from the event ('launched' is status
+        """Spawn-subagent status comes from the event ('launched' is status
         RUNNING because the subagent runs in the background, not parsed from
         text). A bare set_result with no status still defaults to done."""
-        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget = ToolCallWidget("spawn_subagent", "task", args={})
         widget.set_result("subagent 'fix bug' launched (session_id: subagent-abc)", status="running")
         self.assertEqual(widget.status, "running")
-        widget2 = ToolCallWidget("invoke_subagent", "task", args={})
+        widget2 = ToolCallWidget("spawn_subagent", "task", args={})
         widget2.set_result("subagent 'fix bug' launched (session_id: subagent-abc)")
         self.assertEqual(widget2.status, "done")
 
     def test_final_result_is_done_green(self):
-        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget = ToolCallWidget("spawn_subagent", "task", args={})
         widget.set_result("subagent 'fix bug' launched (session_id: subagent-abc)", status="running")
         widget.set_result("the bug is fixed")
         self.assertEqual(widget.status, "done")
 
     def test_launch_error_is_red(self):
-        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget = ToolCallWidget("spawn_subagent", "task", args={})
         widget.set_result("ERR: provider unavailable", status="error")
         self.assertEqual(widget.status, "error")
         self.assertFalse(widget.is_clickable_header())
         self.assertNotIn("tool-header-expandable", widget.header_label.classes)
 
     def test_final_error_is_red(self):
-        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget = ToolCallWidget("spawn_subagent", "task", args={})
         widget.set_result("subagent 'x' launched (session_id: subagent-abc)", status="running")
         self.assertTrue(widget.is_clickable_header())
         self.assertIn("tool-header-expandable", widget.header_label.classes)
@@ -132,7 +132,7 @@ class TestEdgeToolCallInvokeSubagentStatus(unittest.TestCase):
 
 class TestEdgeToolCallMarkRunning(unittest.TestCase):
     def test_mark_running_sets_yellow_status(self):
-        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget = ToolCallWidget("spawn_subagent", "task", args={})
         self.assertEqual(widget.status, "running")
         widget.set_result("the bug is fixed")
         self.assertEqual(widget.status, "done")
@@ -141,7 +141,7 @@ class TestEdgeToolCallMarkRunning(unittest.TestCase):
         self.assertEqual(widget.result_text, "follow-up sent to subagent-abc")
 
     def test_mark_running_no_text_keeps_result(self):
-        widget = ToolCallWidget("invoke_subagent", "task", args={})
+        widget = ToolCallWidget("spawn_subagent", "task", args={})
         widget.set_result("result text")
         widget.mark_running()
         self.assertEqual(widget.status, "running")

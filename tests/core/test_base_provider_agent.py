@@ -1021,19 +1021,19 @@ class TestDrainForeignSession(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_extract_streaming_target('{"command": "pytest -k test_foo'), "pytest -k test_foo")
         self.assertEqual(_extract_streaming_target('{"custom_arg": "in_progress', tool_name="custom_mcp"), "custom_arg=in_progress")
         self.assertEqual(
-            _extract_streaming_target('{"type": "worker", "title": "Auth refactor"}', tool_name="invoke_subagent"),
+            _extract_streaming_target('{"type": "worker", "title": "Auth refactor"}', tool_name="spawn_subagent"),
             'Worker: "Auth refactor"',
         )
         self.assertEqual(
-            _extract_streaming_target('{"type": "explorer"}', tool_name="invoke_subagent"),
+            _extract_streaming_target('{"type": "explorer"}', tool_name="spawn_subagent"),
             "Explorer",
         )
 
     def test_tool_schemas_parameter_orders(self):
-        from johnston.core.tools.invoke_subagent import InvokeSubagentTool
+        from johnston.core.tools.spawn_subagent import SpawnSubagentTool
         from johnston.core.tools.update_plan import UpdatePlanTool
 
-        sub_props = list(InvokeSubagentTool.schema["function"]["parameters"]["properties"].keys())
+        sub_props = list(SpawnSubagentTool.schema["function"]["parameters"]["properties"].keys())
         self.assertEqual(sub_props, ["role", "title", "task"])
 
         plan_props = list(UpdatePlanTool.schema["function"]["parameters"]["properties"].keys())

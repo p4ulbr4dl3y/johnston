@@ -7,8 +7,8 @@ from johnston.core.infrastructure.runtime.subagent_worktree import SubagentWorkt
 from johnston.core.tools.base import BaseTool
 
 
-class InvokeSubagentTool(BaseTool):
-    name = "invoke_subagent"
+class SpawnSubagentTool(BaseTool):
+    name = "spawn_subagent"
     interactive_only = True
     subagent_restriction_detail = "subagents cannot spawn nested subagents"
     description = (

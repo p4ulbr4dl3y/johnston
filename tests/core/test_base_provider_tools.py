@@ -24,7 +24,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
         pm = PermissionManager.get_instance()
         pm.set_session_override("shell", "allow")
         pm.set_session_override("kill", "allow")
-        pm.set_session_override("invoke_subagent", "allow")
+        pm.set_session_override("spawn_subagent", "allow")
         # Grant the file tools that used to be 'allow' via the removed read/write groups.
         pm.set_session_override("read", "allow")
         pm.set_session_override("create", "allow")
@@ -143,7 +143,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool(
-            "invoke_subagent", {"task": "do research", "title": "research task", "branch": "main"}, app=app
+            "spawn_subagent", {"task": "do research", "title": "research task", "branch": "main"}, app=app
         )
         self.assertIn("subagent started", res.content)
         self.assertIn("role worker", res.content)
@@ -186,7 +186,7 @@ class TestBaseProviderTools(unittest.IsolatedAsyncioTestCase):
 
         app = DummyApp()
         res = await execute_tool(
-            "invoke_subagent",
+            "spawn_subagent",
             {"task": "bg task", "title": "bg job", "branch": "main"},
             app=app,
         )

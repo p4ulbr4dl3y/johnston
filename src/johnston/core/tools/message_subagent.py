@@ -11,7 +11,7 @@ class MessageSubagentTool(BaseTool):
     description = (
         "Send follow-up instructions to an existing subagent session (resumes subagent with its worktree branch and history). "
         "Use when: previous task needs refinement, fixes on partial/failed output, or next steps in the same scope. "
-        "Do NOT use for new independent tasks (call invoke_subagent instead)."
+        "Do NOT use for new independent tasks (call spawn_subagent instead)."
     )
     parameters = {
         "type": "object",

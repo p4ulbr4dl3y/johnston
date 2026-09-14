@@ -305,7 +305,7 @@ def _extract_tool_display_inner(
                 return truncate(", ".join(f'"{t}"' for t in formatted), max_len=max_len, mode=mode)
         return ""
 
-    if name == "invoke_subagent":
+    if name == "spawn_subagent":
         title = str(args.get("title") or "").strip()
         role = str(args.get("type") or args.get("role") or "worker").strip()
         role_cap = core_bridge.get_role_display_name(role)

@@ -309,7 +309,7 @@ def _cleanup_rewound_subagents(session: Any, dropped_msgs: list[dict], store: An
         if not isinstance(msg, dict):
             continue
         if msg.get("type") == "tool" and str(msg.get("tool_type") or "").lower() in (
-            "invoke_subagent",
+            "spawn_subagent",
             "message_subagent",
         ):
             args = msg.get("args") or {}

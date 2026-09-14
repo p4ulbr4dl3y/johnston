@@ -35,7 +35,7 @@ DISPLAY_NAMES: dict[str, str] = {
     "search": "Search",
     "ask_user": "AskUser",
     "kill": "Kill",
-    "invoke_subagent": "InvokeSubagent",
+    "spawn_subagent": "SpawnSubagent",
     "message_subagent": "MessageSubagent",
     "web_fetch": "WebFetch",
     "update_plan": "UpdatePlan",
@@ -163,7 +163,7 @@ class ToolCallWidget(
             return res.startswith(("[dir", "[archive"))
         if canonical in (
             "web_fetch",
-            "invoke_subagent",
+            "spawn_subagent",
             "kill",
             "message_subagent",
         ):
@@ -277,7 +277,7 @@ class ToolCallWidget(
         if log_path:
             self.log_path = log_path
 
-        if getattr(self, "canonical_tool", None) in ("invoke_subagent", "message_subagent") and not self.subagent_session_id:
+        if getattr(self, "canonical_tool", None) in ("spawn_subagent", "message_subagent") and not self.subagent_session_id:
             if hasattr(self, "bind_subagent_session"):
                 self.bind_subagent_session()
 

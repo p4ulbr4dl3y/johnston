@@ -711,7 +711,7 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
         hidden_msg = await chat_view.restore_message({"type": "user", "text": "hi", "show_in_ui": False})
         self.assertIsNone(hidden_msg)
 
-    async def test_restore_invoke_subagent_resolves_session_from_store(self):
+    async def test_restore_spawn_subagent_resolves_session_from_store(self):
         chat_view = ChatView()
         chat_view._wait_until_attached = AsyncMock()
         chat_view.mount = AsyncMock()
@@ -723,7 +723,7 @@ class TestChatViewPagination(unittest.IsolatedAsyncioTestCase):
         with patch("johnston.core.infrastructure.storage.session_store.SessionStore.get_instance", return_value=mock_store):
             tool = await chat_view.restore_message({
                 "type": "tool",
-                "tool_type": "invoke_subagent",
+                "tool_type": "spawn_subagent",
                 "target": "",
                 "args": {"title": "Sub Task", "prompt": "do something"},
                 "status": "running",

@@ -131,7 +131,7 @@ def apply_prompt(
         if formatted:
             parts.append(formatted)
     if effective_mode == AgentMode.SUBAGENT and wt_branch and isinstance(wt_branch, str):
-        # Branch name is user-controlled (passed via invoke_subagent(branch=...))
+        # Branch name is user-controlled (passed via spawn_subagent(branch=...))
         # and gets interpolated into the system prompt. Escape it so a name
         # containing literal </worktree> cannot truncate the wrapper and inject
         # arbitrary content into the subagent's system prompt.

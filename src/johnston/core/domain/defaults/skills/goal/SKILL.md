@@ -27,7 +27,7 @@ Drive a multi-step objective with relentless autonomy. Do not yield or stop prem
 ### Phase 2: Autonomous Execution Loop
 Iterate relentlessly through the plan:
 1. Apply surgical changes using `edit` (or `create` for new files).
-2. Use `invoke_subagent` for parallel research, isolated investigations, or heavy tasks.
+2. Use `spawn_subagent` for parallel research, isolated investigations, or heavy tasks.
 3. Update `update_plan` after completing each milestone (`completed` status).
 4. If a test fails or an error occurs:
    - Formulate a concrete hypothesis.

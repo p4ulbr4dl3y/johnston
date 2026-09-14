@@ -27,9 +27,9 @@ Automate codebase discovery and generate a surgical, high-density `AGENTS.md` co
    - If absent: create fresh `AGENTS.md` at repository root.
 
 ### Phase 2: Autonomous Survey (Explorer Subagent)
-Launch an autonomous explorer subagent using `invoke_subagent` to prevent main chat context bloat:
+Launch an autonomous explorer subagent using `spawn_subagent` to prevent main chat context bloat:
 ```python
-invoke_subagent(
+spawn_subagent(
     title="Survey codebase for init",
     task="Analyze repo manifests, CI configs, entry points, linters, and git log. Return high-signal facts for AGENTS.md.",
     role="explorer",

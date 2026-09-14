@@ -35,7 +35,7 @@ def _extract_streaming_target(buffer: str, scan_from: int = 0, tool_name: str = 
         if sid_m:
             return f"send message to {sid_m.group(1).strip()}"
 
-    if canonical == "invoke_subagent":
+    if canonical == "spawn_subagent":
         type_m = re.search(r'"(?:type|role)"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
         title_m = re.search(r'"title"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', buffer)
         role = type_m.group(1).strip() if type_m else ""
@@ -60,7 +60,7 @@ def _extract_streaming_target(buffer: str, scan_from: int = 0, tool_name: str = 
         if cleaned:
             return cleaned
 
-    if canonical not in ("read", "edit", "create", "shell", "search", "update_plan", "invoke_subagent"):
+    if canonical not in ("read", "edit", "create", "shell", "search", "update_plan", "spawn_subagent"):
         for m in _STREAMING_FALLBACK_RE.finditer(window):
             k = m.group(1).lower()
             if k not in _FALLBACK_IGNORE_KEYS:

@@ -186,7 +186,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         elif self.tool_name == "web_fetch":
             url = nargs.get("url") or ""
             action_desc = f"{actor} wants to fetch `{url or 'URL'}`"
-        elif self.tool_name == "invoke_subagent":
+        elif self.tool_name == "spawn_subagent":
             role = nargs.get("type") or nargs.get("role") or "Subagent"
             title = nargs.get("title") or ""
             prompt = nargs.get("prompt") or ""
@@ -286,7 +286,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 if msg:
                     with ToolScrollBox(classes="tool-scroll-box"):
                         yield Markdown(f"```text\n{msg.strip()}\n```", classes="modal-diff-view")
-            elif self.tool_name == "invoke_subagent":
+            elif self.tool_name == "spawn_subagent":
                 prompt = nargs.get("prompt") or ""
                 if prompt:
                     with ToolScrollBox(classes="tool-scroll-box"):
@@ -297,7 +297,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                 "web_fetch",
                 "kill",
                 "message_subagent",
-                "invoke_subagent",
+                "spawn_subagent",
                 "update_plan",
                 "ask_user",
             ):
@@ -365,7 +365,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             is_code_or_diff = False
             msg = nargs.get("message") or ""
             content_lines = msg.splitlines()
-        elif self.tool_name == "invoke_subagent":
+        elif self.tool_name == "spawn_subagent":
             is_code_or_diff = False
             prompt = nargs.get("prompt") or ""
             content_lines = prompt.splitlines()
@@ -375,7 +375,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
             "web_fetch",
             "kill",
             "message_subagent",
-            "invoke_subagent",
+            "spawn_subagent",
             "update_plan",
             "ask_user",
         ):

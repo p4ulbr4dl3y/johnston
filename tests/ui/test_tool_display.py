@@ -37,18 +37,18 @@ class TestToolDisplay(unittest.TestCase):
         self.assertEqual(res, '"Which framework?"')
 
     def test_subagent_title(self):
-        res = extract_tool_display("invoke_subagent", {"title": "find bugs", "prompt": "long prompt"})
+        res = extract_tool_display("spawn_subagent", {"title": "find bugs", "prompt": "long prompt"})
         self.assertEqual(res, 'Worker: "find bugs"')
-        res2 = extract_tool_display("invoke_subagent", {"title": "find bugs", "type": "worker"})
+        res2 = extract_tool_display("spawn_subagent", {"title": "find bugs", "type": "worker"})
         self.assertEqual(res2, 'Worker: "find bugs"')
-        res3 = extract_tool_display("invoke_subagent", {"title": "find bugs", "type": "explorer"})
+        res3 = extract_tool_display("spawn_subagent", {"title": "find bugs", "type": "explorer"})
         self.assertEqual(res3, 'Explorer: "find bugs"')
-        res4 = extract_tool_display("invoke_subagent", {"title": "find bugs", "role": "reviewer"})
+        res4 = extract_tool_display("spawn_subagent", {"title": "find bugs", "role": "reviewer"})
         self.assertEqual(res4, 'Reviewer: "find bugs"')
 
     def test_subagent_prompt_only_empty_parens(self):
         # No title -> shows Worker
-        self.assertEqual(extract_tool_display("invoke_subagent", {"prompt": "long prompt"}), "Worker")
+        self.assertEqual(extract_tool_display("spawn_subagent", {"prompt": "long prompt"}), "Worker")
 
     def test_kill_display(self):
         res = extract_tool_display("kill", {"id": "task_123"})
@@ -67,7 +67,7 @@ class TestToolDisplay(unittest.TestCase):
         for name in ("read", "create", "edit", "shell", "web_fetch", "update_plan"):
             self.assertEqual(extract_tool_display(name, {}), "")
         self.assertEqual(extract_tool_display("ask_user", {}), "")
-        self.assertEqual(extract_tool_display("invoke_subagent", {}), "Worker")
+        self.assertEqual(extract_tool_display("spawn_subagent", {}), "Worker")
         self.assertEqual(extract_tool_display("kill", {}), "")
         self.assertEqual(extract_tool_display("message_subagent", {}), "")
 

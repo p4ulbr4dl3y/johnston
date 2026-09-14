@@ -309,8 +309,8 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
                 ("edit", {"path": "main.py", "old_str": "a", "new_str": "b"}),
                 ("read", {"path": "readme.md"}),
                 ("web_fetch", {"url": "https://api.github.com"}),
-                ("invoke_subagent", {"role": "Tester", "title": "Run Unit Tests", "prompt": "pytest"}),
-                ("invoke_subagent", {"type": "Explorer"}),
+                ("spawn_subagent", {"role": "Tester", "title": "Run Unit Tests", "prompt": "pytest"}),
+                ("spawn_subagent", {"type": "Explorer"}),
                 ("kill", {"id": "task-42"}),
                 ("kill", {}),
                 ("message_subagent", {"id": "sess-99", "message": "hello"}),
@@ -481,8 +481,8 @@ class TestPermissionConfirmScreenCoverage(unittest.IsolatedAsyncioTestCase):
         w3 = screen_sub._calculate_content_width()
         self.assertGreaterEqual(w3, 38)
 
-        # invoke_subagent prompt
-        screen_sub_prompt = PermissionConfirmScreen("invoke_subagent", {"prompt": "line1\nline2\n"})
+        # spawn_subagent prompt
+        screen_sub_prompt = PermissionConfirmScreen("spawn_subagent", {"prompt": "line1\nline2\n"})
         w4 = screen_sub_prompt._calculate_content_width()
         self.assertGreaterEqual(w4, 38)
 

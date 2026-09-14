@@ -32,7 +32,7 @@ Iteration N (1..3):
   [1. Run Tests via shell] ──(fail)──> [Fix Baseline]
           │ (pass)
           ▼
-  [2. invoke_subagent(role="reviewer")] ──> Yield turn & wait for runtime notification
+  [2. spawn_subagent(role="reviewer")] ──> Yield turn & wait for runtime notification
           │
           ▼
   [3. Parse Reviewer Output]
@@ -42,7 +42,7 @@ Iteration N (1..3):
                                                  ▼
                                      [4. Apply Surgical Fixes]
                                         ├── Small: edit directly
-                                        └── Large: invoke_subagent(role="worker") -> git merge
+                                        └── Large: spawn_subagent(role="worker") -> git merge
                                                  │
                                                  ▼
                                      [5. Address False Positives via Code/Tests]
@@ -52,10 +52,10 @@ Iteration N (1..3):
 ```
 
 #### 1. Launching the Reviewer Subagent
-Use the builtin `reviewer` role via `invoke_subagent`:
+Use the builtin `reviewer` role via `spawn_subagent`:
 
 ```python
-invoke_subagent(
+spawn_subagent(
     title="Review & Verification - Iteration N",
     task="Audit changes in <scope> via git diff/files and execute adversarial verification via shell (probe edge cases, boundary inputs, failure paths). Return findings with severity P0-P3 and final VERDICT.",
     role="reviewer",
@@ -71,7 +71,7 @@ invoke_subagent(
 
 #### 3. Applying Fixes (Context Preservation)
 - **Small fixes**: Main agent edits directly using `edit` / `create`.
-- **Large fixes / multi-file refactors**: Prevent main context exhaustion by delegating to `invoke_subagent(role="worker")`. Worker executes in an isolated git worktree; apply with `git merge <subagent-branch>` upon completion.
+- **Large fixes / multi-file refactors**: Prevent main context exhaustion by delegating to `spawn_subagent(role="worker")`. Worker executes in an isolated git worktree; apply with `git merge <subagent-branch>` upon completion.
 - Verify fixes locally with test suite runs via `shell` before next iteration.
 
 ### Step 3: Terminal States

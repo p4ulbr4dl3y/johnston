@@ -38,10 +38,10 @@ class TestToolSchemas(unittest.TestCase):
         self.assertIn("id", props)
         self.assertEqual(KillTool.schema["function"]["parameters"]["required"], ["id"])
 
-    def test_invoke_subagent_dynamic_role_enum(self):
-        from johnston.core.tools.invoke_subagent import InvokeSubagentTool
+    def test_spawn_subagent_dynamic_role_enum(self):
+        from johnston.core.tools.spawn_subagent import SpawnSubagentTool
 
-        tool = InvokeSubagentTool()
+        tool = SpawnSubagentTool()
         schema = tool.get_schema()
         role_prop = schema["function"]["parameters"]["properties"]["role"]
         self.assertIn("enum", role_prop)
@@ -66,12 +66,12 @@ class TestToolSchemas(unittest.TestCase):
         self.assertEqual(params["required"], ["id", "message"])
 
     def test_subagent_schema_has_title_and_no_branch_or_session_id(self):
-        from johnston.core.tools.invoke_subagent import InvokeSubagentTool
+        from johnston.core.tools.spawn_subagent import SpawnSubagentTool
 
-        props = InvokeSubagentTool.schema["function"]["parameters"]["properties"]
+        props = SpawnSubagentTool.schema["function"]["parameters"]["properties"]
         self.assertIn("title", props)
         self.assertNotIn("description", props)
-        self.assertIn("title", InvokeSubagentTool.schema["function"]["parameters"]["required"])
+        self.assertIn("title", SpawnSubagentTool.schema["function"]["parameters"]["required"])
         self.assertNotIn("branch", props)
         self.assertNotIn("session_id", props)
         self.assertNotIn("task_id", props)

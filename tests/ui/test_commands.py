@@ -360,7 +360,7 @@ class TestCommands(unittest.IsolatedAsyncioTestCase):
         session = MagicMock()
         session.messages = [
             {"type": "user", "text": "First", "show_in_ui": True},
-            {"type": "tool", "tool_type": "invoke_subagent", "args": {"session_id": "sub-dropped"}},
+            {"type": "tool", "tool_type": "spawn_subagent", "args": {"session_id": "sub-dropped"}},
         ]
         app.sm.get.return_value = session
         app.agent.history = [{"role": "user", "content": "First"}]
