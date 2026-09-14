@@ -18,7 +18,7 @@ Johnston equips the primary agent and subagents with a suite of 11 builtin tools
    - `mode="filename"`: Find files and directories by glob/regex pattern.
    - `mode="outline"`: Extract code symbol definitions (classes, functions, methods) via Tree-sitter (Python, TS/TSX, JS, Go, Rust) with fallback to regex/AST.
 3. **`create`**: Atomically create new files or overwrite existing files with full contents (`path`, `content`).
-4. **`edit`**: Apply precise search-and-replace edits (`path`, `old_str`, `new_str`, `replace_all`). Omit `new_str` or set empty to delete `old_str`.
+4. **`edit`**: Apply precise search-and-replace edits (`path`, `old_str`, `new_str`, `replace_all`). Pass `new_str=""` to delete `old_str`.
 5. **`shell`**: Execute shell commands (`command`, `cwd`, `timeout`, `wait_seconds`).
    - `command`: Run commands directly without `cd` or piping (`| grep`, `| tail`, `| head`, etc.). Runtime auto-truncates and logs full output; piping breaks streaming and swallows exit codes.
    - `cwd`: Target subdirectory to run command in (default: current workspace root). Always use this parameter instead of `cd`. Omit when working in project root.

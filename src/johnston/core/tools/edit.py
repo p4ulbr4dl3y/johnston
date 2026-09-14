@@ -358,7 +358,7 @@ class EditTool(BaseTool):
             },
             "new_str": {
                 "type": "string",
-                "description": "Replacement text. Omit or set to empty string to delete old_str.",
+                "description": "Replacement text. Pass empty string \"\" to delete old_str.",
             },
             "replace_all": {
                 "type": "boolean",
@@ -366,7 +366,7 @@ class EditTool(BaseTool):
                 "description": "If true, replace every occurrence of old_str instead of requiring a unique match.",
             },
         },
-        "required": ["path", "old_str"],
+        "required": ["path", "old_str", "new_str"],
     }
 
     def is_concurrency_safe(self, args: Dict[str, Any] | None = None) -> bool:
@@ -383,18 +383,9 @@ class EditTool(BaseTool):
 
         old_str = args.get("old_str")
 
-        if "new_string" in args and "new_str" not in args:
-            return ToolResult.error(
-                "params",
-                name="new_str",
-                detail="unknown parameter 'new_string'; schema requires 'new_str'",
-            )
-
         new_str = args.get("new_str")
         if new_str is None:
-            # Absent key means deletion (pinned by test_edit_missing_new_str_is_delete):
-            # keeps single-turn deletes for providers that drop empty-string args.
-            new_str = ""
+            return ToolResult.error("params", name="new_str", detail="required")
 
         replace_all = bool(args.get("replace_all", False))
 

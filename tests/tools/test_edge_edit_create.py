@@ -144,10 +144,18 @@ class TestEditToolFiles(_Base):
         self.assertIn("ERR:", res)
         self.assertIn("cannot be empty", res)
 
-    async def test_edit_missing_new_str_is_delete(self):
+    async def test_edit_missing_new_str_returns_err(self):
         tool = EditTool()
         p = self.write("f.txt", "line1\nTOK\nline3\n")
         res = str(await tool.execute({"path": p, "old_str": "TOK"}))
+        self.assertIn("ERR:", res)
+        self.assertIn("required", res)
+        self.assertEqual(self.read("f.txt"), "line1\nTOK\nline3\n")
+
+    async def test_edit_empty_new_str_is_delete(self):
+        tool = EditTool()
+        p = self.write("f.txt", "line1\nTOK\nline3\n")
+        res = str(await tool.execute({"path": p, "old_str": "TOK", "new_str": ""}))
         self.assertIn("TOK", res)  # diff shows removal
         self.assertEqual(self.read("f.txt"), "line1\nline3\n")
 

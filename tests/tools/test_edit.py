@@ -93,19 +93,17 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(res.content.startswith("ERR: match"))
 
 
-    async def test_missing_new_str_key_means_delete(self):
-        # Pinned behavior: an ABSENT new_str key deletes the target in one turn
-        # (test_edit_missing_new_str_is_delete); only explicit "" vs missing
-        # differ for providers that drop empty-string args.
+    async def test_missing_new_str_key_returns_required_error(self):
         tool = EditTool()
         file_path = os.path.join(self.test_dir, "test.py")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("line1\ndrop\nline2\n")
 
         res = str(await tool.execute({"path": file_path, "old_str": "drop\n"}))
-        self.assertNotIn("ERR:", res)
+        self.assertIn("ERR: params", res)
+        self.assertIn("required", res)
         with open(file_path, "r", encoding="utf-8") as f:
-            self.assertEqual(f.read(), "line1\nline2\n")
+            self.assertEqual(f.read(), "line1\ndrop\nline2\n")
 
     async def test_explicit_empty_new_str_still_deletes(self):
         # "" must stay a valid replacement (deletion).
@@ -188,15 +186,15 @@ class TestEditToolAdvanced(unittest.IsolatedAsyncioTestCase):
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("def foo():\n    return 1\n")
 
-        # Passing new_string instead of new_str must fail with clear error, NOT silently delete return 1
+        # Passing new_string instead of new_str must fail with required error, NOT silently delete return 1
         res = str(await tool.execute({
             "path": file_path,
             "old_str": "    return 1",
             "new_string": "    return 2",
         }))
         self.assertIn("ERR: params", res)
-        self.assertIn("new_string", res)
         self.assertIn("new_str", res)
+        self.assertIn("required", res)
         # Verify content was NOT modified or deleted
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
