@@ -57,7 +57,7 @@ export function App({ command = "python", args = ["-m", "johnston", "serve"] }: 
   // Key bindings: Ctrl+C quits. Unmount runs the cleanup that tells the
   // daemon to persist sessions and shut down.
   useInput((_input, key) => {
-    if (key.ctrl && key.c) {
+    if ((key.ctrl && key.return) || (key.ctrl && key.c)) {
       exit();
     }
   });
