@@ -399,10 +399,16 @@ class TestCreateTool(_Base):
     async def test_create_overwrites_existing_file_with_overwrite_flag(self):
         tool = CreateTool()
         p = self.write("ov.txt", "original\n")
-        res = str(await tool.execute({"path": p, "content": "replaced\n", "overwrite": True}))
-        self.assertNotIn("ERR:", res)
-        self.assertNotIn("--- a/", res)
-        self.assertIn("[overwritten", res)
+        result = await tool.execute({"path": p, "content": "replaced\n", "overwrite": True})
+        self.assertFalse(result.is_error)
+        self.assertNotIn("--- a/", result.content or "")
+        self.assertIn("[overwritten", result.content or "")
+        self.assertIn("+1/-1 lines", result.content or "")
+        self.assertIn("backup: ", result.content or "")
+        self.assertIn(".bak]", result.content or "")
+        self.assertIn("--- a/", result.display or "")
+        self.assertIn("-original", result.display or "")
+        self.assertIn("+replaced", result.display or "")
         # create strips trailing \r\n (tools/create.py), so no trailing newline preserved
         self.assertEqual(self.read("ov.txt"), "replaced")
 

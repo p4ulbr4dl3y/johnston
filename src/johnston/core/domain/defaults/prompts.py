@@ -38,7 +38,7 @@ _SHARED_PLANNING = (
 _SHARED_FILE_EDITS = (
     "- **File Edits**:\n"
     "  - Prefer `edit` for localized changes; batch non-overlapping edits in one turn.\n"
-    "  - Use `create` strictly for new files or wholesale rewrites (>40% changed).\n"
+    "  - Use `create` for new files or wholesale rewrites (>40% changed; set `overwrite=true` only after inspecting the file with `read`). Never overwrite blindly.\n"
     "  - **Mass edits**: For repetitive changes across multiple files (renames, imports, regex refactors), "
     "run a script (Python, `sd`, `sed`) via `shell` instead of dozens of `edit` calls. Cheaper, atomic, zero hallucinations."
 )

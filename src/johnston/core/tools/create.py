@@ -1,11 +1,12 @@
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Dict
 
 from johnston.core.domain.defaults.errors import ToolResult
-from johnston.core.tools.base import BaseTool, write_file_text
+from johnston.core.tools.base import BaseTool, read_file_text, write_file_text
 from johnston.core.tools.cancel import run_cancellable
-from johnston.core.tools.utils import resolve_writable_path
+from johnston.core.tools.utils import format_file_diff, get_max_tool_payload_bytes, resolve_writable_path
 
 
 def _as_bool(val: Any) -> bool:
@@ -16,11 +17,72 @@ def _as_bool(val: Any) -> bool:
     return bool(val)
 
 
+def _compute_line_delta(old_text: str, new_text: str) -> tuple[int, int]:
+    """Compute (added_lines, deleted_lines) between old and new text."""
+    import difflib
+
+    old_lines = old_text.splitlines()
+    new_lines = new_text.splitlines()
+    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
+    added = sum(b2 - b1 for tag, _a1, _a2, b1, b2 in matcher.get_opcodes() if tag in ("replace", "insert"))
+    deleted = sum(a2 - a1 for tag, a1, a2, _b1, _b2 in matcher.get_opcodes() if tag in ("replace", "delete"))
+    return added, deleted
+
+
+def _format_backup_path(path: str) -> str:
+    """Format an absolute backup path with ~ if within user home."""
+    home = os.path.expanduser("~")
+    if path.startswith(home):
+        return f"~{path[len(home):]}"
+    return path
+
+
+def _prune_old_backups(backups_dir: str, ttl_days: int = 7) -> None:
+    """Prune .bak files older than ttl_days."""
+    try:
+        cutoff = time.time() - (ttl_days * 86400)
+        for entry in os.scandir(backups_dir):
+            if entry.is_file() and entry.name.endswith(".bak"):
+                try:
+                    if entry.stat().st_mtime < cutoff:
+                        os.remove(entry.path)
+                except OSError:
+                    pass
+    except Exception:
+        pass
+
+
+def _save_backup(file_path: str, old_content: str) -> str | None:
+    """Save existing file content to ~/.johnston/backups/{timestamp}_{filename}.bak."""
+    try:
+        from johnston.core.infrastructure.platform.paths import BACKUPS_DIR
+
+        os.makedirs(BACKUPS_DIR, exist_ok=True)
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        basename = os.path.basename(file_path)
+        backup_name = f"{ts}_{basename}.bak"
+        backup_path = os.path.join(BACKUPS_DIR, backup_name)
+        if os.path.exists(backup_path):
+            import uuid
+
+            backup_name = f"{ts}_{uuid.uuid4().hex[:6]}_{basename}.bak"
+            backup_path = os.path.join(BACKUPS_DIR, backup_name)
+
+        with open(backup_path, "w", encoding="utf-8", errors="replace") as f:
+            f.write(old_content)
+
+        _prune_old_backups(BACKUPS_DIR, ttl_days=7)
+        return backup_path
+    except Exception:
+        return None
+
+
 @dataclass(frozen=True)
 class _ProbeResult:
     is_dir: bool
     existed: bool
     is_binary: bool = False
+    old_content: str = ""
 
 
 class CreateTool(BaseTool):
@@ -46,7 +108,10 @@ class CreateTool(BaseTool):
             "overwrite": {
                 "type": "boolean",
                 "default": False,
-                "description": "Set true to overwrite existing file (default: false). If false and file exists, tool fails.",
+                "description": (
+                    "Set true to overwrite existing file (default: false). "
+                    "Use ONLY if you have already read/inspected the file and intentionally want a full rewrite."
+                ),
             },
         },
         "required": ["path", "content"],
@@ -77,7 +142,19 @@ class CreateTool(BaseTool):
             if is_binary_file(path):
                 return _ProbeResult(is_dir=False, existed=True, is_binary=True)
 
-            return _ProbeResult(is_dir=False, existed=True)
+            try:
+                if os.path.getsize(path) > get_max_tool_payload_bytes():
+                    return _ProbeResult(is_dir=False, existed=True)
+            except OSError:
+                pass
+
+            old_text = ""
+            try:
+                old_text = read_file_text(path)
+            except Exception:
+                old_text = ""
+
+            return _ProbeResult(is_dir=False, existed=True, old_content=old_text)
 
         probe = await run_cancellable(_probe)
         if probe.is_dir:
@@ -86,7 +163,11 @@ class CreateTool(BaseTool):
             return ToolResult.error(
                 "file_exists",
                 name=str(path_arg or path),
-                detail=f"File '{path_arg}' already exists. Use edit for partial modifications, or set overwrite=true.",
+                detail=(
+                    f"File '{path_arg}' already exists. DO NOT overwrite blindly. "
+                    f"If you have not read this file yet, call 'read' first. "
+                    f"Use 'edit' for partial changes, or set overwrite=true ONLY if you have inspected the file and intend a complete rewrite."
+                ),
             )
         if probe.is_binary:
             return ToolResult.error("binary_file", name=str(path_arg or path), detail="cannot overwrite binary file")
@@ -115,8 +196,23 @@ class CreateTool(BaseTool):
 
         if not probe.existed:
             result_str = f"[created {path_arg} | {cnt} lines]"
-        else:
-            result_str = f"[overwritten {path_arg} | {cnt} lines]"
+            return ToolResult.done(content=result_str, display=result_str)
 
-        result_str = result_str.strip() if result_str else ""
-        return ToolResult.done(content=result_str, display=result_str)
+        added, deleted = _compute_line_delta(probe.old_content, content)
+        backup_path = _save_backup(path, probe.old_content)
+        if backup_path:
+            disp_backup = _format_backup_path(backup_path)
+            result_str = f"[overwritten {path_arg} | +{added}/-{deleted} lines | backup: {disp_backup}]"
+        else:
+            result_str = f"[overwritten {path_arg} | +{added}/-{deleted} lines]"
+
+        display_str = result_str
+        if probe.old_content:
+            try:
+                diff_text = format_file_diff(probe.old_content, content, str(path_arg))
+                if diff_text:
+                    display_str = diff_text
+            except Exception:
+                pass
+
+        return ToolResult.done(content=result_str, display=display_str)

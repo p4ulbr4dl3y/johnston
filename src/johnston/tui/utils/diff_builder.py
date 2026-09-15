@@ -60,3 +60,27 @@ def build_edit_diff_text(args: dict, file_path: str = "file") -> str:
         diff_parts = generate_chunk_unified_diff(old_s or "", new_s or "", disp_path, start_l)
         return "\n".join(diff_parts) if diff_parts else ""
     return ""
+
+
+def build_create_diff_text(file_path: str, new_content: str) -> str:
+    """Build unified diff for create/write tools, comparing with disk file if present."""
+    from johnston.tui.presentation.tool_display import shorten_path
+    from johnston.tui.presentation.tool_renderers import build_synthetic_create_diff
+    from johnston.tui.utils.file_reader import read_file_content
+
+    disp_path = shorten_path(file_path) if file_path else "file"
+    old_content = read_file_content(file_path)
+    if old_content is not None:
+        from johnston.tui.adapters import core_bridge
+
+        diff_text = core_bridge.make_git_diff(
+            old_content,
+            new_content,
+            fromfile=f"a/{disp_path}",
+            tofile=f"b/{disp_path}",
+        )
+        if diff_text:
+            return diff_text
+
+    return build_synthetic_create_diff(disp_path, new_content)
+

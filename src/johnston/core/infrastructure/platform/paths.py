@@ -16,6 +16,7 @@ __all__ = [
     "TEMP_IMAGES_DIR",
     "WORKTREES_DIR",
     "SHADOW_REPOS_DIR",
+    "BACKUPS_DIR",
     "PROMPT_HISTORY_FILE",
     "THEMES_DIR",
     "provider_models_cache_path",
@@ -33,6 +34,7 @@ LOGS_DIR = os.path.join(CONFIG_DIR, "logs")
 TEMP_IMAGES_DIR = os.path.join(CONFIG_DIR, "temp_images")
 WORKTREES_DIR = os.path.join(CONFIG_DIR, "worktrees")
 SHADOW_REPOS_DIR = os.path.join(CONFIG_DIR, "shadow_repos")
+BACKUPS_DIR = os.path.join(CONFIG_DIR, "backups")
 PROMPT_HISTORY_FILE = os.path.join(CONFIG_DIR, "prompt_history.json")
 
 

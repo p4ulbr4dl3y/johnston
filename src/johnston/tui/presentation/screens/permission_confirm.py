@@ -9,7 +9,6 @@ from textual.widgets import Input, Label, Markdown, OptionList, Static
 
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
-from johnston.tui.presentation.tool_renderers import build_synthetic_create_diff
 from johnston.tui.presentation.widgets.chat_diff import format_edit_diff
 from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox
 from johnston.tui.presentation.widgets.modal_header import ModalHeader
@@ -154,8 +153,10 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
 
         # Generate diff for Create/Write tools updating existing file
         if self.tool_name == "create":
+            from johnston.tui.utils.diff_builder import build_create_diff_text
+
             content = self.args.get("content") or ""
-            return build_synthetic_create_diff(target_path, content)
+            return build_create_diff_text(target_path, content)
 
         # Generate diff for Edit tools
         if self.tool_name == "edit":

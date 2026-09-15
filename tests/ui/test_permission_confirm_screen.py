@@ -80,6 +80,20 @@ class TestPermissionConfirmScreen(unittest.TestCase):
         self.assertIn("+line2", diff)
         self.assertIn("@@ -1,2 +1,2 @@", diff)
 
+    def test_build_diff_text_create_existing_file(self):
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".py") as f:
+            f.write("old line 1\nold line 2\n")
+            f_path = f.name
+        try:
+            screen = PermissionConfirmScreen("create", {"path": f_path, "content": "old line 1\nnew line 2\n"})
+            diff = screen._build_diff_text(f_path)
+            self.assertIn("-old line 2", diff)
+            self.assertIn("+new line 2", diff)
+            self.assertIn("--- a/", diff)
+        finally:
+            if os.path.exists(f_path):
+                os.remove(f_path)
+
     def test_build_diff_text_create_empty_content(self):
         screen = PermissionConfirmScreen("create", {"path": "a.py", "content": ""})
         diff = screen._build_diff_text("a.py")
