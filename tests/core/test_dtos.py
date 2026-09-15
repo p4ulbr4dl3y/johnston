@@ -288,3 +288,12 @@ def test_commands_dtos():
     cmd = CommandResultDTO(name="/compact", success=True, message="Compacted")
     assert cmd.name == "/compact"
     assert cmd.success is True
+
+
+def test_reexported_domain_symbols():
+    from johnston.core.dto import COMPACTING_DIVIDER_TITLE, AgentMode
+
+    assert AgentMode.INTERACTIVE == "interactive"
+    assert AgentMode.SUBAGENT == "subagent"
+    assert COMPACTING_DIVIDER_TITLE == "Compacting session..."
+

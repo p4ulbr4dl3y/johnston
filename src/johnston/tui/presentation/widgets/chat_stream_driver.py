@@ -17,7 +17,7 @@ import math
 from collections import deque
 from typing import Any, Callable, Optional
 
-from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
+from johnston.core.dto import COMPACTING_DIVIDER_TITLE
 from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.chat_messages import BotMessage, ThinkingWidget
 from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget

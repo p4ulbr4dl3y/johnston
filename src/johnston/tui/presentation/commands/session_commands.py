@@ -5,7 +5,7 @@ import asyncio
 import inspect
 from typing import Any
 
-from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
+from johnston.core.dto import COMPACTING_DIVIDER_TITLE
 from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.commands.helpers import (

@@ -53,6 +53,7 @@ def _parse_tool_result(res: ToolResult) -> ShellExecResult:
 async def execute_shell_command(
     cmd: str,
     *,
+    cwd: str | None = None,
     host: Any | None = None,
     session: Any | None = None,
     agent: Any | None = None,
@@ -63,6 +64,8 @@ async def execute_shell_command(
     ----------
     cmd:
         The shell command string to execute.
+    cwd:
+        Optional directory to execute the command in.
     host:
         Optional host object for ToolContext (UI app, subagent, etc.).
         Pass ``None`` for headless core usage.
@@ -77,8 +80,12 @@ async def execute_shell_command(
     ctx = ToolContext(app=host)
     tool = ShellTool()
 
+    tool_args: dict[str, Any] = {"command": cmd}
+    if cwd:
+        tool_args["cwd"] = cwd
+
     try:
-        res = await tool.execute({"command": cmd}, ctx=ctx)
+        res = await tool.execute(tool_args, ctx=ctx)
         result = _parse_tool_result(res)
     except Exception as exc:
         logger.exception("Shell execution failed: %s", exc)
@@ -90,12 +97,15 @@ async def execute_shell_command(
         )
 
     if session is not None and hasattr(session, "add_event"):
+        event_args: dict[str, Any] = {"command": cmd}
+        if cwd:
+            event_args["cwd"] = cwd
         session.add_event({
             "type": "tool",
             "tool_type": "shell",
             "target": cmd,
             "result_text": result.content,
-            "args": {"command": cmd},
+            "args": event_args,
             "status": result.status,
             "returncode": result.returncode,
         })

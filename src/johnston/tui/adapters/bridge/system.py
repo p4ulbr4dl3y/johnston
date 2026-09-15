@@ -22,10 +22,7 @@ __all__ = [
     "adopt_task_exception",
     "atomic_write_json",
     "close_tools",
-    "compute_adaptive_palette",
-    "copy_to_os_clipboard_async",
     "format_background_notification",
-    "get_clipboard_image_or_file",
     "get_config_paths",
     "get_settings",
     "get_theme_by_name",
@@ -42,11 +39,9 @@ __all__ = [
     "load_sandbox_config",
     "load_theme_config",
     "normalize_tool_name",
-    "query_terminal_palette",
     "read_json",
     "save_sandbox_config",
     "save_theme_config",
-    "truncate_output",
 ]
 
 
@@ -87,42 +82,6 @@ def is_windows() -> bool:
     from johnston.core.client import is_windows as _f
 
     return _f()
-
-
-def copy_to_os_clipboard_async(text: str) -> Any:
-    """Copy text to the OS clipboard (async helper from core platform utils)."""
-    from johnston.core.infrastructure.platform.platform_utils import (
-        copy_to_os_clipboard_async as _f,
-    )
-
-    return _f(text)
-
-
-def get_clipboard_image_or_file(*args: Any, **kwargs: Any) -> Any:
-    """Return image/file from the OS clipboard (core platform helper)."""
-    from johnston.core.infrastructure.platform.platform_utils import (
-        get_clipboard_image_or_file as _f,
-    )
-
-    return _f(*args, **kwargs)
-
-
-def query_terminal_palette(*args: Any, **kwargs: Any) -> Any:
-    """Query the terminal color palette (core platform helper)."""
-    from johnston.core.infrastructure.platform.terminal_theme import (
-        query_terminal_palette as _f,
-    )
-
-    return _f(*args, **kwargs)
-
-
-def compute_adaptive_palette(bg: str | None = None, fg: str | None = None) -> Any:
-    """Compute an adapted terminal palette (core platform helper)."""
-    from johnston.core.infrastructure.platform.terminal_theme import (
-        compute_adaptive_palette as _f,
-    )
-
-    return _f(bg, fg)
 
 
 def get_theme_variable_defaults() -> dict[str, str]:
@@ -278,13 +237,6 @@ def aclose_tools() -> Any:
     from johnston.core.tools.registry import aclose_tools as _f
 
     return _f()
-
-
-def truncate_output(*args: Any, **kwargs: Any) -> Any:
-    """Truncate tool output for display (core tools base, live lookup)."""
-    from johnston.core.tools.base import truncate_output as _f
-
-    return _f(*args, **kwargs)
 
 
 def format_background_notification(*args: Any, **kwargs: Any) -> Any:

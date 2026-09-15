@@ -168,9 +168,9 @@ def update_background_shell_widget(app: Any, task_id: str, result: str, *, task:
 
     task_log = getattr(task, "log_path", None)
 
-    from johnston.tui.adapters import core_bridge
+    from johnston.tui.utils.text_format import truncate_output
 
-    final_result = core_bridge.truncate_output(
+    final_result = truncate_output(
         result or "(no output)",
         max_chars=4000,
         tool_name="shell",
@@ -217,12 +217,13 @@ def on_background_shell_completed(app: Any, task_id: str, command_str: str, resu
         update_background_shell_widget(app, task_id, result, task=task)
 
         from johnston.tui.adapters import core_bridge
+        from johnston.tui.utils.text_format import truncate_output
 
         if getattr(task, "suppress_notification", False):
             return
         task_log = getattr(task, "log_path", None)
 
-        body = core_bridge.truncate_output(
+        body = truncate_output(
             result,
             max_chars=4000,
             tool_name="shell",
@@ -289,6 +290,7 @@ def on_background_shell_progress(
         return
     try:
         from johnston.tui.adapters import core_bridge
+        from johnston.tui.utils.text_format import truncate_output
 
         mgr = getattr(app, "task_manager", None)
         task = _find_task(mgr, task_id, kind="shell")
@@ -297,7 +299,7 @@ def on_background_shell_progress(
             return
         task_log = getattr(task, "log_path", None)
 
-        body = core_bridge.truncate_output(
+        body = truncate_output(
             result,
             max_chars=4000,
             tool_name="shell",

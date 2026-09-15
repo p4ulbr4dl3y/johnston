@@ -67,7 +67,9 @@ async def try_paste_clipboard_image(widget: Any) -> bool:
     """Checks clipboard for PNG/TIFF/JPEG image or Finder/Explorer image file and inserts as attachment"""
     import time
 
-    file_path, img = await asyncio.to_thread(core_bridge.get_clipboard_image_or_file)
+    from johnston.tui.utils.clipboard import get_clipboard_image_or_file
+
+    file_path, img = await asyncio.to_thread(get_clipboard_image_or_file)
 
     if file_path:
         widget.insert(f"@{file_path} ")

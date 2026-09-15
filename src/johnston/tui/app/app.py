@@ -113,9 +113,9 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
             super().copy_to_clipboard(text)
         except Exception:
             pass
-        from johnston.tui.adapters import core_bridge as _cb
+        from johnston.tui.utils.clipboard import copy_to_os_clipboard_async
 
-        self.create_tracked_task(_cb.copy_to_os_clipboard_async(text))
+        self.create_tracked_task(copy_to_os_clipboard_async(text))
         if notify and hasattr(self, "notify"):
             try:
                 self.notify("Copied to clipboard", severity="information", timeout=1.5)

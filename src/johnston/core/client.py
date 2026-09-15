@@ -84,11 +84,67 @@ def display_thinking_effort(value: str | None) -> str:
     return _disp(value)
 
 
+def estimate_tokens(input_val: Any, model: str | None = None) -> int:
+    """Estimate token count using core character-class-aware heuristic."""
+    from johnston.core.infrastructure.runtime.token_util import estimate_tokens as _est
+
+    return _est(input_val)
+
+
+def format_context_tokens(tokens: int) -> str:
+    """Format token count into human-readable compact string (e.g. '128k', '1M')."""
+    from johnston.core.domain.policies.models_catalog import format_context_tokens as _fmt
+
+    return _fmt(tokens)
+
+
 def get_role_display_name(role_or_key: Any, project_dir: str | None = None) -> str:
     """Return human-readable role name for a key, entity, or role definition."""
     from johnston.core.application.roles.role_registry import get_role_display_name as _get_name
 
     return _get_name(role_or_key, project_dir=project_dir)
+
+
+def get_settings(config_file: str | None = None, force_reload: bool = False) -> Any:
+    """Return central application settings."""
+    from johnston.core.infrastructure.config.settings import get_settings as _gs
+
+    return _gs(config_file=config_file, force_reload=force_reload)
+
+
+def ensure_provider_ready(pm: Any, agent: Any) -> Any:
+    """Check provider connection and model configuration."""
+    from johnston.core.application.generation.engine import ensure_provider_ready as _ensure
+
+    return _ensure(pm, agent)
+
+
+async def auto_title_session(agent: Any, session: Any, *, timeout: float | None = None) -> Any:
+    """(async) Auto-generate a session title."""
+    from johnston.core.application.session.auto_title import auto_title_session as _auto_title
+
+    return await _auto_title(agent, session, timeout=timeout)
+
+
+def sync_session_metrics(session: Any, agent: Any) -> Any:
+    """Sync token/cost metrics from live agent onto session record."""
+    from johnston.core.application.session.stream import sync_session_metrics as _sync
+
+    return _sync(session, agent)
+
+
+async def execute_shell_command(
+    cmd: str,
+    *,
+    cwd: str | None = None,
+    host: Any = None,
+    session: Any = None,
+    agent: Any = None,
+) -> Any:
+    """(async) Run a shell command through the core session executor."""
+    from johnston.core.application.session.shell_executor import execute_shell_command as _exec
+
+    return await _exec(cmd, cwd=cwd, host=host, session=session, agent=agent)
 
 
 def extract_task_status_details(task: Any) -> tuple[str, str]:
@@ -1190,6 +1246,127 @@ class JohnstonClient:
         )
         return True
 
-    get_role_display_name = staticmethod(get_role_display_name)
+    def estimate_tokens(self, text: str | Any = "", model: str | None = None) -> int:
+        """Estimate token count for text or structured payload."""
+        if not isinstance(self, JohnstonClient):
+            return estimate_tokens(self, model=model)
+        return estimate_tokens(text, model=model)
+
+    def format_context_tokens(self, tokens: int | None = None) -> str:
+        """Format token count as a compact human-readable string (e.g. '128k', '1M')."""
+        if not isinstance(self, JohnstonClient):
+            return format_context_tokens(int(self))
+        if tokens is None:
+            return "0"
+        return format_context_tokens(tokens)
+
+    def get_role_display_name(self, role: str | None = None, project_dir: str | None = None) -> str:
+        """Return human-readable role name for a key, entity, or role definition."""
+        if not isinstance(self, JohnstonClient):
+            return get_role_display_name(self, project_dir=project_dir or role)
+        target_role = role if role is not None else getattr(self, "role", "worker")
+        pdir = project_dir or (getattr(self.store, "project_path", None) if getattr(self, "store", None) else None)
+        return get_role_display_name(target_role, project_dir=pdir)
+
+    def get_settings(self: Any = None) -> Any:
+        """Return central application settings."""
+        return get_settings()
+
+    @property
+    def settings(self) -> Any:
+        """Return central application settings."""
+        return self.get_settings()
+
+    @property
+    def role_display_name(self) -> str:
+        """Human-readable display name for the client's current role."""
+        return self.get_role_display_name(self.role)
+
+    def ensure_provider_ready(self, agent: Any = None, *args: Any) -> Any:
+        """Check provider connection and model configuration."""
+        if not isinstance(self, JohnstonClient):
+            return ensure_provider_ready(self, agent)
+        if args:
+            return ensure_provider_ready(agent, args[0])
+        target_agent = agent if agent is not None else self.agent
+        return ensure_provider_ready(self.pm, target_agent)
+
+    async def auto_title_session(self, session_id: str | Any = "", *args: Any, **kwargs: Any) -> Any:
+        """Auto-generate and persist a concise title for the session."""
+        if not isinstance(self, JohnstonClient):
+            return await auto_title_session(self, session_id, **kwargs)
+
+        if args:
+            target_agent, sess = session_id, args[0]
+        else:
+            target_agent = self.agent
+            target_sid = session_id or self.session_id
+            sess = None
+            if self.session and getattr(self.session, "id", "") == target_sid:
+                sess = self.session
+            elif not isinstance(target_sid, str):
+                sess = target_sid
+            elif self.store and hasattr(self.store, "get"):
+                sess = self.store.get(target_sid)
+
+        if sess is None:
+            return None
+
+        title = await auto_title_session(target_agent, sess, **kwargs)
+        if self.store and hasattr(self.store, "save"):
+            try:
+                self.store.save(sess)
+            except Exception:
+                pass
+        return title
+
+    def sync_session_metrics(self, session_id: str | Any = "", *args: Any) -> Any:
+        """Sync context/token metrics onto the session."""
+        if not isinstance(self, JohnstonClient):
+            return sync_session_metrics(self, session_id)
+
+        if args:
+            return sync_session_metrics(session_id, args[0])
+
+        target_sid = session_id or self.session_id
+        sess = None
+        if self.session and getattr(self.session, "id", "") == target_sid:
+            sess = self.session
+        elif not isinstance(target_sid, str):
+            sess = target_sid
+        elif self.store and hasattr(self.store, "get"):
+            sess = self.store.get(target_sid)
+
+        if sess is not None and self.agent is not None:
+            sync_session_metrics(sess, self.agent)
+            if self.store and hasattr(self.store, "save"):
+                try:
+                    self.store.save(sess)
+                except Exception:
+                    pass
+        return None
+
+    async def execute_shell_command(
+        self,
+        cmd: str,
+        cwd: str | None = None,
+        *,
+        host: Any | None = None,
+        session: Any | None = None,
+        agent: Any | None = None,
+    ) -> Any:
+        """Execute a shell command through core shell executor."""
+        target_host = host if host is not None else getattr(self, "app", None)
+        target_session = session if session is not None else self.session
+        target_agent = agent if agent is not None else self.agent
+
+        return await execute_shell_command(
+            cmd,
+            cwd=cwd,
+            host=target_host,
+            session=target_session,
+            agent=target_agent,
+        )
+
     extract_task_status_details = staticmethod(extract_task_status_details)
 

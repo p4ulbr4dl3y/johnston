@@ -14,6 +14,7 @@ from johnston.tui.presentation.widgets.modal_header import ModalHeader
 from johnston.tui.presentation.widgets.modal_hint import ModalHint
 from johnston.tui.utils.key_aliases import expand_bindings
 from johnston.tui.utils.responsive import fit_modal_dialog
+from johnston.tui.utils.text_format import process_carriage_returns, strip_ansi
 
 
 class TaskStdinInput(Input):
@@ -151,7 +152,7 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         for chunk in getattr(getattr(self.bg_task, "output", None), "history", []):
             if chunk.strip():
                 has_history = True
-            self._consume(core_bridge.strip_ansi(chunk))
+            self._consume(strip_ansi(chunk))
         if not has_history:
             if getattr(self.bg_task, "is_running", False):
                 self.log_widget.write("(Waiting for command output...)")
@@ -208,12 +209,12 @@ class TaskConsoleScreen(BaseModalScreen[None]):
         self._pending_line = parts.pop()
         at_bottom = self._is_at_bottom()
         for line in parts:
-            self.log_widget.write(core_bridge.process_carriage_returns(line), scroll_end=at_bottom)
+            self.log_widget.write(process_carriage_returns(line), scroll_end=at_bottom)
 
     def _flush_pending(self) -> None:
         if self._pending_line and self.log_widget:
             at_bottom = self._is_at_bottom()
-            self.log_widget.write(core_bridge.process_carriage_returns(self._pending_line), scroll_end=at_bottom)
+            self.log_widget.write(process_carriage_returns(self._pending_line), scroll_end=at_bottom)
             self._pending_line = ""
 
 

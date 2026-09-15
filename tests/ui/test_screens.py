@@ -443,14 +443,19 @@ class TestProvidersScreen(unittest.TestCase):
 
     def test_models_cache_badge_displayed(self):
         """When provider models DTO is empty but cache file exists, badge displays cached count."""
+        import json
+        from unittest.mock import mock_open
+
+        pm = MagicMock()
+        pm.provider_models_cache_path.return_value = "/fake/cache/p1.json"
         with patch("os.path.exists", return_value=True), patch(
-            "johnston.core.infrastructure.platform.platform_utils.cached_json_read",
-            return_value={"models": ["m1", "m2", "m3"]},
+            "builtins.open", mock_open(read_data=json.dumps({"models": ["m1", "m2", "m3"]}))
         ):
             s = ProvidersScreen(
                 providers=[ProviderDTO(key="p1", name="P1", is_configured=True, models=[], is_disabled=False)],
                 active_key="p1",
                 configured_keys={"p1": "key"},
+                pm=pm,
             )
             self.assertIn("3 models", s.raw_options[0])
 

@@ -21,11 +21,11 @@ from johnston.tui.presentation.toolcall_shell import (
     bash_safe_boundary,
 )
 from johnston.tui.presentation.widgets.chat_markdown import TransparentSyntax
+from johnston.tui.utils.text_format import strip_ansi
 
 # Module aliases kept for tests that monkeypatch chat_toolcall.get_*
 # (tests/ui/test_config_ui_wiring.py).
 get_settings = core_bridge.get_settings
-strip_ansi = core_bridge.strip_ansi
 
 DISPLAY_NAMES: dict[str, str] = {
     "read": "Read",

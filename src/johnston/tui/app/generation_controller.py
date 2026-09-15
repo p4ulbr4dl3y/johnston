@@ -11,8 +11,8 @@ import logging
 import time
 from typing import Any, Callable, Optional
 
-from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
 from johnston.core.dto import (
+    COMPACTING_DIVIDER_TITLE,
     CompactionEventDTO,
     ContentDeltaDTO,
     ErrorEventDTO,
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 def _interactive_mode(agent: Any):
     """Return AgentMode.INTERACTIVE unless the agent is already a subagent."""
-    from johnston.core.domain.policies.role_policy import AgentMode
+    from johnston.core.dto import AgentMode
 
     if getattr(agent, "is_subagent", False):
         return AgentMode.SUBAGENT

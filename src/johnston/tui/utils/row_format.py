@@ -59,9 +59,9 @@ def format_relative_time(ts: float | int | None, now: float | int | None = None)
 
 def format_duration(seconds: float | int | None) -> str:
     """Format duration in seconds as concise string ('<0.1s', '4.2s', '14s', '1m 20s', '2h 15m')."""
-    from johnston.tui.adapters import core_bridge
+    from johnston.tui.utils.text_format import format_duration as _fd
 
-    return core_bridge.format_duration(seconds)
+    return _fd(seconds)
 
 
 def format_cost(cost_usd: float | int | None) -> str:

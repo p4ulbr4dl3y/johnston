@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
+from johnston.core.domain.policies.role_policy import AgentMode
 from johnston.core.dto.commands import CommandResultDTO, CompactionResultDTO
 from johnston.core.dto.events import (
     CompactionEventDTO,
@@ -34,6 +36,8 @@ from johnston.core.dto.tui import (
 )
 
 __all__ = [
+    "AgentMode",
+    "COMPACTING_DIVIDER_TITLE",
     "CommandResultDTO",
     "CompactionEventDTO",
     "CompactionResultDTO",

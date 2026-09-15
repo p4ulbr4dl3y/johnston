@@ -79,7 +79,7 @@ def reconcile_active_agent(
     if agent is not None:
         # Recreated agents lose the interactive-mode stamp; restore it before
         # role configuration so tools/prompt stay interactive.
-        from johnston.core.domain.policies.role_policy import AgentMode
+        from johnston.core.dto import AgentMode
 
         agent.mode = AgentMode.INTERACTIVE
         agent.is_headless = False

@@ -498,6 +498,75 @@ def test_client_get_model_info(mock_pm: MagicMock, mock_store: MagicMock):
     assert isinstance(info.supports_thinking, bool)
 
 
+def test_client_estimate_tokens(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    assert client.estimate_tokens("hello world") > 0
+    assert client.estimate_tokens("hello world", model="gpt-4o") > 0
+    assert JohnstonClient.estimate_tokens("hello world") > 0
+
+
+def test_client_format_context_tokens(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    assert client.format_context_tokens(1000) == "1k"
+    assert client.format_context_tokens(1000000) == "1M"
+    assert JohnstonClient.format_context_tokens(1000) == "1k"
+
+
+def test_client_get_role_display_name(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store, role="reviewer")
+    with patch("johnston.core.application.roles.role_registry.get_role_display_name", side_effect=lambda r, **kw: r.capitalize()):
+        assert client.get_role_display_name("worker") == "Worker"
+        assert client.get_role_display_name() == "Reviewer"
+        assert client.role_display_name == "Reviewer"
+        assert JohnstonClient.get_role_display_name("worker") == "Worker"
+
+
+def test_client_get_settings(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    with patch("johnston.core.client.get_settings", return_value=MagicMock(llm=MagicMock(auto_title=True))):
+        assert client.get_settings().llm.auto_title is True
+        assert client.settings.llm.auto_title is True
+        assert JohnstonClient.get_settings().llm.auto_title is True
+
+
+def test_client_ensure_provider_ready(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    with patch("johnston.core.client.ensure_provider_ready", return_value="ready") as mock_ensure:
+        assert client.ensure_provider_ready() == "ready"
+        mock_ensure.assert_called_with(mock_pm, client.agent)
+        assert client.ensure_provider_ready("custom_agent") == "ready"
+        mock_ensure.assert_called_with(mock_pm, "custom_agent")
+
+
+@pytest.mark.asyncio
+async def test_client_auto_title_session(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    with patch("johnston.core.client.auto_title_session", new=AsyncMock(return_value="New Title")) as mock_at:
+        title = await client.auto_title_session("session-test-123")
+        assert title == "New Title"
+        mock_at.assert_called_once_with(client.agent, client.session)
+        mock_store.save.assert_called_with(client.session)
+
+
+def test_client_sync_session_metrics(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    with patch("johnston.core.client.sync_session_metrics") as mock_sync:
+        res = client.sync_session_metrics("session-test-123")
+        assert res is None
+        mock_sync.assert_called_once_with(client.session, client.agent)
+        mock_store.save.assert_called_with(client.session)
+
+
+@pytest.mark.asyncio
+async def test_client_execute_shell_command(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    mock_res = MagicMock(content="hello", returncode=0, is_error=False, status="done")
+    with patch("johnston.core.client.execute_shell_command", new=AsyncMock(return_value=mock_res)) as mock_exec:
+        res = await client.execute_shell_command("echo hello", cwd="/tmp")
+        assert res.content == "hello"
+        mock_exec.assert_called_once_with("echo hello", cwd="/tmp", host=None, session=client.session, agent=client.agent)
+
+
 def test_architecture_zero_textual_imports():
     """Verify strictly 0 imports from textual or johnston.tui in client.py."""
     client_path = Path(__file__).resolve().parents[2] / "src" / "johnston" / "core" / "client.py"

@@ -6,10 +6,11 @@ import re
 
 from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.tool_renderers import format_truncation_for_ui
-
-is_spinner_line = core_bridge.is_spinner_line
-process_carriage_returns = core_bridge.process_carriage_returns
-process_carriage_returns_lines = core_bridge.process_carriage_returns_lines
+from johnston.tui.utils.text_format import (
+    is_spinner_line,
+    process_carriage_returns,
+    process_carriage_returns_lines,
+)
 
 _TRUNC_BANNER_START = re.compile(r"(?:\.\.\.\s*)?\[(?:Output\s+truncated|Truncated)", re.IGNORECASE)
 

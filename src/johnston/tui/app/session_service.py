@@ -12,7 +12,7 @@ import threading
 import time
 from typing import Any
 
-from johnston.core.domain.policies.role_policy import AgentMode
+from johnston.core.dto import AgentMode
 from johnston.tui.presentation.widgets.chat_container import ChatView
 
 logger = logging.getLogger(__name__)

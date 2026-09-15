@@ -165,6 +165,38 @@ class TestTuiArchitectureBoundaries(unittest.TestCase):
         dto_imports = [target for _, target, _ in visitor.imports if "DTO" in target or "dto" in target]
         self.assertTrue(len(dto_imports) > 0, "model.py does not import DTOs")
 
+    def test_no_forbidden_imports_in_app_and_presentation(self) -> None:
+        """Verify widgets, commands, mixins, and app forbid internal core imports (only client/dto)."""
+        tui_root = SCREENS_DIR.parents[1]
+        target_dirs = [
+            tui_root / "app",
+            tui_root / "mixins",
+            tui_root / "presentation" / "widgets",
+            tui_root / "presentation" / "commands",
+        ]
+
+        violations: list[str] = []
+        for target_dir in target_dirs:
+            self.assertTrue(target_dir.is_dir(), f"Target directory not found: {target_dir}")
+            for py_file in sorted(target_dir.glob("*.py")):
+                source = py_file.read_text(encoding="utf-8")
+                tree = ast.parse(source, filename=str(py_file))
+                visitor = ImportVisitor()
+                visitor.visit(tree)
+
+                for lineno, import_target, _asname in visitor.imports:
+                    if import_target == "johnston.core" or import_target.startswith("johnston.core."):
+                        if not any(import_target.startswith(prefix) for prefix in ALLOWED_CORE_PREFIXES):
+                            violations.append(
+                                f"{py_file.name}:{lineno} forbidden internal core import '{import_target}' "
+                                f"(only johnston.core.client and johnston.core.dto are allowed)"
+                            )
+
+        if violations:
+            msg = "Architecture boundary violations found in TUI components:\n" + "\n".join(violations)
+            self.fail(msg)
+
 
 if __name__ == "__main__":
     unittest.main()
+
