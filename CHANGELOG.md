@@ -7,6 +7,51 @@
 * **permissions:** remove permission groups (read/write/net/exec) and project-level permissions. Only global per-tool permissions (`~/.johnston/config.json` → `permissions.tools`) plus `default`, and session overrides remain. `update_permission("group", ...)` and `project_dir`/project scope arguments are gone; project `.johnston/permissions.json` files are no longer read. Default for all tools without an explicit entry is now `ask` (previously `read`/`write` group tools defaulted to `allow`).
 * **shell:** remove Shell Guard (shell-command safety guard) entirely. The `analyze_shell_command()` guard, `permissions.shell_guard` config key, Shell Guard UI toggle, and related overrides are gone. The `shell` tool now runs through the normal per-tool permission flow only.
 
+## [1.0.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.31.0...johnston-v1.0.0) (2026-09-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove JSON-RPC daemon and Ink client
+
+### Features
+
+* **create:** add delta stats, backups, and ui diff for overwrite ([078b01e](https://github.com/p4ulbr4dl3y/johnston/commit/078b01e4cf1c52625fce6eaba80ca4aeb32a02e9))
+* **ink:** add minimal Node/Ink JSON-RPC TUI client (POC) ([5706482](https://github.com/p4ulbr4dl3y/johnston/commit/5706482dabc7bfcf480e7858e0c4ec3dcff1883e))
+* **ink:** fix ctrl+c exit and client constructor signature ([a269a5f](https://github.com/p4ulbr4dl3y/johnston/commit/a269a5f6e90cbcfe67983415d561b8658461ae9d))
+* **rpc:** add DTO codec with round-trip tests ([bb9fda2](https://github.com/p4ulbr4dl3y/johnston/commit/bb9fda2d927e8b575e16bb17c2be2925a2d5a6c6))
+* **rpc:** add JSON-RPC stdio daemon (serve command) ([a64541f](https://github.com/p4ulbr4dl3y/johnston/commit/a64541f1ca868f39baf9b529b61eeb6142d4d1b8))
+* **tools:** add overwrite param to create and drop diff ([77bd708](https://github.com/p4ulbr4dl3y/johnston/commit/77bd7089ce5059349fe19fbcb50b01b8299f2d79))
+* **tui:** show cached models count in providers modal ([607d0f6](https://github.com/p4ulbr4dl3y/johnston/commit/607d0f688ffbe9a6bda1f853a95f0a5e1d934a4c))
+* **tui:** use ascii j logo on compact terminal width ([d2b13e3](https://github.com/p4ulbr4dl3y/johnston/commit/d2b13e30cdcbe9926f0627a181f08520763d9423))
+
+
+### Bug Fixes
+
+* **read:** show full dir/archive listing in UI ([d9aa457](https://github.com/p4ulbr4dl3y/johnston/commit/d9aa4578b520bd35e7497a823ddef0a70c589817))
+* **session:** separate history on lazy load and track message_subagent ([8c75ada](https://github.com/p4ulbr4dl3y/johnston/commit/8c75adae2adca68d78467e932e2e18a1618d09e7))
+* **subagents:** display in-memory running subagents in modal ([92f9bb5](https://github.com/p4ulbr4dl3y/johnston/commit/92f9bb5c47e51438c3cfa42c854b951cd46949bc))
+* **subagents:** omit branch and merge hint when worktree has no changes ([a4b77e1](https://github.com/p4ulbr4dl3y/johnston/commit/a4b77e1e1b160995638606ffad514f1c422ce6a5))
+* **tools:** prevent subagents from overwriting host current plan ([4a416a9](https://github.com/p4ulbr4dl3y/johnston/commit/4a416a9ab4c8b9cbe7c15450d2a6b8e23959bdb6))
+* **tui:** display vision badge only in models modal ([fb8ceb4](https://github.com/p4ulbr4dl3y/johnston/commit/fb8ceb4ecd4be732793a5576cd5dc87947f52657))
+* **tui:** prevent quadratic difflib lockup on long diff lines ([820a0cd](https://github.com/p4ulbr4dl3y/johnston/commit/820a0cd00b17fe989533efefc86d3d0032f8f5c1))
+
+
+### Performance Improvements
+
+* **core:** accelerate session store listing and lock probing ([ec28ebf](https://github.com/p4ulbr4dl3y/johnston/commit/ec28ebf605cf1ac9ae8bd05824c55026b0a16622))
+* **storage:** lazy load session messages to reduce memory usage ([27d75f4](https://github.com/p4ulbr4dl3y/johnston/commit/27d75f4e7434089262ffc970bfd201f25a2f1247))
+
+
+### Documentation
+
+* **protocol:** add JSON-RPC 2.0 daemon protocol specification ([9ac565a](https://github.com/p4ulbr4dl3y/johnston/commit/9ac565a074d6ff9e727ca6592fc175dd610c4da7))
+
+
+### Code Refactoring
+
+* remove JSON-RPC daemon and Ink client ([342c576](https://github.com/p4ulbr4dl3y/johnston/commit/342c576deccfaf9373146a0a53789c89514537f4))
+
 ## [0.31.0](https://github.com/p4ulbr4dl3y/johnston/compare/johnston-v0.30.0...johnston-v0.31.0) (2026-09-10)
 
 
