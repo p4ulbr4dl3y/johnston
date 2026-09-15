@@ -388,14 +388,22 @@ class TestCreateTool(_Base):
         await tool.execute({"path": p, "content": "a\n\n\n"})
         self.assertEqual(open(p, encoding="utf-8").read(), "a")
 
-    async def test_create_overwrites_existing_file_and_returns_diff(self):
+    async def test_create_existing_file_without_overwrite_returns_err(self):
+        tool = CreateTool()
+        p = self.write("ov_no.txt", "original\n")
+        res = await tool.execute({"path": p, "content": "replaced\n"})
+        self.assertTrue(res.is_error)
+        self.assertIn("ERR: file_exists", res.content)
+        self.assertEqual(self.read("ov_no.txt"), "original\n")
+
+    async def test_create_overwrites_existing_file_with_overwrite_flag(self):
         tool = CreateTool()
         p = self.write("ov.txt", "original\n")
-        res = str(await tool.execute({"path": p, "content": "replaced\n"}))
+        res = str(await tool.execute({"path": p, "content": "replaced\n", "overwrite": True}))
         self.assertNotIn("ERR:", res)
-        self.assertIn("--- a/", res)
-        self.assertIn("+replaced", res)
-        # create strips trailing \r\n (tools/create.py:48), so no trailing newline preserved
+        self.assertNotIn("--- a/", res)
+        self.assertIn("[overwritten", res)
+        # create strips trailing \r\n (tools/create.py), so no trailing newline preserved
         self.assertEqual(self.read("ov.txt"), "replaced")
 
     async def test_create_readonly_file_overwrite_bypasses_perm(self):
@@ -406,7 +414,7 @@ class TestCreateTool(_Base):
         p = self.write("rov.txt", "old\n")
         os.chmod(p, stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
         try:
-            res = str(await tool.execute({"path": p, "content": "new\n"}))
+            res = str(await tool.execute({"path": p, "content": "new\n", "overwrite": True}))
             # RED: current code reports success and overwrites the read-only file.
             self.assertIn("ERR:", res)
         finally:
@@ -452,25 +460,21 @@ class TestCreateTool(_Base):
         tool = CreateTool()
         self.assertFalse(tool.is_concurrency_safe())
 
-    async def test_create_overwrite_large_file_skips_diff(self):
-        from unittest.mock import patch
+    async def test_create_overwrite_accepts_truthy_string(self):
         tool = CreateTool()
-        p = self.write("big_old.txt", "old content\n")
-        with patch("johnston.core.tools.create.get_max_tool_payload_bytes", return_value=5):
-            res = str(await tool.execute({"path": p, "content": "new content\n"}))
-        self.assertNotIn("ERR:", res)
-        self.assertIn("diff skipped", res)
-        self.assertEqual(self.read("big_old.txt"), "new content")
-
-    async def test_create_diff_generation_failure_still_reports_success(self):
-        from unittest.mock import patch
-        tool = CreateTool()
-        p = self.write("fail_diff.txt", "line1\n")
-        with patch("johnston.core.tools.create.format_file_diff", side_effect=RuntimeError("diff broke")):
-            res = str(await tool.execute({"path": p, "content": "line2\n"}))
+        p = self.write("truthy.txt", "old content\n")
+        res = str(await tool.execute({"path": p, "content": "new content\n", "overwrite": "true"}))
         self.assertNotIn("ERR:", res)
         self.assertIn("[overwritten", res)
-        self.assertEqual(self.read("fail_diff.txt"), "line2")
+        self.assertEqual(self.read("truthy.txt"), "new content")
+
+    async def test_create_overwrite_falsy_string_fails(self):
+        tool = CreateTool()
+        p = self.write("falsy.txt", "old content\n")
+        res = await tool.execute({"path": p, "content": "new content\n", "overwrite": "false"})
+        self.assertTrue(res.is_error)
+        self.assertIn("ERR: file_exists", res.content)
+        self.assertEqual(self.read("falsy.txt"), "old content\n")
 
     def test_format_file_diff_truncation(self):
         from johnston.core.tools.utils import format_file_diff
@@ -485,7 +489,7 @@ class TestCreateTool(_Base):
         p = os.path.join(self.tmp, "binary.bin")
         with open(p, "wb") as f:
             f.write(b"\x00\x01\x02\x03\xff\xfe")
-        res = await tool.execute({"path": p, "content": "hello world"})
+        res = await tool.execute({"path": p, "content": "hello world", "overwrite": True})
         self.assertTrue(res.is_error)
         self.assertIn("ERR: binary_file", res.content)
         with open(p, "rb") as f:

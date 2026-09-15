@@ -3,24 +3,30 @@ from dataclasses import dataclass
 from typing import Any, Dict
 
 from johnston.core.domain.defaults.errors import ToolResult
-from johnston.core.tools.base import BaseTool, read_file_text, write_file_text
+from johnston.core.tools.base import BaseTool, write_file_text
 from johnston.core.tools.cancel import run_cancellable
-from johnston.core.tools.utils import format_file_diff, get_max_tool_payload_bytes, resolve_writable_path
+from johnston.core.tools.utils import resolve_writable_path
+
+
+def _as_bool(val: Any) -> bool:
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        return val.strip().lower() in ("true", "1", "yes")
+    return bool(val)
 
 
 @dataclass(frozen=True)
 class _ProbeResult:
     is_dir: bool
     existed: bool
-    old_content: str
-    diff_skipped: bool
     is_binary: bool = False
 
 
 class CreateTool(BaseTool):
     name = "create"
     description = (
-        "Create a new file or completely overwrite an existing file (>40% changed). "
+        "Create a new file or overwrite an existing file. "
         "For localized/partial modifications, use 'edit' instead. Parent directories created automatically."
     )
     parameters = {
@@ -37,6 +43,11 @@ class CreateTool(BaseTool):
                 "type": "string",
                 "description": "Full file content (empty string creates an empty file).",
             },
+            "overwrite": {
+                "type": "boolean",
+                "default": False,
+                "description": "Set true to overwrite existing file (default: false). If false and file exists, tool fails.",
+            },
         },
         "required": ["path", "content"],
     }
@@ -52,39 +63,31 @@ class CreateTool(BaseTool):
         if err is not None:
             return err
 
+        overwrite = _as_bool(args.get("overwrite", False))
+
         def _probe() -> _ProbeResult:
             """Run sync filesystem checks off the event loop."""
             if os.path.isdir(path):
-                return _ProbeResult(is_dir=True, existed=False, old_content="", diff_skipped=False)
+                return _ProbeResult(is_dir=True, existed=False)
             if not os.path.isfile(path):
-                return _ProbeResult(is_dir=False, existed=False, old_content="", diff_skipped=False)
+                return _ProbeResult(is_dir=False, existed=False)
 
             from johnston.core.tools.search.common import is_binary_file
 
             if is_binary_file(path):
-                return _ProbeResult(is_dir=False, existed=True, old_content="", diff_skipped=False, is_binary=True)
+                return _ProbeResult(is_dir=False, existed=True, is_binary=True)
 
-            try:
-                if os.path.getsize(path) > get_max_tool_payload_bytes():
-                    return _ProbeResult(is_dir=False, existed=True, old_content="", diff_skipped=True)
-            except OSError:
-                pass
-
-            old = ""
-            is_bin = False
-            try:
-                old = read_file_text(path)
-            except (UnicodeDecodeError, UnicodeError):
-                is_bin = True
-            except Exception:
-                old = ""
-            if is_bin:
-                return _ProbeResult(is_dir=False, existed=True, old_content="", diff_skipped=False, is_binary=True)
-            return _ProbeResult(is_dir=False, existed=True, old_content=old, diff_skipped=False)
+            return _ProbeResult(is_dir=False, existed=True)
 
         probe = await run_cancellable(_probe)
         if probe.is_dir:
             return ToolResult.error("is_directory", name=path, detail="path is an existing directory")
+        if probe.existed and not overwrite:
+            return ToolResult.error(
+                "file_exists",
+                name=str(path_arg or path),
+                detail=f"File '{path_arg}' already exists. Use edit for partial modifications, or set overwrite=true.",
+            )
         if probe.is_binary:
             return ToolResult.error("binary_file", name=str(path_arg or path), detail="cannot overwrite binary file")
 
@@ -112,14 +115,8 @@ class CreateTool(BaseTool):
 
         if not probe.existed:
             result_str = f"[created {path_arg} | {cnt} lines]"
-        elif probe.diff_skipped:
-            result_str = f"[overwritten {path_arg} | {cnt} lines (diff skipped: file exceeds payload limit)]"
         else:
-            try:
-                diff_text = format_file_diff(probe.old_content, content, str(path_arg))
-                result_str = diff_text if diff_text else f"[unchanged {path_arg} | {cnt} lines]"
-            except Exception:
-                result_str = f"[overwritten {path_arg} | {cnt} lines]"
+            result_str = f"[overwritten {path_arg} | {cnt} lines]"
 
         result_str = result_str.strip() if result_str else ""
         return ToolResult.done(content=result_str, display=result_str)

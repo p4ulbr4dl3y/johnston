@@ -144,11 +144,15 @@ class TestTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn("file", res)
         self.assertTrue(os.path.exists(file_path))
 
-        # Update existing file (should return diff and updated status)
-        res_update = str(await tool.execute({"path": file_path, "content": "Hello Universe"}))
-        self.assertIn("file", res_update)
-        self.assertIn("-Hello World", res_update)
-        self.assertIn("+Hello Universe", res_update)
+        # Overwriting existing file without overwrite=True fails
+        res_fail = await tool.execute({"path": file_path, "content": "Hello Universe"})
+        self.assertTrue(res_fail.is_error)
+        self.assertIn("file_exists", res_fail.content)
+
+        # Overwrite existing file with overwrite=True succeeds
+        res_update = str(await tool.execute({"path": file_path, "content": "Hello Universe", "overwrite": True}))
+        self.assertIn("[overwritten", res_update)
+        self.assertIn("nested/new_file.txt", res_update)
 
         # Create file over existing directory error
         res_dir_err = str(await tool.execute({"path": self.test_dir, "content": "Hello World"}))
