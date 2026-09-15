@@ -73,7 +73,6 @@ def _inspect_directory(path: str, start_line_int: int | None, end_line_int: int 
 
         return ToolResult.done(
             content=content_str,
-            display=f"[dir {path} | total {total_count}]",
         )
     except Exception as e:
         return ToolResult.error("listing", detail=str(e), name=path)
