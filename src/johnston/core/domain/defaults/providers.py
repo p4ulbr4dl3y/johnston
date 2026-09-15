@@ -31,6 +31,11 @@ DEFAULT_JSON_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "name": "OpenRouter",
         "base_url": "https://openrouter.ai/api/v1",
         "api_type": "openai",
+        "headers": {
+            "HTTP-Referer": "https://github.com/p4ulbr4dl3y/johnston",
+            "X-Title": "Johnston",
+            "X-OpenRouter-Categories": "cli-agent",
+        },
     },
     "groq": {
         "key": "groq",

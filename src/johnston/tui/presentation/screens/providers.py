@@ -72,11 +72,10 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             return option_list_row_width(None, MODAL_MEDIUM_ROW_WIDTH)
 
     def _build_options(self):
+        import json
         import os
 
         from johnston.core.dto import ModelInfoDTO
-        from johnston.core.infrastructure.platform.paths import provider_models_cache_path
-        from johnston.core.infrastructure.platform.platform_utils import cached_json_read
 
         options = []
         items = []
@@ -91,18 +90,20 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             has_key = p.is_configured or bool(self.configured_keys.get(key))
 
             models = p.models
-            if not models:
+            if not models and self.pm is not None:
                 try:
-                    cache_path = str(provider_models_cache_path(key))
-                    if os.path.exists(cache_path):
-                        cdata = cached_json_read(cache_path, {})
-                        if isinstance(cdata, dict):
-                            c_models = cdata.get("models", [])
-                            if isinstance(c_models, list) and c_models:
-                                models = [
-                                    ModelInfoDTO(name=str(m), display_name=str(m), provider=key)
-                                    for m in c_models
-                                ]
+                    if hasattr(self.pm, "provider_models_cache_path"):
+                        cache_path = str(self.pm.provider_models_cache_path(key))
+                        if os.path.exists(cache_path):
+                            with open(cache_path, "r", encoding="utf-8") as f:
+                                cdata = json.load(f)
+                            if isinstance(cdata, dict):
+                                c_models = cdata.get("models", [])
+                                if isinstance(c_models, list) and c_models:
+                                    models = [
+                                        ModelInfoDTO(name=str(m), display_name=str(m), provider=key)
+                                        for m in c_models
+                                    ]
                 except Exception:
                     pass
 

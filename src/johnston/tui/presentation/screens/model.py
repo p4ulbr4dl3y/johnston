@@ -212,14 +212,11 @@ class ModelScreen(BaseSelectionScreen[Union[Tuple[str, str, str], Tuple[str, str
                 m_name = m_info.name
                 clean_m = m_info.display_name or m_info.name
                 has_vis = m_info.supports_vision
-                has_thinking = m_info.supports_thinking
 
                 is_active = bool(active_idx is not None and idx == active_idx)
                 badges = []
                 if has_vis:
                     badges.append("vision")
-                if has_thinking:
-                    badges.append("thinking")
                 badge = ", ".join(badges) if badges else ""
                 prefix = f"{status_tag('ACTIVE')} " if is_active else "  "
                 opt_label = format_badge_row(clean_m, badge=badge, target_width=target_w, prefix=prefix)
