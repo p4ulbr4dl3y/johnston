@@ -648,26 +648,27 @@ class JohnstonClient:
 
             is_configured = (not needs_key) or bool(api_key)
 
-            if p_def and getattr(p_def, "models", None):
-                model_names = list(p_def.models)
-            elif isinstance(info, dict) and info.get("models"):
-                model_names = list(info.get("models"))
-            elif p_def and hasattr(p_def, "models_fallback"):
-                model_names = p_def.models_fallback()
-            else:
-                model_names = []
+            model_names = []
+            try:
+                cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{pkey}.json")
+                if os.path.exists(cache_path):
+                    cdata = cached_json_read(cache_path, {})
+                    if isinstance(cdata, dict):
+                        c_models = cdata.get("models", [])
+                        if isinstance(c_models, list) and c_models:
+                            model_names = list(c_models)
+            except Exception:
+                pass
 
             if not model_names:
-                try:
-                    cache_path = os.path.join(CONFIG_DIR, "cache", f"models_{pkey}.json")
-                    if os.path.exists(cache_path):
-                        cdata = cached_json_read(cache_path, {})
-                        if isinstance(cdata, dict):
-                            c_models = cdata.get("models", [])
-                            if isinstance(c_models, list) and c_models:
-                                model_names = list(c_models)
-                except Exception:
-                    pass
+                if p_def and getattr(p_def, "models", None):
+                    model_names = list(p_def.models)
+                elif isinstance(info, dict) and info.get("models"):
+                    model_names = list(info.get("models"))
+                elif p_def and hasattr(p_def, "models_fallback"):
+                    model_names = p_def.models_fallback()
+                else:
+                    model_names = []
 
             if not model_names:
                 try:

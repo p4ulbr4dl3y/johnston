@@ -72,6 +72,12 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             return option_list_row_width(None, MODAL_MEDIUM_ROW_WIDTH)
 
     def _build_options(self):
+        import os
+
+        from johnston.core.dto import ModelInfoDTO
+        from johnston.core.infrastructure.platform.paths import provider_models_cache_path
+        from johnston.core.infrastructure.platform.platform_utils import cached_json_read
+
         options = []
         items = []
         target_w = self._row_width()
@@ -83,8 +89,24 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
             name = p.name or key
             is_disabled = p.is_disabled or key in self.disabled_set
             has_key = p.is_configured or bool(self.configured_keys.get(key))
-            cnt = len(p.models)
 
+            models = p.models
+            if not models:
+                try:
+                    cache_path = str(provider_models_cache_path(key))
+                    if os.path.exists(cache_path):
+                        cdata = cached_json_read(cache_path, {})
+                        if isinstance(cdata, dict):
+                            c_models = cdata.get("models", [])
+                            if isinstance(c_models, list) and c_models:
+                                models = [
+                                    ModelInfoDTO(name=str(m), display_name=str(m), provider=key)
+                                    for m in c_models
+                                ]
+                except Exception:
+                    pass
+
+            cnt = len(models)
             is_active = key == self.active_key
 
             if is_disabled:
@@ -97,7 +119,7 @@ class ProvidersScreen(BaseSelectionScreen[Any]):
                 stag = status_tag("AUTH")
 
             badge = ""
-            if not is_disabled and (is_active or has_key):
+            if not is_disabled:
                 if cnt > 0:
                     badge = f"{cnt} {'model' if cnt == 1 else 'models'}"
 

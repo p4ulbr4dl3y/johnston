@@ -291,11 +291,27 @@ def get_provider_actions() -> dict[str, Any]:
 
 def providers_to_dtos(raw: dict[str, Any]) -> list[ProviderDTO]:
     """Convert the core ``load_providers`` dict shape into render-ready DTOs."""
+    import os
+
+    from johnston.core.infrastructure.platform.paths import provider_models_cache_path
+    from johnston.core.infrastructure.platform.platform_utils import cached_json_read
+
     dtos: list[ProviderDTO] = []
     for pkey, pdata in raw.items():
         if not isinstance(pdata, dict):
             continue
         models_raw = pdata.get("models") or []
+        cache_path = str(provider_models_cache_path(str(pkey)))
+        if os.path.exists(cache_path):
+            try:
+                cdata = cached_json_read(cache_path, {})
+                if isinstance(cdata, dict):
+                    c_models = cdata.get("models", [])
+                    if isinstance(c_models, list) and c_models:
+                        models_raw = c_models
+            except Exception:
+                pass
+
         models = [
             ModelInfoDTO(
                 name=str(m),

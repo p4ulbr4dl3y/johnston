@@ -441,6 +441,19 @@ class TestProvidersScreen(unittest.TestCase):
         self.assertIn("1 model", s.raw_options[1])
         self.assertNotIn("model", s.raw_options[2])  # p3 is disabled/off
 
+    def test_models_cache_badge_displayed(self):
+        """When provider models DTO is empty but cache file exists, badge displays cached count."""
+        with patch("os.path.exists", return_value=True), patch(
+            "johnston.core.infrastructure.platform.platform_utils.cached_json_read",
+            return_value={"models": ["m1", "m2", "m3"]},
+        ):
+            s = ProvidersScreen(
+                providers=[ProviderDTO(key="p1", name="P1", is_configured=True, models=[], is_disabled=False)],
+                active_key="p1",
+                configured_keys={"p1": "key"},
+            )
+            self.assertIn("3 models", s.raw_options[0])
+
     def test_non_dto_entries_skipped(self):
         """Non-DTO entries (malformed payload) are skipped, not fatal."""
         s = ProvidersScreen(
