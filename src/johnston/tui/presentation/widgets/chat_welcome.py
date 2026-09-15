@@ -22,6 +22,16 @@ class WelcomeWidget(Vertical):
         " /_/                                           "
     )
 
+    COMPACT_BANNER = (
+        "   _ \n"
+        "  (_)\n"
+        "   _ \n"
+        "  | |\n"
+        "  | |\n"
+        "  | |\n"
+        " /_/ "
+    )
+
     def compose(self) -> ComposeResult:
         yield Static(self.FULL_BANNER, id="welcome-logo")
 
@@ -29,7 +39,7 @@ class WelcomeWidget(Vertical):
         try:
             logo = self.query_one("#welcome-logo", Static)
             if is_compact_width(width, breakpoint=BREAKPOINT_BANNER):
-                logo.update("[bold]johnston[/bold]")
+                logo.update(self.COMPACT_BANNER)
             else:
                 logo.update(self.FULL_BANNER)
         except Exception:
