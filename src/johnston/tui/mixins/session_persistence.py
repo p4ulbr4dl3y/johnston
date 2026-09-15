@@ -44,7 +44,7 @@ class SessionPersistenceMixin:
         return SessionPersistenceMixin._resolve_session_service(self).get_current_session_data()
 
     def save_current_session(self) -> None:
-        """Save complete UI element state to ~/.johnston/projects/<project>/sessions."""
+        """Save complete UI element state to ~/.johnston/workspaces/<project>/sessions."""
         SessionPersistenceMixin._resolve_session_service(self).save_current_session()
 
     def _write_session_data(self, session_data: dict) -> bool:

@@ -19,7 +19,7 @@ Johnston TUI provides slash commands entered directly in the message input and k
 ## Integration & Inspection
 - `/skills` (alias: `/skill`): Open interactive browser to inspect global and project skills.
 - `/mcp` (alias: `/mcps`): Open MCP server dashboard to view registered servers, tools, and connection statuses.
-- `/workspace` (alias: `/ws`): Manage allowed workspace roots (inspect and manage multi-root paths).
+- `/roots` (alias: `/root`): Manage allowed workspace roots (inspect and manage multi-root paths).
 - `/subagents` (aliases: `/agents`, `/subagent`): Open monitoring screen for running and completed background subagents.
 - `/shell` (aliases: `/tasks`, `/shelltasks`, `/ps`): Monitor background shell processes and async command execution.
 - `/diff` (aliases: `/changes`, `/patch`): View workspace diff for files modified during the active session (`_touched_files`), not general repository git diff.

@@ -9,7 +9,7 @@ from textual.events import Paste
 from textual.widgets import Input, OptionList
 
 from johnston.core.application.permission.permission_manager import PermissionManager
-from johnston.tui.presentation.commands.workspace_command import WorkspaceCommand
+from johnston.tui.presentation.commands.roots_command import RootsCommand
 from johnston.tui.presentation.screens.confirm import ConfirmScreen
 from johnston.tui.presentation.screens.workspace import (
     WorkspaceScreen,
@@ -342,10 +342,10 @@ class TestWorkspaceScreen(unittest.IsolatedAsyncioTestCase):
         finally:
             os.rmdir(extra)
 
-    async def test_workspace_command_pushes_screen_when_available(self):
+    async def test_roots_command_pushes_screen_when_available(self):
         mock_app = MagicMock()
         mock_app.push_screen = MagicMock()
-        cmd = WorkspaceCommand()
+        cmd = RootsCommand()
         await cmd.execute(mock_app)
         mock_app.push_screen.assert_called_once()
         called_screen = mock_app.push_screen.call_args[0][0]

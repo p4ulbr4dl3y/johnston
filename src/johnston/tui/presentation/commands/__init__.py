@@ -13,6 +13,7 @@ from johnston.tui.presentation.commands.provider_commands import (
     ProvidersCommand,
     ThinkingEffortCommand,
 )
+from johnston.tui.presentation.commands.roots_command import RootsCommand
 from johnston.tui.presentation.commands.session_commands import (
     CompactCommand,
     DiffCommand,
@@ -37,13 +38,12 @@ from johnston.tui.presentation.commands.ui_commands import (
     KeybindsCommand,
     ThemeCommand,
 )
-from johnston.tui.presentation.commands.workspace_command import WorkspaceCommand
 
 COMMAND_CLASSES = [
     ModelsCommand,
     ThinkingEffortCommand,
     ProvidersCommand,
-    WorkspaceCommand,
+    RootsCommand,
     BranchCommand,
     NewCommand,
     ResumeCommand,
@@ -74,7 +74,7 @@ __all__ = [
     "ModelsCommand",
     "ThinkingEffortCommand",
     "ProvidersCommand",
-    "WorkspaceCommand",
+    "RootsCommand",
     "BranchCommand",
     "NewCommand",
     "ResumeCommand",

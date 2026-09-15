@@ -9,11 +9,11 @@ from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.widgets.chat_container import ChatView
 
 
-class WorkspaceCommand(BaseCommand):
+class RootsCommand(BaseCommand):
     """Open the workspace roots management screen."""
 
-    name = "/workspace"
-    aliases = ["/ws"]
+    name = "/roots"
+    aliases = ["/root"]
     description = "Manage allowed workspace roots"
 
     async def execute(self, app: Any) -> None:

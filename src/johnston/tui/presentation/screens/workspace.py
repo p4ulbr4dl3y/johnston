@@ -184,7 +184,7 @@ class WorkspaceScreen(BaseModalScreen[None]):
         with Vertical(id=MODAL_DIALOG_ID, classes="modal-dialog-medium"):
             yield ModalHeader("Workspace Roots", esc_hint="")
             yield WorkspaceInput(
-                placeholder="Directory path (e.g. ~/projects/lib)...",
+                placeholder="Directory path (e.g. ~/workspaces/lib)...",
                 id="workspace-add-input",
                 classes="modal-input",
             )

@@ -11,13 +11,13 @@ import time
 
 from johnston.tui.adapters import core_bridge
 from johnston.tui.app.dispatch import COMMAND_REGISTRY
-from johnston.tui.presentation.commands.workspace_command import WorkspaceCommand
+from johnston.tui.presentation.commands.roots_command import RootsCommand
 
 # Module alias kept for tests that monkeypatch command_provider.get_skill_manager.
 get_skill_manager = core_bridge.get_skill_manager
 
 __all__ = [
-    "WorkspaceCommand",
+    "RootsCommand",
     "_build_command_suggestions",
     "get_all_command_suggestions",
 ]

@@ -19,9 +19,9 @@ class TestSessionManager(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir, ignore_errors=True)
-        self.projects_dir_patcher = patch("johnston.core.infrastructure.storage.session_store.PROJECTS_DIR", self.test_dir)
-        self.projects_dir_patcher.start()
-        self.addCleanup(self.projects_dir_patcher.stop)
+        self.workspaces_dir_patcher = patch("johnston.core.infrastructure.storage.session_store.WORKSPACES_DIR", self.test_dir)
+        self.workspaces_dir_patcher.start()
+        self.addCleanup(self.workspaces_dir_patcher.stop)
         self.store = _make_store(self.test_dir)
 
     def test_init_dirs(self):
@@ -127,9 +127,9 @@ class TestSessionManagerRegression(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir, ignore_errors=True)
-        self.projects_dir_patcher = patch("johnston.core.infrastructure.storage.session_store.PROJECTS_DIR", os.path.join(self.test_dir, "projects"))
-        self.projects_dir_patcher.start()
-        self.addCleanup(self.projects_dir_patcher.stop)
+        self.workspaces_dir_patcher = patch("johnston.core.infrastructure.storage.session_store.WORKSPACES_DIR", os.path.join(self.test_dir, "workspaces"))
+        self.workspaces_dir_patcher.start()
+        self.addCleanup(self.workspaces_dir_patcher.stop)
         self.store = _make_store(self.test_dir)
 
     def test_load_session_returns_none_for_malformed_json(self):
@@ -179,7 +179,7 @@ class TestSessionManagerPureReader(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.test_dir)
-        self.p1 = patch("johnston.core.infrastructure.storage.session_store.PROJECTS_DIR", self.test_dir)
+        self.p1 = patch("johnston.core.infrastructure.storage.session_store.WORKSPACES_DIR", self.test_dir)
         self.p1.start()
         self.addCleanup(self.p1.stop)
         self.store = _make_store(self.test_dir)

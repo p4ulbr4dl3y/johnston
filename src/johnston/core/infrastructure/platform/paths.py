@@ -7,7 +7,7 @@ from johnston.core.infrastructure.platform.platform_utils import IMAGE_EXTENSION
 __all__ = [
     "IMAGE_EXTENSIONS",
     "CONFIG_DIR",
-    "PROJECTS_DIR",
+    "WORKSPACES_DIR",
     "CONFIG_FILE",
     "SECRETS_FILE",
     "PROVIDERS_JSON_FILE",
@@ -23,7 +23,7 @@ __all__ = [
 ]
 
 CONFIG_DIR = str(johnston_config_dir())
-PROJECTS_DIR = os.path.join(CONFIG_DIR, "projects")
+WORKSPACES_DIR = os.path.join(CONFIG_DIR, "workspaces")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 SECRETS_FILE = os.path.join(CONFIG_DIR, "secrets.json")
 PROVIDERS_JSON_FILE = os.path.join(CONFIG_DIR, "providers.json")

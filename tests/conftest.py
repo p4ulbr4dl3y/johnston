@@ -34,7 +34,7 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     test_config_dir.mkdir(parents=True, exist_ok=True)
     cfg_dir_str = str(test_config_dir)
 
-    projects_dir = str(test_config_dir / "projects")
+    workspaces_dir = str(test_config_dir / "workspaces")
     config_file = str(test_config_dir / "config.json")
     secrets_file = str(test_config_dir / "secrets.json")
     providers_file = str(test_config_dir / "providers.json")
@@ -57,7 +57,7 @@ def isolate_johnston_env(tmp_path, monkeypatch):
 
     # 2. paths constants
     monkeypatch.setattr("johnston.core.infrastructure.platform.paths.CONFIG_DIR", cfg_dir_str)
-    monkeypatch.setattr("johnston.core.infrastructure.platform.paths.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr("johnston.core.infrastructure.platform.paths.WORKSPACES_DIR", workspaces_dir)
     monkeypatch.setattr("johnston.core.infrastructure.platform.paths.CONFIG_FILE", config_file)
     monkeypatch.setattr("johnston.core.infrastructure.platform.paths.SECRETS_FILE", secrets_file)
     monkeypatch.setattr("johnston.core.infrastructure.platform.paths.PROVIDERS_JSON_FILE", providers_file)
@@ -71,7 +71,7 @@ def isolate_johnston_env(tmp_path, monkeypatch):
     # 3. Module-level bound constants
     monkeypatch.setattr("johnston.core.infrastructure.secrets.CONFIG_DIR", cfg_dir_str)
     monkeypatch.setattr("johnston.core.infrastructure.secrets.SECRETS_FILE", secrets_file)
-    monkeypatch.setattr("johnston.core.infrastructure.storage.session_store.PROJECTS_DIR", projects_dir)
+    monkeypatch.setattr("johnston.core.infrastructure.storage.session_store.WORKSPACES_DIR", workspaces_dir)
     monkeypatch.setattr("johnston.core.application.permission.permission_manager.CONFIG_FILE", config_file)
     monkeypatch.setattr("johnston.core.application.permission.permission_manager.LOGS_DIR", logs_dir)
     monkeypatch.setattr("johnston.core.application.permission.permission_manager.SECRETS_FILE", secrets_file)

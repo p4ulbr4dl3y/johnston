@@ -19,12 +19,12 @@ from johnston.core.infrastructure.storage.session_store import SessionStore
 
 @pytest.fixture
 def store(tmp_path):
-    """Fresh SessionStore rooted in tmp_path (PROJECTS_DIR patched)."""
-    projects_dir = tmp_path / "projects"
-    projects_dir.mkdir(exist_ok=True)
+    """Fresh SessionStore rooted in tmp_path (WORKSPACES_DIR patched)."""
+    workspaces_dir = tmp_path / "workspaces"
+    workspaces_dir.mkdir(exist_ok=True)
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
-    with patch("johnston.core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
+    with patch("johnston.core.infrastructure.storage.session_store.WORKSPACES_DIR", str(workspaces_dir)):
         s = SessionStore(project_path=str(project))
         yield s
 
@@ -181,12 +181,12 @@ def test_roundtrip_after_multiple_saves_matches_memory(store, write_spy):
 # ---------------------------------------------------------------------------
 
 def test_restart_new_store_reads_multiple_saves(tmp_path):
-    projects_dir = tmp_path / "projects"
-    projects_dir.mkdir(exist_ok=True)
+    workspaces_dir = tmp_path / "workspaces"
+    workspaces_dir.mkdir(exist_ok=True)
     project = tmp_path / "proj"
     project.mkdir(exist_ok=True)
 
-    with patch("johnston.core.infrastructure.storage.session_store.PROJECTS_DIR", str(projects_dir)):
+    with patch("johnston.core.infrastructure.storage.session_store.WORKSPACES_DIR", str(workspaces_dir)):
         s1 = SessionStore(project_path=str(project))
         sess = s1.create_main("restart")
         sess.messages = [{"type": "user", "text": "q1"}]

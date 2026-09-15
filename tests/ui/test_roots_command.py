@@ -7,7 +7,7 @@ from textual.app import App
 
 from johnston.core.application.permission.permission_manager import PermissionManager
 from johnston.tui.app.dispatch import handle_slash_command
-from johnston.tui.presentation.commands.workspace_command import WorkspaceCommand
+from johnston.tui.presentation.commands.roots_command import RootsCommand
 from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 from johnston.tui.presentation.widgets.chat_container import ChatView
 
@@ -46,7 +46,7 @@ class MockApp:
         self.notifications.append(message)
 
 
-class TestWorkspaceCommand(unittest.IsolatedAsyncioTestCase):
+class TestRootsCommand(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.orig_cwd = os.getcwd()
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -61,8 +61,8 @@ class TestWorkspaceCommand(unittest.IsolatedAsyncioTestCase):
         self.temp_dir.cleanup()
         self.pm.clear_session_overrides()
 
-    async def test_workspace_list_empty(self):
-        cmd = WorkspaceCommand()
+    async def test_roots_list_empty(self):
+        cmd = RootsCommand()
         await cmd.execute(self.app)
         self.assertEqual(len(self.app.chat_view.messages), 1)
         content = self.app.chat_view.messages[0].content
@@ -70,11 +70,11 @@ class TestWorkspaceCommand(unittest.IsolatedAsyncioTestCase):
         self.assertIn(self.project_dir, content)
         self.assertIn("(none)", content)
 
-    async def test_workspace_list_with_roots(self):
+    async def test_roots_list_with_roots(self):
         extra = os.path.realpath(tempfile.mkdtemp())
         try:
             self.pm.add_workspace_root(extra)
-            cmd = WorkspaceCommand()
+            cmd = RootsCommand()
             await cmd.execute(self.app)
             content = self.app.chat_view.messages[0].content
             self.assertIn(extra, content)
@@ -82,12 +82,12 @@ class TestWorkspaceCommand(unittest.IsolatedAsyncioTestCase):
             os.rmdir(extra)
 
     async def test_handle_slash_command_dispatch(self):
-        handled = await handle_slash_command(self.app, "/workspace")
+        handled = await handle_slash_command(self.app, "/roots")
         self.assertTrue(handled)
         self.assertIn("Workspace Roots:", self.app.chat_view.messages[0].content)
 
-        handled_ws = await handle_slash_command(self.app, "/ws")
-        self.assertTrue(handled_ws)
+        handled_root = await handle_slash_command(self.app, "/root")
+        self.assertTrue(handled_root)
 
 
 class TestPermissionConfirmScreenWorkspaceIntegration(unittest.IsolatedAsyncioTestCase):

@@ -291,7 +291,7 @@ class SessionPersistenceService:
         return self.write_session_data(session_data)
 
     def save_current_session(self) -> None:
-        """Save complete UI element state to ~/.johnston/projects/<project>/sessions."""
+        """Save complete UI element state to ~/.johnston/workspaces/<project>/sessions."""
         session_data = self._collect_session_data()
         if session_data is not None:
             ok = self._persist_session_data(session_data)

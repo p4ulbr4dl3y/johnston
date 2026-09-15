@@ -19,7 +19,7 @@ from johnston.core.domain.policies.messages import (
 )
 from johnston.core.domain.policies.session_naming import build_fork_title
 from johnston.core.infrastructure.config.settings import get_settings  # noqa: F401
-from johnston.core.infrastructure.platform.paths import PROJECTS_DIR
+from johnston.core.infrastructure.platform.paths import WORKSPACES_DIR
 from johnston.core.infrastructure.platform.platform_utils import atomic_write_text, update_json_config
 from johnston.core.infrastructure.platform.session_lock import SessionLock
 from johnston.core.infrastructure.storage.session_index_db import SessionIndexDb
@@ -105,7 +105,7 @@ class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreC
     """Unified store for main and subagent sessions, organized by project.
 
     Disk layout:
-        ~/.johnston/projects/<project_key>/
+        ~/.johnston/workspaces/<project_key>/
             config.json
             sessions/<main_id>.jsonl
             sessions/<main_id>.subagents/<subagent_id>.jsonl
@@ -121,7 +121,7 @@ class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreC
         path_hash = hashlib.md5(self.project_path.encode("utf-8")).hexdigest()[:8]
         folder_name = os.path.basename(self.project_path) or "root"
         self.project_key = f"{folder_name}_{path_hash}"
-        self.project_dir = os.path.join(PROJECTS_DIR, self.project_key)
+        self.project_dir = os.path.join(WORKSPACES_DIR, self.project_key)
         self.sessions_dir = os.path.join(self.project_dir, "sessions")
         self.config_file = os.path.join(self.project_dir, "config.json")
         self.index_db_file = os.path.join(self.project_dir, "sessions_index.db")
