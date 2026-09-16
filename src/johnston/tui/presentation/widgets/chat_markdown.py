@@ -36,9 +36,10 @@ from textual.widgets._markdown import (
 )
 
 from johnston.tui.adapters import core_bridge
+from johnston.tui.utils.theme_constants import get_theme_vars
 
 LruCache = core_bridge.LruCache
-ZINC_DARK = core_bridge.get_theme_vars()
+ZINC_DARK = get_theme_vars()
 
 
 class TransparentSyntax(Syntax):

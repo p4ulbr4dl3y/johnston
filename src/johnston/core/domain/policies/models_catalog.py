@@ -90,6 +90,9 @@ class ModelsCatalog:
         self._updated_at: float = 0.0
         self._client: Optional[httpx.AsyncClient] = None
 
+    def __call__(self) -> "ModelsCatalog":
+        return self
+
     def _clear_internal_caches(self) -> None:
         self._match_cache.clear()
         self._display_name_cache.clear()

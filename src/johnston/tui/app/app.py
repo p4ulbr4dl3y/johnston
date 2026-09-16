@@ -18,6 +18,7 @@ from johnston.tui.mixins.message_flow import MessageFlowMixin
 from johnston.tui.mixins.session_persistence import SessionPersistenceMixin
 from johnston.tui.mixins.task_widget_registry import TaskWidgetRegistryMixin
 from johnston.tui.utils.key_aliases import expand_bindings
+from johnston.tui.utils.theme_constants import get_theme_variable_defaults
 
 _CSS_PATH = Path(__file__).resolve().parents[1] / "app.tcss"
 
@@ -153,7 +154,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
 
     def get_theme_variable_defaults(self) -> dict[str, str]:
         """Return design token defaults for TCSS stylesheet compilation."""
-        return core_bridge.get_theme_variable_defaults()
+        return get_theme_variable_defaults()
 
     def action_quit(self) -> None:
         """Exit application immediately, cancelling in-flight workers."""

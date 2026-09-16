@@ -567,6 +567,98 @@ async def test_client_execute_shell_command(mock_pm: MagicMock, mock_store: Magi
         mock_exec.assert_called_once_with("echo hello", cwd="/tmp", host=None, session=client.session, agent=client.agent)
 
 
+def test_client_catalog(mock_pm: MagicMock, mock_store: MagicMock):
+    from johnston.core.domain.policies.models_catalog import catalog
+
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    assert client.catalog is catalog
+    assert client.catalog() is catalog
+    assert JohnstonClient.catalog(client) is catalog
+
+
+def test_client_get_mcp_manager(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    with patch("johnston.core.infrastructure.mcp.get_mcp_manager") as mock_gmm:
+        mock_gmm.return_value = MagicMock()
+        mgr = client.get_mcp_manager()
+        assert mgr is mock_gmm.return_value
+        mock_gmm.assert_called_once()
+
+
+def test_client_get_gen_engine(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    engine = client.get_gen_engine()
+    assert isinstance(engine, dict)
+    assert "GenCanvas" in engine
+    assert "NullStreamDriver" in engine
+
+
+def test_client_get_permission_manager(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    from johnston.core.application.permission.permission_manager import PermissionManager
+
+    pm = client.get_permission_manager()
+    assert pm is PermissionManager.get_instance()
+    assert client.get_permission_manager("session-123") is pm
+
+    custom_pm = MagicMock()
+    client_custom = JohnstonClient(pm=mock_pm, store=mock_store, perm_manager=custom_pm)
+    assert client_custom.get_permission_manager() is custom_pm
+
+
+def test_client_get_session_actions(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    import johnston.core.application.session.actions as actions
+
+    assert client.get_session_actions() is actions
+
+
+def test_client_cancel_running_subagents(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    with patch(
+        "johnston.core.application.session.subagent_service.SubagentService.cancel_running_subagents", return_value=2
+    ) as mock_cancel:
+        res = client.cancel_running_subagents(parent_id="parent-1")
+        assert res == 2
+        mock_cancel.assert_called_once_with(client.store, "parent-1")
+
+        res_none = client.cancel_running_subagents()
+        assert res_none == 2
+        mock_cancel.assert_called_with(client.store, None)
+
+
+def test_client_resolve_subagent_from_toolcall(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    assert client.resolve_subagent_from_toolcall("spawn_subagent", {"id": "sub-42"}) == "sub-42"
+    assert JohnstonClient.resolve_subagent_from_toolcall("spawn_subagent", {"id": "sub-99"}) == "sub-99"
+
+
+def test_client_make_git_diff(mock_pm: MagicMock, mock_store: MagicMock):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    diff = client.make_git_diff("hello\n", "world\n", "test.txt")
+    assert "test.txt" in diff
+    assert "-hello" in diff
+    assert "+world" in diff
+
+    # identical
+    assert client.make_git_diff("same", "same") == ""
+
+
+def test_client_read_and_atomic_write_json(mock_pm: MagicMock, mock_store: MagicMock, tmp_path: Path):
+    client = JohnstonClient(pm=mock_pm, store=mock_store)
+    target_file = str(tmp_path / "data.json")
+
+    assert client.read_json(target_file, default={"empty": True}) == {"empty": True}
+
+    client.atomic_write_json(target_file, {"foo": "bar"})
+    assert client.read_json(target_file) == {"foo": "bar"}
+
+    # Static call support
+    static_file = str(tmp_path / "static.json")
+    JohnstonClient.atomic_write_json(static_file, {"k": 1})
+    assert JohnstonClient.read_json(static_file) == {"k": 1}
+
+
 def test_architecture_zero_textual_imports():
     """Verify strictly 0 imports from textual or johnston.tui in client.py."""
     client_path = Path(__file__).resolve().parents[2] / "src" / "johnston" / "core" / "client.py"

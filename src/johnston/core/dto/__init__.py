@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from johnston.core.domain.defaults.config import COMPACTING_DIVIDER_TITLE
+from johnston.core.domain.policies.messages import (
+    get_user_event_type,
+    is_ui_visible_user_message,
+    transcript_before_turn,
+)
 from johnston.core.domain.policies.role_policy import AgentMode
 from johnston.core.dto.commands import CommandResultDTO, CompactionResultDTO
 from johnston.core.dto.events import (
@@ -68,5 +73,8 @@ __all__ = [
     "RoleInfoDTO",
     "SessionSnapshotDTO",
     "StatusFooterDTO",
+    "get_user_event_type",
+    "is_ui_visible_user_message",
     "parse_event_dto",
+    "transcript_before_turn",
 ]

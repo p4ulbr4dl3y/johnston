@@ -6,7 +6,6 @@ from typing import Any
 
 from rich.text import Text
 
-from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.tool_renderers import (
     format_code_with_line_numbers,
     format_plan_display,
@@ -14,8 +13,9 @@ from johnston.tui.presentation.tool_renderers import (
 )
 from johnston.tui.presentation.widgets.chat_diff import format_edit_diff
 from johnston.tui.utils.lexer import guess_lexer_name
+from johnston.tui.utils.theme_constants import get_theme_constants
 
-_STATUS_COLORS = core_bridge.get_theme_constants()
+_STATUS_COLORS = get_theme_constants()
 
 _MISSING = object()
 

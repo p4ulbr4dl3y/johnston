@@ -25,23 +25,14 @@ __all__ = [
     "format_background_notification",
     "get_config_paths",
     "get_settings",
-    "get_theme_by_name",
-    "get_theme_class",
-    "get_theme_constants",
-    "get_theme_variable_defaults",
-    "get_theme_vars",
     "get_workspace_root",
     "install_asyncio_exception_handler",
-    "is_ansi_theme",
     "is_builtin_tool",
     "is_windows",
-    "list_themes",
     "load_sandbox_config",
-    "load_theme_config",
     "normalize_tool_name",
     "read_json",
     "save_sandbox_config",
-    "save_theme_config",
 ]
 
 

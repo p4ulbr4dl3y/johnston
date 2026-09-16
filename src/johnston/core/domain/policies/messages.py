@@ -162,6 +162,11 @@ def format_background_notification(
 # Classification helpers (unchanged behavior, more robust markers)
 # ---------------------------------------------------------------------------
 
+def get_user_event_type() -> str:
+    """Return the canonical transcript event type for user messages."""
+    return USER_EVENT_TYPE
+
+
 def is_ui_visible_user_message(msg: Any) -> bool:
     """True if a transcript event should be rendered/counted as a user turn."""
     if not isinstance(msg, dict):

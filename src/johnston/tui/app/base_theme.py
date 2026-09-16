@@ -9,10 +9,17 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from johnston.tui.adapters import core_bridge
+from johnston.tui.utils.theme_constants import (
+    THEMES_DIR,
+    get_theme_class,
+    get_theme_vars,
+    list_themes,
+    load_theme_config,
+    save_theme_config,
+)
 
-ZINC_DARK = core_bridge.get_theme_vars()
-list_themes = core_bridge.list_themes
-Theme = core_bridge.get_theme_class()
+ZINC_DARK = get_theme_vars()
+Theme = get_theme_class()
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +48,7 @@ class BaseThemeManager:
         chosen = default_theme
         if load_config:
             try:
-                saved = core_bridge.load_theme_config()
+                saved = load_theme_config()
                 if saved and saved in self._themes:
                     chosen = saved
             except Exception as e:
@@ -63,7 +70,7 @@ class BaseThemeManager:
 
     def load_user_themes(self, themes_dir: Optional[str | Path] = None) -> list[Theme]:
         """Load and register user-defined themes from JSON files in themes_dir."""
-        target_dir = Path(themes_dir or core_bridge.THEMES_DIR)
+        target_dir = Path(themes_dir or THEMES_DIR)
         loaded: list[Theme] = []
         if not target_dir.exists() or not target_dir.is_dir():
             return loaded
@@ -116,7 +123,7 @@ class BaseThemeManager:
 
         if persist:
             try:
-                core_bridge.save_theme_config(theme.name)
+                save_theme_config(theme.name)
             except Exception as e:
                 logger.warning("Failed to persist theme config: %s", e)
 

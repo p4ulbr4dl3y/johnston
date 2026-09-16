@@ -474,3 +474,16 @@ async def _handle_interruption(
         await canvas.add_event_divider("Response Interrupted")
     except Exception:  # noqa: BLE001
         pass
+
+
+def get_gen_engine() -> dict[str, Any]:
+    """Core generation engine components (GenCanvas, stream drivers, git wraps)."""
+    return dict(
+        GenCanvas=GenCanvas,
+        NullStreamDriver=NullStreamDriver,
+        _await_pending_git_restore=_await_pending_git_restore,
+        _create_git_checkpoint_async=_create_git_checkpoint_async,
+        _finalize_git_turn_async=_finalize_git_turn_async,
+        _handle_interruption=_handle_interruption,
+        _SessionSaveDebounce=_SessionSaveDebounce,
+    )

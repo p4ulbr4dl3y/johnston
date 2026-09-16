@@ -2,9 +2,8 @@
 import sys
 from typing import Any
 
+from johnston.core.dto import is_ui_visible_user_message
 from johnston.tui.adapters import core_bridge
-
-is_ui_visible_user_message = core_bridge.is_ui_visible_user_message
 
 __all__ = ["restore_message_item", "resolve_restore_message_item", "resolve_settings"]
 

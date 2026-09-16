@@ -6,12 +6,19 @@ from typing import Optional
 
 from textual.theme import Theme as TextualTheme
 
-from johnston.tui.adapters import core_bridge
 from johnston.tui.app.base_theme import BaseThemeManager
+from johnston.tui.utils.theme_constants import (
+    get_theme_by_name,
+    get_theme_class,
+    get_theme_vars,
+)
+from johnston.tui.utils.theme_constants import (
+    is_ansi_theme as _is_ansi_theme,
+)
 
-Theme = core_bridge.get_theme_class()
-is_ansi_theme = core_bridge.is_ansi_theme
-ZINC_DARK = core_bridge.get_theme_vars()
+Theme = get_theme_class()
+is_ansi_theme = _is_ansi_theme
+ZINC_DARK = get_theme_vars()
 
 
 class ThemeManager(BaseThemeManager):
@@ -33,7 +40,6 @@ class ThemeManager(BaseThemeManager):
         if not is_ansi:
             return theme
 
-        from johnston.tui.adapters import core_bridge
         from johnston.tui.utils.palette import compute_adaptive_palette, query_terminal_palette
 
         detected_bg, detected_fg = query_terminal_palette()
@@ -43,7 +49,7 @@ class ThemeManager(BaseThemeManager):
         adapted_tcss["bg-overlay"] = "transparent"
 
         if not palette["dark"]:
-            latte = core_bridge.get_theme_by_name("catppuccin-latte")
+            latte = get_theme_by_name("catppuccin-latte")
             md_styles = dict(latte.markdown_styles) if latte else dict(theme.markdown_styles)
             syntax_tokens = latte.syntax_tokens if latte else theme.syntax_tokens
         else:

@@ -207,6 +207,15 @@ def _parse_rewind_stat_numbers(git_stats: str) -> tuple[int, int, bool]:
     return adds, dels, True
 
 
+class _CatalogProperty(property):
+    """Descriptor providing both attribute and call access to the models catalog."""
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        from johnston.core.domain.policies.models_catalog import catalog as _cat
+
+        return _cat
+
+
 class JohnstonClient:
     """Primary in-process facade for programmatic interaction with Johnston core."""
 
@@ -1369,4 +1378,96 @@ class JohnstonClient:
         )
 
     extract_task_status_details = staticmethod(extract_task_status_details)
+
+    @_CatalogProperty
+    def catalog(self) -> Any:
+        """Return global ModelsCatalog policy singleton."""
+        from johnston.core.domain.policies.models_catalog import catalog as _cat
+
+        return _cat
+
+    def get_mcp_manager(self: Any = None, *args: Any, **kwargs: Any) -> Any:
+        """Return the MCP manager instance."""
+        from johnston.core.infrastructure.mcp import get_mcp_manager as _gmm
+
+        return _gmm(*args, **kwargs)
+
+    def get_gen_engine(self: Any = None) -> Any:
+        """Return the generation engine components."""
+        from johnston.core.application.generation.engine import get_gen_engine as _gge
+
+        return _gge()
+
+    def get_permission_manager(self: Any = None, session_id: str | None = None) -> Any:
+        """Return the permission manager instance or singleton."""
+        from johnston.core.application.permission.permission_manager import PermissionManager
+
+        if isinstance(self, JohnstonClient) and getattr(self, "perm_manager", None) is not None:
+            return self.perm_manager
+        return PermissionManager.get_instance()
+
+    def get_session_actions(self: Any = None) -> Any:
+        """Return the session actions module."""
+        import johnston.core.application.session.actions as actions
+
+        return actions
+
+    def cancel_running_subagents(self, parent_id: str | None = None) -> int:
+        """Cancel running subagents and mark their sessions cancelled."""
+        from johnston.core.application.session.subagent_service import SubagentService
+
+        store = getattr(self, "store", None) if isinstance(self, JohnstonClient) else None
+        return SubagentService.cancel_running_subagents(store, parent_id)
+
+    def resolve_subagent_from_toolcall(
+        self, tool: str | Any = "", args: dict[str, Any] | None = None, app: Any = None
+    ) -> str | None:
+        """Extract a subagent session ID from tool-call arguments."""
+        from johnston.core.application.session.facade import resolve_subagent_from_toolcall as _resolve
+
+        if not isinstance(self, JohnstonClient):
+            real_tool = str(self)
+            real_args = tool if isinstance(tool, dict) else (args or {})
+            real_app = args if not isinstance(tool, dict) else app
+            return _resolve(real_tool, real_args, app=real_app)
+        target_app = app if app is not None else getattr(self, "app", None)
+        return _resolve(tool, args or {}, app=target_app)
+
+    def make_git_diff(
+        self,
+        old_str: str,
+        new_str: str = "",
+        file_path: str = "",
+        *,
+        fromfile: str | None = None,
+        tofile: str | None = None,
+        context: int = 3,
+    ) -> str:
+        """Generate a unified diff between old and new strings."""
+        from johnston.core.infrastructure.runtime.git_utils import make_git_diff as _mgd
+
+        if not isinstance(self, JohnstonClient):
+            f_label = fromfile or file_path or "file"
+            t_label = tofile or file_path or "file"
+            return _mgd(self, old_str, fromfile=f_label, tofile=t_label, context=context)
+        f_label = fromfile or file_path or "file"
+        t_label = tofile or file_path or "file"
+        return _mgd(old_str, new_str, fromfile=f_label, tofile=t_label, context=context)
+
+    def read_json(self, path: str | Any = "", default: Any = None) -> Any:
+        """Read a JSON file safely, returning default if missing or invalid."""
+        from johnston.core.infrastructure.platform.platform_utils import read_json as _read_json
+
+        if not isinstance(self, JohnstonClient):
+            return _read_json(self, default=path if path != "" else default)
+        return _read_json(path, default=default)
+
+    def atomic_write_json(self, path: str | Any, data: Any = None, indent: int = 2) -> None:
+        """Atomically write data to a JSON file."""
+        from johnston.core.infrastructure.platform.platform_utils import atomic_write_json as _atomic_write_json
+
+        if not isinstance(self, JohnstonClient):
+            _atomic_write_json(self, path, indent=data if isinstance(data, int) else indent)
+            return
+        _atomic_write_json(path, data, indent=indent)
 
