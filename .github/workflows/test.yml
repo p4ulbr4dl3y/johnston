@@ -77,4 +77,4 @@ jobs:
       - name: Verify CLI Binary
         run: |
           johnston --version
-          johnston --roles
+          johnston roles
