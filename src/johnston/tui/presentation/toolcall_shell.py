@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import re
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.tool_renderers import format_truncation_for_ui
 from johnston.tui.utils.text_format import (
     is_spinner_line,

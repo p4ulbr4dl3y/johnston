@@ -7,7 +7,7 @@ import re
 from rich.markup import escape
 from rich.table import Table
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES
 from johnston.tui.utils.row_format import build_status_right_text, ellipsize, format_cost
 from johnston.tui.utils.theme_constants import get_theme_constants

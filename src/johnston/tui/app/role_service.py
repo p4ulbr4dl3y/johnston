@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 
 RoleRegistry = core_bridge.get_role_registry()
 

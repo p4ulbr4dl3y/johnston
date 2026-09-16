@@ -44,7 +44,7 @@ class UserInteractionService:
         This is the UI-side implementation of tool permission prompting, owned by the app
         layer so that the tools layer stays independent of Textual widgets.
         """
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
         from johnston.tui.presentation.screens.permission_confirm import PermissionConfirmScreen
 
         screen = PermissionConfirmScreen(
@@ -136,7 +136,7 @@ class UserInteractionService:
         left as-is: an open expansion keeps streaming live output until the task
         completes and the completion callback repaints it.
         """
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         count = 0
         task_manager = getattr(self.app, "task_manager", []) or []

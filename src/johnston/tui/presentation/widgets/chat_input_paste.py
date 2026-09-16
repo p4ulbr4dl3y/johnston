@@ -6,7 +6,7 @@ from typing import Any
 
 from textual import events
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.screens.constants import STATUS_FOOTER
 
 MOUSE_ARTIFACT_REGEX = re.compile(r"(?:M|\[)?<[0-9]{1,3};[0-9]+;[0-9]+[Mm]")

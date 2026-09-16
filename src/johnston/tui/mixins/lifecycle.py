@@ -11,7 +11,7 @@ from typing import Any
 from textual.app import ComposeResult
 from textual.containers import Vertical
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.app.lifecycle_service import (
     AppLifecycleService,
     _close_catalog_sync,

@@ -35,7 +35,7 @@ from textual.widgets._markdown import (
     MarkdownTableContent,
 )
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.utils.theme_constants import get_theme_vars
 
 LruCache = core_bridge.LruCache

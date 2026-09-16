@@ -4,7 +4,7 @@ from textual import events
 from textual.message import Message
 from textual.widgets import TextArea
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.chat_input_placeholders import (
     COMPACT_PLACEHOLDER,
     COMPACT_SHELL_PLACEHOLDER,

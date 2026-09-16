@@ -21,7 +21,7 @@ def generate_chunk_unified_diff(
     if not old_content and not new_content:
         return []
 
-    from johnston.tui.adapters import core_bridge
+    from johnston.core import client as core_bridge
 
     diff_text = core_bridge.make_git_diff(
         old_content,
@@ -71,7 +71,7 @@ def build_create_diff_text(file_path: str, new_content: str) -> str:
     disp_path = shorten_path(file_path) if file_path else "file"
     old_content = read_file_content(file_path)
     if old_content is not None:
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         diff_text = core_bridge.make_git_diff(
             old_content,

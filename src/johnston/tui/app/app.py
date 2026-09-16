@@ -8,7 +8,7 @@ from pathlib import Path
 
 from textual.app import App
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.app.interaction_service import UserInteractionService
 from johnston.tui.app.lifecycle_service import AppLifecycleService
 from johnston.tui.app.session_service import SessionPersistenceService
@@ -58,7 +58,7 @@ class JohnstonApp(LifecycleMixin, MessageFlowMixin, SessionPersistenceMixin, Act
         theme: str | None = None,
     ):
         super().__init__()
-        from johnston.tui.adapters import core_bridge as cb
+        from johnston.core import client as cb
         normalize_tool_name = cb.normalize_tool_name
         from johnston.tui.app.startup import (
             apply_startup_flags,

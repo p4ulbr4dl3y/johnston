@@ -3,8 +3,8 @@ from typing import Any
 from textual import events
 from textual.widgets import Input, OptionList
 
+from johnston.core.client import JohnstonClient
 from johnston.core.dto import ProviderDTO
-from johnston.tui.adapters.core_bridge import JohnstonClient
 from johnston.tui.presentation.screens.api_key import ApiKeyScreen
 from johnston.tui.presentation.screens.base_modal import status_tag
 from johnston.tui.presentation.screens.base_selection import BaseSelectionScreen

@@ -59,13 +59,13 @@ class GitMetricsMixin:
 
     def _compute_branch_sync(self, cwd: str | None = None) -> str:
         """(sync) Delegate branch detection to the core git metrics service."""
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         return core_bridge.get_branch_info(cwd)
 
     def _compute_diff_sync(self, cwd: str | None = None) -> str:
         """(sync) Delegate diff stats to the core git metrics service."""
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         return core_bridge.get_diff_stats(cwd)
 

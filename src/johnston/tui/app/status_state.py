@@ -15,7 +15,7 @@ import asyncio
 import os
 import time
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 
 display_thinking_effort = core_bridge.display_thinking_effort
 collect_current_tasks = core_bridge.collect_current_tasks

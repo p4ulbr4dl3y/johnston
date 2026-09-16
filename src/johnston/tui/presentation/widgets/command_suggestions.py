@@ -39,13 +39,13 @@ class CommandSuggestions(HeaderWrapOptionList):
 
         is_home_or_root = real_cwd == home or os.path.dirname(real_cwd) == real_cwd
         try:
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
             cfg_limit = core_bridge.get_settings().ui.autocomplete_max_files
         except Exception:
             cfg_limit = 1000
         max_files = min(300, cfg_limit) if is_home_or_root else cfg_limit
 
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
         DEFAULT_IGNORE_DIRS = core_bridge.get_ignore_dirs()
 
         ignore_dirs = DEFAULT_IGNORE_DIRS | {

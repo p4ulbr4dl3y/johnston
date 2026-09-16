@@ -50,7 +50,7 @@ async def exec_shell_command(app: Any, cmd: str, user_text: Optional[str] = None
         status="running",
     )
 
-    from johnston.tui.adapters import core_bridge
+    from johnston.core import client as core_bridge
 
     agent = getattr(app, "agent", None)
     app.current_tool_widget = tool_widget

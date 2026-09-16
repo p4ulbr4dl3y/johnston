@@ -13,7 +13,7 @@ import sys
 import threading
 from typing import Any
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.widgets.status_footer import StatusFooter
 
 logger = logging.getLogger("johnston.app")
@@ -22,7 +22,7 @@ logger = logging.getLogger("johnston.app")
 def _close_catalog_sync() -> None:
     """Run catalog.close() on a private loop (used from the shutdown thread)."""
     try:
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         asyncio.run(core_bridge.catalog.close())
     except Exception as err:
@@ -32,7 +32,7 @@ def _close_catalog_sync() -> None:
 def _close_tools_sync() -> None:
     """Run aclose_tools() on a private loop (used from the shutdown thread)."""
     try:
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         asyncio.run(core_bridge.aclose_tools())
     except Exception as err:
@@ -80,7 +80,7 @@ class AppLifecycleService:
             os.chdir(new_dir)
         except Exception:
             pass
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         core_bridge.get_permission_manager().get_instance().set_project_dir(new_dir)
         if getattr(self.app, "agent", None):
@@ -159,7 +159,7 @@ class AppLifecycleService:
                     self.app.create_tracked_task(ResumeCommand().execute(self.app))
                 else:
                     asyncio.create_task(ResumeCommand().execute(self.app))
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         core_bridge.catalog.load_cache()
         if hasattr(self.app, "refresh_status_footer"):
@@ -277,7 +277,7 @@ class AppLifecycleService:
         except Exception as err:
             logger.debug(f"Background task cleanup error: {err}")
         try:
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             core_bridge.cancel_running_subagents(self.app.sm)
         except Exception as err:
@@ -289,14 +289,14 @@ class AppLifecycleService:
             logger.debug(f"Unmount session save error: {err}")
 
         try:
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             core_bridge.get_mcp_manager().stop_all()
         except Exception as err:
             logger.debug(f"MCP cleanup error: {err}")
 
         try:
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             if loop is not None and loop.is_running():
                 # A fire-and-forget create_task() here races app shutdown: the
@@ -311,7 +311,7 @@ class AppLifecycleService:
                 # No running loop: run the close coroutine to completion in a
                 # dedicated loop instead of leaving it un-awaited.
                 try:
-                    from johnston.tui.adapters import core_bridge
+                    from johnston.core import client as core_bridge
 
                     asyncio.run(core_bridge.catalog.close())
                 except Exception:

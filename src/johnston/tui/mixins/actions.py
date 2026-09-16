@@ -59,7 +59,7 @@ class ActionsMixin(PlanActionsMixin):
 
     def action_toggle_mode(self) -> None:
         """Cycle execution mode: review -> edits -> yolo -> review"""
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         core_bridge.cycle_execution_mode()
         if hasattr(self, "refresh_status_footer"):

@@ -133,7 +133,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
         self._options, self._option_keys = self._build_options()
 
     def _build_options(self) -> tuple[list[str], list[str]]:
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         raw_options, suggested = core_bridge.JohnstonClient.build_permission_options(
             self.tool_name, self.args, self.server_name
@@ -277,7 +277,7 @@ class PermissionConfirmScreen(BaseModalScreen[str]):
                     yield Static(formatted_diff, classes="modal-diff-view")
             elif self.tool_name == "shell":
                 cmd = nargs.get("command") or ""
-                from johnston.tui.adapters import core_bridge
+                from johnston.core import client as core_bridge
 
                 lang = "powershell" if core_bridge.is_windows() else "bash"
                 with ToolScrollBox(classes="tool-scroll-box"):

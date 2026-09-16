@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.app.dispatch import COMMAND_REGISTRY
 from johnston.tui.presentation.commands.roots_command import RootsCommand
 
@@ -49,7 +49,7 @@ def _build_command_suggestions() -> list[tuple[str, str]]:
         pass
 
     try:
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         mm = core_bridge.get_mcp_manager()
         for s_name, client in mm.clients.items():

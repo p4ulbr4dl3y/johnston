@@ -12,7 +12,7 @@ class ToolCallActionsMixin:
         """Check whether this toolcall is associated with an existing subagent session."""
         if getattr(self, "subagent_session_id", None):
             return True
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         args = self.args if isinstance(self.args, dict) else {}
         call_args = dict(args)
@@ -34,7 +34,7 @@ class ToolCallActionsMixin:
         if getattr(self, "subagent_session_id", None):
             return self.subagent_session_id
 
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         args = self.args if isinstance(self.args, dict) else {}
         call_args = dict(args)
@@ -98,7 +98,7 @@ class ToolCallActionsMixin:
                 or args.get("prompt")
                 or getattr(self, "target", "")
             )
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             curr_session_id = getattr(app, "current_session_id", None) if app else None
             session = core_bridge.resolve_session_by_title(str(identifier), parent_id=curr_session_id, app=app) if identifier else None
@@ -127,7 +127,7 @@ class ToolCallActionsMixin:
             args = self.args if isinstance(self.args, dict) else {}
             session_id = getattr(self, "subagent_session_id", None) or args.get("id") or args.get("session_id")
             if session_id:
-                from johnston.tui.adapters import core_bridge
+                from johnston.core import client as core_bridge
 
                 curr_session_id = getattr(app, "current_session_id", None) if app else None
                 session = core_bridge.resolve_session_by_title(str(session_id), parent_id=curr_session_id, app=app)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES
 from johnston.tui.presentation.widgets.footer_layout import (
     format_display_path,
@@ -76,7 +76,7 @@ def resolve_status_defaults(
             clean_model = catalog_mod.get_model_display_name(provider_key, model_name)
         if not clean_model:
             clean_model = "[Select model: /models]"
-    from johnston.tui.adapters import core_bridge
+    from johnston.core import client as core_bridge
 
     role_str = core_bridge.get_role_display_name(agent_role)
     if is_generating:

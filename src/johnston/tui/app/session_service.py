@@ -150,7 +150,7 @@ class SessionPersistenceService:
             app.role = session.role
 
         # Restore active plan state from session messages
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         restore_plan_from_messages = core_bridge.get_session_actions()["restore_plan_from_messages"]
 

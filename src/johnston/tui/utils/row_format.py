@@ -19,7 +19,7 @@ from rich.cells import cell_len
 from rich.markup import escape
 from rich.text import Text
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 
 format_context_tokens = core_bridge.format_context_tokens
 

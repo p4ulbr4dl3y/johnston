@@ -163,7 +163,7 @@ class MCPProcessProtocolMixin:
 
         try:
             effective_timeout = timeout if timeout is not None else DEFAULT_TOOLS_CALL_TIMEOUT
-            res = await asyncio.wait_for(asyncio.shield(fut), timeout=effective_timeout)
+            res = await asyncio.wait_for(fut, timeout=effective_timeout)
         except asyncio.TimeoutError:
             return format_tool_error("mcp", detail=f"No response from MCP server '{self.name}'", name=tool_name)
         except asyncio.CancelledError:

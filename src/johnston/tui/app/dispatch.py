@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 
 SH = core_bridge.get_skill_helpers()
 _load_skill_blocks = SH['load_skill_blocks']
@@ -101,7 +101,7 @@ async def handle_slash_command(app, command_text: str, attachments: list | None 
         raw_mcp_name = words[0][1:]
         clean_mcp_name = normalize_homoglyphs(raw_mcp_name.lower())
         try:
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             mm = core_bridge.get_mcp_manager()
             args_dict: dict[str, str] = {}

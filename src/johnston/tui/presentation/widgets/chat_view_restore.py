@@ -2,8 +2,8 @@
 import sys
 from typing import Any
 
+from johnston.core import client as core_bridge
 from johnston.core.dto import is_ui_visible_user_message
-from johnston.tui.adapters import core_bridge
 
 __all__ = ["restore_message_item", "resolve_restore_message_item", "resolve_settings"]
 
@@ -73,7 +73,7 @@ async def restore_message_item(
                 except Exception:
                     pass
                 try:
-                    from johnston.tui.adapters import core_bridge
+                    from johnston.core import client as core_bridge
 
                     curr_sid = getattr(app, "current_session_id", None) if app else None
                     found = core_bridge.resolve_session_by_title(str(title), parent_id=curr_sid, app=app)

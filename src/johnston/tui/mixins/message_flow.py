@@ -237,7 +237,7 @@ class MessageFlowMixin:
 
         Thin wrapper that builds a GenCanvas and delegates to the engine.
         """
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
         ProviderReadyState = core_bridge.get_provider_ready_state()
 
         # ---- connectivity check (mixin-level) ----

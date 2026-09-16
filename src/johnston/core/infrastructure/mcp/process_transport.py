@@ -356,7 +356,7 @@ class MCPProcessTransportMixin:
         done = loop.create_future()
         self._write_queue.put_nowait((message, done))
         try:
-            await asyncio.wait_for(asyncio.shield(done), timeout=_WRITE_ACK_TIMEOUT)
+            await asyncio.wait_for(done, timeout=_WRITE_ACK_TIMEOUT)
         except asyncio.TimeoutError:
             # Write still in flight (e.g. a full pipe) but we cannot risk
             # hanging the call forever on the ack; the response stage has its
@@ -514,7 +514,7 @@ class MCPProcessTransportMixin:
 
         try:
             if timeout is not None:
-                return await asyncio.wait_for(asyncio.shield(fut), timeout=timeout)
+                return await asyncio.wait_for(fut, timeout=timeout)
             return await fut
         except Exception:
             logger.debug("MCP request '%s' failed for server '%s'", method, self.name, exc_info=True)

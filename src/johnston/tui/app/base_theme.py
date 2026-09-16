@@ -8,7 +8,7 @@ import weakref
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.utils.theme_constants import (
     THEMES_DIR,
     get_theme_class,

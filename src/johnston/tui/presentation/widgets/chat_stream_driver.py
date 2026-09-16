@@ -17,8 +17,8 @@ import math
 from collections import deque
 from typing import Any, Callable, Optional
 
+from johnston.core import client as core_bridge
 from johnston.core.dto import COMPACTING_DIVIDER_TITLE, is_ui_visible_user_message
-from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.chat_messages import BotMessage, ThinkingWidget
 from johnston.tui.presentation.widgets.chat_toolcall import ToolCallWidget
 

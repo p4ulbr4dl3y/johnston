@@ -4,7 +4,7 @@ from __future__ import annotations
 from rich.table import Table
 from textual.widgets import Static
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.mixins.git_metrics import GitMetricsMixin
 from johnston.tui.mixins.resize_debounce import ResizeDebounceMixin
 from johnston.tui.mixins.stream_frame import SPINNER_FRAMES, StreamFrameMixin

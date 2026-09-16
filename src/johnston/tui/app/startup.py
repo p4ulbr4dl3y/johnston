@@ -9,7 +9,7 @@ All core access goes through ``tui.adapters.core_bridge`` — no direct core
 imports in this module.
 """
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 
 
 def register_textual_themes(app) -> None:

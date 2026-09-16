@@ -465,12 +465,13 @@ class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
             client.process = MagicMock()
             client.process.poll.return_value = None
             client.process.stdin = MagicMock()
+            client.process.stdout = None
 
             task = asyncio.create_task(client.call_tool_async("run_code", {"cell": 1}))
 
             async def _await_pending():
-                while not client._pending_futures:
-                    await asyncio.sleep(0)
+                while (not client._pending_futures) or client._call_lock.locked():
+                    await asyncio.sleep(0.001)
                 return True
 
             await asyncio.wait_for(_await_pending(), timeout=5.0)
@@ -482,6 +483,7 @@ class TestAsyncMCP(unittest.IsolatedAsyncioTestCase):
                 await task
 
             self.assertNotIn(1, client._pending_futures)
+            await client.stop_async()
         finally:
             shutil.rmtree(test_dir)
 

@@ -8,7 +8,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Label, Markdown, Static
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.screens.constants import TOOL_HEADER, TOOL_HEADER_EXPANDABLE, TOOL_SCROLL_BOX
 from johnston.tui.presentation.tool_mixins import FormattingMixin, ParsingMixin
 from johnston.tui.presentation.tool_renderers import format_truncation_for_ui
@@ -100,7 +100,7 @@ class ToolCallWidget(
         if is_sequential:
             classes += " tool-sequential"
         super().__init__(classes=classes)
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         self.is_sequential = is_sequential
         self.tool_type = tool_type
@@ -149,7 +149,7 @@ class ToolCallWidget(
     def is_expandable(self) -> bool:
         if self.status == "generating":
             return False
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         canonical = getattr(self, "canonical_tool", None) or core_bridge.normalize_tool_name(self.tool_type)
         if canonical == "shell":

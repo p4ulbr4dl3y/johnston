@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.widgets.chat_container import ChatView
 

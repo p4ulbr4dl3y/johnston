@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 
 is_ui_visible_user_message = core_bridge.is_ui_visible_user_message
 
@@ -60,7 +60,7 @@ def recompute_context_tokens(agent: Any, ctx: int) -> int:
     if ctx or not getattr(agent, "history", []):
         return ctx
 
-    from johnston.tui.adapters import core_bridge
+    from johnston.core import client as core_bridge
 
     is_subagent = getattr(agent, "is_subagent", False)
     builder = core_bridge.build_prompt_builder(

@@ -2,7 +2,7 @@ from typing import Any
 
 from textual.containers import VerticalScroll
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.widgets.chat_markdown import _apply_chat_markdown_patches
 from johnston.tui.presentation.widgets.chat_messages import (
     BotMessage,

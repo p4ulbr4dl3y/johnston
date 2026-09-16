@@ -216,7 +216,7 @@ def on_background_shell_completed(app: Any, task_id: str, command_str: str, resu
 
         update_background_shell_widget(app, task_id, result, task=task)
 
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
         from johnston.tui.utils.text_format import truncate_output
 
         if getattr(task, "suppress_notification", False):
@@ -289,7 +289,7 @@ def on_background_shell_progress(
     if not getattr(app, "is_app_active", True):
         return
     try:
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
         from johnston.tui.utils.text_format import truncate_output
 
         mgr = getattr(app, "task_manager", None)

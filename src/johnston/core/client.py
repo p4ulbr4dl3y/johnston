@@ -10,24 +10,35 @@ import re
 import time
 from typing import Any, AsyncIterator
 
+from johnston.core.application.generation.engine import ProviderReadyState
 from johnston.core.application.provider.provider_manager import ProviderManager
 from johnston.core.application.roles.apply import apply_role
 from johnston.core.application.rules.rules import RulesManager
 from johnston.core.application.skills.manager import get_skill_manager
+from johnston.core.domain.policies.messages import (
+    get_user_event_type,
+    is_ui_visible_user_message,
+    transcript_before_turn,
+)
+from johnston.core.domain.policies.models_catalog import catalog
 from johnston.core.domain.policies.role_policy import AgentMode
 from johnston.core.dto import (
     CompactionResultDTO,
     ContentDeltaDTO,
     ErrorEventDTO,
+    FooterCacheDTO,
     GitStateDTO,
     MessageDTO,
     ModelInfoDTO,
     ProviderDTO,
     RewindPointDTO,
+    RoleInfoDTO,
     RuleDTO,
     SessionDTO,
+    SessionSnapshotDTO,
     SessionSummaryDTO,
     SkillDTO,
+    StatusFooterDTO,
     StreamEventDTO,
     TaskDTO,
     ToolCallDTO,
@@ -36,9 +47,119 @@ from johnston.core.dto import (
     WorktreeDTO,
     parse_event_dto,
 )
+from johnston.core.infrastructure.platform.paths import (
+    IMAGE_EXTENSIONS,
+    TEMP_IMAGES_DIR,
+    THEMES_DIR,
+    WORKTREES_DIR,
+)
+from johnston.core.infrastructure.platform.platform_utils import atomic_write_json, read_json
+from johnston.core.infrastructure.runtime.git_utils import make_git_diff
+from johnston.core.infrastructure.runtime.git_worktree import GitWorktreeManager
+from johnston.core.infrastructure.runtime.lru import LruCache
 from johnston.core.infrastructure.storage.session_store import SessionStore
+from johnston.core.infrastructure.tasks.output import (
+    is_spinner_line,
+    process_carriage_returns_lines,
+)
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    "FooterCacheDTO",
+    "GitWorktreeManager",
+    "IMAGE_EXTENSIONS",
+    "JohnstonClient",
+    "LruCache",
+    "ModelInfoDTO",
+    "ProviderDTO",
+    "ProviderReadyState",
+    "RoleInfoDTO",
+    "SessionSnapshotDTO",
+    "StatusFooterDTO",
+    "TEMP_IMAGES_DIR",
+    "THEMES_DIR",
+    "WORKTREES_DIR",
+    "aclose_tools",
+    "active_mcp_server_count",
+    "adopt_task_exception",
+    "advance_generation_engine",
+    "apply_execution_mode",
+    "apply_permission_choice",
+    "apply_role_to_agent",
+    "atomic_write_json",
+    "auto_title_session",
+    "build_core_services",
+    "build_prompt_builder",
+    "cancel_running_subagents",
+    "catalog",
+    "clean_heuristic_title",
+    "close_tools",
+    "collect_current_tasks",
+    "collect_task_summary",
+    "configure_agent",
+    "configure_permission_manager",
+    "configure_role_registry",
+    "cycle_execution_mode",
+    "display_thinking_effort",
+    "ensure_provider_ready",
+    "estimate_tokens",
+    "execute_shell_command",
+    "extract_task_status_details",
+    "filter_to_session",
+    "format_background_notification",
+    "format_context_tokens",
+    "format_duration",
+    "get_branch_info",
+    "get_config_paths",
+    "get_diff_stats",
+    "get_effort_auto",
+    "get_extract_task_status_details",
+    "get_fork_base_max_len",
+    "get_gen_engine",
+    "get_git_worktree_manager",
+    "get_ignore_dirs",
+    "get_mcp_manager",
+    "get_mcp_service",
+    "get_permission_manager",
+    "get_provider_actions",
+    "get_provider_ready_state",
+    "get_providers",
+    "get_role_display_name",
+    "get_role_registry",
+    "get_session_actions",
+    "get_settings",
+    "get_skill_helpers",
+    "get_skill_manager",
+    "get_store",
+    "get_user_event_type",
+    "get_workspace_root",
+    "install_asyncio_exception_handler",
+    "is_builtin_tool",
+    "is_spinner_line",
+    "is_ui_visible_user_message",
+    "is_windows",
+    "kill_subagent",
+    "list_branches_and_worktrees",
+    "list_skills",
+    "load_mcp_servers",
+    "load_sandbox_config",
+    "make_git_diff",
+    "mcp_tool_is_known",
+    "normalize_tool_name",
+    "process_carriage_returns",
+    "process_carriage_returns_lines",
+    "providers_to_dtos",
+    "read_json",
+    "resolve_session_by_title",
+    "resolve_subagent_from_toolcall",
+    "save_sandbox_config",
+    "stream_step_to_session_event",
+    "strip_ansi",
+    "sync_session_metrics",
+    "transcript_before_turn",
+    "worktrees_dir",
+]
 
 _LAZY_EXPORTS = {
     "get_rewind_git_stats": ("johnston.core.application.session.actions", "get_rewind_git_stats"),
@@ -665,15 +786,14 @@ class JohnstonClient:
 
     def get_model_info(self, provider_key: str, model_name: str) -> ModelInfoDTO:
         """Get model details (display name, vision, thinking, context) as ModelInfoDTO."""
-        from johnston.core.domain.policies.models_catalog import catalog
 
         clean_name = (
-            catalog.get_model_display_name(provider_key, model_name)
-            if hasattr(catalog, "get_model_display_name")
+            self.catalog.get_model_display_name(provider_key, model_name)
+            if hasattr(self.catalog, "get_model_display_name")
             else model_name
         )
-        has_vis = catalog.has_vision(provider_key, model_name) if hasattr(catalog, "has_vision") else False
-        ctx_limit = catalog.get_context_limit(provider_key, model_name) if hasattr(catalog, "get_context_limit") else 0
+        has_vis = self.catalog.has_vision(provider_key, model_name) if hasattr(self.catalog, "has_vision") else False
+        ctx_limit = self.catalog.get_context_limit(provider_key, model_name) if hasattr(self.catalog, "get_context_limit") else 0
         has_thinking = any(term in model_name.lower() for term in ("thinking", "reasoner", "r1", "claude-3-7"))
 
         return ModelInfoDTO(
@@ -687,17 +807,15 @@ class JohnstonClient:
 
     def estimate_cost(self, provider_key: str, model_name: str, total_tokens: int) -> float:
         """Estimate token cost for provider/model."""
-        from johnston.core.domain.policies.models_catalog import catalog
 
-        if hasattr(catalog, "estimate_cost_from_totals"):
-            return float(catalog.estimate_cost_from_totals(provider_key, model_name, total_tokens))
+        if hasattr(self.catalog, "estimate_cost_from_totals"):
+            return float(self.catalog.estimate_cost_from_totals(provider_key, model_name, total_tokens))
         return 0.0
 
     def get_providers(self) -> list[ProviderDTO]:
         """List configured/available providers and their models as ProviderDTO."""
         import os
 
-        from johnston.core.domain.policies.models_catalog import catalog
         from johnston.core.infrastructure.platform.paths import CONFIG_DIR
         from johnston.core.infrastructure.platform.platform_utils import cached_json_read
 
@@ -737,7 +855,7 @@ class JohnstonClient:
 
             if not model_names:
                 try:
-                    cat_p = catalog.get_catalog_provider(pkey)
+                    cat_p = self.catalog.get_catalog_provider(pkey)
                     if isinstance(cat_p, dict):
                         cat_models = cat_p.get("models", [])
                         if isinstance(cat_models, list) and cat_models:
@@ -1471,3 +1589,512 @@ class JohnstonClient:
             return
         _atomic_write_json(path, data, indent=indent)
 
+
+
+# =====================================================================
+# Canonical Core Public Facade Functions (Client API)
+# =====================================================================
+
+
+def get_branch_info(cwd: str | None = None) -> Any:
+    """Detect the current git branch (core git metrics helper)."""
+    from johnston.core.infrastructure.platform.git_metrics import get_branch_info as _f
+
+    return _f(cwd)
+
+
+def get_diff_stats(cwd: str | None = None) -> Any:
+    """Compute '+add/-del' diff stats vs HEAD (core git metrics helper)."""
+    from johnston.core.infrastructure.platform.git_metrics import get_diff_stats as _f
+
+    return _f(cwd)
+
+
+def get_mcp_manager() -> Any:
+    """Singleton MCP manager (core infrastructure)."""
+    from johnston.core.infrastructure import mcp as _m
+
+    return _m.get_mcp_manager()
+
+
+def worktrees_dir() -> str:
+    """Resolve the worktrees directory live from core paths (test-overridable)."""
+    import johnston.core.infrastructure.platform.paths as _m
+    return getattr(_m, "WORKTREES_DIR", "") or ""
+
+
+def get_git_worktree_manager() -> type[GitWorktreeManager]:
+    """Core GitWorktreeManager class (lazy, for feature/async detection)."""
+    return GitWorktreeManager
+
+
+def get_ignore_dirs() -> list[str]:
+    """Default git-ignore directory names (core defaults)."""
+    from johnston.core.domain.defaults.git_excludes import DEFAULT_IGNORE_DIRS as _f
+    return _f
+
+
+def list_branches_and_worktrees(project_dir: str) -> Any:
+    """List git branches and worktrees (core git worktree helper)."""
+    return GitWorktreeManager.list_branches_and_worktrees(project_dir)
+
+
+def collect_task_summary(app: Any, session_id: str | None = None) -> tuple[list[Any], list[Any]]:
+    """Return (shell_tasks, subagent_sessions) for the current app/session."""
+    from johnston.core.infrastructure.runtime.task_collection import collect_current_tasks as _collect
+    tasks = _collect(app, session_id)
+    return tasks.shell_tasks, tasks.subagent_tasks
+
+
+def collect_current_tasks(app: Any, session_id: str | None = None) -> Any:
+    """Collect shell/subagent task state for the status footer (core helper)."""
+    from johnston.core.infrastructure.runtime.task_collection import collect_current_tasks as _f
+    return _f(app, session_id)
+
+
+def filter_to_session(tasks: Any, session_id: Any) -> Any:
+    """Filter tasks to the given session scope (core task manager helper)."""
+    from johnston.core.infrastructure.tasks.manage import filter_to_session as _f
+    return _f(tasks, session_id)
+
+
+def format_duration(seconds: float | int | None) -> str:
+    """Format a duration as a concise string (core task helper)."""
+    from johnston.core.infrastructure.tasks.manage import format_duration as _f
+    return _f(seconds)
+
+
+def get_extract_task_status_details() -> Any:
+    """Core task status extraction helper."""
+    from johnston.core.client import extract_task_status_details as _f
+    return _f
+
+
+def resolve_subagent_from_toolcall(tool: str, args: dict[str, Any], app: Any = None) -> str | None:
+    """Resolve a subagent session id from a tool call (used by tool widgets)."""
+    from johnston.core.application.session.facade import resolve_subagent_from_toolcall as _r
+    return _r(tool, args, app)
+
+
+def resolve_session_by_title(identifier: str, parent_id: str | None = None, app: Any = None) -> Any:
+    """Resolve a session by title or id."""
+    from johnston.core.application.session.facade import resolve_session_by_title as _r
+    return _r(identifier, parent_id=parent_id, app=app)
+
+
+def cancel_running_subagents(sm: Any, parent_id: str | None = None) -> int:
+    """Cancel running subagent sessions (used on app shutdown / rewind)."""
+    from johnston.core.application.session.stream import cancel_running_subagents as _c
+    try:
+        return _c(sm, parent_id)
+    except Exception:
+        return 0
+
+
+def clean_heuristic_title(text: str, max_len: int = 60) -> str:
+    """Clean a heuristic session title (core auto_title helper)."""
+    from johnston.core.application.session.auto_title import clean_heuristic_title as _f
+    return _f(text, max_len=max_len)
+
+
+def get_session_actions() -> dict[str, Any]:
+    """Core session action helpers (new/compact/rewind/plan/diff)."""
+    from johnston.core.application.session.actions import (
+        _touched_files,
+        compact_session,
+        find_selected_user_message,
+        get_rewind_git_stats,
+        get_session_diff,
+        new_session,
+        restore_plan_from_messages,
+        rewind_session,
+        truncate_agent_history,
+    )
+    return dict(
+        _touched_files=_touched_files,
+        compact_session=compact_session,
+        find_selected_user_message=find_selected_user_message,
+        get_rewind_git_stats=get_rewind_git_stats,
+        get_session_diff=get_session_diff,
+        new_session=new_session,
+        restore_plan_from_messages=restore_plan_from_messages,
+        rewind_session=rewind_session,
+        truncate_agent_history=truncate_agent_history,
+    )
+
+
+def get_fork_base_max_len() -> int:
+    """Max length for fork titles (core session naming policy)."""
+    from johnston.core.domain.policies.session_naming import FORK_BASE_MAX_LEN as _f
+    return _f
+
+
+def get_permission_manager() -> Any:
+    """Shortcut for core PermissionManager singleton."""
+    from johnston.core.application.permission.permission_manager import PermissionManager
+    return PermissionManager
+
+
+def configure_permission_manager(tool_name_normalizer: Any) -> None:
+    """Configure the global PermissionManager singleton."""
+    from johnston.core.application.permission.permission_manager import PermissionManager
+    PermissionManager.configure_instance(tool_name_normalizer=tool_name_normalizer)
+
+
+def apply_execution_mode(app: Any, mode: str) -> None:
+    """Set the permission execution mode from the --mode CLI flag."""
+    from johnston.core.application.permission.permission_manager import PermissionManager
+    from johnston.core.domain.policies.permission_policy import ExecutionMode
+    try:
+        PermissionManager.get_instance().set_session_mode(ExecutionMode(mode.lower()))
+    except Exception:
+        pass
+
+
+def cycle_execution_mode() -> Any:
+    """Cycle permission execution mode: review -> edits -> yolo -> review."""
+    from johnston.core.application.permission.interactor import cycle_execution_mode as _f
+    return _f()
+
+
+def apply_permission_choice(choice: Any, permission_name: Any) -> Any:
+    """Apply a permission choice onto the permission manager singleton."""
+    from johnston.core.application.permission.interactor import apply_permission_choice as _f
+    return _f(choice, permission_name)
+
+
+def list_skills(*, include_hidden: bool = False) -> Any:
+    """List skills via core skill manager (lazy import)."""
+    from johnston.core.application.skills.manager import get_skill_manager
+    return get_skill_manager().list_skills(include_hidden=include_hidden)
+
+
+def get_skill_helpers() -> dict[str, Any]:
+    """Core skill helper functions (homoglyph normalize, skill resolve)."""
+    from johnston.core.application.skills.inject import (
+        load_skill_blocks,
+        normalize_homoglyphs,
+        resolve_skills,
+    )
+    return dict(
+        load_skill_blocks=load_skill_blocks,
+        normalize_homoglyphs=normalize_homoglyphs,
+        resolve_skills=resolve_skills,
+    )
+
+
+def get_store(app: Any = None) -> Any:
+    """Resolve the session store (core client facade, live lookup)."""
+    from johnston.core.client import _get_store as _f
+    return _f(app)
+
+
+def get_workspace_root() -> str:
+    """Current workspace root path from core."""
+    from johnston.core.infrastructure.platform import paths
+    return paths.workspace_root()
+
+
+def get_config_paths() -> Any:
+    """Core platform path constants (CONFIG_DIR, PROMPT_HISTORY_FILE, ...)."""
+    from johnston.core.infrastructure.platform import paths as _paths
+    return _paths
+
+
+def install_asyncio_exception_handler() -> None:
+    """Install the global asyncio exception handler."""
+    from johnston.core.infrastructure.platform.logging_setup import install_asyncio_exception_handler as _f
+    _f()
+
+
+def adopt_task_exception(task: Any) -> None:
+    """Attach an exception handler to a tracked task."""
+    from johnston.core.infrastructure.platform.logging_setup import adopt_task_exception as _f
+    _f(task)
+
+
+def load_sandbox_config() -> bool:
+    """Load the sandbox default from core config."""
+    from johnston.core.infrastructure.config.config_helpers import load_sandbox_config as _f
+    return _f()
+
+
+def save_sandbox_config(enabled: bool) -> None:
+    """Persist the sandbox default (core config helper, live lookup)."""
+    import johnston.core.infrastructure.config.config_helpers as _m
+    _m.save_sandbox_config(enabled)
+
+
+def normalize_tool_name(name: str) -> str:
+    """Normalize tool name for display and lookup."""
+    from johnston.core.infrastructure.runtime.tool_name import normalize_tool_name as _f
+    return _f(name)
+
+
+def close_tools() -> None:
+    """Close all registered tool instances (used on app shutdown)."""
+    import asyncio
+
+    from johnston.core.tools.registry import aclose_tools as _aclose_tools
+    asyncio.run(_aclose_tools())
+
+
+def aclose_tools() -> Any:
+    """Core tool registry async close (live lookup)."""
+    from johnston.core.tools.registry import aclose_tools as _f
+    return _f()
+
+
+def format_background_notification(*args: Any, **kwargs: Any) -> Any:
+    """Format a background-task completion notification (core tools base)."""
+    from johnston.core.tools.base import format_background_notification as _f
+    return _f(*args, **kwargs)
+
+
+def is_builtin_tool(name: str) -> bool:
+    """Whether a tool name is registered in the core tool registry."""
+    from johnston.core.tools.registry import REGISTRY as _r
+    return name in _r
+
+
+def load_mcp_servers() -> Any:
+    """Load MCP servers via core MCP manager."""
+    from johnston.core.infrastructure import mcp as mcp_mod
+    return mcp_mod.get_mcp_manager().load_servers()
+
+
+def active_mcp_server_count(servers: list[Any]) -> int:
+    """Number of currently-active MCP servers among servers."""
+    from johnston.core.infrastructure import mcp as mcp_mod
+    try:
+        fn = getattr(mcp_mod.get_mcp_manager(), "active_server_count", None)
+        if callable(fn):
+            return fn(servers) or 0
+    except Exception:
+        pass
+    return 0
+
+
+def mcp_tool_is_known(name: str) -> bool:
+    """Whether a tool name belongs to a known MCP server."""
+    from johnston.core.infrastructure.mcp import mcp_tool_is_known as _f
+    return _f(name)
+
+
+def get_mcp_service(*args: Any, **kwargs: Any) -> Any:
+    """Instantiate core McpService."""
+    from johnston.core.client import McpService as _f
+    return _f(*args, **kwargs)
+
+
+def get_role_registry() -> Any:
+    """Core RoleRegistry class (singleton access via get_instance())."""
+    from johnston.core.application.roles.role_registry import RoleRegistry
+    return RoleRegistry
+
+
+def configure_role_registry(tool_name_normalizer: Any) -> None:
+    """Configure the global RoleRegistry singleton."""
+    from johnston.core.application.roles.role_registry import RoleRegistry
+    RoleRegistry._instance = RoleRegistry(tool_name_normalizer=tool_name_normalizer)
+
+
+def apply_role_to_agent(app: Any, role: Any) -> None:
+    """Apply CLI-selected role to the active agent."""
+    from johnston.core.application.roles.apply import apply_role as _apply_role
+    try:
+        _apply_role(app.agent, role, is_subagent=False)
+        app.role = role
+    except Exception:
+        pass
+
+
+def build_core_services(app: Any) -> None:
+    """Create provider manager, session store, task manager, agent and client facade."""
+    from johnston.core.application.provider.provider_manager import ProviderManager
+    from johnston.core.domain.policies.role_policy import AgentMode
+    from johnston.core.infrastructure.storage.session_store import SessionStore
+    from johnston.core.infrastructure.tasks.manager import TaskManager
+
+    app.pm = ProviderManager()
+    app.sm = SessionStore()
+    app.task_manager = TaskManager()
+    app._subagent_tools = {}
+    app._background_shell_widgets = {}
+    app._foreground_shell_tasks = {}
+    app.agent = app.pm.create_active_agent()
+    app.role = getattr(app.agent, "role", "worker") if app.agent else "worker"
+    if app.agent:
+        app.agent.app = app
+        app.agent.mode = AgentMode.INTERACTIVE
+        app.agent.is_headless = False
+        app.agent.is_subagent = False
+    app.client = JohnstonClient(
+        pm=app.pm,
+        store=app.sm,
+        agent=app.agent,
+        task_manager=app.task_manager,
+        app=app,
+    )
+    app.selection_copy_active = False
+    app.message_queue = []
+    app.is_generating = False
+    app._is_compacting = False
+    app.is_compacting = False
+    app._background_tasks = set()
+
+
+def build_prompt_builder(
+    base_system_prompt: Any,
+    base_tools: Any,
+    *,
+    role: str = "worker",
+    is_subagent: bool = False,
+    subagent_schema: Any = None,
+) -> Any:
+    """Instantiate the core PromptBuilder bound to an agent prompt/tools."""
+    import johnston.core.application.generation.prompt_builder as _m
+    return _m.PromptBuilder(
+        base_system_prompt,
+        base_tools,
+        role=role,
+        is_subagent=is_subagent,
+        subagent_schema=subagent_schema,
+    )
+
+
+def advance_generation_engine(provider_manager: Any, agent: Any) -> Any:
+    """(async) Ensure the active provider is ready for generation (core engine)."""
+    from johnston.core.application.generation.engine import ensure_provider_ready as _f
+    return _f(provider_manager, agent)
+
+
+def get_provider_ready_state() -> Any:
+    """Provider readiness enum from the core generation engine."""
+    from johnston.core.application.generation.engine import ProviderReadyState as _f
+    return _f
+
+
+def stream_step_to_session_event(
+    step: Any, text_accumulator: Any = None, *, from_stream_step: bool = False
+) -> Any:
+    """Canonicalize a raw stream step tuple into a session event (core helper)."""
+    from johnston.core.application.session.stream import stream_step_to_session_event as _f
+    return _f(step, text_accumulator, from_stream_step=from_stream_step)
+
+
+def configure_agent(
+    agent: Any,
+    role_key: str = "worker",
+    *,
+    app: Any = None,
+    project_dir: Any = None,
+    is_subagent: bool = False,
+    worktree_branch: Any = None,
+) -> Any:
+    """Configure the agent role definition (core session stream helper)."""
+    from johnston.core.application.session.stream import configure_agent as _f
+    return _f(
+        agent,
+        role_key,
+        app=app,
+        project_dir=project_dir,
+        is_subagent=is_subagent,
+        worktree_branch=worktree_branch,
+    )
+
+
+def get_provider_actions() -> dict[str, Any]:
+    """Core provider action helpers (models, credentials, thinking effort)."""
+    from johnston.core.application.provider.actions import (
+        fetch_grouped_models,
+        get_current_thinking_effort,
+        select_model,
+        set_provider_credentials,
+        set_thinking_effort,
+    )
+    return dict(
+        fetch_grouped_models=fetch_grouped_models,
+        get_current_thinking_effort=get_current_thinking_effort,
+        select_model=select_model,
+        set_provider_credentials=set_provider_credentials,
+        set_thinking_effort=set_thinking_effort,
+    )
+
+
+def providers_to_dtos(raw: dict[str, Any]) -> list[Any]:
+    """Convert the core load_providers dict shape into render-ready DTOs."""
+    import os
+
+    from johnston.core.dto import ModelInfoDTO, ProviderDTO
+    from johnston.core.infrastructure.platform.paths import provider_models_cache_path
+    from johnston.core.infrastructure.platform.platform_utils import cached_json_read
+
+    dtos: list[ProviderDTO] = []
+    for pkey, pdata in raw.items():
+        if not isinstance(pdata, dict):
+            continue
+        models_raw = pdata.get("models") or []
+        cache_path = str(provider_models_cache_path(str(pkey)))
+        if os.path.exists(cache_path):
+            try:
+                cdata = cached_json_read(cache_path, {})
+                if isinstance(cdata, dict):
+                    c_models = cdata.get("models", [])
+                    if isinstance(c_models, list) and c_models:
+                        models_raw = c_models
+            except Exception:
+                pass
+
+        models = [
+            ModelInfoDTO(
+                name=str(m),
+                display_name=str(m),
+                provider=str(pkey),
+            )
+            for m in models_raw
+        ]
+        enabled = bool(pdata.get("enabled", True))
+        dtos.append(
+            ProviderDTO(
+                name=str(pdata.get("name") or pkey),
+                is_configured=False,
+                models=models,
+                key=str(pdata.get("key") or pkey),
+                is_active=False,
+                is_disabled=not enabled,
+            )
+        )
+    return dtos
+
+
+def get_effort_auto() -> str:
+    """Sentinel value for auto thinking effort."""
+    return EFFORT_AUTO
+
+
+def get_providers() -> list[Any]:
+    """Provider list from core client."""
+    return JohnstonClient().get_providers()
+
+
+def get_gen_engine() -> dict[str, Any]:
+    """Core generation engine module components."""
+    from johnston.core.application.generation.engine import (
+        GenCanvas,
+        NullStreamDriver,
+        _await_pending_git_restore,
+        _create_git_checkpoint_async,
+        _finalize_git_turn_async,
+        _handle_interruption,
+        _SessionSaveDebounce,
+    )
+    return dict(
+        GenCanvas=GenCanvas,
+        NullStreamDriver=NullStreamDriver,
+        _await_pending_git_restore=_await_pending_git_restore,
+        _create_git_checkpoint_async=_create_git_checkpoint_async,
+        _finalize_git_turn_async=_finalize_git_turn_async,
+        _handle_interruption=_handle_interruption,
+        _SessionSaveDebounce=_SessionSaveDebounce,
+    )

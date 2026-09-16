@@ -5,8 +5,8 @@ import asyncio
 import inspect
 from typing import Any
 
+from johnston.core import client as core_bridge
 from johnston.core.dto import COMPACTING_DIVIDER_TITLE
-from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.commands.helpers import (
     WORKER_TEARDOWN_TIMEOUT,
@@ -56,7 +56,7 @@ class NewCommand(BaseCommand):
             await app.task_manager.kill_all()
 
         def cancel_subagents():
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             core_bridge.cancel_running_subagents(app.sm)
 
@@ -281,7 +281,7 @@ def _extract_user_messages(app, session=None) -> list[tuple[int, str]]:
     """Extract list of (idx, text) user messages from session transcript or chat view."""
     user_msgs: list[tuple[int, str]] = []
     if session and getattr(session, "messages", None):
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         for i, m in enumerate(session.messages):
             if isinstance(m, dict) and m.get("type") == core_bridge.get_user_event_type() and core_bridge.is_ui_visible_user_message(m):
@@ -363,7 +363,7 @@ class RewindCommand(BaseCommand):
                         else:
                             cv.rollback_to(target_idx)
                         try:
-                            from johnston.tui.adapters import core_bridge
+                            from johnston.core import client as core_bridge
                             restore_plan_from_messages = core_bridge.get_session_actions()['restore_plan_from_messages']
                             from johnston.tui.presentation.widgets.plan_notch import PlanNotch
 
@@ -434,7 +434,7 @@ class ForkCommand(BaseCommand):
     description = "Fork session from a selected message"
 
     async def execute(self, app) -> None:
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
 
         curr_sid = getattr(app, "current_session_id", None)
         if not curr_sid or not hasattr(app, "sm"):
@@ -609,7 +609,7 @@ class DiffCommand(BaseCommand):
     description = "View workspace diff for files modified in this session"
 
     async def execute(self, app) -> None:
-        from johnston.tui.adapters import core_bridge
+        from johnston.core import client as core_bridge
         S2 = core_bridge.get_session_actions()
         _touched_files, get_session_diff = S2['_touched_files'], S2['get_session_diff']
 

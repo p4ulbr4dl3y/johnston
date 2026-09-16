@@ -41,7 +41,7 @@ class BranchCommand(BaseCommand):
         try:
             import asyncio
 
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             GitWorktreeManagerCls = core_bridge.get_git_worktree_manager()
             if hasattr(GitWorktreeManagerCls, "list_branches_and_worktrees_async"):

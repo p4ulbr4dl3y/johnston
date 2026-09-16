@@ -11,7 +11,7 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from johnston.tui.adapters.core_bridge import JohnstonClient
+from johnston.core.client import JohnstonClient
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList
 from johnston.tui.presentation.screens.confirm import ConfirmScreen

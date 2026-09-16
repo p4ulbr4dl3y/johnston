@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 
 # Module-level aliases used by the sys.modules fallback below; `config` mirrors
 # the chat_input module namespace so runtime-injected overrides keep working.

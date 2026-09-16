@@ -11,6 +11,7 @@ import logging
 import time
 from typing import Any, Callable, Optional
 
+from johnston.core import client as core_bridge
 from johnston.core.dto import (
     COMPACTING_DIVIDER_TITLE,
     CompactionEventDTO,
@@ -23,7 +24,6 @@ from johnston.core.dto import (
     ToolResultDTO,
     TurnCompletedDTO,
 )
-from johnston.tui.adapters import core_bridge
 from johnston.tui.presentation.widgets.chat_stream_driver import ChatStreamDriver
 
 GenCanvas = core_bridge.get_gen_engine()['GenCanvas']

@@ -8,8 +8,8 @@ from textual.containers import Vertical
 from textual.widgets import Input, OptionList
 from textual.widgets.option_list import Option
 
-from johnston.tui.adapters import core_bridge
-from johnston.tui.adapters.core_bridge import JohnstonClient
+from johnston.core import client as core_bridge
+from johnston.core.client import JohnstonClient
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.base_selection import HeaderWrapOptionList, ModalSearchNavMixin
 from johnston.tui.presentation.screens.constants import (
@@ -578,7 +578,7 @@ class SubagentsScreen(BaseTasksListScreen):
             if not role_display:
                 role = getattr(agent, "role", None) if agent else getattr(s, "role", None)
                 if role and isinstance(role, str) and role.strip() and role.strip().lower() not in ("worker", "subagent", "default"):
-                    from johnston.tui.adapters import core_bridge
+                    from johnston.core import client as core_bridge
 
                     role_display = core_bridge.get_role_display_name(role)
             if role_display and isinstance(role_display, str) and role_display.lower() not in ("worker", "subagent", "default"):
@@ -639,7 +639,7 @@ class SubagentsScreen(BaseTasksListScreen):
             app = getattr(self, "_app", None)
         sess = item.get("raw_obj")
         if sess is not None and hasattr(sess, "async_task"):
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             core_bridge.kill_subagent(sess, app)
         elif session_id:

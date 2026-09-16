@@ -80,7 +80,7 @@ async def cancel_active_workers_and_tasks(
 
     if cancel_subagents and getattr(app, "sm", None) is not None:
         try:
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             core_bridge.cancel_running_subagents(app.sm, session_id)
         except Exception:

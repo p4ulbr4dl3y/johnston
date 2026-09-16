@@ -9,7 +9,7 @@ from textual.app import ComposeResult
 from textual.containers import Container
 from textual.widgets import Static
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.widgets.footer_layout import format_hint, get_theme_colors
 from johnston.tui.utils.row_format import display_width, ellipsize
 

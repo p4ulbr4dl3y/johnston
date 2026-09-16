@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, RichLog
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.screens.base_modal import BaseModalScreen
 from johnston.tui.presentation.screens.constants import MODAL_DIALOG_ID, MODAL_HINT_ID
 from johnston.tui.presentation.widgets.chat_toolcall import ToolScrollBox

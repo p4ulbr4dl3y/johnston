@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.commands.base import BaseCommand
 from johnston.tui.presentation.screens.constants import MESSAGE_INPUT
 from johnston.tui.presentation.screens.model import ModelScreen

@@ -1,4 +1,4 @@
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.presentation.screens.base_modal import status_tag
 from johnston.tui.presentation.screens.base_selection import BaseSelectionScreen
 

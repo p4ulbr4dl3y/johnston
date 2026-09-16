@@ -10,7 +10,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from johnston.tui.adapters import core_bridge
+from johnston.core import client as core_bridge
 from johnston.tui.utils.row_format import format_duration
 
 LruCache = core_bridge.LruCache
@@ -281,7 +281,7 @@ def _extract_tool_display_inner(
     result_text: Optional[str] = None,
     status: Optional[str] = None,
 ) -> str:
-    from johnston.tui.adapters import core_bridge
+    from johnston.core import client as core_bridge
     _normalize = core_bridge.normalize_tool_name
 
     name = _normalize(tool_name)
@@ -447,7 +447,7 @@ def _format_active_tool_progress(
     turn_events: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """Format an active tool invocation into a short, human-like activity badge."""
-    from johnston.tui.adapters import core_bridge
+    from johnston.core import client as core_bridge
     _normalize = core_bridge.normalize_tool_name
 
     name = _normalize(tool_name) if tool_name else ""

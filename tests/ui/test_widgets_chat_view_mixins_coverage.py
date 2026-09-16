@@ -432,7 +432,7 @@ def test_get_total_user_message_count():
         {"type": "bot", "text": "not user"},
     ]
     with patch(
-        "johnston.tui.adapters.core_bridge.is_ui_visible_user_message",
+        "johnston.core.client.is_ui_visible_user_message",
         side_effect=lambda m: m.get("type") == "user" and m.get("show_in_ui") is not False,
     ):
         assert p.get_total_user_message_count() == 1

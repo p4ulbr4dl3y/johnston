@@ -28,7 +28,7 @@ def schedule_auto_title(app: Any, session: Any) -> None:
         ):
             return
         try:
-            from johnston.tui.adapters import core_bridge
+            from johnston.core import client as core_bridge
 
             agent = getattr(app, "agent", None)
             title = await core_bridge.auto_title_session(agent, session)
