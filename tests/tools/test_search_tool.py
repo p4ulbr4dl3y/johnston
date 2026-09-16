@@ -579,7 +579,7 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         mock_proc.returncode = 0
         mock_proc.communicate.return_value = ("", "")
 
-        with patch("subprocess.Popen", return_value=mock_proc):
+        with patch("shutil.which", return_value="/usr/bin/rg"), patch("subprocess.Popen", return_value=mock_proc):
             lines, count, files_count = _search_content_ripgrep(
                 target_path=".", pattern="test", cwd="C:\\repo"
             )
@@ -720,7 +720,8 @@ class TestSearchTool(unittest.IsolatedAsyncioTestCase):
         mock_proc.poll.return_value = 0
         mock_proc.wait.return_value = 0
 
-        with mock.patch("subprocess.Popen", return_value=mock_proc):
+        with mock.patch("shutil.which", return_value="/usr/bin/rg"), \
+             mock.patch("subprocess.Popen", return_value=mock_proc):
             res = _search_content_ripgrep(
                 target_path=self.tmpdir,
                 pattern="match",

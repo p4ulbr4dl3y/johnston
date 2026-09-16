@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from johnston.core.infrastructure.platform.sandbox import is_sandbox_supported
 from johnston.core.infrastructure.tasks.manager import TaskManager
 from johnston.core.infrastructure.tasks.shell_task import ShellTask
 from johnston.core.tools.base import resolve_path
@@ -711,6 +712,13 @@ async def test_shell_readonly_windows_mutations_blocked():
         assert _check_read_only_command_mutations("type foo.txt") is None
 
 
+_requires_sandbox = pytest.mark.skipif(
+    not is_sandbox_supported(),
+    reason="OS sandbox backend (sandbox-exec/bwrap) required",
+)
+
+
+@_requires_sandbox
 async def test_shell_readonly_allows_grep_with_commit_word(tool, make_tool_context):
     ctx = make_tool_context(is_subagent=True, sandbox_enabled=True, is_read_only=True)
     res = await tool.execute({"command": "echo 'git commit is good'"}, ctx=ctx)
@@ -722,6 +730,7 @@ async def test_shell_readonly_allows_grep_with_commit_word(tool, make_tool_conte
         assert not res_safe.is_error or "not permitted in read-only role" not in str(res_safe)
 
 
+@_requires_sandbox
 async def test_shell_readonly_allows_devnull_redirects(tool, make_tool_context):
     ctx = make_tool_context(is_subagent=True, sandbox_enabled=True, is_read_only=True)
     for cmd in ("echo hi > /dev/null", "echo hi 2>/dev/null", "echo hi >> /dev/null", "git status 2>/dev/null"):

@@ -853,8 +853,16 @@ class TestProcessClientAsyncRegression(unittest.IsolatedAsyncioTestCase):
         proc.stdin.flush = MagicMock()
         client.process = proc
 
-        # Force infinite wait on future to trigger cancellation
-        with patch.object(client, "_start_async_reader"):
+        # Patch _send_async to block indefinitely so the task is guaranteed to be
+        # awaiting (not mid-synchronous-code) when cancel() is called.  The writer
+        # thread resolves the write-ack on mock stdin so quickly that the real
+        # _send_async completes before the event loop can deliver the CancelledError,
+        # causing the cancellation to be silently swallowed.
+
+        async def _blocking_send(_msg):
+            await asyncio.sleep(3600)
+
+        with patch.object(client, "_start_async_reader"), patch.object(client, "_send_async", _blocking_send):
             task = asyncio.create_task(client.call_tool_async("tool1", {}, timeout=10.0))
             while not client._pending_futures:
                 await asyncio.sleep(0)
