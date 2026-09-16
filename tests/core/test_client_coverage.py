@@ -7,6 +7,7 @@ subagent kill paths and git-state exception handling. All mock-based.
 """
 from __future__ import annotations
 
+import os
 import time
 from types import SimpleNamespace
 from typing import Any, AsyncIterator
@@ -85,7 +86,7 @@ def test_module_level_helpers():
     assert cmod.display_thinking_effort("bogus") == "auto"
     assert cmod.process_carriage_returns("a\rline2\n") == "line2\n"
     assert cmod.strip_ansi("\x1b[31mred\x1b[0m") == "red"
-    assert cmod.is_windows() is False
+    assert cmod.is_windows() is (os.name == "nt")
     assert cmod._parse_rewind_stat_numbers("") == (0, 0, True)
 
     with patch("johnston.core.application.session.facade.kill_subagent", return_value=True) as mkill:

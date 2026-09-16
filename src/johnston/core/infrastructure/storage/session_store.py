@@ -142,6 +142,11 @@ class SessionStore(SessionStorePathsMixin, SessionStoreLocksMixin, SessionStoreC
         self._session_write_state: Dict[str, Dict[str, Any]] = {}
         self.ensure_dirs()
 
+    def close(self) -> None:
+        """Close the SQLite index DB connection. Safe to call multiple times."""
+        if hasattr(self, "index_db") and self.index_db is not None:
+            self.index_db.close()
+
     @classmethod
     def get_instance(cls, project_path: Optional[str] = None) -> "SessionStore":
         if cls._instance is None or project_path is not None:

@@ -123,7 +123,12 @@ def isolate_johnston_env(tmp_path, monkeypatch):
 
     yield
 
-    # Reset singletons after test
+    # Close SQLite connections before resetting singletons (prevents WinError 32)
+    if SessionStore._instance is not None:
+        try:
+            SessionStore._instance.close()
+        except Exception:
+            pass
     SessionStore._instance = None
     PermissionManager._instance = None
     RulesManager._instance = None

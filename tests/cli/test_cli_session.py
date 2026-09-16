@@ -283,7 +283,8 @@ class TestCLISession(unittest.TestCase):
             code = export_session("export-non-serial", format_="md", store=self.mock_store)
 
         self.assertEqual(code, 0)
-        self.assertIn("/test/path", out.getvalue())
+        # Path serialization may use OS-native separators
+        self.assertIn(str(Path("/test/path")), out.getvalue())
 
     def test_export_session_markdown_history_fallback(self):
         sess = AgentSession(

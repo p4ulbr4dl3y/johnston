@@ -284,7 +284,7 @@ class TestToolDisplay(unittest.TestCase):
 
         # Explicit CWD argument test
         fake_cwd = os.path.abspath("/custom/project")
-        self.assertEqual(shorten_path("/custom/project/a/b.py", cwd=fake_cwd), "a/b.py")
+        self.assertEqual(shorten_path(os.path.join(fake_cwd, "a", "b.py"), cwd=fake_cwd), "a/b.py")
 
         # Empty / non-string
         self.assertEqual(shorten_path(""), "")

@@ -46,7 +46,16 @@ def split_archive_path(path: str) -> tuple[str, str] | None:
 
     if ":" in path and "://" not in path:
         parts = path.split(":", 1)
-        if os.path.isfile(parts[0]) and is_archive_file(parts[0]):
+        # Windows drive letter (e.g., "C" from "C:\path\file.zip:inner")
+        if len(parts[0]) == 1 and parts[0].isalpha():
+            rest = parts[1]
+            next_colon = rest.find(":")
+            if next_colon >= 0:
+                archive_candidate = parts[0] + ":" + rest[:next_colon]
+                inner = rest[next_colon + 1:]
+                if os.path.isfile(archive_candidate) and is_archive_file(archive_candidate):
+                    return archive_candidate, inner.strip("/")
+        elif os.path.isfile(parts[0]) and is_archive_file(parts[0]):
             return parts[0], parts[1].strip("/")
 
     curr = path

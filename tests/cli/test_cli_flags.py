@@ -193,6 +193,12 @@ class TestCLIDirectoryAndDebugExecution(unittest.TestCase):
                         main(["-C", tmp_dir])
                     self.assertEqual(cm.exception.code, 0)
                     self.assertEqual(os.path.realpath(os.getcwd()), real_tmp)
+                    # On Windows, normcase handles drive-letter and case differences
+                    if os.name == "nt":
+                        self.assertEqual(
+                            os.path.normcase(os.path.realpath(os.getcwd())),
+                            os.path.normcase(real_tmp),
+                        )
 
     def test_entrypoint_debug_sets_logging_level(self):
         with patch("johnston.tui.app.JohnstonApp.run"):

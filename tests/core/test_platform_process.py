@@ -114,16 +114,17 @@ async def test_spawn_windows_process_cmd():
 @pytest.mark.asyncio
 async def test_spawn_windows_process_fallback():
     with patch("asyncio.create_subprocess_shell", new_callable=AsyncMock) as mock_shell:
-        await spawn_windows_process(
-            command="echo 1",
-            env={"A": "1"},
-            cwd="C:\\test",
-            executable=None,
-        )
-        mock_shell.assert_called_once()
-        args, kwargs = mock_shell.call_args
-        assert args[0] == "echo 1"
-        assert kwargs["cwd"] == "C:\\test"
+        with patch("johnston.core.infrastructure.platform.process.shell_executable", return_value=None):
+            await spawn_windows_process(
+                command="echo 1",
+                env={"A": "1"},
+                cwd="C:\\test",
+                executable=None,
+            )
+            mock_shell.assert_called_once()
+            args, kwargs = mock_shell.call_args
+            assert args[0] == "echo 1"
+            assert kwargs["cwd"] == "C:\\test"
 
 
 def test_check_read_only_command_mutations_policies():
@@ -260,7 +261,7 @@ async def test_terminate_process_tree_posix():
 
     with (
         patch("johnston.core.infrastructure.platform.process.is_windows", return_value=False),
-        patch("os.killpg") as mock_killpg,
+        patch("johnston.core.infrastructure.platform.process.os.killpg") as mock_killpg,
     ):
         await terminate_process_tree(proc, timeout=0.5)
         mock_killpg.assert_called_once()

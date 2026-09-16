@@ -183,6 +183,7 @@ class TestSessionManagerPureReader(unittest.TestCase):
         self.p1.start()
         self.addCleanup(self.p1.stop)
         self.store = _make_store(self.test_dir)
+        self.addCleanup(self.store.close)  # close DB before rmtree (prevents WinError 32)
 
     def test_list_main_sessions_does_not_delete_empty_files(self):
         empty_path = os.path.join(self.store.sessions_dir, "empty.json")

@@ -122,6 +122,7 @@ def test_cache_mixin_standalone(monkeypatch):
         dummy_dict = {}
         cache._load_file(dummy_dict, bad_file)
         assert dummy_dict == {}
+        cache.index_db.close()
 
 
 def test_session_store_integration():
@@ -156,4 +157,5 @@ def test_session_store_integration():
 
         # Delete
         store.delete("s_int")
+        store.close()
         assert store.get("s_int") is None

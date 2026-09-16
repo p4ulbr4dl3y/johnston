@@ -7,6 +7,7 @@ walk filtering that the integration-level suite
 
 import os
 import re
+import sys
 import threading
 from unittest.mock import patch
 
@@ -308,13 +309,13 @@ def test_gitignore_entries_missing_root(tmp_path):
 
 
 def test_gitignore_entries_fingerprint(tmp_path):
-    (tmp_path / ".gitignore").write_text("*.log\n")
+    (tmp_path / ".gitignore").write_bytes(b"*.log\n")
     entries = _gitignore_entries(str(tmp_path))
     assert len(entries) == 1
     path, mtime_ns, size = entries[0]
     assert path == str(tmp_path / ".gitignore")
     assert mtime_ns > 0
-    assert size == len("*.log\n")
+    assert size == len(b"*.log\n")
 
 
 def test_gitignore_entries_empty_root_falls_back(tmp_path):
@@ -362,6 +363,7 @@ def test_walk_filtered_file_target_uses_dirname(tmp_path):
     assert list(_walk_filtered(str(f))) == []
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="os.mkfifo is POSIX-only")
 def test_walk_filtered_hidden_and_special_files(tmp_path):
     (tmp_path / ".hidden").mkdir()
     (tmp_path / ".hidden" / "h.py").write_text("pass\n")
@@ -444,6 +446,7 @@ def test_walk_filtered_hidden_dot_dir_excluded(tmp_path):
     assert names_hidden == {"vars.py", "visible.py"}
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="os.mkfifo is POSIX-only")
 def test_walk_filtered_non_regular_file_skipped(tmp_path):
     """FIFO/socket targets are skipped (line 519)."""
     (tmp_path / "data.py").write_text("pass\n")

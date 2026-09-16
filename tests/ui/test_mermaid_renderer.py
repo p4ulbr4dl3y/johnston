@@ -7,6 +7,7 @@ from textual.widgets import Button
 
 from johnston.tui.presentation.widgets.chat_markdown import CustomMarkdownFence, prewarm_fences_from_markdown
 from johnston.tui.utils.mermaid_renderer import (
+    _get_mermaid_binary,
     _store_cache,
     clean_mermaid_code,
     clear_mermaid_cache,
@@ -16,7 +17,15 @@ from johnston.tui.utils.mermaid_renderer import (
     render_mermaid_to_ascii,
 )
 
+import pytest
 
+_no_mermaid = pytest.mark.skipif(
+    _get_mermaid_binary() is None,
+    reason="mermaid-ascii binary not available",
+)
+
+
+@_no_mermaid
 class TestMermaidRenderer:
     def setup_method(self):
         clear_mermaid_cache()
@@ -167,6 +176,7 @@ graph TD
         assert isinstance(content_themed, Content)
 
 
+@_no_mermaid
 class TestCustomMarkdownFenceMermaid:
     def setup_method(self):
         clear_mermaid_cache()

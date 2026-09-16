@@ -163,7 +163,9 @@ def is_secrets_shell_command(
         except Exception:
             norm_sec_real = norm_sec_abs = os.path.normcase(os.path.expanduser(sec.strip())).lower()
 
-        if norm_sec_real in norm_cmd or norm_sec_abs in norm_cmd:
+        norm_sec_fwd = norm_sec_real.replace("\\", "/")
+        norm_sec_abs_fwd = norm_sec_abs.replace("\\", "/")
+        if norm_sec_fwd in norm_cmd or norm_sec_abs_fwd in norm_cmd:
             return True
 
         sec_dir = os.path.dirname(norm_sec_real)
@@ -184,6 +186,7 @@ def is_secrets_shell_command(
             return True
         try:
             resolved = os.path.normcase(os.path.realpath(os.path.abspath(os.path.expanduser(path_str.strip())))).lower()
+            resolved = resolved.replace("\\", "/")
             if resolved in sec_dirs:
                 return True
             if resolved.endswith("/.johnston") or resolved.endswith("/.config/johnston"):
@@ -203,7 +206,7 @@ def is_secrets_shell_command(
         sub_lower = sub_stripped.lower().replace("\\", "/")
 
         try:
-            tokens = shlex.split(sub_stripped)
+            tokens = shlex.split(sub_stripped.replace("\\", "/"))
         except Exception:
             tokens = sub_stripped.split()
 
