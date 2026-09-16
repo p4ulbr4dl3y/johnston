@@ -359,23 +359,21 @@ class TestLifecycleAndStatusState(unittest.TestCase):
 
         app = DummyApp()
         orig_cwd = os.getcwd()
-        try:
-            with tempfile.TemporaryDirectory() as td:
-                real_td = os.path.realpath(td)
-                app.switch_project_dir(real_td, branch="feat/test-branch")
+        with tempfile.TemporaryDirectory() as td:
+            real_td = os.path.realpath(td)
+            app.switch_project_dir(real_td, branch="feat/test-branch")
 
-                self.assertEqual(app.project_dir, real_td)
-                self.assertEqual(app.agent.project_dir, real_td)
-                self.assertEqual(app.agent.worktree_branch, "feat/test-branch")
-                self.assertTrue(app.refreshed)
-                self.assertEqual(PermissionManager.get_instance().current_project_dir, real_td)
-                # Close connections and reset singletons before temp dir cleanup (prevents WinError 32)
-                from johnston.core.infrastructure.storage.session_store import SessionStore
-                if SessionStore._instance is not None:
-                    SessionStore._instance.close()
-                    SessionStore._instance = None
-                PermissionManager._instance = None
-        finally:
+            self.assertEqual(app.project_dir, real_td)
+            self.assertEqual(app.agent.project_dir, real_td)
+            self.assertEqual(app.agent.worktree_branch, "feat/test-branch")
+            self.assertTrue(app.refreshed)
+            self.assertEqual(PermissionManager.get_instance().current_project_dir, real_td)
+            # Close connections, reset singletons, and restore cwd before temp dir cleanup (prevents WinError 32)
+            from johnston.core.infrastructure.storage.session_store import SessionStore
+            if SessionStore._instance is not None:
+                SessionStore._instance.close()
+                SessionStore._instance = None
+            PermissionManager._instance = None
             os.chdir(orig_cwd)
 
     def test_build_status_kwargs_uses_app_project_dir(self) -> None:
