@@ -877,11 +877,16 @@ class TestChatViewDividerSpacing(unittest.IsolatedAsyncioTestCase):
             await chat_view.load_session(session)
             await pilot.pause(0.1)
 
-            # Trigger pagination
+            # Trigger pagination: first scroll moves near top, second triggers load
             chat_view.scroll_up_page()
             await pilot.pause(0.1)
             chat_view.scroll_up_page()
-            await pilot.pause(0.2)
+
+            # Wait for the pagination worker to finish loading older messages
+            for _ in range(100):
+                await pilot.pause(0.05)
+                if not chat_view._is_loading_older and not chat_view._unloaded_messages:
+                    break
 
             # Verify all mounted widgets have visible styles restored
             for child in chat_view.children:
