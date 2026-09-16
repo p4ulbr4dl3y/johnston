@@ -49,7 +49,12 @@ class TestChatInputUnit(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         self.patcher.stop()
-        self.tmp_dir.cleanup()
+        try:
+            self.tmp_dir.cleanup()
+        except OSError:
+            # Async save task may still be writing prompt_history.json
+            import shutil
+            shutil.rmtree(self.tmp_dir.name, ignore_errors=True)
 
     async def test_on_mount_and_update_height(self):
         ci = ChatInput()

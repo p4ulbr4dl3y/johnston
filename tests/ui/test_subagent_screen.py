@@ -544,11 +544,14 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
 
         # First visit: notch has no items, screen closes
         async with app.run_test() as pilot:
-            await pilot.pause(0.2)
-            notch = screen.query_one(PlanNotch)
+            for _ in range(20):
+                notch = screen.query_one(PlanNotch)
+                if not notch.display:
+                    break
+                await pilot.pause(0.05)
             self.assertFalse(notch.display)
             screen.action_close()
-            await pilot.pause(0.1)
+            await pilot.pause(0.05)
 
         # Ensure empty notch did NOT save display=False poison
         self.assertNotIn("task-reopen-plan", getattr(app, "_subagent_plan_state", {}))
@@ -569,8 +572,11 @@ class TestSubagentViewScreenPilot(unittest.IsolatedAsyncioTestCase):
         app2._subagent_plan_state = dict(getattr(app, "_subagent_plan_state", {}))
 
         async with app2.run_test() as pilot:
-            await pilot.pause(0.2)
-            notch2 = screen2.query_one(PlanNotch)
+            for _ in range(20):
+                notch2 = screen2.query_one(PlanNotch)
+                if notch2.display:
+                    break
+                await pilot.pause(0.05)
             self.assertTrue(notch2.display)
             self.assertEqual(len(notch2.plan_items), 1)
             self.assertEqual(notch2.plan_items[0]["step"], "Created later")
