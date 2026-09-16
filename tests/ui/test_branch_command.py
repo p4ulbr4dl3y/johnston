@@ -369,10 +369,12 @@ class TestLifecycleAndStatusState(unittest.TestCase):
                 self.assertEqual(app.agent.worktree_branch, "feat/test-branch")
                 self.assertTrue(app.refreshed)
                 self.assertEqual(PermissionManager.get_instance().current_project_dir, real_td)
-                # Close SQLite connections before temp dir cleanup (prevents WinError 32)
+                # Close connections and reset singletons before temp dir cleanup (prevents WinError 32)
                 from johnston.core.infrastructure.storage.session_store import SessionStore
                 if SessionStore._instance is not None:
                     SessionStore._instance.close()
+                    SessionStore._instance = None
+                PermissionManager._instance = None
         finally:
             os.chdir(orig_cwd)
 

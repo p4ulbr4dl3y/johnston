@@ -199,6 +199,13 @@ class TestCLIDirectoryAndDebugExecution(unittest.TestCase):
                             os.path.normcase(os.path.realpath(os.getcwd())),
                             os.path.normcase(real_tmp),
                         )
+                    # Close SQLite connections before temp dir cleanup (prevents WinError 32)
+                    from johnston.core.infrastructure.storage.session_store import SessionStore
+                    if SessionStore._instance is not None:
+                        SessionStore._instance.close()
+                        SessionStore._instance = None
+                    from johnston.core.application.permission.permission_manager import PermissionManager
+                    PermissionManager._instance = None
 
     def test_entrypoint_debug_sets_logging_level(self):
         with patch("johnston.tui.app.JohnstonApp.run"):

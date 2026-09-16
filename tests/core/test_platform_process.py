@@ -1,3 +1,4 @@
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -250,6 +251,7 @@ async def test_terminate_process_tree_windows():
         assert "1234" in args
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="os.killpg is POSIX-only")
 @pytest.mark.asyncio
 async def test_terminate_process_tree_posix():
     from johnston.core.infrastructure.platform.process import terminate_process_tree

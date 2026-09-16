@@ -19,8 +19,8 @@ from johnston.tui.utils.mermaid_renderer import (
 )
 
 _no_mermaid = pytest.mark.skipif(
-    _get_mermaid_binary() is None,
-    reason="mermaid-ascii binary not available",
+    _get_mermaid_binary() is None or render_mermaid_to_ascii("graph TD\n    A-->B") is None,
+    reason="mermaid-ascii binary not available or not working",
 )
 
 
