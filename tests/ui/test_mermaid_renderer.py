@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, PropertyMock, patch
 
+import pytest
 from rich.text import Text
 from textual._context import active_app
 from textual.content import Content
@@ -16,8 +17,6 @@ from johnston.tui.utils.mermaid_renderer import (
     prewarm_mermaid,
     render_mermaid_to_ascii,
 )
-
-import pytest
 
 _no_mermaid = pytest.mark.skipif(
     _get_mermaid_binary() is None,
